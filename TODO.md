@@ -584,9 +584,35 @@ Constraints: **paths before moves, moves before content, data before code.**
   Found while measuring: the test's search had to be made non-recursive, because
   the Hotstrings submenu carries its own hardcoded-French `"Recharger les
   hotstrings"` entry that a recursive match finds first — the first cut passed
-  against the wrong item. That label is one of the 101 tracked in Lot 5(3). One `npm run gen` regenerating everything
-  deterministically in a single Node process, plus `npm run gen:check` writing to a
-  temp dir and diffing — which also fixes by construction the fact that
+  against the wrong item. That label is one of the 101 tracked in Lot 5(3). ~~One `npm run gen` regenerating everything
+  deterministically in a single Node process, plus `npm run gen:check`~~ —
+  **done**, with one deviation from the plan and a measured reason for it.
+  `gen:check` does **not** write to a temp dir: no generator accepts an
+  output-dir override (`build-features-manifest.js` writes hardcoded paths, and
+  so do the other eleven), so a temp-dir check would mean adding a parameter to
+  twelve scripts to gain nothing snapshot-restore already gives. Instead
+  `tools/build/generators.cjs` is a registry — **12 generators, 20 distinct
+  outputs, each generator declaring the files it writes** — read by both
+  `npm run gen` and the no-drift gate, so "what gets regenerated" and "what gets
+  checked" cannot disagree.
+  **The measurement that forced the registry:** the drift gate had just been
+  fixed from a hand-written 2-file list to a scan of the three `_generated/`
+  trees. That is still a guess, and wrong for generators writing outside them —
+  `build-domain.cjs` writes twelve files, two of them
+  (`_shared/lua/keymap/terminators_catalogue.lua`,
+  `_shared/modules/menu/menu_manifest.json`) nowhere near a `_generated/` folder,
+  and `gen-architecture-diagram.cjs` writes `docs/architecture.md`. Adding those
+  generators to a directory-scoped gate would have silently overwritten those
+  three in the working tree and never restored them — the identical bug, one
+  layer up. Verified after the fix: editing `terminators_catalogue.lua` makes the
+  gate go red **and leaves the edit in place**.
+  Also worth knowing: `npm run codegen` was only ever `build:domain`, which
+  covers most generators but not the metrics category aliases, the port
+  contracts, the logger sub-file tables, the locale tables or the architecture
+  diagram — so someone running the documented command and committing would still
+  ship a stale file. `gen-all.cjs` additionally fails when a declared output does
+  not exist after a full run, so the registry cannot quietly fall behind reality.
+  This also fixed by construction the fact that
   ~~`test-features-manifest-no-drift.cjs` **silently rewrites three files it does not
   guard**~~ — **fixed**, and the real count was **four of six**, not three of five:
   the generator writes a features manifest AND a `config_template.toml` for each
