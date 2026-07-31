@@ -559,6 +559,14 @@ function findUnflooredScans(file, src, ext) {
 		// variable finds nothing. Any size assertion in the file is therefore taken
 		// as the floor: a file that asserts a scan result is non-empty anywhere is
 		// not the shape this pattern is about.
+		// A size floor anywhere in the same block counts, whatever it is on. A scan
+		// over a file list is floored by `#files > 0` — no files, nothing scanned —
+		// even though the collector the loop fills is `offenders`. A block that
+		// asserts some collection is non-empty has thought about vacuity.
+		if (!floored && /(?:Assert\w*|assert_\w+)\s*\([^\n]*(?:#\s*\w+|\.\s*(?:Length|Count))\s*(?:>|>=|~=|!=)\s*0/.test(block.text)) {
+			floored = true;
+		}
+
 		// The caller's floor is just as often a plain counter it increments while
 		// iterating (`Checked >= 11`) as a size read on the list, so both count.
 		if (!floored && collectors.size > 0 && !ASSERT.test(block.text)) {

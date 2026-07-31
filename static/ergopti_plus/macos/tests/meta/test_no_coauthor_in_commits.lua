@@ -45,6 +45,12 @@ helpers.describe("meta: no Co-Authored-By trailers in new commits", function()
 			return
 		end
 		local body = pipe:read("*a") or "" ; pipe:close()
+		-- This check passes when it finds no trailer, so an empty read is
+		-- indistinguishable from a clean history. Assert git actually returned
+		-- something before concluding anything about what is in it.
+		helpers.assert_true(#body > 0,
+			"git returned no commit text at all — the scan below would report a clean "
+			.. "history because it read nothing, not because the history is clean")
 		-- Strip lines that merely document or test the rule (meta-references).
 		local cleaned = body
 		for line in body:gmatch("[^\n]+") do
