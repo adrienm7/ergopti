@@ -492,12 +492,22 @@ The gate is delivered: `tools/test/find-false-greens.cjs` runs inside
 `npm run test:js` and ratchets five classes — tautology, vacuous-absence,
 dead-test, pcall-only, and `corpus-skip` (added 2026-07-31). It only turns down.
 
-**549 → 503 so far.** `dead-test` is at **0**: the two placeholders spliced into
+**549 → 479 so far.** `dead-test` is at **0**: the two placeholders spliced into
 the body of `_DE_Add()` are gone, and the two Linux skips with empty bodies now
-assert the reason they skipped for. `tautology` is 153 → 119, from five files —
-`test_domain_expander.ahk`, `test_adapter_compliance_new.ahk`,
-`test_hotstrings_full.ahk`, macOS `test_aggregator.lua`, Linux
-`test_keylogger.lua`.
+assert the reason they skipped for. `tautology` is 153 → 95.
+
+**The biggest thing the pass found is not counted by the ratchet at all.** Four
+corpus consumers were replaying only their LAST vector. AHK v2 closures capture
+by reference, and the `VecCopy := Vec` idiom — commented "capture loop variables
+for the closure" — freezes nothing: one slot, shared by every closure, all
+reading the final value after the loop ends. Measured: dropping a keystroke from
+the first of 13 aggregation vectors produced 13 green tests. And because those
+runners dispatch on `Vec["id"]`, twelve of the thirteen took no branch and
+asserted nothing. `test_corpus_prompt_builder.ahk` had already hit this and
+documented the fix in a comment; nothing enforced it, so three more files were
+written the same way afterwards. `test-ahk-loop-capture.cjs` now enforces it at
+0, and PROJECT_MEMORY carries the trap as
+`project_ahk_loop_capture_copy_freezes_nothing`.
 
 The method that worked, in case it helps the next pass:
 
@@ -514,7 +524,14 @@ The method that worked, in case it helps the next pass:
    production code it covers — dropping `I1`, removing a suspend guard, making
    `on_keydown` return immediately (14 tests red, previously 0).
 
-What is left: 119 tautologies, thinly spread, and the 367 `pcall-only` sites —
+A fifth step earned its place after the corpus find:
+
+5. **Ask what the test would do if the code were absent.** A per-item loop whose
+   items all assert the same value cannot tell a correct binding from a broken
+   one; a runner that dispatches on an id asserts nothing for an id it does not
+   handle. Both look like coverage in the count.
+
+What is left: 95 tautologies, thinly spread, and the 367 `pcall-only` sites —
 the largest class and the one lot 9 has a plan for.
 
 
