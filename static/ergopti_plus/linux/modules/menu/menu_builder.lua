@@ -762,13 +762,31 @@ local function _build_about(_ctx)
 end
 
 --- Builds the reload item.
-local function _build_reload(_ctx)
+---
+--- This used to run `kill -HUP $$` through os.execute. Two things were wrong
+--- with that, and together they made the item a no-op that logged success:
+--- `os.getpid` does not exist in Lua, so the expression always fell through to
+--- the literal `"$$"`; and os.execute runs its string in a NEW /bin/sh, where
+--- `$$` is that shell's own PID. The daemon therefore told a throwaway shell to
+--- reload, and the shell obligingly killed itself.
+---
+--- The daemon owns the reload; the menu asks it to, exactly as the quit item
+--- asks via on_quit. No signal, no subprocess, no PID to get wrong.
+local function _build_reload(ctx)
 	return {
 		title = i18n_safe("menu.global.reload"),
 		fn = function()
-			Logger.info(LOG, "Reload requested — sending SIGHUP.")
-			-- SIGHUP triggers on_sighup_reload in the daemon (if posix.signal is available).
-			os.execute("kill -HUP " .. tostring(os.getpid and os.getpid() or "$$") .. " 2>/dev/null")
+			if type(ctx.on_reload) ~= "function" then
+				-- Loudly, not silently: a Reload item that cannot reload is the
+				-- exact failure this replaced.
+				Logger.error(LOG, "Reload requested but ctx.on_reload is absent — the menu cannot reload the daemon.")
+				return
+			end
+			Logger.info(LOG, "Reload requested from the tray menu…")
+			local ok, err = pcall(ctx.on_reload)
+			if not ok then
+				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
+			end
 		end,
 	}
 end
