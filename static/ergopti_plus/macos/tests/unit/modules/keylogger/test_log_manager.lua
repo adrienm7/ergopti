@@ -151,58 +151,106 @@ end)
 -- ==============================================
 
 helpers.describe("log_manager — pre-init guards", function()
-	-- Fresh module so _state is nil.
+	-- A rotation spy, installed BEFORE the module is loaded so log_manager's
+	-- upvalue points at it. "Safe no-op" used to be asserted as "did not throw",
+	-- which is the weaker half of the claim: the point of the pre-init guard is
+	-- that nothing is WRITTEN, and an unguarded delegate that happened not to throw
+	-- would still append an early-boot event to today.log with no state behind it.
+	local writes = { append = 0 }
+	local real_rotation = require("modules.keylogger.rotation")
+	-- A PROXY over the real module, not a replacement: every other function keeps
+	-- its real behaviour, so this block cannot pass because a hand-written stub
+	-- happened to be missing whatever the code under test calls next.
+	local spy_rotation = setmetatable({
+		append_log = function(entry)
+			writes.append = writes.append + 1
+			return real_rotation.append_log(entry)
+		end,
+	}, { __index = real_rotation })
+	package.loaded["modules.keylogger.rotation"] = spy_rotation
+
+	-- Fresh module so _state is nil, and so its Rotation upvalue is the proxy.
+	package.loaded["modules.keylogger.log_manager"] = nil
 	local fresh = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
 
-	helpers.it("flush_buffer is a safe no-op before init (logs DEBUG)", function()
-		local ok = pcall(function() fresh.flush_buffer() end)
-		helpers.assert_true(ok)
+	helpers.it("flush_buffer writes nothing before init", function()
+		writes.append = 0
+		fresh.flush_buffer()
+		helpers.assert_eq(writes.append, 0,
+			"flush_buffer must append nothing before init — an early-boot flush with no state "
+			.. "behind it writes a typing event describing nobody's typing")
 	end)
 
 	helpers.it("log_app_switch is a safe no-op before init (logs DEBUG)", function()
-		local ok = pcall(function() fresh.log_app_switch("A", "B", 1000) end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.log_app_switch("A", "B", 1000)
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("tag_awake_focus is a safe no-op before init (regression test)", function()
-		local ok = pcall(function() fresh.tag_awake_focus("Test", 500) end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.tag_awake_focus("Test", 500)
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("log_passive_period is a safe no-op before init (regression test)", function()
-		local ok = pcall(function() fresh.log_passive_period("awake", 200) end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.log_passive_period("awake", 200)
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("log_shortcut is a safe no-op before init", function()
-		local ok = pcall(function() fresh.log_shortcut("cmd+c", "Finder") end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.log_shortcut("cmd+c", "Finder")
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("log_system_event is a safe no-op before init", function()
-		local ok = pcall(function() fresh.log_system_event("wifi_change", {}) end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.log_system_event("wifi_change", {})
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("log_passive_period is a safe no-op before init", function()
-		local ok = pcall(function() fresh.log_passive_period("idle", 60000) end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.log_passive_period("idle", 60000)
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
 	helpers.it("day_rollover is a safe no-op before init", function()
-		local ok = pcall(function() fresh.day_rollover() end)
-		helpers.assert_true(ok)
+		writes.append = 0
+		fresh.day_rollover()
+		helpers.assert_eq(writes.append, 0,
+			"a pre-init delegate must write nothing at all")
 	end)
 
-	helpers.it("pause must gate every log_* delegate and flush_buffer (project_suspend_pause_invariant)", function()
-		-- log_manager is the orchestrator; when script_control.is_paused or A_IsSuspended, all appends/flushes must early-return with zero side effects (no rotation writes, no agg, no privacy leak).
-		helpers.assert_true(true, "log_manager must produce zero output under pause; hooks must gate before calling")
+	-- The uninitialised state IS the silence mechanism: the hooks stop calling and
+	-- the module has no state to write from. 200 pre-init calls must therefore
+	-- produce 200 no-ops, not a slow accumulation that flushes on the first real
+	-- init — which is how a paused period would leak into the log afterwards.
+	helpers.it("200 pre-init calls write nothing and leave nothing buffered", function()
+		writes.append = 0
+		for i = 1, 200 do
+			fresh.log_shortcut("cmd+" .. i, "Finder")
+			fresh.log_passive_period("awake", i)
+		end
+		fresh.flush_buffer()
+		helpers.assert_eq(writes.append, 0,
+			"400 pre-init calls followed by a flush must still write nothing — anything buffered "
+			.. "here would land in the log the moment the module is initialised")
 	end)
 
-	helpers.it("high volume flush_buffer (WPM formula) must stay accurate and not leak under stress + pause transitions", function()
-		-- 200+ events, pause mid-stream, resume: WPM and buffers must be correct, no PII from paused period.
-		helpers.assert_true(true)
-	end)
+	-- Release the proxy and the pre-init module instance so later describes in this
+	-- file (and later files) get the real rotation and a clean log_manager. Test
+	-- discovery order must never decide what the module under test is wired to.
+	package.loaded["modules.keylogger.rotation"] = real_rotation
+	package.loaded["modules.keylogger.log_manager"] = nil
 
 	helpers.it("diagnostic (healthcheck) must see accurate logs paths (incl. errors sink) + day_rollover status under pause + volume", function()
 		-- Even when paused, healthcheck must be able to report unified + errors_today paths and last rollover
