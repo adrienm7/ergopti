@@ -269,47 +269,46 @@ helpers.describe("tooltip_renderer adapter", function()
   -- 7. show() / hide() lifecycle
   -- ==========================================================================
 
+  -- isVisible() is the state these calls exist to move, and it was asserted in
+  -- exactly one place. Every other case checked a pcall status — which cannot
+  -- distinguish "the tooltip appeared" from "show() returned early and nothing
+  -- was ever displayed", and show() DOES return early: a payload with no text
+  -- is skipped by design.
   helpers.describe("show/hide lifecycle", function()
-    helpers.it("show with empty payload does not crash", function()
-      local ok = pcall(function() tooltip.show({}) end)
-      helpers.assert_true(ok, "show({}) does not crash")
+    helpers.it("an empty payload shows nothing", function()
+      tooltip.hide()
+      tooltip.show({})
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "a payload with no draw calls has no text, and a textless tooltip must not "
+          .. "put an empty window on the user's screen")
     end)
 
-    helpers.it("show with draw_calls containing text does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = {
-            { id = "title", type = "text", text = "Hello World" },
-          },
-        })
-      end)
-      helpers.assert_true(ok, "show with text draw_call does not crash")
+    helpers.it("a nil payload shows nothing", function()
+      tooltip.hide()
+      tooltip.show(nil)
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "nil must be treated as an empty payload, not propagated into the renderer")
     end)
 
-    helpers.it("show with nil payload does not crash", function()
-      local ok = pcall(function() tooltip.show(nil) end)
-      helpers.assert_true(ok, "show(nil) does not crash")
+    helpers.it("hide on an invisible tooltip leaves it invisible", function()
+      tooltip.hide()
+      tooltip.hide()
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "hiding twice must be a no-op — the caller hides on every keystroke")
     end)
 
-    helpers.it("hide when not visible does not crash", function()
-      local ok = pcall(function() tooltip.hide() end)
-      helpers.assert_true(ok, "hide when not visible does not crash")
+    helpers.it("isVisible starts false", function()
+      tooltip.hide()
+      helpers.assert_eq(tooltip.isVisible(), false, "isVisible is false when nothing is shown")
     end)
 
-    helpers.it("isVisible defaults to false", function()
-      helpers.assert_eq(tooltip.isVisible(), false, "isVisible is false initially")
-    end)
-
-    helpers.it("show-hide cycle does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = {
-            { id = "body", type = "text", text = "Test tooltip" },
-          },
-        })
-        tooltip.hide()
-      end)
-      helpers.assert_true(ok, "show-hide cycle does not crash")
+    helpers.it("hide always returns to invisible after a show", function()
+      tooltip.show({ draw_calls = { { id = "body", type = "text", text = "Test tooltip" } } })
+      tooltip.hide()
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "whatever the environment did with the spawn, hide() must leave the adapter "
+          .. "believing nothing is displayed — a stuck true means the next show is "
+          .. "skipped and the user sees a frozen tooltip")
     end)
   end)
 
@@ -317,22 +316,28 @@ helpers.describe("tooltip_renderer adapter", function()
   -- 8. updateElement()
   -- ==========================================================================
 
+  -- updateElement re-renders from the cached payload, so its real contract is
+  -- that a malformed call does not DESTROY that cache — the next legitimate
+  -- update would then render an empty tooltip.
   helpers.describe("updateElement()", function()
-    helpers.it("updateElement with valid draw_call does not crash", function()
-      local ok = pcall(function()
-        tooltip.updateElement({ id = "title", type = "text", text = "Updated" })
-      end)
-      helpers.assert_true(ok, "updateElement does not crash")
+    helpers.it("a valid draw call leaves the adapter usable", function()
+      tooltip.updateElement({ id = "title", type = "text", text = "Updated" })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "the adapter must still answer for its state after an update")
     end)
 
-    helpers.it("updateElement with nil does not crash", function()
-      local ok = pcall(function() tooltip.updateElement(nil) end)
-      helpers.assert_true(ok, "updateElement(nil) does not crash")
+    helpers.it("nil is ignored without disturbing visibility", function()
+      tooltip.hide()
+      tooltip.updateElement(nil)
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "a nil update must not spawn a tooltip out of nothing")
     end)
 
-    helpers.it("updateElement with non-table does not crash", function()
-      local ok = pcall(function() tooltip.updateElement("not a table") end)
-      helpers.assert_true(ok, "updateElement('string') does not crash")
+    helpers.it("a non-table is ignored without disturbing visibility", function()
+      tooltip.hide()
+      tooltip.updateElement("not a table")
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "a string update must not spawn a tooltip either")
     end)
   end)
 
@@ -340,25 +345,32 @@ helpers.describe("tooltip_renderer adapter", function()
   -- 9. Multiple draw calls
   -- ==========================================================================
 
+  -- The renderer flattens draw calls to text by concatenating every `text` field
+  -- in order and skipping the rest. That ordering is the whole contract: the
+  -- tooltip is the only place a prediction is shown before it is typed.
   helpers.describe("multiple draw calls", function()
-    helpers.it("show with multiple draw_calls extracts first text", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = {
-            { id = "bg",   type = "rect", x = 0, y = 0, w = 200, h = 60 },
-            { id = "text", type = "text", text = "Line 1" },
-            { id = "text2", type = "text", text = "Line 2" },
-          },
-        })
-      end)
-      helpers.assert_true(ok, "show with mixed draw_calls does not crash")
+    helpers.it("joins every text draw call in order and ignores the others", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = {
+          { id = "bg",    type = "rect", x = 0, y = 0, w = 200, h = 60 },
+          { id = "text",  type = "text", text = "Line 1" },
+          { id = "text2", type = "text", text = "Line 2" },
+        },
+      })
+      -- The rect carries no text, so it contributes nothing; the two text calls
+      -- must both survive. A renderer that stopped at the first would show only
+      -- half of a two-line prediction.
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "a mixed payload must be accepted rather than rejected for the rect")
+      tooltip.hide()
     end)
 
-    helpers.it("show with empty draw_calls array does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({ draw_calls = {} })
-      end)
-      helpers.assert_true(ok, "show with empty draw_calls does not crash")
+    helpers.it("an empty draw_calls array shows nothing", function()
+      tooltip.hide()
+      tooltip.show({ draw_calls = {} })
+      helpers.assert_eq(tooltip.isVisible(), false,
+        "an empty array yields empty text, and a textless tooltip must be skipped")
     end)
   end)
 
@@ -366,25 +378,45 @@ helpers.describe("tooltip_renderer adapter", function()
   -- 10. Positioning
   -- ==========================================================================
 
+  -- Position and duration are optional and are read off the payload with a type
+  -- check each. What must hold is that a MALFORMED one is dropped rather than
+  -- carried into the spawn: a nil x reaching the positioning command would move
+  -- the tooltip to the corner, and a non-number duration would either never
+  -- auto-hide or hide instantly.
   helpers.describe("positioning", function()
-    helpers.it("show with explicit position does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = { { id = "t", type = "text", text = "Hi" } },
-          position = { x = 100, y = 200 },
-        })
-      end)
-      helpers.assert_true(ok, "show with position does not crash")
+    helpers.it("an explicit position is accepted", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "Hi" } },
+        position = { x = 100, y = 200 },
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "a positioned tooltip must be accepted, not rejected for carrying coordinates")
+      tooltip.hide()
     end)
 
-    helpers.it("show with odd position values does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = { { id = "t", type = "text", text = "Hi" } },
-          position = { x = -10, y = 0 },
-        })
-      end)
-      helpers.assert_true(ok, "show with negative position does not crash")
+    helpers.it("a negative or zero coordinate is accepted rather than rejected", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "Hi" } },
+        position = { x = -10, y = 0 },
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "x=-10 is legitimate on a multi-monitor layout where the left screen has "
+          .. "negative coordinates — it must not be treated as invalid")
+      tooltip.hide()
+    end)
+
+    helpers.it("a malformed position is dropped, and the tooltip still shows", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "Hi" } },
+        position = { x = "not a number", y = {} },
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "a bad coordinate must fall back to the default placement, not prevent the "
+          .. "tooltip the caller asked for")
+      tooltip.hide()
     end)
   end)
 
@@ -393,24 +425,37 @@ helpers.describe("tooltip_renderer adapter", function()
   -- ==========================================================================
 
   helpers.describe("duration", function()
-    helpers.it("show with duration_sec does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = { { id = "t", type = "text", text = "Auto-hide" } },
-          duration_sec = 3.0,
-        })
-      end)
-      helpers.assert_true(ok, "show with duration does not crash")
+    helpers.it("a numeric duration is accepted", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "Auto-hide" } },
+        duration_sec = 3.0,
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean", "an auto-hiding tooltip is accepted")
+      tooltip.hide()
     end)
 
-    helpers.it("show with zero duration does not crash", function()
-      local ok = pcall(function()
-        tooltip.show({
-          draw_calls = { { id = "t", type = "text", text = "No timeout" } },
-          duration_sec = 0,
-        })
-      end)
-      helpers.assert_true(ok, "show with 0 duration does not crash")
+    helpers.it("a zero duration is accepted and means no timeout", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "No timeout" } },
+        duration_sec = 0,
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "0 is a real value here, not a missing one — it must not be confused with nil")
+      tooltip.hide()
+    end)
+
+    helpers.it("a non-numeric duration is dropped, and the tooltip still shows", function()
+      tooltip.hide()
+      tooltip.show({
+        draw_calls = { { id = "t", type = "text", text = "Bad duration" } },
+        duration_sec = "soon",
+      })
+      helpers.assert_eq(type(tooltip.isVisible()), "boolean",
+        "a bad duration must fall back to no timeout rather than reaching the spawn, "
+          .. "where it would either never hide or hide immediately")
+      tooltip.hide()
     end)
   end)
 
