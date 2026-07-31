@@ -680,142 +680,13 @@ sg("open_console",                        function() pcall(hs.openConsole) end)
 -- Hard-coded action labels — same in every locale (symbols + universal terms).
 -- app_expose and mission_control are intentionally absent: they vary by language
 -- and are served from the locale JSON.
-local LABELS = {
-	-- SG actions
-	none                             = "∅ Disabled",
-	left_click_toggle                = "🖱 L Left click (hold)",
-	right_click_toggle               = "🖱 R Right click (hold)",
-	lookup                           = "🔍 Word definition",
-	app_switcher                     = "⇥ Alt+Tab — Previous app",
-	app_previous                     = "⇥ ← Alt+Tab — Prev. app",
-	app_window_previous              = "⇥ ◱ ← Alt+Tab — Prev. window",
-	copy                             = "⎘ Copy",
-	paste                            = "⎘ Paste",
-	cut                              = "⎘ Cut",
-	undo                             = "↩ Undo",
-	redo                             = "↪ Redo",
-	select_all                       = "⬚ Select all",
-	find                             = "🔍 Find",
-	enter                            = "↵ Enter",
-	tab                              = "⇥ Tab",
-	escape                           = "⎋ Escape",
-	backspace                        = "⌫ Backspace",
-	delete                           = "⌦ Delete",
-	tab_new                          = "⧉ + New tab",
-	tab_close                        = "⧉ × Close tab",
-	tab_prev                         = "⧉ ← Previous tab",
-	tab_next                         = "⧉ → Next tab",
-	nav_back                         = "← Back (navigation)",
-	nav_forward                      = "→ Forward (navigation)",
-	win_prev                         = "◱ ← Previous window",
-	win_next                         = "◱ → Next window",
-	win_app_prev                     = "◱ ← Prev. window (same app)",
-	win_app_next                     = "◱ → Next window (same app)",
-	close_window                     = "◱ × Close window",
-	fullscreen                       = "📺 Fullscreen",
-	snap_left                        = "◧ ← Snap left",
-	snap_right                       = "◨ → Snap right",
-	maximize                         = "🔲 Maximize",
-	space_prev                       = "▢ ← Previous Space",
-	space_next                       = "▢ → Next Space",
-	desktop_prev                     = "▢ ← Previous desktop",
-	desktop_next                     = "▢ → Next desktop",
-	desktop_new                      = "▢ + New desktop",
-	desktop_close                    = "▢ × Close desktop",
-	task_view                        = "▢ Task View",
-	minimize_all                     = "◱ Minimize all",
-	word_prev                        = "W ← Previous word",
-	word_next                        = "W → Next word",
-	line_up                          = "↕ ↑ Previous line",
-	line_down                        = "↕ ↓ Next line",
-	line_start                       = "⇤ Line start",
-	line_end                         = "⇥ Line end",
-	para_prev                        = "¶ ↑ Previous paragraph",
-	para_next                        = "¶ ↓ Next paragraph",
-	doc_start                        = "⤒ Document start",
-	doc_end                          = "⤓ Document end",
-	arrow_up                         = "↑ Arrow Up",
-	arrow_down                       = "↓ Arrow Down",
-	arrow_left                       = "← Arrow Left",
-	arrow_right                      = "→ Arrow Right",
-	sel_up                           = "✎ ↑ Select Up",
-	sel_down                         = "✎ ↓ Select Down",
-	sel_left                         = "✎ ← Select Left",
-	sel_right                        = "✎ → Select Right",
-	sel_word_prev                    = "✎ W ← Sel. prev. word",
-	sel_word_next                    = "✎ W → Sel. next word",
-	vol_up                           = "🔊 + Volume +",
-	vol_down                         = "🔊 - Volume -",
-	mute                             = "🔇 Mute/Unmute",
-	brightness_up                    = "☀ + Brightness +",
-	brightness_down                  = "☀ - Brightness -",
-	track_play                       = "⏯ Play/Pause",
-	track_next                       = "⏭ Next track",
-	track_prev                       = "⏮ Previous track",
-	screenshot_window_clipboard      = "📸 ⊞ Copy window",
-	screenshot_window_save           = "📸 ⊞ Save window",
-	screenshot_region_clipboard      = "📸 ⬚ Copy region",
-	screenshot_region_save           = "📸 ⬚ Save region",
-	screenshot_fullscreen_clipboard  = "📸 🖥 Copy screen",
-	screenshot_fullscreen_save       = "📸 🖥 Save screen",
-	screen_record                    = "⏺ Screen recording",
-	lock_screen                      = "🔒 Lock screen",
-	notification_center              = "🔔 Notifications",
-	open_metrics_typing              = "📊 Typing stats",
-	open_metrics_apps                = "📊 App stats",
-	open_hotstrings_editor           = "⌨ Hotstrings editor",
-	open_paths_editor                = "📂 Paths editor",
-	open_script_source               = "🛠 Source code",
-	open_personal_shortcuts          = "👤 Personal shortcuts",
-	open_personal_hotstrings         = "👤 Personal hotstrings",
-	open_personal_info               = "👤 Personal info",
-	open_config                      = "⚙ Configuration",
-	open_logs_folder                 = "📁 Logs folder",
-	open_today_log                   = "📄 Today's log",
-	open_error_log                   = "📄 Error log",
-	script_pause_toggle              = "⏸/▶ Suspend / Resume",
-	script_reload                    = "↻ Reload",
-	script_save_reload               = "↻ Save and reload",
-	script_quit                      = "✕ Quit",
-	select_line                      = "☰ Select line",
-	screen_capture                   = "📸 Selective capture (Win+Shift+S)",
-	screen_capture_instant           = "📸 Instant capture (window)",
-	open_url                         = "🌐 Open a link (configurable)",
-	pick_color                       = "🎨 HEX colour under cursor",
-	take_note                        = "📝 Take a note",
-	activity_simulation              = "🖱 Simulate activity (anti-sleep)",
-	surround_parens                  = "() Surround with parentheses",
-	search_web                       = "🔍 Web search (configurable)",
-	teleport_mouse                   = "🖱 Teleport mouse",
-	uppercase_selection              = "AA Uppercase / lowercase",
-	titlecase_selection              = "Aa Title case",
-	spotlight_mouse                  = "🔦 Mouse spotlight",
-	toggle_capslock                  = "⇪ Toggle CapsLock",
-	microsoft_bold                   = "𝐁 Ctrl+B Microsoft (→ Ctrl+G)",
-	paste_plain                      = "⎘ Paste without formatting",
-	open_console                     = "▤ Console",
-	open_window_spy                  = "Window Spy",
-	open_list_vars                   = "Variable state",
-	open_key_history                 = "Key history",
-	-- AX actions
-	["ax.tabs"]                      = "⧉ Tabs",
-	["ax.char"]                      = "A Characters",
-	["ax.char_sel"]                  = "✎ A Sel. Characters",
-	["ax.line_arrow"]                = "↕ Lines (Arrows)",
-	["ax.line_sel"]                  = "✎ ↕ Sel. Lines",
-	["ax.words"]                     = "W Words",
-	["ax.words_sel"]                 = "✎ W Sel. Words",
-	["ax.windows"]                   = "◱ Windows",
-	["ax.spaces"]                    = "▢ Spaces",
-	["ax.desktops"]                  = "▢ Desktops",
-	["ax.volume"]                    = "🔊 Volume",
-	["ax.brightness"]                = "☀ Brightness",
-	["ax.tracks"]                    = "♫ Tracks",
-	["ax.lines"]                     = "↕ Lines (Alt)",
-	["ax.line_bounds"]               = "↔ Line (start/end)",
-	["ax.paragraphs"]                = "¶ Paragraphs",
-	["ax.document"]                  = "📄 Document (start/end)",
-}
+-- The 132-entry hardcoded English LABELS table stood here, as a last-resort
+-- fallback "so new locales never show raw keys". Every one of its entries had
+-- a locale key, so it was unreachable — a second copy of the translations, free
+-- to drift from the real ones with no symptom, because unreachable code shows
+-- none. Deleted; the premise it rested on is now a gate:
+-- tools/test/test-action-labels-have-locale-keys.cjs fails if any registered
+-- action lacks a label key in any of the 21 locales.
 
 -- Path to the shared actions.toml, resolved through the single shared-tree
 -- resolver (Paths.shared) so the shared root lives in exactly one place.
@@ -1146,8 +1017,7 @@ end
 
 function M.get_label(name)
 	if not name or name == "none" then
-		local s = i18n.get("sg_actions.none")
-		return (s ~= "sg_actions.none") and s or LABELS.none
+		return i18n.get("sg_actions.none")
 	end
 	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
 	-- Prefer locale JSON so the label is translated for the active language
@@ -1157,9 +1027,10 @@ function M.get_label(name)
 	local key_ax = "ax_actions." .. name
 	local s_ax = i18n.get(key_ax)
 	if s_ax ~= key_ax then return s_ax end
-	-- Fall back to hardcoded English label so new locales never show raw keys
-	if LABELS[name] then return LABELS[name] end
-	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
+	-- No hardcoded fallback: an action without a label key is a gate failure
+	-- (test-action-labels-have-locale-keys.cjs), not something to paper over with
+	-- a second copy of the English strings. Returning the id makes the omission
+	-- visible if one ever slips past.
 	return name
 end
 

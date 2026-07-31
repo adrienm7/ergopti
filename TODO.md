@@ -276,9 +276,21 @@ Constraints: **paths before moves, moves before content, data before code.**
   `_shared/ui/` defines that hook, so it is dead too.) The payload is built and
   tested, so the day the channel lands the content is already right. (9) Replace the macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the
   AHK-only `modifier_combos` groups with one `chord_bindings` group rendered
-  identically everywhere. (10) Delete the 136-line macOS hardcoded label fallback
-  and the 13 `shortcuts.label_*` locale keys that duplicate an `sg_actions.*` key
-  (13 pairs × 21 locales = **273 redundant translation strings**).
+  identically everywhere. ~~(10) Delete the 136-line macOS hardcoded label fallback~~ — done. All 132 of
+  its entries had a locale key, so it was unreachable: a second copy of the
+  translations, free to drift from the real ones with no symptom, because
+  unreachable code shows none. Its premise is now a gate
+  (`test-action-labels-have-locale-keys.cjs`): all 102 registered actions resolve
+  a label in all 21 locales, and `get_label` returns the raw id rather than
+  papering over an omission.
+
+  The `shortcuts.label_*` half does **not** hold up. There are 23 such keys and
+  **4**, not 13, say the same thing as an `sg_actions.*` key — and those four
+  differ by an emoji prefix (`"Select line"` vs `"☰ Select line"`), which is a
+  real distinction between the two menus rather than redundancy. Deleting them
+  would strip the emoji from the shortcuts menu or add it where it does not
+  belong. Left alone deliberately; the 273-string figure does not survive
+  measurement.
 
 - **Lot 7 — the cross-cutting layer.** Order matters: (1) `linux/infra/shared_paths.lua`
   + `config_paths.lua` mirroring macOS and `windows/lib/boot.ahk` — Linux has
