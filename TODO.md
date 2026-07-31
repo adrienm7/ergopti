@@ -506,9 +506,29 @@ The gate is delivered: `tools/test/find-false-greens.cjs` runs inside
 `npm run test:js` and ratchets five classes — tautology, vacuous-absence,
 dead-test, pcall-only, and `corpus-skip` (added 2026-07-31). It only turns down.
 
-**549 → 479 so far.** `dead-test` is at **0**: the two placeholders spliced into
+**549 → 427 so far.** `dead-test` is at **0**: the two placeholders spliced into
 the body of `_DE_Add()` are gone, and the two Linux skips with empty bodies now
-assert the reason they skipped for. `tautology` is 153 → 95.
+assert the reason they skipped for. `tautology` is 153 → **60**.
+
+`vacuous-absence` is at **0**, and that one is a detector correction rather than
+a burn-down: it flagged absence assertions on `_DriverFuncBody`, which used to
+return `""` on a miss. That helper now throws, naming the symbol — the guarantee
+moved out of each individual test, where it had to be remembered, and into the
+helper, where it cannot be forgotten. The detector watches `_DriverFuncBodyOrEmpty`
+now, the deliberate escape hatch and the only thing that can still produce an
+empty body. Verified by dropping a probe file of exactly that shape into the tree.
+
+**The skip-shaped false greens are the ones worth hunting first.** Three cases
+found so far, each of which reported a pass for something that had never run:
+`test_build_inserts_missing_timestamp.lua` loaded its module with a bare
+`pcall(require, …)` on a module that pulls in `hs.fs` — so the require ALWAYS
+failed outside Hammerspoon and all three cases took their skip branch on every
+run since the file was written, for a crash that stalled the whole ingest loop
+permanently; `test_timer_scheduler_suspend.ahk` read its adapter by hardcoded
+path inside a `try` whose `catch` asserted true, so a rename silenced the canary
+instead of failing it; and the two keystroke-injection vectors asserted `true`
+in CI, where the behaviour genuinely cannot run — they now assert what CI *can*
+check, that the entry point exists and reaches a real send primitive.
 
 **The biggest thing the pass found is not counted by the ratchet at all.** Four
 corpus consumers were replaying only their LAST vector. AHK v2 closures capture
