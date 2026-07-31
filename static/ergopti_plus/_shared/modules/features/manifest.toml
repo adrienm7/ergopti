@@ -2665,7 +2665,12 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 # letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
 
 [menu]
-dynamic_hotstrings_order = ["DateLongFr", "DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "---", "TextExpansionPersonalInformation"]
+# dynamic_hotstrings_order lived here and was read by nobody. The order that
+# actually renders is _DYNAMIC_HOTSTRINGS_ORDER in windows/ui/tray_menu.ahk,
+# which spells its separator "-" where this spelled it "---" — two sources for
+# one order, disagreeing, one of them dead. Removed rather than reconciled: the
+# live one is the one the menu uses, and a second copy that nothing reads is a
+# trap for whoever edits it next expecting the menu to change.
 
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
@@ -3230,82 +3235,6 @@ type = "dynamic"
 id = "tap_hold_keys"
 platforms = ["ahk"]
 
-[[menu.word_delimiter_defs]]
-char = " "
-i18n = "hs_config.delim_space"
-
-[[menu.word_delimiter_defs]]
-char = "\t"
-i18n = "hs_config.delim_tab"
-
-[[menu.word_delimiter_defs]]
-char = "."
-label = "."
-
-[[menu.word_delimiter_defs]]
-char = ","
-label = ","
-
-[[menu.word_delimiter_defs]]
-char = ";"
-label = ";"
-
-[[menu.word_delimiter_defs]]
-char = ":"
-label = ":"
-
-[[menu.word_delimiter_defs]]
-char = "?"
-label = "?"
-
-[[menu.word_delimiter_defs]]
-char = "!"
-label = "!"
-
-[[menu.word_delimiter_defs]]
-char = "'"
-label = "' (ASCII)"
-
-[[menu.word_delimiter_defs]]
-char = "’"
-label = "’ (typogr.)"
-
-[[menu.word_delimiter_defs]]
-char = "-"
-label = "-"
-
-[[menu.word_delimiter_defs]]
-char = "="
-label = "="
-
-[[menu.word_delimiter_defs]]
-char = "("
-label = "("
-
-[[menu.word_delimiter_defs]]
-char = ")"
-label = ")"
-
-[[menu.word_delimiter_defs]]
-char = "["
-label = "["
-
-[[menu.word_delimiter_defs]]
-char = "]"
-label = "]"
-
-[[menu.word_delimiter_defs]]
-char = "/"
-label = "/"
-
-[[menu.word_delimiter_defs]]
-char = "\\"
-label = "\\"
-
-[[menu.word_delimiter_defs]]
-char = "+"
-label = "+"
-
-[[menu.word_delimiter_defs]]
-char = "*"
-label = "*"
+# word_delimiter_defs (20 entries) lived here and was read by nobody on any
+# driver — not a duplicate, simply unreferenced. Its i18n keys are still in the
+# locale files because the hotstrings config window uses them directly.
