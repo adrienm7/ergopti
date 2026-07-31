@@ -220,10 +220,25 @@ Test("GetLastSentCharacterAt: single-element buffer, -1 ok, -2 empty",
 ; Pause invariant for hotstrings (regression)
 ; ==========================
 ; Every hotstring path must early-return on A_IsSuspended (project_suspend_pause_invariant).
+; The invariant is that the GUARD EXISTS, on the dispatch path, and that the
+; pure helpers below it do not carry a second copy of it. Both halves matter: a
+; missing guard expands hotstrings while the user has deliberately paused the
+; driver, and a duplicated guard in a pure helper makes the helper's result
+; depend on global state its callers already checked.
 TestHE_PauseGuardNoExpansion() {
-	; Simulate suspended state; in real dispatch _OnPrefixChar etc. check A_IsSuspended
-	; Here we test that engine helpers don't assume active state (pure logic).
-	AssertTrue(true, "hotstring engine must be guarded by caller on pause")
+	Dispatch := _DriverDirConcat("lib\hotstrings")
+	Assert(InStr(Dispatch, "A_IsSuspended") > 0,
+		"some hotstring dispatch path must early-return on A_IsSuspended — without it a paused "
+		. "driver still expands")
+
+	; The pure helpers must stay pure: they are called from the tooltip preview as
+	; well as from dispatch, and the preview runs while suspended.
+	for Fn in ["GenerateUppercaseVariants", "GetLastSentCharacterAt", "IsTimeActivationExpired"] {
+		Body := _DriverFuncBody(Fn)
+		Assert(InStr(Body, "A_IsSuspended") == 0,
+			Fn . "() must not read A_IsSuspended — the gate belongs on the dispatch path, and a "
+			. "second copy here would change what the preview computes while paused")
+	}
 }
 Test("Hotstring engine: pause guard skeleton (dispatch must check A_IsSuspended)", TestHE_PauseGuardNoExpansion)
 
@@ -316,20 +331,64 @@ Test("GenerateUppercaseVariants: comma generates exactly 2 extra variants",
 	TestHE_VariantsCommaTwoAlternatives)
 
 ; ULTIMATE MAX: pause + time-activation + volume + bad input for 100% regression catch
+; IsTimeActivationExpired fails CLOSED: with no recorded timestamp for the
+; previous character it must report expired. That is the whole point — a pause
+; prunes the timestamp map, and defaulting to "now" would let a trigger the user
+; typed before the pause fire as if it had just been typed.
 TestHE_PauseTimeActivationNoExpiry() {
-	; Even if time activation would fire, pause (A_IsSuspended) in caller must prevent any dispatch.
-	; This pure helper must remain safe; real guard is in prefix watcher / _HSE.
-	AssertTrue(true, "IsTimeActivationExpired must be pause-safe (caller gates)")
+	global LastSentCharacterKeyTime
+	LastSentCharacterKeyTime := Map()
+
+	AssertTrue(IsTimeActivationExpired("q", 2.0),
+		"with no timestamp for the previous char the gate must fail CLOSED (expired) — "
+		. "defaulting to now would let a pre-pause trigger fire as if just typed")
+
+	; A fresh timestamp is not expired…
+	LastSentCharacterKeyTime["q"] := A_TickCount
+	AssertFalse(IsTimeActivationExpired("q", 2.0),
+		"a character typed just now is inside a 2 s activation window")
+
+	; …and an old one is, on the same input.
+	LastSentCharacterKeyTime["q"] := A_TickCount - 5000
+	AssertTrue(IsTimeActivationExpired("q", 2.0),
+		"a character typed 5 s ago is outside a 2 s activation window")
+
+	; Zero disables the gate entirely, whatever the timestamp says.
+	AssertFalse(IsTimeActivationExpired("q", 0),
+		"a zero activation window disables the time gate")
 }
 Test("Hotstring engine: time activation must be pause-silent (project_suspend_pause_invariant)", TestHE_PauseTimeActivationNoExpiry)
 
+; The ring is _LSC_CAP wide and wraps. After far more pushes than it can hold it
+; must still answer for the LAST _LSC_CAP characters and return "" beyond them —
+; the two ways a wrapping buffer goes wrong are keeping a stale slot alive and
+; reading off the end of it.
 TestHE_HighVolumeLastSentRing() {
-	; 200+ feeds must not corrupt ring or cause OOB in GetLastSentCharacterAt (volume regression).
+	global _LSC_CAP
 	_LSCResetFrom([])
+
+	Last := ""
+	Pushed := []
 	Loop 250 {
-		HSE_FeedChar(Chr(65 + Mod(A_Index, 26)))  ; but use direct for engine helper test
+		C := Chr(65 + Mod(A_Index, 26))
+		_LSCPush(C)
+		Pushed.Push(C)
+		Last := C
 	}
-	AssertTrue(true, "high volume buffer must stay bounded and correct")
+
+	AssertEqual(Last, GetLastSentCharacterAt(-1),
+		"after 250 pushes offset -1 must be the most recent character, not a stale slot")
+
+	; Every slot the ring can hold answers with the matching tail character.
+	Loop _LSC_CAP {
+		Offset := -A_Index
+		AssertEqual(Pushed[Pushed.Length - A_Index + 1], GetLastSentCharacterAt(Offset),
+			"offset " . Offset . " must be the matching character from the tail of the push sequence")
+	}
+
+	; And one past the end is empty rather than an out-of-bounds read.
+	AssertEqual("", GetLastSentCharacterAt(-(_LSC_CAP + 1)),
+		"reading past the ring capacity must return an empty string, not throw")
 }
 Test("Hotstring engine: high volume (250+) LastSent ring must not corrupt or OOB", TestHE_HighVolumeLastSentRing)
 

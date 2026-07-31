@@ -40,16 +40,50 @@ _KLR_DateFilter_EndOnly() {
 }
 
 ; ULTIMATE encore plus: healthcheck/diagnostic integration + pause (diagnostic must use reader safely under pause for troubleshooting, surface errors sink, no side effects).
+; The reader is what the healthcheck window calls, and the healthcheck is most
+; useful precisely when the driver is paused. So the query builders must be pure
+; string assembly: no suspend check, no writes. A reader that returned a
+; different WHERE clause while paused would show the user a different history
+; than the one on disk.
 _KLR_PauseSafeForDiagnostic() {
-	; Simulate A_IsSuspended. Reader functions must be safe to call from healthcheck (which is always-available for debug).
-	; No writes, no activation, just pure query builders.
-	AssertTrue(true, "keylogger reader must be pause-resilient (project_suspend_pause_invariant) — healthcheck can read logs/paths/errors sink even when paused")
+	Body := _DriverFuncBody("KLR_DateFilter")
+	Assert(InStr(Body, "A_IsSuspended") == 0,
+		"KLR_DateFilter() must not read A_IsSuspended — the diagnostic has to report the same "
+		. "history whether or not the driver is paused")
+
+	; Pure assembly: same inputs, same clause, twice.
+	A := KLR_DateFilter("2024-01-01", "2024-12-31")
+	B := KLR_DateFilter("2024-01-01", "2024-12-31")
+	AssertEqual(A, B, "the query builder must be deterministic")
+	AssertTrue(InStr(A, "WHERE") > 0, "and it must actually build a WHERE clause for two dates")
+
+	; No arguments at all yields no clause rather than a malformed one.
+	AssertEqual("", KLR_DateFilter("", ""),
+		"with neither bound the builder must return an empty string, not a dangling WHERE")
 }
 Test("KLR: reader must be safe for healthcheck under pause (diagnostic troubleshooting)", _KLR_PauseSafeForDiagnostic)
 
+; A date bound reaches SQL, so it goes through SQLite_Q. The clause must quote
+; what it interpolates — the reader takes its dates from a WebView2 message, and
+; an unquoted bound there is an injection into the metrics database.
 _KLR_DiagnosticSeesErrorsSinkAndVolume() {
-	; Healthcheck keylogger summary + reader must see errors sink path + high volume events without leaking PII or corrupting under pause + rollover sim.
-	AssertTrue(true, "diagnostic using reader must report errors sink + volume counts correctly under pause + edges (would have caught missing errors log visibility in troubleshooting report)")
+	One := KLR_DateFilter("2024-01-01", "")
+	AssertTrue(InStr(One, "date >=") > 0, "a start bound must produce a lower-bound comparison")
+	AssertTrue(InStr(One, "date <=") == 0, "and must not invent an upper bound")
+
+	Two := KLR_DateFilter("", "2024-12-31")
+	AssertTrue(InStr(Two, "date <=") > 0, "an end bound must produce an upper-bound comparison")
+	AssertTrue(InStr(Two, "date >=") == 0, "and must not invent a lower bound")
+
+	; Both bounds are joined, never concatenated into one broken predicate.
+	Both := KLR_DateFilter("2024-01-01", "2024-12-31")
+	AssertTrue(InStr(Both, " AND ") > 0, "two bounds must be joined with AND")
+
+	; The values are quoted through SQLite_Q rather than pasted in raw.
+	Quoted := KLR_DateFilter("2024-01-01' OR 1=1 --", "")
+	AssertTrue(InStr(Quoted, "OR 1=1") == 0 or InStr(Quoted, "''") > 0,
+		"a quote in a date bound must be escaped by SQLite_Q — this clause is built from a "
+		. "WebView2 message and lands in the metrics database")
 }
 Test("KLR: healthcheck via reader must expose errors sink + volume under pause + rollover (errors sink + privacy)", _KLR_DiagnosticSeesErrorsSinkAndVolume)
 

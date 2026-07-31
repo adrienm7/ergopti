@@ -216,11 +216,19 @@ function findTautologies(file, src, ext) {
 
 /**
  * PATTERN 2 — Vacuous absence assertion (Windows only).
- * `_DriverFuncBody(Name)` returns "" when Name is not found
- * (tests/test_framework.ahk:254). `InStr("", "anything") == 0` is TRUE, so every
- * "the body must NOT contain X" assertion passes when the function was renamed,
- * moved out of the scanned tree, or simply mistyped. AHK v2 raises no load-time
- * error for an unknown name, so nothing anywhere reports the problem.
+ * `InStr("", "anything") == 0` is TRUE, so a "the body must NOT contain X"
+ * assertion passes for free on an empty body — which is what you get when the
+ * function was renamed, moved out of the scanned tree, or simply mistyped. AHK
+ * v2 raises no load-time error for an unknown name, so nothing reports it.
+ *
+ * ONLY `_DriverFuncBodyOrEmpty` CAN PRODUCE THAT EMPTY BODY.
+ * This detector used to flag `_DriverFuncBody` as well, because that helper also
+ * returned "" on a miss. It no longer does — it throws, naming the symbol. The
+ * guarantee moved from each individual test (where it had to be remembered) into
+ * the helper (where it cannot be forgotten), which is strictly stronger, so
+ * continuing to flag its callers reported a hazard that no longer exists.
+ * `_DriverFuncBodyOrEmpty` is the deliberate escape hatch for tests whose
+ * assertion IS the absence, and it is the one that still needs proving.
  *
  * A body is considered proven non-empty by either an explicit emptiness guard
  * (`Assert(Body != "", …)`) or by any PRESENCE assertion on the same variable
@@ -230,7 +238,7 @@ function findVacuousAbsence(file, src) {
 	const out = [];
 	for (const block of ahkFunctionBlocks(src)) {
 		const vars = new Set();
-		for (const m of block.text.matchAll(/(\w+)\s*:=\s*_DriverFuncBody\s*\(/g)) vars.add(m[1]);
+		for (const m of block.text.matchAll(/(\w+)\s*:=\s*_DriverFuncBodyOrEmpty\s*\(/g)) vars.add(m[1]);
 		if (vars.size === 0) continue;
 
 		const proven = new Set();
@@ -433,7 +441,7 @@ function findCorpusSkips(file, src, ext) {
 
 const PATTERNS = {
 	tautology: 'Assertion that cannot fail (Assert(true) / assert_true(true))',
-	'vacuous-absence': 'Absence assertion on a _DriverFuncBody() that may be empty',
+	'vacuous-absence': 'Absence assertion on a _DriverFuncBodyOrEmpty() that may be empty',
 	'dead-test': 'Test body that asserts nothing, or a Test() never registered',
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
 	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
