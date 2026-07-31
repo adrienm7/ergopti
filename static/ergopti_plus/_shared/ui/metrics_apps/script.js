@@ -1122,7 +1122,7 @@ function updateCharts(appsArray, aggregatedData) {
 				labels: topApps.map((a) => a.name),
 				datasets: [
 					{
-						label: 'Temps',
+						label: _t('metrics_apps.chart_time_series'),
 						data: topApps.map((a) => formatDurationDecimal(a.timeMs)),
 						backgroundColor: topApps.map((a) => getAppColor(a.name, a.score)),
 						borderRadius: 4
@@ -1970,7 +1970,7 @@ function renderDashboard() {
 
 			const tdCat = document.createElement('td');
 			tdCat.className = 'app-cat-cell';
-			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="Modifier la catégorie">${escapeHtml(app.category)} ✎</span>`;
+			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="${escapeHtml(_t('metrics_apps.edit_category_hint'))}">${escapeHtml(app.category)} ✎</span>`;
 			tdCat.addEventListener('click', (ev) => {
 				ev.stopPropagation();
 				postBridge({ action: 'edit', app: app.name, cat: app.category, score: app.score });
@@ -3053,20 +3053,24 @@ window.setHourWeekdayMode = function (mode) {
 
 let _calendarMode = 'chars';
 
-const MONTHS_FR_SHORT = [
-	'Jan',
-	'Fév',
-	'Mar',
-	'Avr',
-	'Mai',
-	'Juin',
-	'Juil',
-	'Août',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Déc'
-];
+// Month abbreviations for the calendar axis, from Intl rather than a translated
+// array: the browser already knows every locale's short month names, including
+// the ones where they are not simply the first three letters, and a hand-written
+// list would need 21 translations that can drift. Built once — Intl formatter
+// construction is the expensive part, not the formatting.
+const MONTHS_SHORT = (() => {
+	const locale = (typeof window !== 'undefined' && window._i18n_locale) || 'fr';
+	let fmt;
+	try {
+		fmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+	} catch (_) {
+		// An unknown or malformed locale tag must not take the calendar down with
+		// it; the axis is decoration, the grid below it is the data.
+		fmt = new Intl.DateTimeFormat('fr', { month: 'short' });
+	}
+	// Day 15 avoids any timezone rollover into a neighbouring month.
+	return Array.from({ length: 12 }, (_, m) => fmt.format(new Date(2024, m, 15)));
+})();
 
 /**
  * Renders a GitHub-style 53-week × 7-day calendar covering the last 365
@@ -3154,7 +3158,7 @@ function renderActivityCalendar() {
 		if (c.date.getDate() <= 7 && c.date.getMonth() !== last_label_month) {
 			last_label_month = c.date.getMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_SHORT[c.date.getMonth()]}</text>`;
 		}
 	});
 
