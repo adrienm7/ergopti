@@ -371,13 +371,17 @@ renderer, whose input is a GitHub release body, so it was never dormant) ·
 `test-ahk-test-coverage.cjs` (walks `tests/` at any depth; no orphan was hiding
 there, so prevention rather than a fix) · **new** `test-ahk-runners-are-invoked.cjs`
 (three runners were referenced by nothing; two carried ten tests that had never
-run, one of which had rotted out of the code it stubs).
+run, one of which had rotted out of the code it stubs) ·
+`test-no-pinned-source-reads*.cjs` (now ratchets the PINS, not the files: AHK
+**326** pins behind a file count of 16 — `_DriverFuncBody` takes a symbol, not a
+path, so one call exempted every raw path beside it; macOS 40 behind 31) ·
+`test-dev-tool-paths.cjs` (now rejects a hardcoded checkout anywhere under
+`tools/`; the 2 absolute paths were both in the prediction-corpus generator,
+which therefore ran on exactly one machine — fixed).
 
 Still open:
 
-`test-no-pinned-source-reads*.cjs` — its `HELPER_RE` is applied per FILE, so one
-converted read hides every remaining pinned read in the same file. Count per
-READ · the AHK purity ratchet (3 families of ~12; ignores `ui/` and the entry
+the AHK purity ratchet (3 families of ~12; ignores `ui/` and the entry
 point) · the macOS purity ratchet (ignores `macos/ui/`, 636 `hs.*` lines) ·
 `test-webview-geometry-single-source.cjs` (zero Linux coverage, 3 Windows apps
 absent) · `test-webview-teardown-order.cjs` (7 hosts of 12, and it pins exact
