@@ -323,8 +323,32 @@ Constraints: **paths before moves, moves before content, data before code.**
   `path.join` segments, and Windows builds its two with **backslashes**. Both
   left their suites green while still reading the old location, which is the
   updater move's lesson in a second form.
-  Still open on this item: the `emit` / `emit_<os>` / `native` / `default_chord`
-  / `ports` schema fields, which are what (3) consumes. (3) Convert the **62 measured pure-keystroke Windows
+  ~~Still open on this item: the `emit` / `emit_<os>` … schema fields~~ — **the
+  `emit` half is in.** 62 actions now carry a declarative keystroke, and the
+  backlog's count of 62 is exactly right while its *mechanism* was not: only
+  **four** are bare `Send(literal)` lambdas. The other **58** call
+  `TextPressKey("c", ["Ctrl"])` — a key plus a modifier list — which is why the
+  portable shape is `emit_key` + `emit_mods` and a raw send-string would not have
+  fitted. The four genuine raw sequences are `emit_ahk`, since
+  `{Home}{Shift Down}{End}{Shift Up}` has no portable form. `Win` is stored as
+  `super`, each driver mapping it to its own physical key.
+  The rows were **derived from the registry, not transcribed**: 62 hand-copied
+  key/modifier pairs would carry errors nothing catches until a user makes the
+  gesture and the wrong shortcut fires — `copy` sending Ctrl+X is not a crash,
+  not a failing test, and not visible in review.
+  `test-action-emit-rows-match-code.cjs` re-derives them independently and
+  compares in **both** directions: a declared row whose handler is not a plain
+  keystroke is caught too, because converting that would silently replace
+  whatever the handler really does. That gate is what makes the data trustworthy
+  enough to delete the code against in (3).
+  **Found while doing it — a real defect in the shared TOML codec:** an inline
+  table containing a *multi-element* nested array (`{ key = "Left", mods =
+  ["ctrl", "super"] }`) makes `decode` return **nil**, with no error. Single
+  element works; a top-level multi-element array works; two scalar keys work.
+  The Linux gesture suite lost 14 tests to it. Flat keys sidestep it and suit
+  the AHK and Lua hand-parsers that read this file too, but the codec bug is
+  still there — it is the same shape as the logger sub-files bug (a nested
+  delimiter confusing a flat scanner), and it deserves its own fix and test. (3) Convert the **62 measured pure-keystroke Windows
   actions** to `emit` rows — deletes 62 AHK lambdas, 27 Lua closures and ~30 Linux
   `elseif` branches (54 % of the Windows action registry is data pretending to be
   code). (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —

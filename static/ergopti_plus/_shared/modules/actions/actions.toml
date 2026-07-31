@@ -170,6 +170,8 @@ platform = "hs"
 
 [sg_actions.app_switcher]
 platform = "all"
+emit_key = "Tab"
+emit_mods = ["alt"]
 
 [sg_actions.app_previous]
 platform = "hs"
@@ -181,49 +183,75 @@ platform = "hs"
 
 [sg_actions.copy]
 platform = "ahk"
+emit_key = "c"
+emit_mods = ["ctrl"]
 
 [sg_actions.paste]
 platform = "ahk"
+emit_key = "v"
+emit_mods = ["ctrl"]
 
 [sg_actions.cut]
 platform = "ahk"
+emit_key = "x"
+emit_mods = ["ctrl"]
 
 [sg_actions.undo]
 platform = "ahk"
+emit_key = "z"
+emit_mods = ["ctrl"]
 
 [sg_actions.redo]
 platform = "ahk"
+emit_key = "y"
+emit_mods = ["ctrl"]
 
 [sg_actions.select_all]
 platform = "ahk"
+emit_key = "a"
+emit_mods = ["ctrl"]
 
 [sg_actions.find]
 platform = "ahk"
+emit_key = "f"
+emit_mods = ["ctrl"]
 
 # --- Touches ---
 
 [sg_actions.enter]
 platform = "all"
+emit_key = "Enter"
+emit_mods = []
 
 [sg_actions.tab]
 platform = "all"
 
 [sg_actions.escape]
 platform = "all"
+emit_key = "Escape"
+emit_mods = []
 
 [sg_actions.backspace]
 platform = "all"
+emit_key = "BackSpace"
+emit_mods = []
 
 [sg_actions.delete]
 platform = "all"
+emit_key = "Delete"
+emit_mods = []
 
 # --- Onglets ---
 
 [sg_actions.tab_new]
 platform = "all"
+emit_key = "t"
+emit_mods = ["ctrl"]
 
 [sg_actions.tab_close]
 platform = "all"
+emit_key = "w"
+emit_mods = ["ctrl"]
 
 [sg_actions.tab_prev]
 platform = "all"
@@ -255,18 +283,28 @@ platform = "ahk"
 
 [sg_actions.close_window]
 platform = "all"
+emit_key = "F4"
+emit_mods = ["alt"]
 
 [sg_actions.fullscreen]
 platform = "all"
+emit_key = "F11"
+emit_mods = []
 
 [sg_actions.snap_left]
 platform = "all"
+emit_key = "Left"
+emit_mods = ["super"]
 
 [sg_actions.snap_right]
 platform = "all"
+emit_key = "Right"
+emit_mods = ["super"]
 
 [sg_actions.maximize]
 platform = "all"
+emit_key = "Up"
+emit_mods = ["super"]
 
 # --- Espaces / bureaux virtuels ---
 
@@ -284,113 +322,181 @@ platform = "hs"
 
 [sg_actions.desktop_prev]
 platform = "ahk"
+emit_key = "Left"
+emit_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_next]
 platform = "ahk"
+emit_key = "Right"
+emit_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_new]
 platform = "ahk"
+emit_key = "d"
+emit_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_close]
 platform = "ahk"
+emit_key = "F4"
+emit_mods = ["ctrl", "super"]
 
 [sg_actions.task_view]
 platform = "ahk"
+emit_key = "Tab"
+emit_mods = ["super"]
 
 [sg_actions.minimize_all]
 platform = "ahk"
+emit_key = "d"
+emit_mods = ["super"]
 
 # --- Déplacement curseur ---
 
 [sg_actions.word_prev]
 platform = "all"
+emit_key = "Left"
+emit_mods = ["ctrl"]
 
 [sg_actions.word_next]
 platform = "all"
+emit_key = "Right"
+emit_mods = ["ctrl"]
 
 [sg_actions.line_up]
 platform = "all"
+emit_key = "Up"
+emit_mods = []
 
 [sg_actions.line_down]
 platform = "all"
+emit_key = "Down"
+emit_mods = []
 
 [sg_actions.line_start]
 platform = "all"
+emit_key = "Home"
+emit_mods = []
 
 [sg_actions.line_end]
 platform = "all"
+emit_key = "End"
+emit_mods = []
 
 [sg_actions.para_prev]
 platform = "all"
+emit_key = "Up"
+emit_mods = ["ctrl"]
 
 [sg_actions.para_next]
 platform = "all"
+emit_key = "Down"
+emit_mods = ["ctrl"]
 
 [sg_actions.doc_start]
 platform = "all"
+emit_key = "Home"
+emit_mods = ["ctrl"]
 
 [sg_actions.doc_end]
 platform = "all"
+emit_key = "End"
+emit_mods = ["ctrl"]
 
 # --- Flèches ---
 
 [sg_actions.arrow_up]
 platform = "all"
+emit_key = "Up"
+emit_mods = []
 
 [sg_actions.arrow_down]
 platform = "all"
+emit_key = "Down"
+emit_mods = []
 
 [sg_actions.arrow_left]
 platform = "all"
+emit_key = "Left"
+emit_mods = []
 
 [sg_actions.arrow_right]
 platform = "all"
+emit_key = "Right"
+emit_mods = []
 
 # --- Sélection ---
 
 [sg_actions.sel_up]
 platform = "all"
+emit_key = "Up"
+emit_mods = ["shift"]
 
 [sg_actions.sel_down]
 platform = "all"
+emit_key = "Down"
+emit_mods = ["shift"]
 
 [sg_actions.sel_left]
 platform = "all"
+emit_key = "Left"
+emit_mods = ["shift"]
 
 [sg_actions.sel_right]
 platform = "all"
+emit_key = "Right"
+emit_mods = ["shift"]
 
 [sg_actions.sel_word_prev]
 platform = "all"
+emit_key = "Left"
+emit_mods = ["ctrl", "shift"]
 
 [sg_actions.sel_word_next]
 platform = "all"
+emit_key = "Right"
+emit_mods = ["ctrl", "shift"]
 
 # --- Médias ---
 
 [sg_actions.vol_up]
 platform = "all"
+emit_key = "Volume_Up"
+emit_mods = []
 
 [sg_actions.vol_down]
 platform = "all"
+emit_key = "Volume_Down"
+emit_mods = []
 
 [sg_actions.mute]
 platform = "all"
+emit_key = "Volume_Mute"
+emit_mods = []
 
 [sg_actions.brightness_up]
 platform = "all"
+emit_key = "Brightness_Up"
+emit_mods = []
 
 [sg_actions.brightness_down]
 platform = "all"
+emit_key = "Brightness_Down"
+emit_mods = []
 
 [sg_actions.track_play]
 platform = "all"
+emit_key = "Media_Play_Pause"
+emit_mods = []
 
 [sg_actions.track_next]
 platform = "all"
+emit_key = "Media_Next"
+emit_mods = []
 
 [sg_actions.track_prev]
 platform = "all"
+emit_key = "Media_Prev"
+emit_mods = []
 
 # --- Captures d'écran ---
 
@@ -414,6 +520,8 @@ platform = "all"
 
 [sg_actions.screen_record]
 platform = "ahk"
+emit_key = "r"
+emit_mods = ["super", "alt"]
 
 # --- Système ---
 
@@ -422,6 +530,8 @@ platform = "all"
 
 [sg_actions.notification_center]
 platform = "all"
+emit_key = "n"
+emit_mods = ["super"]
 
 # --- UI / Fenêtres de l'app ---
 
@@ -483,15 +593,18 @@ platform = "all"
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/ and registered into the gesture registry.
 platform = "all"
+emit_ahk = "{Home}{Shift Down}{End}{Shift Up}"
 
 [sg_actions.screen_capture]
 platform = "ahk"
+emit_ahk = "#+s"
 
 [sg_actions.screen_capture_instant]
 platform = "ahk"
 
 [sg_actions.ocr_screenshot]
 platform = "ahk"
+emit_ahk = "#+t"
 
 [sg_actions.open_url]
 platform = "all"
@@ -510,6 +623,7 @@ platform = "ahk"
 
 [sg_actions.surround_parens]
 platform = "ahk"
+emit_ahk = "{Home}({End}){Home}"
 
 [sg_actions.search_web]
 platform = "all"
@@ -553,15 +667,21 @@ platform = "ahk"
 
 [sg_actions.ctrl_backspace]
 platform = "ahk"
+emit_key = "BackSpace"
+emit_mods = ["ctrl"]
 
 [sg_actions.ctrl_delete]
 platform = "ahk"
+emit_key = "Delete"
+emit_mods = ["ctrl"]
 
 [sg_actions.alt_tab_monitor]
 platform = "ahk"
 
 [sg_actions.space]
 platform = "ahk"
+emit_key = "Space"
+emit_mods = []
 
 [sg_actions.caps_lock]
 platform = "ahk"

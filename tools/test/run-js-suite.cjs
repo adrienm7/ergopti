@@ -100,6 +100,7 @@ const CHECKS = [
 	{ name: 'new-driver scaffold emits one adapter per port spec (not zero)', cmd: 'node', args: ['tools/test/test-new-driver-scaffold.cjs'], repro: 'node tools/test/test-new-driver-scaffold.cjs' },
 	{ name: 'driver tree parity I1 (shared directory ratio, ratcheted)', cmd: 'node', args: ['tools/test/test-driver-tree-parity.cjs'], repro: 'node tools/test/test-driver-tree-parity.cjs --measure' },
 	{ name: 'stubs intercept something (no package.loaded key naming a missing module)', cmd: 'node', args: ['tools/test/test-stubs-intercept-something.cjs'], repro: 'node tools/test/test-stubs-intercept-something.cjs' },
+	{ name: 'action emit rows match the Windows registry (both directions)', cmd: 'node', args: ['tools/test/test-action-emit-rows-match-code.cjs'], repro: 'node tools/test/test-action-emit-rows-match-code.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
