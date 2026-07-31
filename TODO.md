@@ -257,11 +257,24 @@ Constraints: **paths before moves, moves before content, data before code.**
   is dead machinery: `M.DEFAULTS` is empty by design and the only production
   caller of `set_action` writes `"none"`. (7) Merge
   `karabiner/data/actions.json` (73 actions, hardcoded French, no i18n keys) into
-  the one registry, `holdable` becoming a per-action flag. (8) Fix the Linux
-  `action_picker` bridge, which implements a **different, fictional** protocol
-  (`execute`/`search`/`ready`/`close` + three hardcoded French labels) and never
-  calls `init(...)`, so the page renders empty; the contract test covers 2 hosts
-  of 3. (9) Replace the macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the
+  the one registry, `holdable` becoming a per-action flag. ~~(8) Fix the Linux `action_picker` bridge~~ — mostly done. It answered
+  `execute`/`search` with three hardcoded French labels; the page posts
+  `confirm`/`cancel`/`ready` and nothing else, so neither end matched and the
+  picker was inert while both sides looked implemented. It now speaks the page's
+  protocol, passes `none` and `__native__` through unchanged rather than deciding
+  what they mean, and `build_init_payload()` produces exactly the shape
+  `init(data)` reads, with the SAME locale keys macOS uses so the two hosts show
+  the same words. The contract test covers three hosts now and, as importantly,
+  asserts that no host answers a message the page never sends — a handler branch
+  for an invented action is indistinguishable from a working feature until
+  somebody tries it.
+
+  **What is left is one structural gap:** the host→page push. `init(data)` has to
+  be evaluated IN the webview after `ready`, and a Linux bridge handler is given
+  only `(payload, state)` — no webview reference — so the channel does not exist.
+  (`webview_manager` has a `__hostBridgeResponse` reply path, but no page in
+  `_shared/ui/` defines that hook, so it is dead too.) The payload is built and
+  tested, so the day the channel lands the content is already right. (9) Replace the macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the
   AHK-only `modifier_combos` groups with one `chord_bindings` group rendered
   identically everywhere. (10) Delete the 136-line macOS hardcoded label fallback
   and the 13 `shortcuts.label_*` locale keys that duplicate an `sg_actions.*` key

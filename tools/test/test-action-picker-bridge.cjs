@@ -39,6 +39,7 @@ const WIN_HOST = 'static/ergopti_plus/windows/ui/action_picker_webview.ahk';
 const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
 const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
+const LINUX_HOST = 'static/ergopti_plus/linux/modules/ui/bridge_handlers/action_picker_bridge.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
 
 let total_pass = 0;
@@ -73,6 +74,7 @@ const winHost = read(WIN_HOST);
 const winNative = read(WIN_NATIVE);
 const macHost = read(MAC_HOST);
 const macMenu = read(MAC_MENU);
+const linuxHost = read(LINUX_HOST);
 const enLocale = read(EN_LOCALE);
 
 // 1. Host-agnostic post().
@@ -100,9 +102,24 @@ while ((m = re.exec(script)) !== null) actions.add(m[1]);
 check('script.js posts ready + confirm + cancel',
 	actions.has('ready') && actions.has('confirm') && actions.has('cancel'),
 	`Found: ${[...actions].join(', ')}`);
+// Three hosts, not two. Linux was absent from this list, and its bridge had
+// drifted into a protocol of its own — execute/search, which the page has never
+// posted — so the picker did nothing there while both ends looked implemented.
 for (const a of [...actions].sort()) {
 	check(`Windows host handles "${a}"`, winHost.includes(`"${a}"`));
 	check(`macOS host handles "${a}"`, macHost.includes(`"${a}"`));
+	check(`Linux host handles "${a}"`, linuxHost.includes(`"${a}"`));
+}
+
+// And no host may answer a message the page never sends. A handler branch for an
+// invented action is indistinguishable from a working feature until someone tries
+// it — which is what the Linux bridge was made of.
+for (const invented of ['execute', 'search']) {
+	check(
+		`Linux host does NOT answer the invented "${invented}"`,
+		!new RegExp(`action\\s*==\\s*"${invented}"`).test(linuxHost),
+		`the page posts only ${[...actions].sort().join(' / ')}`
+	);
 }
 
 // 4. initData-shape parity — both hosts emit every field the page reads.
@@ -112,6 +129,7 @@ for (const f of FIELDS) {
 	check(`page reads data.${f}`, script.includes(`data.${f}`) || script.includes(`.${f}`));
 	check(`Windows host emits "${f}"`, winHost.includes(`"${f}"`));
 	check(`macOS host emits ${f}`, new RegExp(`\\b${f}\\b`).test(macHost));
+	check(`Linux host emits ${f}`, new RegExp(`\\b${f}\\b`).test(linuxHost));
 }
 
 // 4b. Ordered-item shape — headings ({type,level,text}) + actions ({type,id,label}).

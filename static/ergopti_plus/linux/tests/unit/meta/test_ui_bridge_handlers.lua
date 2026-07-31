@@ -167,12 +167,22 @@ helpers.describe("ui.bridge_handlers", function()
       local result = wm.route_message("nonexistent_bridge", "hello")
       helpers.assert_eq(result, nil)
     end)
-    helpers.it("route_message routes to action_picker handler", function()
+    -- The picker's protocol is confirm/cancel/ready and none of them returns a
+    -- value — the page is told things by an init(...) push, not by a reply. This
+    -- case used to post {action="search"} and assert a result table, a protocol
+    -- the page has never spoken; it passed because the handler had been written
+    -- to the same invention.
+    helpers.it("route_message reaches the action_picker handler", function()
       wm.show("action_picker", "fr")
       wm.set_daemon_state(build_mock_state())
-      local result = wm.route_message("action_picker_bridge", { action = "search", query = "test" })
-      helpers.assert_true(type(result) == "table", "route_message should return a table")
-      helpers.assert_true(type(result.results) == "table", "result.results should be a table")
+      local confirmed = nil
+      local handler = require("modules.ui.bridge_handlers.action_picker_bridge")
+      handler.on_confirm = function(id) confirmed = id end
+      wm.route_message("action_picker_bridge", { action = "confirm", id = "tab_new" })
+      handler.on_confirm = nil
+      helpers.assert_eq(confirmed, "tab_new",
+        "a confirm must reach the handler with the id the user picked — routing that "
+          .. "silently dropped it is exactly what made the Linux picker inert")
     end)
     -- Regression: the handler file was named personal_toml_editor.lua without
     -- the "_bridge" suffix that _load_handler() requires, so route_message()
@@ -241,15 +251,40 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("ready", state)
       helpers.assert_eq(result, nil)
     end)
-    helpers.it("handles 'search' action", function()
-      local result = handler.on_message({ action = "search", query = "hotstrings" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.results) == "table")
-      helpers.assert_true(#result.results > 0)
+    helpers.it("handles 'confirm' and passes the picked id on", function()
+      local seen = nil
+      handler.on_confirm = function(id) seen = id end
+      handler.on_message({ action = "confirm", id = "app_switcher" }, state)
+      handler.on_confirm = nil
+      helpers.assert_eq(seen, "app_switcher", "the id the user picked must reach the caller")
     end)
-    helpers.it("handles 'execute' action", function()
-      local result = handler.on_message({ action = "execute", command = "reload" }, state)
-      helpers.assert_eq(result, nil)
+    helpers.it("passes the two specials through unchanged", function()
+      local seen = {}
+      handler.on_confirm = function(id) seen[#seen + 1] = id end
+      handler.on_message({ action = "confirm", id = "none" }, state)
+      handler.on_message({ action = "confirm", id = "__native__" }, state)
+      handler.on_confirm = nil
+      helpers.assert_eq(seen[1], "none", "\"none\" is a real choice, not an absence")
+      helpers.assert_eq(seen[2], "__native__",
+        "and __native__ means \"leave the OS binding alone\" — the handler must not "
+          .. "decide what either means")
+    end)
+    helpers.it("handles 'cancel'", function()
+      local cancelled = false
+      handler.on_cancel = function() cancelled = true end
+      handler.on_message({ action = "cancel" }, state)
+      handler.on_cancel = nil
+      helpers.assert_true(cancelled, "dismissing the picker must reach the caller")
+    end)
+    helpers.it("build_init_payload matches the shape init(data) reads", function()
+      local p = handler.build_init_payload({ current = "tab_new", allow_native = true })
+      for _, key in ipairs({ "title", "label", "current", "allowNative", "nativeLabel",
+                             "noneLabel", "searchPlaceholder", "noResults", "cancelLabel", "items" }) do
+        helpers.assert_true(p[key] ~= nil, "init(data) reads data." .. key .. " — it must be present")
+      end
+      helpers.assert_eq(p.current, "tab_new", "the already-bound id must be carried through")
+      helpers.assert_eq(p.allowNative, true, "and the native flag")
+      helpers.assert_eq(type(p.items), "table", "items must be a list, even when empty")
     end)
     helpers.it("handles unknown action gracefully", function()
       local result = handler.on_message({ action = "invalid" }, state)
