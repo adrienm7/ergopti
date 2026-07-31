@@ -2335,5 +2335,7 @@
 	"menu.llm.backend_unknown": "Unknown",
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
-	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"metrics_apps.chart_time_series": "时长",
+	"metrics_apps.edit_category_hint": "编辑类别"
 }

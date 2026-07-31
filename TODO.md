@@ -665,9 +665,14 @@ cannot silently leave a spelling unrecognised.
 historical `"Design"` spelling — 23 vectors, each asserting the id its stored
 value must resolve to.
 
-**What is genuinely left** is cosmetic and needs no migration: the ~88 French
-literals in `script.js` that are pure display text. They can now be translated
-without touching identity, which was the whole obstacle.
+**And the display text is done.** The "~88 French literals" figure predated the
+earlier i18n passes; measured, only three were still user-visible and not part of
+the category tables. The chart series label and the edit-category hint are now
+locale keys in all 21 languages; the 12-entry `MONTHS_FR_SHORT` array is gone in
+favour of `Intl.DateTimeFormat`, which the browser already localises correctly —
+including the languages where a short month is not the first three letters
+(`ja`/`zh` render 1月…12月, `ar` renders يناير…) — and which needs no translation
+keys that could drift.
 
 Also worth recording while here: the two drivers write DIFFERENT vocabularies to
 files of the same name. Windows `app_categories.json` holds a five-token

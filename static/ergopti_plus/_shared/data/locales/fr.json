@@ -2335,5 +2335,7 @@
 	"menu.llm.backend_unknown": "Inconnu",
 	"mlx.init_title": "Initialisation du moteur IA (MLX)",
 	"mlx.init_subtitle": "Initialisation IA en cours, veuillez patienter…",
-	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"metrics_apps.chart_time_series": "Temps",
+	"metrics_apps.edit_category_hint": "Modifier la catégorie"
 }
