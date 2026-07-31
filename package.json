@@ -56,6 +56,8 @@
 		"test:corpus-backspace-semantics": "node ./tools/test/test-corpus-backspace-count-semantics.cjs",
 		"test:logger-scalars": "node ./tools/test/test-logger-scalars-single-source.cjs",
 		"test:locale-names": "node ./tools/test/test-locale-names-single-source.cjs",
+		"test:new-driver": "node ./tools/test/test-new-driver-scaffold.cjs",
+		"test:tree-parity": "node ./tools/test/test-driver-tree-parity.cjs",
 		"test:tap-hold-lifecycle": "node ./tools/test/test-tap-hold-defaults-lifecycle.cjs",
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
 		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",

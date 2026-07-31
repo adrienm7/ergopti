@@ -164,11 +164,34 @@ Constraints: **paths before moves, moves before content, data before code.**
   prefix rewrite must touch production **and** the ~1 942 test require/stub sites
   in the same commit or every stub silently stops intercepting; (c) `ui/`
   dissolves into `modules/<feature>/{menu,window}`; (d) de-platform `_shared/` and
-  repair `tools/codegen/new-driver.js` (`REPO_ROOT` resolves to `tools/`, the
-  three spec paths are pre-reorg, it emits **zero** adapters and a README saying
-  "Ports to implement (0)"). Then the I1 gate and the Convention S stubs.
-  **Progress metric: tree-identity ratio, 18.9 % today** (10 of 53 depth-≤2
-  subdirectories present in all three drivers).
+  ~~repair `tools/codegen/new-driver.js`~~ — **repaired.** All four paths were
+  stale, not three: `REPO_ROOT` resolved to `tools/`, `DRIVERS_DIR` pointed at the
+  pre-reorg `static/drivers/`, and both spec dirs had moved under
+  `_shared/core/`. The tool scanned an empty directory, wrote **zero** adapter
+  stubs, generated a README announcing "Ports to implement (0)", **exited 0** and
+  printed a "Done. Next steps:" checklist. Nothing about scanning an empty
+  directory is an error, and `static/drivers/` still exists on some checkouts as
+  a husk of two empty untracked folders, so the path did not look wrong to a
+  reader either. It now emits 20 adapters + 5 domain specs, and **refuses** to
+  scaffold at all when it finds no ports — an empty scaffold is not a scaffold.
+  `test-new-driver-scaffold.cjs` runs the tool for real and counts the files,
+  because a structural check would pass on a tool whose other three paths are
+  still wrong. Proving it red taught the test one more thing: the broken tool
+  wrote to `tools/static/drivers/`, so cleanup aimed only at the correct location
+  left a stray tree behind — a cleanup that works only when the tool works is not
+  a cleanup, and it now sweeps the mis-rooted locations too.
+  ~~Then the I1 gate~~ — **built**, as `test-driver-tree-parity.cjs`.
+  **Progress metric: tree-identity ratio, 21.6 % today** — 11 of 51 depth-≤2
+  subdirectories present in all three drivers (the earlier 18.9 %/10-of-53 figure
+  used a slightly different exclusion set; this counter documents its own rule
+  and excludes `tests/`, virtualenvs, caches, `build/`, `bin/` and `.app`
+  bundles). Ratcheted in **both** directions: the shared count may not fall, and
+  the union may not grow — a new directory in one driver alone dilutes I1 even
+  when nothing was removed. `--measure` prints the full breakdown, including the
+  26 macOS-only, 22 Windows-only and 6 Linux-only paths that make up the gap.
+  Note the baseline is a literal: deriving it from the value it constrains would
+  make the comparison `x <= x`, which passes for every input — the exact false
+  green this repo ratchets against elsewhere. Still to do: the Convention S stubs.
 
 - **Lot 4 — one namespace.** Migrate the **206 of 335 features (61.5 %)** out of
   the `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry

@@ -32,15 +32,27 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Root of the repository (one level above scripts/). */
-const REPO_ROOT = path.resolve(__dirname, '..');
+/**
+ * Root of the repository. This file lives in tools/codegen/, so the root is TWO
+ * levels up — it was one, which resolved to tools/ and made every path below
+ * point into a directory that does not exist.
+ */
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
-/** Where all drivers live. */
-const DRIVERS_DIR = path.join(REPO_ROOT, 'static', 'drivers');
+/**
+ * Where all drivers live.
+ *
+ * `static/drivers/` is the pre-reorg location. A husk of it still exists on some
+ * checkouts as two empty, untracked directories, which is why pointing here
+ * failed silently rather than loudly: readSpecNames() found no specs, the
+ * scaffold emitted ZERO adapters, and the generated adapters/README.md
+ * cheerfully announced "Ports to implement (0)".
+ */
+const DRIVERS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 
-/** Glob-equivalent source directories for specs. */
-const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'ports');
-const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'domain');
+/** Spec sources. Both moved under _shared/core/ in the same reorg. */
+const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'ports');
+const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'domain');
 
 /** Sub-directories every driver is expected to contain (canonical mirror layout:
  *  see the driver READMEs and docs/PROJECT_MEMORY.md). */
@@ -303,6 +315,16 @@ function main() {
 	// Collect specs
 	const ports = readSpecNames(PORTS_DIR);
 	const domains = readSpecNames(DOMAIN_DIR);
+
+	// A scaffold with no adapters is not a scaffold — it is an empty directory
+	// tree and a README claiming there is nothing to implement. That is what this
+	// tool produced for as long as its paths were stale, and nothing about the
+	// output said so. Refuse instead.
+	if (ports.length === 0) {
+		console.error(`Error: no port specs found in ${PORTS_DIR}`);
+		console.error('Refusing to scaffold a driver with zero adapters — fix the spec path first.');
+		process.exit(1);
+	}
 
 	console.log(`\nGenerating driver scaffold: ${driverName} (lang=${lang})`);
 	console.log(`Ports found:  ${ports.length}`);
