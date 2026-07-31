@@ -436,7 +436,7 @@ HSE_RegistryClear() {
 ; statement about the hot path, which sent a performance reader here by mistake.
 ; Its sibling _HSE_BucketsFor, which had no callers at all, was deleted.
 HSE_MappingsForTail(TailChar) {
-		global HSE_RegistryByLastChar
+		global HSE_RegistryByLastChar, HSE_PRIORITY_COMMON
 		; Collect from both the case-sensitive and case-insensitive buckets.
 		Out := []
 		LowerKey := StrLower(TailChar)
@@ -461,8 +461,10 @@ HSE_MappingsForTail(TailChar) {
 						j := A_Index
 						A := Out[j]
 						B := Out[j + 1]
-						APrio := A.HasOwnProp("Priority") ? A.Priority : 50
-						BPrio := B.HasOwnProp("Priority") ? B.Priority : 50
+						; Same source default as _HSE_Beats and the macOS comparator: an entry
+						; with no Priority is common, not personal.
+						APrio := A.HasOwnProp("Priority") ? A.Priority : HSE_PRIORITY_COMMON
+						BPrio := B.HasOwnProp("Priority") ? B.Priority : HSE_PRIORITY_COMMON
 						Swap := false
 						if (A.Length < B.Length) {
 								Swap := true
