@@ -13,9 +13,9 @@ _USWB_FuncBodyStripped(Src, FuncDef) {
 }
 
 _USWB_AssertOneClickUpdateAsync() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_OneClickUpdate(*) {")
-	Assert(Body != "", "Updater_OneClickUpdate must exist in lib/updater.ahk")
+	Assert(Body != "", "Updater_OneClickUpdate must exist in modules/updater.ahk")
 	
 	SyncIdx := InStr(Body, "Updater_FetchLatestJson(")
 	Assert(!SyncIdx, "Updater_OneClickUpdate must not call synchronous Updater_FetchLatestJson (sync-winhttp-blocks-keyboard-on-user-check)")
@@ -25,9 +25,9 @@ _USWB_AssertOneClickUpdateAsync() {
 }
 
 _USWB_AssertDownloadAndInstallAsync() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_DownloadAndInstall(Release) {")
-	Assert(Body != "", "Updater_DownloadAndInstall must exist in lib/updater.ahk")
+	Assert(Body != "", "Updater_DownloadAndInstall must exist in modules/updater.ahk")
 	
 	Assert(InStr(Body, "ComObject(") = 0 and InStr(Body, "Req.Open(") = 0,
 		"Updater_DownloadAndInstall must not create any WinHTTP object on the keyboard thread (sync-winhttp-blocks-keyboard-on-user-check)")
@@ -36,9 +36,9 @@ _USWB_AssertDownloadAndInstallAsync() {
 }
 
 _USWB_AssertShowAvailableUpdateAsync() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_ShowAvailableUpdate(*) {")
-	Assert(Body != "", "Updater_ShowAvailableUpdate must exist in lib/updater.ahk")
+	Assert(Body != "", "Updater_ShowAvailableUpdate must exist in modules/updater.ahk")
 
 	SyncIdx := InStr(Body, "Updater_FetchLatestJson(")
 	Assert(!SyncIdx, "Updater_ShowAvailableUpdate must not call synchronous Updater_FetchLatestJson — it blocks keyboard remapping on the menu/notification path (sync-winhttp-blocks-keyboard-on-user-check)")

@@ -27,7 +27,7 @@
 ; scan covered ui/menu ONLY — the directory the fix touched — while the guarantee
 ; is transitive: ANY path reachable while paused that reloads must carry the
 ; pause. Twenty-one bare Reload sites existed; fourteen were outside ui/menu, in
-; lib/config_io.ahk (ten), lib/i18n.ahk, lib/updater/core.ahk, ui/editors.ahk
+; lib/config_io.ahk (ten), lib/i18n.ahk, modules/updater/core.ahk, ui/editors.ahk
 ; (three), ui/action_picker, ui/paths_editor, ui/personal_info_editor,
 ; ui/onboarding (two) and modules/gestures/actions.ahk. Changing the interface
 ; language while paused, or saving from any editor, silently brought the driver

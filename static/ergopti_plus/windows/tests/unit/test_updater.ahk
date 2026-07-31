@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater Logic Tests
 ; DESCRIPTION:
-; Unit-tests for the semver and JSON parsing functions in lib/updater.ahk.
+; Unit-tests for the semver and JSON parsing functions in modules/updater.ahk.
 ; Ensures prerelease ordering, version parsing, and blocking-call hygiene work
 ; correctly.
 ; ==============================================================================
@@ -69,10 +69,10 @@ Test("Updater: version parsing", _UpdaterTest_ParseVersion)
 ; enough to freeze all keyboard input during a background update check on a
 ; slow or unresponsive network.
 _UpdaterTest_FetchLatestJsonHasTimeout() {
-	; Scan the whole updater module (now split across lib/updater/*.ahk) so body
+	; Scan the whole updater module (now split across modules/updater/*.ahk) so body
 	; extraction survives the decomposition. Anchor on the column-0 definition
 	; ("`n" + name) so a call site can never be mistaken for the body.
-	Source := _DriverDirConcat("lib/updater")
+	Source := _DriverDirConcat("modules/updater")
 
 	; Extract only the body of Updater_FetchLatestJson so we don't match
 	; SetTimeouts that belong to other functions (e.g. Updater_FetchReleasesListJson).
@@ -155,7 +155,7 @@ Test("Updater: WinHttp timeouts are all finite (regression: infinite DNS resolve
 ; froze the driver. A source scan catches a reintroduction even if it bypasses
 ; the named constants.
 _UpdaterTest_NoZeroResolveTimeout() {
-	Source := _DriverDirConcat("lib/updater")
+	Source := _DriverDirConcat("modules/updater")
 	Found := RegExMatch(Source, "SetTimeouts\(\s*0\s*,") > 0
 	AssertEqual(false, Found,
 		"updater.ahk passes a literal 0 resolve timeout to SetTimeouts -- that is infinite in WinHttp and freezes the main thread")
@@ -205,7 +205,7 @@ Test("Updater: staging worker runtime script retains its argv, timeout, integrit
 ; Updater_BackgroundTick goes through the async dispatch and never calls the
 ; blocking Updater_FetchLatestJson directly.
 _UpdaterTest_BackgroundTickIsAsync() {
-	Source := _DriverDirConcat("lib/updater")
+	Source := _DriverDirConcat("modules/updater")
 	FnStart := InStr(Source, "`nUpdater_BackgroundTick(")
 	if (FnStart == 0) {
 		AssertEqual("found", "missing", "Updater_BackgroundTick not found in updater.ahk")

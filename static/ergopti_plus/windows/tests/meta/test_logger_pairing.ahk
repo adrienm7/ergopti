@@ -162,7 +162,7 @@ Test("logger: no LoggerStart immediately precedes Reload (dangling-start-before-
 ; so it must close its START with LoggerSuccess, not LoggerInfo.
 _MetaUpdaterUpToDateLogsSuccess() {
 	SplitPath(A_ScriptDir, , &Root)
-	src := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/changelog.ahk")
+	src := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/changelog.ahk")
 	Assert(InStr(src, "already up to date") > 0, "sanity: the up-to-date message must exist in changelog.ahk")
 	Assert(RegExMatch(src, "LoggerInfo\([^\r\n]*already up to date") == 0,
 		"the one-click up-to-date path must close its START with LoggerSuccess, not LoggerInfo (updater-up-to-date-pairing)")

@@ -11,7 +11,7 @@
 ; silently produce a zero-byte or tiny file that the batch script then moved
 ; into place as the production exe — bricking the installation.
 ;
-; The fix adds two complementary guards in lib/updater.ahk:
+; The fix adds two complementary guards in modules/updater.ahk:
 ; a) Content-Length check: compares the Content-Length response header to the
 ;    actual saved file size. On mismatch the partial file is deleted and the
 ;    install is aborted with an error message.
@@ -59,9 +59,9 @@ _DIG_FuncBodyStripped(Src, FuncDef) {
 ; ===================================================
 
 _DIG_MinSizeConstantDeclared() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Assert(InStr(Src, "UPDATER_MIN_EXE_SIZE_BYTES") > 0,
-		"lib/updater.ahk must declare UPDATER_MIN_EXE_SIZE_BYTES — the named constant for the minimum valid exe size (rule 5.1: no magic numbers; download-no-integrity-partial-safety)")
+		"modules/updater.ahk must declare UPDATER_MIN_EXE_SIZE_BYTES — the named constant for the minimum valid exe size (rule 5.1: no magic numbers; download-no-integrity-partial-safety)")
 }
 Test("updater: UPDATER_MIN_EXE_SIZE_BYTES constant declared (download-no-integrity-partial-safety)", _DIG_MinSizeConstantDeclared)
 

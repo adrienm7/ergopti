@@ -16,7 +16,7 @@
 ; move fails (new exe absent after move), rename .bak back. Only delete the
 ; .bak after a confirmed successful move. The relaunch only fires on success.
 ;
-; SCOPE: source introspection of lib/updater.ahk.
+; SCOPE: source introspection of modules/updater.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -44,8 +44,8 @@ _USBR_ReadSource(RelPath) {
 ; ===================================================
 
 _USBR_CheckNoBareDelete() {
-	Src := _USBR_ReadSource("lib/updater.ahk")
-	Assert(Src != "", "lib/updater.ahk must be readable")
+	Src := _USBR_ReadSource("modules/updater.ahk")
+	Assert(Src != "", "modules/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
 	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
@@ -57,8 +57,8 @@ _USBR_CheckNoBareDelete() {
 }
 
 _USBR_CheckBakRenamePresent() {
-	Src := _USBR_ReadSource("lib/updater.ahk")
-	Assert(Src != "", "lib/updater.ahk must be readable")
+	Src := _USBR_ReadSource("modules/updater.ahk")
+	Assert(Src != "", "modules/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
 	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
@@ -74,8 +74,8 @@ _USBR_CheckBakRenamePresent() {
 }
 
 _USBR_CheckBakDeletedOnSuccess() {
-	Src := _USBR_ReadSource("lib/updater.ahk")
-	Assert(Src != "", "lib/updater.ahk must be readable")
+	Src := _USBR_ReadSource("modules/updater.ahk")
+	Assert(Src != "", "modules/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
 	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")

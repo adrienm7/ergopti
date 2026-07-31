@@ -53,7 +53,7 @@ TrayMenuSetMenu(Items) {
 	; Delete() can be recycled by the next Add() and fire the wrong callback --
 	; the same AHK 2.0 click-drop class RegisterMenuItem below exists to guard
 	; against. Reset the dispatcher's bookkeeping before rebuilding, mirroring
-	; _Updater_RebuildMenu (lib/updater/core.ahk).
+	; _Updater_RebuildMenu (modules/updater/core.ahk).
 	try MenuDispatcher_Reset()
 	try A_TrayMenu.Delete()
 	if !(Items is Array)

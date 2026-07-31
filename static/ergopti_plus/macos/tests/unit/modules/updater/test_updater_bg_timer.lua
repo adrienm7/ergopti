@@ -1,4 +1,4 @@
---- tests/unit/lib/test_updater_bg_timer.lua
+--- tests/unit/modules/updater/test_updater_bg_timer.lua
 
 --- ==============================================================================
 --- MODULE: updater background-timer lifecycle (regression)
@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 --- Loads a fresh updater whose source reports a packaged (non-local) build so
 --- that background checks actually arm.
 local function fresh_packaged()
-	package.loaded["lib.updater"] = nil
-	return helpers.load_with_stubs("lib.updater", {
+	package.loaded["modules.updater"] = nil
+	return helpers.load_with_stubs("modules.updater", {
 		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
 	})
 end

@@ -44,9 +44,9 @@ Test("webview-lowram: healthcheck gates WebView2 on free RAM", _TWLR_Healthcheck
 
 ; The updater module (changelog pane + update prompt) must gate the same way.
 _TWLR_UpdaterModuleGated() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
-		"lib/updater must gate WebView2 on WebView_ShouldUseNativeFallback")
+		"modules/updater must gate WebView2 on WebView_ShouldUseNativeFallback")
 }
 Test("webview-lowram: updater module gates WebView2 on free RAM", _TWLR_UpdaterModuleGated)
 
@@ -71,7 +71,7 @@ Test("webview-lowram: model_browser prefers native ListView on low RAM", _TWLR_M
 ; notes. Before this feature ShowBody returned 0 with WebView2 off, leaving the
 ; pane blank. Pin the native Edit fallback so that regression cannot return.
 _TWLR_UpdaterChangelogHasNativeNotes() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Assert(InStr(Src, "RightPaneEdit") > 0,
 		"updater changelog must build a native RightPaneEdit fallback when WebView2 is off")
 	Assert(InStr(Src, "RightPaneEdit.Value := _Updater_MarkdownToPlain(md)") > 0,

@@ -27,7 +27,7 @@ local text_utils = require("lib.text_utils")
 local i18n      = require("lib.i18n")
 local dialog    = require("lib.dialog_util")
 local changelog = require("ui.changelog")
-local Updater   = require("lib.updater")
+local Updater   = require("modules.updater")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector

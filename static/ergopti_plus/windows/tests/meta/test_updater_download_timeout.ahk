@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater Download Timeout Meta-Test
 ; DESCRIPTION:
-; Structural regression for the download poll ceiling fix in lib/updater.ahk.
+; Structural regression for the download poll ceiling fix in modules/updater.ahk.
 ;
 ; Before the fix, _Updater_PollDownloadAsync() capped the total wait at
 ; 120 000 ms (2 minutes):
@@ -49,7 +49,7 @@ _UDTO_FindPollBlock() {
 
 _UDTO_600SecCeiling() {
 	SplitPath(A_ScriptDir, , &Root)
-	Core := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/core.ahk")
+	Core := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/core.ahk")
 	Assert(InStr(Core, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000") > 0,
 		"core.ahk must retain the 600000 ms download timeout budget passed to the staging worker")
 }

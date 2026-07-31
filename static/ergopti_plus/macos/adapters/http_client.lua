@@ -38,7 +38,7 @@
 ---    instance's current generation before delivering, so a stale callback
 ---    from a superseded request (e.g. a warmup POST outlived by a real
 ---    inference POST sharing the same instance) is discarded instead of
----    delivering its result to the wrong caller. Mirrors lib/updater.lua's
+---    delivering its result to the wrong caller. Mirrors modules/updater/init.lua's
 ---    _poll_generation pattern.
 --- ==============================================================================
 

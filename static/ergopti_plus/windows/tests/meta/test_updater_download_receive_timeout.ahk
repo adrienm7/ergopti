@@ -26,7 +26,7 @@ _UDRT_AssertDownloadReceiveBudget() {
 	Assert(InStr(Body, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS") > 0,
 		"_Updater_StartStagingWorker must pass the dedicated download timeout to the worker, not the 30 s API budget (updater-download-receive-timeout)")
 	SplitPath(A_ScriptDir, , &Root)
-	Core := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/core.ahk")
+	Core := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/core.ahk")
 	m := ""
 	Assert(RegExMatch(Core, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS\s*:=\s*(\d+)", &m) > 0,
 		"core.ahk must define UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS (updater-download-receive-timeout)")

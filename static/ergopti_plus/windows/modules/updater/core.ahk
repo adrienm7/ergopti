@@ -1,11 +1,11 @@
-﻿; lib/updater/core.ahk
+﻿; modules/updater/core.ahk
 
 ; ==============================================================================
 ; MODULE: Updater / Config + Version + Release Fetch
 ; DESCRIPTION:
 ; Updater constants, channel and check-interval config, semantic-version parsing and comparison, GitHub Releases API URLs, and the (sync + async) latest-release / releases-list fetch and JSON parsing.
 ;
-; Split out of lib/updater.ahk (the module split); see lib/updater.ahk for the module
+; Split out of modules/updater.ahk (the module split); see modules/updater.ahk for the module
 ; overview. Functions and globals are hoisted, so load order across the
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
@@ -370,7 +370,7 @@ _Updater_CompareVersions(A, B) {
 		; Non-semver tag(s): refuse to order them. Fail closed (return 0 = "not
 		; newer") rather than guess lexicographically — "10" vs "9" and other
 		; ambiguous tags must never trigger or suppress an update by accident.
-		; Mirrors macOS lib/updater.lua + _shared/.../version.js; kept in
+		; Mirrors macOS modules/updater/init.lua + _shared/.../version.js; kept in
 		; lock-step by the version-compare parity gate (D-1)
 		return 0
 	}

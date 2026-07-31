@@ -145,7 +145,7 @@ OnError(_FatalErrorHandler)
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
-#Include ../lib/updater.ahk
+#Include ../modules/updater.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../lib/registry.ahk
 #Include ../lib/json.ahk
