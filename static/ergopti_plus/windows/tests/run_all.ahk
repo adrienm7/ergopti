@@ -422,6 +422,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk
+#Include meta/test_assertions_are_case_sensitive.ahk
 #Include meta/test_personal_hotstring_node_shape.ahk
 #Include meta/test_personal_hotstring_seed.ahk
 #Include meta/test_personal_hotstring_new_section_seed.ahk
