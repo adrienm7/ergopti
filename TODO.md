@@ -311,8 +311,23 @@ Constraints: **paths before moves, moves before content, data before code.**
   which is the thing they are computing — so the gate asserts their depth
   directly instead of exempting them on trust. `engine.lua` was one of the five.
 
-  Still open in this item: the **14 files deriving `$HOME` separately**
-  (`config_paths.lua`). Gate:
+  ~~The `$HOME` half~~ is done too, as `linux/lib/config_paths.lua`. The count
+  was **19 call sites across 15 files**, with **six different answers** for a
+  missing HOME — `"/tmp"`, `"~"`, `""`, `"."`, `"/home/user"`, and one bare
+  concatenation with no fallback at all. Two of those are broken rather than
+  merely inconsistent: the bare concat THROWS on a nil HOME and took the whole
+  menu build with it, and `"~"` is never expanded by `io.open` (Lua does no tilde
+  expansion), so those paths addressed a literal directory named `~` beside the
+  process — the keylogger wrote its database there. `"/home/user"`, in five
+  webview bridges, is the worst of the three: a plausible path belonging to
+  nobody, so a write there looks like it worked.
+
+  One policy now, applied everywhere: fall back to `TMPDIR` (or `/tmp`), which is
+  honest — obviously not the user's home, writable, and nothing there is mistaken
+  for durable state. `adapters/storage.lua` keeps its `ergopti_plus/` directory
+  name rather than being "corrected" to `ergopti/`: that is where existing
+  installs have their `storage.json`, and renaming it would orphan every stored
+  setting. 19 sites → 3, all inside the resolver, and the gate holds it. Gate:
   `test-shared-root-resolvers.cjs` must **execute** each expression and assert the
   file exists — never merely that the module loaded. (2) Move the macOS
   config-path SSOT out of `ui/menu/menu_paths.lua` (25 call sites): today `lib/`

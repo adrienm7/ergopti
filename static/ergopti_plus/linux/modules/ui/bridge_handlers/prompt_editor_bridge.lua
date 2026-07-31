@@ -24,7 +24,7 @@ end
 
 -- Path to the daemon config file.
 local function _config_path()
-	local home = os.getenv("HOME") or "/home/user"
+	local home = require("lib.config_paths").home()
 	return home .. "/.config/ergopti/config.toml"
 end
 

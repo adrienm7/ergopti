@@ -126,6 +126,36 @@ for (const b of BOOTSTRAPS) {
 	}
 }
 
+// ── The user's directories, same rule, same reason ──────────────────────────
+//
+// Fifteen files derived $HOME themselves, across nineteen call sites, with SIX
+// different answers for a missing HOME: "/tmp", "~", "", ".", "/home/user", and
+// one bare concatenation with no fallback at all. Two of those were wrong rather
+// than merely inconsistent — the bare concat THROWS on nil and took the menu
+// build with it, and "~" is never expanded by io.open, so those paths addressed
+// a literal directory named "~" beside the process. "/home/user" is the worst of
+// the three: a plausible path belonging to nobody, so a write there looks like it
+// worked.
+const HOME_EXEMPT = new Set(['lib/config_paths.lua']);
+const USER_ENV = /os\.getenv\(\s*"(HOME|XDG_CONFIG_HOME|XDG_DATA_HOME)"\s*\)/;
+
+for (const abs of files) {
+	const rel = path.relative(DRIVER, abs).split(path.sep).join('/');
+	if (HOME_EXEMPT.has(rel)) continue;
+	fs.readFileSync(abs, 'utf8')
+		.split(/\r?\n/)
+		.forEach((line, i) => {
+			if (/^\s*--/.test(line)) return;
+			const m = line.match(USER_ENV);
+			if (!m) return;
+			errors.push(
+				`${rel}:${i + 1}: reads ${m[1]} directly — require("lib.config_paths"). Fifteen files ` +
+					'once did this with six different fallbacks, two of them broken: a bare concatenation ' +
+					'throws on nil, and "~" is never expanded by io.open.'
+			);
+		});
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux modules bypassing the shared-path resolver:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

@@ -28,7 +28,7 @@ local LOG = "diagnostics.crash_reporter"
 -- =========================================
 
 local MAX_CRASH_FILES = 20
-local CRASH_DIR = (os.getenv("HOME") or "/tmp") .. "/.local/share/ergopti/crashes"
+local CRASH_DIR = require("lib.config_paths").data("crashes")
 
 
 -- =========================================

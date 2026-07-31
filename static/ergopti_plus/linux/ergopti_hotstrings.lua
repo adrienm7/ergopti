@@ -178,7 +178,7 @@ if ok_fw then file_watchers = fw_mod end
 -- =========================================
 
 -- Default hotstring data location (XDG-compliant user config).
-local DEFAULT_CONFIG_DIR = (os.getenv("HOME") or "~") .. "/.config/ergopti/hotstrings"
+local DEFAULT_CONFIG_DIR = require("lib.config_paths").config("hotstrings")
 
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()

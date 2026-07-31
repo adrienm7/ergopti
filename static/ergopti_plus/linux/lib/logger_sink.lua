@@ -118,7 +118,7 @@ end
 function M.log_dir()
 	local data_home = os.getenv(XDG_DATA_HOME_ENV)
 	if not data_home or data_home == "" then
-		local home = os.getenv("HOME") or "."
+		local home = require("lib.config_paths").home()
 		data_home = home .. DEFAULT_DATA_HOME_REL
 	end
 	return data_home .. LOG_SUBDIR
