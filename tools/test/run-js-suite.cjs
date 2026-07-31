@@ -48,6 +48,7 @@ const CHECKS = [
 	{ name: 'AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)', cmd: 'node', args: ['tools/test/test-ahk-parse-coverage.cjs'], repro: 'node tools/test/test-ahk-parse-coverage.cjs' },
 	{ name: 'Lua closure-binds-nil-global (ratchet against the fourth recurrence of the hs.task GC-pin trap)', cmd: 'node', args: ['tools/test/test-lua-closure-before-local.cjs'], repro: 'node tools/test/test-lua-closure-before-local.cjs' },
 	{ name: 'glossaries match the code (port count + names derived from _shared/core/ports, no retired driver dirs)', cmd: 'node', args: ['tools/test/test-glossary-matches-code.cjs'], repro: 'node tools/test/test-glossary-matches-code.cjs' },
+	{ name: 'Linux menu i18n keys exist (every i18n_safe key is defined in en.json)', cmd: 'node', args: ['tools/test/test-linux-menu-keys-exist.cjs'], repro: 'node tools/test/test-linux-menu-keys-exist.cjs' },
 	{ name: 'source encoding (no double-encoded UTF-8, no repeated BOM, valid UTF-8 — every driver)', cmd: 'node', args: ['tools/test/test-source-encoding.cjs'], repro: 'node tools/test/test-source-encoding.cjs' },
 	{ name: 'AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)', cmd: 'node', args: ['tools/test/test-ahk-v2-syntax-antipatterns.cjs'], repro: 'node tools/test/test-ahk-v2-syntax-antipatterns.cjs' },
 	{ name: 'unified reporter parses TAP + Lua output (report.cjs)', cmd: 'node', args: ['tools/test/test-report.cjs'], repro: 'node tools/test/test-report.cjs' },

@@ -70,7 +70,7 @@ local function _build_layouts(ctx)
 	local current = ctx.layout or "qwerty"
 	local on_change = ctx.on_layout_change
 	return {
-		title = i18n_safe("menu.layout.title", "⌨ Disposition"),
+		title = i18n_safe("menu.layout.title"),
 		menu = {
 			{
 				title = "qwerty " .. (current == "qwerty" and "✓" or ""),
@@ -94,7 +94,7 @@ local function _build_hotstrings(ctx)
 	local items = {}
 
 	if type(config) ~= "table" then
-		return { title = i18n_safe("menu.hotstrings.title", "⚡ Hotstrings"), menu = {
+		return { title = i18n_safe("menu.hotstrings.title"), menu = {
 			{ title = "(config non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -127,14 +127,14 @@ local function _build_hotstrings(ctx)
 		end,
 	}
 
-	return { title = i18n_safe("menu.hotstrings.title", "⚡ Hotstrings"), menu = items }
+	return { title = i18n_safe("menu.hotstrings.title"), menu = items }
 end
 
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { title = i18n_safe("menu.llm.title", "🤖 IA"), menu = {
+		return { title = i18n_safe("menu.llm.title"), menu = {
 			{ title = "LLM non disponible", fn = function() end, disabled = true },
 			{ title = "(démarrer Ollama sur le port 11434)", fn = function() end, disabled = true },
 		}}
@@ -165,7 +165,7 @@ local function _build_llm(ctx)
 		end
 	end
 
-	return { title = i18n_safe("menu.llm.title", "🤖 IA"), menu = items }
+	return { title = i18n_safe("menu.llm.title"), menu = items }
 end
 
 --- Builds the metrics/keylogger submenu.
@@ -214,12 +214,12 @@ end
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { title = i18n_safe("menu.metrics.title", "📊 Métriques"), menu = {
+		return { title = i18n_safe("menu.metrics.title"), menu = {
 			{ title = "(métriques non disponibles)", fn = function() end, disabled = true },
 		}}
 	end
 
-	return { title = i18n_safe("menu.metrics.title", "📊 Métriques"), menu = {
+	return { title = i18n_safe("menu.metrics.title"), menu = {
 		{
 			title = "Statistiques de session",
 			fn = function()
@@ -283,7 +283,7 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { title = i18n_safe("menu.shortcuts.title", "⚙ Raccourcis"), menu = {
+		return { title = i18n_safe("menu.shortcuts.title"), menu = {
 			{ title = "(shortcuts non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -354,7 +354,7 @@ local function _build_shortcuts(ctx)
 	end
 	items[#items + 1] = { title = "Wrap symbols", menu = wrap_items }
 
-	return { title = i18n_safe("menu.shortcuts.title", "⚙ Raccourcis"), menu = items }
+	return { title = i18n_safe("menu.shortcuts.title"), menu = items }
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner equivalent).
@@ -370,7 +370,7 @@ local function _build_kanata(ctx)
 
 	local running = km and km.is_running() or false
 
-	return { title = i18n_safe("menu.kanata.title", "🎹 Kanata"), menu = {
+	return { title = i18n_safe("menu.kanata.title"), menu = {
 		{
 			title = "Générer le .kbd",
 			fn = function()
@@ -422,7 +422,7 @@ end
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { title = i18n_safe("menu.gestures.title", "🖐 Gestes"), menu = {
+		return { title = i18n_safe("menu.gestures.title"), menu = {
 			{ title = "(gestures non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -519,14 +519,14 @@ local function _build_gestures(ctx)
 		end,
 	}
 
-	return { title = i18n_safe("menu.gestures.title", "🖐 Gestes"), menu = items }
+	return { title = i18n_safe("menu.gestures.title"), menu = items }
 end
 
 --- Builds the apps submenu (per-app configs via webview).
 local function _build_apps(ctx)
-	return { title = i18n_safe("menu.apps.title", "📱 Apps"), menu = {
+	return { title = i18n_safe("menu.apps.title"), menu = {
 		{
-			title = i18n_safe("menu.apps.config_per_app", "Configurer les hotstrings par application"),
+			title = i18n_safe("menu.apps.config_per_app"),
 			fn = function()
 				if ctx.webview then
 					ctx.webview.show("hotstrings_config_window")
@@ -545,22 +545,22 @@ end
 
 --- Builds the global actions submenu.
 local function _build_global_actions(ctx)
-	return { title = i18n_safe("menu.global.title", "Actions globales"), menu = {
+	return { title = i18n_safe("menu.global.title"), menu = {
 		{
-			title = i18n_safe("menu.global.enable_all", "Activer tout"),
+			title = i18n_safe("menu.global.enable_all"),
 			fn = function()
 				if ctx.on_enable_all then ctx.on_enable_all() end
 			end,
 		},
 		{
-			title = i18n_safe("menu.global.disable_all", "Désactiver tout"),
+			title = i18n_safe("menu.global.disable_all"),
 			fn = function()
 				if ctx.on_disable_all then ctx.on_disable_all() end
 			end,
 		},
 		{ title = "-" },
 		{
-			title = i18n_safe("menu.global.reset_defaults", "Réinitialiser"),
+			title = i18n_safe("menu.global.reset_defaults"),
 			fn = function()
 				if ctx.on_reset_defaults then ctx.on_reset_defaults() end
 			end,
@@ -604,13 +604,13 @@ local function _build_language(_ctx)
 		end }
 	end
 
-	return { title = i18n_safe("menu.global.language", "🌐 Langue"), menu = items }
+	return { title = i18n_safe("menu.global.language"), menu = items }
 end
 
 --- Builds the config folder launcher.
 local function _build_config_folder(ctx)
 	return {
-		title = i18n_safe("menu.global.config_folder", "📂 Dossier de config"),
+		title = i18n_safe("menu.global.config_folder"),
 		fn = function()
 			local dir = os.getenv("HOME") .. "/.config/ergopti/hotstrings"
 			Logger.info(LOG, "Opening config folder: %s", dir)
@@ -622,7 +622,7 @@ end
 --- Builds the setup wizard launcher (opens the WebKitGTK onboarding window).
 local function _build_setup_wizard(ctx)
 	return {
-		title = i18n_safe("menu.global.setup_wizard", "🧙 Assistant"),
+		title = i18n_safe("menu.global.setup_wizard"),
 		fn = function()
 			if ctx.on_show_setup_wizard then ctx.on_show_setup_wizard() end
 		end,
@@ -633,7 +633,7 @@ end
 local function _build_updates(ctx)
 	local up = ctx.updater
 	if not up then
-		return { title = i18n_safe("menu.updates.title", "🔄 Mises à jour"), menu = {
+		return { title = i18n_safe("menu.updates.title"), menu = {
 			{ title = "(updater non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -729,13 +729,13 @@ local function _build_updates(ctx)
 		end,
 	}
 
-	return { title = i18n_safe("menu.updates.title", "🔄 Mises à jour"), menu = items }
+	return { title = i18n_safe("menu.updates.title"), menu = items }
 end
 
 --- Builds the about item.
 local function _build_about(_ctx)
 	return {
-		title = i18n_safe("menu.about.title", "ℹ À propos"),
+		title = i18n_safe("menu.about.title"),
 		fn = function()
 			Logger.info(LOG, "Ergopti — ergonomic keyboard optimizer.")
 		end,
@@ -745,7 +745,7 @@ end
 --- Builds the reload item.
 local function _build_reload(_ctx)
 	return {
-		title = i18n_safe("menu.global.reload", "↺ Recharger"),
+		title = i18n_safe("menu.global.reload"),
 		fn = function()
 			Logger.info(LOG, "Reload requested — sending SIGHUP.")
 			-- SIGHUP triggers on_sighup_reload in the daemon (if posix.signal is available).
@@ -757,7 +757,7 @@ end
 --- Builds the quit item.
 local function _build_quit(ctx)
 	return {
-		title = i18n_safe("menu.global.quit", "✕ Quitter"),
+		title = i18n_safe("menu.global.quit"),
 		fn = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if ctx.on_quit then ctx.on_quit() end
@@ -778,19 +778,19 @@ local function _build_debug(ctx)
 		}
 	end
 
-	return { title = i18n_safe("menu.debug.title", "🐛 Débogage"), menu = {
+	return { title = i18n_safe("menu.debug.title"), menu = {
 		{
-			title = i18n_safe("menu.debug.log_level", "Niveau de log"),
+			title = i18n_safe("menu.debug.log_level"),
 			menu = level_items,
 		},
 		{
-			title = i18n_safe("menu.debug.open_logs", "Ouvrir les logs"),
+			title = i18n_safe("menu.debug.open_logs"),
 			fn = function()
 				if ctx.on_open_logs then ctx.on_open_logs() end
 			end,
 		},
 		{
-			title = i18n_safe("menu.debug.healthcheck", "Diagnostic"),
+			title = i18n_safe("menu.debug.healthcheck"),
 			fn = function()
 				if ctx.on_healthcheck then ctx.on_healthcheck() end
 			end,
@@ -805,18 +805,25 @@ end
 -- =========================================
 -- =========================================
 
---- Returns a translated string if the i18n module is available, or the fallback.
---- Separated so the menu builder works before the i18n wiring is done.
---- @param key string i18n key
---- @param fallback string Fallback text
---- @return string
-function i18n_safe(key, fallback)
+--- Returns the translated string, or the KEY when the i18n module cannot be
+--- loaded at all. Separated so the menu builder works before the i18n wiring is
+--- done — the pcall guards a real boot-order case, not a missing translation.
+---
+--- It used to take a French `fallback` second argument, supplied at all 30 call
+--- sites. Every one of those keys exists in en.json and the locale-parity gate
+--- keeps all 21 locales in step with it, so the fallback was unreachable — and
+--- had it ever been reached, it would have shown French to a user of any of the
+--- other 20 languages. A raw key on screen is ugly and diagnosable; a silently
+--- wrong language is neither.
+--- @param key string i18n key.
+--- @return string The translation, or the key itself.
+function i18n_safe(key)
 	local ok, i18n = pcall(require, "lib.i18n")
 	if ok and i18n and type(i18n.get) == "function" then
 		local val = i18n.get(key)
 		if val and val ~= key then return val end
 	end
-	return fallback or key
+	return key
 end
 
 
