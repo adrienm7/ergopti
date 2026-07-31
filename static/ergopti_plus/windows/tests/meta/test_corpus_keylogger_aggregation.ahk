@@ -356,6 +356,15 @@ _KlgAggCorpus_RunVector(Vec) {
 		; divergence (macOS-only feature, AHK walker handles modifier_hold +
 		; system_day but not focus_first_key)
 	}
+	else {
+		; An id with no branch used to fall straight off the end of this chain and
+		; report green having asserted nothing. That is how a vector added to the
+		; shared corpus would be "consumed" by this driver without being checked —
+		; and it is the same silent-coverage shape the loop-capture bug produced,
+		; which is why it is closed here too.
+		Assert(false,
+			"corpus vector '" . Id . "' has no branch in _KlgAggCorpus_RunVector — add one, or this driver silently ignores the case the vector was written for")
+	}
 }
 
 _KlgAggCorpus_RegisterAll()
