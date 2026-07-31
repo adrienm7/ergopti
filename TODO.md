@@ -450,10 +450,34 @@ Constraints: **paths before moves, moves before content, data before code.**
   entry point and add the unwatched AHK families (`SetTimer` 264 lines,
   `Hotkey/Hotstring/HotIf` 203, `Gui/Menu` 162, `Run` 59, `Win*` 54, `GetKeyState`
   45 — **874 unwatched lines**, plus 130 in `ui/` that are inside the ratchet's own
-  categories but outside its scan). Route the 61 Linux module shell-outs and 54
-  hand-quoting sites through `shell_runner` — it exists, its docstring explains
-  exactly why (`string.format("%q")` is a Lua literal quoter, not a shell one), and
-  **no module requires it**. One `npm run gen` regenerating everything
+  categories but outside its scan). Route the Linux module shell-outs through
+  `shell_runner` — it exists, its docstring explains exactly why
+  (`string.format("%q")` is a Lua literal quoter, not a shell one), and **no
+  module requires it** (the `adapters/` do; in `modules/` the measured count is
+  **56 sites across 15 files, 0 requiring it**).
+  **Measured, and the quoting is mostly not the problem.** 25 of the 28
+  interpolating sites already hand-roll the correct `gsub("'", "'\''")` — the
+  same four-character escape written out 25 times, which is duplication, not a
+  defect. Only **3** interpolate unescaped, and 2 of those quote at the call site
+  instead (`gestures/manager.lua`, `hotstrings/injector.lua` — both only append
+  redirection to an already-quoted command).
+  ~~The third was a live bug~~ — **fixed.** The tray Reload item ran
+  `"kill -HUP " .. tostring(os.getpid and os.getpid() or "$$")`, wrong twice
+  over: `os.getpid` **does not exist in Lua**, so the guard always fell through
+  to the literal `"$$"`; and `os.execute` runs its string in a NEW `/bin/sh`,
+  where `$$` is that shell's pid, never the caller's. The daemon told a throwaway
+  shell to reload, the shell killed itself, and the item logged
+  `"Reload requested — sending SIGHUP."` while reloading nothing. It could not
+  fail visibly — `os.execute` does not raise on a command that runs successfully
+  and does the wrong thing, so any "does it crash?" test passes on it forever.
+  Reload now goes through `ctx.on_reload` into the daemon's own reload path, the
+  same shape the quit item already used: no subprocess, no signal, no pid. The
+  regression test asserts `os.execute` is **not reached**, which is the only
+  assertion that could have caught this shape.
+  Found while measuring: the test's search had to be made non-recursive, because
+  the Hotstrings submenu carries its own hardcoded-French `"Recharger les
+  hotstrings"` entry that a recursive match finds first — the first cut passed
+  against the wrong item. That label is one of the 101 tracked in Lot 5(3). One `npm run gen` regenerating everything
   deterministically in a single Node process, plus `npm run gen:check` writing to a
   temp dir and diffing — which also fixes by construction the fact that
   `test-features-manifest-no-drift.cjs` **silently rewrites three files it does not

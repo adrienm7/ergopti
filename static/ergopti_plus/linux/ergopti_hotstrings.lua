@@ -279,10 +279,16 @@ local function resolve_config_path(config_path)
 	return nil
 end
 
---- Attempts the SIGHUP reload flow.  Called from a signal handler so it must
---- be self-contained and not throw.
-local function on_sighup_reload()
-	Logger.info(LOG, "SIGHUP received — reloading hotstring config…")
+--- Reloads the hotstring config.  Reached from the SIGHUP handler and from the
+--- tray menu's Reload item, so it must be self-contained and not throw.
+---
+--- The menu used to reach this by shelling out `kill -HUP $$`, which signalled
+--- the /bin/sh that os.execute had just spawned rather than this process — the
+--- item logged success and reloaded nothing. There is no reason to leave the
+--- process to signal itself: the menu now calls this directly.
+--- @param trigger string What asked for the reload, for the log line.
+local function perform_reload(trigger)
+	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
 	local ok, count = pcall(function() return hotstrings_config.reload() end)
 	if ok then
 		Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
@@ -319,7 +325,7 @@ local function install_signal_handlers()
 	pcall(signal.signal, signal.SIGTERM, on_term)
 
 	-- SIGHUP → hot reload.
-	pcall(signal.signal, signal.SIGHUP,  function(_) on_sighup_reload() end)
+	pcall(signal.signal, signal.SIGHUP,  function(_) perform_reload("SIGHUP") end)
 
 	Logger.debug(LOG, "Signal handlers installed (INT, TERM, HUP).")
 end
@@ -604,6 +610,11 @@ local function main()
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
 			on_quit       = function() keyboard_hook.stop() end,
+			-- Same code path the SIGHUP handler takes. The menu item used to
+			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
+			-- spawned — never this process — so Reload logged success and
+			-- reloaded nothing.
+			on_reload     = function() perform_reload("the tray menu") end,
 			on_open_config = function(dir)
 				local d = dir or config_dir
 				Logger.info(LOG, "Opening config folder: %s", d)
