@@ -69,8 +69,13 @@ _RLUA_AssignmentNotInsideEmptyStringBranch() {
 	posAssign := InStr(block, "RemappedList[Character] := ScanCode")
 	posEmptyGuard := InStr(block, 'AlternativeCharacter == ""')
 	if (posEmptyGuard = 0) {
-		; No == "" guard exists any more — assignment is unconditional. Pass.
-		Assert(true, "")
+		; The guard is gone entirely, which is the strongest form of the fix. Say so
+		; by asserting what remains true — that the assignment is still THERE. An
+		; Assert(true, "") here also passed when the assignment had been deleted
+		; along with the guard, and RemapKey stopped recording remaps at all.
+		Assert(posAssign > 0,
+			"the RemappedList assignment must still exist — with the empty-string guard gone, "
+			. "nothing else in this test would notice its removal")
 		return
 	}
 	; If the == "" guard still exists, the assignment must come BEFORE it.
