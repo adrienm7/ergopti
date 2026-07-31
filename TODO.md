@@ -554,10 +554,30 @@ Constraints: **paths before moves, moves before content, data before code.**
   real traffic and supersede ADR-001 with the measured reality; honest demotion
   candidates: `AppLauncher`, `Crypto`, `Storage`, `ProcessLifecycle`,
   `MouseControl`, `TooltipRenderer`. Extend both purity ratchets to `ui/` and the
-  entry point and add the unwatched AHK families (`SetTimer` 264 lines,
-  `Hotkey/Hotstring/HotIf` 203, `Gui/Menu` 162, `Run` 59, `Win*` 54, `GetKeyState`
-  45 — **874 unwatched lines**, plus 130 in `ui/` that are inside the ratchet's own
-  categories but outside its scan). Route the Linux module shell-outs through
+  entry point and ~~add the unwatched AHK families~~ — **done.**
+  Measured with the enforcing counter itself: **1 064 lines across three trees**
+  (modules+lib 773, ui 280, entry 11), broken down as Binding 330, Timer 277,
+  GuiMenu 219, KeyState 105, Window 74, Process 59. The earlier estimate of 874
+  was low, mostly on the binding family.
+  Kept as a **second, separate** ratchet rather than folded into the OS-call one,
+  because the two mean different things: `DllCall`/`COM`/`FileIO` are impurity
+  whose target is zero, while a keyboard driver legitimately binds hotkeys and
+  arms timers — telling it to stop would be telling it to stop being a keyboard
+  driver. What makes those families worth bounding is that they are where the
+  driver's *behaviour* is declared, and 312 binding lines plus 193 timer lines in
+  modules+lib is behaviour spelled out in code that the other drivers express as
+  manifest rows. The number should fall on its own as Lot 6 migrates them.
+  **A cross-check earned its keep here:** the same tally written in another
+  language counted `ui` at 271 where the AHK counter reports 280, because AHK's
+  `InStr` is **case-insensitive**. In this counter that is correct rather than a
+  bug — AHK resolves function names case-insensitively too, so `gui(` and `Gui(`
+  are the same call — but a baseline taken from the case-sensitive tally would
+  have frozen a number the enforcing rule can never produce, and the ratchet
+  would have been red on arrival. Every baseline is now read from the counter
+  that enforces it. (Same property, opposite verdict, as the `AssertEqual` fix
+  earlier in this file's history: case-insensitivity was wrong there and is right
+  here, which is exactly why it has to be decided per call site rather than
+  assumed.) Route the Linux module shell-outs through
   `shell_runner` — it exists, its docstring explains exactly why
   (`string.format("%q")` is a Lua literal quoter, not a shell one), and **no
   module requires it** (the `adapters/` do; in `modules/` the measured count is

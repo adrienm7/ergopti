@@ -161,3 +161,118 @@ _AOPR_RatchetEntry() {
 	_AOPR_AssertTree("windows/ErgoptiPlus.ahk", [Entry], _AOPR_BASELINE_ENTRY)
 }
 Test("meta: windows/ OS-call purity ratchet — entry point", _AOPR_RatchetEntry)
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 3/ Platform-API family ratchets ==========
+; ==================================================
+; ==================================================
+
+; A SECOND ratchet, deliberately kept apart from the OS-call one above, because
+; the two mean different things.
+;
+; DllCall / COM / FileIO are impurity: the long-term target is zero, because
+; every one of them belongs behind an adapter. The families below are not.
+; A keyboard driver legitimately binds hotkeys, arms timers and builds menus —
+; telling it to stop would be telling it to stop being a keyboard driver.
+;
+; What makes them worth watching is that they are the surface where the driver's
+; BEHAVIOUR is declared, and unbounded growth there is the exact shape of the
+; AHK-only logic that ought to be manifest data instead: 312 binding lines and
+; 193 timer lines in modules+lib is a lot of behaviour spelled out in code that
+; other drivers express as rows. So this ratchet bounds rather than eliminates —
+; and it will fall on its own as those rows migrate.
+;
+; Sharing one total with the OS-call ratchet would let a win in one pay for a
+; regression in the other, which is the same reason the three trees already
+; carry separate numbers.
+
+_AOPR_CountFamilies(Files) {
+	Categories := Map(
+		"Timer",    ["SetTimer"],
+		"Binding",  ["Hotkey(", "Hotstring(", "#HotIf", "HotIf("],
+		"GuiMenu",  ["Gui(", "Menu(", "MenuBar(", "TrayTip"],
+		"Process",  ["Run(", "RunWait("],
+		"Window",   ["WinActivate", "WinExist", "WinGetTitle", "WinGetClass", "WinGetPos",
+		             "WinMove", "WinShow", "WinHide", "WinClose", "WinKill", "WinWaitActive",
+		             "WinGetProcessName", "WinSetTransparent", "WinGetID"],
+		"KeyState", ["GetKeyState(", "KeyWait"])
+	Result := Map("Timer", 0, "Binding", 0, "GuiMenu", 0, "Process", 0, "Window", 0, "KeyState", 0)
+	for FilePath in Files {
+		Src := ""
+		try Src := FileRead(FilePath)
+		Loop Parse, Src, "`n", "`r" {
+			Line := Trim(A_LoopField)
+			if (SubStr(Line, 1, 1) == ";")
+				continue
+			for Cat, Needles in Categories {
+				for Needle in Needles {
+					if InStr(Line, Needle) {
+						Result[Cat] += 1
+						break
+					}
+				}
+			}
+		}
+	}
+	return Result
+}
+
+_AOPR_FamilyTotal(C) {
+	return C["Timer"] + C["Binding"] + C["GuiMenu"] + C["Process"] + C["Window"] + C["KeyState"]
+}
+
+_AOPR_AssertFamilies(Label, Files, Baseline) {
+	Assert(Files.Length > 0,
+		"family ratchet found NO .ahk file for '" . Label . "' — the walk is broken, not the tree. "
+		. "A ratchet that scans nothing passes forever.")
+	C := _AOPR_CountFamilies(Files)
+	Total := _AOPR_FamilyTotal(C)
+	Assert(Total <= Baseline,
+		"Platform-API family lines in " . Label . " rose to " . Total . " (baseline " . Baseline
+		. "): Timer=" . C["Timer"] . " Binding=" . C["Binding"] . " GuiMenu=" . C["GuiMenu"]
+		. " Process=" . C["Process"] . " Window=" . C["Window"] . " KeyState=" . C["KeyState"]
+		. " — prefer a manifest row or an existing helper over a new direct binding; "
+		. "do not raise the baseline.")
+}
+
+; Baselines: 2026-07-31, first measurement of these families. Not regressions —
+; nothing had ever counted them. Every number below was read from THIS counter's
+; own output rather than reproduced elsewhere, and that distinction earned its
+; keep immediately: a cross-check written in another language counted ui at 271
+; where this counts 280, because AHK's InStr is CASE-INSENSITIVE. Here that is
+; the correct behaviour, not a bug — AHK resolves function names case
+; insensitively too, so `gui(` and `Gui(` are the same call and both belong in
+; the count. A baseline taken from a case-sensitive tally would have frozen a
+; number this rule can never produce.
+;
+; modules+lib: 773 (Timer=193 Binding=312 GuiMenu=63  Process=43 Window=58 KeyState=104)
+; ui:          280 (Timer=76  Binding=17  GuiMenu=156 Process=15 Window=16 KeyState=0)
+; entry point:  11 (Timer=8   Binding=1   GuiMenu=0   Process=1  Window=0  KeyState=1)
+_AOPR_FAMILY_BASELINE_CORE  := 773
+_AOPR_FAMILY_BASELINE_UI    := 280
+_AOPR_FAMILY_BASELINE_ENTRY := 11
+
+_AOPR_FamilyRatchetCore() {
+	global _AOPR_FAMILY_BASELINE_CORE
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "lib"]), _AOPR_FAMILY_BASELINE_CORE)
+}
+Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
+
+_AOPR_FamilyRatchetUi() {
+	global _AOPR_FAMILY_BASELINE_UI
+	_AOPR_AssertFamilies("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
+}
+Test("meta: windows/ platform-API family ratchet — ui", _AOPR_FamilyRatchetUi)
+
+_AOPR_FamilyRatchetEntry() {
+	global _AOPR_FAMILY_BASELINE_ENTRY
+	Entry := _AOPR_DriverRoot() . "\ErgoptiPlus.ahk"
+	Assert(FileExist(Entry), "family ratchet: entry point not found at " . Entry)
+	_AOPR_AssertFamilies("windows/ErgoptiPlus.ahk", [Entry], _AOPR_FAMILY_BASELINE_ENTRY)
+}
+Test("meta: windows/ platform-API family ratchet — entry point", _AOPR_FamilyRatchetEntry)
