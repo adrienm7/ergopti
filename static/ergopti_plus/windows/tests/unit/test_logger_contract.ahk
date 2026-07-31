@@ -46,27 +46,84 @@ _LoggerContractSetup()
 ; These would have caught silent error loss or main-log pollution under pause.
 ; project_suspend_pause_invariant (high-severity still reaches errors sink for diagnostics).
 
+; The contract is that the logger is ALWAYS-ON. Pause silences features, not
+; diagnostics — a user reporting a problem has usually paused the driver first,
+; and that is exactly when the ERROR lines matter. So the emit path must not
+; consult A_IsSuspended, and an ERROR must land in both the ring and the
+; errors-only queue.
 TestLoggerContract_PauseMustNotAffectErrorsSink() {
-	; Even under A_IsSuspended, WARNING/ERROR must still reach the dedicated errors-only sink
-	; (for post-pause diagnostics) while normal features are silenced. Main unified log may
-	; still receive them per logger design, but the contract is: errors sink survives pause.
-	; (In practice the pause gate is in dispatchers; logger itself is always-on for >=WARN.)
-	AssertTrue(true, "errors-only sink must remain usable under pause for debugging user issues (no loss of ERROR lines)")
+	global _LOGGER_PENDING_ERRORS, LOGGER_RING_BUFFER
+	_LoggerContractSetup()
+
+	Emit := _DriverFuncBody("_LoggerEmit")
+	Assert(InStr(Emit, "A_IsSuspended") == 0,
+		"_LoggerEmit() must not read A_IsSuspended — pause silences features, not diagnostics, "
+		. "and a paused driver is exactly when the user is reporting a problem")
+
+	LoggerError("test", "boom {1}", 42)
+	Assert(_LOGGER_PENDING_ERRORS.Length >= 1,
+		"an ERROR must reach the errors-only queue")
+	Assert(LOGGER_RING_BUFFER.Length >= 1,
+		"and the in-memory ring, which is what the diagnostic window dumps")
+	AssertTrue(InStr(_LOGGER_PENDING_ERRORS[_LOGGER_PENDING_ERRORS.Length], "boom 42") > 0,
+		"the formatted message must survive into the sink, arguments included")
 }
 Test("Logger contract: errors sink must survive pause (for post-pause diagnostics)", TestLoggerContract_PauseMustNotAffectErrorsSink)
 
+; Two separate claims about volume, and they pull in opposite directions.
+; The errors queue must not lose the newest lines when it hits its cap — it
+; trims the OLDEST, because the newest describe whatever is breaking right now.
+; The ring saturates at its fixed size rather than growing without bound.
 TestLoggerContract_HighVolumeErrorsOnlyUnderPause() {
-	; 300+ ERROR logs while simulating pause must all land in errors file + ring + main sink
-	; with correct format, no loss, no main-log bloat from lower levels.
-	AssertTrue(true, "high volume (300+) ERROR under pause must populate errors-only sink reliably without polluting main log")
+	global _LOGGER_PENDING_ERRORS, LOGGER_RING_BUFFER, LOGGER_RING_BUFFER_SIZE
+	_LoggerContractSetup()
+
+	Loop 300 {
+		LoggerError("test", "err-{1}", A_Index)
+	}
+
+	Assert(_LOGGER_PENDING_ERRORS.Length > 0, "300 errors must not empty the errors queue")
+	Last := _LOGGER_PENDING_ERRORS[_LOGGER_PENDING_ERRORS.Length]
+	AssertTrue(InStr(Last, "err-300") > 0,
+		"the MOST RECENT error must survive the cap — the queue trims the oldest, because the "
+		. "newest lines describe what is breaking now")
+
+	Assert(LOGGER_RING_BUFFER.Length <= LOGGER_RING_BUFFER_SIZE,
+		"the ring must saturate at LOGGER_RING_BUFFER_SIZE rather than grow without bound")
+
+	; And a DEBUG line below the threshold must not reach the errors sink at all.
+	Before := _LOGGER_PENDING_ERRORS.Length
+	LoggerDebug("test", "quiet")
+	AssertEqual(Before, _LOGGER_PENDING_ERRORS.Length,
+		"a DEBUG line must never pollute the errors-only sink")
 }
 Test("Logger contract: high volume (300+) ERROR under pause must fill errors sink correctly", TestLoggerContract_HighVolumeErrorsOnlyUnderPause)
 
+; The sink is best-effort; the ring is not. Point the errors path at a directory
+; that cannot exist and the emit must still return normally with the line in the
+; ring — a logging failure that propagated would take down whatever was being
+; logged about.
 TestLoggerContract_FsFailureOnErrorsSinkDoesNotCrash() {
-	; Hard FS write failure on the errors path (invalid dir, permission) must never throw
-	; to user code; the line must still reach ring buffer (best-effort).
-	; This mirrors the production resilience in logger.ahk try/catch around FileOpen.
-	AssertTrue(true, "FS failure on errors sink must not crash (line still reaches ring)")
+	global LOGGER_ERRORS_LOG_PATH, LOGGER_LOG_PATH, LOGGER_RING_BUFFER
+	_LoggerContractSetup()
+	LOGGER_ERRORS_LOG_PATH := "Z:\no_such_volume\nope\errors.log"
+	LOGGER_LOG_PATH        := "Z:\no_such_volume\nope\main.log"
+
+	LoggerError("test", "still-recorded")
+	_LoggerFlush(true)   ; force the write attempt that must fail silently
+
+	Found := false
+	for Line in LoggerRingBufferSnapshot() {
+		if InStr(Line, "still-recorded") {
+			Found := true
+			break
+		}
+	}
+	Assert(Found,
+		"with an unwritable sink the line must still be in the ring — the ring is the only "
+		. "record the diagnostic window can show when the disk is the problem")
+
+	_LoggerContractSetup()
 }
 Test("Logger contract: hard FS write failure on errors sink must not crash and line reaches ring", TestLoggerContract_FsFailureOnErrorsSinkDoesNotCrash)
 
