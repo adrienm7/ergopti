@@ -141,16 +141,13 @@ Test("TimerScheduler/suspend F25 -- cancelAll cancels handles that carry Requeue
 ; Verify that the fix is present in the adapter source by reading the file
 ; and asserting the key identifiers exist. This is a canary that fails if
 ; someone removes the RequeuedFn tracking without updating the tests.
+; The read used to be wrapped in a try that turned an unreadable source into
+; AssertTrue(true) — so a renamed or moved adapter did not fail this canary, it
+; silenced it. A structural guard that cannot find the structure has to say so.
+; _DriverDirConcat throws when the directory holds no .ahk file, which is both
+; the read and the proof that the read found something.
 _TSSuspTest_SourceContainsRequeuedFnWrite() {
-	SrcPath := A_ScriptDir "\..\adapters\timer_scheduler.ahk"
-	src := ""
-	try {
-		src := FileRead(SrcPath)
-	} catch {
-		; If we cannot read the source, skip this structural check gracefully.
-		AssertTrue(true, "source file not readable -- skipping structural check")
-		return
-	}
+	src := _DriverDirConcat("adapters")
 	; The suspend branch must store the closure in BoundHandle["RequeuedFn"].
 	AssertTrue(InStr(src, "RequeuedFn") > 0,
 		"adapter source must contain RequeuedFn tracking (F25 fix absent)")
