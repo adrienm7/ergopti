@@ -91,6 +91,7 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../lib/bundle.ahk
 #Include ../lib/ui_style.ahk
+#Include ../_generated/logger_sub_files.ahk
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs

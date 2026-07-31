@@ -37,50 +37,78 @@ _LSFR_ReadSource(RelPath) {
 ; =====================================
 ; =====================================
 
-; F11 — path must NOT climb three directory levels
-_LSFR_F11_NoTripleDotPath() {
-	Src := _LSFR_ReadSource("lib\logger.ahk")
-	; The old broken path contained three consecutive ..\
-	HasTripleDot := InStr(Src, "..\..\..\\_shared") or InStr(Src, "..\\..\\..\\ shared") or InStr(Src, "...\\..\\..\\")
-	; More reliable: count occurrences of "..\" in the TomlPath assignment line
-	FoundBad := false
-	for _, Line in StrSplit(Src, "`n", "`r") {
-		if InStr(Line, "TomlPath") and InStr(Line, "ScriptDir") {
-			if (InStr(Line, "..\..\..\"))
-				FoundBad := true
+; ── F11 / F19a — now asserted on the DATA, not on the parser's spelling ──────
+;
+; These two used to grep lib/logger.ahk: F11 for the shared-file path the parser
+; built, F19a for the "ahk" token its platform filter compared against. Both were
+; pins on the current spelling of a hand-rolled parser — and that parser is gone,
+; because the routing table is generated from the canonical TOML now.
+;
+; The invariants survive intact and are stronger stated as data: a wrong path in
+; the generator produces an empty or wrong table, and a wrong platform token
+; produces the wrong set of entries. Comparing the generated table against the
+; canonical file catches both, and cannot be satisfied by a rename.
+
+; Names of the [[sub_files]] entries whose platforms array lists "ahk".
+;
+; Reads only what it needs: every shipped platforms array is written on one line,
+; so this needs no array-continuation handling — which is deliberate, since a
+; second hand-rolled TOML reader is precisely what this work removed.
+_LSFR_CanonicalAhkNames() {
+	Raw := ""
+	try {
+		Raw := FileRead(A_ScriptDir . "\..\..\_shared\modules\logger\sub_files.toml", "UTF-8")
+	} catch {
+		return []
+	}
+	Names := []
+	CurName := ""
+	for _, Line in StrSplit(Raw, "`n", "`r") {
+		T := Trim(Line)
+		if (T == "[[sub_files]]") {
+			CurName := ""
+			continue
+		}
+		if RegExMatch(T, '^name\s*=\s*"([^"]*)"', &M) {
+			CurName := M[1]
+			continue
+		}
+		if (SubStr(T, 1, 9) == "platforms" and InStr(T, '"ahk"') and CurName != "") {
+			Names.Push(CurName)
 		}
 	}
-	Assert(!FoundBad, "F11: _LoggerLoadSubFilesToml still uses three-level relative path (..\..\..\).")
+	return Names
 }
-Test("meta logger sub_files: F11 — path does not climb 3 levels", _LSFR_F11_NoTripleDotPath)
 
+_LSFR_GeneratedMatchesCanonical() {
+	Canonical := _LSFR_CanonicalAhkNames()
+	Assert(Canonical.Length > 0,
+		"the canonical _shared/modules/logger/sub_files.toml must be readable and declare at least one ahk entry, or this test asserts nothing")
 
-; F11 — path must use _SharedDir or one-level relative form
-_LSFR_F11_UsesCorrectPath() {
-	Src := _LSFR_ReadSource("lib\logger.ahk")
-	HasSharedDir := InStr(Src, "_SharedDir")
-	HasOneLevelUp := InStr(Src, "..\_shared\modules\logger")
-	Assert(HasSharedDir or HasOneLevelUp,
-		"F11: _LoggerLoadSubFilesToml must reference _SharedDir or one-level relative path (..\_shared\logger).")
-}
-Test("meta logger sub_files: F11 — path uses _SharedDir or one-level relative", _LSFR_F11_UsesCorrectPath)
+	Entries := LoggerSubFilesData()
+	Assert(Entries.Length > 0, "the generated routing table must not be empty")
 
-
-; F19a — platform filter must use "ahk" not "autohotkey"
-_LSFR_F19a_PlatformToken() {
-	Src := _LSFR_ReadSource("lib\logger.ahk")
-	; The wrong token: comparing against the string "autohotkey"
-	HasWrongToken := false
-	for _, Line in StrSplit(Src, "`n", "`r") {
-		if InStr(Line, "= " . Chr(34) . "autohotkey" . Chr(34)) and InStr(Line, "P ")
-			HasWrongToken := true
+	; Every canonical ahk entry must be present. A wrong source path in the
+	; generator, or a platform filter comparing against the wrong token, both
+	; show up here as a missing entry.
+	for _, Name in Canonical {
+		Want := "ErgoptiPlus_" . Name . ".log"
+		Found := false
+		for _, E in Entries {
+			if (E["name"] == Want) {
+				Found := true
+				break
+			}
+		}
+		Assert(Found, "the generated routing table is missing " . Want . ", which sub_files.toml declares for the ahk platform")
 	}
-	; The correct token must appear
-	HasCorrectToken := InStr(Src, Chr(34) . "ahk" . Chr(34))
-	Assert(!HasWrongToken, "F19a: platform filter still uses the token " . Chr(34) . "autohotkey" . Chr(34) . ".")
-	Assert(HasCorrectToken, "F19a: platform filter does not use the token " . Chr(34) . "ahk" . Chr(34) . ".")
+
+	; …and nothing else. An entry the canonical file does not declare for ahk
+	; means the platform filter let a macOS-only topic through.
+	Assert(Entries.Length == Canonical.Length,
+		"the generated table has " . Entries.Length . " entr(ies) but sub_files.toml declares " . Canonical.Length . " for ahk — the platform filter is including topics this driver never writes")
 }
-Test("meta logger sub_files: F19a — platform token is " . Chr(34) . "ahk" . Chr(34), _LSFR_F19a_PlatformToken)
+Test("meta logger sub_files: the generated table matches the canonical file's ahk entries", _LSFR_GeneratedMatchesCanonical)
 
 
 ; F19b — fan-out must use substring match (InStr) not exact tag equality

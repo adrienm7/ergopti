@@ -144,19 +144,19 @@ global _LOGGER_DROPPED_LINES := 0
 ; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
 ; previous days are deleted at init time. Paths are resolved relative to LogDir.
 ;
-; Populated by _LoggerLoadSubFilesToml() at LoggerInit time from the canonical
-; _shared/modules/logger/sub_files.toml; falls back to the hardcoded list when the
-; shared file is unavailable (e.g. stripped builds, running from a temp copy).
+; Filled at LoggerInit from _generated/logger_sub_files.ahk, which is generated
+; from the canonical _shared/modules/logger/sub_files.toml.
+;
+; This used to be populated by a 112-line hand-rolled [[array_of_tables]] parser
+; living right here, backed by a hardcoded fallback list. Both were liabilities.
+; The parser was one of TWO copies of the same grammar (the macOS driver had its
+; own), so the same bug had to be found and fixed twice — a "]" inside a quoted
+; pattern closed the array early and silently dropped every pattern after it,
+; and the shared file's own guidance is to prefer bracketed tag patterns like
+; "[gestures". The fallback was a second copy of the data, free to drift, and
+; the macOS one already had: it routed gestures on one pattern where the
+; canonical file declares two.
 global LOGGER_SUB_FILES := []
-
-; Hardcoded fallback used when sub_files.toml cannot be found. Covers the
-; minimum set of AHK-only sub-files required for production log triage.
-global LOGGER_SUB_FILES_FALLBACK := [
-		Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures"]),
-		Map("name", "ErgoptiPlus_layout.log", "tags", ["[LayoutShift]", "[LayoutCaps]", "[LayoutAltGr]"]),
-		Map("name", "ErgoptiPlus_dispatch.log", "tags", ["[Dispatch]", "[ScriptShortcuts]", "[TomlLoader]"]),
-		Map("name", "ErgoptiPlus_tray.log", "tags", ["[ErgoptiPlus]"]),
-]
 
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
 global _LOGGER_SUB_PATHS := Map()
@@ -230,9 +230,11 @@ LoggerInit() {
 
 		LogDir := _LoggerResolveDatedPaths()
 		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
-		; Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
-		; new topical log requires only a TOML edit, not a code change in both drivers.
-		_LoggerLoadSubFilesToml(A_ScriptDir . "\")
+		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
+		; _shared/modules/logger/sub_files.toml — adding a topical log is a TOML edit
+		; plus a codegen run, never a parser change in two drivers.
+		global LOGGER_SUB_FILES
+		LOGGER_SUB_FILES := LoggerSubFilesData()
 		_LoggerInitSubFiles(LogDir)
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
@@ -880,170 +882,6 @@ _LoggerFanOut(Tag, Line) {
 								break
 						}
 				}
-		}
-}
-
-; Parses _shared/modules/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
-; entries whose platforms array includes "ahk". Falls back to LOGGER_SUB_FILES_FALLBACK
-; when the file is absent or unreadable so the driver stays functional in stripped builds.
-;
-; The parser handles the fixed schema:
-;   [[sub_files]]
-;   name     = "gestures"
-;   platforms = ["ahk", "hs"]
-;   patterns = ["[gestures", "gesture"]
-;
-; Unknown keys (description) are silently skipped. Arrays may span multiple lines.
-; The file is NOT the general-purpose TOML parser because [[array_of_tables]] is
-; outside the scope of toml_helpers.ahk — this dedicated reader is intentionally minimal.
-_LoggerLoadSubFilesToml(ScriptDir) {
-		global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK, _SharedDir
-		; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
-		; to the corrected one-level relative path (windows/ → ergopti_plus/_shared/).
-		if (IsSet(_SharedDir) and _SharedDir != "")
-				TomlPath := _SharedDir . "\modules\logger\sub_files.toml"
-		else
-				TomlPath := ScriptDir . "..\_shared\modules\logger\sub_files.toml"
-		if !FileExist(TomlPath) {
-				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-				return
-		}
-		Raw := ""
-		try {
-				Raw := FileRead(TomlPath, "UTF-8")
-		} catch {
-				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-				return
-		}
-		if Raw = "" {
-				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-				return
-		}
-
-		; Collapse CRLF and LF to a single line-break token for uniform processing
-		Raw := StrReplace(Raw, "`r`n", "`n")
-		Raw := StrReplace(Raw, "`r", "`n")
-
-		Result := []
-		CurrentEntry := ""       ; "name" string while inside a [[sub_files]] block
-		CurrentPlatforms := []   ; platforms array for the current entry
-		CurrentPatterns  := []   ; patterns array for the current entry
-		InPatternsArray := false ; true while accumulating a multi-line array value
-		InPlatformsArray := false
-
-		_FlushEntry() {
-				if CurrentEntry = "" {
-						return
-				}
-				; Only include entries that list "ahk" in their platforms array
-				IsAhk := false
-				for _, P in CurrentPlatforms {
-						if (P = "ahk") {
-								IsAhk := true
-								break
-						}
-				}
-				if IsAhk and CurrentPatterns.Length > 0 {
-						Result.Push(Map(
-								"name", "ErgoptiPlus_" . CurrentEntry . ".log",
-								"tags", CurrentPatterns
-						))
-				}
-				CurrentEntry := ""
-				CurrentPlatforms := []
-				CurrentPatterns  := []
-				InPatternsArray  := false
-				InPlatformsArray := false
-		}
-
-		; Extracts all quoted strings from an array fragment like ["foo", "bar"]
-		_ExtractStrings(Fragment) {
-				Strings := []
-				Pos := 1
-				loop {
-						if !RegExMatch(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', &M, Pos) {
-								break
-						}
-						Strings.Push(M[1])
-						Pos := M.Pos + M.Len
-				}
-				return Strings
-		}
-
-		; True when a fragment closes its TOML array. Only a "]" OUTSIDE a quoted
-		; value ends the array: this file's own authoring rules prefer tag-shaped
-		; patterns ("[LayoutCaps]"), every one of which carries a "]" inside its own
-		; string. Testing the raw line therefore closed a multi-line array on its
-		; FIRST value and silently discarded every pattern after it - 1309 of 1867
-		; routable production lines never reached their sub-file, and one sub-file
-		; was structurally guaranteed to stay empty forever
-		; (logger-subfiles-multiline-array-truncated).
-		_ArrayIsClosed(Fragment) {
-				return InStr(RegExReplace(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', ""), "]") > 0
-		}
-
-		Lines := StrSplit(Raw, "`n")
-		for _, Line in Lines {
-				; Strip inline comments and trim
-				Line := Trim(RegExReplace(Line, "\s*#.*$", ""))
-				if Line = "" {
-						continue
-				}
-				if (Line = "[[sub_files]]") {
-						_FlushEntry()
-						continue
-				}
-				; Accumulate multi-line arrays
-				if InPatternsArray {
-						Extracted := _ExtractStrings(Line)
-						for _, S in Extracted {
-								CurrentPatterns.Push(S)
-						}
-						if _ArrayIsClosed(Line) {
-								InPatternsArray := false
-						}
-						continue
-				}
-				if InPlatformsArray {
-						Extracted := _ExtractStrings(Line)
-						for _, S in Extracted {
-								CurrentPlatforms.Push(S)
-						}
-						if _ArrayIsClosed(Line) {
-								InPlatformsArray := false
-						}
-						continue
-				}
-				; Key-value lines
-				if RegExMatch(Line, '^name\s*=\s*"([^"]*)"', &M) {
-						CurrentEntry := M[1]
-				} else if RegExMatch(Line, '^platforms\s*=\s*\[(.*)$', &M) {
-						Fragment := M[1]
-						Extracted := _ExtractStrings(Fragment)
-						for _, S in Extracted {
-								CurrentPlatforms.Push(S)
-						}
-						if !_ArrayIsClosed(Fragment) {
-								InPlatformsArray := true
-						}
-				} else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
-						Fragment := M[1]
-						Extracted := _ExtractStrings(Fragment)
-						for _, S in Extracted {
-								CurrentPatterns.Push(S)
-						}
-						if !_ArrayIsClosed(Fragment) {
-								InPatternsArray := true
-						}
-				}
-		}
-		_FlushEntry()
-
-		if Result.Length > 0 {
-				LOGGER_SUB_FILES := Result
-		} else {
-				; Parsed but no valid entries — fall back to avoid an empty fan-out table
-				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
 		}
 }
 

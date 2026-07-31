@@ -331,10 +331,31 @@ Constraints: **paths before moves, moves before content, data before code.**
   `test-shared-root-resolvers.cjs` must **execute** each expression and assert the
   file exists — never merely that the module loaded. (2) Move the macOS
   config-path SSOT out of `ui/menu/menu_paths.lua` (25 call sites): today `lib/`
-  depends on `ui/menu/`. (3) **Generate the logger sub-file routing tables** from
-  `sub_files.toml` — deletes two hand-rolled TOML array-of-tables parsers (150 +
-  112 lines) carrying **the same fix for the same bug** ("a `]` inside a quoted
-  pattern closed the array early"), and makes that bug structurally impossible.
+  depends on `ui/menu/`. ~~(3) **Generate the logger sub-file routing tables** from `sub_files.toml`~~ —
+  **done.** Both hand-rolled `[[array_of_tables]]` parsers are gone (≈120 lines of
+  Lua, ≈112 of AutoHotkey), replaced by
+  `tools/codegen/codegen-logger-sub-files.cjs` emitting
+  `macos/_generated/logger_sub_files.lua` and
+  `windows/_generated/logger_sub_files.ahk`. The "`]` inside a quoted pattern
+  closes the array early" bug is now structurally impossible: the generator uses
+  a real TOML library, and there is no second copy of the grammar to fix twice.
+  **Found while doing it:** each parser also carried a *hardcoded fallback list*
+  for when the shared file is unreachable — a second copy of the routing data,
+  and the macOS one had **already drifted**: it routed `gestures` on one pattern
+  where the canonical file declares two (`"[gestures"` and `"gesture"`), so a
+  stripped build silently stopped collecting every bare `gesture` line. Both
+  fallbacks are deleted; a committed generated file has no "unavailable" branch
+  to diverge in, which is the convention `terminators.ahk` already followed.
+  Four regression tests guarded the removed parsers. None were deleted — each was
+  re-pointed at the artifact that can still regress: the generated table compared
+  against the canonical TOML. Two of them had already decayed into pinning a
+  spelling (`src:find("strip_quoted(line)")`, `InStr(Body, "_ArrayIsClosed(")`),
+  which is exactly the failure mode the false-green skill warns about; asserting
+  the loaded data instead means no rename can make them vacuous. The bracket bug
+  is now proven end-to-end by probe: inserting `"PROBE_SENTINEL]"` before
+  `"gesture"` in the TOML leaves both patterns in both drivers' output.
+  The drift gate takes a **list** of generators now rather than one hardcoded
+  path — the same shape of mistake as the hardcoded file list it already had.
   ~~(4) `[logger]` section in `_shared/modules/timings/constants.toml` + single-source
   gate~~ — **done.** Measured counts: retention 14 in **3** copies (not 4 — AHK
   `LOGGER_RETENTION_DAYS` plus the macOS `max_age_days or 14` default written
