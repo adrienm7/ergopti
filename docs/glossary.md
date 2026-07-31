@@ -20,7 +20,7 @@
 
 **CoreState** — Table Lua centralisée créée par `init.lua` et injectée dans chaque module via `M.init(state)`. Évite les globals ; toute dépendance partagée (feature flags, config, registries) passe par cette table.
 
-**Corpus test** — Test cross-driver en JavaScript (`_shared/core/domain/*.spec.js`) qui vérifie qu'un contrat comportemental est respecté par les deux drivers (AHK et Lua) à partir du même jeu de vecteurs. Voir ADR 006.
+**Corpus test** — Test cross-driver en JavaScript (`_shared/core/domain/*.spec.js`) qui vérifie qu'un contrat comportemental est respecté par les trois drivers (Windows/AHK, macOS/Lua, Linux/Lua) à partir du même jeu de vecteurs. Voir ADR 006.
 
 ---
 
@@ -32,7 +32,7 @@
 
 **Debounce** — Délai minimal entre le dernier événement déclenchant et le lancement d'une opération coûteuse (requête LLM, rebuild menu, écriture config). Évite les déclenchements parasites lors d'une frappe rapide.
 
-**Domain spec** — Fichier JavaScript dans `_shared/core/domain/` (ex. `HotstringMatcher.spec.js`) définissant le contrat comportemental cross-driver d'un composant. Exécuté par la suite JS pour certifier la parité des deux drivers.
+**Domain spec** — Fichier JavaScript dans `_shared/core/domain/` (ex. `HotstringMatcher.spec.js`) définissant le contrat comportemental cross-driver d'un composant. Exécuté par la suite JS pour certifier la parité des drivers.
 
 **Driver** — L'une des trois implémentations complètes d'ErgoptiPlus : `windows/` (AutoHotkey v2), `macos/` (Hammerspoon/Lua) ou `linux/` (Lua/LuaJIT + kanata). Les trois partagent données et frontends via `_shared/`.
 
@@ -80,7 +80,7 @@
 
 **Karabiner-Elements (KE)** — Outil macOS de remapping clavier bas niveau fonctionnant au niveau kernel. ErgoptiPlus génère entièrement son `karabiner.json` en Lua et le déploie dans le répertoire de config KE pour gérer les remappings que Hammerspoon ne peut pas intercepter.
 
-**Keylogger** — Démon bas niveau qui intercepte, horodate et stocke chaque frappe humaine globalement. Ne loggue pas les frappes synthétiques (injectées par l'expander). Persiste en SQLite + JSONL ; partage le schéma disque entre les deux drivers pour les dossiers cloud partagés.
+**Keylogger** — Démon bas niveau qui intercepte, horodate et stocke chaque frappe humaine globalement. Ne loggue pas les frappes synthétiques (injectées par l'expander). Persiste en SQLite + JSONL ; partage le schéma disque entre les trois drivers pour les dossiers cloud partagés.
 
 ---
 

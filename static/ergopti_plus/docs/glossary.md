@@ -409,7 +409,7 @@ synced (listed in the auto-generated `.gitignore`). See `KEYLOGGER_SPEC.md`
 
 **Adapter**
 A driver-specific implementation of a **→ Port** contract. Each driver (macOS,
-Windows, Linux) provides its own set of adapters for the nine OS-facing
+Windows, Linux) provides its own set of adapters for the twenty OS-facing
 interfaces. Adapters live under `static/ergopti_plus/<driver>/adapters/`. See
 ADR-001.
 
@@ -429,7 +429,7 @@ corpus automatically exercises every driver. See ADR-006.
 **Driver**
 A self-contained integration of Ergopti+ for a specific OS runtime:
 `hammerspoon` (macOS), `autohotkey` (Windows), `linux` (LuaJIT+libinput).
-Each driver implements the nine **→ Port** adapters and consumes the
+Each driver implements the **→ Port** adapters it needs and consumes the
 shared domain modules. All live under `static/ergopti_plus/<driver>/`.
 
 **Domain Module**
@@ -447,7 +447,7 @@ driver-specific feature registries are generated from this file. See ADR-002.
 The structural pattern adopted by Ergopti+ to decouple domain logic from OS
 APIs. Domain modules depend only on **→ Port** interfaces; driver adapters
 implement those interfaces. This makes domain logic unit-testable without any
-OS runtime and allows new drivers to be added by implementing the nine port
+OS runtime and allows new drivers to be added by implementing the port
 contracts. See ADR-001.
 
 **i18n (Internationalisation)**
@@ -464,10 +464,11 @@ reaching the codegen step.
 **Port**
 A formal JavaScript interface contract stored in `_shared/core/ports/` as a
 `*.spec.js` file. Each port defines method signatures, parameter shapes, return
-values, and compliance test vectors. The nine ports are: `Clipboard`,
-`FileSystem`, `HttpClient`, `KeyboardHook`, `Notifier`, `ProcessLifecycle`,
+values, and compliance test vectors. The twenty ports are: `AppLauncher`, `Clipboard`, `Crypto`,
+`FileSystem`, `GraphicsRenderer`, `HttpClient`, `KeyState`, `KeyboardHook`,
+`MouseControl`, `NetworkInfo`, `Notifier`, `ProcessLifecycle`,
 `SecureFieldDetector`, `Storage`, `TextSender`, `TimerScheduler`,
-`TooltipRenderer`, `TrayMenu`, `WindowInfo`. See ADR-001 and
+`TooltipRenderer`, `TrayMenu`, `WindowInfo`, `WindowManager`. See ADR-001 and
 `_shared/core/ports/SPEC.md`.
 
 **Port Compliance**
@@ -479,5 +480,5 @@ A driver that does not pass all vectors for a port is considered non-compliant.
 Directories under each driver folder that contain files produced by the
 **→ Codegen** step. These files are never edited by hand; they are committed
 so drivers can boot without running a build. Examples:
-`autohotkey/_generated/features_manifest.ahk`,
-`hammerspoon/_generated/features_manifest.lua`.
+`windows/_generated/features_manifest.ahk`,
+`macos/_generated/features_manifest.lua`.
