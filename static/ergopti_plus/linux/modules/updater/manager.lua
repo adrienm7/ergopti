@@ -141,7 +141,7 @@ M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
-	local home = os.getenv("HOME") or "/tmp"
+	local home = require("lib.config_paths").home()
 	return home .. "/.cache/ergopti/updater_etag_" .. (channel or "stable") .. ".txt"
 end
 
@@ -520,7 +520,7 @@ function M.download_update(url)
 
 	_state = "downloading"
 
-	local home = os.getenv("HOME") or "/tmp"
+	local home = require("lib.config_paths").home()
 	local dest = home .. "/.cache/ergopti/ergopti_update.tar.gz"
 
 	-- Ensure cache directory exists.

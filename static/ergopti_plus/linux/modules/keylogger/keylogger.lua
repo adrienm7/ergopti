@@ -251,10 +251,12 @@ function M.init(opts)
 	if Metrics then Metrics.init({}) end
 
 	-- Set up log / SQLite directories for persistence.
-	local home = os.getenv("HOME") or "~"
-	local data_home = os.getenv("XDG_DATA_HOME") or (home .. "/.local/share")
-	_log_dir = options.log_dir or (home .. "/.config/ergopti/logs")
-	_sqlite_path = options.sqlite_path or (data_home .. "/ergopti/metrics.sqlite")
+	-- Through the resolver. The old "~" fallback was not expanded by io.open —
+	-- Lua does no tilde expansion — so with HOME unset the keylogger wrote its
+	-- database into a literal directory named "~" beside the process.
+	local ConfigPaths = require("lib.config_paths")
+	_log_dir = options.log_dir or ConfigPaths.config("logs")
+	_sqlite_path = options.sqlite_path or ConfigPaths.data("metrics.sqlite")
 
 	-- Derive device ID from hostname.
 	local hostname = "linux"

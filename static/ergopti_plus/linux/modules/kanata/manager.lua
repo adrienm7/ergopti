@@ -57,7 +57,7 @@ local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
 local function _resolve_paths()
 	if _config_dir then return end
 
-	local home = os.getenv("HOME") or "~"
+	local home = require("lib.config_paths").home()
 	_config_dir = home .. "/.config/kanata"
 
 	-- Generated kanata config destination.

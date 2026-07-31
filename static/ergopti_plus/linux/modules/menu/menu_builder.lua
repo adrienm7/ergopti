@@ -627,7 +627,10 @@ local function _build_config_folder(ctx)
 	return {
 		title = i18n_safe("menu.global.config_folder"),
 		fn = function()
-			local dir = os.getenv("HOME") .. "/.config/ergopti/hotstrings"
+			-- Through the resolver: this concatenated a possibly-nil HOME, which
+			-- throws and takes the whole menu build with it.
+			local ConfigPaths = require("lib.config_paths")
+			local dir = ConfigPaths.config("hotstrings")
 			Logger.info(LOG, "Opening config folder: %s", dir)
 			if ctx.on_open_config then ctx.on_open_config(dir) end
 		end,

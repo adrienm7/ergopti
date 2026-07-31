@@ -20,7 +20,7 @@ local function _build_initial_payload(state)
 	local toml_path = ""
 
 	-- Try to read the actual personal_info.toml file.
-	local home = os.getenv("HOME") or "/home/user"
+	local home = require("lib.config_paths").home()
 	local candidates = {
 		home .. "/.config/ergopti/hotstrings/personal_info.toml",
 	}

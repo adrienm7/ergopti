@@ -27,7 +27,7 @@ end
 
 -- Path to the daemon config file.
 local function _config_path()
-	local home = os.getenv("HOME") or "/home/user"
+	local home = require("lib.config_paths").home()
 	return home .. "/.config/ergopti/config.toml"
 end
 
@@ -35,7 +35,7 @@ end
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state)
-	local home = os.getenv("HOME") or "/home/user"
+	local home = require("lib.config_paths").home()
 	local paths = {
 		config_dir = home .. "/.config/ergopti/",
 		data_dir   = home .. "/.local/share/ergopti/",

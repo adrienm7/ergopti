@@ -861,7 +861,7 @@ function M.init(opts)
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
 	end
-	_config_path = opts.config_path or ((os.getenv("HOME") or "") .. "/.config/ergopti/config.toml")
+	_config_path = opts.config_path or require("lib.config_paths").config("config.toml")
 	_persist = opts.persist == true
 	if _persist then load_user_config(_config_path) end
 
