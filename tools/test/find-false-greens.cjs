@@ -452,8 +452,12 @@ function luaItBlocks(src) {
 		let depth = 0;
 		let j = i;
 		for (; j < lines.length; j++) {
-			depth += (lines[j].match(/\bfunction\b/g) || []).length;
-			depth -= (lines[j].match(/\bend\b/g) || []).length;
+			// Every Lua block opener, not just `function`. Counting only functions
+			// made a `for … do … end` inside the case close the case early, so the
+			// block text stopped before its own assertions and every floor after a
+			// loop looked absent.
+			depth += (lines[j].match(/\b(?:function|do|then|repeat)\b/g) || []).length;
+			depth -= (lines[j].match(/\b(?:end|until)\b/g) || []).length;
 			if (j > i && depth <= 0) break;
 		}
 		out.push({ start: i + 1, text: lines.slice(i, j + 1).join('\n') });
@@ -490,38 +494,66 @@ function findUnflooredScans(file, src, ext) {
 	const LOOP = isAhk
 		? /\b(?:while|loop)\b[^\n]*\bRegExMatch\s*\(/
 		: /\bfor\b[^\n]*[:.]\s*(?:gmatch|gfind)\s*\(/;
-	// A counter compared against zero, in the same block.
-	const COUNTER = /\b(?:seen|count|found|matches|hits)\w*\s*(?:>|>=|!=|~=)\s*0/i;
+	const ASSERT = /\bAssert\w*\s*\(|\bassert_\w+\s*\(/;
 
 	for (const block of blocks) {
-		if (!LOOP.test(block.text)) continue;
-		if (COUNTER.test(block.text)) continue;
+		// Matched per LINE, not against the whole block: `\s*` in the pattern will
+		// happily cross a newline, so testing the joined text reported a loop in
+		// blocks that contain none and pointed the finding at an unrelated line.
+		const rows = block.text.split(/\r?\n/);
+		const idx = rows.findIndex((l) => LOOP.test(l));
+		if (idx < 0) continue;
 
-		// A collector is just as good a floor, and it is often asserted by the
-		// CALLER rather than in the scanning function itself — a collector helper
-		// that returns its list, with the consumer asserting the length. Look for
-		// that assertion anywhere in the file.
-		const collectors = new Set();
-		for (const m of block.text.matchAll(/(\w+)\s*\.\s*(?:Push|insert)\s*\(/g)) collectors.add(m[1]);
-		for (const m of block.text.matchAll(/table\.insert\s*\(\s*(\w+)/g)) collectors.add(m[1]);
+		// Two shapes count as a floor, and both are common here.
+		//
+		// A COUNTER incremented in the loop and then asserted on. The name does
+		// not matter — Bare, Guarded, Sites and Seen are all in use — so the test
+		// is "was this variable incremented inside the loop, and does an assertion
+		// mention it", not a list of blessed identifiers.
+		//
+		// A COLLECTOR whose length is asserted. That assertion is often in the
+		// CALLER: a helper returns its list and the consumer asserts the length.
+		// So the collector search covers the whole file, not just this block.
+		const counters = new Set();
+		for (const m of block.text.matchAll(/(\w+)\s*\+=\s*1\b/g)) counters.add(m[1]);
+		for (const m of block.text.matchAll(/(\w+)\s*=\s*\1\s*\+\s*1\b/g)) counters.add(m[1]);
 		let floored = false;
-		for (const c of collectors) {
-			const re = new RegExp(
-				`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=)\\s*\\d`
-			);
-			if (re.test(src)) {
+		for (const c of counters) {
+			const re = new RegExp(`(?:Assert\\w*|assert_\\w+)\\s*\\([^\\n]*\\b${c}\\b`);
+			if (re.test(block.text)) {
 				floored = true;
 				break;
 			}
 		}
+
+		const collectors = new Set();
+		for (const m of block.text.matchAll(/(\w+)\s*\.\s*(?:Push|insert)\s*\(/g)) collectors.add(m[1]);
+		for (const m of block.text.matchAll(/table\.insert\s*\(\s*(\w+)/g)) collectors.add(m[1]);
+		if (!floored) {
+			for (const c of collectors) {
+				const re = new RegExp(
+					`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=|==)\\s*\\d`
+				);
+				if (re.test(src)) {
+					floored = true;
+					break;
+				}
+			}
+		}
 		if (floored) continue;
 
-		const rows = block.text.split(/\r?\n/);
-		const idx = rows.findIndex((l) => LOOP.test(l));
+		// A block with no assertion at all is normally a dead test, and findDeadTests
+		// owns that. The exception is a COLLECTOR HELPER — a scanning function that
+		// legitimately only gathers and returns, with the assertions living in its
+		// caller. Skipping those on "no assertion here" would exempt exactly the
+		// shape this pattern is worst in, since the caller iterates the list and
+		// asserts inside the iteration.
+		if (!ASSERT.test(block.text) && collectors.size === 0) continue;
+
 		out.push({
 			file: rel(file),
-			line: block.start + (idx >= 0 ? idx : 0),
-			text: (rows[idx >= 0 ? idx : 0] || '').trim(),
+			line: block.start + idx,
+			text: (rows[idx] || '').trim(),
 			detail: 'scan loop never asserts it matched anything — a broken pattern passes',
 		});
 	}
