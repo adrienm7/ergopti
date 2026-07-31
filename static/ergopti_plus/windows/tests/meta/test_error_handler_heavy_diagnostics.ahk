@@ -58,7 +58,7 @@ _EHHD_CountOccurrences(Hay, Needle) {
 ; ==================================================
 
 _EHHD_HealthCheckRunAtMostOnce() {
-	Src := _EHHD_ReadSource("lib/crash_reporter.ahk")
+	Src := _EHHD_ReadSource("modules/diagnostics/crash_reporter.ahk")
 	Seg := _DriverFuncBody("CrashReport_Build")
 	Assert(Seg != "", "CrashReport_Build(ErrorObj) must exist in crash_reporter.ahk")
 	Runs := _EHHD_CountOccurrences(Seg, "HealthCheck_Run()")

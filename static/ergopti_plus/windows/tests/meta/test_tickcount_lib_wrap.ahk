@@ -100,8 +100,8 @@ Test("tickcount-wrap: healthcheck.ahk uptime division uses & 0xFFFFFFFF mask", _
 ; ================================================================
 
 _TCLW_CrashReporterWrapSafe() {
-	Src := _TCLW_ReadSource("lib/crash_reporter.ahk")
-	Assert(Src != "", "lib/crash_reporter.ahk must be readable")
+	Src := _TCLW_ReadSource("modules/diagnostics/crash_reporter.ahk")
+	Assert(Src != "", "modules/diagnostics/crash_reporter.ahk must be readable")
 
 	Assert(!InStr(Src, "UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000"),
 		"crash_reporter.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")

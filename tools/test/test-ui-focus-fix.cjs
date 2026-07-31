@@ -119,7 +119,7 @@ checkNegative(
 const filesToAudit = [
     'static/ergopti_plus/macos/ui/onboarding/init.lua',
     'static/ergopti_plus/macos/ui/healthcheck/core.lua',
-    'static/ergopti_plus/macos/lib/crash_reporter.lua',
+    'static/ergopti_plus/macos/modules/diagnostics/crash_reporter.lua',
     'static/ergopti_plus/macos/modules/karabiner/onboarding.lua'
 ];
 

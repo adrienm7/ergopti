@@ -93,15 +93,20 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 
 // ── The ratchet ─────────────────────────────────────────────────────────────
 //
-// 2026-07-31, first measurement with this counter: 11 of 51 distinct paths are
-// present in all three drivers (21.6 %). Raise BASELINE_SHARED as Lots 3–6 land;
-// never lower it to make a change pass.
+// 2026-07-31: 12 of 51 distinct paths are present in all three drivers (23.5 %).
+// Raise BASELINE_SHARED as Lots 3–6 land; never lower it to make a change pass.
+//
+// History, so the ratchet reads as a trajectory rather than a number:
+//   11/51 (21.6 %) — first measurement.
+//   12/51 (23.5 %) — crash_reporter promoted out of lib/ into modules/diagnostics
+//                    on macOS and Windows, where Linux already had it. The union
+//                    did not grow: the path already existed, on one driver.
 //
 // Written as a literal, not as `shared.length`. Deriving the baseline from the
 // value it is supposed to constrain makes the comparison `x <= x` — a check that
 // passes for every possible input, which is the precise definition of the false
 // green this repo already ratchets against elsewhere.
-const BASELINE_SHARED = 11;
+const BASELINE_SHARED = 12;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops

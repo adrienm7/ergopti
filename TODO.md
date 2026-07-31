@@ -158,7 +158,21 @@ Constraints: **paths before moves, moves before content, data before code.**
      converted. Counting per READ is the fix; it belongs with the §0.7 work on
      the same gates.
 
-- **Lot 3 — one tree.** Four independently-green steps: (a) extract `platform/`;
+- **Lot 3 — one tree.** Four independently-green steps.
+  **First promotion landed:** `crash_reporter` moved out of `lib/` into
+  `modules/diagnostics/` on macOS and Windows, where **Linux already had it**.
+  That third driver is what makes these moves objective rather than taste: the
+  question "is this a feature or infrastructure?" has no clean answer in the
+  abstract, but "where does the same code live in the other drivers?" does, and
+  answering it raises I1 by construction. Ratio 21.6 % → **23.5 %** (11 → 12 of
+  51); the union did not grow, because the path already existed on one driver.
+  Cost, for calibrating the rest: 5 references on macOS across 3 files, ~10 files
+  on Windows, plus four test files moved to mirror the code and two source-text
+  scans re-pointed from `_DriverDirConcat("lib")` to
+  `_DriverDirConcat("modules/diagnostics")` — that helper is move-resilient
+  *within* a directory, not across one, which is worth knowing before the bigger
+  moves. One JS gate named the file by path and had to follow.
+  Remaining steps: (a) extract `platform/`;
   (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`
   and `lib/toml/*` shims must keep their basenames, and the `lib.` → `infra.`
   prefix rewrite must touch production **and** the test require/stub sites in the

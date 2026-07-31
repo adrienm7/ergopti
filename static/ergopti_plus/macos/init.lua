@@ -132,7 +132,7 @@ Boot.begin()
 
 local i18n               = require("lib.i18n")
 local locale_mod         = require("lib.locale")
-local crash_reporter     = require("lib.crash_reporter")
+local crash_reporter     = require("modules.diagnostics.crash_reporter")
 local reload_guard       = require("lib.reload_guard")
 
 -- Tell a reload apart from a real quit. A fresh boot starts with the sentinel

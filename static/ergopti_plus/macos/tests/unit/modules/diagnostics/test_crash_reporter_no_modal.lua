@@ -1,4 +1,4 @@
---- tests/unit/lib/test_crash_reporter_no_modal.lua
+--- tests/unit/modules/diagnostics/test_crash_reporter_no_modal.lua
 
 --- ==============================================================================
 --- MODULE: Regression — the crash reporter never opens a blocking modal
@@ -60,8 +60,8 @@ local function load_with_tripwires(config_dir)
 		},
 	}
 
-	package.loaded["lib.crash_reporter"] = nil
-	local CrashReporter = helpers.load_with_stubs("lib.crash_reporter", hs_overrides)
+	package.loaded["modules.diagnostics.crash_reporter"] = nil
+	local CrashReporter = helpers.load_with_stubs("modules.diagnostics.crash_reporter", hs_overrides)
 
 	-- dialog_util is the only route the module ever used to reach blockAlert; a
 	-- raising stub makes a lingering modal call impossible to miss.

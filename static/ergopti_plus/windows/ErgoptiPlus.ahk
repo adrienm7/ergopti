@@ -309,7 +309,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/updater.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
-#Include lib/crash_reporter.ahk
+#Include modules/diagnostics/crash_reporter.ahk
 #Include lib/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
