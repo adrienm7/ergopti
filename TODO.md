@@ -337,10 +337,26 @@ Constraints: **paths before moves, moves before content, data before code.**
   pattern closed the array early"), and makes that bug structurally impossible.
   (4) `[logger]` section in `_shared/modules/timings/constants.toml` + single-source
   gate: retention 14 (4 copies), ring 200 (3), dedup 5 s (2 magic literals), flush
-  500 ms. (5) Add the `active → en → fr` cascade to `_shared/ui/i18n.js` — it
-  fetches one file and leaves missing keys **blank**, so a partially translated
-  locale renders empty labels in every shared webview while all three native menus
-  cascade. (6) Generate the three 21-locale tables from `locale_order.json` + a new
+  500 ms. ~~(5) Add the `active → en → fr` cascade to `_shared/ui/i18n.js`~~ — **done**,
+  and the premise needed correcting twice. All 21 locales are key-complete today
+  (2 339 keys, 0 missing, 0 blank), so "a partially translated locale" was not the
+  live failure; and the native menus do not cascade either — they fall back to the
+  raw key name. The real hole was worse than described: **368 `data-i18n` elements
+  across the eleven shared webviews all ship with an EMPTY body**, so the loader's
+  single `if (strings) apply(strings)` meant one failed fetch — an unshipped
+  locale code, a `file://` restriction, malformed JSON — rendered the **entire
+  window blank**, with nothing but a `console.warn` in a webview that has no
+  visible console. A blank window reads as a hang; the native raw-key fallback is
+  at least legible. The chain is now consulted lazily, so a complete active locale
+  still costs exactly one request — a cascade that always fetched three would have
+  tripled every request to fix a case that never happens.
+  `test-webview-i18n-cascade.cjs` executes the real `i18n.js` in a DOM stub
+  (a source grep would pass on a cascade that is written but never reached) and
+  asserts the fetch **count** as well as the text.
+  Left alone deliberately: the **12 copies of `_t()`** in two flavours — 3 return
+  `null` on a miss so callers can write `_t(k) || "French default"`, 3 return the
+  key. Unifying them would silently disable those `||` fallbacks; it is a separate
+  change with its own reds. (6) Generate the three 21-locale tables from `locale_order.json` + a new
   `locale_names.json` (the flag column stays per-driver: flag emoji do not render
   in Windows menus). (7) **Only then** make macOS consume the shared logger core,
   and only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` —
