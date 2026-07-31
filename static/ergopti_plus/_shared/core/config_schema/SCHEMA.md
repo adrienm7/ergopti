@@ -10,11 +10,11 @@ config/ergopti_plus/
 ├── hotstrings_config.toml          # Universal, delay/colour overrides per group
 ├── ahk/
 │  ├── config.toml                  # v2 schema (universal sections + [ahk.*])
-│  ├── tap_hold.toml                # Complete AHK tap-hold config (no runtime merge)
+│  ├── tap_hold.toml                # AHK tap-hold overrides (merged OVER the shared defaults)
 │  └── logs/
 └── hammerspoon/
    ├── config.toml                  # v2 schema (universal sections + [hs.*])
-   ├── tap_hold.toml                # Complete HS tap-hold config (no runtime merge)
+   ├── tap_hold.toml                # HS tap-hold config ([hs_*] always read from the shared file)
    └── config_karabiner.toml        # HS-only, managed by the karabiner module
 ```
 
@@ -182,11 +182,32 @@ If `config/ergopti_plus/<driver>/config.toml` does not exist at first boot:
    - Explicit defaults for every feature.
 4. It writes the file and continues its normal boot.
 
-The same mechanism applies to `tap_hold.toml`: at first boot the driver renders `_shared/tap_hold/defaults.toml` into `config/ergopti_plus/<driver>/tap_hold.toml`. After that, the per-driver file IS the config — there is no runtime merge with the shared defaults, and the two drivers may diverge freely.
+`tap_hold.toml` does **not** follow that mechanism, despite three places in this
+document having said it did. Every driver reads `_shared/tap_hold/defaults.toml`
+at runtime, on every boot — and each reads it differently. See
+[Tap-hold](#tap-hold) below for what each one actually does.
 
 ## Tap-hold
 
-`_shared/tap_hold/defaults.toml` is a **generation template only** — it is read once at first boot to produce each driver's `tap_hold.toml`. After that, the per-driver file is the complete config; the shared file is never read again at runtime.
+`_shared/tap_hold/defaults.toml` is read **at runtime, on every boot, by all
+three drivers**. It was documented here as a first-boot generation template whose
+output is thereafter complete — "the shared file is never read again at runtime"
+— and that was wrong in three separate places. The three loaders do not even
+agree with each other, and each one's own comments claim it matches the others:
+
+| Driver | Sections read | Lifecycle |
+| --- | --- | --- |
+| Windows | `[tap_hold.*]` | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists". |
+| Linux | `[tap_hold.*]` | The user file, **when present, fully replaces** the defaults — no per-key merge. Editing `defaults.toml` has **no** effect on an install that has a user file. `modules/kanata/manager.lua` describes this as "mirroring the other drivers", which is the opposite of what Windows does. |
+| macOS | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `modules/karabiner/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies. |
+
+The two namespaces in that one file describe the **same seven physical keys**
+under different ids (`left_ctrl`/`left_control`, `left_alt`/`left_option`), with
+different thresholds (0.2–0.35 s per key vs a flat 1000 ms global) and, in
+places, different actions — `caps_lock` holds `ctrl` under `[tap_hold.*]` and
+`cmd` under `[hs_tap_hold]`. Unifying them is Lot 8(7); this section documents
+what is true today so nobody edits the file believing it cannot reach a shipped
+install.
 
 This means:
 
