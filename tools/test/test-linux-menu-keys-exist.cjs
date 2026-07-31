@@ -41,6 +41,21 @@ const MIN_CALLS = 20;
 const src = fs.readFileSync(SOURCE, 'utf8');
 const en = JSON.parse(fs.readFileSync(EN, 'utf8'));
 
+// Accented literals still hardcoded in the builder. Exactly one is legitimate —
+// the "Français" row of the language picker, which is written in its own
+// language on purpose, like every other entry in that list. The ratchet only
+// turns down; NEVER raise it to let a new French label through.
+const FRENCH_LITERAL_BASELINE = 1;
+const FRENCH = /[éèêëàâçûùôîïœÉÈÀÇÎÔÛ]/;
+
+const frenchLiterals = [];
+src.split(/\r?\n/).forEach((line, i) => {
+	if (/^\s*--/.test(line)) return;
+	for (const m of line.matchAll(/"([^"\n]{2,})"/g)) {
+		if (FRENCH.test(m[1])) frenchLiterals.push(`${i + 1}: ${JSON.stringify(m[1])}`);
+	}
+});
+
 const calls = [...src.matchAll(/i18n_safe\(\s*"([^"]+)"/g)].map((m) => m[1]);
 const distinct = [...new Set(calls)];
 const missing = distinct.filter((k) => !Object.prototype.hasOwnProperty.call(en, k));
@@ -55,6 +70,13 @@ if (calls.length < MIN_CALLS) {
 for (const k of missing) {
 	failures.push(`menu_builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`);
 }
+if (frenchLiterals.length > FRENCH_LITERAL_BASELINE) {
+	failures.push(
+		`hardcoded French literals rose to ${frenchLiterals.length} (baseline ${FRENCH_LITERAL_BASELINE}):\n      ` +
+			frenchLiterals.join('\n      ') +
+			'\n    Route the label through i18n_safe with a key defined in en.json.'
+	);
+}
 
 if (failures.length > 0) {
 	console.error('\x1b[31m[FAIL] Linux menu i18n keys:\x1b[0m');
@@ -62,4 +84,7 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] Every Linux menu key resolves (${calls.length} call(s), ${distinct.length} distinct).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] Every Linux menu key resolves (${calls.length} call(s), ${distinct.length} distinct); ` +
+		`${frenchLiterals.length}/${FRENCH_LITERAL_BASELINE} hardcoded French literal(s).\x1b[0m`
+);
