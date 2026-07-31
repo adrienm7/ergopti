@@ -103,6 +103,7 @@ const CHECKS = [
 	{ name: 'action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)', cmd: 'node', args: ['tools/test/test-action-emit-is-per-os.cjs'], repro: 'node tools/test/test-action-emit-is-per-os.cjs' },
 	{ name: 'macOS keyboard-slot config surface reachability (held measurement)', cmd: 'node', args: ['tools/test/test-keyboard-slot-surface-is-dead.cjs'], repro: 'node tools/test/test-keyboard-slot-surface-is-dead.cjs' },
 	{ name: 'hotstring flag support per driver (is_case_sensitive_strict is Windows-only)', cmd: 'node', args: ['tools/test/test-hotstring-flag-support-per-driver.cjs'], repro: 'node tools/test/test-hotstring-flag-support-per-driver.cjs' },
+	{ name: 'feature-state boot smoke (4 fixtures, real include graph, own process)', cmd: 'node', args: ['tools/test/test-feature-state-boot-smoke.cjs'], repro: 'node tools/test/test-feature-state-boot-smoke.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
