@@ -523,9 +523,19 @@ differently — a Map keyed in the loop and sized after it, `Count++`, a floor
 compared against a variable rather than a literal, and a collector helper floored
 by its CALLER under a different variable name. 84 reported → 34 real.
 
-**549 → 441 so far**, over six classes rather than the original five. `dead-test` is at **0**: the two placeholders spliced into
+**549 → 298 so far**, over six classes rather than the original five. `dead-test` is at **0**: the two placeholders spliced into
 the body of `_DE_Add()` are gone, and the two Linux skips with empty bodies now
-assert the reason they skipped for. `tautology` is 153 → **60**.
+assert the reason they skipped for. `tautology` is 153 → **49**, and `pcall-only` 367 → **225**.
+
+The pcall-only burn-down is where the live hazards were. Every adapter whose job
+is to BUILD A SHELL COMMAND had its tests written as "does not crash" — and
+os.execute does not raise on a malformed command, it runs it, so an injection
+hole and correct behaviour are indistinguishable to a pcall. Six adapters
+converted so far (app launcher, notifier, text sender, tray, keyboard hook, timer
+scheduler, plus the macOS port-contract vectors), each proven by breaking the
+production code: removing Shell.quote, dropping the `!` doubling yad needs,
+deleting the ydotool quote escape, changing an `intercept == true` to a
+truthiness test that would GRAB the keyboard.
 
 `vacuous-absence` is at **0**, and that one is a detector correction rather than
 a burn-down: it flagged absence assertions on `_DriverFuncBody`, which used to
