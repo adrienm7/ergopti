@@ -96,24 +96,28 @@ helpers.describe("aggregator — pre-init guard", function()
 	-- Each walker must be a safe no-op when called before M.init().
 	local fresh = helpers.load_with_stubs("modules.keylogger.aggregator")
 
-	helpers.it("walk_typing before init does not crash", function()
-		local ok = pcall(function()
-			fresh.walk_typing({ app = "A", timestamp = "2024-01-01 10:00:00.000", events = {} })
-		end)
-		helpers.assert_true(ok)
+	-- "does not crash" is the weak half. A walker that ran before init would
+	-- accumulate rows against a nil device id and a batch that does not exist —
+	-- the point of the guard is that NOTHING is recorded, not that nothing
+	-- throws. has_pending_batch() is the observable, and no case looked at it.
+	helpers.it("walk_typing before init records nothing", function()
+		fresh.walk_typing({ app = "A", timestamp = "2024-01-01 10:00:00.000", events = {} })
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"a pre-init walk must leave no batch behind — one flushed later would carry "
+				.. "rows with no device id attached")
 	end)
 
-	helpers.it("walk_app_switch before init does not crash", function()
-		local ok = pcall(function()
-			fresh.walk_app_switch({ prev_app = "A", next_app = "B",
-				timestamp = "2024-01-01 10:00:01.000", duration_ms = 1000 })
-		end)
-		helpers.assert_true(ok)
+	helpers.it("walk_app_switch before init records nothing", function()
+		fresh.walk_app_switch({ prev_app = "A", next_app = "B",
+			timestamp = "2024-01-01 10:00:01.000", duration_ms = 1000 })
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"the same holds for an app switch — the guard is about the write, not the throw")
 	end)
 
-	helpers.it("flush before init does not crash", function()
-		local ok = pcall(function() fresh.flush() end)
-		helpers.assert_true(ok)
+	helpers.it("flush before init writes nothing", function()
+		fresh.flush()
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"flushing before init must not create a batch on the way out")
 	end)
 
 end)
@@ -256,12 +260,42 @@ helpers.describe("aggregator — init", function()
 		helpers.assert_true(ctx == nil or type(ctx) == "table")
 	end)
 
-	helpers.it("ignores duplicate init calls", function()
+	helpers.it("ignores duplicate init calls and keeps the first device id", function()
+		-- The double-init guard lives in aggregator.state, which load_with_stubs
+		-- does NOT reload — so without dropping it here an earlier test's init is
+		-- still in effect and BOTH calls below are ignored, making the assertion
+		-- pass for the wrong reason.
+		--
+		-- The four submodules must be dropped and restored as one unit: they close
+		-- over the same state table, so reloading a subset leaves events.lua
+		-- pointing at the old table while core.lua uses the new one.
+		local FAMILY = {
+			"modules.keylogger.aggregator",
+			"modules.keylogger.aggregator.state",
+			"modules.keylogger.aggregator.core",
+			"modules.keylogger.aggregator.events",
+			"modules.keylogger.aggregator.sql",
+		}
+		local saved = {}
+		for _, name in ipairs(FAMILY) do
+			saved[name] = package.loaded[name]
+			package.loaded[name] = nil
+		end
+
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "uuid-a" })
-		-- Second call must not crash.
-		local ok = pcall(function() a.init({ device_id = "uuid-b" }) end)
-		helpers.assert_true(ok)
+		a.init({ device_id = "uuid-b" })
+		local seen = a.get_device_id()
+
+		-- Put the shared family back before asserting, so a failure here does not
+		-- cascade into every later test in the file.
+		for _, name in ipairs(FAMILY) do
+			package.loaded[name] = saved[name]
+		end
+		helpers.assert_eq(seen, "uuid-a",
+			"a second init must be ignored, not applied — the device id keys every row "
+				.. "written so far, and changing it mid-session splits one machine's "
+				.. "history across two identities")
 	end)
 end)
 
@@ -333,11 +367,12 @@ helpers.describe("aggregator — batch management", function()
 	helpers.it("reset_batch does not crash and can be called repeatedly", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "batch-uuid" })
-		local ok = pcall(function()
-			a.reset_batch()
-			a.reset_batch()
-		end)
-		helpers.assert_true(ok)
+		a.reset_batch()
+		a.reset_batch()
+		helpers.assert_eq(a.has_pending_batch(), false,
+			"resetting twice must leave the batch empty, not half-rebuilt — the second "
+				.. "reset running against an already-cleared batch is the ordinary case on "
+				.. "a flush that found nothing to write")
 	end)
 end)
 
