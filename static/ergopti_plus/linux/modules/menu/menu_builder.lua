@@ -32,6 +32,21 @@ local LOG = "modules.menu.menu_builder"
 -- Single source of the driver version.
 local Version = require("lib.version")
 
+--- Substitutes a single placeholder in a translated template.
+---
+--- Plain indices rather than gsub: a release tag or an interval code is data,
+--- and a "%" in it would be read as a capture reference in gsub's REPLACEMENT
+--- string and raise "invalid use of '%'".
+--- @param template string The translated string, containing `placeholder`.
+--- @param placeholder string The literal token to replace, e.g. "{tag}".
+--- @param value any The value to substitute.
+--- @return string The filled template.
+local function _fill(template, placeholder, value)
+	local at = template:find(placeholder, 1, true)
+	if not at then return template .. " " .. tostring(value) end
+	return template:sub(1, at - 1) .. tostring(value) .. template:sub(at + #placeholder)
+end
+
 local function shell_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
 end
@@ -105,7 +120,7 @@ local function _build_hotstrings(ctx)
 	end
 
 	if #groups == 0 then
-		items[#items + 1] = { title = "(aucun groupe chargé)", fn = function() end, disabled = true }
+		items[#items + 1] = { title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true }
 	else
 		for _, group in ipairs(groups) do
 			local gname = group
@@ -136,7 +151,7 @@ local function _build_llm(ctx)
 	if not llm then
 		return { title = i18n_safe("menu.llm.title"), menu = {
 			{ title = "LLM non disponible", fn = function() end, disabled = true },
-			{ title = "(démarrer Ollama sur le port 11434)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.llm.ollama_start_hint"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -144,7 +159,7 @@ local function _build_llm(ctx)
 	local enabled = llm.is_enabled and llm:is_enabled() or false
 
 	items[#items + 1] = {
-		title = "Activé " .. (enabled and "✓" or ""),
+		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
 		fn = function()
 			if llm.toggle then llm:toggle() end
 		end,
@@ -191,7 +206,7 @@ end
 
 --- Reports the at-rest migration and offers to stop it.
 --- Converting a year of stored rows takes minutes, and without this entry the
---- user ticks "Chiffrer les données au repos" and sees nothing happen at all.
+--- user ticks menu.metrics.encrypt_at_rest and sees nothing happen at all.
 --- @param k table The keylogger module.
 --- @return table One menu entry.
 local function _migration_status(k)
@@ -203,7 +218,7 @@ local function _migration_status(k)
 		return { title = "Migration du chiffrement : inactive", fn = function() end, disabled = true }
 	end
 	return {
-		title = string.format("Migration : %d/%d ligne(s) — cliquer pour arrêter",
+		title = string.format(i18n_safe("menu.metrics.migration_progress"),
 			progress.scanned, progress.total),
 		fn = function()
 			if type(k.cancel_migration) == "function" then k.cancel_migration() end
@@ -215,7 +230,7 @@ local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
 		return { title = i18n_safe("menu.metrics.title"), menu = {
-			{ title = "(métriques non disponibles)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.metrics.unavailable"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -250,15 +265,15 @@ local function _build_metrics(ctx)
 		-- Privacy posture. The four toggles below mirror macOS and Windows and
 		-- read the same shared manifest defaults; the driver shipped without any
 		-- of them, so metrics could not be turned off at all.
-		_privacy_toggle(k, "enabled", "Collecte activée", k.set_enabled),
+		_privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled),
 		_privacy_toggle(k, "private_filter_enabled",
-			"Ignorer la navigation privée", k.set_private_filter_enabled),
+			i18n_safe("menu.metrics.filter_private"), k.set_private_filter_enabled),
 		_privacy_toggle(k, "secure_filter_enabled",
 			"Ignorer les champs de mot de passe", k.set_secure_filter_enabled),
 		_privacy_toggle(k, "system_auth_filter_enabled",
 			"Ignorer les invites d'authentification", k.set_system_auth_filter_enabled),
 		_privacy_toggle(k, "encrypt",
-			"Chiffrer les données au repos", k.set_encrypt_enabled),
+			i18n_safe("menu.metrics.encrypt_at_rest"), k.set_encrypt_enabled),
 		_migration_status(k),
 		{ title = "-" },
 		{
@@ -269,7 +284,7 @@ local function _build_metrics(ctx)
 			end,
 		},
 		{
-			title = "Réinitialiser la session",
+			title = i18n_safe("menu.metrics.reset_session"),
 			fn = function()
 				if type(k.reset_session) ~= "function" then return end
 				k.reset_session()
@@ -294,7 +309,7 @@ local function _build_shortcuts(ctx)
 
 	-- Master toggle.
 	items[#items + 1] = {
-		title = "Activé " .. (enabled and "✓" or ""),
+		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
 		fn = function() sc.toggle() end,
 	}
 	items[#items + 1] = { title = "-" }
@@ -327,11 +342,11 @@ local function _build_shortcuts(ctx)
 
 	-- Selection helpers.
 	items[#items + 1] = {
-		title = "Sélectionner le mot",
+		title = i18n_safe("menu.shortcuts.select_word"),
 		fn = function() sc.select_word() end,
 	}
 	items[#items + 1] = {
-		title = "Sélectionner la ligne",
+		title = i18n_safe("sg_actions.select_line"),
 		fn = function() sc.select_line() end,
 	}
 	items[#items + 1] = {
@@ -372,7 +387,7 @@ local function _build_kanata(ctx)
 
 	return { title = i18n_safe("menu.kanata.title"), menu = {
 		{
-			title = "Générer le .kbd",
+			title = i18n_safe("menu.kanata.generate_kbd"),
 			fn = function()
 				if km then
 					if km.write_kbd() then
@@ -386,7 +401,7 @@ local function _build_kanata(ctx)
 			end,
 		},
 		{
-			title = "Démarrer kanata" .. (running and " ✓" or ""),
+			title = i18n_safe("menu.kanata.start") .. (running and " ✓" or ""),
 			fn = function()
 				if km then
 					km.start()
@@ -396,7 +411,7 @@ local function _build_kanata(ctx)
 			end,
 		},
 		{
-			title = "Arrêter kanata",
+			title = i18n_safe("menu.kanata.stop"),
 			fn = function()
 				if km then
 					km.stop()
@@ -406,7 +421,7 @@ local function _build_kanata(ctx)
 			end,
 		},
 		{
-			title = "Redémarrer kanata",
+			title = i18n_safe("menu.kanata.restart"),
 			fn = function()
 				if km then
 					km.restart()
@@ -432,18 +447,18 @@ local function _build_gestures(ctx)
 
 	-- Master toggle.
 	items[#items + 1] = {
-		title = "Activé " .. (enabled and "✓" or ""),
+		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
 		fn = function()
 			ge.toggle()
 		end,
 	}
 	items[#items + 1] = { title = "-" }
 	items[#items + 1] = {
-		title = "Réinitialiser les actions par défaut",
+		title = i18n_safe("menu.gestures.restore_defaults"),
 		fn = function() ge.reset_defaults() end,
 	}
 	items[#items + 1] = {
-		title = "Tout mettre à vide",
+		title = i18n_safe("menu.gestures.disable_all"),
 		fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
 	}
 	items[#items + 1] = { title = "-" }
@@ -453,8 +468,8 @@ local function _build_gestures(ctx)
 			return ctx.prompt_action_parameter(slot, action, spec, prior)
 		end
 		local prompt = spec == "search_url"
-			and "URL de recherche (un seul %s pour la requête) :"
-			or "Lien à ouvrir :"
+			and i18n_safe("dialog.gestures.param_search_url")
+			or i18n_safe("dialog.gestures.param_link")
 		local command = "zenity --entry --title=" .. shell_quote("Configurer " .. (ge.get_action_label(action) or action))
 			.. " --text=" .. shell_quote(prompt) .. " --entry-text=" .. shell_quote(prior or "") .. " 2>/dev/null"
 		local pipe = io.popen(command, "r")
@@ -672,7 +687,7 @@ local function _build_updates(ctx)
 		local rel = up.get_cached_release()
 		if rel then
 			items[#items + 1] = {
-				title = "Télécharger et installer " .. rel.tag,
+				title = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 				fn = function()
 					local archive = up.download_update()
 					if archive then
@@ -694,7 +709,7 @@ local function _build_updates(ctx)
 		end,
 	}
 	items[#items + 1] = {
-		title = "Canal dev (préversions)" .. (channel == "dev" and " ✓" or ""),
+		title = i18n_safe("menu.updates.channel_dev") .. (channel == "dev" and " ✓" or ""),
 		fn = function()
 			up.set_channel("dev")
 			Logger.info(LOG, "Update channel set to dev.")
@@ -708,7 +723,8 @@ local function _build_updates(ctx)
 	for _, preset in ipairs(up.INTERVAL_PRESETS) do
 		local is_current = (preset.seconds == current_interval)
 		items[#items + 1] = {
-			title = "Vérifier toutes les " .. preset.code .. (is_current and " ✓" or ""),
+			title = _fill(i18n_safe("menu.updates.check_every"), "{interval}", preset.code)
+				.. (is_current and " ✓" or ""),
 			fn = function()
 				up.set_check_interval(preset.seconds)
 				up.stop_background_checks()
