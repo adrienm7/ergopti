@@ -97,6 +97,16 @@ class KLMigration {
 		static readFh := ""
 		static writeFh := ""
 
+		; Re-entrancy guard for KL_Mig_Slice.
+		;
+		; A slice does blocking file I/O, and AHK PUMPS MESSAGES during it — so the
+		; one-shot KL_Mig_Tick this pass schedules can dispatch in the middle of a
+		; slice already running. The inner slice can reach the end of the pass,
+		; call _KL_Mig_Release (which sets writeFh back to "") and return into the
+		; outer one, whose very next line is writeFh.Write(...). That surfaced as an
+		; intermittent 'This value of type "String" has no method named "Write"'.
+		static inSlice := false
+
 		; Unconsumed input. Holds at most one statement plus the tail of the last
 		; read, never the ledger.
 		static buffer := ""
@@ -441,7 +451,22 @@ _KL_Mig_Finish() {
 KL_Mig_Slice() {
 		if (!KLMigration.active)
 				return false
+		; A tick that lands while a slice is already running must yield, not run a
+		; second slice over the same handles. Returning true keeps the pass alive:
+		; the slice already in flight will schedule the next tick itself.
+		if (KLMigration.inSlice)
+				return true
+		KLMigration.inSlice := true
+		try {
+				return _KL_Mig_SliceBody()
+		} finally {
+				KLMigration.inSlice := false
+		}
+}
 
+; The body of one slice. Split out so the re-entrancy guard above wraps every
+; exit path, including the early returns for end-of-pass and abort.
+_KL_Mig_SliceBody() {
 		deviceIdLit := Keylogger._device_id_lit
 		processed := 0
 		while (processed < KL_MIG_STATEMENTS_PER_SLICE) {
