@@ -761,7 +761,24 @@ Constraints: **paths before moves, moves before content, data before code.**
   is the only thing preventing that, and it pins the four behaviours that must
   NOT change with the narrower operator — verified against the interpreter first:
   numbers still compare numerically (`1 == "1"`, `1 == 1.0`, `255 == "0xFF"`),
-  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. ~~8 files under `windows/tests/` are invoked by nothing, including the **only**
+  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. ~~Two macOS files (593 lines) replay 36 vectors against a **reimplementation
+defined inside the test**~~ — **measured, and the diagnosis was wrong in the way
+that matters.** `test_adapter_contract_vectors.lua` loads the **real** adapters
+through `load_with_stubs` and calls them directly; it is not a reimplementation,
+and its 100 tests are genuine behavioural coverage.
+The real defect is narrower and was hiding behind that description: the
+docstring promised *"When the JS vectors are updated the Lua mirrors must be
+updated to match — the tests will fail until they are synchronised, making drift
+immediately visible."* **Nothing made that true.** The file reads no `.spec.js`,
+so a vector changed on the JS side leaves the Lua mirror passing against the old
+expectation. Measured: **138 vectors across 20 ports, 61 referenced here by id**
+— 77 could drift unnoticed, and TooltipRenderer (0/12), Notifier (0/7) and
+TimerScheduler (0/7) had *no* traceable vector while their sections looked fully
+populated.
+The docstring now says what is actually true, and
+`test-port-vector-traceability.cjs` ratchets the link at 61/138 so it can only
+improve — adding an id to a test is a one-line change. A requirement of all 138
+would have failed on arrival and been deleted within the week. ~~8 files under `windows/tests/` are invoked by nothing, including the **only**
 Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI
 coverage).~~ — **measured: both halves were wrong, and the residue was worth
 finding.** `test-ahk-test-coverage.cjs` already proves all **838**

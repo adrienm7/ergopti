@@ -15,9 +15,21 @@
 ---
 --- APPROACH:
 --- Each port section hard-codes the relevant contractTestVectors() inputs and
---- expected outputs, mirroring the JS source exactly. When the JS vectors are
---- updated the Lua mirrors must be updated to match — the tests will fail until
---- they are synchronised, making drift immediately visible.
+--- expected outputs, mirroring the JS source. The adapters themselves are REAL —
+--- loaded through load_with_stubs and called directly — so these are behavioural
+--- tests, not a reimplementation.
+---
+--- DRIFT, HONESTLY:
+--- This file reads no .spec.js, so a vector changed on the JS side leaves the
+--- Lua mirror passing against the old expectation. An earlier version of this
+--- docstring claimed the opposite — "the tests will fail until they are
+--- synchronised, making drift immediately visible" — and nothing made that true.
+--- Measured: 138 vectors across 20 ports, 61 of them referenced here by id.
+---
+--- tools/test/test-port-vector-traceability.cjs ratchets that number, so the
+--- link can only get better. Naming a vector id in a test is what makes that
+--- test traceable — prefer including the id in the assertion message when adding
+--- one.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
