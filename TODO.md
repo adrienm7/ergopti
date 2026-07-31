@@ -356,10 +356,33 @@ Constraints: **paths before moves, moves before content, data before code.**
   Six regression cases in `test_toml_codec_edge_cases.lua`; three go red without
   the fix (2-element, 3-element, nested inline table) and three guard behaviour
   that already worked and must keep working — a comma inside a string, and the
-  trailing-comma rejection that depth tracking must not soften. (3) Convert the **62 measured pure-keystroke Windows
-  actions** to `emit` rows — deletes 62 AHK lambdas, 27 Lua closures and ~30 Linux
-  `elseif` branches (54 % of the Windows action registry is data pretending to be
-  code). (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —
+  trailing-comma rejection that depth tracking must not soften. ~~(3) Convert the **62 measured pure-keystroke Windows actions** to `emit` rows~~
+  — **the Windows half is done.** All 62 hand-written lambdas are gone from
+  `modules/gestures/actions.ahk`; the handlers are now built at static-init from
+  `_generated/gesture_emit_actions.ahk`, itself generated from the shared
+  catalogue. The macOS closures and Linux `elseif` branches are still to follow.
+  **Generated rather than registered at runtime, for a measured reason:** the
+  obvious move is to let `_GestureLoadActionCatalog()` install them while it
+  already has the TOML parsed — but that loader is deliberately deferred off the
+  boot path (a `SetTimer` with a negative period, worth ~100 ms), so building
+  handlers there opens a window in which a gesture fires and finds nothing
+  registered. Generation keeps registration where it was and adds no boot-path
+  parse.
+  **The bug this shape avoids:** a closure created inside an AHK loop captures
+  the LOOP VARIABLE, so building the emitters inline would have given all 62 the
+  final iteration's values — every gesture emitting one keystroke, with the
+  registry still reporting the right count and nothing thrown. The emitters are
+  built by helper functions taking the values as parameters, and
+  `test_gesture_emit_actions.ahk` pins that construction.
+  The old `test-action-emit-rows-match-code.cjs` was **retired, not weakened**:
+  once the code is generated from the catalogue, comparing them is circular. It
+  had already done its job — making the data trustworthy enough to delete the
+  code against — and its own floor check reported that it had nothing left to
+  compare. Its replacement asserts registration completeness and the binding
+  construction. What it deliberately does **not** do is invoke a handler and
+  observe the keystroke: AHK v2 resolves function names at compile time, so that
+  needs a recorder seam in `adapters/text_sender.ahk` that nothing else in the
+  suite currently requires. (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —
   none of the 20 has a "bind a chord to a callback" operation, which is why each
   driver invented its own. (5) Replace Windows layers A+B, which bind the same
   intent to two different physical keys because layer B is registered *before*

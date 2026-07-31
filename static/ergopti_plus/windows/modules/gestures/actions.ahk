@@ -24,54 +24,12 @@ global GESTURE_ACTIONS := Map(
 		"right_click_toggle", {
 				Fn: (*) => GestureToggleRightClick(),
 		},
-		"app_switcher", {
-				Fn: (*) => TextPressKey("Tab", ["Alt"]),
-		},
 		; --- Editing ---
-		"copy", {
-				Fn: (*) => TextPressKey("c", ["Ctrl"]),
-		},
-		"paste", {
-				Fn: (*) => TextPressKey("v", ["Ctrl"]),
-		},
-		"cut", {
-				Fn: (*) => TextPressKey("x", ["Ctrl"]),
-		},
-		"undo", {
-				Fn: (*) => TextPressKey("z", ["Ctrl"]),
-		},
-		"redo", {
-				Fn: (*) => TextPressKey("y", ["Ctrl"]),
-		},
-		"select_all", {
-				Fn: (*) => TextPressKey("a", ["Ctrl"]),
-		},
-		"find", {
-				Fn: (*) => TextPressKey("f", ["Ctrl"]),
-		},
 		; --- Keys ---
-		"enter", {
-				Fn: (*) => TextPressKey("Enter", []),
-		},
 		"tab", {
 				Fn: (*) => LLM_Tooltip_FireTabOrAccept([]),
 		},
-		"escape", {
-				Fn: (*) => TextPressKey("Escape", []),
-		},
-		"backspace", {
-				Fn: (*) => TextPressKey("BackSpace", []),
-		},
-		"delete", {
-				Fn: (*) => TextPressKey("Delete", []),
-		},
 		; --- Tabs ---
-		"tab_new", {
-				Fn: (*) => TextPressKey("t", ["Ctrl"]),
-		},
-		"tab_close", {
-				Fn: (*) => TextPressKey("w", ["Ctrl"]),
-		},
 		"tab_prev", {
 				Fn: (*) => GestureSendShortcut("^+{Tab}"),
 		},
@@ -98,127 +56,10 @@ global GESTURE_ACTIONS := Map(
 		"win_app_next", {
 				Fn: (*) => GestureCycleAppWindows(True),
 		},
-		"close_window", {
-				Fn: (*) => TextPressKey("F4", ["Alt"]),
-		},
-		"fullscreen", {
-				Fn: (*) => TextPressKey("F11", []),
-		},
-		"snap_left", {
-				Fn: (*) => TextPressKey("Left", ["Win"]),
-		},
-		"snap_right", {
-				Fn: (*) => TextPressKey("Right", ["Win"]),
-		},
-		"maximize", {
-				Fn: (*) => TextPressKey("Up", ["Win"]),
-		},
-		"desktop_prev", {
-				Fn: (*) => TextPressKey("Left", ["Ctrl", "Win"]),
-		},
-		"desktop_next", {
-				Fn: (*) => TextPressKey("Right", ["Ctrl", "Win"]),
-		},
-		"desktop_new", {
-				Fn: (*) => TextPressKey("d", ["Ctrl", "Win"]),
-		},
-		"desktop_close", {
-				Fn: (*) => TextPressKey("F4", ["Ctrl", "Win"]),
-		},
-		"task_view", {
-				Fn: (*) => TextPressKey("Tab", ["Win"]),
-		},
-		"minimize_all", {
-				Fn: (*) => TextPressKey("d", ["Win"]),
-		},
 		; --- Cursor movement ---
-		"word_prev", {
-				Fn: (*) => TextPressKey("Left", ["Ctrl"]),
-		},
-		"word_next", {
-				Fn: (*) => TextPressKey("Right", ["Ctrl"]),
-		},
-		"line_up", {
-				Fn: (*) => TextPressKey("Up", []),
-		},
-		"line_down", {
-				Fn: (*) => TextPressKey("Down", []),
-		},
-		"line_start", {
-				Fn: (*) => TextPressKey("Home", []),
-		},
-		"line_end", {
-				Fn: (*) => TextPressKey("End", []),
-		},
-		"para_prev", {
-				Fn: (*) => TextPressKey("Up", ["Ctrl"]),
-		},
-		"para_next", {
-				Fn: (*) => TextPressKey("Down", ["Ctrl"]),
-		},
-		"doc_start", {
-				Fn: (*) => TextPressKey("Home", ["Ctrl"]),
-		},
-		"doc_end", {
-				Fn: (*) => TextPressKey("End", ["Ctrl"]),
-		},
 		; --- Arrows ---
-		"arrow_up", {
-				Fn: (*) => TextPressKey("Up", []),
-		},
-		"arrow_down", {
-				Fn: (*) => TextPressKey("Down", []),
-		},
-		"arrow_left", {
-				Fn: (*) => TextPressKey("Left", []),
-		},
-		"arrow_right", {
-				Fn: (*) => TextPressKey("Right", []),
-		},
 		; --- Selection ---
-		"sel_up", {
-				Fn: (*) => TextPressKey("Up", ["Shift"]),
-		},
-		"sel_down", {
-				Fn: (*) => TextPressKey("Down", ["Shift"]),
-		},
-		"sel_left", {
-				Fn: (*) => TextPressKey("Left", ["Shift"]),
-		},
-		"sel_right", {
-				Fn: (*) => TextPressKey("Right", ["Shift"]),
-		},
-		"sel_word_prev", {
-				Fn: (*) => TextPressKey("Left", ["Ctrl", "Shift"]),
-		},
-		"sel_word_next", {
-				Fn: (*) => TextPressKey("Right", ["Ctrl", "Shift"]),
-		},
 		; --- Media ---
-		"vol_up", {
-				Fn: (*) => TextPressKey("Volume_Up", []),
-		},
-		"vol_down", {
-				Fn: (*) => TextPressKey("Volume_Down", []),
-		},
-		"mute", {
-				Fn: (*) => TextPressKey("Volume_Mute", []),
-		},
-		"brightness_up", {
-				Fn: (*) => TextPressKey("Brightness_Up", []),
-		},
-		"brightness_down", {
-				Fn: (*) => TextPressKey("Brightness_Down", []),
-		},
-		"track_play", {
-				Fn: (*) => TextPressKey("Media_Play_Pause", []),
-		},
-		"track_next", {
-				Fn: (*) => TextPressKey("Media_Next", []),
-		},
-		"track_prev", {
-				Fn: (*) => TextPressKey("Media_Prev", []),
-		},
 		; --- System ---
 		; Each capture target ships in two flavours: the *_clipboard variant
 		; copies the image to the Windows clipboard for immediate paste into
@@ -245,14 +86,8 @@ global GESTURE_ACTIONS := Map(
 		"screenshot_fullscreen_save", {
 				Fn: (*) => GestureScreenshotFullscreen("save"),
 		},
-		"screen_record", {
-				Fn: (*) => TextPressKey("r", ["Win", "Alt"]),
-		},
 		"lock_screen", {
 				Fn: (*) => DllCall("LockWorkStation"),
-		},
-		"notification_center", {
-				Fn: (*) => TextPressKey("n", ["Win"]),
 		},
 		; --- UI windows ---
 		; Each UI action follows the same three-state pattern: if the window is
@@ -319,17 +154,8 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => KeyHistory(),
 		},
 		; --- Advanced system actions ---
-		"select_line", {
-				Fn: (*) => SendFinalResult("{Home}{Shift Down}{End}{Shift Up}"),
-		},
-		"screen_capture", {
-				Fn: (*) => SendFinalResult("#+s"),
-		},
 		"screen_capture_instant", {
 				Fn: (*) => GestureScreenshotInstant(),
-		},
-		"ocr_screenshot", {
-				Fn: (*) => SendFinalResult("#+t"),
 		},
 		"open_url", {
 				Fn: (BindingId := "") => GestureOpenConfiguredURL(BindingId),
@@ -344,9 +170,6 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => (
 						IsSet(ToggleActivitySimulation) ? ToggleActivitySimulation() : LoggerWarn("gestures", "Activity Simulation is disabled in shortcuts config.")
 				),
-		},
-		"surround_parens", {
-				Fn: (*) => SendFinalResult("{Home}({End}){Home}"),
 		},
 		"search_web", {
 				Fn: (BindingId := "") => GestureSearchWeb(BindingId),
@@ -381,22 +204,48 @@ global GESTURE_ACTIONS := Map(
 		"caps_word", {
 				Fn: (*) => ToggleCapsWord(),
 		},
-		"ctrl_backspace", {
-				Fn: (*) => TextPressKey("BackSpace", ["Ctrl"]),
-		},
-		"ctrl_delete", {
-				Fn: (*) => TextPressKey("Delete", ["Ctrl"]),
-		},
 		"alt_tab_monitor", {
 				Fn: (*) => AltTabMonitor(),
-		},
-		"space", {
-				Fn: (*) => TextPressKey("Space", []),
 		},
 		"caps_lock", {
 				Fn: (*) => ToggleCapsLock(),
 		},
 )
+
+; ── Actions the shared catalogue fully describes ────────────────────────────
+;
+; 62 entries used to be written out above, each one spelling a key and its
+; modifiers into a lambda — `copy` as TextPressKey("c", ["Ctrl"]), and the same
+; fact spelled again in the macOS and Linux registries. Three copies of one
+; thing, where a wrong copy is invisible: a `copy` action that sends Ctrl+X is
+; not a crash and not a failing test.
+;
+; They now come from _shared/modules/actions/actions.toml through
+; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init, and not
+; in _GestureLoadActionCatalog(): that loader is deliberately deferred off the
+; boot path, so building handlers there would open a window in which a gesture
+; fires and finds nothing registered.
+for _EmitId, _Emit in GestureEmitActionsData() {
+		if _Emit.HasOwnProp("Seq") {
+				; Raw send sequence — no portable key/modifier form exists for it.
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
+		} else {
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods) }
+		}
+}
+
+; Built in helper functions rather than inline: a closure created inside a loop
+; captures the LOOP VARIABLE, so every handler would end up emitting whatever
+; the last iteration happened to leave there. Passing the values as parameters
+; gives each closure its own copy.
+_GestureMakeKeyEmitter(Key, Mods) {
+		return (*) => TextPressKey(Key, Mods)
+}
+
+_GestureMakeSeqEmitter(Seq) {
+		return (*) => SendFinalResult(Seq)
+}
+
 
 ; Returns the translated label for a gesture action.
 ; Uses t("sg_actions.X") from the active locale JSON as the canonical source.
