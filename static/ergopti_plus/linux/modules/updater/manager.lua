@@ -747,27 +747,48 @@ function M.clear_cached_release()
 	_state = "idle"
 end
 
+--- Test seam: places the module in the "an update is available" state without a
+--- network round trip, so the label formatting can be exercised directly.
+---
+--- Reaching that state for real needs a GitHub response, and the one thing worth
+--- asserting about it — that the release tag is carried into the localised
+--- template intact — is pure formatting.
+--- @param release table { tag = string, prerelease = boolean }.
+function M._test_set_cached_release(release)
+	_cached_release = release
+	_state = "available"
+end
+
 --- Returns a user-facing label for the update menu item.
 --- @return string
 function M.get_menu_label()
+	local i18n = require("lib.i18n")
 	if _state == "checking" then
-		return "Vérification en cours…"
+		return i18n.get("menu.about.update_checking")
 	end
 	if _state == "downloading" then
-		return "Téléchargement en cours…"
+		return i18n.get("menu.about.update_downloading")
 	end
 	if _state == "installing" then
-		return "Installation en cours…"
+		return i18n.get("menu.about.update_installing")
 	end
 	if _state == "available" and _cached_release then
-		local tag = _cached_release.tag
-		local suffix = _cached_release.prerelease and " (dev)" or ""
-		return "Mettre à jour → " .. tag .. suffix
+		local tag = tostring(_cached_release.tag) ..
+			(_cached_release.prerelease and " (dev)" or "")
+		-- Plain-index substitution, not gsub: a tag is user-supplied data and a
+		-- "%" in it would be read as a capture reference in gsub's REPLACEMENT
+		-- string and raise "invalid use of '%'".
+		local template = i18n.get("menu.about.update_now")
+		local at = template:find("{tag}", 1, true)
+		if not at then return template .. " " .. tag end
+		return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
 	end
+	-- "(dev)" is the channel's own name, the same token in every locale — see
+	-- changelog_window.channel_dev, which is "Dev" in English and in French.
 	if _channel == "dev" then
-		return "Rechercher les mises à jour (dev)"
+		return i18n.get("menu.about.check_for_updates") .. " (dev)"
 	end
-	return "Rechercher les mises à jour"
+	return i18n.get("menu.about.check_for_updates")
 end
 
 -- =========================================
