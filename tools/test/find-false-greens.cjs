@@ -559,8 +559,12 @@ function findUnflooredScans(file, src, ext) {
 		// variable finds nothing. Any size assertion in the file is therefore taken
 		// as the floor: a file that asserts a scan result is non-empty anywhere is
 		// not the shape this pattern is about.
+		// The caller's floor is just as often a plain counter it increments while
+		// iterating (`Checked >= 11`) as a size read on the list, so both count.
 		if (!floored && collectors.size > 0 && !ASSERT.test(block.text)) {
-			if (/(?:\.\s*(?:Length|Count)|#\s*\w+)\s*(?:>|>=|==|~=|!=)\s*\w/.test(src)) floored = true;
+			const CALLER_FLOOR =
+				/(?:Assert\w*|assert_\w+)\s*\([^\n]*(?:(?:\.\s*(?:Length|Count)|#\s*\w+)\s*(?:>|>=|==|~=|!=)\s*\w|\b\w+\s*(?:>|>=)\s*\d)/;
+			if (CALLER_FLOOR.test(src)) floored = true;
 		}
 		if (floored) continue;
 
