@@ -39,17 +39,22 @@ function check(name, condition, detail) {
 
 const ports = gen.readSpecNames(gen.PORTS_DIR);
 const domain = gen.readSpecNames(gen.DOMAIN_DIR);
-const ahkAdapters = gen.readAdapterNames(gen.AHK_DIR);
-const hsAdapters = gen.readAdapterNames(gen.HS_DIR);
+const driverData = gen.collectDriverData();
 
 // (a) The reorg-drift regression: a stale path resolves to 0 entries.
 check('generator resolves the ports/ spec dir (>=18, not 0)', ports.length >= 18, `found ${ports.length} at ${gen.PORTS_DIR}`);
 check('generator resolves the domain/ spec dir (>=4)', domain.length >= 4, `found ${domain.length} at ${gen.DOMAIN_DIR}`);
-check('generator resolves windows/adapters (>=18)', ahkAdapters.length >= 18, `found ${ahkAdapters.length} at ${gen.AHK_DIR}`);
-check('generator resolves macos/adapters (>=18)', hsAdapters.length >= 18, `found ${hsAdapters.length} at ${gen.HS_DIR}`);
+
+// (a2) Every driver, not two of them. The diagram used to hardcode windows and
+// macos, so linux/adapters/ — a full set of them — appeared nowhere in a
+// document titled "the three-layer hexagonal architecture".
+check('generator discovers all three drivers', gen.DRIVERS.length >= 3, `found ${gen.DRIVERS.map((d) => d.name).join(', ')}`);
+for (const { driver, adapters } of driverData) {
+	check(`generator resolves ${driver.name}/adapters (>=18)`, adapters.length >= 18, `found ${adapters.length} at ${driver.dir}`);
+}
 
 // (b) Staleness: the committed diagram body must match the freshly built one.
-const mermaid = gen.buildDiagram(ports, domain, ahkAdapters, hsAdapters);
+const mermaid = gen.buildDiagram(ports, domain, driverData);
 const committed = fs.existsSync(gen.OUT_FILE) ? fs.readFileSync(gen.OUT_FILE, 'utf8') : '';
 check(
 	'committed architecture.md is in sync with the generator',
@@ -60,6 +65,11 @@ check(
 // Every port spec must appear as a node in the rendered diagram.
 const missing = ports.filter((p) => !mermaid.includes(`["${p}"]`));
 check('every port spec appears as a diagram node', missing.length === 0, `missing: ${missing.join(', ')}`);
+
+// And every driver must have its own subgraph. Naming the driver in the diagram
+// text is the check that would have failed on the original two-driver version.
+const noSubgraph = gen.DRIVERS.filter((d) => !mermaid.includes(`${d.name}/adapters/`));
+check('every driver has an adapters subgraph', noSubgraph.length === 0, `missing: ${noSubgraph.map((d) => d.name).join(', ')}`);
 
 console.log(`\nTotal: ${pass + fail} — ${pass} passed, ${fail} failed.`);
 process.exit(fail > 0 ? 1 : 0);

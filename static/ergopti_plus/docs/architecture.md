@@ -3,7 +3,7 @@
 
 # Architecture Overview
 
-> Generated on 2026-07-29 from port specs, domain specs, and adapter file listings.
+> Generated on 2026-07-31 from port specs, domain specs, and adapter file listings.
 
 The diagram below shows the three-layer hexagonal architecture:
 **Ports** (shared contracts) → **Adapters** (driver-specific implementations) → **Domain** (pure business logic).
@@ -34,55 +34,80 @@ graph TD
         P_WindowManager["WindowManager"]
     end
 
-    subgraph AHK_Adapters["AHK Adapters — windows/adapters/"]
-        AHK_app_launcher["AppLauncher.ahk"]
-        AHK_clipboard["Clipboard.ahk"]
-        AHK_crypto["Crypto.ahk"]
-        AHK_file_system["FileSystem.ahk"]
-        AHK_graphics_renderer["GraphicsRenderer.ahk"]
-        AHK_http_client["HttpClient.ahk"]
-        AHK_key_state["KeyState.ahk"]
-        AHK_keyboard_hook["KeyboardHook.ahk"]
-        AHK_mouse_control["MouseControl.ahk"]
-        AHK_network_info["NetworkInfo.ahk"]
-        AHK_notifier["Notifier.ahk"]
-        AHK_process_lifecycle["ProcessLifecycle.ahk"]
-        AHK_secure_field_detector["SecureFieldDetector.ahk"]
-        AHK_shell_runner["ShellRunner.ahk"]
-        AHK_storage["Storage.ahk"]
-        AHK_text_sender["TextSender.ahk"]
-        AHK_timer_scheduler["TimerScheduler.ahk"]
-        AHK_tooltip_renderer["TooltipRenderer.ahk"]
-        AHK_tray_menu["TrayMenu.ahk"]
-        AHK_window_info["WindowInfo.ahk"]
-        AHK_window_manager["WindowManager.ahk"]
+    subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
+        LINUX_app_launcher["AppLauncher.lua"]
+        LINUX_clipboard["Clipboard.lua"]
+        LINUX_crypto["Crypto.lua"]
+        LINUX_event_loop["EventLoop.lua"]
+        LINUX_file_system["FileSystem.lua"]
+        LINUX_graphics_renderer["GraphicsRenderer.lua"]
+        LINUX_http_client["HttpClient.lua"]
+        LINUX_key_state["KeyState.lua"]
+        LINUX_keyboard_hook["KeyboardHook.lua"]
+        LINUX_mouse_control["MouseControl.lua"]
+        LINUX_network_info["NetworkInfo.lua"]
+        LINUX_notifier["Notifier.lua"]
+        LINUX_process_lifecycle["ProcessLifecycle.lua"]
+        LINUX_secure_field_detector["SecureFieldDetector.lua"]
+        LINUX_shell_runner["ShellRunner.lua"]
+        LINUX_storage["Storage.lua"]
+        LINUX_text_sender["TextSender.lua"]
+        LINUX_timer_scheduler["TimerScheduler.lua"]
+        LINUX_tooltip_renderer["TooltipRenderer.lua"]
+        LINUX_tray_menu["TrayMenu.lua"]
+        LINUX_window_info["WindowInfo.lua"]
+        LINUX_window_manager["WindowManager.lua"]
     end
 
-    subgraph HS_Adapters["HS Adapters — macos/adapters/"]
-        HS_app_launcher["AppLauncher.lua"]
-        HS_clipboard["Clipboard.lua"]
-        HS_crypto["Crypto.lua"]
-        HS_event_tap_guard["EventTapGuard.lua"]
-        HS_file_system["FileSystem.lua"]
-        HS_graphics_renderer["GraphicsRenderer.lua"]
-        HS_http_client["HttpClient.lua"]
-        HS_json_codec["JsonCodec.lua"]
-        HS_key_state["KeyState.lua"]
-        HS_keyboard_hook["KeyboardHook.lua"]
-        HS_mouse_control["MouseControl.lua"]
-        HS_network_info["NetworkInfo.lua"]
-        HS_notifier["Notifier.lua"]
-        HS_process_lifecycle["ProcessLifecycle.lua"]
-        HS_secure_field_detector["SecureFieldDetector.lua"]
-        HS_shell_runner["ShellRunner.lua"]
-        HS_storage["Storage.lua"]
-        HS_text_sender["TextSender.lua"]
-        HS_timer_scheduler["TimerScheduler.lua"]
-        HS_toml_cache["TomlCache.lua"]
-        HS_tooltip_renderer["TooltipRenderer.lua"]
-        HS_tray_menu["TrayMenu.lua"]
-        HS_window_info["WindowInfo.lua"]
-        HS_window_manager["WindowManager.lua"]
+    subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
+        MACOS_app_launcher["AppLauncher.lua"]
+        MACOS_clipboard["Clipboard.lua"]
+        MACOS_crypto["Crypto.lua"]
+        MACOS_event_tap_guard["EventTapGuard.lua"]
+        MACOS_file_system["FileSystem.lua"]
+        MACOS_graphics_renderer["GraphicsRenderer.lua"]
+        MACOS_http_client["HttpClient.lua"]
+        MACOS_json_codec["JsonCodec.lua"]
+        MACOS_key_state["KeyState.lua"]
+        MACOS_keyboard_hook["KeyboardHook.lua"]
+        MACOS_mouse_control["MouseControl.lua"]
+        MACOS_network_info["NetworkInfo.lua"]
+        MACOS_notifier["Notifier.lua"]
+        MACOS_process_lifecycle["ProcessLifecycle.lua"]
+        MACOS_secure_field_detector["SecureFieldDetector.lua"]
+        MACOS_shell_runner["ShellRunner.lua"]
+        MACOS_storage["Storage.lua"]
+        MACOS_text_sender["TextSender.lua"]
+        MACOS_timer_scheduler["TimerScheduler.lua"]
+        MACOS_toml_cache["TomlCache.lua"]
+        MACOS_tooltip_renderer["TooltipRenderer.lua"]
+        MACOS_tray_menu["TrayMenu.lua"]
+        MACOS_window_info["WindowInfo.lua"]
+        MACOS_window_manager["WindowManager.lua"]
+    end
+
+    subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
+        WINDOWS_app_launcher["AppLauncher.ahk"]
+        WINDOWS_clipboard["Clipboard.ahk"]
+        WINDOWS_crypto["Crypto.ahk"]
+        WINDOWS_file_system["FileSystem.ahk"]
+        WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
+        WINDOWS_http_client["HttpClient.ahk"]
+        WINDOWS_key_state["KeyState.ahk"]
+        WINDOWS_keyboard_hook["KeyboardHook.ahk"]
+        WINDOWS_mouse_control["MouseControl.ahk"]
+        WINDOWS_network_info["NetworkInfo.ahk"]
+        WINDOWS_notifier["Notifier.ahk"]
+        WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
+        WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
+        WINDOWS_shell_runner["ShellRunner.ahk"]
+        WINDOWS_storage["Storage.ahk"]
+        WINDOWS_text_sender["TextSender.ahk"]
+        WINDOWS_timer_scheduler["TimerScheduler.ahk"]
+        WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
+        WINDOWS_tray_menu["TrayMenu.ahk"]
+        WINDOWS_window_info["WindowInfo.ahk"]
+        WINDOWS_window_manager["WindowManager.ahk"]
     end
 
     subgraph Domain["Domain — shared business logic"]
@@ -93,49 +118,71 @@ graph TD
         D_Terminators["Terminators"]
     end
 
-    %% Port implementations: AHK
-    P_AppLauncher -->|implements| AHK_app_launcher
-    P_Clipboard -->|implements| AHK_clipboard
-    P_Crypto -->|implements| AHK_crypto
-    P_FileSystem -->|implements| AHK_file_system
-    P_GraphicsRenderer -->|implements| AHK_graphics_renderer
-    P_HttpClient -->|implements| AHK_http_client
-    P_KeyState -->|implements| AHK_key_state
-    P_KeyboardHook -->|implements| AHK_keyboard_hook
-    P_MouseControl -->|implements| AHK_mouse_control
-    P_NetworkInfo -->|implements| AHK_network_info
-    P_Notifier -->|implements| AHK_notifier
-    P_ProcessLifecycle -->|implements| AHK_process_lifecycle
-    P_SecureFieldDetector -->|implements| AHK_secure_field_detector
-    P_Storage -->|implements| AHK_storage
-    P_TextSender -->|implements| AHK_text_sender
-    P_TimerScheduler -->|implements| AHK_timer_scheduler
-    P_TooltipRenderer -->|implements| AHK_tooltip_renderer
-    P_TrayMenu -->|implements| AHK_tray_menu
-    P_WindowInfo -->|implements| AHK_window_info
-    P_WindowManager -->|implements| AHK_window_manager
+    %% Port implementations: Linux (Lua)
+    P_AppLauncher -->|implements| LINUX_app_launcher
+    P_Clipboard -->|implements| LINUX_clipboard
+    P_Crypto -->|implements| LINUX_crypto
+    P_FileSystem -->|implements| LINUX_file_system
+    P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
+    P_HttpClient -->|implements| LINUX_http_client
+    P_KeyState -->|implements| LINUX_key_state
+    P_KeyboardHook -->|implements| LINUX_keyboard_hook
+    P_MouseControl -->|implements| LINUX_mouse_control
+    P_NetworkInfo -->|implements| LINUX_network_info
+    P_Notifier -->|implements| LINUX_notifier
+    P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
+    P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
+    P_Storage -->|implements| LINUX_storage
+    P_TextSender -->|implements| LINUX_text_sender
+    P_TimerScheduler -->|implements| LINUX_timer_scheduler
+    P_TooltipRenderer -->|implements| LINUX_tooltip_renderer
+    P_TrayMenu -->|implements| LINUX_tray_menu
+    P_WindowInfo -->|implements| LINUX_window_info
+    P_WindowManager -->|implements| LINUX_window_manager
 
-    %% Port implementations: Hammerspoon
-    P_AppLauncher -->|implements| HS_app_launcher
-    P_Clipboard -->|implements| HS_clipboard
-    P_Crypto -->|implements| HS_crypto
-    P_FileSystem -->|implements| HS_file_system
-    P_GraphicsRenderer -->|implements| HS_graphics_renderer
-    P_HttpClient -->|implements| HS_http_client
-    P_KeyState -->|implements| HS_key_state
-    P_KeyboardHook -->|implements| HS_keyboard_hook
-    P_MouseControl -->|implements| HS_mouse_control
-    P_NetworkInfo -->|implements| HS_network_info
-    P_Notifier -->|implements| HS_notifier
-    P_ProcessLifecycle -->|implements| HS_process_lifecycle
-    P_SecureFieldDetector -->|implements| HS_secure_field_detector
-    P_Storage -->|implements| HS_storage
-    P_TextSender -->|implements| HS_text_sender
-    P_TimerScheduler -->|implements| HS_timer_scheduler
-    P_TooltipRenderer -->|implements| HS_tooltip_renderer
-    P_TrayMenu -->|implements| HS_tray_menu
-    P_WindowInfo -->|implements| HS_window_info
-    P_WindowManager -->|implements| HS_window_manager
+    %% Port implementations: macOS (Hammerspoon)
+    P_AppLauncher -->|implements| MACOS_app_launcher
+    P_Clipboard -->|implements| MACOS_clipboard
+    P_Crypto -->|implements| MACOS_crypto
+    P_FileSystem -->|implements| MACOS_file_system
+    P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
+    P_HttpClient -->|implements| MACOS_http_client
+    P_KeyState -->|implements| MACOS_key_state
+    P_KeyboardHook -->|implements| MACOS_keyboard_hook
+    P_MouseControl -->|implements| MACOS_mouse_control
+    P_NetworkInfo -->|implements| MACOS_network_info
+    P_Notifier -->|implements| MACOS_notifier
+    P_ProcessLifecycle -->|implements| MACOS_process_lifecycle
+    P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
+    P_Storage -->|implements| MACOS_storage
+    P_TextSender -->|implements| MACOS_text_sender
+    P_TimerScheduler -->|implements| MACOS_timer_scheduler
+    P_TooltipRenderer -->|implements| MACOS_tooltip_renderer
+    P_TrayMenu -->|implements| MACOS_tray_menu
+    P_WindowInfo -->|implements| MACOS_window_info
+    P_WindowManager -->|implements| MACOS_window_manager
+
+    %% Port implementations: Windows (AutoHotkey)
+    P_AppLauncher -->|implements| WINDOWS_app_launcher
+    P_Clipboard -->|implements| WINDOWS_clipboard
+    P_Crypto -->|implements| WINDOWS_crypto
+    P_FileSystem -->|implements| WINDOWS_file_system
+    P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
+    P_HttpClient -->|implements| WINDOWS_http_client
+    P_KeyState -->|implements| WINDOWS_key_state
+    P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
+    P_MouseControl -->|implements| WINDOWS_mouse_control
+    P_NetworkInfo -->|implements| WINDOWS_network_info
+    P_Notifier -->|implements| WINDOWS_notifier
+    P_ProcessLifecycle -->|implements| WINDOWS_process_lifecycle
+    P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
+    P_Storage -->|implements| WINDOWS_storage
+    P_TextSender -->|implements| WINDOWS_text_sender
+    P_TimerScheduler -->|implements| WINDOWS_timer_scheduler
+    P_TooltipRenderer -->|implements| WINDOWS_tooltip_renderer
+    P_TrayMenu -->|implements| WINDOWS_tray_menu
+    P_WindowInfo -->|implements| WINDOWS_window_info
+    P_WindowManager -->|implements| WINDOWS_window_manager
 
     %% Key domain relationships
     D_Expander -->|uses| D_Registry
