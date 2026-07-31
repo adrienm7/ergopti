@@ -379,21 +379,22 @@ path, so one call exempted every raw path beside it; macOS 40 behind 31) ·
 `tools/`; the 2 absolute paths were both in the prediction-corpus generator,
 which therefore ran on exactly one machine — fixed).
 
-Still open:
+**§0.7 is closed.** The remaining nine gates were extended the same day. Each
+one is listed with what it was blind to and what the blindness was hiding —
+because in five cases it was hiding a live defect, not just a coverage gap:
 
-the AHK purity ratchet (3 families of ~12; ignores `ui/` and the entry
-point) · the macOS purity ratchet (ignores `macos/ui/`, 636 `hs.*` lines) ·
-`test-webview-geometry-single-source.cjs` (zero Linux coverage, 3 Windows apps
-absent) · `test-webview-teardown-order.cjs` (7 hosts of 12, and it pins exact
-internal whitespace) · `test-config-schema.cjs` (2 templates of 3) ·
-`test-updater-constants-single-source.cjs` (excludes Linux) ·
-`test-menu-labels-single-source.cjs` (blind to Linux; should become an exclusion
-ratchet, which would immediately flag the AHK copy) · `test-priority-parity.cjs`
-(a text scan of 3 declarations; sees neither Linux, nor the comparison-site
-fallback, nor the tiebreak chain) · `gen-architecture-diagram.cjs` (**0
-occurrences of "linux"** in a document titled "three-layer hexagonal
-architecture") · `test-dev-tool-paths.cjs` (scoped to `tools/dev/` while
-`tools/build/` carries 2 absolute machine paths).
+| Gate | Was blind to | What that hid |
+| --- | --- | --- |
+| AHK purity ratchet | `ui/` and the entry point | 138 uncounted OS calls, 108 of them `DllCall` in the WebView2 hosts; one combined total also let one tree's improvement pay for another's regression. Now three frozen numbers |
+| macOS purity ratchet | `macos/ui/` and `init.lua` | 630 `hs.*` + 65 io/os lines. Its own history comment says "ui/ is outside this scan" twice, both times *raising* the baseline for code moved out of ui/ — the ratchet could be satisfied by moving OS calls to where nobody counts them |
+| `test-webview-geometry-single-source.cjs` | 4 of 14 apps, all of Linux | **the macOS diagnostic opened at 700x600 while Windows opened it at the manifest's 740x560**; the macOS download window held its own 460x380 copy. Coverage now derives from the manifest, with reasoned exclusions |
+| `test-webview-teardown-order.cjs` | 6 of 13 hosts | and for the 7 it watched it compared the FIRST occurrence of each handle — the top-of-file declaration — so **deleting the teardown release entirely still passed** |
+| `test-config-schema.cjs` | the Linux template; a missing file "skipped" | the Linux template violates the schema (no `[script]`), now pinned with its reason. Drivers are discovered by their `adapters/` tree |
+| `test-updater-constants-single-source.cjs` | Linux, and both `_DEFAULTS_FALLBACK` tables | a drifted fallback queries the wrong repo and reports "no update" forever, silently — the copy least likely to be exercised was the one least likely to be caught |
+| `test-menu-labels-single-source.cjs` | anything it did not name | **two macOS menu files carried their own `fmt_count`**. Now an exclusion ratchet: the AHK copies are pinned, and a pin whose duplicate is gone fails too |
+| `test-priority-parity.cjs` | use sites; Linux; the cascade order | **Windows defaulted a priority-less candidate to 50 (personal) where macOS uses 10 (common)** — the two drivers ranked the same collision differently |
+| `gen-architecture-diagram.cjs` | Linux | 22 adapters absent from the map of the system. Drivers are discovered; every one gets a subgraph |
+| `test-dev-tool-paths.cjs` | everything outside `tools/dev/` | the prediction-corpus generator ran on exactly one machine |
 
 ### 0.8 Gates to retire — after migration only
 

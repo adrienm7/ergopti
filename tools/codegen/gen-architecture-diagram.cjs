@@ -10,7 +10,8 @@
  * FEATURES & RATIONALE:
  * 1. Source-driven: reads spec file names and adapter listings directly from
  *    the filesystem so the diagram is always in sync with the actual codebase.
- * 2. Three-layer model: Ports (contracts) → Adapters (AHK / HS) → Domain
+ * 2. Three-layer model: Ports (contracts) → Adapters (one subgraph per
+ *    discovered driver) → Domain
  *    modules, showing which ports each adapter implements and which domain
  *    modules exist independently.
  * 3. Zero external deps: uses only Node.js built-ins so it runs without
@@ -38,15 +39,49 @@ const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 // repo root) pointed at nothing, so the diagram silently regenerated empty.
 const PORTS_DIR = shared('core', 'ports');
 const DOMAIN_DIR = shared('core', 'domain');
-const AHK_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'adapters');
-const HS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'macos', 'adapters');
 const OUT_FILE = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'docs', 'architecture.md');
+const DRIVERS_ROOT = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 
 // Prefix used in Mermaid node IDs to avoid reserved-keyword collisions
 const PREFIX_PORT = 'P_';
 const PREFIX_DOMAIN = 'D_';
-const PREFIX_AHK = 'AHK_';
-const PREFIX_HS = 'HS_';
+
+/**
+ * Every driver, discovered by its adapters/ tree.
+ *
+ * The two directories used to be hardcoded, which is why a document titled
+ * "the three-layer hexagonal architecture" contained zero occurrences of the
+ * word "linux" while linux/adapters/ held 22 of them. A diagram is read as the
+ * map of the system; one that omits a third of it is worse than none, because
+ * nobody re-checks a picture.
+ * @returns {{name: string, dir: string, prefix: string, title: string}[]}
+ */
+function discoverDrivers() {
+	// Display names for the drivers that exist; the directory name is only the
+	// fallback, so a new driver renders sensibly without an edit here.
+	const TITLES = {
+		windows: 'Windows (AutoHotkey)',
+		macos: 'macOS (Hammerspoon)',
+		linux: 'Linux (Lua)'
+	};
+	return fs
+		.readdirSync(DRIVERS_ROOT, { withFileTypes: true })
+		.filter((e) => e.isDirectory() && fs.existsSync(path.join(DRIVERS_ROOT, e.name, 'adapters')))
+		.map((e) => ({
+			name: e.name,
+			dir: path.join(DRIVERS_ROOT, e.name, 'adapters'),
+			prefix: e.name.toUpperCase().replace(/[^A-Z0-9]/g, '') + '_',
+			title: TITLES[e.name] || e.name.charAt(0).toUpperCase() + e.name.slice(1)
+		}))
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const DRIVERS = discoverDrivers();
+
+// Kept for any external caller; both now derive from the discovered list
+// rather than from their own literals.
+const AHK_DIR = (DRIVERS.find((d) => d.name === 'windows') || {}).dir;
+const HS_DIR = (DRIVERS.find((d) => d.name === 'macos') || {}).dir;
 
 // ====================================
 // ====================================
@@ -74,12 +109,24 @@ function readSpecNames(dir) {
  * @returns {string[]} Sorted list of adapter names.
  */
 function readAdapterNames(dir) {
-	if (!fs.existsSync(dir)) return [];
+	if (!dir || !fs.existsSync(dir)) return [];
 	return fs
 		.readdirSync(dir)
 		.filter((f) => /\.(ahk|lua)$/.test(f))
 		.map((f) => f.replace(/\.(ahk|lua)$/, ''))
 		.sort();
+}
+
+/**
+ * Returns the adapter file extension a driver uses, read from disk rather than
+ * assumed, so a driver written in a third language needs no edit here.
+ * @param {string} dir - Absolute path to the adapters directory.
+ * @returns {string} Extension with the dot (e.g. ".lua"), or "" if unknown.
+ */
+function adapterExtension(dir) {
+	if (!dir || !fs.existsSync(dir)) return '';
+	const f = fs.readdirSync(dir).find((n) => /\.(ahk|lua)$/.test(n));
+	return f ? f.slice(f.lastIndexOf('.')) : '';
 }
 
 // ==============================================
@@ -134,11 +181,11 @@ function matchPort(adapterName, portNames) {
  * Builds the full Mermaid diagram string from the collected data.
  * @param {string[]} ports   - Port spec names (PascalCase).
  * @param {string[]} domain  - Domain spec names (PascalCase).
- * @param {string[]} ahkAdapters - AHK adapter file base names.
- * @param {string[]} hsAdapters  - HS adapter file base names.
+ * @param {{driver: object, adapters: string[], ext: string}[]} driverData
+ *   One entry per discovered driver, in the order they should be drawn.
  * @returns {string} Complete Mermaid graph definition.
  */
-function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
+function buildDiagram(ports, domain, driverData) {
 	const lines = ['graph TD'];
 
 	// --- Ports subgraph ---
@@ -149,23 +196,15 @@ function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
 	}
 	lines.push('    end');
 
-	// --- AHK adapters subgraph with edges from ports ---
-	lines.push('');
-	lines.push('    subgraph AHK_Adapters["AHK Adapters — windows/adapters/"]');
-	for (const a of ahkAdapters) {
-		const lbl = label(a) + '.ahk';
-		lines.push(`        ${nodeId(PREFIX_AHK, a)}["${lbl}"]`);
+	// --- One adapters subgraph per driver ---
+	for (const { driver, adapters, ext } of driverData) {
+		lines.push('');
+		lines.push(`    subgraph ${driver.prefix}Adapters["${driver.title} Adapters — ${driver.name}/adapters/"]`);
+		for (const a of adapters) {
+			lines.push(`        ${nodeId(driver.prefix, a)}["${label(a)}${ext}"]`);
+		}
+		lines.push('    end');
 	}
-	lines.push('    end');
-
-	// --- HS adapters subgraph with edges from ports ---
-	lines.push('');
-	lines.push('    subgraph HS_Adapters["HS Adapters — macos/adapters/"]');
-	for (const a of hsAdapters) {
-		const lbl = label(a) + '.lua';
-		lines.push(`        ${nodeId(PREFIX_HS, a)}["${lbl}"]`);
-	}
-	lines.push('    end');
 
 	// --- Domain subgraph ---
 	lines.push('');
@@ -175,23 +214,15 @@ function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
 	}
 	lines.push('    end');
 
-	// --- Port → AHK adapter edges ---
-	lines.push('');
-	lines.push('    %% Port implementations: AHK');
-	for (const a of ahkAdapters) {
-		const p = matchPort(a, ports);
-		if (p) {
-			lines.push(`    ${nodeId(PREFIX_PORT, p)} -->|implements| ${nodeId(PREFIX_AHK, a)}`);
-		}
-	}
-
-	// --- Port → HS adapter edges ---
-	lines.push('');
-	lines.push('    %% Port implementations: Hammerspoon');
-	for (const a of hsAdapters) {
-		const p = matchPort(a, ports);
-		if (p) {
-			lines.push(`    ${nodeId(PREFIX_PORT, p)} -->|implements| ${nodeId(PREFIX_HS, a)}`);
+	// --- Port → adapter edges, per driver ---
+	for (const { driver, adapters } of driverData) {
+		lines.push('');
+		lines.push(`    %% Port implementations: ${driver.title}`);
+		for (const a of adapters) {
+			const p = matchPort(a, ports);
+			if (p) {
+				lines.push(`    ${nodeId(PREFIX_PORT, p)} -->|implements| ${nodeId(driver.prefix, a)}`);
+			}
 		}
 	}
 
@@ -244,20 +275,33 @@ function wrapMarkdown(mermaid) {
 // ==============================
 // ==============================
 
+/**
+ * Reads every discovered driver's adapter listing once, so the diagram and the
+ * regression test see exactly the same data.
+ * @returns {{driver: object, adapters: string[], ext: string}[]}
+ */
+function collectDriverData() {
+	return DRIVERS.map((driver) => ({
+		driver,
+		adapters: readAdapterNames(driver.dir),
+		ext: adapterExtension(driver.dir)
+	}));
+}
+
 function main() {
 	console.log('[gen:diagram] Reading specs and adapter listings…');
 
 	const ports = readSpecNames(PORTS_DIR);
 	const domain = readSpecNames(DOMAIN_DIR);
-	const ahkAdapters = readAdapterNames(AHK_DIR);
-	const hsAdapters = readAdapterNames(HS_DIR);
+	const driverData = collectDriverData();
 
 	console.log(`[gen:diagram]   Ports   : ${ports.length}`);
 	console.log(`[gen:diagram]   Domain  : ${domain.length}`);
-	console.log(`[gen:diagram]   AHK     : ${ahkAdapters.length}`);
-	console.log(`[gen:diagram]   HS      : ${hsAdapters.length}`);
+	for (const { driver, adapters } of driverData) {
+		console.log(`[gen:diagram]   ${driver.name.padEnd(8)}: ${adapters.length}`);
+	}
 
-	const mermaid = buildDiagram(ports, domain, ahkAdapters, hsAdapters);
+	const mermaid = buildDiagram(ports, domain, driverData);
 	const markdown = wrapMarkdown(mermaid);
 
 	fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
@@ -278,9 +322,12 @@ module.exports = {
 	DOMAIN_DIR,
 	AHK_DIR,
 	HS_DIR,
+	DRIVERS,
 	OUT_FILE,
 	readSpecNames,
 	readAdapterNames,
+	adapterExtension,
+	collectDriverData,
 	buildDiagram,
 	wrapMarkdown,
 	main
