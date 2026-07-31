@@ -149,15 +149,36 @@ helpers.describe("export — init validation", function()
 		helpers.assert_eq(e.get_device_short_id(), "first-uu\xe2\x80\xa6")
 	end)
 
-	helpers.it("pause must gate all export init and path access (project_suspend_pause_invariant)", function()
-		-- Real export of logs must be skipped when paused; no file reads/writes, no privacy leaks.
-		helpers.assert_true(true, "keylogger export must early-return under pause (no side effects)")
+	-- The getters are pure reads of module state. Asserting that they never touch
+	-- the filesystem is what makes "the export is gated elsewhere" mean anything:
+	-- a getter that opened the database would export while paused regardless of
+	-- any gate upstream.
+	helpers.it("the path getters perform no file I/O", function()
+		local src = helpers.read_driver_source("function M.get_sqlite_path")
+		helpers.assert_not_nil(src, "the export source must be findable by symbol")
+		for _, fn in ipairs({ "get_sqlite_path", "get_device_short_id" }) do
+			local body = src:match("function M%." .. fn .. ".-" .. string.char(10) .. "end" .. string.char(10))
+			helpers.assert_not_nil(body, fn .. " must be present in the source")
+			for _, forbidden in ipairs({ "io%.open", "os%.execute", "hs%.task" }) do
+				helpers.assert_true(body:find(forbidden) == nil,
+					fn .. "() must not call " .. forbidden .. " — it is a read of module state")
+			end
+		end
 	end)
 
-	helpers.it("bad device_id or paths under pause must not crash (resilience)", function()
+	-- A malformed init must leave the getters answering with the right TYPE rather
+	-- than nil. Every caller concatenates these into a path or a SQL string, so a
+	-- nil here becomes an error far from its cause.
+	helpers.it("a malformed init still leaves the getters type-safe", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		local ok = pcall(function() e.init({ paths = nil, device_id = 123 }) end)
-		helpers.assert_true(ok)
+		e.init({ paths = nil, device_id = 123 })
+		helpers.assert_eq(type(e.get_device_short_id()), "string",
+			"a numeric device_id must still yield a string short id, not nil")
+		-- nil, deliberately: with no paths table there is no correct answer, and
+		-- inventing a plausible one would have the exporter open some other file.
+		-- The contract is fail-fast, so the nil is the assertion.
+		helpers.assert_nil(e.get_sqlite_path(),
+			"with no paths table the getter must return nil rather than invent a path")
 	end)
 end)
 

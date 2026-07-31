@@ -281,7 +281,18 @@ helpers.describe("aggregator — ngram context", function()
 	helpers.it("setup: init succeeds", function()
 		a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "ctx-test-uuid" })
-		helpers.assert_true(true)
+		-- "init succeeds" asserted as assert_true(true) meant the setup could fail
+		-- silently and every case below would run against a half-built module. The
+		-- post-condition is that the instance is usable, so check that.
+		helpers.assert_eq(type(a.get_ngram_ctx), "function",
+			"after init the aggregator must expose its context API")
+		-- The context is restored from disk after init, so it is nil until then. What
+		-- must hold is that the setter coerces: a non-table restore (a corrupt or
+		-- half-written JSON file) becomes an empty context, never a nil that every
+		-- later index would fault on.
+		a.set_ngram_ctx("not a table")
+		helpers.assert_eq(type(a.get_ngram_ctx()), "table",
+			"a non-table restore must be coerced to an empty context, not left nil")
 	end)
 
 	helpers.it("set_ngram_ctx stores a table and get_ngram_ctx retrieves it", function()
@@ -347,7 +358,9 @@ helpers.describe("aggregator — walk_typing char counts", function()
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "walk-uuid" })
-		helpers.assert_true(true)
+		helpers.assert_eq(type(a.walk_typing), "function",
+			"after init the aggregator must expose walk_typing — the cases below all call it, "
+			.. "and a silent setup failure would leave them running against nothing")
 	end)
 
 	helpers.it("empty events list does not crash", function()
