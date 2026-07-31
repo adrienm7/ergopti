@@ -12,8 +12,17 @@
  *
  * FEATURES & RATIONALE:
  * 1. Parity enforcement: AHK keeps inline literals (AHK parse complexity),
- *    macOS reads from JSON — this gate keeps both in sync with the JSON.
+ *    macOS and Linux read from JSON — this gate keeps all three in sync with it.
  * 2. Additive: does not remove any existing checks; purely a new gate.
+ *
+ * THE THIRD DRIVER, AND THE FALLBACKS NOBODY WAS WATCHING:
+ * Linux has a full updater (modules/updater/manager.lua) that this gate did not
+ * mention. Both Lua drivers also carry a _DEFAULTS_FALLBACK table — a second,
+ * hand-written copy of owner/repo/timing used when the shared JSON is
+ * unreachable. Nothing compared those copies to the JSON. A fallback that has
+ * drifted is worse than no fallback: on the one path where it is used, the
+ * updater silently queries the wrong repository and reports "no update" forever,
+ * with no error anywhere. Both fallbacks are now pinned to defaults.json.
  * ==============================================================================
  */
 
@@ -27,6 +36,7 @@ const SHARED_ROOT = path.join(ROOT, "static", "ergopti_plus", "_shared");
 const DEFAULTS    = path.join(SHARED_ROOT, "modules", "updater", "defaults.json");
 const AHK_CORE    = path.join(ROOT, "static", "ergopti_plus", "windows", "lib", "updater", "core.ahk");
 const LUA_UPDATER = path.join(ROOT, "static", "ergopti_plus", "macos", "lib", "updater.lua");
+const LINUX_UPDATER = path.join(ROOT, "static", "ergopti_plus", "linux", "modules", "updater", "manager.lua");
 
 let exitCode = 0;
 
@@ -121,6 +131,64 @@ if (luaOldRepoLiteral.test(luaSrc)) {
 	fail("updater.lua still has bare `local GH_REPO = \"ergopti\"` — should now read from defaults.json");
 } else {
 	pass("updater.lua no longer has bare GH_REPO literal (reads from defaults.json)");
+}
+
+// ─── Both Lua drivers: the offline fallback must equal defaults.json ─────────
+
+// Each Lua updater keeps a _DEFAULTS_FALLBACK table for the case where the
+// shared tree is unreachable. It is a second copy of the canonical values, so it
+// is exactly the kind of literal this gate exists to pin — and it was the one
+// copy nothing checked.
+const LUA_DRIVERS = [
+	{ label: "macos/lib/updater.lua", file: LUA_UPDATER },
+	{ label: "linux/modules/updater/manager.lua", file: LINUX_UPDATER }
+];
+
+for (const drv of LUA_DRIVERS) {
+	if (!fs.existsSync(drv.file)) {
+		fail(`${drv.label}: not found — the updater moved, or this gate's path is stale`);
+		continue;
+	}
+	const src = fs.readFileSync(drv.file, "utf8");
+
+	const block = src.match(/_DEFAULTS_FALLBACK\s*=\s*\{([\s\S]*?)\n\}/);
+	if (!block) {
+		fail(`${drv.label}: could not find the _DEFAULTS_FALLBACK table`);
+		continue;
+	}
+	const body = block[1];
+
+	const expectations = [
+		{ name: "github.owner", re: /owner\s*=\s*"([^"]+)"/, want: owner },
+		{ name: "github.repo", re: /repo\s*=\s*"([^"]+)"/, want: repo },
+		{ name: "timing.default_check_interval_sec", re: /default_check_interval_sec\s*=\s*(\d+)/, want: interval },
+		{ name: "timing.boot_check_delay_sec", re: /boot_check_delay_sec\s*=\s*(\d+)/, want: boot }
+	];
+
+	for (const exp of expectations) {
+		const m = body.match(exp.re);
+		if (!m) {
+			fail(`${drv.label}: _DEFAULTS_FALLBACK has no ${exp.name}`);
+			continue;
+		}
+		const got = /^\d+$/.test(m[1]) ? Number(m[1]) : m[1];
+		if (got !== exp.want) {
+			fail(
+				`${drv.label}: _DEFAULTS_FALLBACK ${exp.name}=${JSON.stringify(got)} does not match ` +
+					`defaults.json ${exp.name}=${JSON.stringify(exp.want)} — on the offline path this driver ` +
+					"would silently use the wrong value"
+			);
+		} else {
+			pass(`${drv.label}: _DEFAULTS_FALLBACK ${exp.name} matches defaults.json`);
+		}
+	}
+
+	// The live values must come from the JSON, not from the fallback directly.
+	if (!/defaults\.json/.test(src)) {
+		fail(`${drv.label}: does not reference _shared/modules/updater/defaults.json — it must read the canonical source`);
+	} else {
+		pass(`${drv.label}: reads _shared/modules/updater/defaults.json`);
+	}
 }
 
 // ─── Check the Linux packaging recipes point at the real repository ──────────
