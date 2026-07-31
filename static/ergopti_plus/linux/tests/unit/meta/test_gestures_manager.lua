@@ -437,7 +437,7 @@ helpers.describe("modules/gestures/manager.lua", function()
 
   helpers.it("derives SINGLE_SLOTS / AXIS_SLOTS from the shared actions.toml in order", function()
     local codec = require("toml_codec")
-    local path = helpers.driver_root() .. "/../_shared/modules/gestures/actions.toml"
+    local path = helpers.driver_root() .. "/../_shared/modules/actions/actions.toml"
     local fh = io.open(path, "r")
     helpers.assert_true(fh ~= nil, "shared actions.toml must be readable")
     local content = fh:read("*a"); fh:close()
@@ -485,7 +485,7 @@ helpers.describe("modules/gestures/manager.lua", function()
     local src = fh:read("*a"); fh:close()
     helpers.assert_true(src:find("load_slot_space(", 1, true) ~= nil,
       "manager must derive the slot-space via load_slot_space()")
-    helpers.assert_true(src:find("_shared/modules/gestures/actions.toml", 1, true) ~= nil,
+    helpers.assert_true(src:find("_shared/modules/actions/actions.toml", 1, true) ~= nil,
       "manager must read the shared actions.toml")
     helpers.assert_true(src:find("M.SINGLE_SLOTS = {", 1, true) == nil,
       "SINGLE_SLOTS must be derived, not re-hardcoded as a literal array")

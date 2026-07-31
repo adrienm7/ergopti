@@ -51,11 +51,11 @@ local _now_sec = Monotonic.now_sec
 -- =========================================
 
 -- The gesture slot key-space (tap/swipe slot names) is the SINGLE SOURCE shared
--- with the macOS driver, declared once in _shared/modules/gestures/actions.toml
+-- with the macOS driver, declared once in _shared/modules/actions/actions.toml
 -- under [slots]. This driver derives SINGLE_SLOTS / AXIS_SLOTS and the
 -- DEFAULT_GESTURES key-space from that file at load time so the two drivers can
 -- never drift. Only the default action VALUES below stay Linux-specific.
-local ACTIONS_TOML_REL_PATH = "/_shared/modules/gestures/actions.toml"
+local ACTIONS_TOML_REL_PATH = "/_shared/modules/actions/actions.toml"
 local UTF8_BOM = "\239\187\191"
 
 --- Resolves the absolute path to the shared gesture actions TOML from this
@@ -230,6 +230,12 @@ local ACTION_COMPUTED_LABELS = {}
 local MODIFIER_ACTION_COMMANDS = {}
 
 local function load_modifier_chords()
+	-- The JSON path is derived by rewriting the FILENAME of actions.toml, so the
+	-- two files must stay siblings. That is not obvious from either end, and it
+	-- broke exactly once: moving actions.toml to _shared/modules/actions/ while
+	-- modifier_chords.json stayed behind made this resolve to a file that does not
+	-- exist, and the only symptom was the modifier-chord labels quietly going
+	-- missing from the action picker.
 	local actions_path = resolve_actions_toml_path()
 	local path = actions_path:gsub("actions%.toml$", "modifier_chords.json")
 	if path == actions_path then return nil end

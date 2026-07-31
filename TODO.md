@@ -308,9 +308,23 @@ Constraints: **paths before moves, moves before content, data before code.**
   that already existed. `test-action-platform-truth.cjs` holds both directions:
   a declaration claiming macOS with no handler, and a handler hidden by its
   declaration. The second is what these four were.
-  (2) Move `_shared/modules/gestures/actions.toml` to
-  `_shared/modules/actions/actions.toml` and add `emit` / `emit_<os>` / `native` /
-  `default_chord` / `ports`. (3) Convert the **62 measured pure-keystroke Windows
+  ~~(2) Move `_shared/modules/gestures/actions.toml` to
+  `_shared/modules/actions/actions.toml`~~ — **moved**, together with
+  `modifier_chords.json`, which had to travel with it: the Linux loader derives
+  the JSON path by rewriting the FILENAME of `actions.toml`
+  (`gsub("actions%.toml$", "modifier_chords.json")`), so the two files are
+  coupled as siblings with nothing on either side saying so. Leaving the JSON
+  behind resolved it to a file that does not exist, and the only symptom was the
+  modifier-chord labels quietly vanishing from the action picker. That coupling
+  is now stated in a comment where the derivation happens.
+  The catalogue is read per-driver rather than generated, so all three had to
+  follow: 8 files by path string, plus **two more the first sweep could not
+  see** — `test-action-platform-truth.cjs` builds its path from separate
+  `path.join` segments, and Windows builds its two with **backslashes**. Both
+  left their suites green while still reading the old location, which is the
+  updater move's lesson in a second form.
+  Still open on this item: the `emit` / `emit_<os>` / `native` / `default_chord`
+  / `ports` schema fields, which are what (3) consumes. (3) Convert the **62 measured pure-keystroke Windows
   actions** to `emit` rows — deletes 62 AHK lambdas, 27 Lua closures and ~30 Linux
   `elseif` branches (54 % of the Windows action registry is data pretending to be
   code). (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —

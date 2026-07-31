@@ -2507,7 +2507,7 @@ commentaire (« this is an .ahk-only ratchet »). Chaque trou a coute :
   sur 21 rendues illisibles par un double BOM**, introduit par le commit
   *« chore: standardize repository line endings to lf »* — la passe qui durcissait le garde
   `.ahk` est celle qui a casse les `.json`. Un cinquieme fichier corrompu
-  (`_shared/modules/gestures/actions.toml`) n'a ete trouve que par le nouveau garde.
+  (`_shared/modules/actions/actions.toml`) n'a ete trouve que par le nouveau garde.
 
 **Comment l'appliquer :** quand tu ecris un ratchet, scanne l'arbre entier des le depart. Un
 garde scope a un driver est une politique a moitie appliquee, et la moitie non couverte est

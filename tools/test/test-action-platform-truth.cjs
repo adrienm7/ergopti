@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Action Platform Declaration Guard
  * DESCRIPTION:
- * `_shared/modules/gestures/actions.toml` declares a `platform` for every
+ * `_shared/modules/actions/actions.toml` declares a `platform` for every
  * action. That declaration is not documentation — the macOS picker filters on
  * it, so it decides what a user can bind.
  *
@@ -32,7 +32,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const TOML = path.join(SP, '_shared', 'modules', 'gestures', 'actions.toml');
+const TOML = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
 const MAC_ACTIONS = path.join(SP, 'macos', 'modules', 'gestures', 'actions.lua');
 
 /**

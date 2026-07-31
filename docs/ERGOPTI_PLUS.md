@@ -161,8 +161,8 @@ ne jamais l'éditer à la main.
 `_shared/modules/features/manifest.toml` (3 313 l) | tout toggle de fonctionnalité, son défaut, sa clé i18n, ses plateformes | non — **c'est la source** | via les manifestes générés | `test:manifest-parity`, `test:feature-read-sites` |
 `windows/_generated/features_manifest.ahk`, `macos/_generated/features_manifest.lua` | projection pré-résolue du précédent | **oui** (`build:manifest`) | `lib/manifest_reader.*` | `test-features-manifest-no-drift` |
 `_shared/modules/menu/menu_manifest.json` (862 l) | l'arbre de menu : ordre, types, filtres de plateforme | **oui** (`build:menu`) | Windows + macOS. **Pas Linux** | `test-menu-manifest`, `test:manifest-equivalence` |
-`_shared/modules/gestures/actions.toml` (765 l) | le catalogue d'actions : id, plateforme, ordre, paramètres | non | les trois drivers | `test-gesture-slots-single-source` |
-`_shared/modules/gestures/modifier_chords.json` | **le seul fichier exprimant une équivalence de modificateur par OS** | non | les trois + le générateur Karabiner | — |
+`_shared/modules/actions/actions.toml` (765 l) | le catalogue d'actions : id, plateforme, ordre, paramètres | non | les trois drivers | `test-gesture-slots-single-source` |
+`_shared/modules/actions/modifier_chords.json` | **le seul fichier exprimant une équivalence de modificateur par OS** | non | les trois + le générateur Karabiner | — |
 `_shared/modules/hotstrings/*.toml` (2 994 entrées) | les hotstrings livrées, par catégorie | non | les trois | corpus `hotstrings/` |
 `_shared/modules/hotstrings/priority.json` | les 3 rangs de priorité (10/30/50) | non | Windows + macOS | `test:priority-parity` |
 `_shared/tap_hold/defaults.toml` (430 l) | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non | Windows + kanata (`[tap_hold.*]`) ; macOS (`[hs_*]`) | `test:kanata-defalias-parity` |
@@ -683,7 +683,7 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
 
 **Aujourd'hui — 8 fichiers minimum, et elle restera non liable sur macOS et Linux :**
 
-1. `_shared/modules/gestures/actions.toml` : ajouter `[sg_actions.copy_word]` avec
+1. `_shared/modules/actions/actions.toml` : ajouter `[sg_actions.copy_word]` avec
    `platform = "all"`, puis ajouter l'id à `[sg_order].items` dans le bon groupe.
 2. `_shared/data/locales/en.json` : ajouter `"sg_actions.copy_word"`, puis
    `python tools/locale/check_locales.py --fix` pour la propager aux 20 autres locales.
@@ -737,7 +737,7 @@ disponibles pour les cas réellement spécifiques.
 **Aujourd'hui** : il n'existe aucune notation neutre. Quatre dialectes coexistent (préfixes
 AHK `^+!#`, forme touche-préfixe `SC138 & SC01C`, tableau de modificateurs Hammerspoon,
 `key_code` Karabiner, `xdotool`). Le seul fichier exprimant une équivalence par OS est
-`_shared/modules/gestures/modifier_chords.json` — mais c'est une table de *modificateurs*,
+`_shared/modules/actions/modifier_chords.json` — mais c'est une table de *modificateurs*,
 pas une *notation d'accord* : les ids d'action qui en résultent sont eux-mêmes spécifiques à
 la plateforme (`win_a` / `cmd_a` / `super_a`), donc un accord ne peut jamais être nommé
 portablement.

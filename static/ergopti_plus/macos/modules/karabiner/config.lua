@@ -97,7 +97,7 @@ end
 local _chord_catalogue = nil
 
 local function append_shared_modifier_chords(actions)
-	local catalogue_path = Paths.shared("modules/gestures/modifier_chords.json")
+	local catalogue_path = Paths.shared("modules/actions/modifier_chords.json")
 	if not catalogue_path then return end
 	if _chord_catalogue == nil then
 		_chord_catalogue = load_json_file(catalogue_path) or false

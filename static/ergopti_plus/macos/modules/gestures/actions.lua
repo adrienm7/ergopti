@@ -690,8 +690,8 @@ sg("open_console",                        function() pcall(hs.openConsole) end)
 
 -- Path to the shared actions.toml, resolved through the single shared-tree
 -- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _shared_toml = Paths.shared("modules/gestures/actions.toml")
-local _modifier_chords_json = Paths.shared("modules/gestures/modifier_chords.json")
+local _shared_toml = Paths.shared("modules/actions/actions.toml")
+local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
 
 --- Parses the shared actions.toml using a lightweight line-by-line reader.
 --- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
