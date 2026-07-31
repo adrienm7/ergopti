@@ -116,50 +116,98 @@ helpers.describe("aggregator — pre-init guard", function()
 		helpers.assert_true(ok)
 	end)
 
-	helpers.it("pause must not affect pure aggregation logic but real callers must gate (project_suspend_pause_invariant)", function()
-		-- Aggregator itself is pure; the hook/writer callers must early-return when paused.
-		-- This test documents the contract: flush/walk must produce zero side effects under pause.
-		helpers.assert_true(true, "keylogger aggregator walks must be suppressed by pause in kc_bridge / hook layer")
-	end)
-
-	helpers.it("high volume burst detection remains accurate under repeated walk_typing", function()
-		-- Stress: 100+ events must not corrupt ngram or burst counters.
-		helpers.assert_true(true)
-	end)
-
-	helpers.it("pause boundaries + privacy vectors + rollover simulation must produce zero output (project_suspend_pause_invariant)", function()
-		-- Aggregator pure; real kc_bridge/hook must gate. Pause mid-burst + day boundary must
-		-- not leak PII into any flush and must resume cleanly.
-		helpers.assert_true(true, "keylogger aggregator under pause + privacy + rollover must stay silent (callers gate)")
-	end)
-
-	helpers.it("FS/pcall resilience in flush path + 200+ events must never crash and still reach ring/errors", function()
-		-- Hard write failure in downstream must be caught; line stats must still be correct.
-		helpers.assert_true(true, "aggregator must survive FS/pcall errors (no crash, stats correct)")
-	end)
 end)
 
-helpers.describe("aggregator — diagnostic (healthcheck) integration + pause", function()
-	helpers.it("pause must keep aggregator pure; diagnostic must read safe counts + errors sink (project_suspend_pause_invariant)", function()
-		-- Aggregator is pure math; real hooks gate on pause. Healthcheck must still see
-		-- current session counts, privacy_hits, and the dedicated errors log path.
-		helpers.assert_true(true, "aggregator must be readable by diagnostic under pause; no side effects, privacy preserved")
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 3b/ Determinism, volume, bad input =======
+-- ==================================================
+-- ==================================================
+
+-- Eight assert_true(true) placeholders stood here. Seven of them restated the
+-- same sentence — "the aggregator is pure, the CALLERS gate on pause" — and
+-- verified none of it. That claim is not testable against this module at all:
+-- the aggregator has no knowledge of suspend, by design. Where it IS testable
+-- is at the caller, and that is where it is now asserted (the Windows twin
+-- pins the guard-before-mutation ordering in _OnPrefixChar / _OnPrefixKeyDown).
+--
+-- What IS a property of this module — determinism, behaviour at volume, and
+-- resilience to hostile app names — was named by those placeholders and checked
+-- by none of them. It is checked here.
+
+--- Builds a walk_typing entry from a plain string, one event per character.
+--- @param app string App name recorded on the entry.
+--- @param text string Characters to feed.
+--- @return table The entry shape walk_typing expects.
+local function typing_entry(app, text)
+	local events = {}
+	for i = 1, #text do
+		events[#events + 1] = { text:sub(i, i), 100, {} }
+	end
+	return { app = app, timestamp = "2024-01-01 10:00:00.000", events = events }
+end
+
+--- Characters the walker classified, summed across every app-day row.
+---
+--- chars_class is the walker's own per-character tally (letter / digit / punct
+--- / space / other), so it is the honest place to count what actually went in —
+--- the n-gram buckets are populated only on the paths that build grams.
+--- @param batch table|nil The aggregation batch.
+--- @return number Total classified characters.
+local function classified_chars(batch)
+	local n = 0
+	for _, row in pairs((batch or {}).chars_class or {}) do
+		n = n + (row.letter or 0) + (row.digit or 0) + (row.punct or 0) + (row.space or 0) + (row.other or 0)
+	end
+	return n
+end
+
+helpers.describe("aggregator — determinism, volume and hostile input", function()
+	local State = require("modules.keylogger.aggregator.state")
+
+	--- Walks `text` through a freshly-initialised aggregator and returns its batch.
+	local function walk_fresh(app, text)
+		State.initialized = false
+		State.agg_batch   = nil
+		State.ngram_ctx   = nil
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		a.init({ device_id = "determinism-probe" })
+		a.walk_typing(typing_entry(app, text))
+		return State.agg_batch
+	end
+
+	helpers.it("the same input produces the same character counts twice", function()
+		local first  = walk_fresh("Editor", "hello world")
+		local a_count = classified_chars(first)
+		local second = walk_fresh("Editor", "hello world")
+		local b_count = classified_chars(second)
+
+		helpers.assert_true(a_count > 0,
+			"the walker must record characters at all — a zero here would make the comparison below vacuous")
+		helpers.assert_eq(b_count, a_count,
+			"identical input must aggregate identically; a difference means state leaked across instances")
 	end)
 
-	helpers.it("high volume (200+) + pause mid-burst + rollover sim + unicode events must keep diagnostic summary correct", function()
-		-- Stress + pause + day boundary + bad chars: flush stats and ngram must be sane;
-		-- diagnostic keylogger section (events/wpm/privacy + errors sink) must not lie or leak.
-		helpers.assert_true(true, "aggregator volume + pause + rollover + unicode must not corrupt diagnostic keylogger summary (would have caught PII or wrong WPM in troubleshooting)")
+	helpers.it("200 characters are all counted", function()
+		local batch = walk_fresh("Editor", string.rep("ab", 100))
+		helpers.assert_eq(classified_chars(batch), 200,
+			"every fed character must reach the character bucket — the placeholder this replaces claimed to stress 200 events and fed none")
 	end)
 
-	helpers.it("privacy vectors + FS error in downstream + pause must still let diagnostic see errors sink and safe counts", function()
-		-- Even if flush/rollover hits protected FS, pcall must protect; diagnostic must surface
-		-- the clean ErgoptiPlus_errors_*.log for the user who is paused and debugging.
-		helpers.assert_true(true, "aggregator privacy + FS/pcall under pause must preserve diagnostic errors sink visibility")
-	end)
-
-	helpers.it("bad app names / empty / special unicode in events + pause must not crash walks and diagnostic must see only safe data", function()
-		helpers.assert_true(true, "aggregator bad/unicode app events under pause must be resilient; diagnostic summary remains privacy-safe")
+	helpers.it("an empty or non-ASCII app name neither crashes nor is dropped", function()
+		-- Deliberately NOT wrapped in pcall. A throw here fails the test on its
+		-- own, with the real stack; asserting on a pcall status instead would
+		-- prove only "it returned" and would pass on a walker that swallowed
+		-- every character.
+		for _, app in ipairs({ "", "Éditeur ✎", "app\tname" }) do
+			local batch = walk_fresh(app, "abc")
+			helpers.assert_eq(classified_chars(batch), 3,
+				"the characters must still be counted for app " .. string.format("%q", app))
+		end
 	end)
 end)
 
