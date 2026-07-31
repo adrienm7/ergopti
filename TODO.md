@@ -364,23 +364,32 @@ the renderer" ratchet · "every manifest array key has a reader" ·
 
 ### 0.7 Gates to extend (each hole measured)
 
-`test-git-mv-resilience.cjs` (macOS only) · `test-no-pinned-source-reads*.cjs`
-(its `HELPER_RE` certifies 139 directory-pinned files as move-resilient) · the AHK
-purity ratchet (3 families of ~12; ignores `ui/` and the entry point) · the macOS
-purity ratchet (ignores `macos/ui/`, 636 `hs.*` lines) ·
+**Done 2026-07-31:** `test-git-mv-resilience.cjs` (193 → 799 pins, all three
+suites) · `test_jsstr_cr_escaped.ahk` (now discovers all 11 helpers from source;
+the three that were still deleting `\r` are fixed — including the changelog
+renderer, whose input is a GitHub release body, so it was never dormant) ·
+`test-ahk-test-coverage.cjs` (walks `tests/` at any depth; no orphan was hiding
+there, so prevention rather than a fix) · **new** `test-ahk-runners-are-invoked.cjs`
+(three runners were referenced by nothing; two carried ten tests that had never
+run, one of which had rotted out of the code it stubs).
+
+Still open:
+
+`test-no-pinned-source-reads*.cjs` — its `HELPER_RE` is applied per FILE, so one
+converted read hides every remaining pinned read in the same file. Count per
+READ · the AHK purity ratchet (3 families of ~12; ignores `ui/` and the entry
+point) · the macOS purity ratchet (ignores `macos/ui/`, 636 `hs.*` lines) ·
 `test-webview-geometry-single-source.cjs` (zero Linux coverage, 3 Windows apps
 absent) · `test-webview-teardown-order.cjs` (7 hosts of 12, and it pins exact
-internal whitespace) · `test_jsstr_cr_escaped.ahk` (names 2 helpers of 12; **3
-siblings still delete `\r` instead of escaping it**) · `test-config-schema.cjs`
-(2 templates of 3) · `test-updater-constants-single-source.cjs` (excludes Linux) ·
+internal whitespace) · `test-config-schema.cjs` (2 templates of 3) ·
+`test-updater-constants-single-source.cjs` (excludes Linux) ·
 `test-menu-labels-single-source.cjs` (blind to Linux; should become an exclusion
 ratchet, which would immediately flag the AHK copy) · `test-priority-parity.cjs`
 (a text scan of 3 declarations; sees neither Linux, nor the comparison-site
 fallback, nor the tiebreak chain) · `gen-architecture-diagram.cjs` (**0
 occurrences of "linux"** in a document titled "three-layer hexagonal
-architecture") · `test-ahk-test-coverage.cjs` (`readdirSync` depth 1; ignores
-`run_*.ahk` and `bench_*.ahk`) · `test-dev-tool-paths.cjs` (scoped to `tools/dev/`
-while `tools/build/` carries 2 absolute machine paths).
+architecture") · `test-dev-tool-paths.cjs` (scoped to `tools/dev/` while
+`tools/build/` carries 2 absolute machine paths).
 
 ### 0.8 Gates to retire — after migration only
 
