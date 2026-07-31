@@ -257,14 +257,36 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		helpers.assert_true(v == true or v == false)
 	end)
 
-	helpers.it("pause must prevent execute_single / execute_axis / toggle from any side effect (project_suspend_pause_invariant)", function()
-		-- All dispatch paths must be skipped when script is paused.
-		helpers.assert_true(true, "gesture actions must early-return with zero OS effect under pause")
+	-- Dispatch is name-keyed: an action that is not registered must be REFUSED,
+	-- not guessed at. This is what makes a paused or partially-initialised driver
+	-- silent — a lookup miss returns false instead of reaching the OS. Asserting
+	-- the refusal is the only way to know the gate is a gate.
+	helpers.it("execute_single refuses an unregistered action instead of dispatching", function()
+		helpers.assert_eq(Actions.execute_single("no_such_action_at_all"), false,
+			"an unknown action name must be refused, not dispatched")
+		helpers.assert_eq(Actions.execute_single(nil), false,
+			"a nil action name must be refused too")
 	end)
 
-	helpers.it("force_cleanup must be safe to call under pause (no-op or guard)", function()
-		-- Cleanup is defensive; must not re-activate anything while paused.
-		helpers.assert_true(true)
+	helpers.it("execute_axis on an unknown axis fires nothing", function()
+		-- No return value to check: the assertion is that it completes without
+		-- reaching an axis function, which a missing guard would turn into an
+		-- index-a-nil error rather than a silent no-op.
+		Actions.execute_axis("no_such_axis", true)
+		Actions.execute_axis("no_such_axis", false)
+		helpers.assert_eq(type(Actions.execute_axis), "function",
+			"execute_axis survived two unknown-axis dispatches")
+	end)
+
+	-- force_cleanup releases held synthetic clicks. It has to be idempotent:
+	-- it runs on quit, on suspend, and on every tap that is not a click toggle,
+	-- so a second call must not post a second mouse-up into whatever the user is
+	-- doing.
+	helpers.it("force_cleanup is idempotent", function()
+		Actions.force_cleanup()
+		Actions.force_cleanup()
+		helpers.assert_eq(Actions.is_right_click_held(), false,
+			"after cleanup no synthetic right-click may remain held")
 	end)
 end)
 

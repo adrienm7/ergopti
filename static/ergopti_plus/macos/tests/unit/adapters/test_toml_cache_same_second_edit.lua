@@ -54,7 +54,14 @@ local BODY_B = PREAMBLE .. '[alpha]\ntrigger = "aaa"\noutput = "BBB"\n'
 -- mtime of 1000.5 makes every write look strictly later and the ambiguous branch
 -- becomes unreachable. That is what an earlier version of this fixture did, and
 -- it reported the fix as broken when the fixture was.
-local cur_mtime, cur_size = os.time() + 0.5, #BODY_A
+-- Deliberately NOT initialised from os.time() here. This value is read at store
+-- time, and the ambiguous branch only exists while floor(mtime) equals the
+-- second in which the snapshot was written. Fixing it at module-load time made
+-- the case depend on how long the rest of the suite took to reach it: on a slow
+-- run the clock had already advanced, the write looked strictly newer than the
+-- stat, and the test failed claiming the fix was broken when the fixture was.
+-- The case re-stamps it immediately before storing.
+local cur_mtime, cur_size = 0, #BODY_A
 
 
 --- Writes bytes to the shared source path.
@@ -111,6 +118,9 @@ helpers.describe("toml_cache: a same-second edit past 512 bytes invalidates", fu
 		write_source(BODY_A)
 		cur_size = #BODY_A
 		local cache = fresh_cache()
+		-- Stamp the stat mtime into the SAME second the snapshot is written, which
+		-- is the only condition under which the ambiguous branch is reachable.
+		cur_mtime = os.time() + 0.5
 		cache.store(SRC, { alpha = { "AAA" } })
 
 		local hit = cache.load(SRC)

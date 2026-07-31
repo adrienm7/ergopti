@@ -109,13 +109,38 @@ helpers.describe("Config migration and edge cases", function()
 		helpers.assert_true(state ~= nil)
 	end)
 
-	helpers.it("pause must also block generator surface and lifecycle (project_suspend_pause_invariant)", function()
-		-- generator.generate and KE lifecycle must be skipped when paused.
-		helpers.assert_true(true, "karabiner full pipeline must respect pause (no file writes, no reloads)")
+	-- build_default_state is the shape every later write is derived from, so it
+	-- must be total: a key with no shared default gets none/none rather than a
+	-- missing entry. A nil entry here becomes a nil index far downstream, in the
+	-- middle of writing the user's Karabiner config.
+	helpers.it("every requested key gets an entry, even with no shared default", function()
+		local state = Config.build_default_state(
+			{ { id = "no_such_key_in_defaults" } },
+			{ { id = "no_such_combo_in_defaults" } }
+		)
+		helpers.assert_not_nil(state.tap_hold_config["no_such_key_in_defaults"],
+			"an unknown tap-hold key must still get an entry")
+		helpers.assert_eq(state.tap_hold_config["no_such_key_in_defaults"].tap, "none",
+			"and it must default to none, not nil")
+		helpers.assert_eq(state.tap_hold_config["no_such_key_in_defaults"].hold, "none")
+		helpers.assert_not_nil(state.mod_combos_config["no_such_combo_in_defaults"],
+			"an unknown combo must still get an entry")
 	end)
 
-	helpers.it("empty or migration under pause must still be safe (no partial writes)", function()
-		helpers.assert_true(true)
+	-- Building the state is pure bookkeeping. The write and the Karabiner reload
+	-- are gated elsewhere, and that gate is worthless if simply computing the
+	-- state already touched the disk.
+	helpers.it("build_default_state performs no file I/O", function()
+		local src = helpers.read_driver_source("function M.build_default_state")
+		helpers.assert_not_nil(src, "the config source must be findable by symbol")
+		local body = src:match("function M%.build_default_state.-" .. string.char(10) .. "end" .. string.char(10))
+		helpers.assert_true(body ~= nil, "build_default_state must be present in the source")
+		for _, forbidden in ipairs({ "io%.open", "os%.execute", "hs%.task", "os%.remove" }) do
+			helpers.assert_true(body:find(forbidden) == nil,
+				"build_default_state must not call " .. forbidden ..
+				" — the write is gated downstream, and that gate means nothing if computing " ..
+				"the state already wrote")
+		end
 	end)
 end)
 

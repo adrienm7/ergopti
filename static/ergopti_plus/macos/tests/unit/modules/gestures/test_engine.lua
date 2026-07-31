@@ -144,15 +144,30 @@ end)
 -- =============================================================
 -- =============================================================
 
+-- "does not crash" was the whole assertion here: the call ran, then
+-- assert_true(true) passed whatever happened. Not crashing is table stakes for a
+-- frame callback fed by the trackpad driver — the invariant that matters is that
+-- garbage input FIRES NOTHING, because a spurious action reaches the user's
+-- desktop.
 helpers.describe("gestures.engine: nil/invalid input guard", function()
-	helpers.it("process_frame(nil) does not crash", function()
-		Engine.process_frame(nil)
-		helpers.assert_true(true)
+	helpers.it("process_frame(nil) fires no action", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state(), fired.actions)
+		reset_engine(E)
+		E.process_frame(nil)
+		helpers.assert_eq(#fired.singles, 0, "a nil frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 
-	helpers.it("process_frame(string) does not crash", function()
-		Engine.process_frame("not a table")
-		helpers.assert_true(true)
+	helpers.it("process_frame(string) fires no action", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state(), fired.actions)
+		reset_engine(E)
+		E.process_frame("not a table")
+		helpers.assert_eq(#fired.singles, 0, "a non-table frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 end)
 
@@ -167,12 +182,16 @@ end)
 -- ==================================================================
 
 helpers.describe("gestures.engine: empty frame after init", function()
-	helpers.it("process_frame({}) after init does not crash", function()
+	-- An empty frame is what the driver sends when every finger has lifted. It is
+	-- the most common frame there is, and it must be inert: firing on it would mean
+	-- an action every time the user takes their hand off the trackpad.
+	helpers.it("process_frame({}) after init fires nothing", function()
 		local fired = make_fired()
 		local E = fresh_engine()
 		E.init(make_state(), fired.actions)
 		reset_engine(E)
-		helpers.assert_true(true)
+		helpers.assert_eq(#fired.singles, 0, "an empty frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 end)
 
@@ -345,7 +364,13 @@ helpers.describe("gestures.engine: swipe detection", function()
 			end
 			return false
 		end)(), "tap_3 sentinel must not fire (test is directional)")
-		helpers.assert_true(true)
+		-- A directional swipe must not also register as a tap. The two share the
+		-- same finger count, so a commit that fired both would give the user an
+		-- unrequested action alongside the one they made.
+		for _, a in ipairs(fired.singles) do
+			helpers.assert_true(a ~= "tap_3",
+				"a 3-finger swipe must not also fire the 3-finger tap")
+		end
 	end)
 
 	helpers.it("swipe too small (delta < SWIPE_MIN) does not fire at commit", function()
