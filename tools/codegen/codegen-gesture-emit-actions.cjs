@@ -22,10 +22,15 @@
  * three copies of one fact, and a wrong one is invisible (a `copy` action that
  * sends Ctrl+X is not a crash and not a failing test).
  *
- * The modifier vocabulary is portable — ctrl / alt / shift / super — and this
- * generator maps it to the AHK names TextPressKey expects. `super` becomes
- * "Win" here and would become "Cmd" in a macOS emitter; storing one platform's
- * spelling in the shared catalogue is the silo the one-registry work removes.
+ * WHY THE ROWS ARE PER-OS AND NOT PORTABLE:
+ * They were briefly named `emit_key` / `emit_mods`, which reads as portable.
+ * Measurement says they are not. Of the 24 actions BOTH drivers implement as a
+ * bare keystroke, 13 use a different key or modifier — `close_window` is alt+F4
+ * on Windows and cmd+w on macOS, `word_next` is ctrl+Right against alt+right,
+ * `doc_start` is ctrl+Home against cmd+up — and several more differ in key-name
+ * spelling alone (`BackSpace`/`delete`, `Enter`/`return`). A shared row with a
+ * super→cmd mapping would have silently broken more than half of them. Hence
+ * `emit_ahk_*` here and `emit_hs_*` beside it.
  *
  * USAGE:  node tools/codegen/codegen-gesture-emit-actions.cjs
  * ==============================================================================
@@ -53,8 +58,8 @@ const seqRows = [];
 
 for (const [id, entry] of Object.entries(sg)) {
 	if (!entry || typeof entry !== 'object') continue;
-	if (entry.emit_key) {
-		const mods = (entry.emit_mods || []).map((m) => {
+	if (entry.emit_ahk_key) {
+		const mods = (entry.emit_ahk_mods || []).map((m) => {
 			const ahk = MOD_TO_AHK[m];
 			if (!ahk) {
 				console.error(`[ERROR] ${id}: modifier "${m}" has no Windows mapping.`);
@@ -62,7 +67,7 @@ for (const [id, entry] of Object.entries(sg)) {
 			}
 			return ahk;
 		});
-		keyRows.push({ id, key: entry.emit_key, mods });
+		keyRows.push({ id, key: entry.emit_ahk_key, mods });
 	} else if (entry.emit_ahk) {
 		seqRows.push({ id, seq: entry.emit_ahk });
 	}
