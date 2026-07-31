@@ -244,8 +244,30 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 971  -- hs.* calls in macos/modules/ and macos/lib/ (+1 from the 2026-07-22 audit's space_wrap perf fix: modules/gestures/actions.lua's _cached_all_spaces adds one hs.timer.secondsSinceEpoch() to age a short-lived cache of the Space LAYOUT — a NET REDUCTION in OS work, since it removes an hs.spaces.allSpaces() private-API round-trip from every space navigation on the gesture frame callback, where a stall shows up directly as input lag; the sibling logger flush fix in the same pass was deliberately made count-based rather than time-based so it needed no clock read at all. bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into lib/personal_hotstrings during boot-orchestrator thinning; +4 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +2 from PF-1: modules/keylogger/timestamp.lua:13,16 and modules/llm/api_common.lua:151 are pure docstring/comment mentions of hs.* (this scanner does not skip comments) — NOT new OS calls, a documented false-positive class of this meta-test. The other PF-1 contributors were fixed rather than baseline-bumped: the CapsWord probe watchdog in modules/karabiner/watchers.lua now schedules through adapters/timer_scheduler instead of raw hs.timer.doAfter, and the duplicated "Respects per-section enable/disable state stored in hs.settings." docstring copy-pasted from registry_index.lua into registry_groups.lua's load_toml was reworded to point at the actual owner instead of repeating the implementation detail. modules/shortcuts/actions/system_pixel.lua:19's `local pasteboard = hs.pasteboard` is a genuine 4th copy of the same one-line alias created when system.lua was split into sub-modules (each is a separate Lua chunk needing its own upvalue — inlining it at the single call site would not reduce the count, since the hs.pasteboard reference would just move to that line instead) — counted here as unavoidable, not deduped further; +1 from F-MED-18: modules/karabiner/ke_lifecycle.lua's notify_karabiner_ready() cooldown branch now arms a genuine hs.timer.doAfter retry so a deferred "Karabiner ready" notification is no longer silently dropped forever — this whole module already uses raw hs.timer.doAfter extensively and is not yet migrated to adapters/timer_scheduler, so this one new call is left consistent with its many untouched siblings rather than converting a single call site in isolation; +7 from the 2026-07-01 audit's parallel multi-group implementation pass: each fix group verified its OWN hs.* delta in an isolated worktree before merging, so no single group saw the cumulative total. Traced line-by-line post-merge: modules/llm/init.lua +3 (two new Logger.error() strings and one comment in auto_detect_backend/set_active_profile literally spell out "hs.http.asyncGet"/describe hs.timer.doAfter while fixing F-MED-5/F-MED-6 — no new API call, the underlying asyncGet/doAfter call sites are unchanged), modules/llm/api_token_crypto.lua +1 and modules/llm/api_remote.lua +1 (new docstrings for F-MED-9's decrypt_async/prewarm_active_entry_decrypt reference "hs.execute"/"hs.settings"/"hs.task" descriptively), modules/llm/mlx_deps_checker.lua +1 (F-LOW-10's reset_bootstrap_state docstring mentions "hs.task"), and +1 from a cross-group blind spot the same way (another comment-only mention, same false-positive class) — all 7 confirmed to be comment/log-string text, not new OS call sites; verified via `git diff <pre-merge>..HEAD -- modules lib` that no actual new hs.* call was introduced; +2 from DC-1: modules/keylogger/aggregator/core.lua's load_shared_kc_to_finger() adds one genuine `pcall(hs.json.decode, content)` call to load the shared azerty.json keycode catalogue — the exact same load-shared-JSON-at-module-level pattern modules/shortcuts/actions/text.lua's load_shared_groups() already uses for the wrap-symbols catalogue (already counted in this baseline) — plus one PF-1-class comment mention ("hs.json.decode rejects it" in the BOM-stripping comment, same line-adjacent to the real call); +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one genuine `pcall(hs.json.decode, raw)` to load the shared _shared/modules/hotstrings/priority.json collision-priority tiers (dropping the hand-copied literals per plan item 14), the same load-shared-JSON-at-module-level pattern as DC-1 above. +1 from 2026-07-29: modules/keymap/utils.lua gained a COMMENT naming hs.window.timeout() while explaining why the ignored-window AX probe is served from cache and refreshed off the tap — this scanner does not strip comments, so it is a documented false positive, NOT a new OS call; verified with `git diff -- modules lib` showing the only added hs. token is inside a comment block.
-local LUA_IO_OS_BASELINE    = 77   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into lib/personal_hotstrings; +5 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one io.open to read the shared _shared/modules/hotstrings/priority.json before decoding it — a genuine module-level shared-data load replacing the hand-copied priority literals per plan item 14)
+--
+-- ui/ AND THE ENTRY POINT USED TO BE OUTSIDE THIS SCAN.
+-- The history comment on LUA_HS_BASELINE says "not new OS calls, ui/ is outside
+-- this scan" twice, both times raising the baseline for code MOVED out of
+-- ui/menu/ into modules/. That is the hole, stated in its own words: a
+-- relocation out of the unwatched tree reads as a regression and costs a bump,
+-- while a relocation INTO it is free — the ratchet could be satisfied by moving
+-- OS calls to where nobody counts them. macos/ui/ holds 630 hs.* lines, two
+-- thirds of what modules+lib holds, and init.lua another 46. Each tree now
+-- carries its own frozen pair.
+local LUA_HS_BASELINE       = 944  -- hs.* calls in macos/modules/ and macos/lib/ (+1 from the 2026-07-22 audit's space_wrap perf fix: modules/gestures/actions.lua's _cached_all_spaces adds one hs.timer.secondsSinceEpoch() to age a short-lived cache of the Space LAYOUT — a NET REDUCTION in OS work, since it removes an hs.spaces.allSpaces() private-API round-trip from every space navigation on the gesture frame callback, where a stall shows up directly as input lag; the sibling logger flush fix in the same pass was deliberately made count-based rather than time-based so it needed no clock read at all. bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into lib/personal_hotstrings during boot-orchestrator thinning; +4 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +2 from PF-1: modules/keylogger/timestamp.lua:13,16 and modules/llm/api_common.lua:151 are pure docstring/comment mentions of hs.* (this scanner does not skip comments) — NOT new OS calls, a documented false-positive class of this meta-test. The other PF-1 contributors were fixed rather than baseline-bumped: the CapsWord probe watchdog in modules/karabiner/watchers.lua now schedules through adapters/timer_scheduler instead of raw hs.timer.doAfter, and the duplicated "Respects per-section enable/disable state stored in hs.settings." docstring copy-pasted from registry_index.lua into registry_groups.lua's load_toml was reworded to point at the actual owner instead of repeating the implementation detail. modules/shortcuts/actions/system_pixel.lua:19's `local pasteboard = hs.pasteboard` is a genuine 4th copy of the same one-line alias created when system.lua was split into sub-modules (each is a separate Lua chunk needing its own upvalue — inlining it at the single call site would not reduce the count, since the hs.pasteboard reference would just move to that line instead) — counted here as unavoidable, not deduped further; +1 from F-MED-18: modules/karabiner/ke_lifecycle.lua's notify_karabiner_ready() cooldown branch now arms a genuine hs.timer.doAfter retry so a deferred "Karabiner ready" notification is no longer silently dropped forever — this whole module already uses raw hs.timer.doAfter extensively and is not yet migrated to adapters/timer_scheduler, so this one new call is left consistent with its many untouched siblings rather than converting a single call site in isolation; +7 from the 2026-07-01 audit's parallel multi-group implementation pass: each fix group verified its OWN hs.* delta in an isolated worktree before merging, so no single group saw the cumulative total. Traced line-by-line post-merge: modules/llm/init.lua +3 (two new Logger.error() strings and one comment in auto_detect_backend/set_active_profile literally spell out "hs.http.asyncGet"/describe hs.timer.doAfter while fixing F-MED-5/F-MED-6 — no new API call, the underlying asyncGet/doAfter call sites are unchanged), modules/llm/api_token_crypto.lua +1 and modules/llm/api_remote.lua +1 (new docstrings for F-MED-9's decrypt_async/prewarm_active_entry_decrypt reference "hs.execute"/"hs.settings"/"hs.task" descriptively), modules/llm/mlx_deps_checker.lua +1 (F-LOW-10's reset_bootstrap_state docstring mentions "hs.task"), and +1 from a cross-group blind spot the same way (another comment-only mention, same false-positive class) — all 7 confirmed to be comment/log-string text, not new OS call sites; verified via `git diff <pre-merge>..HEAD -- modules lib` that no actual new hs.* call was introduced; +2 from DC-1: modules/keylogger/aggregator/core.lua's load_shared_kc_to_finger() adds one genuine `pcall(hs.json.decode, content)` call to load the shared azerty.json keycode catalogue — the exact same load-shared-JSON-at-module-level pattern modules/shortcuts/actions/text.lua's load_shared_groups() already uses for the wrap-symbols catalogue (already counted in this baseline) — plus one PF-1-class comment mention ("hs.json.decode rejects it" in the BOM-stripping comment, same line-adjacent to the real call); +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one genuine `pcall(hs.json.decode, raw)` to load the shared _shared/modules/hotstrings/priority.json collision-priority tiers (dropping the hand-copied literals per plan item 14), the same load-shared-JSON-at-module-level pattern as DC-1 above. +1 from 2026-07-29: modules/keymap/utils.lua gained a COMMENT naming hs.window.timeout() while explaining why the ignored-window AX probe is served from cache and refreshed off the tap — this scanner does not strip comments, so it is a documented false positive, NOT a new OS call; verified with `git diff -- modules lib` showing the only added hs. token is inside a comment block.
+local LUA_IO_OS_BASELINE    = 76   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into lib/personal_hotstrings; +5 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one io.open to read the shared _shared/modules/hotstrings/priority.json before decoding it — a genuine module-level shared-data load replacing the hand-copied priority literals per plan item 14)
+
+-- macos/ui/ — the menus and windows. First measured 2026-07-31 at 630 hs.* and
+-- 65 io.open/os.execute lines; not a regression, this tree had simply never been
+-- counted. It is where the keyboard-layout TIS glue lived before audit F4 moved
+-- it into modules/ and paid +4/+5 for the privilege.
+local LUA_HS_BASELINE_UI    = 630
+local LUA_IO_OS_BASELINE_UI = 65
+
+-- macos/init.lua — the entry point. One file, but the one file every launch
+-- runs. First measured 2026-07-31 at 46 hs.* and 2 io.open/os.execute lines.
+local LUA_HS_BASELINE_ENTRY    = 46
+local LUA_IO_OS_BASELINE_ENTRY = 2
 
 helpers.describe("meta: _shared/ code purity", function()
 	local shared_dir = SHARED_DIR
@@ -329,83 +351,116 @@ end)
 -- ======================================================
 -- ======================================================
 
-helpers.describe("meta: lua module OS-API purity baseline", function()
-	local macos_root    = DRIVER_ROOT
-	local modules_dir   = macos_root .. "modules"
-	local lib_dir       = macos_root .. "lib"
-	local adapters_dir  = macos_root .. "adapters"
-
-	-- Count violations in a list of Lua files, excluding adapter files
-	-- (adapters are allowed — and expected — to call OS APIs directly).
-	local function count_lua_pattern(files, pattern, adapters_prefix)
-		local count = 0
-		local details = {}
-		for _, file_path in ipairs(files) do
-			-- Adapters are the boundary layer; OS calls there are intentional
-			if file_path:find(adapters_prefix, 1, true) then goto continue end
-			local fh = io.open(file_path, "r")
-			if not fh then goto continue end
-			local body = fh:read("*a")
-			fh:close()
-			local line_num = 0
-			for line in (body .. "\n"):gmatch("([^\n]*)\n") do
-				line_num = line_num + 1
-				if line:find(pattern) then
-					count = count + 1
-					details[#details + 1] = string.format("    %s:%d", file_path, line_num)
-				end
+-- Counts violations in a list of Lua files, excluding adapter files (adapters
+-- are the boundary layer; OS calls there are intentional).
+--- @param files table List of absolute Lua file paths.
+--- @param pattern string Lua pattern matched against each line.
+--- @param adapters_prefix string Path fragment identifying the adapters tree.
+--- @return number, table Line count and "path:line" details.
+local function count_lua_pattern(files, pattern, adapters_prefix)
+	local count = 0
+	local details = {}
+	for _, file_path in ipairs(files) do
+		if file_path:find(adapters_prefix, 1, true) then goto continue end
+		local fh = io.open(file_path, "r")
+		if not fh then goto continue end
+		local body = fh:read("*a")
+		fh:close()
+		local line_num = 0
+		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+			line_num = line_num + 1
+			if line:find(pattern) then
+				count = count + 1
+				details[#details + 1] = string.format("    %s:%d", file_path, line_num)
 			end
-			::continue::
 		end
-		return count, details
+		::continue::
 	end
+	return count, details
+end
 
-	local lua_module_files = list_files(modules_dir, "lua")
-	local lua_lib_files    = list_files(lib_dir, "lua")
-	local all_lua_files    = {}
-	for _, f in ipairs(lua_module_files) do all_lua_files[#all_lua_files + 1] = f end
-	for _, f in ipairs(lua_lib_files)    do all_lua_files[#all_lua_files + 1] = f end
+--- Registers the hs.* and io/os ratchets for one tree against its own baselines.
+--- Each tree is frozen separately so an improvement in one can never pay for a
+--- regression in another — the failure mode that let OS calls migrate into the
+--- unwatched ui/ tree for free.
+--- @param label string Human-readable tree name, used in every message.
+--- @param files table Absolute Lua file paths making up the tree.
+--- @param hs_baseline number Frozen hs.* line count.
+--- @param io_os_baseline number Frozen io.open + os.execute line count.
+local function purity_ratchet(label, files, hs_baseline, io_os_baseline)
+	local adapters_dir = DRIVER_ROOT .. "adapters"
 
 	-- Frontier guard (%f[%w]) so the pattern matches the Hammerspoon global `hs.`
 	-- only at a word boundary — NOT the trailing "hs." inside identifiers such as
 	-- `Paths.shared` (the centralised shared-tree resolver), which would otherwise
 	-- inflate the count with a false positive.
-	local hs_count, hs_details   = count_lua_pattern(all_lua_files, "%f[%w]hs%.", adapters_dir)
-	local io_count, io_details   = count_lua_pattern(all_lua_files, "io%.open", adapters_dir)
-	local os_count, os_details   = count_lua_pattern(all_lua_files, "os%.execute", adapters_dir)
-	local total_io_os            = io_count + os_count
+	local hs_count, hs_details = count_lua_pattern(files, "%f[%w]hs%.", adapters_dir)
+	local io_count, io_details = count_lua_pattern(files, "io%.open", adapters_dir)
+	local os_count, os_details = count_lua_pattern(files, "os%.execute", adapters_dir)
+	local total_io_os          = io_count + os_count
+
+	-- A tree that resolves to no file would pass both ratchets forever.
+	helpers.it(string.format("purity scan of %s found source files", label), function()
+		helpers.assert_true(#files > 0,
+			string.format("purity ratchet found NO .lua file for %s — the walk is broken, not the tree", label))
+	end)
 
 	-- Print violation details so CI logs show exactly which lines regressed
-	if hs_count > LUA_HS_BASELINE then
-		print(string.format("  REGRESSION: hs.* calls increased from %d to %d — new violations:", LUA_HS_BASELINE, hs_count))
+	if hs_count > hs_baseline then
+		print(string.format("  REGRESSION: hs.* calls in %s increased from %d to %d — new violations:", label, hs_baseline, hs_count))
 		for _, d in ipairs(hs_details) do print(d) end
 	else
-		print(string.format("  INFO: %d hs.* call(s) in modules+lib (baseline %d) — TODO: drive to zero", hs_count, LUA_HS_BASELINE))
+		print(string.format("  INFO: %d hs.* call(s) in %s (baseline %d) — TODO: drive to zero", hs_count, label, hs_baseline))
 	end
 
-	if total_io_os > LUA_IO_OS_BASELINE then
-		print(string.format("  REGRESSION: io.open/os.execute calls increased from %d to %d — new violations:", LUA_IO_OS_BASELINE, total_io_os))
+	if total_io_os > io_os_baseline then
+		print(string.format("  REGRESSION: io.open/os.execute calls in %s increased from %d to %d — new violations:", label, io_os_baseline, total_io_os))
 		for _, d in ipairs(io_details) do print(d) end
 		for _, d in ipairs(os_details) do print(d) end
 	else
-		print(string.format("  INFO: %d io.open/os.execute call(s) in modules+lib (baseline %d) — TODO: drive to zero", total_io_os, LUA_IO_OS_BASELINE))
+		print(string.format("  INFO: %d io.open/os.execute call(s) in %s (baseline %d) — TODO: drive to zero", total_io_os, label, io_os_baseline))
 	end
 
 	helpers.it(
-		string.format("hs.* usage in lua modules has not increased beyond baseline (%d)", LUA_HS_BASELINE),
+		string.format("hs.* usage in %s has not increased beyond baseline (%d)", label, hs_baseline),
 		function()
-			helpers.assert_true(hs_count <= LUA_HS_BASELINE,
+			helpers.assert_true(hs_count <= hs_baseline,
 				string.format(
-					"hs.* call count regressed: %d > baseline %d — move new OS calls into adapters/",
-					hs_count, LUA_HS_BASELINE))
+					"hs.* call count in %s regressed: %d > baseline %d — move new OS calls into adapters/",
+					label, hs_count, hs_baseline))
 		end)
 
 	helpers.it(
-		string.format("io.open/os.execute usage in lua modules has not increased beyond baseline (%d)", LUA_IO_OS_BASELINE),
+		string.format("io.open/os.execute usage in %s has not increased beyond baseline (%d)", label, io_os_baseline),
 		function()
-			helpers.assert_true(total_io_os <= LUA_IO_OS_BASELINE,
+			helpers.assert_true(total_io_os <= io_os_baseline,
 				string.format(
-					"io.open/os.execute count regressed: %d > baseline %d — move new OS calls into adapters/",
-					total_io_os, LUA_IO_OS_BASELINE))
+					"io.open/os.execute count in %s regressed: %d > baseline %d — move new OS calls into adapters/",
+					label, total_io_os, io_os_baseline))
 		end)
+end
+
+helpers.describe("meta: lua module OS-API purity baseline", function()
+	local macos_root = DRIVER_ROOT
+
+	local all_lua_files = {}
+	for _, dir in ipairs({ "modules", "lib" }) do
+		for _, f in ipairs(list_files(macos_root .. dir, "lua")) do
+			all_lua_files[#all_lua_files + 1] = f
+		end
+	end
+
+	purity_ratchet("modules+lib", all_lua_files, LUA_HS_BASELINE, LUA_IO_OS_BASELINE)
+end)
+
+-- The menus and windows. Every hs.* line here is a call the UI makes without
+-- going through a port, and the tree is two thirds the size of modules+lib.
+helpers.describe("meta: lua ui OS-API purity baseline", function()
+	purity_ratchet("ui", list_files(DRIVER_ROOT .. "ui", "lua"), LUA_HS_BASELINE_UI, LUA_IO_OS_BASELINE_UI)
+end)
+
+-- The entry point. list_files is recursive, so it is named directly rather than
+-- scanned — asking for DRIVER_ROOT would pull in the whole driver.
+helpers.describe("meta: lua entry-point OS-API purity baseline", function()
+	purity_ratchet("init.lua", { DRIVER_ROOT .. "init.lua" }, LUA_HS_BASELINE_ENTRY, LUA_IO_OS_BASELINE_ENTRY)
 end)
