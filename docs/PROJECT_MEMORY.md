@@ -30,6 +30,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-windows-at-rest-store-is-data-sql](#project-windows-at-rest-store-is-data-sql) — Windows never opens db.sqlite: data.sql is the data at rest, and the cache is rebuilt from it
 - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
 - [project-ahk-loop-capture-copy-freezes-nothing](#project-ahk-loop-capture-copy-freezes-nothing) — Copying a loop variable into another outer local does not freeze it for a closure; use .Bind()
+- [project-source-scan-loops-need-a-floor](#project-source-scan-loops-need-a-floor) — A scan loop that finds nothing looks exactly like a scan loop that finds only good results; assert the match count
 - [project-ahk-settimer-reenters-during-file-io](#project-ahk-settimer-reenters-during-file-io) — AHK pumps messages during blocking file I/O, so a routine that schedules its own next tick can be re-entered mid-flight
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
@@ -2749,3 +2750,52 @@ Two traps when rewriting that ledger:
   `FSMove(..., overwrite)` so the original is intact until the last instant.
 
 Related: [[project_heredoc_normalises_trailing_newlines]].
+
+
+
+
+### project-source-scan-loops-need-a-floor
+
+_A source-scanning test whose assertions live INSIDE the match loop passes for free when the pattern matches nothing. Assert that the loop ran._
+
+<sub>slug: `project_source_scan_loops_need_a_floor`</sub>
+
+The shape is everywhere in the meta suites:
+
+```ahk
+while (Pos := RegExMatch(Content, Pattern, &M, Pos)) {
+    if InStr(M[], "forbidden")
+        AssertFalse(true, "…")
+    Pos += StrLen(M[])
+}
+AssertTrue(true)   ; ← "no forbidden condition found"
+```
+
+Zero matches and only-good matches are indistinguishable from outside the loop.
+The trailing `AssertTrue(true)` cannot tell them apart, so a pattern that stops
+matching — because the code it targets was renamed, reformatted, or moved out of
+the scanned tree — silently converts the guard into a permanent pass.
+
+**The specific regex trap that causes it here:** `[^)]*` inside a pattern meant
+to span a call. AHK conditions routinely contain a nested `)`:
+
+```ahk
+HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+```
+
+`HotIf\([^)]*ergopti_alt_gr[^)]*\)` matches this **zero** times, because
+`[^)]` stops at the `)` of `(*)`. This has now happened twice in this repo: the
+AltGr number-row guard (found 2026-07-31, scanning nothing since it was written)
+and the first version of `test-ahk-loop-capture.cjs`, whose own regex found no
+occurrences of the pattern it was written to count.
+
+**How to apply:**
+
+- Count the matches and assert the count. `Seen > 0` with a message naming what
+  should have been found turns a broken pattern into a failure instead of a pass.
+- Prefer a line-anchored pattern (`m)^.*Token.*$`) over `[^)]*` whenever the
+  target can contain a bracket. Conditions are written on one line.
+- Verify a repaired guard by INJECTING the regression it exists for, not by
+  running it green. Green proves the pattern compiles, not that it looks anywhere.
+
+Related: [[project_ahk_loop_capture_copy_freezes_nothing]].

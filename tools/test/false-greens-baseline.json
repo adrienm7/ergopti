@@ -3,5 +3,6 @@
 	"vacuous-absence": 0,
 	"dead-test": 0,
 	"pcall-only": 358,
-	"corpus-skip": 0
+	"corpus-skip": 0,
+	"unfloored-scan": 84
 }
