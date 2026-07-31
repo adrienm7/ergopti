@@ -154,6 +154,7 @@ OnError(_FatalErrorHandler)
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
 ; management) follows it and calls into the loaders/state it declares.
 #Include ../lib/locale.ahk
+#Include ../_generated/gesture_emit_actions.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../lib/i18n.ahk
 _LogBootProgress("i18n included (t() available)")
@@ -256,6 +257,7 @@ InstallSendNoOps()
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_gesture_emit_actions.ahk
 #Include unit/test_updater_constants_single_source.ahk
 #Include meta/test_updater_load_interval_guard.ahk
 
