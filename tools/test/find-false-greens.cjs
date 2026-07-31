@@ -439,22 +439,113 @@ function findCorpusSkips(file, src, ext) {
 // ==================================================
 // ==================================================
 
+/**
+ * Splits a Lua test file into its `it("…", function() … end)` cases.
+ * @param {string} src Full file source.
+ * @returns {{start: number, text: string}[]} One entry per case.
+ */
+function luaItBlocks(src) {
+	const lines = src.split(/\r?\n/);
+	const out = [];
+	for (let i = 0; i < lines.length; i++) {
+		if (!/\bit\s*\(/.test(lines[i])) continue;
+		let depth = 0;
+		let j = i;
+		for (; j < lines.length; j++) {
+			depth += (lines[j].match(/\bfunction\b/g) || []).length;
+			depth -= (lines[j].match(/\bend\b/g) || []).length;
+			if (j > i && depth <= 0) break;
+		}
+		out.push({ start: i + 1, text: lines.slice(i, j + 1).join('\n') });
+		i = j;
+	}
+	return out;
+}
+
+/**
+ * PATTERN 6 — A source-scan loop with no floor.
+ * A test that loops over regex matches and asserts only INSIDE the loop passes
+ * for free when the pattern matches nothing. Zero matches and only-good matches
+ * are indistinguishable from outside the loop, so a pattern that stops matching
+ * — because the code it targets was renamed, reformatted, or moved out of the
+ * scanned tree — silently converts the guard into a permanent pass.
+ *
+ * This has happened twice here. The AltGr number-row guard searched for
+ * `HotIf\([^)]*ergopti_alt_gr[^)]*\)`, which matches the real registration
+ * `HotIf((*) => Features[…]["ergopti_alt_gr"] and IsRealAltGrPress())` ZERO
+ * times, because `[^)]` stops at the ")" of "(*)". It had been scanning nothing
+ * since it was written. The first version of test-ahk-loop-capture.cjs hit the
+ * same trap in its own regex.
+ *
+ * A loop is considered floored when the enclosing function counts iterations and
+ * asserts on that count, or asserts a match variable outside the loop.
+ */
+function findUnflooredScans(file, src, ext) {
+	const out = [];
+	const isAhk = ext === '.ahk';
+	// Lua has no ahkFunctionBlocks equivalent; an it("…", function() … end) case
+	// is the right unit — it is what passes or fails.
+	const blocks = isAhk ? ahkFunctionBlocks(src) : luaItBlocks(src);
+	// A loop driven by a regex search over source text.
+	const LOOP = isAhk
+		? /\b(?:while|loop)\b[^\n]*\bRegExMatch\s*\(/
+		: /\bfor\b[^\n]*[:.]\s*(?:gmatch|gfind)\s*\(/;
+	// A counter compared against zero, in the same block.
+	const COUNTER = /\b(?:seen|count|found|matches|hits)\w*\s*(?:>|>=|!=|~=)\s*0/i;
+
+	for (const block of blocks) {
+		if (!LOOP.test(block.text)) continue;
+		if (COUNTER.test(block.text)) continue;
+
+		// A collector is just as good a floor, and it is often asserted by the
+		// CALLER rather than in the scanning function itself — a collector helper
+		// that returns its list, with the consumer asserting the length. Look for
+		// that assertion anywhere in the file.
+		const collectors = new Set();
+		for (const m of block.text.matchAll(/(\w+)\s*\.\s*(?:Push|insert)\s*\(/g)) collectors.add(m[1]);
+		for (const m of block.text.matchAll(/table\.insert\s*\(\s*(\w+)/g)) collectors.add(m[1]);
+		let floored = false;
+		for (const c of collectors) {
+			const re = new RegExp(
+				`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=)\\s*\\d`
+			);
+			if (re.test(src)) {
+				floored = true;
+				break;
+			}
+		}
+		if (floored) continue;
+
+		const rows = block.text.split(/\r?\n/);
+		const idx = rows.findIndex((l) => LOOP.test(l));
+		out.push({
+			file: rel(file),
+			line: block.start + (idx >= 0 ? idx : 0),
+			text: (rows[idx >= 0 ? idx : 0] || '').trim(),
+			detail: 'scan loop never asserts it matched anything — a broken pattern passes',
+		});
+	}
+	return out;
+}
+
 const PATTERNS = {
 	tautology: 'Assertion that cannot fail (Assert(true) / assert_true(true))',
 	'vacuous-absence': 'Absence assertion on a _DriverFuncBodyOrEmpty() that may be empty',
 	'dead-test': 'Test body that asserts nothing, or a Test() never registered',
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
 	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
+	'unfloored-scan': 'Source-scan loop that never asserts it matched anything',
 };
 
 function scan() {
-	const findings = { tautology: [], 'vacuous-absence': [], 'dead-test': [], 'pcall-only': [], 'corpus-skip': [] };
+	const findings = { tautology: [], 'vacuous-absence': [], 'dead-test': [], 'pcall-only': [], 'corpus-skip': [], 'unfloored-scan': [] };
 	for (const tree of TREES) {
 		for (const file of walk(tree.dir, tree.ext)) {
 			const src = fs.readFileSync(file, 'utf8');
 			findings.tautology.push(...findTautologies(file, src, tree.ext));
 			findings['dead-test'].push(...findDeadTests(file, src, tree.ext));
 			findings['corpus-skip'].push(...findCorpusSkips(file, src, tree.ext));
+			findings['unfloored-scan'].push(...findUnflooredScans(file, src, tree.ext));
 			if (tree.ext === '.ahk') findings['vacuous-absence'].push(...findVacuousAbsence(file, src));
 			else findings['pcall-only'].push(...findPcallOnly(file, src));
 		}
