@@ -147,6 +147,47 @@ function ahkFunctionBlocks(src) {
 }
 
 /**
+ * Every AHK function definition at ANY nesting depth, by brace matching.
+ *
+ * ahkFunctionBlocks tracks one block at a time, so a function defined INSIDE
+ * another is invisible to it. That is not a rare shape here: the corpus and
+ * scan files define their result callback inside the helper that registers it,
+ * and one of those bodies was empty — a test that could not fail, skipped by
+ * the dead-test check because the callback name resolved to nothing and an
+ * unresolvable name was quietly treated as fine.
+ * @param {string} src - Full file text.
+ * @returns {Map<string, {name: string, start: number, text: string}>} By name.
+ */
+function ahkAllFunctionBlocks(src) {
+	const lines = src.split(/\r?\n/);
+	const found = new Map();
+	for (let i = 0; i < lines.length; i++) {
+		if (isComment(lines[i], '.ahk')) continue;
+		const m = lines[i].match(/^[ \t]*([A-Za-z_]\w*)\s*\([^()]*\)\s*\{/);
+		if (!m || isControlKeyword(m[1])) continue;
+		let depth = 0;
+		const body = [];
+		let j = i;
+		for (; j < lines.length; j++) {
+			body.push(lines[j]);
+			const code = lines[j]
+				.replace(/"(?:[^"`]|`.)*"/g, '""')
+				.replace(/'[^']*'/g, "''")
+				.replace(/;.*$/, '');
+			for (const ch of code) {
+				if (ch === '{') depth++;
+				else if (ch === '}') depth--;
+			}
+			if (j > i || depth <= 0) {
+				if (depth <= 0) break;
+			}
+		}
+		if (!found.has(m[1])) found.set(m[1], { name: m[1], start: i + 1, text: body.join('\n') });
+	}
+	return found;
+}
+
+/**
  * Names, for every line, the innermost enclosing AHK FUNCTION (or null).
  * Registering tests from inside a helper that the file then CALLS at top level
  * is a legitimate idiom here — it is how the corpus files emit one test per
@@ -290,6 +331,12 @@ function findDeadTests(file, src, ext) {
 
 	const blocks = ahkFunctionBlocks(src);
 	const byName = new Map(blocks.map((b) => [b.name, b]));
+	// Nested definitions too, so a callback defined inside its registering helper
+	// resolves. Top-level blocks win on a name clash — they are the ones the
+	// delegation walk below is built around.
+	for (const [name, blk] of ahkAllFunctionBlocks(src)) {
+		if (!byName.has(name)) byName.set(name, blk);
+	}
 
 	/** True when the body asserts, throws, or reaches something that does. */
 	const proves = (block, depth, seen) => {
@@ -308,7 +355,12 @@ function findDeadTests(file, src, ext) {
 		return false;
 	};
 
-	for (const m of src.matchAll(/^[ \t]*Test\s*\(\s*(?:"[^"]*"|'[^']*')\s*,\s*([A-Za-z_]\w*)\s*\)/gm)) {
+	// The title is any expression, not necessarily a plain literal. It is often
+	// built by concatenation so the count appears in the run — and
+	// test_no_duplicate_defaults did exactly that around an EMPTY body, which a
+	// string-literal-only pattern skipped entirely. Greedy up to the last comma
+	// takes the callback whatever the title is made of.
+	for (const m of src.matchAll(/^[ \t]*Test\s*\([^\n]*,\s*([A-Za-z_]\w*)\s*\)/gm)) {
 		const block = byName.get(m[1]);
 		if (!block) continue;
 		if (!proves(block, DELEGATION_DEPTH, new Set())) {
