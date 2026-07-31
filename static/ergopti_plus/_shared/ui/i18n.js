@@ -16,8 +16,18 @@
 //    _shared/data/locales/) and window._i18n_locale into every webview as a
 //    <script> prefix, so fetch() resolves correctly even when the HTML is
 //    loaded inline with no base URL.
-// 3. Graceful fallback — if the fetch fails or a key is missing, elements
-//    remain empty (textContent was cleared when data-i18n was added).
+// 3. Fallback cascade — active → en → fr, consulted lazily. A locale file that
+//    fails to load, or that resolves only part of the page, no longer leaves
+//    labels blank: the next locale in the chain fills exactly the gaps.
+//    This is not hypothetical. The 368 data-i18n elements across the eleven
+//    shared webviews all ship with an EMPTY body — the text exists only in the
+//    locale JSON — so a single failed fetch rendered the entire window blank
+//    with nothing but a console.warn nobody sees. The native menus degrade to
+//    the raw key name, which is ugly but legible; the webviews degraded to
+//    nothing at all.
+//    Cost when the active locale is complete (the normal case, and today the
+//    case for all 21): exactly one fetch, as before. A fallback is requested
+//    only once the page has measured which keys it still needs.
 // 4. Global store — strings are saved in window._i18n_strings so page scripts
 //    can call _t(key) for dynamic content not reachable via DOM attributes.
 // 5. Direct injection — Lua backends can skip the fetch entirely by calling
@@ -57,6 +67,42 @@
 		return base_parts.join('/') + '/data/locales/' + code + '.json';
 	}
 
+	// Locales consulted, in order, for keys the active locale did not resolve.
+	// English first because it is the canonical key set every other locale is
+	// diffed against; French second because it is the project's UI language and
+	// therefore the most complete human translation.
+	var FALLBACK_CHAIN = ['en', 'fr'];
+
+	// Every locale key this page needs, gathered from the same attributes apply()
+	// consumes. Collected from the DOM rather than from a manifest so the two can
+	// never disagree about what "complete" means for this page.
+	function required_keys() {
+		var keys = [];
+		document.querySelectorAll('[data-i18n]').forEach(function (el) {
+			keys.push(el.getAttribute('data-i18n'));
+		});
+		document.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+			keys.push(el.getAttribute('data-i18n-title'));
+		});
+		document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+			keys.push(el.getAttribute('data-i18n-placeholder'));
+		});
+		document.querySelectorAll('select[data-i18n-option-prefix]').forEach(function (sel) {
+			var prefix = sel.getAttribute('data-i18n-option-prefix');
+			sel.querySelectorAll('option').forEach(function (opt) {
+				keys.push(prefix + '.' + opt.value);
+			});
+		});
+		return keys;
+	}
+
+	/** Keys the page needs that this string map does not resolve. */
+	function unresolved_keys(strings) {
+		return required_keys().filter(function (k) {
+			return strings[k] === undefined;
+		});
+	}
+
 	function apply(strings) {
 		// Store globally so page scripts can call _t(key) for dynamic content
 		window._i18n_strings = strings;
@@ -93,20 +139,76 @@
 	// evaluateJavaScript without relying on the fetch() path.
 	window.i18n_apply = apply;
 
-	function load() {
-		var code = window._i18n_locale || 'fr';
-		var url = resolve_locale_url(code);
-
-		fetch(url)
+	// Fetches one locale file. Resolves to its string map, or to null on any
+	// failure — a 404, a parse error, a file:// restriction. The caller decides
+	// what a null means; here it is simply "this link of the chain is absent",
+	// which is the same thing as an empty map for cascade purposes.
+	function fetch_locale(code) {
+		return fetch(resolve_locale_url(code))
 			.then(function (r) {
 				return r.ok ? r.json() : null;
 			})
 			.then(function (strings) {
-				if (strings) apply(strings);
+				return strings && typeof strings === 'object' ? strings : null;
 			})
 			.catch(function (err) {
 				console.warn("[i18n] Could not load locale '" + code + "':", err);
+				return null;
 			});
+	}
+
+	function load() {
+		var code = window._i18n_locale || 'fr';
+
+		// The chain always starts with the active locale, and never repeats it:
+		// with _i18n_locale === "en" the chain is en → fr, not en → en → fr.
+		var chain = [code];
+		FALLBACK_CHAIN.forEach(function (c) {
+			if (chain.indexOf(c) === -1) chain.push(c);
+		});
+
+		// Walk the chain, stopping as soon as the page is fully resolved. Earlier
+		// locales win: each step fills only the keys still missing, so a complete
+		// active locale means one fetch and no fallback request at all.
+		function step(index, merged) {
+			if (index >= chain.length) return finish(merged);
+			return fetch_locale(chain[index]).then(function (strings) {
+				var combined = merged;
+				if (strings) {
+					combined = {};
+					Object.keys(strings).forEach(function (k) {
+						combined[k] = strings[k];
+					});
+					// The already-merged map came from an earlier, more specific
+					// locale, so it overwrites what this fallback proposes.
+					Object.keys(merged).forEach(function (k) {
+						combined[k] = merged[k];
+					});
+				}
+				if (unresolved_keys(combined).length === 0) return finish(combined);
+				return step(index + 1, combined);
+			});
+		}
+
+		function finish(strings) {
+			apply(strings);
+			var missing = unresolved_keys(strings);
+			if (missing.length > 0) {
+				// Named, not counted: a key no locale in the chain resolves is a
+				// packaging bug, and the name is what makes it fixable.
+				console.warn(
+					'[i18n] ' +
+						missing.length +
+						' key(s) unresolved after ' +
+						chain.join(' → ') +
+						': ' +
+						missing.slice(0, 10).join(', ') +
+						(missing.length > 10 ? ', …' : '')
+				);
+			}
+		}
+
+		step(0, {});
 	}
 
 	// Run after DOM is ready
