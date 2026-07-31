@@ -230,9 +230,23 @@ TestFMv2_BadOverrideTomlGraceful() {
 }
 Test("Features manifest: bad override toml must not crash build (graceful fallback)", TestFMv2_BadOverrideTomlGraceful)
 
+; Building the features map is a pure read of the manifest plus the override
+; file. It must not itself activate anything — the activation happens later, at
+; the call sites that consult the map, and those are what the pause gate covers.
+; A build that registered a hotstring would create one while the driver is
+; paused, no matter what any gate said.
 TestFMv2_PausePlusOverrideNoSideEffects() {
-	; Even with override + pause, no feature (e.g. hotstring creation) may activate.
-	AssertTrue(true, "manifest + override under pause must produce zero side effects")
+	Body := _DriverFuncBody("ManifestBuildFeaturesMap")
+	for Forbidden in ["Hotstring(", "SetTimer", "A_IsSuspended", "Send("] {
+		Assert(InStr(Body, Forbidden) == 0,
+			"ManifestBuildFeaturesMap() must not reference " . Forbidden . " — building the map "
+			. "is a read, and anything it activates would bypass every pause gate downstream")
+	}
+	; And it is repeatable: two builds agree, so a caller can rebuild after a
+	; resume without the map having drifted.
+	A := ManifestBuildFeaturesMap()
+	B := ManifestBuildFeaturesMap()
+	AssertEqual(A.Count, B.Count, "two builds must produce the same number of features")
 }
 Test("Features manifest: pause + override must cause zero activations", TestFMv2_PausePlusOverrideNoSideEffects)
 

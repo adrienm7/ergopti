@@ -341,10 +341,15 @@ _KlgAggCorpus_RunVector(Vec) {
 		AssertEqual(300, R["max_ms"], "max_ms = 300")
 	}
 	else if (Id = "system_event_manifest_increment_hs") {
-		; AHK walker KLW_WalkSystemEvent has no manifest_increment branch —
-		; this is accepted divergence (macOS-only feature). Skip with a
-		; passing assertion so the test file stays green on AHK
-		AssertTrue(true, "manifest_increment is macOS-only — skipped on AHK")
+		; Accepted divergence: manifest_increment is a macOS-only feature and the AHK
+		; walker has no branch for it. Asserting true said nothing — and would keep
+		; saying nothing on the day someone implements it, leaving the corpus vector
+		; unverified on this driver forever. Assert the divergence instead, so it
+		; fails the moment it stops being true.
+		Body := _DriverFuncBody("KLW_WalkSystemEvent")
+		Assert(InStr(Body, "manifest_increment") == 0,
+			"KLW_WalkSystemEvent now handles manifest_increment — the vector is no longer a "
+			. "documented divergence and must be asserted like every other one")
 	}
 	else if (Id = "mixed_batch_typing_and_system") {
 		Row := _KlgAggCorpus_ReadAppDay("2024-07-02", "MixedApp")
