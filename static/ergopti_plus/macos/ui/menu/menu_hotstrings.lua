@@ -13,6 +13,7 @@ local text_utils = require("lib.text_utils")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
+local Labels        = require("menu.labels")
 local LOG           = "menu_hotstrings"
 
 --- Resolves a description value that may be a plain string or a multilingual table.
@@ -94,19 +95,10 @@ end
 -- ====================================
 -- ====================================
 
---- Formats a number with spaces as thousands separators.
---- @param n number|string The number to format.
---- @return string The formatted number.
-local function fmt_count(n)
-	local num = tonumber(n) or 0
-	local s = tostring(math.floor(num + 0.5))
-	local r = ""
-	for i = 1, #s do
-		if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-		r = r .. s:sub(i, i)
-	end
-	return r
-end
+-- Thousands separator formatting lives in _shared/lua/menu/labels.lua, so the
+-- three drivers render the same count the same way. This file used to carry its
+-- own byte-identical copy.
+local fmt_count = Labels.fmt_count
 
 --- Checks if a hotstring group is enabled.
 --- @param ctx table Context.
