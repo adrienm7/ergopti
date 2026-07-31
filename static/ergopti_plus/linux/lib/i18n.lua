@@ -236,25 +236,22 @@ end
 --- @param code string Locale code (e.g. "en", "fr").
 --- @return string Display name (e.g. "English", "Français").
 function M.display_name(code)
-	local names = {
-		ar = "العربية",
-		de = "Deutsch",
-		en = "English",
-		es = "Español",
-		fr = "Français",
-		it = "Italiano",
-		ja = "日本語",
-		ko = "한국어",
-		nl = "Nederlands",
-		pl = "Polski",
-		pt = "Português",
-		ru = "Русский",
-		sv = "Svenska",
-		tr = "Türkçe",
-		uk = "Українська",
-		zh = "中文",
-	}
-	return names[code] or code
+	-- From the generated table rather than a map written out here. The
+	-- hand-written one carried 16 of the 21 shipped locales, and the lookup ends
+	-- in `or code` — so da, no, cs, he and hi rendered in the language menu as
+	-- those bare two-letter codes, sitting between "Nederlands" and "Русский",
+	-- while the other sixteen showed their native names. Nothing failed; five
+	-- rows just looked like a bug nobody had filed.
+	local ok, table_mod = pcall(require, "_generated.locale_table")
+	if not ok or type(table_mod) ~= "table" then
+		Logger.error(LOG, "display_name(): _generated/locale_table.lua is missing — "
+			.. "language names fall back to raw codes. Run `npm run codegen:locale-tables`.")
+		return code
+	end
+	for _, entry in ipairs(table_mod) do
+		if entry.code == code then return entry.name end
+	end
+	return code
 end
 
 --- Passthrough for macOS API parity.

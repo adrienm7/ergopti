@@ -9,8 +9,11 @@
  *   - The order array covers EXACTLY the locale JSON files shipped in
  *     _shared/data/locales/ (no missing, no extra, no duplicates) — so adding
  *     or removing a locale forces a matching order edit.
- *   - The macOS LOCALES table (macos/lib/i18n.lua) is declared in that order.
- *   - The Windows I18N_LOCALES table (windows/lib/i18n.ahk) is declared in
+ *   - The macOS locale table (macos/_generated/locale_table.lua) is emitted in
+ *     that order. It used to be hand-written in lib/i18n.lua, with the native
+ *     NAMES hand-written in three places — and the Linux copy had fallen five
+ *     locales behind, so both columns are generated now.
+ *   - The Windows locale table (windows/_generated/locale_table.ahk) is emitted in
  *     that order.
  *   - The site loader (routes/ergopti-plus/+page.server.js) and the Linux
  *     driver (linux/lib/i18n.lua) read locale_order.json at runtime rather
@@ -66,22 +69,22 @@ if (order.length > 0) {
 	void ordered;
 
 	// ── 3. macOS table declared in canonical order ──────────────────────────
-	const luaCodes = [...read('static/ergopti_plus/macos/lib/i18n.lua').matchAll(/code\s*=\s*"([a-z]+)"/g)].map(
+	const luaCodes = [...read('static/ergopti_plus/macos/_generated/locale_table.lua').matchAll(/code\s*=\s*"([a-z]+)"/g)].map(
 		(m) => m[1]
 	);
 	if (luaCodes.join(',') !== order.join(',')) {
 		errors.push(
-			`macOS i18n.lua LOCALES order != locale_order.json.\n    order.json: ${order.join(' ')}\n    i18n.lua : ${luaCodes.join(' ')}`
+			`macOS locale table order != locale_order.json.\n    order.json: ${order.join(' ')}\n    generated : ${luaCodes.join(' ')}`
 		);
 	}
 
 	// ── 4. Windows table declared in canonical order ────────────────────────
 	const ahkCodes = [
-		...read('static/ergopti_plus/windows/lib/i18n.ahk').matchAll(/Code:\s*"([a-z]+)"/g)
+		...read('static/ergopti_plus/windows/_generated/locale_table.ahk').matchAll(/Code:\s*"([a-z]+)"/g)
 	].map((m) => m[1]);
 	if (ahkCodes.join(',') !== order.join(',')) {
 		errors.push(
-			`Windows i18n.ahk I18N_LOCALES order != locale_order.json.\n    order.json: ${order.join(' ')}\n    i18n.ahk : ${ahkCodes.join(' ')}`
+			`Windows locale table order != locale_order.json.\n    order.json: ${order.join(' ')}\n    generated : ${ahkCodes.join(' ')}`
 		);
 	}
 }

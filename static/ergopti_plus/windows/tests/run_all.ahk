@@ -154,6 +154,7 @@ OnError(_FatalErrorHandler)
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
 ; management) follows it and calls into the loaders/state it declares.
 #Include ../lib/locale.ahk
+#Include ../_generated/locale_table.ahk
 #Include ../lib/i18n.ahk
 _LogBootProgress("i18n included (t() available)")
 

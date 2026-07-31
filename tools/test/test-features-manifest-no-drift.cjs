@@ -58,7 +58,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // somebody remembering to widen a guard.
 const GENERATORS = [
 	'tools/build/build-features-manifest.js',
-	'tools/codegen/codegen-logger-sub-files.cjs'
+	'tools/codegen/codegen-logger-sub-files.cjs',
+	'tools/codegen/codegen-locale-tables.cjs'
 ];
 
 // Every directory the generator can write into. Deliberately NOT a list of
@@ -81,7 +82,10 @@ const EXPECTED_TARGETS = [
 	'static/ergopti_plus/windows/_generated/config_template.toml',
 	'static/ergopti_plus/linux/_generated/config_template.toml',
 	'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
-	'static/ergopti_plus/windows/_generated/logger_sub_files.ahk'
+	'static/ergopti_plus/windows/_generated/logger_sub_files.ahk',
+	'static/ergopti_plus/macos/_generated/locale_table.lua',
+	'static/ergopti_plus/linux/_generated/locale_table.lua',
+	'static/ergopti_plus/windows/_generated/locale_table.ahk'
 ];
 
 /** Every file under a directory, as repo-relative POSIX paths. */
