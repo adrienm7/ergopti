@@ -516,19 +516,38 @@ three French fallbacks, and the Linux gesture action labels — which needed no
 translation at all, because the shared `sg_actions.*` catalogue already held all
 42 in 21 languages and only Linux was not reading it.
 
-Still hardcoded:
+The whole Linux driver is done too: the menu labels, the updater menu, the 30
+dead `i18n_safe(key, "<French>")` fallbacks, and the pre-i18n CLI surfaces
+(`--help` and the two startup errors, which are now **English** — they run at
+`parse_args` before `i18n.init()`, and that init cannot move earlier because the
+config directory it reads the locale from is itself settable with `--config`).
+Two gates hold the line: `test-linux-menu-keys-exist.cjs` asserts every key the
+menu asks for is defined in `en.json`, and ratchets hardcoded French literals at
+**1** — the "Français" row of the language picker, correctly in its own language.
 
-- **Linux menu leaf titles** — `modules/menu/menu_builder.lua`, ~33 literals.
-  Note this file is slated for deletion by lot 5.3; route the labels through the
-  shared locales as part of that work rather than twice.
-- **Linux updater menu** — `modules/updater/manager.lua`, 5 literals. The keys
-  already exist (`_shared/data/locales/fr.json` `check_for_updates`, `channel_*`,
-  `install_update`, `open_releases_page`), so this needs no new translation.
-- **Linux GTK window titles** and the 9 literals in `ergopti_hotstrings.lua`.
-- **The metrics app picker.**
-- **`i18n_safe(key, "<French>")` fallbacks** throughout the Linux menu: the
-  locale-parity gate guarantees the key exists, so the French second argument is
-  dead code that can only ever surface French to a non-French user.
+**What is left is one item, and it is not a string problem.**
+
+### The metrics app picker needs category IDs before it can be translated
+
+`_shared/ui/metrics_apps/script.js` holds ~88 French literals, but replacing
+them is not the work. The French label **is** the internal key:
+
+- `MAC_CATEGORIES_FR` maps the macOS native English category to a French label,
+  and that label is then used as the category `type` throughout — charts,
+  tables, the hourly ribbon.
+- `FIXED_CAT_COLORS` is keyed by the FRENCH label (`Productivité`, `Développement`,
+  `Santé & Forme`…), so translating the label silently loses every fixed colour.
+- Worse, the value is **persisted**: a user category override is written to
+  `app_categories.json`, and `macos/ui/metrics_apps/init.lua:82` supplies the
+  default as `i18n.get("metrics_apps.general_category")` — a LOCALISED string.
+  So the stored data already depends on the language that was active when it was
+  written, and a user who switches language finds their overrides orphaned.
+
+The fix is a data-model change, not a translation pass: give each category a
+stable id (the English key is already one), key `FIXED_CAT_COLORS` by id, look
+the label up at render time — and migrate `app_categories.json`, mapping every
+known localised spelling back to its id so existing overrides survive. Do the
+migration first and prove it with a corpus of stored files in several languages.
 
 ---
 
