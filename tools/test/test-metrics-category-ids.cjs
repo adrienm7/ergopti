@@ -48,13 +48,23 @@ const prelude = src.slice(0, cut);
 // The prelude reads `window` for host-injected data. A minimal stand-in is
 // enough — this guard is about the category tables, and giving it a real DOM
 // would couple it to whatever the dashboard renders next.
+const ALIASES_FILE = path.join(
+	ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'metrics_general_category_aliases.json'
+);
+const CORPUS_FILE = path.join(
+	ROOT, 'static', 'ergopti_plus', '_shared', 'tests', 'corpus', 'metrics', 'app_categories_vectors.json'
+);
+
+const aliasDoc = JSON.parse(fs.readFileSync(ALIASES_FILE, 'utf8'));
+const corpus = JSON.parse(fs.readFileSync(CORPUS_FILE, 'utf8'));
+
 const sandbox = new Function(
 	'window',
 	'document',
 	`${prelude}\nreturn { MAC_CATEGORIES_FR, FIXED_CAT_COLORS, LABEL_TO_CATEGORY_ID, categoryId, getCategoryColor, CHART_PALETTE };`
 );
 const { MAC_CATEGORIES_FR, FIXED_CAT_COLORS, categoryId, getCategoryColor } = sandbox(
-	{ ManifestData: {}, addEventListener() {} },
+	{ ManifestData: {}, GeneralCategoryAliases: aliasDoc.aliases, addEventListener() {} },
 	{ addEventListener() {}, getElementById: () => null, querySelectorAll: () => [] }
 );
 
@@ -120,6 +130,54 @@ check(
 // 7. Scores still win over any colour lookup.
 check(getCategoryColor('Productivity', 1) === '#30D158', 'a positive score must render green');
 check(getCategoryColor('Productivity', -1) === '#FF453A', 'a negative score must render red');
+
+// 8. The generated alias file must still match the locales. Regenerating is one
+//    command; a stale list silently orphans the overrides of whichever language
+//    was added or corrected since.
+const { collect } = require('../build/gen-metrics-category-aliases.cjs');
+const live = collect();
+for (const [code, label] of Object.entries(live)) {
+	check(
+		aliasDoc.by_locale[code] === label,
+		`metrics_general_category_aliases.json is stale for "${code}": file says ` +
+			`${JSON.stringify(aliasDoc.by_locale[code])}, locale says ${JSON.stringify(label)}. ` +
+			'Run `node tools/build/gen-metrics-category-aliases.cjs`.'
+	);
+}
+check(
+	Object.keys(aliasDoc.by_locale).length === Object.keys(live).length,
+	`the alias file covers ${Object.keys(aliasDoc.by_locale).length} locale(s), the tree ships ` +
+		`${Object.keys(live).length} — regenerate it`
+);
+
+// 9. The corpus: every stored spelling, in every shipped language, resolves to
+//    the id its vector expects. This is the file a real user has on disk.
+check(
+	corpus.vectors.length >= 20,
+	`the corpus holds only ${corpus.vectors.length} vector(s) — it must cover every locale`
+);
+for (const v of corpus.vectors) {
+	for (const [app, storedEntry] of Object.entries(v.stored)) {
+		const want = v.expected_ids[app];
+		const got = categoryId(storedEntry.type);
+		check(
+			got === want,
+			`corpus "${v.id}": ${app} is stored as ${JSON.stringify(storedEntry.type)} and must ` +
+				`resolve to ${JSON.stringify(want)}, got ${JSON.stringify(got)} — a user who switched ` +
+				'language would find this override orphaned'
+		);
+	}
+}
+
+// Every alias must land on the SAME id, so the picker shows one general category
+// rather than one per language the user has ever used.
+const generalIds = new Set(aliasDoc.aliases.map((a) => categoryId(a)));
+check(
+	generalIds.size === 1,
+	`the ${aliasDoc.aliases.length} spellings of the default category resolve to ` +
+		`${generalIds.size} different ids (${[...generalIds].join(', ')}) — they must collapse to one, ` +
+		'or the picker grows a new "General" every time the user switches language'
+);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Metrics category identity is broken:\x1b[0m');

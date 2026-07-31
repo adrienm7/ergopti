@@ -648,11 +648,33 @@ Doing that surfaced a bug that was already live: `'Graphics design'` displays as
 silently lost its lavender and fell through to the hash palette. Neither spelling
 looks wrong on its own, which is exactly why a label-keyed table hides it.
 
-**Step two remains:** look the label up at render time from the locale files
-rather than from `MAC_CATEGORIES_FR`, and write the `app_categories.json`
-migration. The resolver above is what makes that migration safe — every stored
-spelling already maps to an id — but the migration itself still needs a corpus of
-stored files in several languages to prove it against.
+**Step two is done too, and it is a read-side normalisation rather than a file
+rewrite** — which is the safer shape: nothing on disk is touched, so there is no
+half-migrated state and no rollback to design.
+
+The default category is the only value the picker itself writes, and it writes it
+LOCALISED. All 19 distinct spellings across the 21 locales are generated into
+`_shared/data/metrics_general_category_aliases.json` and resolve to one id, so a
+user who switches from French to German no longer grows a second "General" with
+their old overrides stranded under the first. The generator is checked against
+the locale files on every run, so adding a locale or correcting a translation
+cannot silently leave a spelling unrecognised.
+
+`_shared/tests/corpus/metrics/app_categories_vectors.json` holds one stored
+`app_categories.json` per shipped language plus a user-invented category and the
+historical `"Design"` spelling — 23 vectors, each asserting the id its stored
+value must resolve to.
+
+**What is genuinely left** is cosmetic and needs no migration: the ~88 French
+literals in `script.js` that are pure display text. They can now be translated
+without touching identity, which was the whole obstacle.
+
+Also worth recording while here: the two drivers write DIFFERENT vocabularies to
+files of the same name. Windows `app_categories.json` holds a five-token
+productivity scale (`productive` / `distracting` / `communication` / `neutral` /
+`unknown`) keyed by process name; macOS holds free-text user categories keyed by
+app name. Neither is wrong, but nothing says so anywhere, and "migrate
+app_categories.json" means two different things depending on the driver.
 
 ---
 

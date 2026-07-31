@@ -62,6 +62,15 @@ function $id(id) {
 // ===================================
 // ===================================
 
+// Localised spellings of the default ("General") category, injected by the host
+// from _shared/data/metrics_general_category_aliases.json. Falls back to the two
+// spellings that predate the generated file so the dashboard still resolves the
+// common cases if the host has not supplied it.
+const GENERAL_CATEGORY_ALIASES = (typeof window !== 'undefined' && window.GeneralCategoryAliases) || [
+	'General',
+	'Général'
+];
+
 const MAC_CATEGORIES_FR = {
 	Productivity: 'Productivité',
 	'Social networking': 'Réseaux sociaux',
@@ -154,6 +163,16 @@ const LABEL_TO_CATEGORY_ID = (() => {
 	// "Design" was the FIXED_CAT_COLORS key for 'Graphics design' while the
 	// displayed label was "Design graphique"; either may be on disk.
 	map['Design'] = 'Graphics design';
+
+	// Every localised spelling of the DEFAULT category. This one is not a macOS
+	// App Store name — it is what the picker writes for an app the user has not
+	// classified, in whatever language was active at the time. A user who
+	// switches from French to German gets "Allgemein" while their file still
+	// holds "Général", and without this the picker shows two general categories
+	// where there should be one. The list is generated from the locale files
+	// (tools/build/gen-metrics-category-aliases.cjs) so it cannot go stale when a
+	// locale is added or a translation corrected.
+	for (const alias of GENERAL_CATEGORY_ALIASES) map[alias] = 'Unknown';
 	return map;
 })();
 
