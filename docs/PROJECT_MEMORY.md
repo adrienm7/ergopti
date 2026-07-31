@@ -29,6 +29,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-heredoc-normalises-trailing-newlines](#project-heredoc-normalises-trailing-newlines) — A shell heredoc always appends a newline, so `with_stdin` silently alters DATA payloads; use `with_exact_stdin`
 - [project-windows-at-rest-store-is-data-sql](#project-windows-at-rest-store-is-data-sql) — Windows never opens db.sqlite: data.sql is the data at rest, and the cache is rebuilt from it
 - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
+- [project-ahk-loop-capture-copy-freezes-nothing](#project-ahk-loop-capture-copy-freezes-nothing) — Copying a loop variable into another outer local does not freeze it for a closure; use .Bind()
 - [project-ahk-settimer-reenters-during-file-io](#project-ahk-settimer-reenters-during-file-io) — AHK pumps messages during blocking file I/O, so a routine that schedules its own next tick can be re-entered mid-flight
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
@@ -665,6 +666,39 @@ Every user-facing string ships in **all 21 supported languages** (ar, cs, da, de
 - Internal logs and developer comments stay English per CLAUDE.md — this rule covers user-visible text only.
 
 Parity is enforced in CI against the canonical `en.json` — see [[project_locale_parity_test]].
+
+### project-ahk-loop-capture-copy-freezes-nothing
+
+_Copying a loop variable into another outer local does NOT freeze it for a closure — every closure shares that one variable and sees the last iteration's value. Use `.Bind()`_
+
+<sub>slug: `project_ahk_loop_capture_copy_freezes_nothing`</sub>
+
+The trap is well known for lambdas; the trap in the *attempted fix* is not.
+`for Vec in Vectors { VidCopy := VecId; _T() { … VidCopy … }; Test(name, _T) }`
+looks like it snapshots per iteration. It does not: `VidCopy` is one variable in
+the enclosing function, every registered closure closes over the same slot, and
+they all run **after** the loop has finished — so they all read the final value.
+
+**Why it survives review, and how it presents:** the suite is green. Found
+2026-07-31 in `tests/meta/test_corpus_security_keylogger.ahk`, where six
+per-vector tests had shared one binding for however long: all six asserted the
+same expected value, so reading the last vector's data gave the right answer
+every time. It surfaced only when a seventh vector with a *different* expected
+shape joined them — `Item has no value`, because SEC-008's payload was being
+read through SEC-007's test.
+
+**How to apply:**
+
+- Register the callback with `.Bind(args…)`: `Test(name, _Check.Bind(VecId, Vec["expected"]))`.
+  Bind evaluates its arguments at registration and stores them per callable —
+  that is the only per-iteration snapshot AHK v2 gives you.
+- Take everything the assertion needs as **parameters** of a top-level named
+  function. A closure that reads any enclosing local is suspect by construction.
+- Suspect any per-item test loop whose items all assert the SAME value: it
+  cannot tell a correct binding from a broken one. Give one item a different
+  expectation and re-run.
+
+Related: [[feedback_regression_tests]], [[project_false_green_tests]].
 
 ### project-ahk-settimer-reenters-during-file-io
 
