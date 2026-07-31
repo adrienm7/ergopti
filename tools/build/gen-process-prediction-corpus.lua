@@ -17,8 +17,26 @@
 ---     lua tools/build/gen-process-prediction-corpus.lua
 --- ==============================================================================
 
+--- Repo root, derived from THIS script's own path.
+---
+--- Both paths below used to be absolute — "D:/Documents/GitHub/ergopti/…", one
+--- maintainer's checkout. The generator therefore could not run on any other
+--- machine or in CI: it would either fail to require the shared parser or, worse,
+--- write its corpus to a directory that does not exist.
+--- @return string Absolute repo root, no trailing slash.
+local function repo_root()
+	local src = debug.getinfo(1, "S").source
+	if src:sub(1, 1) == "@" then src = src:sub(2) end
+	src = src:gsub("\\", "/")
+	-- src is <root>/tools/build/gen-process-prediction-corpus.lua
+	local root = src:match("^(.*)/tools/build/[^/]+$")
+	return root or "."
+end
+
+local ROOT = repo_root()
+
 -- Resolve the repo's _shared/lua so the shared modules resolve regardless of cwd.
-local SHARED_LUA = "D:/Documents/GitHub/ergopti/static/ergopti_plus/_shared/lua"
+local SHARED_LUA = ROOT .. "/static/ergopti_plus/_shared/lua"
 package.path = SHARED_LUA .. "/?.lua;" .. SHARED_LUA .. "/?/init.lua;" .. package.path
 
 local parser = require("llm.parser")
@@ -213,7 +231,7 @@ end
 table.insert(lines, "\t]")
 table.insert(lines, "}")
 
-local OUT = "D:/Documents/GitHub/ergopti/static/ergopti_plus/_shared/tests/corpus/llm/process_prediction_vectors.json"
+local OUT = ROOT .. "/static/ergopti_plus/_shared/tests/corpus/llm/process_prediction_vectors.json"
 local fh = assert(io.open(OUT, "w"))
 fh:write(table.concat(lines, "\n") .. "\n")
 fh:close()
