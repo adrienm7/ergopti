@@ -677,24 +677,30 @@ inventorying those would bury the four that matter.
 
 ### Follow-ups found while implementing
 
-- **Five independent decodes of the same manifest at boot (~200 ms).** The four
-  `_MM_*` loaders in `lib/menu_manifest.ahk` each keep their own cache, and
-  `_MR_MANIFEST_CACHE` is a fifth — all decoding the same 12.5 KB file, benched
-  at 44 ms per decode. Consolidating them behind `_MR_GetManifestRoot()` follows
-  the per-item fix already shipped, but touches five sites and four caches:
-  separate commit, and only after measuring the shipped fix in isolation.
-- **Dead Ollama WinHTTP path.** `LLM_OllamaCancelAsync` has no production
-  callers and `_LLM_Ollama_PollRequest` is never armed; both carry an
-  `entry.Has("http")` branch that cannot be true, since the only creation site
-  writes no `"http"` key. curl is the live transport. Remove under §5.6.
+- ~~**Five independent decodes of the same manifest at boot (~200 ms).**~~ Done:
+  one `_MM_MANIFEST_ROOT_CACHE`, one `FileRead`, one `JsonParse`, and all six
+  call sites route through `_MM_GetManifestRoot()`. A failure is deliberately
+  NOT cached, so a transient I/O error cannot pin the hard-coded fallback lists
+  for the rest of the session. `test_menu_manifest_single_decode.ahk` holds it.
+- ~~**Dead Ollama WinHTTP path.**~~ Done: both functions and the
+  `entry.Has("http")` branches are gone, and
+  `test_ollama_async_registry_is_curl_only.ahk` holds the line. The write-up
+  there is worth keeping in mind — the poll re-armed itself, so a "who calls
+  this?" search found a caller, and the only test that touched the shape
+  fabricated the `"http"` key it was checking for.
 - **Magic numbers around the LLM health probe**: the 3 s throttle is inline and
   the 10 s interval is duplicated between `menu_llm/init.ahk` and
   `menu_llm/actions.ahk`. Name them next to `LLM_HEALTH_PROBE_IDLE_MAX_MS`.
-- **Regex per keylogger event.** `MF_ShouldFilter` runs 7 `RegExMatch` over the
-  window title on every logged event when `private_browsing` is on — the only
-  real per-event regex site, never instructed. Either memoize per focus-cache
-  generation (the title only changes on refresh, 50 ms TTL) or discard it
-  explicitly with the measurement that justifies it.
+- ~~**Regex per keylogger event.**~~ Done: memoized on the title itself, with the
+  same build-then-swap discipline as `MetricsFocusCache` — title and verdict are
+  published together through one reference assignment, so a timer interrupting
+  mid-scan can never expose a new title paired with the old verdict. The compare
+  is case-SENSITIVE on purpose: two titles differing only in case are two
+  different titles, and the patterns are already case-insensitive.
+
+**All four §4 follow-ups are now closed.** What remains in this section is the
+instrumentation itself, which needs a running driver and a day of real typing to
+produce numbers — not something that can be written blind.
 
 ---
 
