@@ -411,10 +411,6 @@ inventory of checks is the run itself).
 - Purge the remaining dead plan-phase references (`P5 refactor`, `P0 SSoT`,
   `P6 split`) from driver sources, several of which point at files that no longer
   exist.
-- The two glossaries disagree with the code and with each other:
-  `static/ergopti_plus/docs/glossary.md` announces "the **nine** port contracts",
-  then lists **thirteen**, where there are **20**, and names driver directories
-  `hammerspoon/` and `autohotkey/` that do not exist.
 
 ### 0.10 Risks
 
