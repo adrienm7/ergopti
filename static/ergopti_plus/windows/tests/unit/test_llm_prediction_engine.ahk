@@ -190,22 +190,63 @@ _EngineCancelTimer_ClearsPendingTimer() {
 Test("LLM_Engine_CancelTimer: clears pending_timer reference", _EngineCancelTimer_ClearsPendingTimer)
 
 ; ULTIMATE encore plus: pause on every engine path + diagnostic integration + volume + pcall/errors to sink (for 100% certainty on the enriched healthcheck).
+; Silence is implemented by the `enabled` flag, which the suspend handler clears
+; — not by an A_IsSuspended read inside the engine. Assert the mechanism that
+; actually exists: with enabled false, OnKeystroke arms nothing at all. A timer
+; armed here fires an HTTP request and types into the user's document, so
+; "returns early" has to mean "left no timer behind".
 _EnginePauseSilencesAndDiagnosticSeesState() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map("model", "test"))
-	; Under A_IsSuspended / script pause: OnKeystroke, Fire, timers must early-return (no HTTP, no tooltip, no typing).
-	; Healthcheck (diagnostic) must still report llm section (backend/profile) + errors sink without side effects.
-	AssertTrue(true, "prediction engine must respect full pause silence (project_suspend_pause_invariant); diagnostic must see llm state + errors sink")
+
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["pending_timer"] := ""
+	_LLM_Engine["timer_active"] := false
+	_LLM_Engine["last_buffer"] := ""
+
+	LLM_Engine_OnKeystroke("bonjour")
+
+	AssertEqual("", _LLM_Engine["pending_timer"],
+		"a disabled engine must not arm a prediction timer — that timer fires an HTTP request "
+		. "and types into the user's document")
+	AssertFalse(_LLM_Engine["timer_active"], "and must not mark itself active")
+	AssertEqual("", _LLM_Engine["last_buffer"],
+		"nor record the keystroke buffer, which is what the prompt is built from")
+
+	; Re-enabled, the very same call does arm — so the assertion above is about the
+	; gate, not about a keystroke that never reached the engine.
+	_LLM_Engine["enabled"] := true
+	LLM_Engine_OnKeystroke("bonjour")
+	AssertEqual("bonjour", _LLM_Engine["last_buffer"],
+		"an enabled engine must record the buffer — otherwise the check above proves nothing")
+	LLM_Engine_CancelTimer()
 }
 Test("LLM Prediction Engine: pause must silence OnKeystroke/Fire/timers + diagnostic must still see llm state + errors sink", _EnginePauseSilencesAndDiagnosticSeesState)
 
+; Every keystroke cancels the in-flight request before re-arming. Two hundred of
+; them must therefore leave exactly ONE armed timer, not two hundred: a leak here
+; is what kept the "génération en cours" spinner alive and queued stale work
+; behind Ollama's single slot for seconds after the user stopped typing.
 _EngineHighVolumePcallBackendToErrorsSinkUnderPause() {
+	global _LLM_Engine
 	LLM_Engine_Init(Map("model", "test"))
+
 	Loop 200 {
-		LLM_Engine_OnKeystroke("a")
+		LLM_Engine_OnKeystroke("a" . A_Index)
 	}
-	; Internal pcall around backend must log ERROR to errors-only sink and continue; pause must not activate anything.
-	AssertTrue(true, "200+ volume + pcall backend errors must go to errors sink; pause must keep engine silent; diagnostic must surface the sink")
+
+	AssertTrue(_LLM_Engine["timer_active"],
+		"after a burst the engine must hold exactly one armed timer")
+	AssertEqual("a200", _LLM_Engine["last_buffer"],
+		"and it must be the LAST buffer — an earlier one would predict against text the user "
+		. "has already typed past")
+
+	; Cancelling once is enough, because there is only ever one.
+	LLM_Engine_CancelTimer()
+	AssertFalse(_LLM_Engine["timer_active"],
+		"a single cancel must clear the whole burst — 200 surviving timers would each fire an "
+		. "HTTP request")
+	AssertEqual("", _LLM_Engine["pending_timer"], "and drop the timer reference")
 }
 Test("LLM Prediction Engine: high volume (200+) + pcall backend ERROR to errors sink under pause; diagnostic visibility", _EngineHighVolumePcallBackendToErrorsSinkUnderPause)
 
