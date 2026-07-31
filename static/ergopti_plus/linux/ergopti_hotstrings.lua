@@ -224,19 +224,27 @@ local function parse_args()
 	return opts
 end
 
+--- Prints the CLI usage. Deliberately ENGLISH, not translated.
+---
+--- This runs from parse_args, long before i18n.init() — which cannot move
+--- earlier, because the config directory it reads the persisted locale from is
+--- itself settable with --config. So at this point the user's chosen language is
+--- genuinely unknown, and routing the text through i18n would render it in the
+--- default locale rather than theirs. Every other pre-i18n surface in this file
+--- (the two startup error prints) is English for the same reason.
 local function print_usage()
-	print("Utilisation : luajit ergopti_hotstrings.lua [OPTIONS]")
+	print("Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
 	print("")
-	print("  --config <chemin>   Fichier TOML ou répertoire de définitions.")
-	print("                      Défaut : ~/.config/ergopti/hotstrings/")
-	print("  --device <chemin>   Périphérique evdev (ex. /dev/input/event3).")
-	print("                      Défaut : détection automatique.")
-	print("  --layout <nom>      Disposition clavier : qwerty | azerty.")
-	print("                      Défaut : variable $XKBLAYOUT, sinon qwerty.")
-	print("  --tray              Active l'icône de la barre système (nécessite yad).")
-	print("  --dry-run           Journalise les correspondances sans injecter.")
-	print("  --verbose           Active les messages de débogage.")
-	print("  --help              Afficher ce message.")
+	print("  --config <path>     TOML file or directory of definitions.")
+	print("                      Default: ~/.config/ergopti/hotstrings/")
+	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
+	print("                      Default: auto-detected.")
+	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
+	print("                      Default: $XKBLAYOUT, else qwerty.")
+	print("  --tray              Enable the system tray icon (requires yad).")
+	print("  --dry-run           Log matches without injecting.")
+	print("  --verbose           Enable debug messages.")
+	print("  --help              Show this message.")
 end
 
 
@@ -352,7 +360,7 @@ local function main()
 	end
 	if not device then
 		Logger.error(LOG, "No keyboard device found. Specify one with --device.")
-		print("Erreur : aucun périphérique clavier détecté. Utilisez --device.")
+		print("Error: no keyboard device detected. Specify one with --device.")
 		os.exit(1)
 	end
 	Logger.info(LOG, "Using device: %s.", device)
@@ -557,7 +565,7 @@ local function main()
 
 	if not keyboard_hook.isRunning() then
 		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
-		print("Erreur : impossible de démarrer le hook clavier.")
+		print("Error: could not start the keyboard hook.")
 		os.exit(1)
 	end
 
