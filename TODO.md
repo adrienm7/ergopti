@@ -442,9 +442,24 @@ Constraints: **paths before moves, moves before content, data before code.**
   driver invented its own. (5) Replace Windows layers A+B, which bind the same
   intent to two different physical keys because layer B is registered *before*
   `modules/keymap/layout.ahk` and therefore resolves against the OS layout instead
-  of Ergopti's. (6) Give macOS the binding UI it lacks — its keyboard-slot module
-  is dead machinery: `M.DEFAULTS` is empty by design and the only production
-  caller of `set_action` writes `"none"`. (7) Merge
+  of Ergopti's. (6) Give macOS the binding UI it lacks — **measured and
+  confirmed, still to build.** `M.DEFAULTS` is empty by design; `get_action`,
+  `get_slot_label` and `get_assignments` have **0** production callers;
+  `set_action` has exactly one, writing the literal `"none"`. `start`/`stop` do
+  real work, so the module is not dead — its *configuration* is.
+  Worse than "unused": that single writer is `clear_keyboard_shortcut_settings()`
+  in `ui/menu/init.lua`, a reset routine that walks `hs.settings` for the
+  `keyboard_shortcut_` prefix and clears each match. **Nothing in the driver ever
+  writes a key with that prefix**, and DEFAULTS is empty — so it is a reset path
+  for a feature that cannot be configured, iterating over keys that cannot exist.
+  Not deleted: the module runs, and removing the reset would strand settings the
+  day the UI lands. `test-keyboard-slot-surface-is-dead.cjs` holds the
+  measurement instead — it fails if a reader appears (the UI landed: replace the
+  gate with tests of it), if `DEFAULTS` gains an entry (slots would start bound
+  on a fresh install), if the writer gains a second caller, or if that caller
+  starts writing anything other than `"none"`. It also stops the dead surface
+  growing, which is the shape of the 136 unreachable label entries and the
+  16-of-21 locale table already found here. (7) Merge
   `karabiner/data/actions.json` (73 actions, hardcoded French, no i18n keys) into
   the one registry, `holdable` becoming a per-action flag. ~~(8) Fix the Linux `action_picker` bridge~~ — mostly done. It answered
   `execute`/`search` with three hardcoded French labels; the page posts
