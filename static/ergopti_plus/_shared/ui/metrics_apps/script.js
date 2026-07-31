@@ -108,27 +108,65 @@ const CHART_PALETTE = [
 	'#5AC8FA' // Light Blue
 ];
 
-// Fixed aesthetic mappings for standard categories — each hue is deliberately distant
+// Fixed aesthetic mappings for standard categories — each hue is deliberately
+// distant. Keyed by the STABLE ENGLISH ID, not by the displayed label.
+//
+// It used to be keyed by the French label, which made the colour a property of
+// the translation rather than of the category. Two consequences, one of them
+// already live: 'Graphics design' displays as "Design graphique" but the table
+// held "Design", so that category silently lost its lavender and fell through to
+// the hash palette — a mismatch impossible to see, because both spellings look
+// correct. And translating the UI would have dropped EVERY fixed colour at once.
 const FIXED_CAT_COLORS = {
-	Productivité: '#0A84FF', // Blue
-	Développement: '#5E5CE6', // Indigo
-	'Réseaux sociaux': '#FF375F', // Pink-Red
-	Jeux: '#FF453A', // Deep Red
-	Divertissement: '#BF5AF2', // Purple
-	Utilitaires: '#64D2FF', // Sky Blue
-	Éducation: '#FF9F0A', // Orange
+	Productivity: '#0A84FF', // Blue
+	'Developer tools': '#5E5CE6', // Indigo
+	'Social networking': '#FF375F', // Pink-Red
+	Games: '#FF453A', // Deep Red
+	Entertainment: '#BF5AF2', // Purple
+	Utilities: '#64D2FF', // Sky Blue
+	Education: '#FF9F0A', // Orange
 	Business: '#FFD60A', // Yellow
 	Finance: '#30B0C7', // Teal
-	Design: '#E588F8', // Lavender
-	Photographie: '#FF6B35', // Burnt Orange
-	Vidéo: '#FF375F', // Coral
-	Musique: '#32D74B', // Green
-	'Santé & Forme': '#34C759', // Leaf Green
-	Actualités: '#F4A460', // Sandy
-	Météo: '#5AC8FA', // Light Blue
-	Voyage: '#00C7BE', // Cyan-Teal
-	Général: '#8E8E93' // Neutral Gray for uncategorized pieces
+	'Graphics design': '#E588F8', // Lavender
+	Photography: '#FF6B35', // Burnt Orange
+	Video: '#FF375F', // Coral
+	Music: '#32D74B', // Green
+	'Health fitness': '#34C759', // Leaf Green
+	News: '#F4A460', // Sandy
+	Weather: '#5AC8FA', // Light Blue
+	Travel: '#00C7BE', // Cyan-Teal
+	Unknown: '#8E8E93' // Neutral Gray for uncategorized pieces
 };
+
+// Every localised spelling a category has ever been STORED as, mapped back to its
+// id. The category is persisted into app_categories.json as a user override, and
+// the default written there is itself localised — so the file on disk already
+// depends on which language was active when it was written. Without this map, a
+// user who switches language finds their overrides orphaned and their charts
+// recoloured. Built from MAC_CATEGORIES_FR so the French spellings cannot drift
+// out of sync, plus the two historical spellings that were never in it.
+const LABEL_TO_CATEGORY_ID = (() => {
+	const map = {};
+	for (const [id, fr] of Object.entries(MAC_CATEGORIES_FR)) {
+		map[id] = id; // an id resolves to itself
+		map[fr] = id;
+	}
+	// "Design" was the FIXED_CAT_COLORS key for 'Graphics design' while the
+	// displayed label was "Design graphique"; either may be on disk.
+	map['Design'] = 'Graphics design';
+	return map;
+})();
+
+/**
+ * Resolves any category spelling — an id, a French label, or a historical one —
+ * to its stable id. Unknown values pass through unchanged so a user-invented
+ * category keeps working and keeps its hashed colour.
+ * @param {string} value Stored or displayed category name.
+ * @returns {string} The category id, or `value` when it is not a known category.
+ */
+function categoryId(value) {
+	return LABEL_TO_CATEGORY_ID[value] || value;
+}
 
 function translateCategory(catName) {
 	return MAC_CATEGORIES_FR[catName] || catName;
@@ -149,11 +187,21 @@ function paletteIndex(str) {
 	return h % CHART_PALETTE.length;
 }
 
+/**
+ * Colour for a category, accepting an id OR any label it has been stored as.
+ * The hash fallback is deliberately applied to the resolved ID, so a category
+ * keeps the same colour across languages instead of jumping when the UI is
+ * translated.
+ * @param {string} catName Category id or displayed label.
+ * @param {number} score User productivity score (positive green, negative red).
+ * @returns {string} Hex colour.
+ */
 function getCategoryColor(catName, score) {
 	if (score > 0) return '#30D158';
 	if (score < 0) return '#FF453A';
-	if (FIXED_CAT_COLORS[catName]) return FIXED_CAT_COLORS[catName];
-	return CHART_PALETTE[paletteIndex(catName)];
+	const id = categoryId(catName);
+	if (FIXED_CAT_COLORS[id]) return FIXED_CAT_COLORS[id];
+	return CHART_PALETTE[paletteIndex(id)];
 }
 
 const postBridge = makeHostBridge('metrics_apps_bridge');

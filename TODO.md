@@ -637,11 +637,22 @@ them is not the work. The French label **is** the internal key:
   So the stored data already depends on the language that was active when it was
   written, and a user who switches language finds their overrides orphaned.
 
-The fix is a data-model change, not a translation pass: give each category a
-stable id (the English key is already one), key `FIXED_CAT_COLORS` by id, look
-the label up at render time — and migrate `app_categories.json`, mapping every
-known localised spelling back to its id so existing overrides survive. Do the
-migration first and prove it with a corpus of stored files in several languages.
+The fix is a data-model change, not a translation pass. **Step one is done:**
+`FIXED_CAT_COLORS` is keyed by the stable English id, and `categoryId()` resolves
+any id, French label or historical spelling back to it, so nothing already on
+disk is orphaned. `test-metrics-category-ids.cjs` asserts the identity model
+rather than the spelling.
+
+Doing that surfaced a bug that was already live: `'Graphics design'` displays as
+"Design graphique" while the colour table held `"Design"`, so that category had
+silently lost its lavender and fell through to the hash palette. Neither spelling
+looks wrong on its own, which is exactly why a label-keyed table hides it.
+
+**Step two remains:** look the label up at render time from the locale files
+rather than from `MAC_CATEGORIES_FR`, and write the `app_categories.json`
+migration. The resolver above is what makes that migration safe — every stored
+spelling already maps to an id — but the migration itself still needs a corpus of
+stored files in several languages to prove it against.
 
 ---
 
