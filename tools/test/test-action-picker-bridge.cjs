@@ -151,7 +151,7 @@ check('index.html exposes the TOC button + drawer',
 	/id="toc-btn"/.test(index) && /id="toc"/.test(index));
 
 // 4d. Catalogue is now multi-level (at least one "##" sub-header in sg_order).
-const catalogue = read('static/ergopti_plus/_shared/modules/gestures/actions.toml');
+const catalogue = read('static/ergopti_plus/_shared/modules/actions/actions.toml');
 check('actions.toml sg_order has h1 group parents (grp_*) + h2 sub-headers (##)',
 	/"#grp_/.test(catalogue) && /"##/.test(catalogue));
 

@@ -716,7 +716,7 @@ _GestureJoin(Values, Separator) {
 _GestureRegisterModifierChords() {
 		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_LABELS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
 
-		Path := _SharedDir . "\modules\gestures\modifier_chords.json"
+		Path := _SharedDir . "\modules\actions\modifier_chords.json"
 		Raw := FSRead(Path)
 		if (Raw = false) {
 				try LoggerWarn("gestures", "Cannot load shared modifier chords from '{1}'.", Path)
@@ -905,7 +905,7 @@ _GestureLoadActionCatalog(*) {
 		GESTURE_AX_NAMES := []
 		GESTURE_ACTION_PARAMETER_SPECS := Map()
 
-		_SharedToml := _SharedDir . "\modules\gestures\actions.toml"
+		_SharedToml := _SharedDir . "\modules\actions\actions.toml"
 		_Toml       := ParseTomlFile(_SharedToml)
 
 		; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The gesture slot key-space (tap/swipe slot names) is identical on every driver:
  * a gesture bound on one platform must name the same slot on the other. The single
- * declared slot-space lives in _shared/modules/gestures/actions.toml [slots]. The
+ * declared slot-space lives in _shared/modules/actions/actions.toml [slots]. The
  * Linux manager derives its lists from that file at runtime (this gate checks it
  * reads the canonical file and never re-hardcodes them; the Linux Lua suite proves
  * the derived lists match in order). macOS still hardcodes the lists, so this gate
@@ -51,7 +51,7 @@ function eqOrdered(a, b) { return a.length === b.length && a.every((v, i) => v =
 
 const errors = [];
 try {
-	const toml = read('_shared/modules/gestures/actions.toml');
+	const toml = read('_shared/modules/actions/actions.toml');
 	const single = tomlSlotArray(toml, 'single');
 	const axis = tomlSlotArray(toml, 'axis');
 	const union = new Set([...single, ...axis]);
@@ -89,7 +89,7 @@ try {
 		if (!/load_slot_space\s*\(/.test(src)) {
 			errors.push('linux manager must derive the slot-space via load_slot_space()');
 		}
-		if (!src.includes('_shared/modules/gestures/actions.toml')) {
+		if (!src.includes('_shared/modules/actions/actions.toml')) {
 			errors.push('linux manager must read the shared actions.toml');
 		}
 		if (/M\.SINGLE_SLOTS\s*=\s*\{\s*"/.test(src) || /M\.AXIS_SLOTS\s*=\s*\{\s*"/.test(src)) {
