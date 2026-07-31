@@ -1182,6 +1182,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_prefetch_apps_list_deduped.ahk
 #Include unit/test_prefetch_dbg_write_level_gated.ahk
 #Include unit/test_preview_picks_engine_winner.ahk
+#Include unit/test_priority_missing_defaults_to_common.ahk
 #Include unit/test_preview_uses_by_trigger_index.ahk
 #Include unit/test_repeat_key_honours_rebuild_fence.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk

@@ -30,14 +30,21 @@
 ; Priority, then by lower Seq (first-registered) for a stable, deterministic
 ; result. Returns true when Cand should replace Best.
 _HSE_Beats(Cand, Best) {
+		global HSE_PRIORITY_COMMON
 		if (!IsObject(Best)) {
 				return true
 		}
 		if (Cand.Length != Best.Length) {
 				return Cand.Length > Best.Length
 		}
-		CandPrio := Cand.HasOwnProp("Priority") ? Cand.Priority : 50
-		BestPrio := Best.HasOwnProp("Priority") ? Best.Priority : 50
+		; An entry with no Priority property gets the SOURCE DEFAULT, which is
+		; common. This used to read 50 — the personal tier — so a preview entry
+		; carrying no priority silently outranked a real common hotstring, and
+		; disagreed with the macOS comparator, which has always fallen back to
+		; PRIORITY_COMMON. The literal was invisible to the parity gate because
+		; that gate only compared the three constant declarations.
+		CandPrio := Cand.HasOwnProp("Priority") ? Cand.Priority : HSE_PRIORITY_COMMON
+		BestPrio := Best.HasOwnProp("Priority") ? Best.Priority : HSE_PRIORITY_COMMON
 		if (CandPrio != BestPrio) {
 				return CandPrio > BestPrio
 		}
