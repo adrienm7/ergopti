@@ -29,6 +29,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-heredoc-normalises-trailing-newlines](#project-heredoc-normalises-trailing-newlines) — A shell heredoc always appends a newline, so `with_stdin` silently alters DATA payloads; use `with_exact_stdin`
 - [project-windows-at-rest-store-is-data-sql](#project-windows-at-rest-store-is-data-sql) — Windows never opens db.sqlite: data.sql is the data at rest, and the cache is rebuilt from it
 - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
+- [project-ahk-settimer-reenters-during-file-io](#project-ahk-settimer-reenters-during-file-io) — AHK pumps messages during blocking file I/O, so a routine that schedules its own next tick can be re-entered mid-flight
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
 - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut.
@@ -664,6 +665,41 @@ Every user-facing string ships in **all 21 supported languages** (ar, cs, da, de
 - Internal logs and developer comments stay English per CLAUDE.md — this rule covers user-visible text only.
 
 Parity is enforced in CI against the canonical `en.json` — see [[project_locale_parity_test]].
+
+### project-ahk-settimer-reenters-during-file-io
+
+_AHK pumps messages during blocking file I/O, so a one-shot SetTimer a routine schedules can dispatch INSIDE that routine — any function that both does file I/O and schedules its own next tick needs a re-entrancy flag_
+
+<sub>slug: `project_ahk_settimer_reenters_during_file_io`</sub>
+
+Found 2026-07-31 in `KL_Mig_Slice` (the keylogger at-rest migration). The slice
+reads and writes the ledger, and schedules `KL_Mig_Tick` as a one-shot. AHK's
+message pump runs during that I/O, so the tick can dispatch **while a slice is
+still on the stack**. The inner slice reached the end of the pass, called
+`_KL_Mig_Release` — which sets `writeFh` back to `""` — and returned into the
+outer slice, whose very next statement was `KLMigration.writeFh.Write(...)`.
+
+**How it presents:** an intermittent red that passes on every re-run. Here it was
+`This value of type "String" has no method named "Write"`, twice in one session,
+green on the immediately following run each time. **A test that fails once and
+passes on retry is a concurrency bug until proven otherwise** — do not write it
+off as a stale handle or a temp-dir clash without reading the scheduling.
+
+**How to apply:**
+
+- Any function that does blocking I/O **and** arms a timer that re-enters it
+  needs a guard flag, not just a state check: `active` was still true, so the
+  usual `if (!active) return` did nothing.
+- Split the body out so the `try/finally` around the flag covers **every** exit
+  path — these routines are full of early returns for end-of-pass and abort.
+- The re-entrant call must **yield** (return "still alive"), not abort the pass:
+  the slice already in flight schedules the next tick, so returning false would
+  stall the migration.
+- Drive the re-entry **deterministically** in the test — raise the flag by hand
+  and call in — rather than waiting for the scheduler to reproduce it.
+
+Related: [[project_hs_timer_callback_errors_invisible]] (the macOS twin, where
+the swallowed error is the symptom rather than the corrupted state).
 
 ### project-ahk-menu-dispatcher-error-swallow
 
