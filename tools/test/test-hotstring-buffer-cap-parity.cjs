@@ -9,7 +9,7 @@
  * hotstring definitions, so the cap must be identical everywhere or a long trigger
  * would fire on some drivers and silently not on others.
  *
- * ROOT CAUSE ENCODED (P0-F):
+ * ROOT CAUSE ENCODED:
  * The cap had diverged — _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS =
  * 256 (used by macOS + Linux, which require the shared engine) vs Windows'
  * hardcoded 64 in two AHK files. Windows therefore failed to match triggers of

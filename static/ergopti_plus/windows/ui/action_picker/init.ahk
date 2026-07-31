@@ -6,7 +6,7 @@
 ; Searchable GUI pickers for assigning actions to script/keyboard shortcut slots
 ; (ShowKeyboardSlotPicker, ShowActionPicker, ShowKeyboardShortcutPicker) and the
 ; config-paths editor (FilePathsEditor). Extracted verbatim from ErgoptiPlus.ahk
-; (P4 entrypoint decomposition) and #Include'd in place; functions are hoisted so
+; (the entry-point decomposition) and #Include'd in place; functions are hoisted so
 ; their menu call sites are unaffected.
 ; ==============================================================================
 

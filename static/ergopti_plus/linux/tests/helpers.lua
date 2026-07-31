@@ -22,7 +22,7 @@
 
 local M = {}
 
--- Value formatting and stack-trace helpers shared with macOS (P0 SSoT).
+-- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
 M.inspect = fmt.inspect
 M.deep_equal = fmt.deep_equal
@@ -69,7 +69,7 @@ end
 -- ==================================
 -- ==================================
 
---- Convenience aliases to the shared format module (P0 SSoT).
+--- Convenience aliases to the shared format module (single source of truth).
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 

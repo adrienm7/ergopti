@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Wizard constants and shared state, the public entry points that launch / resume the first-run wizard, the AltGr-neutralisation guard used by other modules #HotIf criteria, and the i18n live-preview helpers.
 ;
-; Split out of the former lib/onboarding.ahk (P5 refactor); see
+; Split out of the former lib/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the onboarding/*.ahk files is irrelevant.
 ; ==============================================================================

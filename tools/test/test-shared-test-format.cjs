@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: Shared Test Format Single-Source Guard (P0 SSoT)
+ * MODULE: Shared Test Format Single-Source Guard
  * DESCRIPTION:
  * `inspect()`, `deep_equal()`, and `caller_site()/fail_msg_for()` live exactly
  * once in `_shared/lua/test/format.lua`. Both the Linux and macOS test helpers
@@ -185,5 +185,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] test.format single-sourced — _shared/lua/test/format.lua (inspect, deep_equal, fail_msg_for) consumed by Linux + macOS helpers; no local definitions. (P0 SSoT)\x1b[0m'
+	'\x1b[32m[OK] test.format single-sourced — _shared/lua/test/format.lua (inspect, deep_equal, fail_msg_for) consumed by Linux + macOS helpers; no local definitions.\x1b[0m'
 );

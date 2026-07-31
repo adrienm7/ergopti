@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; Surface lifecycle (suspend/reveal), screen clamping, stack presentation, dequeue rebuild, border teardown, GUI building, text measuring, stacked-corner rounding, border-alpha premultiply, the GDI border ring, DWM rounding control, accent resolution, tint mixing and caret-anchored positioning.
 ;
-; Split out of the former lib/tooltip.ahk (P5 refactor); see ui/tooltip/init.ahk
+; Split out of the former lib/tooltip.ahk (the module split); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
 ; across the tooltip/*.ahk files is irrelevant.
 ; ==============================================================================

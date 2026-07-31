@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Hotstrings category: grand-total counting, magic-key / repeat-key config, per-category delays, word expanders, delimiter editor, standard / dynamic / Ergopti / personal / extension sub-trees and their caches.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.

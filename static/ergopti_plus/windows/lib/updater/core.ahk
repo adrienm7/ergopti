@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Updater constants, channel and check-interval config, semantic-version parsing and comparison, GitHub Releases API URLs, and the (sync + async) latest-release / releases-list fetch and JSON parsing.
 ;
-; Split out of lib/updater.ahk (P5 refactor); see lib/updater.ahk for the module
+; Split out of lib/updater.ahk (the module split); see lib/updater.ahk for the module
 ; overview. Functions and globals are hoisted, so load order across the
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================

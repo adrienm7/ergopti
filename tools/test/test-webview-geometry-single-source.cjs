@@ -9,7 +9,7 @@
  * canonical size (SSoT), so the same editor is never a different size on macOS
  * vs Windows.
  *
- * ROOT CAUSE ENCODED (P0-A):
+ * ROOT CAUSE ENCODED:
  * The manifest existed but was read by no live path, so each size was in reality
  * hardcoded per driver — and 9 of them had already drifted (e.g. the hotstring
  * editor was 960x640 on Windows but 760x640 on macOS). This guard makes drift

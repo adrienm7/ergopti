@@ -9,7 +9,7 @@
 ; core.ahk injects the snapshot as JSON and the client-side script.js renders
 ; the report.
 ;
-; Split out of the former lib/healthcheck.ahk (P5 refactor); see
+; Split out of the former lib/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================

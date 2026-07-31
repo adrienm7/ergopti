@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The top-level initMenu orchestrator plus the personal-shortcuts and language submenu builders it appends. Assembles the whole tray context menu from the category builders.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.

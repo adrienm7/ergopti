@@ -6,7 +6,7 @@
 ; Reading/writing the user config: the bulk feature/hotstring/category toggles,
 ; SaveFullConfig + _CollectFeatureUpdates, ReloadWithDefaultConfig, and the
 ; script/keyboard shortcut slot configuration (read/run/set/menu). Extracted
-; verbatim from ErgoptiPlus.ahk (P4 entrypoint decomposition) and #Include'd in
+; verbatim from ErgoptiPlus.ahk (the entry-point decomposition) and #Include'd in
 ; place; functions are hoisted so their boot-time call sites (SaveFullConfig
 ; SetTimer, ReadScript/KeyboardShortcutsConfig) are unaffected.
 ; ==============================================================================
