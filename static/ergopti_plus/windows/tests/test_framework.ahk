@@ -91,8 +91,15 @@ _TestAppendProgress(line) {
 	try FileAppend(line . "`r`n", "*")
 }
 
+; ``!==`` and not ``!=``: AHK v2's ``!=`` compares strings CASE-INSENSITIVELY, so
+; AssertEqual("BTW", "btw") passed — in a suite whose whole subject is case
+; propagation, hotstring triggers and layout keys, that is the one distinction it
+; most needed to make. ``!==`` narrows nothing else: numbers still compare
+; numerically (1 == "1", 1 == 1.0, 255 == "0xFF"), "" is still distinct from 0,
+; true is still 1, and object comparison is identity either way — the ONLY
+; behaviour that changes is string case, which is the behaviour we want back.
 AssertEqual(Expected, Actual, Message := "values differ") {
-	if (Expected != Actual) {
+	if (Expected !== Actual) {
 		throw Error(Message . " - expected: <" . _DescribeValue(Expected)
 			. ">, actual: <" . _DescribeValue(Actual) . ">")
 	}
@@ -108,8 +115,11 @@ AssertFalse(Value, Message := "expected false") {
 	}
 }
 
+; CaseSense := true for the same reason AssertEqual uses ``!==``: InStr defaults
+; to a case-INSENSITIVE search, so AssertContains(output, "BTW") was satisfied by
+; an output containing "btw".
 AssertContains(Haystack, Needle, Message := "substring not found") {
-	if !InStr(Haystack, Needle) {
+	if !InStr(Haystack, Needle, true) {
 		throw Error(Message . " — needle <" . Needle . "> not in <" . Haystack . ">")
 	}
 }

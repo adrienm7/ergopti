@@ -424,7 +424,20 @@ Constraints: **paths before moves, moves before content, data before code.**
   | Lua assertion library | 352 | 176 | the diff of the two files is **62 lines, all comments, banners and declaration order** |
   | Convention invariants (8, in 2–3 languages) | 1 594 | ~450 | one `.cjs` gate per invariant over the three trees — and Linux gains 6 it does not have |
   | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
-  Also: **assertion argument order is inverted** between AHK (`AssertEqual(expected, actual)`) and Lua (`assert_eq(actual, expected)`) across **1 587 sites**, and `AssertEqual` is **case-insensitive** (AHK v2 `!=`), so `AssertEqual("BTW","btw")` passes — fix in a dedicated commit with the reds triaged. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. 8 files under `windows/tests/` are invoked by nothing, including the **only** Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI coverage). 20 test files are named after a date or a plan phase (~2 900 lines).
+  Also: **assertion argument order is inverted** between AHK (`AssertEqual(expected, actual)`) and Lua (`assert_eq(actual, expected)`) across **1 587 sites** — still open.
+~~`AssertEqual` is **case-insensitive** (AHK v2 `!=`), so `AssertEqual("BTW","btw")` passes~~ — **fixed**, and `AssertContains` had the identical defect (`InStr` defaults to a case-INSENSITIVE search, so an upper-case needle was satisfied by lower-case output). Both now use the case-sensitive forms (`!==`, `InStr(…, true)`).
+  **There were no reds to triage: 3 803 passing before, 3 803 after.** Not a
+  disappointing result — a revealing one. Case is the *subject* of large parts of
+  this suite (case propagation, `is_case_sensitive_strict` on 1 302 entries,
+  trigger matching, layout key names), and not one of those assertions had ever
+  exercised the distinction it was written to make; an implementation that
+  lower-cased its entire output would have gone green.
+  It also means the suite cannot demonstrate its own bug, so the operator would
+  silently regress the day somebody "simplified" it back. `meta/test_assertions_are_case_sensitive.ahk`
+  is the only thing preventing that, and it pins the four behaviours that must
+  NOT change with the narrower operator — verified against the interpreter first:
+  numbers still compare numerically (`1 == "1"`, `1 == 1.0`, `255 == "0xFF"`),
+  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. 8 files under `windows/tests/` are invoked by nothing, including the **only** Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI coverage). 20 test files are named after a date or a plan phase (~2 900 lines).
 
 - **Lot 10 — pruning.** Port the macOS reachability gate to Windows and Linux, then
   delete the **3 101 lines of dead adapter code** (12 of 21 Windows adapters and 11
