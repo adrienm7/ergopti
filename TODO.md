@@ -714,8 +714,16 @@ Constraints: **paths before moves, moves before content, data before code.**
      engine-side and the record corrected; the exclusion is probed as
      load-bearing. Same shape as `is_case_sensitive_strict`: a vector is only
      writable once the engines agree. ·
-     the terminator path, ~~the
-     NBSP typographic rule~~ — **measured: Windows and macOS implement the
+     ~~the terminator path~~ and ~~consumed delimiters~~ — **measured: implemented
+     on all three and already covered.** Linux looked thin (1 site) because the
+     work is in the shared catalogue: `terminators_mod.is_terminator(ch)` feeds
+     `terminator_consumed` into the engine on every keystroke, exactly as macOS
+     and Windows do. Both branches of the flag are pinned by the two existing
+     `backspace_count` vectors (`= tlen` when not consumed, `= tlen + 1` when it
+     is), and the catalogue itself is generated from one source by
+     `codegen-terminators.cjs` — the one part of the engine that has never
+     drifted. No new vector adds anything here. ·
+     ~~the NBSP typographic rule~~ — **measured: Windows and macOS implement the
      strip-and-require rule (`hotstring_match.ahk`, `expander.lua:426-436` +
      `:503-512`, both adding the extra backspace for the stripped nbsp); **Linux
      has none**. So it joins `auto_expand` and `final_result` as a Linux feature
@@ -803,9 +811,10 @@ Constraints: **paths before moves, moves before content, data before code.**
      all false, and the last survivor (`terminator`) turned out to be injected by
      all three **e2e** runners — a narrow reader scan over-reports, and each false
      positive invites deleting something load-bearing.
-  **Item 2, measured in full — the framing was wrong.** It reads as a corpus
-  gap ("extend the corpus to the branches measured as absent"), and half of it
-  is not. Of the branches listed, **four are Linux FEATURE gaps**, where a
+  **Item 2 is now complete to the limit of what a test can do.** Every listed
+  branch has been measured; the writable ones are written and the rest are not
+  test debt. **The framing was wrong**: it reads as a corpus gap ("extend the
+  corpus to the branches measured as absent"), and half of it is not. Of the branches listed, **four are Linux FEATURE gaps**, where a
   correct vector fails because the behaviour does not exist:
   `auto_expand`, `final_result`, the NBSP typographic rule (all three
   implemented on Windows **and** macOS), and `is_case_sensitive_strict`
