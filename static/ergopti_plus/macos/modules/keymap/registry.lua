@@ -20,6 +20,10 @@ local M = {}
 
 local hs          = hs
 local text_utils  = require("infra.text_utils")
+-- The collision cascade is shared with the Linux driver rather than defined here:
+-- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
+-- none, so the same pair of colliding entries elected different winners per OS.
+local HotstringPriority = require("hotstring_priority")
 local km_utils    = require("modules.keymap.utils")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
@@ -112,16 +116,11 @@ end
 --- @param category string|nil Category (e.g. "personal", "custom", "personal_ext_demo", "ext.demo", "rolls").
 --- @return integer The source-default priority (personal 50 / package 30 / common 10).
 local function source_priority(category)
-	local c = type(category) == "string" and category:lower() or ""
-	if c == "personal" then return PRIORITY_PERSONAL end
-	-- "custom" is the group the hotstring editor reloads personal_hotstrings.toml
-	-- into on a live save (init.lua loads the same file as "personal" at boot).
-	-- Scoring it at the personal tier keeps an edited personal hotstring at the
-	-- same priority it gets at startup instead of silently dropping to common.
-	if c == "custom" then return PRIORITY_PERSONAL end
-	if c:sub(1, 13) == "personal_ext_" then return PRIORITY_PACKAGE end
-	if c:sub(1, 4) == "ext." then return PRIORITY_PACKAGE end
-	return PRIORITY_COMMON
+	return HotstringPriority.source_priority(category, {
+		common   = PRIORITY_COMMON,
+		package  = PRIORITY_PACKAGE,
+		personal = PRIORITY_PERSONAL,
+	})
 end
 
 --- Resolve the effective collision priority through the cascade
@@ -132,10 +131,11 @@ end
 --- @param category string|nil Category name, for the source-default fallback.
 --- @return integer The resolved priority.
 local function resolve_priority(individual, section, file, category)
-	if type(individual) == "number" then return individual end
-	if type(section)    == "number" then return section end
-	if type(file)       == "number" then return file end
-	return source_priority(category)
+	return HotstringPriority.resolve(individual, section, file, category, {
+		common   = PRIORITY_COMMON,
+		package  = PRIORITY_PACKAGE,
+		personal = PRIORITY_PERSONAL,
+	})
 end
 
 -- Exposed for the loader cascade and unit tests.
