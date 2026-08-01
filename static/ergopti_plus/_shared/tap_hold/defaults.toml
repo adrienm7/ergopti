@@ -209,7 +209,24 @@ delete = "delete_word_forward"
 
 [hs_timeouts]
 # Global tap-vs-hold threshold (KE basic.to_if_alone_timeout_milliseconds).
-tap_hold_timeout_ms = 1000
+#
+# 250 ms, not 1000. The old value was Karabiner-Elements' own default for
+# to_if_alone_timeout_milliseconds rather than a decision, and it made macOS
+# 3-5x slower than the other two drivers on the SAME setting: the
+# [tap_hold.keys.*] block above — which Windows and Linux read and macOS does
+# not — declares 0.20 s for five of its seven keys and 0.35 s for the other two.
+# A full second means every hold takes a second to register, and any deliberate
+# tap that overruns it silently becomes a hold.
+#
+# 250 ms sits inside the range the other two already use, so no key is more than
+# 100 ms away from its Windows/Linux twin, against 650-800 ms before.
+#
+# The remaining gap is that this is ONE global where the others are per-key. The
+# generator already supports a per-manipulator override
+# (basic.to_if_alone_timeout_milliseconds, generator.lua), so wiring the
+# [tap_hold.keys.*] values into it is the follow-up; it needs the two id
+# vocabularies reconciled first (left_ctrl/left_control, left_alt/left_option).
+tap_hold_timeout_ms = 250
 # One-shot modifier auto-cancel delay.
 sticky_timeout_ms = 3000
 # Max delay between the two keys of a shortcut for the combo slot to fire.
