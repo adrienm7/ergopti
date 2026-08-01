@@ -404,6 +404,46 @@ MenuRenderer_ResolveDisabledWhen(MenuKey, ItemId, Getters) {
 	return false
 }
 
+; Evaluates the declarative ``checked_when`` predicate of a manifest item, the
+; mirror of ``disabled_when``: an array of canonical state keys, the item checked
+; only when EVERY getter returns truthy. Items without the array are never
+; checked by this mechanism (returns ``false``).
+;
+; FAILS OPEN, unlike its sibling, and the asymmetry is deliberate. A checkmark
+; is an ASSERTION to the user that something is currently on. Inventing one when
+; the state cannot be read tells them a filter is active that is not — they stop
+; looking for the setting, and the data they thought was excluded is being
+; recorded. `disabled_when` fails CLOSED for the same underlying reason: in both
+; directions the safe answer is the one that does not overstate what is enabled.
+;
+; A missing getter is still logged as an ERROR — the manifest and the driver's
+; getters Map have drifted, and a row whose checkmark silently never appears is
+; exactly the kind of quiet wrong that this file exists to make loud.
+MenuRenderer_ResolveCheckedWhen(MenuKey, ItemId, Getters) {
+	Item := _MR_FindItemById(MenuKey, ItemId)
+	if (Item == false) {
+		try LoggerError("MenuRenderer", "No manifest item '{1}.{2}' — treating as unchecked.", MenuKey, ItemId)
+		return false
+	}
+
+	Keys := _MR_Get(Item, "checked_when", 0)
+	if !(Keys is Array) or Keys.Length == 0 {
+		return false
+	}
+
+	for Key in Keys {
+		if !(Getters is Map) or !Getters.Has(Key) {
+			try LoggerError("MenuRenderer", "No getter for checked_when key '{1}' on item '{2}.{3}' — treating as unchecked.", Key, MenuKey, ItemId)
+			return false
+		}
+		if !(Getters[Key])() {
+			return false
+		}
+	}
+
+	return true
+}
+
 ; Returns the ``i18n_dynamic`` key declared on a manifest item — the locale key
 ; a dynamic handler prefixes to a runtime value (a shortcut label, a model name)
 ; before rendering its own row.

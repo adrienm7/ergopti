@@ -159,11 +159,16 @@ Test("menu-metrics-disabled-when: AHK handlers delegate to the shared resolver (
 ; The shared getters map itself must map each canonical key to the correct
 ; state read — this is the only place MetricsShortcuts.enabled / WPMWidget.visible
 ; should still be referenced for disabling purposes.
+; Matched with a tolerant gap between the key and its arrow rather than the exact
+; two spaces the map happened to use. The mapping is the contract; the column the
+; arrow lands in is not, and pinning it made adding a LONGER key to the map fail
+; this test — the alignment shifts, the assertion breaks, and nothing about the
+; state read has changed.
 _MMDW_GettersMapCorrect() {
 	Src := _DriverSourceConcat()
-	Assert(InStr(Src, '"keylogger_enabled",  () => MetricsShortcuts.enabled,') > 0,
+	Assert(RegExMatch(Src, '"keylogger_enabled",\s+\(\) => MetricsShortcuts\.enabled,') > 0,
 		"_MET_STATE_GETTERS must map keylogger_enabled to MetricsShortcuts.enabled")
-	Assert(InStr(Src, '"wpm_widget_visible", () => WPMWidget.visible,') > 0,
+	Assert(RegExMatch(Src, '"wpm_widget_visible",\s+\(\) => WPMWidget\.visible,') > 0,
 		"_MET_STATE_GETTERS must map wpm_widget_visible to WPMWidget.visible")
 }
 Test("menu-metrics-disabled-when: shared getters map reads the correct AHK state", _MMDW_GettersMapCorrect)
