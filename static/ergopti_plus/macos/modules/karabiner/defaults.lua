@@ -38,10 +38,34 @@ local READER_ARTIFACT_KEYS = { description = true, entries = true }
 -- =====================================
 -- =====================================
 
---- Resolves _shared/tap_hold/defaults.toml by walking up from this file:
---- macos/modules/karabiner/defaults.lua → … → ergopti_plus → /_shared.
+--- Resolves _shared/tap_hold/defaults.toml.
+---
+--- Asks infra.paths first — the resolver that exists precisely so the shared
+--- root lives in one place and survives the symlinked and packaged layouts,
+--- and which the SIBLING file config.lua already uses. The hand-rolled walk
+--- below stays only as a last resort.
+---
+--- The order matters more than it looks. A wrong path here does not fail
+--- politely: TomlReader.parse() returns an EMPTY result for a file it cannot
+--- open, so the `type(parsed.sections) == "table"` guard passes and the failure
+--- surfaces later as require_section() raising at MODULE LOAD time. This module
+--- is required from config.lua, which is required from karabiner/init.lua, so
+--- until init.lua learned to pcall that chain a defaults.toml the walk could not
+--- reach cost the entire boot rather than one feature.
+---
+--- Requiring the resolver LAZILY, inside the function: this file's body runs at
+--- require time, and a top-level require of infra.paths would put a second
+--- module on the same un-pcall'd load path this comment is about.
 --- @return string Absolute path to the shared tap-hold defaults TOML.
 local function shared_defaults_path()
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	if ok_paths and type(Paths) == "table" and type(Paths.shared) == "function" then
+		local resolved = Paths.shared("tap_hold/defaults.toml")
+		if type(resolved) == "string" and resolved ~= "" then return resolved end
+	end
+
+	-- Fallback: walk up from this file.
+	-- macos/modules/karabiner/defaults.lua → … → ergopti_plus → /_shared.
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
 	local dir = src:match("^(.*)[/\\][^/\\]+$") or src   -- → macos/modules/karabiner
 	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir          -- → macos/modules
