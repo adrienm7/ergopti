@@ -898,6 +898,37 @@ Constraints: **paths before moves, moves before content, data before code.**
     change survives it but lands on its stated rationale and must be reconciled
     in that file's header, not silently.
 
+  **CONVERGENCE STATUS (implemented).** Linux now honours all four flags; the
+  Linux loader had been building mappings from three fields and dropping the
+  rest, so every real entry behaved as auto_expand + non-final + case-folding
+  regardless of its TOML. Fixed and pinned by 9 probed regression tests:
+  `auto_expand` (typing "yaourt" produced "y’aourt"), `final_result` (Linux reset
+  after every expansion so it never chained and the flag was unobservable), the
+  NBSP typographic rule (a trigger before a typographic ":" never fired; the
+  space is REQUIRED so ":D" stays literal), and `is_case_sensitive_strict` (1 300
+  magickey entries matched any casing — `"OUi" → "Oui"` exists so typing `oui`
+  does NOT autocorrect). Star-vs-end-char resolves by trigger LENGTH, Windows's
+  rule.
+
+  **macOS is now the only outlier, on two counts, both measured:**
+  * **`is_case_sensitive_strict` is unread.** macOS registers case VARIANTS at
+    load time (`registry.lua:652-670`): `is_case_sensitive` → one registration of
+    the exact trigger; otherwise a conform fast-path (`use_conform`, which
+    collapses ~2 119 magic-key specs to ~1 000) or explicit lower/Title/UPPER.
+    Windows's `is_case_sensitive` is ALSO single-registration — the two flags
+    differ only in the AHK `C` flag, i.e. whether matching itself is exact. So
+    the macOS change is not "register fewer variants" but "make the compare
+    exact", and it must not disturb `use_conform`, the space variants, or the
+    magic-key exclusions.
+  * **Star-vs-end-char ordering.** `run_trigger_checks`
+    (`modules/keymap/init.lua:586-595`) returns on the first auto hit before
+    reaching the terminator loop at :600, so auto wins unconditionally. Windows
+    and Linux both resolve by length. With star `b★` (len 2) and non-star `aab`
+    (len 3), typing `aab★` fires `aab` on Windows and Linux, `b★` on macOS.
+
+  Once both land, corpus vectors for all four flags become writable and Lot 8
+  item 2 closes completely.
+
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
