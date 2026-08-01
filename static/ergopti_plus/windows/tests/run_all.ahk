@@ -117,6 +117,10 @@ OnError(_FatalErrorHandler)
 #Include ../infra/tap_hold/tap_hold_loader.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
+; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
+; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
+; so no registration happens at harness load.
+#Include ../modules/dynamic_hotstrings/dynamic_hotstrings.ahk
 #Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
@@ -232,6 +236,7 @@ InstallSendNoOps()
 #Include unit/test_toml_loader.ahk
 #Include unit/test_toml_helpers_roundtrip.ahk
 #Include unit/test_hotstrings_cache.ahk
+#Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_terminators.ahk
 #Include unit/test_personal_toml_editor.ahk

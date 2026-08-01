@@ -93,7 +93,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 
 // ── The ratchet ─────────────────────────────────────────────────────────────
 //
-// 2026-07-31: 13 of 50 distinct paths are present in all three drivers (26.0 %).
+// 2026-08-01: 14 of 50 distinct paths are present in all three drivers (28.0 %).
 // Raise BASELINE_SHARED as Lots 3–6 land; never lower it to make a change pass.
 //
 // History, so the ratchet reads as a trajectory rather than a number:
@@ -105,12 +105,19 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    because Windows had a whole lib/updater/ directory that
 //                    moved rather than a single file: one unshared path removed
 //                    and one shared path gained, from the same move.
+//   14/50 (28.0 %) — dynamic_hotstrings. macOS and Linux both had
+//                    modules/dynamic_hotstrings/; on Windows the same behaviour
+//                    was section 5 of modules/hotstrings/hotstrings_text_expansion.ahk.
+//                    Found only after this file's OWN report was fixed: it used
+//                    to print a two-driver path once under each driver's
+//                    "unique to it" list, so the strongest promotion candidate
+//                    in the tree read as two unrelated private folders.
 //
 // Written as a literal, not as `shared.length`. Deriving the baseline from the
 // value it is supposed to constrain makes the comparison `x <= x` — a check that
 // passes for every possible input, which is the precise definition of the false
 // green this repo already ratchets against elsewhere.
-const BASELINE_SHARED = 13;
+const BASELINE_SHARED = 14;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
