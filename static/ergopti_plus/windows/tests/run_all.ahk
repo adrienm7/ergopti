@@ -238,6 +238,7 @@ InstallSendNoOps()
 #Include unit/test_menu_helpers.ahk
 #Include unit/test_manifest_menu_resolve_disabled_when_failclosed.ahk
 #Include unit/test_manifest_menu_declarations_are_read.ahk
+#Include unit/test_manifest_menu_checked_when.ahk
 #Include unit/test_layout_tables.ahk
 
 #Include unit/test_config.ahk

@@ -2960,16 +2960,19 @@ i18n = "menu.metrics.privacy_header"
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_private"
+checked_when = ["metrics_filter_private"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_secure"
+checked_when = ["metrics_filter_secure"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_sysauth"
+checked_when = ["metrics_filter_sysauth"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]

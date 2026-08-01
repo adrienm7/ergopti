@@ -20,8 +20,13 @@
 ; (which item greys out on which toggle) lives once in menu_manifest.json
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
-	"keylogger_enabled",  () => MetricsShortcuts.enabled,
-	"wpm_widget_visible", () => WPMWidget.visible,
+	"keylogger_enabled",       () => MetricsShortcuts.enabled,
+	"wpm_widget_visible",      () => WPMWidget.visible,
+	; Read by the manifest's checked_when predicates, so the checkmark state is
+	; declared beside the row rather than restated in each handler.
+	"metrics_filter_private",  () => MetricsFilters.private_browsing,
+	"metrics_filter_secure",   () => MetricsFilters.secure_field,
+	"metrics_filter_sysauth",  () => MetricsFilters.system_auth,
 )
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
@@ -105,7 +110,7 @@ _MET_ShortcutApps(M, _Cat, Getters) {
 _MET_FilterPrivate(M, _Cat, Getters) {
 	Label := t("menu.metrics.filter_private")
 	RegisterMenuItem(M, Label, ToggleFilterPrivate)
-	if MetricsFilters.private_browsing
+	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_private", Getters)
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_private", Getters)
 		M.Disable(Label)
@@ -115,7 +120,7 @@ _MET_FilterPrivate(M, _Cat, Getters) {
 _MET_FilterSecure(M, _Cat, Getters) {
 	Label := t("menu.metrics.filter_secure")
 	RegisterMenuItem(M, Label, ToggleFilterSecureField)
-	if MetricsFilters.secure_field
+	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_secure", Getters)
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_secure", Getters)
 		M.Disable(Label)
@@ -125,7 +130,7 @@ _MET_FilterSecure(M, _Cat, Getters) {
 _MET_FilterSysauth(M, _Cat, Getters) {
 	Label := t("menu.metrics.filter_sysauth")
 	RegisterMenuItem(M, Label, ToggleFilterSystemAuth)
-	if MetricsFilters.system_auth
+	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_sysauth", Getters)
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_sysauth", Getters)
 		M.Disable(Label)
