@@ -217,3 +217,74 @@ helpers.describe("shared hotstring engine — buffer reset", function()
 		helpers.assert_true(result == nil, "after reset, partial buffer is cleared — no match")
 	end)
 end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 9/ final_result and chaining =============
+-- ==================================================
+-- ==================================================
+
+-- Linux reset the buffer after every expansion, so nothing could ever chain and
+-- final_result was unobservable — while Windows and macOS both keep the expanded
+-- text and let a later keystroke complete a further trigger. apply_expansion is
+-- what closes that; reset() stays for the final case.
+
+--- Feeds a string, applying each expansion the way the driver does.
+--- @return table|nil last result, table engine
+local function _fr_drive(mappings, text)
+	local e = engine_mod.new()
+	e:load_mappings(mappings)
+	local last
+	for ch in text:gmatch(".") do
+		local r = e:on_char(ch, {})
+		if r then
+			last = r
+			if r.final_result then e:reset() else e:apply_expansion(r) end
+		end
+	end
+	return last, e
+end
+
+helpers.describe("shared hotstring engine — final_result governs chaining", function()
+	helpers.it("a non-final expansion stays in the buffer and can chain", function()
+		local _, e = _fr_drive({
+			{ trigger = "sig", replacement = "JD", auto_expand = true, final_result = false },
+		}, "sig")
+		helpers.assert_eq("JD", e:current_buffer(),
+			"the replacement must remain in the buffer — resetting here is what stopped Linux chaining")
+	end)
+
+	helpers.it("the chained trigger fires on the next keystroke", function()
+		local last = _fr_drive({
+			{ trigger = "sig", replacement = "JD",       auto_expand = true, final_result = false },
+			{ trigger = "JDx", replacement = "John Doe", auto_expand = true, final_result = false },
+		}, "sigx")
+		helpers.assert_true(last ~= nil and last.replacement == "John Doe",
+			"the second trigger must complete off the first expansion's output")
+	end)
+
+	helpers.it("final_result clears the buffer so nothing chains", function()
+		local last, e = _fr_drive({
+			{ trigger = "sig", replacement = "JD",       auto_expand = true, final_result = true },
+			{ trigger = "JDx", replacement = "John Doe", auto_expand = true },
+		}, "sigx")
+		helpers.assert_eq("x", e:current_buffer(), "only the post-expansion keystroke may remain")
+		helpers.assert_true(last ~= nil and last.replacement == "JD",
+			"the chained trigger must NOT fire when the first expansion is final")
+	end)
+
+	helpers.it("apply_expansion never re-enters matching", function()
+		-- A replacement containing its own trigger would loop if apply_expansion
+		-- re-ran the matcher. Chaining is deferred to the next real keystroke
+		-- precisely so this cannot happen.
+		local _, e = _fr_drive({
+			{ trigger = "ab", replacement = "xaby", auto_expand = true, final_result = false },
+		}, "ab")
+		helpers.assert_eq("xaby", e:current_buffer(),
+			"one expansion only — a self-containing replacement must not recurse")
+	end)
+end)

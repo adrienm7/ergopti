@@ -461,7 +461,16 @@ local function main()
 					end
 				end
 			end
-			engine:reset()
+			-- final_result means "this expansion is the end of it": drop the
+			-- buffer so nothing can chain off the replacement. Otherwise keep the
+			-- expanded text in the buffer, which is what Windows and macOS do —
+			-- resetting unconditionally is why Linux could never chain, and made
+			-- final_result unobservable here.
+			if result.final_result then
+				engine:reset()
+			else
+				engine:apply_expansion(result)
+			end
 		end
 
 		-- Feed the character AND the current typing buffer to the LLM prediction
