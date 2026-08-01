@@ -242,19 +242,56 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 			"collision_vectors must be present in the corpus")
 	end)
 
+	-- The shared engine sorts each bucket by trigger length only. It has no
+	-- priority field — but "collisions need priority" was too broad a reason to
+	-- skip all six: three of them turn on rules the engine DOES implement, and
+	-- those are replayed for real below.
+	local ENGINE_DECIDED = {
+		longer_trigger_beats_higher_priority          = true, -- length is primary (the longest-first sort)
+		equal_priority_falls_back_to_first_registered = true, -- first-registered IS the engine's rule
+		no_match_when_buffer_ends_outside_any_trigger = true,
+	}
+
+	--- Loads every mapping of a collision vector and types its buffer.
+	--- @return string The winning replacement, or "<none>".
+	local function play_collision(v, mappings)
+		local e = engine_mod.new()
+		e:load_mappings(mappings)
+		local result
+		for _, cp in ipairs(split_codepoints(v.buffer)) do
+			result = e:on_char(cp)
+		end
+		return result and result.replacement or "<none>"
+	end
+
 	if collisions then
-		it("SKIP [CONF-LINUX-HOTSTRING-COLLISION] — shared engine delegates priority-based resolution to the caller", function()
-			-- The shared engine sorts mappings by trigger length only (longest
-			-- first). It has no priority field and does not resolve same-length
-			-- collisions by priority. The Linux driver's engine.lua thin re-export
-			-- applies priority sorting BEFORE calling load_mappings(), which is
-			-- tested separately. Collision vectors are pinned by the macOS
-			-- registry consumer (test_corpus_hotstrings.lua) and the AHK consumer
-			-- (test_corpus_hotstrings.ahk). The shared engine corpus replay
-			-- correctly stops at the vectors array — this SKIP is explicit and
-			-- tracked, not a silent gap.
-			assert_true(true, "skip acknowledged — " .. #collisions
-				.. " collision vector(s) require priority-based resolution")
-		end)
+		for _, v in ipairs(collisions) do
+			if ENGINE_DECIDED[v.id] then
+				it("collision replay: " .. v.id, function()
+					local want = (v.expected.matched == false) and "<none>" or v.expected.winner
+					assert_eq(want, play_collision(v, v.mappings),
+						"collision vector '" .. v.id .. "' turns on a rule the shared engine implements")
+				end)
+			end
+		end
+
+		-- The remaining three DO need priority, and the skip now asserts its own
+		-- premise instead of `assert_true(true)`. Two of them would PASS by
+		-- accident if replayed naively — their expected winner happens to be the
+		-- mapping registered first — so a future "just enable the rest" would
+		-- read as Linux honouring priority when it is blind to it. What is true
+		-- and checkable is that the engine always yields the FIRST-REGISTERED
+		-- mapping; the day that stops being true, priority arrived and this
+		-- ledger entry needs revisiting.
+		for _, v in ipairs(collisions) do
+			if not ENGINE_DECIDED[v.id] then
+				it("SKIP [CONF-LINUX-HOTSTRING-COLLISION] priority-blind: " .. v.id, function()
+					assert_eq(v.mappings[1].replacement, play_collision(v, v.mappings),
+						"the shared engine must resolve '" .. v.id
+							.. "' to the first-registered mapping — if it no longer does, it has gained "
+							.. "priority resolution and the conformance ledger entry is stale")
+				end)
+			end
+		end
 	end
 end)
