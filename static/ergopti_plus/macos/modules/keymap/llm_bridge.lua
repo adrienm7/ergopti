@@ -40,6 +40,7 @@ local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
 local TimerScheduler   = require("adapters.timer_scheduler")
+local ManifestReader = require("infra.manifest_reader")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -607,7 +608,7 @@ function M.update_preview(buf)
 		-- character their layout no longer produces. The literal remains only as
 		-- the fallback for a state that has not resolved one yet.
 		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
-			and _state.magic_key or "★"
+			and _state.magic_key or ManifestReader.default_for("hotstrings.trigger_char")
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil

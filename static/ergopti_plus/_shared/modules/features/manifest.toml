@@ -101,36 +101,36 @@ platforms = ["ahk", "hs"]
 
 [sections.hotstrings]
 description_key = "menu.hotstrings"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal"]
 
 [sections.hotstrings.autocorrection]
 description_key = "menu.hotstrings.autocorrection"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.distances_reduction]
 description_key = "menu.hotstrings.distances_reduction"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.sfbs_reduction]
 description_key = "menu.hotstrings.sfbs_reduction"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.rolls]
 description_key = "menu.hotstrings.rolls"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.magic_key]
 description_key = "menu.hotstrings.magic_key"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.dynamic]
 description_key = "menu.hotstrings.dynamic"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.personal]
 description_key = "menu.hotstrings.personal"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 

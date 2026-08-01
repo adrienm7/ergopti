@@ -101,6 +101,7 @@ local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
 local Monotonic         = require("infra.monotonic")
+local ManifestReader    = require("infra.manifest_reader")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -551,8 +552,14 @@ local function main()
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	if dyn_hotstrings then
+		-- The magic key is declared once, in the shared feature manifest, and every
+		-- driver reads it from there. Linux used to hardcode a backslash while the
+		-- manifest, both other drivers, the shared engine and the onboarding page
+		-- all say "★" — so the @-tag expansions were the only feature in the
+		-- product listening for a different key, and the personal-info editor told
+		-- the user so.
 		dyn_hotstrings.init({
-			trigger_char = "\\",  -- default magic key (backslash)
+			trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
 		})
 		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
 			dyn_hotstrings.get_rules_count())

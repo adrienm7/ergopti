@@ -22,6 +22,7 @@ local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
+local ManifestReader = require("infra.manifest_reader")
 local LOG           = "menu_shortcuts"
 
 
@@ -67,7 +68,7 @@ local function pretty_key(id, state)
 	if #parts == 0 then return id end
 
 	local key = parts[#parts]
-	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or "★" end
+	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for("hotstrings.trigger_char") end
 	if key == "period"   then key = "." end
 	if key == "quote"    then key = "'" end
 	if key == "capslock" then key = "CapsLock" end

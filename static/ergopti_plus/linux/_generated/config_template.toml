@@ -4,6 +4,249 @@
 # This is the default v2 config copied into config/ergopti_plus/linux/
 # on first boot. After that, the user owns the copy.
 
+[hotstrings]
+trigger_char = "★"
+
+[hotstrings.autocorrection.accents]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.errors]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.multiple_punctuation_marks]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.names]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.ou]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.suffixes_a_chaining]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.typographic_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.qu]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.suffixes_a]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.comma_j]
+enabled = true
+
+[hotstrings.distances_reduction.comma_far_letters]
+enabled = true
+
+[hotstrings.distances_reduction.dead_key_e_circumflex]
+enabled = true
+
+[hotstrings.distances_reduction.e_circumflex_e]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.space_around_symbols]
+enabled = true
+
+[hotstrings.sfbs_reduction.comma]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_circ]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_grave]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.bu]
+enabled = true
+
+[hotstrings.sfbs_reduction.i_e_acute]
+enabled = true
+
+[hotstrings.rolls.hc]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.sx]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.cx]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ct]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ez]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.assign]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_right]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_right]
+enabled = true
+
+[hotstrings.rolls.bracket_quote]
+enabled = true
+
+[hotstrings.rolls.chevron_equal]
+enabled = true
+
+[hotstrings.rolls.chevron_greater]
+enabled = true
+
+[hotstrings.rolls.chevron_less]
+enabled = true
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_close]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_open]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.english_negation]
+enabled = true
+
+[hotstrings.rolls.equal_string]
+enabled = true
+
+[hotstrings.rolls.hashtag_close_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_open_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_parenthesis]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_quote]
+enabled = true
+
+[hotstrings.rolls.left_arrow]
+enabled = true
+
+[hotstrings.rolls.not_equal]
+enabled = true
+
+[hotstrings.rolls.paren_quote]
+enabled = true
+
+[hotstrings.magic_key.replace]
+enabled = true
+
+[hotstrings.magic_key.repeat_corrections]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_auto]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_emojis]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_symbols]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_symbols_typst]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.dynamic.date]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = true
+
+[hotstrings.dynamic.date_long_fr]
+enabled = true
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = true
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = true
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = true
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = true
+pattern_max_length = 1
+
+[hotstrings.personal.autocorrection]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.code]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.email_shortcuts]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.professional_vocabulary]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.test]
+enabled = true
+time_activation_seconds = 0.75
+
 [metrics]
 enabled = true
 private_filter_enabled = true
