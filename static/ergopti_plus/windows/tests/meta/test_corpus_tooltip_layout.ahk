@@ -87,9 +87,14 @@ _TtLayoutCorpus_TestVectorFields() {
 ; ===================================================
 ; ===================================================
 
-; _TooltipClampToScreen uses real monitor bounds via MonitorGetWorkArea,
-; so we cannot mock a synthetic 1920x1080 screen. Instead we verify the
-; function is reachable and produces clamped output within the real screen.
+; _TooltipClampToScreen reads the real monitor work area, so it cannot be driven
+; with the corpus's synthetic screenFrame. That is why this file used to check
+; the corpus's SHAPE and never compared one of its 6 golden positions.
+;
+; The clamp maths now lives in _TooltipClampRect, which takes the bounds as
+; parameters — so section 4 below replays every vector against it. The tests here
+; keep exercising the OS-reading wrapper, which is the part that cannot be
+; replayed.
 
 _TtLayout_TestClampCallable() {
 	; Call the real clamp function with a small canvas at origin — should
@@ -142,3 +147,87 @@ Test("[corpus:tooltip-layout] _TooltipClampToScreen: multiple calls produce cons
 ; Register the corpus structure tests (these run before the behavioral tests).
 Test("[corpus:tooltip-layout] corpus has vectors array", _TtLayoutCorpus_TestHasVectors)
 Test("[corpus:tooltip-layout] all vectors have required fields", _TtLayoutCorpus_TestVectorFields)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Golden positions from the corpus =======
+; ===================================================
+; ===================================================
+
+; Replays every corpus vector through the pure clamp and compares the result to
+; the expected {x, y} the shared JS produced.
+;
+; This is what "corpus test" was supposed to mean here. The file loaded the JSON,
+; asserted that each vector HAD an expected x and y, and never once compared
+; them — so a Windows clamp that disagreed with the shared implementation would
+; have passed every assertion in this file.
+;
+; Only the clamp is replayed, not the full cascade: acquiring the anchor needs
+; CaretGetPos and UIA, which cannot run headlessly. The vectors whose expected
+; position is the unclamped anchor-derived point are therefore checked for
+; idempotence — clamping a position already inside the screen must not move it,
+; which is the property the cascade relies on.
+_TtLayoutCorpus_GoldenClampPositions() {
+	Data := _TtLayoutCorpus_LoadCorpus()
+	Assert(Data.Has("vectors") && Data["vectors"].Length > 0,
+		"corpus must expose vectors — a golden comparison over an empty list proves nothing")
+
+	MARGIN := 5
+	Checked := 0
+	for Vec in Data["vectors"] {
+		Id := Vec.Has("id") ? Vec["id"] : "?"
+		Exp := Vec["expected"]
+		Canvas := Vec["canvasSize"]
+		Frame := Vec["screenFrame"]
+
+		L := Frame["x"]
+		Top := Frame["y"]
+		R := Frame["x"] + Frame["w"]
+		B := Frame["y"] + Frame["h"]
+
+		; The expected position is what the shared implementation resolved AND
+		; clamped. Clamping it again must be a no-op: the shared clamp is
+		; idempotent, and if the AHK formula or margin differed from it, the
+		; second pass would move the point.
+		Out := _TooltipClampRect(Exp["x"], Exp["y"], Canvas["w"], Canvas["h"], L, Top, R, B, MARGIN)
+		AssertEqual(Exp["x"], Out.X,
+			"vector '" . Id . "': re-clamping the expected X moved it. The shared clamp is idempotent, "
+			. "so a different result means the Windows formula or margin disagrees with the corpus")
+		AssertEqual(Exp["y"], Out.Y,
+			"vector '" . Id . "': re-clamping the expected Y moved it — same divergence, vertical axis")
+		Checked += 1
+	}
+
+	Assert(Checked >= 6,
+		"expected at least the 6 shipped layout vectors, compared " . Checked
+		. " — a shrinking corpus silently reduces this to a formality")
+}
+Test("[corpus:tooltip-layout] every golden position survives a re-clamp", _TtLayoutCorpus_GoldenClampPositions)
+
+
+; A position OUTSIDE the corpus screen must be pulled back to the margin, with
+; the corpus's own frame supplying the bounds. Without this, the test above
+; would pass on a clamp that did nothing at all.
+_TtLayoutCorpus_ClampActuallyClamps() {
+	Data := _TtLayoutCorpus_LoadCorpus()
+	Vec := Data["vectors"][1]
+	Frame := Vec["screenFrame"]
+	Canvas := Vec["canvasSize"]
+	MARGIN := 5
+
+	L := Frame["x"], Top := Frame["y"]
+	R := Frame["x"] + Frame["w"], B := Frame["y"] + Frame["h"]
+
+	FarRight := _TooltipClampRect(R + 500, Top + 100, Canvas["w"], Canvas["h"], L, Top, R, B, MARGIN)
+	AssertEqual(R - Canvas["w"] - MARGIN, FarRight.X,
+		"a tooltip past the right edge must be pulled back to (right - width - margin)")
+
+	FarUp := _TooltipClampRect(L + 100, Top - 500, Canvas["w"], Canvas["h"], L, Top, R, B, MARGIN)
+	AssertEqual(Top + MARGIN, FarUp.Y,
+		"a tooltip above the top edge must be pushed down to (top + margin)")
+}
+Test("[corpus:tooltip-layout] the clamp actually clamps (not an identity function)", _TtLayoutCorpus_ClampActuallyClamps)

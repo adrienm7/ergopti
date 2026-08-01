@@ -753,7 +753,23 @@ Constraints: **paths before moves, moves before content, data before code.**
      the field.
      Still open on this item: the
      macOS test replays a clone defined inside the test file instead of the
-     renderer, and the AHK test never compares the 6 golden values. Two
+     renderer, ~~and the AHK test never compares the 6 golden values~~ — **now it does, and
+     the reason it could not is the interesting part.** The test loaded the JSON,
+     asserted that every vector *had* an expected x and y, and never compared one
+     — so a Windows clamp that disagreed with the shared implementation would
+     have passed every assertion in the file.
+     It was not laziness: `_TooltipClampToScreen` reads the real monitor work
+     area via `MonitorGetWorkArea`, so nothing could drive it with the corpus's
+     synthetic `screenFrame`. The maths is now split into `_TooltipClampRect`,
+     which takes the bounds as parameters, with the OS-reading wrapper
+     delegating to it — behaviour-neutral, suite unchanged at 3 815 before the
+     new tests.
+     All 6 vectors are replayed: re-clamping each expected position must be a
+     **no-op**, since the shared clamp is idempotent and any difference in the
+     Windows formula or margin moves the point. A second test drives positions
+     deliberately outside the corpus frame, because the idempotence check alone
+     would pass on a clamp that did nothing at all. Verified by drifting the
+     right-edge term 4 px: both tests fail, naming the vector and the axis. Two
      ~~`[positioning]` constants never reach Windows, with three comments
      asserting the opposite.~~ — **measured, and the shape differs from the
      note.** Of the 7 `[positioning]` keys: three are genuinely shared
