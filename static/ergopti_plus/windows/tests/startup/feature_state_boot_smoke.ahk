@@ -23,9 +23,9 @@ global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
-#Include ..\..\lib\toml\toml_helpers.ahk
-#Include ..\..\lib\feature_state.ahk
-#Include ..\..\lib\config_io.ahk
+#Include ..\..\infra\toml\toml_helpers.ahk
+#Include ..\..\infra\feature_state.ahk
+#Include ..\..\infra\config_io.ahk
 
 try {
     if (A_Args.Length != 1)

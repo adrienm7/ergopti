@@ -150,7 +150,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"ui.tooltip", "modules.keylogger", "lib.notifications", "lib.keycodes",
+			"ui.tooltip", "modules.keylogger", "infra.notifications", "infra.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -202,7 +202,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		}
 
 		-- Silence the "server ready" notification path
-		package.loaded["lib.notifications"] = { notify = function() end }
+		package.loaded["infra.notifications"] = { notify = function() end }
 
 		-- Load the REAL api_mlx against those adapters
 		package.loaded["modules.llm.api_mlx"] = nil
@@ -246,7 +246,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			get_retry_policy = function() return 2, 0.18, 5 end,
 			get_rate_limit_min_interval_s = function(_) return 0 end,
 		}
-		package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		package.loaded["ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
 			set_chain_start = function(_) end, mark_chain_complete = function() end,

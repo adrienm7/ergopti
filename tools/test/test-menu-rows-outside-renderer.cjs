@@ -64,7 +64,7 @@ const DRIVER_SPEC = {
 		// calls; `<something>Menu.Add(` / `Sub*.Add(` is a row added straight to a
 		// Menu object. Restricting the receiver keeps Array.Add and Map.Add out.
 		patterns: [/\bRegisterMenuItem\s*\(/, /\bMenuAdd[A-Za-z]*\s*\(/, /\b(?:[A-Za-z_]*Menu|Sub[A-Za-z_]*|M)\.Add\s*\(/],
-		renderers: new Set(['lib/manifest_menu.ahk'])
+		renderers: new Set(['infra/manifest_menu.ahk'])
 	},
 	macos: {
 		exts: ['.lua'],
@@ -72,7 +72,7 @@ const DRIVER_SPEC = {
 		// sits with an action, a checkmark, or a nested menu.
 		patterns: [/\btitle\s*=\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		renderers: new Set(['lib/manifest_menu.lua', 'ui/menu/builder.lua'])
+		renderers: new Set(['infra/manifest_menu.lua', 'ui/menu/builder.lua'])
 	},
 	linux: {
 		exts: ['.lua'],

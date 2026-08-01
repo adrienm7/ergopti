@@ -8,7 +8,7 @@
 ; On a RAM-starved machine the Edge/Chromium cold start costs many seconds, so
 ; WebView windows that have a native equivalent skip WebView2 and use that native
 ; view when free RAM is below WEBVIEW_MIN_AVAIL_RAM_MB. This test pins:
-;   1. the shared gate helper exists in lib/webview_utils.ahk,
+;   1. the shared gate helper exists in infra/webview_utils.ahk,
 ;   2. each gated host actually consults WebView_ShouldUseNativeFallback,
 ;   3. updater/changelog has a real native notes fallback (an Edit), so gating
 ;      it cannot leave the notes pane blank.
@@ -24,11 +24,11 @@ _TWLR_ReadSource(RelPath) {
 
 ; The shared gate helper + tunable threshold must live in webview_utils.ahk.
 _TWLR_GateHelperExists() {
-	Src := _TWLR_ReadSource("lib/webview_utils.ahk")
+	Src := _TWLR_ReadSource("infra/webview_utils.ahk")
 	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
-		"lib/webview_utils.ahk must define WebView_ShouldUseNativeFallback")
+		"infra/webview_utils.ahk must define WebView_ShouldUseNativeFallback")
 	Assert(InStr(Src, "WEBVIEW_MIN_AVAIL_RAM_MB") > 0,
-		"lib/webview_utils.ahk must define the tunable WEBVIEW_MIN_AVAIL_RAM_MB threshold")
+		"infra/webview_utils.ahk must define the tunable WEBVIEW_MIN_AVAIL_RAM_MB threshold")
 	Assert(InStr(Src, "GlobalMemoryStatusEx") > 0,
 		"WebView_AvailRamMb must read free RAM via GlobalMemoryStatusEx")
 }

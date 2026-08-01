@@ -21,7 +21,7 @@
 ;   2. TapHoldTapAction returns "" for a key absent from TapHold["keys"].
 ;   3. _TH_TapNoneI18n is declared as a global constant.
 ;
-; SCOPE: source introspection of lib/tap_hold/tap_hold_writer.ahk.
+; SCOPE: source introspection of infra/tap_hold/tap_hold_writer.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,7 +36,7 @@
 ; ====================================================
 
 _THNS_ReadSource() {
-	return _DriverDirConcat("lib/tap_hold")
+	return _DriverDirConcat("infra/tap_hold")
 }
 
 
@@ -48,7 +48,7 @@ _THNS_ReadSource() {
 
 _THNS_HoldOptionsHasNoneSentinel() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "lib/tap_hold/ source must be readable")
+	Assert(Src != "", "infra/tap_hold/ source must be readable")
 
 	Q := Chr(34)
 	; _TH_HoldOptions must contain an entry with id="" and kind="none"
@@ -63,7 +63,7 @@ Test("tap_hold_writer: _TH_HoldOptions contains a none-sentinel entry (tap-hold-
 
 _THNS_NoneHoldIdIsEmptyString() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "lib/tap_hold/ source must be readable")
+	Assert(Src != "", "infra/tap_hold/ source must be readable")
 
 	; The sentinel is Map("id", "", "kind", "none", ...) — id must be the empty string
 	; that the TOML serialiser writes as hold_modifier = ""
@@ -82,7 +82,7 @@ Test("tap_hold_writer: none-sentinel hold entry has empty-string id (tap-hold-no
 
 _THNS_TapNoneI18nDeclared() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "lib/tap_hold/ source must be readable")
+	Assert(Src != "", "infra/tap_hold/ source must be readable")
 
 	Assert(InStr(Src, "_TH_TapNoneI18n") > 0,
 		"_TH_TapNoneI18n must be declared as a global constant in tap_hold_writer.ahk — it is the single source of truth for the i18n key that the action picker displays when a key has no tap action")
@@ -96,10 +96,10 @@ Test("tap_hold_writer: _TH_TapNoneI18n is declared (tap-hold-none-sentinel)",
 
 _THNS_TapHoldTapActionReturnsSentinel() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "lib/tap_hold/ source must be readable")
+	Assert(Src != "", "infra/tap_hold/ source must be readable")
 
 	Body := _DriverFuncBody("TapHoldTapAction")
-	Assert(Body != "", "TapHoldTapAction must be defined in lib/tap_hold/tap_hold_loader.ahk or tap_hold_writer.ahk")
+	Assert(Body != "", "TapHoldTapAction must be defined in infra/tap_hold/tap_hold_loader.ahk or tap_hold_writer.ahk")
 
 	; The function must check Has() before indexing to avoid a missing-key throw
 	Assert(InStr(Body, ".Has(") > 0,

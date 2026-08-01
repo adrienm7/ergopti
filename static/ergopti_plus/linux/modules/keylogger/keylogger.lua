@@ -27,11 +27,11 @@
 local M = {}
 
 local Logger   = require("logger.shim")
-local Monotonic = require("lib.monotonic")
-local Timings   = require("lib.timings")
+local Monotonic = require("infra.monotonic")
+local Timings   = require("infra.timings")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
-local Manifest      = require("lib.manifest_reader")
+local Manifest      = require("infra.manifest_reader")
 local PrivateWindow = require("keylogger.private_window")
 -- WPM ring cap single-sourced from the shared keylogger metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
@@ -254,7 +254,7 @@ function M.init(opts)
 	-- Through the resolver. The old "~" fallback was not expanded by io.open —
 	-- Lua does no tilde expansion — so with HOME unset the keylogger wrote its
 	-- database into a literal directory named "~" beside the process.
-	local ConfigPaths = require("lib.config_paths")
+	local ConfigPaths = require("infra.config_paths")
 	_log_dir = options.log_dir or ConfigPaths.config("logs")
 	_sqlite_path = options.sqlite_path or ConfigPaths.data("metrics.sqlite")
 

@@ -28,12 +28,12 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must load first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- lib.i18n is required at module load time by export.lua. We provide a minimal
 -- stub that returns the key itself so tests are locale-independent.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -94,35 +94,35 @@ end)
 helpers.describe("export — init validation", function()
 	helpers.it("rejects nil deps", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init(nil)
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without paths table", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ device_id = "uuid-x", get_db = function() return nil end })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without device_id string", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ paths = {}, get_db = function() return nil end })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without get_db function", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ paths = {}, device_id = "uuid-y" })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("accepts valid deps", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = "abcdef01-0000-0000-0000-000000000000",
@@ -133,7 +133,7 @@ helpers.describe("export — init validation", function()
 
 	helpers.it("ignores a duplicate init call", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/first.sqlite" },
 			device_id = "first-uuid-0000-0000-000000000001",
@@ -194,7 +194,7 @@ end)
 helpers.describe("export — get_device_short_id", function()
 	local function make_export(uuid)
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = uuid,
@@ -227,7 +227,7 @@ end)
 helpers.describe("export — get_sqlite_path", function()
 	helpers.it("returns the sqlite_path from the injected paths table", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		local expected_path = "/private/tmp/ergopti_metrics/test-uuid/db.sqlite"
 		e.init({
 			paths     = { sqlite_path = expected_path },
@@ -255,7 +255,7 @@ helpers.describe("export — get_native_app_category fallback", function()
 
 	helpers.it("setup: init export module", function()
 		e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = "cat-test-uuid-0000-0000-000000000000",

@@ -31,7 +31,7 @@
 ;   2. The debounce check appears before the action call in _ScriptAltGrDispatch.
 ;   3. A HotIf predicate combining A_IsSuspended and SC138 state is registered.
 ;
-; SCOPE: source introspection of lib/script_altgr_hotkeys.ahk.
+; SCOPE: source introspection of infra/script_altgr_hotkeys.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,7 +46,7 @@
 ; ====================================================
 
 _ADRA_ReadSource() {
-	return _DriverDirConcat("lib")
+	return _DriverDirConcat("infra")
 }
 
 
@@ -58,10 +58,10 @@ _ADRA_ReadSource() {
 
 _ADRA_ChordDebouncePerSlotMap() {
 	Src := _ADRA_ReadSource()
-	Assert(Src != "", "lib/ source must be readable")
+	Assert(Src != "", "infra/ source must be readable")
 
 	Body := _DriverFuncBody("_ScriptAltGrChordDebounce")
-	Assert(Body != "", "_ScriptAltGrChordDebounce must be defined in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_ScriptAltGrChordDebounce must be defined in infra/script_altgr_hotkeys.ahk")
 
 	; Must use a static Map to track the last fire time per slot
 	Assert(InStr(Body, "static last := Map()") > 0,
@@ -93,7 +93,7 @@ Test("script_altgr: chord debounce check runs before the action call (altgr-disp
 
 _ADRA_SuspendedHotIfBlockRegistered() {
 	Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be defined in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be defined in infra/script_altgr_hotkeys.ahk")
 
 	; Must register HotIf context that is active when suspended AND SC138 is held
 	Assert(InStr(Body, "A_IsSuspended") > 0 and InStr(Body, "GetKeyState") > 0,

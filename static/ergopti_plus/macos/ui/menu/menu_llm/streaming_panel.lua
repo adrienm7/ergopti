@@ -17,7 +17,7 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local i18n    = require("lib.i18n")
+local i18n    = require("infra.i18n")
 
 
 

@@ -57,10 +57,10 @@ _SCDD_DocBlock(Src, FuncDef) {
 
 _SCDD_DocstringMatchesMergeBehaviour() {
 	; Move-resilient: scan the toml module dir via the framework helper (comments
-	; preserved) instead of a pinned lib/toml/toml_helpers.ahk read. The DocBlock
+	; preserved) instead of a pinned infra/toml/toml_helpers.ahk read. The DocBlock
 	; extractor still scopes the assertion to TOML_RunStrictCanonicalization's own
 	; leading comment, which is unique across the dir.
-	Src := _DriverDirConcat("lib/toml")
+	Src := _DriverDirConcat("infra/toml")
 	Doc := _SCDD_DocBlock(Src, "TOML_RunStrictCanonicalization(Path) {")
 	Assert(Doc != "", "TOML_RunStrictCanonicalization docstring must exist in toml_helpers.ahk")
 	; The false claim must be gone - the step does not drop stale sections/keys.

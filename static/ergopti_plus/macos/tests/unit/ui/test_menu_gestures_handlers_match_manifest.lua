@@ -51,7 +51,7 @@ helpers.describe("menu_gestures: circular_spaces handler is dispatched by the ma
 		-- override permanently clobbering the shared _G.hs.json stub (test isolation
 		-- footgun unrelated to this finding) — load_with_stubs always hands back a
 		-- freshly `__reset()` stub regardless of what a previous test left behind.
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 		local gestures_menu = ManifestMenu.get_array("gestures_menu")
 		helpers.assert_true(type(gestures_menu) == "table" and #gestures_menu > 0,
 			"menu_manifest.json must have a non-empty gestures_menu array")
@@ -66,7 +66,7 @@ helpers.describe("menu_gestures: circular_spaces handler is dispatched by the ma
 	end)
 
 	helpers.it("ManifestMenu.build renders the circular_spaces item via the real dyn_handlers shape", function()
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 		local dyn_handlers = make_dyn_handlers()
 
 		local built = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, {})

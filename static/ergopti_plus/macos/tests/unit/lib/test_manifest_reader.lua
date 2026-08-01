@@ -20,10 +20,10 @@
 local helpers = require("tests.helpers")
 
 -- manifest_reader logs through lib.logger; load the stub first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local Manifest = require("lib.manifest_reader")
+local Manifest = require("infra.manifest_reader")
 
 -- The canonical values that modules/keymap/init.lua DEFAULT_STATE is wired to.
 -- Mirror these in the AHK manifest too — they are the cross-driver canon.

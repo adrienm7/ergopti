@@ -26,8 +26,8 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("lib.logger")
-local Timings  = require("lib.timings")
+local Logger   = require("infra.logger")
+local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
 
 local LOG = "adapters.text_sender"

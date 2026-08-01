@@ -31,7 +31,7 @@
 
 _ENDT_HandlerHasDedupCache() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in lib/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
 	Assert(InStr(Body, "static") > 0 and InStr(Body, "Map()") > 0,
 		"ErgoptiGlobalErrorHandler must declare a static per-signature dedup cache (Map()), mirroring HookDispatcher.Dispatch's _err_cache pattern (error-handler-no-dedup-throttle)")
 }
@@ -39,7 +39,7 @@ Test("meta error-net: ErgoptiGlobalErrorHandler declares a static dedup cache (e
 
 _ENDT_DedupGuardsSetTimerAndNotifier() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in lib/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
 
 	CacheCheckIdx := InStr(Body, "_geh_dedup_map.Has(")
 	Assert(CacheCheckIdx > 0,

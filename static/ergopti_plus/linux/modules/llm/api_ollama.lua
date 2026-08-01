@@ -27,7 +27,7 @@ local LOG = "modules.llm.api_ollama"
 
 -- HTTP request hard timeout comes from the shared timings registry so every
 -- driver's LLM call times out identically (no magic seconds literal here).
-local Timings = require("lib.timings")
+local Timings = require("infra.timings")
 
 
 -- =========================================

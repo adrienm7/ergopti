@@ -17,7 +17,7 @@ local M = {}
 
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
-local Logger  = require("lib.logger")
+local Logger  = require("infra.logger")
 local LOG     = "keylogger.aggregator"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")

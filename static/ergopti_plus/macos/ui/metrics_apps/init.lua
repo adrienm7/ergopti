@@ -24,13 +24,13 @@ local M = {}
 
 local hs         = hs
 local fs         = require("hs.fs")
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
-local dialog     = require("lib.dialog_util")
-local i18n       = require("lib.i18n")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
+local dialog     = require("infra.dialog_util")
+local i18n       = require("infra.i18n")
 
 local LOG = "metrics_apps"
 
@@ -235,7 +235,7 @@ function M.prompt_category(app_name, default_cat, default_score)
 end
 
 local function prompt_pick_app()
-	local ok_mod, app_picker = pcall(require, "lib.app_picker")
+	local ok_mod, app_picker = pcall(require, "infra.app_picker")
 	if not ok_mod then
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return

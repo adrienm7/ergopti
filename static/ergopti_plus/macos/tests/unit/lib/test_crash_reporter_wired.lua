@@ -32,8 +32,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("logger: a recoverable timer-callback error must NOT reach the crash reporter (audit H-06)", function()
 	helpers.it("logs an uncaught hs.timer callback error to the errors sink instead of reporting a crash", function()
-		package.loaded["lib.logger"] = nil
-		local Logger = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.install_runtime_error_capture()  -- patches _G.hs.timer.doAfter to guard callbacks
 
 		local reported = nil
@@ -76,8 +76,8 @@ helpers.describe("logger: a recoverable timer-callback error must NOT reach the 
 	end)
 
 	helpers.it("does not invoke the reporter for a clean timer callback", function()
-		package.loaded["lib.logger"] = nil
-		local Logger = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.install_runtime_error_capture()
 
 		local reported = false

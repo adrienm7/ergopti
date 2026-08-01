@@ -38,8 +38,8 @@ helpers.describe("sqlite_writer: build_inserts does not raise on missing timesta
 		package.loaded["modules.keylogger.sqlite_writer"] = nil
 
 		-- Stub dependencies so the module loads without a real DB or device
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		-- No "lib.json" stub: sqlite_writer requires hs.json, and nothing in the
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		-- No "infra.json" stub: sqlite_writer requires hs.json, and nothing in the
 		-- macOS driver requires lib.json at all. The stub that used to sit here
 		-- intercepted nothing — the module took the real hs.json from the hs stub
 		-- either way, so removing it changes no behaviour, only the impression

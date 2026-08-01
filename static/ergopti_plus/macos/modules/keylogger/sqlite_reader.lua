@@ -30,7 +30,7 @@ local hs      = hs
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "keylogger.sqlite_reader"
 
 

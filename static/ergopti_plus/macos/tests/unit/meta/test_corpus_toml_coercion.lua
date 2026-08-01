@@ -45,7 +45,7 @@ helpers.describe("corpus — TOML scalar coercion (macOS)", function()
 	if corpus and corpus.vectors then
 
 		local overrides_mod = nil
-		local ok_ov, ov = pcall(require, "lib.config_overrides")
+		local ok_ov, ov = pcall(require, "infra.config_overrides")
 		if ok_ov and ov and type(ov.coerce) == "function" then
 			overrides_mod = ov
 		else

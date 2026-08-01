@@ -19,10 +19,10 @@
 local M = {}
 
 local hs          = hs
-local text_utils  = require("lib.text_utils")
+local text_utils  = require("infra.text_utils")
 local km_utils    = require("modules.keymap.utils")
-local Logger      = require("lib.logger")
-local Paths       = require("lib.paths")
+local Logger      = require("infra.logger")
+local Paths       = require("infra.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")
 local RI          = require("modules.keymap.registry_index")

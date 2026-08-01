@@ -23,8 +23,8 @@ local Gen     = pbt.Gen
 
 -- Warm up the hs stub so that all subsequent plain require() calls share it.
 -- load_with_stubs sets _G.hs and populates package.loaded["hs.*"] sub-modules.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
 
@@ -38,12 +38,12 @@ helpers.load_with_stubs("modules.keymap.registry")
 --- @return table, table state, Registry module reference
 local function fresh_registry()
 	-- Clear the dependency chain that calls hs.settings.get at load-time
-	package.loaded["lib.i18n"]                   = nil
-	package.loaded["lib.locale"]                 = nil
+	package.loaded["infra.i18n"]                   = nil
+	package.loaded["infra.locale"]                 = nil
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	-- Refresh the hs stub so hs.settings is available for the new require chain
-	helpers.load_with_stubs("lib.logger")
+	helpers.load_with_stubs("infra.logger")
 	local R     = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	R.init(state)

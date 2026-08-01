@@ -21,7 +21,7 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("lib.logger")
+local Logger  = require("infra.logger")
 
 local LOG = "startup_ctrl"
 

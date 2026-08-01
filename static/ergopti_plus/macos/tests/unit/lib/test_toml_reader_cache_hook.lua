@@ -17,9 +17,9 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
-local reader = helpers.load_with_stubs("lib.toml.reader")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
+local reader = helpers.load_with_stubs("infra.toml.reader")
 
 --- Writes a TOML body to a temp file and returns its path.
 local function write_temp(name, body)

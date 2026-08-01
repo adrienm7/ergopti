@@ -15,15 +15,15 @@
 local helpers = require("tests.helpers")
 
 -- Reload the logger from scratch so init_log_path picks up our shell stub.
-local _real_logger = package.loaded["lib.logger"]
+local _real_logger = package.loaded["infra.logger"]
 local _real_shell  = package.loaded["adapters.shell_runner"]
 
 local exec_log = {}
 package.loaded["adapters.shell_runner"] = {
 	exec = function(cmd) exec_log[#exec_log + 1] = tostring(cmd); return "" end,
 }
-package.loaded["lib.logger"] = nil
-local Logger = require("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = require("infra.logger")
 
 
 
@@ -94,4 +94,4 @@ end)
 
 -- Restore the originals so subsequent test files are unaffected.
 package.loaded["adapters.shell_runner"] = _real_shell
-package.loaded["lib.logger"]            = _real_logger
+package.loaded["infra.logger"]            = _real_logger

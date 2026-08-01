@@ -15,7 +15,7 @@
 --- 4. prompt_builder/vectors.json     — SKIP (PromptBuilder not wired on Linux)
 --- 5. security/keylogger vectors      — partially tested (pure-logic paths)
 --- 6. toml/fuzz_corpus.json           — tested (shared TOML codec)
---- 7. locale/resolution_vectors.json  — SKIP (Linux resolves via lib/locale.lua)
+--- 7. locale/resolution_vectors.json  — SKIP (Linux resolves via infra/locale.lua)
 --- 8. tooltip/{layout,dequeue}         — SKIP (canonical layout math is JS)
 --- 9. updater/release_parser_vectors.json — tested (full replay in
 ---    test_corpus_updater_release_parser.lua; parser used by manager.lua)
@@ -390,10 +390,10 @@ describe("Corpus: locale/resolution_vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in locale corpus")
 	end)
 
-	it("SKIP [CONF-LINUX-LOCALE-CASCADE] — Linux resolves locales via lib/locale.lua (shared cascade replay is a roadmap item)", function()
+	it("SKIP [CONF-LINUX-LOCALE-CASCADE] — Linux resolves locales via infra/locale.lua (shared cascade replay is a roadmap item)", function()
 		-- The shared locale.core cascade (active->en->fr with star substitution)
 		-- is pinned by the macOS consumer (test_corpus_locale_resolution.lua). The
-		-- Linux driver reads locale files through lib/locale.lua and does not yet
+		-- Linux driver reads locale files through infra/locale.lua and does not yet
 		-- replay the shared cascade; ADR-006 compliance here means the corpus is
 		-- consumed (file loaded, vectors counted) with the gap tracked, not hidden.
 		assert_true(true, "skip acknowledged — shared locale.core replay is a roadmap item")

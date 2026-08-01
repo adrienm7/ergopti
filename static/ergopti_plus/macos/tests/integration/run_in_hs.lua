@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local TARGETS = {
-	"lib.text_utils", "lib.toml.reader", "lib.logger",
-	"lib.keycodes", "modules.keymap.layout", "lib.perf",
+	"infra.text_utils", "infra.toml.reader", "infra.logger",
+	"infra.keycodes", "modules.keymap.layout", "infra.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
 	"modules.karabiner.defaults", "modules.karabiner.config",
 	"modules.llm.backend_detector", "modules.llm.parser",

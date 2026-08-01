@@ -236,8 +236,8 @@ local function load_real_day_rollover(stall)
 		sync_foreign_data_sql   = function() end,
 	}
 
-	package.loaded["lib.i18n"] = { t = function(key) return key end }
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.i18n"] = { t = function(key) return key end }
+	package.loaded["infra.timings"] = {
 		ms  = function() return 1000 end,
 		sec = function() return 1.0 end,
 	}

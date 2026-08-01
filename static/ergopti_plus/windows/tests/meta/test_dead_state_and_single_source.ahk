@@ -94,7 +94,7 @@ _DSSS_PreviewBoundariesUseTheConstant() {
 	; matcher does not gate on. Scoped to this layer because the keymap
 	; legitimately spells the same codepoint for the AltGr key that TYPES a
 	; curly quote, which has nothing to do with word boundaries.
-	HsSrc := _DriverDirConcat("lib/hotstrings")
+	HsSrc := _DriverDirConcat("infra/hotstrings")
 	Assert(HsSrc != "", "the hotstrings source must be readable")
 	Spellings := 0
 	Pos := 1
@@ -103,7 +103,7 @@ _DSSS_PreviewBoundariesUseTheConstant() {
 		Pos += 1
 	}
 	Assert(Spellings == 1,
-		"the curly-quote boundary codepoint must be spelled exactly ONCE in lib/hotstrings (found " . Spellings . ") — a second spelling is how the preview and the matcher came to disagree about which characters open a word")
+		"the curly-quote boundary codepoint must be spelled exactly ONCE in infra/hotstrings (found " . Spellings . ") — a second spelling is how the preview and the matcher came to disagree about which characters open a word")
 
 	; One derivation, referenced by both consumers. The constant is declared in
 	; hotstring_engine_main.ahk rather than hotstrings_io.ahk on purpose: the

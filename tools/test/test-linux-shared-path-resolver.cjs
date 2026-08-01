@@ -5,13 +5,13 @@
  * MODULE: Linux Shared-Tree Resolver Guard
  * DESCRIPTION:
  * No Linux module may derive the `_shared` tree by counting `..` steps of its
- * own. It asks lib/paths.lua, which derives the root once.
+ * own. It asks infra/paths.lua, which derives the root once.
  *
  * ROOT CAUSE ENCODED — TWO SHIPPED BUGS, SAME SHAPE:
  * Twelve independent `_shared` expressions existed across the Linux driver, at
  * four different depths, and two of them were wrong:
  *
- *   * lib/i18n.lua walked "../../" from the driver root for
+ *   * infra/i18n.lua walked "../../" from the driver root for
  *     _shared/data/locales. One level too high. `ls` on the missing directory
  *     printed nothing, the scan collected zero codes, and the {"en","fr"}
  *     fallback took over — so the language menu offered 2 locales out of the 21
@@ -36,7 +36,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
-const RESOLVER = path.join(DRIVER, 'lib', 'paths.lua');
+const RESOLVER = path.join(DRIVER, 'infra', 'paths.lua');
 
 /** Every production Lua file in the Linux driver. */
 function walk(dir, acc = []) {
@@ -55,18 +55,18 @@ function walk(dir, acc = []) {
 const errors = [];
 
 if (!fs.existsSync(RESOLVER)) {
-	errors.push('linux/lib/paths.lua is missing — every module would go back to counting ".." itself');
+	errors.push('linux/infra/paths.lua is missing — every module would go back to counting ".." itself');
 }
 
 // The resolver is allowed to know where the tree is; that is its job. Two more
 // are exempt with a reason:
-//   - lib/locale.lua walks UPWARD looking for the tree rather than assuming a
+//   - infra/locale.lua walks UPWARD looking for the tree rather than assuming a
 //     depth, which is a search, not a hardcoded count.
 //   - ui/webkit_host.lua probes a candidate list for the file:// base a webview
 //     needs before any module has loaded.
 const EXEMPT = new Set([
-	'lib/paths.lua',
-	'lib/locale.lua',
+	'infra/paths.lua',
+	'infra/locale.lua',
 	'ui/webkit_host.lua',
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
@@ -136,7 +136,7 @@ for (const b of BOOTSTRAPS) {
 // a literal directory named "~" beside the process. "/home/user" is the worst of
 // the three: a plausible path belonging to nobody, so a write there looks like it
 // worked.
-const HOME_EXEMPT = new Set(['lib/config_paths.lua']);
+const HOME_EXEMPT = new Set(['infra/config_paths.lua']);
 const USER_ENV = /os\.getenv\(\s*"(HOME|XDG_CONFIG_HOME|XDG_DATA_HOME)"\s*\)/;
 
 for (const abs of files) {
@@ -163,6 +163,6 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] All ${files.length} Linux module(s) reach _shared through lib/paths.lua ` +
+	`\x1b[32m[OK] All ${files.length} Linux module(s) reach _shared through infra/paths.lua ` +
 		`(${EXEMPT.size} documented exemption(s)).\x1b[0m`
 );

@@ -4,7 +4,7 @@
 ; MODULE: HSE Notepad Branch Consumed Delimiter Guard
 ; DESCRIPTION:
 ; Static source guard for the Notepad clipboard branch of HSE_DispatchMatch in
-; lib/hotstrings/hotstring_engine_main.ahk.
+; infra/hotstrings/hotstring_engine_main.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The Notepad branch unconditionally sent `SendInstant(Replacement . EndChar)`,
@@ -54,8 +54,8 @@ _THNCD_ExtractNotepadBranch(Src) {
 ; =========================================================
 
 _THNCD_NotepadBranchHasConsumedDelimiterGuard() {
-	Src := _DriverDirConcat("lib/hotstrings")
-	Assert(Src != "", "lib/hotstrings/hotstring_engine_main.ahk must be readable")
+	Src := _DriverDirConcat("infra/hotstrings")
+	Assert(Src != "", "infra/hotstrings/hotstring_engine_main.ahk must be readable")
 
 	Branch := _THNCD_ExtractNotepadBranch(Src)
 	Assert(Branch != "", "Notepad branch (if IsNotepadApp) must exist in HSE_DispatchMatch")

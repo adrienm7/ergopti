@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local Logger = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = helpers.load_with_stubs("infra.logger")
 
 --- Collect all log calls so we can verify ERROR is logged on missing paths.
 local log_calls = {}
@@ -63,7 +63,7 @@ helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 	helpers.it("logs ERROR when shared constants cannot be found", function()
 		-- Simulate by mocking Paths.find_from_configdir to return nil
 		log_calls = {}
-		local Paths = require("lib.paths")
+		local Paths = require("infra.paths")
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 
@@ -91,7 +91,7 @@ end)
 helpers.describe("locale.locale_path", function()
 	helpers.it("resolves locale JSON via module-relative path", function()
 		log_calls = {}
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -105,11 +105,11 @@ helpers.describe("locale.locale_path", function()
 
 	helpers.it("logs ERROR when locale file cannot be found", function()
 		log_calls = {}
-		local Paths = require("lib.paths")
+		local Paths = require("infra.paths")
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -129,7 +129,7 @@ helpers.describe("locale.locale_path", function()
 		-- When locale path resolution fails completely, the module should
 		-- NOT secretly use English translations as a silent fallback.
 		-- Instead, it should log ERROR and return empty or minimal value.
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -291,7 +291,7 @@ helpers.describe("path resolution anti-patterns", function()
 		hs.configdir = "/tmp/bogus_hs_config_dir_12345"
 
 		local ok1, _ = pcall(function() require("ui.wpm.wpm_widget") end)
-		local ok2, _ = pcall(function() require("lib.locale") end)
+		local ok2, _ = pcall(function() require("infra.locale") end)
 
 		hs.configdir = original_configdir
 

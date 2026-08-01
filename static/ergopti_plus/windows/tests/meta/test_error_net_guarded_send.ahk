@@ -37,7 +37,7 @@
 
 _TENGS_CheckGuardedSend() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in lib/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
 
 	; Must have at least one guarded SendEvent
 	Assert(InStr(Body, "try SendEvent(") > 0,

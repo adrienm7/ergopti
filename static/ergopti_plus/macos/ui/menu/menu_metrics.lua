@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
----    ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic blocks
+---    ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.  Dynamic blocks
 ---    (shortcut pickers, app exclusion, WPM controls, encryption) are supplied
 ---    as handlers so state-bearing logic stays in Lua.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and
@@ -22,13 +22,13 @@
 local M = {}
 local hs = hs
 local fs = require("hs.fs")
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 
-local AppPickerLib  = require("lib.app_picker")
-local dialog        = require("lib.dialog_util")
+local AppPickerLib  = require("infra.app_picker")
+local dialog        = require("infra.dialog_util")
 local kl_mod        = require("modules.keylogger")
-local i18n          = require("lib.i18n")
-local ManifestMenu  = require("lib.manifest_menu")
+local i18n          = require("infra.i18n")
+local ManifestMenu  = require("infra.manifest_menu")
 
 
 

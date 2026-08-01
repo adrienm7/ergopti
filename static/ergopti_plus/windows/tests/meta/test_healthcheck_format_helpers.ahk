@@ -9,7 +9,7 @@
 ;
 ; These were previously only exercised by the orphaned, never-run,
 ; P5-stale test_session_regressions.ahk, which referenced removed paths
-; (lib/healthcheck.ahk) and could not load. helpers.ahk is headless-safe (only
+; (infra/healthcheck.ahk) and could not load. helpers.ahk is headless-safe (only
 ; function definitions, no top-level side effects), so run_all.ahk includes it
 ; and this test verifies the uptime math and HTML escaping directly.
 ; ==============================================================================

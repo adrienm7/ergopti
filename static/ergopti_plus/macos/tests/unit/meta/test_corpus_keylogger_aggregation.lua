@@ -297,7 +297,7 @@ local function setup_and_replay(vec)
 		get_native_app_category = function() return "Development" end,
 		init = function() end,
 	}
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.timings"] = {
 		ms  = function(_section, key)
 			if key == "think_pause_ms" then return 2000 end
 			if key == "max_keystroke_delay_ms" then return 5000 end

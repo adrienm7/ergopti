@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
-local writer = helpers.load_with_stubs("lib.toml.writer")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
+local writer = helpers.load_with_stubs("infra.toml.writer")
 
 
 --- Convenience: writes a TOML payload to a temp file and returns its content.

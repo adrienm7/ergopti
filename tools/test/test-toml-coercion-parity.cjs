@@ -66,8 +66,8 @@ if (fs.existsSync(ahkTestPath)) {
 
 // ─── 4. All 4 coercion sites still exist ─────────────────────────────
 
-// macOS: lib/config_overrides.lua exports M.coerce
-const macosOverridePath = path.join(MACOS, 'lib', 'config_overrides.lua');
+// macOS: infra/config_overrides.lua exports M.coerce
+const macosOverridePath = path.join(MACOS, 'infra', 'config_overrides.lua');
 assert(fs.existsSync(macosOverridePath), 'macOS config_overrides.lua exists');
 if (fs.existsSync(macosOverridePath)) {
 	const src = fs.readFileSync(macosOverridePath, 'utf8');
@@ -76,7 +76,7 @@ if (fs.existsSync(macosOverridePath)) {
 }
 
 // AHK: config_shortcuts.ahk defines CS_CoerceValue
-const csPath = path.join(WINDOWS, 'lib', 'config_shortcuts.ahk');
+const csPath = path.join(WINDOWS, 'infra', 'config_shortcuts.ahk');
 assert(fs.existsSync(csPath), 'AHK config_shortcuts.ahk exists');
 if (fs.existsSync(csPath)) {
 	const src = fs.readFileSync(csPath, 'utf8');
@@ -84,7 +84,7 @@ if (fs.existsSync(csPath)) {
 }
 
 // AHK: toml_loader.ahk defines TomlCoerceValue
-const tlPath = path.join(WINDOWS, 'lib', 'toml', 'toml_loader.ahk');
+const tlPath = path.join(WINDOWS, 'infra', 'toml', 'toml_loader.ahk');
 assert(fs.existsSync(tlPath), 'AHK toml_loader.ahk exists');
 if (fs.existsSync(tlPath)) {
 	const src = fs.readFileSync(tlPath, 'utf8');
@@ -92,7 +92,7 @@ if (fs.existsSync(tlPath)) {
 }
 
 // AHK: toml_config_loader.ahk defines TomlCoerceValueExt
-const tclPath = path.join(WINDOWS, 'lib', 'toml', 'toml_config_loader.ahk');
+const tclPath = path.join(WINDOWS, 'infra', 'toml', 'toml_config_loader.ahk');
 assert(fs.existsSync(tclPath), 'AHK toml_config_loader.ahk exists');
 if (fs.existsSync(tclPath)) {
 	const src = fs.readFileSync(tclPath, 'utf8');
@@ -103,7 +103,7 @@ if (fs.existsSync(tclPath)) {
 // ─── 5. Linux driver has no equivalent coercion bypass ───────────────
 // The Linux driver uses toml_codec for all TOML parsing — there should
 // be no hand-rolled coercion site in the Linux driver.
-const linuxOverridePath = path.join(LINUX, 'lib', 'config_overrides.lua');
+const linuxOverridePath = path.join(LINUX, 'infra', 'config_overrides.lua');
 assert(!fs.existsSync(linuxOverridePath), 'Linux has no config_overrides.lua (uses toml_codec)');
 
 // ─── Summary ─────────────────────────────────────────────────────────

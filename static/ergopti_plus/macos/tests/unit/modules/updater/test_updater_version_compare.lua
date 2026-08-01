@@ -18,7 +18,7 @@ local json    = require("json")
 helpers.describe("updater.compare_versions: cross-driver version vectors (version-compare-parity)", function()
 	-- modules.updater requires lib.logger / lib.dialog_util; stub the logger so the
 	-- pure comparator loads headless under the hs stub.
-	package.loaded["lib.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	local updater = helpers.load_with_stubs("modules.updater")
 
 	local path = helpers.shared("modules/updater/version_vectors.json")

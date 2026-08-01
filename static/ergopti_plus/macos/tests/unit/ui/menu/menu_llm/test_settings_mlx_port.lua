@@ -25,8 +25,8 @@ local helpers = require("tests.helpers")
 -- Scripted dialog: text_prompt(title, msg, default, ok_label, cancel_label) returns
 -- (ok_label, value). Echoing ok_label makes the handler's OK-gate pass locale-free.
 local prompt_value = { "54321" }
-local _real_dialog = package.loaded["lib.dialog_util"]
-package.loaded["lib.dialog_util"] = {
+local _real_dialog = package.loaded["infra.dialog_util"]
+package.loaded["infra.dialog_util"] = {
 	text_prompt = function(_title, _msg, _default, ok_label, _cancel_label)
 		return ok_label, prompt_value[1]
 	end,
@@ -99,6 +99,6 @@ helpers.describe("settings_manager — MLX port configuration", function()
 end)
 
 -- Restore real modules so downstream test files see production wiring.
-package.loaded["lib.dialog_util"] = _real_dialog
+package.loaded["infra.dialog_util"] = _real_dialog
 package.loaded["ui.menu.menu_llm.settings_manager"] = nil
 package.loaded["modules.llm.api_mlx"] = nil

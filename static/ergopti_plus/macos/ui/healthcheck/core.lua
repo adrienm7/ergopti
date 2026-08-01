@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Core
 --- DESCRIPTION:
 --- The healthcheck probe, public API, and report window. Extracted from the
---- former monolithic lib/healthcheck.lua (audit F2) so the macOS driver mirrors
+--- former monolithic infra/healthcheck.lua (audit F2) so the macOS driver mirrors
 --- the Windows ui/healthcheck/{init,core,helpers} layout.
 ---
 --- FEATURES & RATIONALE:
@@ -30,9 +30,9 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("lib.logger")
+local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
-local Paths    = require("lib.paths")
+local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
@@ -353,7 +353,7 @@ function M.show_window()
 		plain = "(format error)"
 	end
 
-	local i18n_ok, i18n = pcall(require, "lib.i18n")
+	local i18n_ok, i18n = pcall(require, "infra.i18n")
 	if not i18n_ok then
 		Logger.warn(LOG, "lib.i18n unavailable — using key names as labels.")
 	end
@@ -372,7 +372,7 @@ function M.show_window()
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "ui.ui_builder unavailable — falling back to text alert: %s.", tostring(ui_builder))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -381,7 +381,7 @@ function M.show_window()
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)
 	if not ok_html or not html then
 		Logger.error(LOG, "build_injected_html() failed: %s.", tostring(html))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -392,7 +392,7 @@ function M.show_window()
 	local ok_enc, snapshot_json = pcall(hs.json.encode, snapshot)
 	if not ok_enc or not snapshot_json then
 		Logger.error(LOG, "hs.json.encode() failed: %s.", tostring(snapshot_json))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -427,7 +427,7 @@ function M.show_window()
 	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
 	if not ok_wv or not wv then
 		Logger.error(LOG, "hs.webview.new() failed — falling back to text alert: %s.", tostring(wv))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end

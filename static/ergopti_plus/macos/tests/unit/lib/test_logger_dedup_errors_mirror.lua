@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/logger.lua rather than by
+-- Selected by a declaration unique to infra/logger.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("function M.set_error_notification_handler")
-helpers.assert_true(src ~= nil, "lib/logger.lua source must be locatable")
+helpers.assert_true(src ~= nil, "infra/logger.lua source must be locatable")
 
 -- Locate _flush_dedup_summary body.
 local fn_pos = src:find("local function _flush_dedup_summary()", 1, true)

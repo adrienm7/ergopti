@@ -6,14 +6,14 @@
 ; Static source guard for the "_Onboarding_Commit crashes on AppState access"
 ; finding (onboarding-no-appstate).
 ;
-; _Onboarding_Commit() in lib/onboarding.ahk previously set
+; _Onboarding_Commit() in infra/onboarding.ahk previously set
 ; AppState["toml_strict_canon_in_progress"] as its first statement. AppState
 ; is never defined in production (the Map was deliberately removed from
-; lib/app_state.ahk). This throws UnsetError immediately, aborting the entire
+; infra/app_state.ahk). This throws UnsetError immediately, aborting the entire
 ; first-run wizard commit: config is never written and the script never
 ; reloads.
 ;
-; TOML_RunStrictCanonicalization() in lib/toml/toml_helpers.ahk also used
+; TOML_RunStrictCanonicalization() in infra/toml/toml_helpers.ahk also used
 ; AppState.Has("toml_strict_canon_in_progress") and AppState[...] for the same
 ; flag, suffering the same UnsetError in production.
 ;
@@ -50,7 +50,7 @@ _ONA_CommitDoesNotUseAppState() {
 	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")
 	; Any AppState[...] index-assign in this function throws UnsetError in production
-	; because the Map was removed from lib/app_state.ahk
+	; because the Map was removed from infra/app_state.ahk
 	Assert(InStr(Seg, "AppState[") = 0,
 		"_Onboarding_Commit must NOT use AppState[...] — AppState is not defined in production and throws UnsetError")
 }
@@ -97,7 +97,7 @@ Test("onboarding: commit persists transactionally before publishing or reloading
 
 _ONA_StrictCanonDoesNotUseAppState() {
 	Seg := _DriverFuncBody("TOML_RunStrictCanonicalization")
-	Assert(Seg != "", "TOML_RunStrictCanonicalization declaration must exist in lib/toml/toml_helpers.ahk")
+	Assert(Seg != "", "TOML_RunStrictCanonicalization declaration must exist in infra/toml/toml_helpers.ahk")
 	; AppState.Has(...) would throw UnsetError in production
 	Assert(InStr(Seg, "AppState.Has") = 0,
 		"TOML_RunStrictCanonicalization must NOT call AppState.Has — AppState is not defined in production")

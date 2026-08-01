@@ -27,7 +27,7 @@
 
 local helpers = require("tests.helpers")
 
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 
 
 

@@ -23,7 +23,7 @@ _G.hs.settings = {
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("lib.config_overrides")
+local Overrides = helpers.load_with_stubs("infra.config_overrides")
 -- helpers.load_with_stubs may have re-pointed _G.hs to a fresh stub via
 -- __reset; re-apply the override so the describes below still observe it.
 _G.hs.settings = {
@@ -137,11 +137,11 @@ helpers.describe("config_overrides source: no {N} log placeholders", function()
 	-- Logger.success passed those to string.format, which treated them as literal
 	-- brace-sequences and left them in the output — keys and paths were never shown.
 	helpers.it("source uses %s / %d placeholders, not {N}", function()
-		-- Selected by a declaration unique to lib/config_overrides.lua rather than by
+		-- Selected by a declaration unique to infra/config_overrides.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function match_quoted_prefix")
-		helpers.assert_true(src ~= nil, "lib/config_overrides.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "infra/config_overrides.lua source must be locatable")
 		helpers.assert_true(
 			src:find("{1}", 1, true) == nil and src:find("{2}", 1, true) == nil,
 			"config_overrides.lua must not use {N} log placeholders — use %s / %d instead")

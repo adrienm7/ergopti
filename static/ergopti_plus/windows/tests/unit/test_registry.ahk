@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Windows Registry Abstraction Tests
 ; DESCRIPTION:
-; Unit-tests for the fail-safe wrapper functions in lib/registry.ahk.
+; Unit-tests for the fail-safe wrapper functions in infra/registry.ahk.
 ; Tests use well-known read-only system keys that exist on every Windows
 ; installation, so no writes are needed and the suite is safe on any CI runner.
 ; ==============================================================================

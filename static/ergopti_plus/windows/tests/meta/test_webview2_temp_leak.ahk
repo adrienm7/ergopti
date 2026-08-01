@@ -59,9 +59,9 @@ _TWTL_CheckLegacyHost(Path, CreatePrefix) {
 ; The single shared user-data folder must be a FIXED path (no A_TickCount), so it
 ; cannot accumulate -- exactly one folder, reused for the whole session.
 _TWTL_SharedFolderIsFixed() {
-	Src := _TWTL_ReadSource("lib/webview_utils.ahk")
+	Src := _TWTL_ReadSource("infra/webview_utils.ahk")
 	Assert(InStr(Src, "WebView_SharedEnvironment") > 0,
-		"lib/webview_utils.ahk must define the shared environment helper")
+		"infra/webview_utils.ahk must define the shared environment helper")
 	Assert(InStr(Src, 'WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"') > 0,
 		"WEBVIEW_SHARED_UDIR must be a single fixed path (leak-free by construction)")
 }

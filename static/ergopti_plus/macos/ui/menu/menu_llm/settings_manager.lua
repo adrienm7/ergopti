@@ -12,9 +12,9 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("lib.logger")
-local i18n    = require("lib.i18n")
-local dialog  = require("lib.dialog_util")
+local Logger  = require("infra.logger")
+local i18n    = require("infra.i18n")
+local dialog  = require("infra.dialog_util")
 
 local LOG = "menu_llm.settings"
 

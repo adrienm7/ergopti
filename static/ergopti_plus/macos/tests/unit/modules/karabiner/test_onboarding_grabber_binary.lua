@@ -19,11 +19,11 @@ local helpers = require("tests.helpers")
 --- Loads a fresh onboarding module instance.
 --- @return table Onboarding module.
 local function fresh_onboarding()
-	package.loaded["lib.logger"] = nil
-	helpers.load_with_stubs("lib.logger")
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
-	package.loaded["lib.notifications"] = { notify = function() end }
-	package.loaded["lib.dialog_util"] = { block_alert = function() return "later" end }
+	package.loaded["infra.logger"] = nil
+	helpers.load_with_stubs("infra.logger")
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["infra.dialog_util"] = { block_alert = function() return "later" end }
 	package.loaded["modules.karabiner.onboarding"] = nil
 	return helpers.load_with_stubs("modules.karabiner.onboarding")
 end

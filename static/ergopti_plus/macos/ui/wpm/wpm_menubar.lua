@@ -17,7 +17,7 @@ local M = {}
 local hs        = hs
 local keylogger = require("modules.keylogger")
 local WPMShared = require("ui.wpm.shared")
-local Logger    = require("lib.logger")
+local Logger    = require("infra.logger")
 
 local LOG = "wpm_menubar"
 

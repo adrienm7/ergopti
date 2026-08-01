@@ -72,16 +72,16 @@ _WMDR_NoShowWpmMenubarPushInMain() {
 Test("F13 regression: ErgoptiPlus.ahk must not contain metrics_show_wpm_menubar", _WMDR_NoShowWpmMenubarPushInMain)
 
 _WMDR_NoShowWpmMenubarFieldInClass() {
-	Src := _WMDR_ReadSource("lib\metrics\metrics_shortcuts.ahk")
-	Assert(Src != "", "lib/metrics/metrics_shortcuts.ahk must be readable")
+	Src := _WMDR_ReadSource("infra\metrics\metrics_shortcuts.ahk")
+	Assert(Src != "", "infra/metrics/metrics_shortcuts.ahk must be readable")
 	Assert(not InStr(Src, "show_wpm_menubar"),
 		"MetricsShortcuts class must not declare the show_wpm_menubar field")
 }
 Test("F13 regression: metrics_shortcuts.ahk must not contain show_wpm_menubar", _WMDR_NoShowWpmMenubarFieldInClass)
 
 _WMDR_NoShowWpmMenubarInConfigShortcuts() {
-	Src := _WMDR_ReadSource("lib\config_shortcuts.ahk")
-	Assert(Src != "", "lib/config_shortcuts.ahk must be readable")
+	Src := _WMDR_ReadSource("infra\config_shortcuts.ahk")
+	Assert(Src != "", "infra/config_shortcuts.ahk must be readable")
 	Assert(not InStr(Src, "metrics_show_wpm_menubar"),
 		"config_shortcuts.ahk must not read or write metrics_show_wpm_menubar")
 }

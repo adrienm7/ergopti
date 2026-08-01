@@ -118,7 +118,7 @@ global LLM_HEALTH_PROBE_THROTTLE_MS := 3000
 ; =============================
 
 ; Initial values are replaced at startup by LLM_Menu_ApplySharedDefaults()
-; which reads from the shared defaults.json via LLM_Defaults (lib/llm_defaults.ahk).
+; which reads from the shared defaults.json via LLM_Defaults (infra/llm_defaults.ahk).
 ; String fields use "" as placeholder — ApplySharedDefaults() overwrites them.
 global _LLM_Menu := Map(
 	"enabled",                    false,

@@ -295,7 +295,7 @@ Updater_ShowUpdatePrompt(Release) {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		WVC := unset
 		try {
-			; Reuse the shared session environment (lib/webview_utils.ahk) so no
+			; Reuse the shared session environment (infra/webview_utils.ahk) so no
 			; second Chromium process boots and reopens are near-instant.
 			WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC

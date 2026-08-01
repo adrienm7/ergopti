@@ -25,7 +25,7 @@
 --- Both bounds are asserted. It must come AFTER the requires it closes over: a
 --- closure written above the `local` it uses binds a nil GLOBAL instead, and the
 --- resulting error inside a shutdown callback is swallowed to the Hammerspoon
---- Console where lib/logger never sees it. And it must come BEFORE the boot
+--- Console where infra/logger never sees it. And it must come BEFORE the boot
 --- phases that can throw, which is the whole point.
 --- ==============================================================================
 
@@ -69,7 +69,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- Karabiner deploy failure, a menu build error, an unreadable watch root.
 		-- Anything that throws here used to leave the session with no teardown.
 		local later_phases = {
-			'require("lib.file_watchers").start',
+			'require("infra.file_watchers").start',
 			"menu.start",
 			"Boot.mark(\"Boot complete",
 		}

@@ -26,9 +26,9 @@ local M = {}
 
 local hs      = hs
 local Parser  = require("modules.llm.parser")
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local i18n    = require("lib.i18n")
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
+local i18n    = require("infra.i18n")
 
 local LOG = "llm.streaming_handler"
 

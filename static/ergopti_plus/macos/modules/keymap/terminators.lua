@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local M    = require("keymap.terminators")
-local i18n = require("lib.i18n")
+local i18n = require("infra.i18n")
 
 -- Resolve i18n keys for the five labels that vary by locale. All other labels
 -- are plain French strings that match the French locale value and need no

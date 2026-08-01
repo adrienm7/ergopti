@@ -35,7 +35,7 @@ _MetaCheckMetricsFocusOffThread() {
 	; The file must register the refresh off-thread.
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
-	try Src := FileRead(WindowsDir . "\lib\metrics\metrics_filters.ahk")
+	try Src := FileRead(WindowsDir . "\infra\metrics\metrics_filters.ahk")
 	Assert(Src != "", "metrics_filters.ahk must be readable")
 	Assert(InStr(Src, "SetTimer(MF_RefreshFocus") > 0,
 		"metrics_filters.ahk must set a periodic timer on MF_RefreshFocus (off-thread focus cache refresh)")

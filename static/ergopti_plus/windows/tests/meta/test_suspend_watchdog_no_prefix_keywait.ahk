@@ -87,7 +87,7 @@ Test("ErgoptiPlus: Suspend(-1) is the only suspend call site (suspend-watchdog-n
 ; went from 2807/2807 to 2806 passed/1 failed purely because the Pattern-1
 ; Suspend-guard hardening campaign added ~10 explanatory comments like
 ; "; native Suspend() never disarms this hotkey's own KeyWait/dispatch" across
-; lib/modules/adapters/ui, none of which added a real Suspend() call site.
+; infra/modules/adapters/ui, none of which added a real Suspend() call site.
 ; Without _StripFullLineComments/_DriverSourceNoComments, ANY future
 ; explanatory comment mentioning "Suspend(" reintroduces this false failure.
 _SWNPK_CommentDoesNotInflateSuspendCount() {
@@ -127,7 +127,7 @@ Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-
 _SWNPK_DrainHelperWaitsEveryPrefix() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("_SuspendPrefixesAreClear")
-	Assert(Seg != "", "_SuspendPrefixesAreClear() must exist in lib/lifecycle.ahk")
+	Assert(Seg != "", "_SuspendPrefixesAreClear() must exist in infra/lifecycle.ahk")
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)
 	ListPos := InStr(Src, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS")
@@ -159,7 +159,7 @@ Test("lifecycle: _SuspendDrainPrefix drains every registered custom-combination 
 ; « AltGr bloqué »). _ReleasePhantomModifiers clears it at boot.
 _SWNPK_BootReleasesPhantomModifiers() {
 	Seg := _DriverFuncBody("_ReleasePhantomModifiers")
-	Assert(Seg != "", "_ReleasePhantomModifiers() must exist in lib/lifecycle.ahk")
+	Assert(Seg != "", "_ReleasePhantomModifiers() must exist in infra/lifecycle.ahk")
 	Assert(InStr(Seg, "{SC138 up}") > 0,
 		"_ReleasePhantomModifiers must release SC138 (the AltGr/Kana prefix key) to clear an OS phantom carried across a Reload")
 	Assert(InStr(Seg, "{RAlt up}") > 0,

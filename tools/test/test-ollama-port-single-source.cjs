@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The default Ollama port lives in exactly ONE place —
  * _shared/modules/llm/defaults.json (llm_ollama_port). The AHK driver loads it
- * into LLM_Defaults (lib/llm_defaults.ahk) and sources every default from there:
+ * into LLM_Defaults (infra/llm_defaults.ahk) and sources every default from there:
  * api_ollama.ahk seeds LLM_OLLAMA_PORT at boot (LLM_Ollama_LoadDefaults), the
  * tray menu seeds _LLM_Menu["ollama_port"] (LLM_Menu_ApplySharedDefaults) and
  * reads the default via _LLM_DefaultFor("llm_ollama_port"). macOS reads the same

@@ -39,7 +39,7 @@ local assert_true = helpers.assert_true
 local Logger = require("logger")
 local json   = require("json")
 
-local Paths = require("lib.paths")
+local Paths = require("infra.paths")
 
 -- Every variant the corpus can name, mapped to the function that emits it.
 -- A vector naming a variant absent from this table fails loudly rather than

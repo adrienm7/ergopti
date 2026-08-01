@@ -13,7 +13,7 @@ local Logger = require("logger.shim")
 local LOG = "bridge.healthcheck"
 
 -- Single source of the driver version (never a re-typed literal).
-local Version = require("lib.version")
+local Version = require("infra.version")
 
 --- Resolves the active UI locale so the healthcheck dashboard renders in the
 --- user's language instead of a hardcoded 'fr'. Falls back to 'fr' only if
@@ -21,7 +21,7 @@ local Version = require("lib.version")
 --- a silent override of the user's persisted locale.
 --- @return string BCP-47-ish locale code (e.g. "de"), or "fr" on failure.
 local function _resolve_locale()
-	local ok, i18n = pcall(require, "lib.i18n")
+	local ok, i18n = pcall(require, "infra.i18n")
 	if ok and type(i18n) == "table" and type(i18n.get_locale) == "function" then
 		local ok2, loc = pcall(i18n.get_locale)
 		if ok2 and type(loc) == "string" and loc ~= "" then return loc end

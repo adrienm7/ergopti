@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 
 -- toml_reader logs through lib.logger; load it first under the stub
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local reader = helpers.load_with_stubs("lib.toml.reader")
+local reader = helpers.load_with_stubs("infra.toml.reader")
 
 local function write_temp(name, body)
 	local path = os.tmpname()

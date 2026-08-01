@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
-local SOURCE_DIRS = { "adapters", "lib", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
 
 -- The two forbidden markers, with the reason each one is banned.
 local FORBIDDEN = {

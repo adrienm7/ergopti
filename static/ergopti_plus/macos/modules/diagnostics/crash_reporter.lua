@@ -27,8 +27,8 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
 
 local LOG = "crash_reporter"
 
@@ -308,7 +308,7 @@ function M.prompt_user(report)
 	-- Required lazily: lib.notifications requires lib.logger, and crash_reporter is
 	-- itself reachable from the logger's error paths, so a top-level require would
 	-- tighten that cycle for a dependency only this one function needs.
-	local ok_notify, Notifications = pcall(require, "lib.notifications")
+	local ok_notify, Notifications = pcall(require, "infra.notifications")
 	local can_notify = ok_notify and type(Notifications) == "table"
 		and type(Notifications.notify) == "function"
 

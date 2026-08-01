@@ -34,13 +34,13 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
-local text_utils = require("lib.text_utils")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
+local text_utils = require("infra.text_utils")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
-local ok_notif, Notifications = pcall(require, "lib.notifications")
+local ok_notif, Notifications = pcall(require, "infra.notifications")
 if not ok_notif then Notifications = nil end
 
 local LOG = "karabiner.onboarding"
@@ -595,7 +595,7 @@ function M.run_first_run_wizard()
 
 	-- Decide which step to run based on the first missing dependency in order
 	-- of the install pipeline (app → sysext → daemon running).
-	local dialog_util = require("lib.dialog_util")
+	local dialog_util = require("infra.dialog_util")
 	if not report.ke_installed or not report.grabber_present then
 		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.required_title"),

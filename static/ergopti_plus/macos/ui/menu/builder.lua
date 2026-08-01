@@ -13,11 +13,11 @@
 
 local M = {}
 local hs         = hs
-local Logger     = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Paths      = require("infra.paths")
 local LOG        = "builder"
-local i18n       = require("lib.i18n")
+local i18n       = require("infra.i18n")
 local HotCounter  = require("ui.menu.hotstring_counter")
 local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
@@ -492,7 +492,7 @@ function M.generate(ctx, menu_mods, actions)
 
 	-- ── Tail: order driven by the shared manifest top_level (MENU-1/MENU-2).
 	-- Build log-level items first (needed only when "debug" id is dispatched).
-	local Logger_mod = require("lib.logger")
+	local Logger_mod = require("infra.logger")
 	local active_level_name = "INFO"
 	local log_level_items = {}
 	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do

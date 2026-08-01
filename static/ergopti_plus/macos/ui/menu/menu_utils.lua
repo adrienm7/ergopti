@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local M = {}
-local i18n = require("lib.i18n")
+local i18n = require("infra.i18n")
 
 --- Builds the canonical ✅/❌ category toggle item followed by a separator.
 --- Mirrors AHK's AddCategoryToggleItem — keeps both platforms structurally identical.

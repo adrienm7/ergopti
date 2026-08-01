@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Basic crash diagnostics for the Linux daemon. Writes crash dumps to
 --- ~/.local/share/ergopti/crashes/ when a pcall-wrapped operation fails with
---- a non-trivial error. Mirrors macOS lib/crash_reporter.lua in intent but
+--- a non-trivial error. Mirrors macOS infra/crash_reporter.lua in intent but
 --- uses filesystem dumps instead of hs.crash.crashReporter.
 ---
 --- FEATURES & RATIONALE:
@@ -28,7 +28,7 @@ local LOG = "diagnostics.crash_reporter"
 -- =========================================
 
 local MAX_CRASH_FILES = 20
-local CRASH_DIR = require("lib.config_paths").data("crashes")
+local CRASH_DIR = require("infra.config_paths").data("crashes")
 
 
 -- =========================================

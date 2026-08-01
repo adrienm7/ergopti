@@ -8,7 +8,7 @@
 ; Covers the override-file parser, the resolution cascade
 ; (user.section → user.file → toml.section → toml.file → GLOBAL_DEFAULT_DELAY)
 ; and the set / clear override mutators implemented in
-; ``lib/hotstrings_config.ahk``. The TOML metadata layer is mocked through
+; ``infra/hotstrings_config.ahk``. The TOML metadata layer is mocked through
 ; the global ``HotstringGroupConfig`` map populated by
 ; ``ParseTomlGroupConfig`` so the tests do not depend on the bundled
 ; hotstring files being present at a specific location during CI.
@@ -711,7 +711,7 @@ Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", Test
 ; and the next read silently reverted the user's whole delimiter set.
 TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
 	Body := _DriverFuncBody("_SaveOverrides")
-	Assert(Body != "", "_SaveOverrides must exist in lib/hotstrings/hotstrings_io.ahk")
+	Assert(Body != "", "_SaveOverrides must exist in infra/hotstrings/hotstrings_io.ahk")
 	Assert(InStr(Body, "_EscapeTomlString(_HotstringsWordDelimiters)") > 0,
 		"_SaveOverrides must escape word_delimiters exactly like _SaveGlobalKey does")
 	Assert(InStr(Body, "_EscapeTomlString(_HotstringsConsumedDelimiters)") > 0,

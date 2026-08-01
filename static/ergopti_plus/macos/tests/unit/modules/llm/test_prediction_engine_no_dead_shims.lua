@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 -- ===================================================
 
 helpers.describe("prediction_engine: B7.1 dead shim set_llm_show_model_name absent", function()
-	package.loaded["lib.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	local engine = helpers.load_with_stubs("modules.llm.prediction_engine")
 
 	helpers.it("set_llm_show_model_name is NOT exported (shim deleted, §5.6)", function()

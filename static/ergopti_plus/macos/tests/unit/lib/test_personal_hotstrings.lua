@@ -1,10 +1,10 @@
 --- tests/unit/lib/test_personal_hotstrings.lua
 
 --- ==============================================================================
---- MODULE: lib/personal_hotstrings load contract
+--- MODULE: infra/personal_hotstrings load contract
 --- DESCRIPTION:
 --- The personal hotstrings loader was extracted from init.lua Section 5.1 into
---- lib/personal_hotstrings. The Lua suite never loads init.lua, so without this
+--- infra/personal_hotstrings. The Lua suite never loads init.lua, so without this
 --- test a missing require, a renamed dep, or a regression in the load order would
 --- only surface as a boot failure on the maintainer's Mac. This exercises M.load
 --- under stubbed keymap/menu_paths/hotstring_editor/fs_dir and asserts (1) the
@@ -24,16 +24,16 @@ local function mock(name, mod)
 end
 local function restore_all()
 	for name, prev in pairs(SAVED) do package.loaded[name] = prev end
-	package.loaded["lib.personal_hotstrings"] = nil
+	package.loaded["infra.personal_hotstrings"] = nil
 end
 
-helpers.describe("lib/personal_hotstrings — load contract", function()
+helpers.describe("infra/personal_hotstrings — load contract", function()
 	helpers.it("registers personal first, then extensions in stem order, skipping the canonical file", function()
 		-- Record every keymap.load_toml call so we can assert order independently of
 		-- the returned list (the two must agree).
 		local registered = {}
 		mock("modules.keymap", {
-			-- The real module exports this constant and lib/personal_hotstrings reads
+			-- The real module exports this constant and infra/personal_hotstrings reads
 			-- it, so a stub without it hands nil to load_toml and the group silently
 			-- registers under no name. A stub must model the real API it stands in for.
 			PERSONAL_GROUP_NAME = "personal",
@@ -50,7 +50,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		})
 		-- A flat dir: one canonical file (must be skipped at prefix=="") + two
 		-- extension TOMLs returned out of order to prove the loader sorts them.
-		mock("lib.fs_dir", {
+		mock("infra.fs_dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then
 					return { "zebra.toml", "alpha.toml", "personal_hotstrings.toml", "_index.toml" }
@@ -68,8 +68,8 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		end
 		hs.json = { decode = function(_) return nil end }
 
-		package.loaded["lib.personal_hotstrings"] = nil
-		local PH = require("lib.personal_hotstrings")
+		package.loaded["infra.personal_hotstrings"] = nil
+		local PH = require("infra.personal_hotstrings")
 		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
 
 		hs.fs.attributes, hs.json = prev_attr, prev_json
@@ -112,7 +112,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("lib.fs_dir", {
+		mock("infra.fs_dir", {
 			-- Every directory in this fixture contains exactly one further "loop"
 			-- entry that resolves back to a directory — a growing-path cycle.
 			entries = function(_dir) return { "loop" } end,
@@ -126,8 +126,8 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		end
 		hs.json = { decode = function(_) return nil end }
 
-		package.loaded["lib.personal_hotstrings"] = nil
-		local PH = require("lib.personal_hotstrings")
+		package.loaded["infra.personal_hotstrings"] = nil
+		local PH = require("infra.personal_hotstrings")
 		local ok, err = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
 
 		hs.fs.attributes, hs.json = prev_attr, prev_json
@@ -159,7 +159,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("lib.fs_dir", {
+		mock("infra.fs_dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then return { "a__b.toml", "a" } end
 				if dir == "/fake/hot/a" then return { "b.toml" } end
@@ -177,8 +177,8 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 
 		-- Capture Logger.warn calls without silencing them (same pattern as
 		-- tests/meta/test_healthcheck_api_contract.lua).
-		package.loaded["lib.personal_hotstrings"] = nil
-		local Logger = require("lib.logger")
+		package.loaded["infra.personal_hotstrings"] = nil
+		local Logger = require("infra.logger")
 		local warnings = {}
 		local orig_warn = Logger.warn
 		Logger.warn = function(log_obj, fmt, ...)
@@ -186,7 +186,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 			return orig_warn(log_obj, fmt, ...)
 		end
 
-		local PH = require("lib.personal_hotstrings")
+		local PH = require("infra.personal_hotstrings")
 		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
 
 		Logger.warn = orig_warn

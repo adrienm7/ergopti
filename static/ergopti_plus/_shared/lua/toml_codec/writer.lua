@@ -6,7 +6,7 @@
 --- Serializes a hotstrings data structure back to the TOML format used by
 --- the application. Canonical source shared by all Lua-based drivers
 --- (Hammerspoon, future Linux driver). Previously lived at
---- hammerspoon/lib/toml_writer.lua; moved here so both drivers share one
+--- hammerspoon/infra/toml_writer.lua; moved here so both drivers share one
 --- implementation without duplication.
 ---
 --- FEATURES & RATIONALE:
@@ -27,11 +27,11 @@ local M = {}
 -- descriptions; elsewhere a print shim + key-passthrough i18n take over. Hard
 -- requires on lib.logger / lib.i18n here were the impurity that forced the Linux
 -- driver to fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "lib.logger")
+local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
-local _ok_i18n, i18n = pcall(require, "lib.i18n")
+local _ok_i18n, i18n = pcall(require, "infra.i18n")
 if not _ok_i18n or type(i18n) ~= "table" then
 	i18n = { get = function(k) return k end, get_locale = function() return "fr" end }
 end

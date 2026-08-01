@@ -387,7 +387,7 @@ _LLM_ModelBrowser_ShowWeb() {
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 	try {
-		; Reuse the shared session environment (lib/webview_utils.ahk) so no
+		; Reuse the shared session environment (infra/webview_utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
 		_LLM_MBW_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {

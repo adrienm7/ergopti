@@ -37,15 +37,15 @@
 local helpers = require("tests.helpers")
 
 -- Stub the shell adapter and reload the logger fresh so init_log_path picks it up.
-local _real_logger_loaded = package.loaded["lib.logger"]
+local _real_logger_loaded = package.loaded["infra.logger"]
 local _real_shell_loaded  = package.loaded["adapters.shell_runner"]
 
 local exec_log = {}
 package.loaded["adapters.shell_runner"] = {
 	exec = function(cmd) exec_log[#exec_log + 1] = tostring(cmd); return "" end,
 }
-package.loaded["lib.logger"] = nil
-local Logger = require("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = require("infra.logger")
 
 -- Age (days) stamped on the fake topical sub-file so the ephemeral pass must drop it.
 local STALE_SUB_FILE_AGE_DAYS = 3
@@ -225,4 +225,4 @@ end)
 
 -- Restore the real modules so subsequent test files are unaffected.
 package.loaded["adapters.shell_runner"] = _real_shell_loaded
-package.loaded["lib.logger"]            = _real_logger_loaded
+package.loaded["infra.logger"]            = _real_logger_loaded

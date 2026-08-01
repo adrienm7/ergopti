@@ -8,7 +8,7 @@
 --- inputs it needs are the min/max word limits, which this shim resolves from the
 --- Hammerspoon settings store (falling back to the llm DEFAULT_STATE) and threads
 --- into process_prediction's opts. Every other function (strip_thinking,
---- split_blocks) is re-exported unchanged — the same pattern as lib/text_utils.lua.
+--- split_blocks) is re-exported unchanged — the same pattern as infra/text_utils.lua.
 --- ==============================================================================
 
 local Shared = require("llm.parser")

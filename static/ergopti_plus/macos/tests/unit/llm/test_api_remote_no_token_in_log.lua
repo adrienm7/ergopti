@@ -45,7 +45,7 @@ helpers.describe("api_remote: the API token never reaches the log", function()
 	helpers.it("a dispatched Gemini request logs a redacted URL", function()
 		package.loaded["modules.llm.api_remote"] = nil
 		local api = helpers.load_with_stubs("modules.llm.api_remote", {})
-		local logger = require("lib.logger")
+		local logger = require("infra.logger")
 
 		-- Capture EVERY line the logger emits, at every level — the leak was a
 		-- debug line, and a capture restricted to errors would miss it entirely.

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Logger Lifecycle Pairing Test
 ; DESCRIPTION:
-; For each AHK source file in lib/ and modules/, counts LoggerStart vs
+; For each AHK source file in infra/ and modules/, counts LoggerStart vs
 ; LoggerSuccess and LoggerTrace vs LoggerDone occurrences. Imbalances are
 ; flagged as warnings (not errors) because legitimate early-return control
 ; flow can produce natural asymmetries.
@@ -95,7 +95,7 @@ _MetaRunLoggerPairingTests() {
 	Imbalanced := 0
 	Report := ""
 
-	for Sub in ["lib", "modules", "ui"] {
+	for Sub in ["infra", "modules", "ui"] {
 		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -146,7 +146,7 @@ _MetaNoStartBeforeReload() {
 	SplitPath(A_ScriptDir, , &Root)
 	Root := StrReplace(Root, "\", "/")
 	offenders := ""
-	for Sub in ["lib", "modules", "ui"] {
+	for Sub in ["infra", "modules", "ui"] {
 		Loop Files, Root . "/" . Sub . "/*.ahk", "FR" {
 			src := FileRead(A_LoopFileFullPath)
 			if RegExMatch(src, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")

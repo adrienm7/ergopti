@@ -31,8 +31,8 @@ local helpers = require("tests.helpers")
 -- Capture notifications fired by api_mlx. Installed BEFORE requiring api_mlx so the
 -- module captures this stub as its Notifications upvalue.
 local notify_calls = {}
-local _real_notifications = package.loaded["lib.notifications"]
-package.loaded["lib.notifications"] = {
+local _real_notifications = package.loaded["infra.notifications"]
+package.loaded["infra.notifications"] = {
 	notify = function(title, body, kind)
 		notify_calls[#notify_calls + 1] = { title = title, body = body, kind = kind }
 	end,
@@ -101,5 +101,5 @@ end)
 
 -- Restore the real notifications module and drop our fresh api_mlx instance so
 -- downstream test modules re-require the production wiring, not this stub.
-package.loaded["lib.notifications"] = _real_notifications
+package.loaded["infra.notifications"] = _real_notifications
 package.loaded["modules.llm.api_mlx"] = nil

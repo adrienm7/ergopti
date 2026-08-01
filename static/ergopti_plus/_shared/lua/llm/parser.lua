@@ -17,7 +17,7 @@
 --- reads them from its settings store; a Linux driver would read its own config).
 --- Each driver re-exports
 --- this module through a thin shim (macOS modules/llm/parser.lua), exactly like
---- lib/text_utils.lua re-exports shared text_utils.
+--- infra/text_utils.lua re-exports shared text_utils.
 ---
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).

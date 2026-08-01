@@ -27,16 +27,16 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,
 }
 -- git idle throughout: isolate self-write filtering from the git gate.
-package.loaded["lib.git_status"] = { operation_in_progress = function() return false end }
+package.loaded["infra.git_status"] = { operation_in_progress = function() return false end }
 
-package.loaded["lib.file_watchers"] = nil
-local FW = require("lib.file_watchers")
+package.loaded["infra.file_watchers"] = nil
+local FW = require("infra.file_watchers")
 
 local CONFIG_ROOT   = "/fake/config/"
 local CONFIG_TOML   = CONFIG_ROOT .. "hammerspoon/config.toml"
@@ -163,6 +163,6 @@ end)
 
 -- Restore the real modules for later test files: the stubs above would
 -- otherwise leak through package.loaded into whichever module loads next.
-package.loaded["lib.ui_restore"] = nil
-package.loaded["lib.git_status"] = nil
-package.loaded["lib.file_watchers"] = nil
+package.loaded["infra.ui_restore"] = nil
+package.loaded["infra.git_status"] = nil
+package.loaded["infra.file_watchers"] = nil

@@ -26,10 +26,10 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("lib.logger")
+local Logger         = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Timings        = require("lib.timings")
-local Keycodes       = require("lib.keycodes")
+local Timings        = require("infra.timings")
+local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -81,7 +81,7 @@ local LAYOUT_POLL_TIMEOUT_SEC = 5.0
 -- Watchdog handle declared ABOVE the poll body (closure-before-local rule): a
 -- `local` declared textually after a closure that uses it binds the nil GLOBAL,
 -- and the resulting error inside an async callback is swallowed to the
--- Hammerspoon Console — never reaching lib/logger.
+-- Hammerspoon Console — never reaching infra/logger.
 local _layout_poll_watchdog = nil
 
 -- Handle of the in-flight layout read, so the watchdog can reclaim it. Without

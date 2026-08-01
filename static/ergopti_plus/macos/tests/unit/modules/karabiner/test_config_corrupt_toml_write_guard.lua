@@ -26,7 +26,7 @@ local helpers = require("tests.helpers")
 
 local Config = helpers.load_with_stubs("modules.karabiner.config")
 -- Required AFTER Config so this is the very table config.lua just captured.
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 -- Unclosed table header plus a bare unquoted value: the shared codec returns a
 -- non-table for this input, which is exactly the "exists but cannot be decoded"

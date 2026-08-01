@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Every tray-menu row gets its label from the manifest's `description_key`,
  * resolved through the candidate chain in
- * `static/ergopti_plus/windows/lib/manifest_descriptions.ahk`. When no candidate
+ * `static/ergopti_plus/windows/infra/manifest_descriptions.ahk`. When no candidate
  * hits, `MenuLabelFromDescriptionKey` falls back to the LAST SEGMENT OF THE PATH
  * — so the user sees a raw snake_case id in the menu.
  *
@@ -47,7 +47,7 @@ const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MANIFEST = 'static/ergopti_plus/windows/_generated/features_manifest.ahk';
-const RESOLVER = 'static/ergopti_plus/windows/lib/manifest_descriptions.ahk';
+const RESOLVER = 'static/ergopti_plus/windows/infra/manifest_descriptions.ahk';
 const LOCALE_DIR = 'static/ergopti_plus/_shared/data/locales';
 
 // Non-feature entries whose label does not resolve today. This number may only
@@ -106,7 +106,7 @@ function readLocale(name) {
 const EN = readLocale('en');
 const FR = readLocale('fr');
 
-// lib/locale.ahk t(): active locale, then en, then fr. An empty string counts as
+// infra/locale.ahk t(): active locale, then en, then fr. An empty string counts as
 // MISSING at every level. A total miss returns the raw key.
 function t(key) {
 	if (EN[key] !== undefined && EN[key] !== '') return EN[key];
@@ -204,7 +204,7 @@ const resolverSrc = fs.readFileSync(path.join(REPO_ROOT, RESOLVER), 'utf8');
 check(
 	'the resolver still folds underscores and bridges the dynamic category',
 	resolverSrc.includes('_StripUnderscores') && resolverSrc.includes('dynamichotstrings.'),
-	'lib/manifest_descriptions.ahk no longer matches the cascade this test ports — update both together'
+	'infra/manifest_descriptions.ahk no longer matches the cascade this test ports — update both together'
 );
 check(
 	'the resolver still falls back to the path tail segment',

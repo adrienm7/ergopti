@@ -24,7 +24,7 @@
 ; replayed lines are simply missing, and the profiler looks like it was never
 ; wired up rather than like it lost its data.
 ;
-; SCOPE: source introspection. lib/boot_profiler.ahk is not loaded by the
+; SCOPE: source introspection. infra/boot_profiler.ahk is not loaded by the
 ; headless runner (it has no test-visible entry point and its only observable
 ; effect is log output), so the invariants are asserted against its source.
 ; ==============================================================================

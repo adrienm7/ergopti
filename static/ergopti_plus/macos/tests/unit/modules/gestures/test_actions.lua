@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local Actions = helpers.load_with_stubs("modules.gestures.actions")
 
@@ -311,8 +311,8 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 	-- replaced with a function that raises — driving an actual thrown exception through
 	-- the real action registry rather than a synthetic stub action.
 	local function make_actions_with_real_logger_and_throwing_timer()
-		package.loaded["lib.logger"] = nil
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 
 		package.loaded["modules.gestures.actions"] = nil

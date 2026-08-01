@@ -80,11 +80,11 @@ local Logger = require("logger.shim")
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
 -- two fatal errors below — went to a ring buffer and nowhere else.
-local LoggerSink = require("lib.logger_sink")
+local LoggerSink = require("infra.logger_sink")
 LoggerSink.install(Logger)
 
 -- Single source of the driver version (never a re-typed literal).
-local Version = require("lib.version")
+local Version = require("infra.version")
 local LOG = "ergopti_hotstrings"
 
 
@@ -100,7 +100,7 @@ local injector          = require("modules.hotstrings.injector")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
-local Monotonic         = require("lib.monotonic")
+local Monotonic         = require("infra.monotonic")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -167,7 +167,7 @@ if ok_kan then kanata = kan_mod end
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
 local file_watchers = nil
-local ok_fw, fw_mod = pcall(require, "lib.file_watchers")
+local ok_fw, fw_mod = pcall(require, "infra.file_watchers")
 if ok_fw then file_watchers = fw_mod end
 
 
@@ -178,7 +178,7 @@ if ok_fw then file_watchers = fw_mod end
 -- =========================================
 
 -- Default hotstring data location (XDG-compliant user config).
-local DEFAULT_CONFIG_DIR = require("lib.config_paths").config("hotstrings")
+local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
@@ -268,7 +268,7 @@ local function resolve_config_path(config_path)
 	-- One level up, not two: SCRIPT_DIR is the driver root and _shared is its
 	-- sibling. The old "../../" resolved outside the tree, so this fallback
 	-- never found the bundled hotstrings and silently returned the default dir.
-	local Paths = require("lib.paths")
+	local Paths = require("infra.paths")
 	local shared = Paths.shared("modules/hotstrings")
 	if not shared then return DEFAULT_CONFIG_DIR end
 	local fh2 = io.open(shared, "r")
@@ -683,7 +683,7 @@ local function main()
 	install_signal_handlers()
 
 	-- 8.10a) Initialise i18n (loads persisted locale, enables ★ substitution).
-	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 	if ok_i18n and i18n_mod then
 		i18n_mod.init()
 		i18n_mod.set_trigger_provider(function()

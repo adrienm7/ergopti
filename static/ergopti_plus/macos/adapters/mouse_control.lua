@@ -18,7 +18,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.mouse_control"
 

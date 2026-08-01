@@ -29,10 +29,10 @@ local keyStroke = hs.eventtap.keyStroke
 
 local km_utils         = require("modules.keymap.utils")
 local EventTapGuard = require("adapters.event_tap_guard")
-local text_utils       = require("lib.text_utils")
+local text_utils       = require("infra.text_utils")
 local core_llm         = require("modules.llm")
-local Logger           = require("lib.logger")
-local Keycodes         = require("lib.keycodes")
+local Logger           = require("infra.logger")
+local Keycodes         = require("infra.keycodes")
 local keylogger        = require("modules.keylogger")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")

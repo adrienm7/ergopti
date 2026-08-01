@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Text Utilities Tests
 ; DESCRIPTION:
-; Unit-tests for the pure string helpers in lib/text_utils.ahk.
+; Unit-tests for the pure string helpers in infra/text_utils.ahk.
 ; ==============================================================================
 
 

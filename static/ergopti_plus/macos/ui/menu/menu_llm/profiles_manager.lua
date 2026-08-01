@@ -11,12 +11,12 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
+local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
-local dialog        = require("lib.dialog_util")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
+local dialog        = require("infra.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 
 local LOG = "menu_llm.profiles"

@@ -17,8 +17,8 @@ local M = {}
 
 local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
 local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
-local Logger       = require("lib.logger")
-local Manifest     = require("lib.manifest_reader")
+local Logger       = require("infra.logger")
+local Manifest     = require("infra.manifest_reader")
 local LOG          = "dynamic_hotstrings"
 
 

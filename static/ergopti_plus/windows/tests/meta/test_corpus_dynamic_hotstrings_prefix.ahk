@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Loads the shared cross-driver corpus from
 ; _shared/tests/corpus/dynamic_hotstrings/prefix_vectors.json and validates
-; the AHK personal-info prefix counter (CountDynamicSection, lib/menu_helpers.ahk)
+; the AHK personal-info prefix counter (CountDynamicSection, infra/menu_helpers.ahk)
 ; against it — proving the AHK reimplementation of the phone/SSN/IBAN threshold
 ; arithmetic still matches the shared Lua reference it was hand-copied from
 ; (_shared/lua/dynamic_hotstrings/init.lua:compute_prefix_counts).

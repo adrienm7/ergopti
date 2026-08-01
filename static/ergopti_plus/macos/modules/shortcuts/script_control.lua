@@ -20,11 +20,11 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
+local notifications = require("infra.notifications")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Logger        = require("lib.logger")
-local Keycodes      = require("lib.keycodes")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local Keycodes      = require("infra.keycodes")
+local i18n          = require("infra.i18n")
 
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")

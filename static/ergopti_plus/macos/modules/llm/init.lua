@@ -14,8 +14,8 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
-local Logger    = require("lib.logger")
-local Paths     = require("lib.paths")
+local Logger    = require("infra.logger")
+local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.core"
@@ -548,7 +548,7 @@ local _model_index = nil
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
-	local Paths = require("lib.paths")
+	local Paths = require("infra.paths")
 	local path = Paths.shared_llm_path("models.json")
 	local presets = {}
 	if path then

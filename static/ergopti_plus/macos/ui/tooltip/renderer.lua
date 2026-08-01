@@ -12,7 +12,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
 
@@ -21,7 +21,7 @@ local Config = require("ui.tooltip.config")
 -- so macOS and Windows round identically — never hardcode it here.
 local CORNER_RADIUS = Config.layout.corner_radius
 
-local ok_bridge, vscode_bridge = pcall(require, "lib.vscode_bridge")
+local ok_bridge, vscode_bridge = pcall(require, "infra.vscode_bridge")
 if not ok_bridge then vscode_bridge = nil end
 
 

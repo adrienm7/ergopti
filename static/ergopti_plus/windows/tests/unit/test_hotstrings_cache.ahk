@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Hotstrings Self-Healing Cache Tests
 ; DESCRIPTION:
-; Pins the behaviour of lib/hotstrings/hotstrings_cache.ahk — the gitignored .tsv
+; Pins the behaviour of infra/hotstrings/hotstrings_cache.ahk — the gitignored .tsv
 ; cache that replaced the committed generated_*.ahk bundle. The bundled-hotstring
 ; registration path had NO end-to-end coverage in the headless suite before this;
 ; these tests are that safety net.

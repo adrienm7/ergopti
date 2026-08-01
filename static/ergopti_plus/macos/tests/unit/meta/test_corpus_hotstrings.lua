@@ -45,8 +45,8 @@ local function read_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Load hs stub to get access to json.decode
-	package.loaded["lib.logger"] = nil
-	helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	helpers.load_with_stubs("infra.logger")
 	local ok, corpus = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(corpus) end
 	return corpus, nil
@@ -118,8 +118,8 @@ end)
 -- ==========================================
 
 -- Load the registry with a clean stub environment
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 local Registry = helpers.load_with_stubs("modules.keymap.registry")
 
 -- Registry requires a core_state; provide a minimal one.
@@ -292,8 +292,8 @@ end)
 local function fresh_collision_registry()
 	package.loaded["modules.keymap.registry"] = nil
 	package.loaded["modules.keymap.terminators"] = nil
-	package.loaded["lib.logger"] = nil
-	helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	helpers.load_with_stubs("infra.logger")
 	local R = helpers.load_with_stubs("modules.keymap.registry")
 	R.init({
 		magic_key                  = "★",

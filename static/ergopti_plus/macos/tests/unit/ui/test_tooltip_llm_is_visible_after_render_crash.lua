@@ -33,16 +33,16 @@ helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions
 	--- regression covers — no additional stubbing is needed to trigger it.
 	local function load_tooltip_llm_with_logger_spy()
 		local logged_errors = {}
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		local Tooltip = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		-- tooltip_llm already bound its own upvalue to the real (mutated)
 		-- module above — release the cache entry now so the monkey-patched
-		-- .error doesn't leak into every later require("lib.logger") for the
+		-- .error doesn't leak into every later require("infra.logger") for the
 		-- rest of the full-suite process.
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Tooltip, logged_errors
 	end
 

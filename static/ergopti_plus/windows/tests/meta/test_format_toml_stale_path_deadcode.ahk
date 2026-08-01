@@ -42,7 +42,7 @@ _FTSP_NoStalePathTokens() {
 	; must be absent everywhere, so a whole-tree scan catches a reappearance in
 	; any file, not just the two the fix originally touched.
 	Src := _DriverSourceConcat()
-	Files := ["lib/toml/toml_helpers.ahk", "ui/personal_toml_editor.ahk"]
+	Files := ["infra/toml/toml_helpers.ahk", "ui/personal_toml_editor.ahk"]
 	for _, Rel in Files {
 		Assert(InStr(Src, StaleLayout) = 0,
 			Rel . " must not reference the stale '" . StaleLayout . "' layout - the driver lives under static/ergopti_plus/windows")

@@ -8,15 +8,15 @@
 --- FEATURES & RATIONALE:
 --- 1. Lightweight Rendering: Designed for simple text without AI diffs.
 --- 2. Failsafe Watchers: Dismisses on any standard user interaction.
---- 3. Stacked dequeue: per-row expiry logic mirrors AHK lib/tooltip.ahk and
+--- 3. Stacked dequeue: per-row expiry logic mirrors AHK infra/tooltip.ahk and
 ---    _shared/modules/tooltip/dequeue.js (see SPEC.md § 7.1).
 --- ==============================================================================
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Keycodes = require("lib.keycodes")
+local Keycodes = require("infra.keycodes")
 local LOG = "tooltip_hotstring"
 
 local Config = require("ui.tooltip.config")

@@ -62,7 +62,7 @@ echo "Copying driver files..."
 cp -r "$BUILD_DIR"/linux/*.lua "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 cp -r "$BUILD_DIR"/linux/modules "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 cp -r "$BUILD_DIR"/linux/adapters "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/lib "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/infra "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 cp -r "$BUILD_DIR"/linux/ui "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 cp -r "$BUILD_DIR"/linux/vendor "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 

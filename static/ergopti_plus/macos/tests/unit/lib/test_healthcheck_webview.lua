@@ -4,7 +4,7 @@
 --- MODULE: healthcheck Dead Webview Regression Tests
 --- DESCRIPTION:
 --- Source-level guard for the "healthcheck-webview-dead-userdata" bug in
---- lib/healthcheck.lua.
+--- infra/healthcheck.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The 200 ms poll timer called wv:evaluateJavaScript() with only an `if not wv`

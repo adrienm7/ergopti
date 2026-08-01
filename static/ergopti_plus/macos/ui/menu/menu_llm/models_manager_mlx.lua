@@ -12,10 +12,10 @@
 
 local M = {}
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger = require("lib.logger")
-local fs_dir       = require("lib.fs_dir")
-local i18n = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger = require("infra.logger")
+local fs_dir       = require("infra.fs_dir")
+local i18n = require("infra.i18n")
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).

@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 --- Returns a fixed STREAM_WATCHDOG_SEC so timer assertions are deterministic.
 local WATCHDOG_DELAY_SEC = 5.0
 
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	sec = function(_section, _key) return WATCHDOG_DELAY_SEC end,
 	ms  = function(_section, _key) return WATCHDOG_DELAY_SEC * 1000 end,
 }
@@ -37,8 +37,8 @@ package.loaded["modules.llm.parser"] = {
 }
 
 --- Load lib.logger first so the handler can require it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Load the module under test with a clean hs stub.
 local Handler = helpers.load_with_stubs("modules.llm.streaming_handler")

@@ -18,20 +18,20 @@
 
 local hs         = hs
 local eventtap   = hs.eventtap
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 local EventTapGuard = require("adapters.event_tap_guard")
 local km_utils   = require("modules.keymap.utils")
-local Logger     = require("lib.logger")
-local Keycodes   = require("lib.keycodes")
-local Manifest   = require("lib.manifest_reader")
+local Logger     = require("infra.logger")
+local Keycodes   = require("infra.keycodes")
+local Manifest   = require("infra.manifest_reader")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
-local Perf       = require("lib.perf")
-local HotPath    = require("lib.hotpath_profiler")
+local Perf       = require("infra.perf")
+local HotPath    = require("infra.hotpath_profiler")
 
 local M   = {}
 local LOG = "keymap"
@@ -223,7 +223,7 @@ end
 --- without mutating the counter themselves — only onKeyDownRaw's own drain
 --- below is allowed to decrement it (F-HIGH-17 fix).
 --- Uses Keycodes.to_name() (which reverse-maps the keycode registry already
---- required by lib/keycodes.lua) rather than a fresh keycode-map lookup here,
+--- required by infra/keycodes.lua) rather than a fresh keycode-map lookup here,
 --- so this peek adds no new raw OS-API call site to keymap/init.lua (tracked
 --- by the OS-API purity baseline meta-test).
 --- @param flags table The modifier flags from the key event.
@@ -393,7 +393,7 @@ M.reset_predictions  = LLMBridge.reset_predictions
 
 M.classify_trigger   = Registry.classify_trigger
 M.has_exact_trigger  = Registry.has_exact_trigger
--- The group name personal hotstrings are registered under. lib/personal_hotstrings
+-- The group name personal hotstrings are registered under. infra/personal_hotstrings
 -- loads the file with it at boot and ui/hotstring_editor reloads the SAME file with
 -- it on save. Exported so the two cannot drift: reloading under a different name
 -- left both copies alive, and the sort tie-break handed the win to whichever loaded
@@ -472,7 +472,7 @@ end
 
 -- ── Perf telemetry proxies ───────────────────────────────────────────────────
 -- Exposed on M so the Hammerspoon console can toggle sampling and read the
--- per-bucket p50/p99/max stats without having to `require("lib.perf")` by
+-- per-bucket p50/p99/max stats without having to `require("infra.perf")` by
 -- hand. Sampling defaults to disabled so production typing pays no cost;
 -- `M.perf_enable(true)` arms it, `M.perf_report_all()` emits the summary.
 

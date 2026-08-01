@@ -33,8 +33,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- export is required by Sql.flush(); category lookup is irrelevant here.
 package.loaded["modules.keylogger.export"] = {

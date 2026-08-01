@@ -27,11 +27,11 @@ local M = {}
 
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
-local Logger            = require("lib.logger")
+local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local TomlReader        = require("lib.toml.reader")
-local i18n              = require("lib.i18n")
-local Paths            = require("lib.paths")
+local TomlReader        = require("infra.toml.reader")
+local i18n              = require("infra.i18n")
+local Paths            = require("infra.paths")
 
 local LOG = "hotstrings_config_window"
 
@@ -122,10 +122,10 @@ local COLOR_PRESETS = {
 -- =========================================
 -- =========================================
 
--- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in lib/fs_dir so
+-- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is shared with init.lua's hotstring discovery; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("lib.fs_dir").entries
+local safe_dir_entries = require("infra.fs_dir").entries
 
 --- Lists TOML files in a directory, skipping names that start with `_`.
 --- Returns an array of absolute paths.

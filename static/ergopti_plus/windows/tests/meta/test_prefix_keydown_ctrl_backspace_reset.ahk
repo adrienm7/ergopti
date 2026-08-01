@@ -16,7 +16,7 @@
 
 _PKCB_CtrlBackspaceResetsBuffer() {
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
-	Assert(Body != "", "_OnPrefixKeyDown must exist in lib/hotstrings/hotstring_inputhook.ahk")
+	Assert(Body != "", "_OnPrefixKeyDown must exist in infra/hotstrings/hotstring_inputhook.ahk")
 
 	; The Ctrl-combo reset group (which does the context-unknown HSE_FeedReset) must
 	; include VK == 0x08 (Backspace), and that reset must precede the plain single-

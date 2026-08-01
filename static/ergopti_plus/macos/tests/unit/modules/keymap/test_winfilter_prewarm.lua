@@ -22,8 +22,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.keymap.utils"] = nil
-package.loaded["lib.logger"]           = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"]           = nil
+helpers.load_with_stubs("infra.logger")
 
 helpers.describe("keymap.utils prewarm_ignored_win_watchers (winfilter-cold-start)", function()
 	helpers.it("exposes M.prewarm_ignored_win_watchers as a function", function()

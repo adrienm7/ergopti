@@ -15,9 +15,9 @@
 
 local M = {}
 
-local i18n   = require("lib.i18n")
-local Logger = require("lib.logger")
-local dialog = require("lib.dialog_util")
+local i18n   = require("infra.i18n")
+local Logger = require("infra.logger")
+local dialog = require("infra.dialog_util")
 
 local LOG = "models_selector"
 

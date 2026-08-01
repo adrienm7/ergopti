@@ -65,7 +65,7 @@ LLMApiLoadTimings() {
 
 ; Source the Ollama port default from the shared registry (LLM_Defaults, loaded
 ; from _shared/modules/llm/defaults.json) at boot — keeps 11434 in exactly one
-; place. Mirrors LLMApiLoadTimings; called right after it in lib/boot.ahk, after
+; place. Mirrors LLMApiLoadTimings; called right after it in infra/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
 LLM_Ollama_LoadDefaults() {
 	global LLM_Defaults, LLM_OLLAMA_KEEP_ALIVE

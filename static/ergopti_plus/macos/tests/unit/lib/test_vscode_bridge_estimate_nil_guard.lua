@@ -11,11 +11,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/vscode_bridge.lua rather than by
+-- Selected by a declaration unique to infra/vscode_bridge.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function get_editor_ax_frame")
-helpers.assert_true(src ~= nil, "lib/vscode_bridge.lua source must be locatable")
+helpers.assert_true(src ~= nil, "infra/vscode_bridge.lua source must be locatable")
 
 -- Locate estimate_position body.
 local fn_pos = src:find("function M.estimate_position()", 1, true)

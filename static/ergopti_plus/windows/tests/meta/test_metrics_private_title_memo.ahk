@@ -23,7 +23,7 @@
 ; evaluates an arbitrary caller-supplied title, not the live focus cache — keeps
 ; scanning unconditionally.
 ;
-; SCOPE: source introspection. lib/metrics/metrics_filters.ahk is not among the
+; SCOPE: source introspection. infra/metrics/metrics_filters.ahk is not among the
 ; production files the headless runner includes, so MF_ShouldFilter cannot be
 ; called here; a behavioural twin becomes possible the day that include is added.
 ; ==============================================================================
@@ -41,7 +41,7 @@
 
 _MFP_ScanIsMemoizedOnTheTitle() {
 	Body := _DriverFuncBody("MF_ShouldFilter")
-	Assert(Body != "", "MF_ShouldFilter must exist in lib/metrics/metrics_filters.ahk")
+	Assert(Body != "", "MF_ShouldFilter must exist in infra/metrics/metrics_filters.ahk")
 
 	MemoPos  := InStr(Body, "static _private_memo")
 	GuardPos := InStr(Body, "title !== memo.title")
@@ -103,7 +103,7 @@ Test("metrics_filters: the title memo is published in one atomic swap (metrics-p
 ; live-focus memo would answer the wrong question for it.
 _MFP_OutgoingVariantScansUnconditionally() {
 	Body := _DriverFuncBody("MF_ShouldFilterFor")
-	Assert(Body != "", "MF_ShouldFilterFor must exist in lib/metrics/metrics_filters.ahk")
+	Assert(Body != "", "MF_ShouldFilterFor must exist in infra/metrics/metrics_filters.ahk")
 	Assert(InStr(Body, "for _, pat in MF_PRIVATE_TITLE_PATTERNS") > 0,
 		"prerequisite: MF_ShouldFilterFor must still scan the private-browsing patterns against the supplied title")
 	Assert(InStr(Body, "_private_memo") = 0,

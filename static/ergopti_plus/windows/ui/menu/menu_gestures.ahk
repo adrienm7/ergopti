@@ -128,7 +128,7 @@ ToggleGesturesEnabled() {
 		and Features["gestures"]["enabled"] = true)
 	; v2-native write via the canonical manifest path — no v1->v2 translation.
 	; WriteFeatureV2 derives the [ahk.gestures] section + the Features node from
-	; the path and persists in lock-step (see lib/feature_io.ahk).
+	; the path and persists in lock-step (see infra/feature_io.ahk).
 	WriteFeatureV2(Features, "ahk.gestures.enabled", NewVal)
 	ReloadPreservingSuspend()
 }

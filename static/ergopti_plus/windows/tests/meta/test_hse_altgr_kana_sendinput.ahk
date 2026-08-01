@@ -18,7 +18,7 @@
 ;   eliminating the hook-chain round-trip latency. Reverting to SendEvent
 ;   silently re-adds the expansion latency on AltGr-fixup keyboards.
 ;
-; SCOPE: source introspection of lib/hotstrings/hotstring_engine_main.ahk.
+; SCOPE: source introspection of infra/hotstrings/hotstring_engine_main.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,7 +35,7 @@
 
 _MetaCheckHseAltGrKanaSendInput() {
 	; Move-resilient: isolate HSE_DispatchMatch's body across the whole driver
-	; source. Scoping to the function body (not the lib/hotstrings dir) is
+	; source. Scoping to the function body (not the infra/hotstrings dir) is
 	; required because a SIBLING function in hotstring_engine.ahk legitimately
 	; uses SendEvent("{SC138 Up}"); the absent check must stay scoped to
 	; HSE_DispatchMatch alone.

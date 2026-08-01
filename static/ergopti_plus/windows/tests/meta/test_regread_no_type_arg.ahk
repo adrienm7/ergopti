@@ -4,7 +4,7 @@
 ; MODULE: Reg_ReadBinary No Third Argument Guard
 ; DESCRIPTION:
 ; Static source guard for the Reg_ReadBinary invalid third-argument fix in
-; lib/registry.ahk.
+; infra/registry.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; AHK v2's RegRead() accepts exactly two arguments: (KeyPath, ValueName). In
@@ -42,11 +42,11 @@ _TRNTA_StripLineComments(Src) {
 ; ================================================================
 
 _TRNTA_NoThirdArg() {
-	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("lib/registry.ahk"))
-	Assert(Src != "", "lib/registry.ahk must be readable")
+	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("infra/registry.ahk"))
+	Assert(Src != "", "infra/registry.ahk must be readable")
 
 	Body := _DriverFuncBody("Reg_ReadBinary")
-	Assert(Body != "", "Reg_ReadBinary must be defined in lib/registry.ahk")
+	Assert(Body != "", "Reg_ReadBinary must be defined in infra/registry.ahk")
 
 	; The broken AHK v1 form passes "REG_BINARY" as third argument
 	Assert(InStr(Body, "REG_BINARY") = 0,

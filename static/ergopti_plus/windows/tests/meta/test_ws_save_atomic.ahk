@@ -4,7 +4,7 @@
 ; MODULE: _WS_Save Atomic Write Guard
 ; DESCRIPTION:
 ; Static source guard for the _WS_Save atomic write fix in
-; lib/wrap_symbols_config.ahk.
+; infra/wrap_symbols_config.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original _WS_Save wrote directly to the config file, leaving a window
@@ -40,11 +40,11 @@ _TWSA_StripLineComments(Src) {
 ; ========================================================
 
 _TWSA_AtomicWrite() {
-	Src := _TWSA_StripLineComments(_TWSA_ReadSource("lib/wrap_symbols_config.ahk"))
-	Assert(Src != "", "lib/wrap_symbols_config.ahk must be readable")
+	Src := _TWSA_StripLineComments(_TWSA_ReadSource("infra/wrap_symbols_config.ahk"))
+	Assert(Src != "", "infra/wrap_symbols_config.ahk must be readable")
 
 	Body := _DriverFuncBody("_WS_Save")
-	Assert(Body != "", "_WS_Save must be defined in lib/wrap_symbols_config.ahk")
+	Assert(Body != "", "_WS_Save must be defined in infra/wrap_symbols_config.ahk")
 
 	; Must use a .tmp staging file
 	Assert(InStr(Body, ".tmp") > 0,

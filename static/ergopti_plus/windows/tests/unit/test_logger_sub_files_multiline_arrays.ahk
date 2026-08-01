@@ -117,7 +117,7 @@ Test("logger: a multi-line TOML patterns array keeps every pattern (logger-subfi
 ; The fix for that was structural rather than another careful quote-stripping
 ; pass: the driver no longer parses the TOML at all. So the assertion is now that
 ; there is no parser here to get it wrong — a hand-rolled array reader inside
-; lib/logger.ahk is the precondition for the whole bug class, and it was one of
+; infra/logger.ahk is the precondition for the whole bug class, and it was one of
 ; TWO copies of the same grammar, which is why the same fix had to be written
 ; twice in two languages.
 _LSFM_NoHandRolledParserRemains() {

@@ -4,7 +4,7 @@
 --- MODULE: vscode_bridge AX Frame Cache Regression Tests
 --- DESCRIPTION:
 --- Source-level guard for the "vscode-bridge-blocking-ax-call" bug in
---- lib/vscode_bridge.lua.
+--- infra/vscode_bridge.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- get_editor_ax_frame() called hs.axuielement synchronously on every invocation
@@ -33,11 +33,11 @@ local helpers = require("tests.helpers")
 helpers.describe("vscode_bridge — AX frame cache (vscode-bridge-blocking-ax-call)", function()
 
 	local function read_source()
-		-- Selected by a declaration unique to lib/vscode_bridge.lua rather than by
+		-- Selected by a declaration unique to infra/vscode_bridge.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function get_editor_ax_frame")
-		helpers.assert_true(src ~= nil, "lib/vscode_bridge.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "infra/vscode_bridge.lua source must be locatable")
 		return src
 	end
 
@@ -109,7 +109,7 @@ helpers.describe("vscode_bridge — a negative AX lookup is cached (behaviour)",
 		local ax_calls = 0
 		local captured_callback
 
-		local Bridge = helpers.load_with_stubs("lib.vscode_bridge", {
+		local Bridge = helpers.load_with_stubs("infra.vscode_bridge", {
 			application = {
 				frontmostApplication = function()
 					return { bundleID = function() return "com.microsoft.VSCode" end }

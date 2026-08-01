@@ -37,14 +37,14 @@ local helpers = require("tests.helpers")
 helpers.describe("http_client: a throwing completion callback is logged, not swallowed", function()
 	helpers.it("reports the throw and contains it", function()
 		local errors = {}
-		package.loaded["lib.logger"] = nil
-		local real_logger = require("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local real_logger = require("infra.logger")
 		local spy = setmetatable({}, { __index = real_logger })
 		spy.error = function(_mod, fmt, ...)
 			local ok, formatted = pcall(string.format, fmt, ...)
 			errors[#errors + 1] = ok and formatted or tostring(fmt)
 		end
-		package.loaded["lib.logger"] = spy
+		package.loaded["infra.logger"] = spy
 
 		package.loaded["adapters.http_client"] = nil
 		local HC = helpers.load_with_stubs("adapters.http_client", {
@@ -86,7 +86,7 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 				.. "that never completed — no prediction, no error, nothing to search for. "
 				.. "Errors seen: " .. (#errors > 0 and table.concat(errors, " | ") or "(none)"))
 
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		package.loaded["adapters.http_client"] = nil
 	end)
 end)

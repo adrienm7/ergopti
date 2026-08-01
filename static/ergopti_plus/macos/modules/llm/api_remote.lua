@@ -32,10 +32,10 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Timings        = require("lib.timings")
-local Paths          = require("lib.paths")
+local Logger         = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Timings        = require("infra.timings")
+local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")

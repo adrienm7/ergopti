@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch" anti-pattern
 ; (docs/PROJECT_MEMORY.md's project-ahk-invariant-incomplete-application).
-; AltTabMonitor (lib/window_utils.ahk) enumerates every top-level window and
+; AltTabMonitor (infra/window_utils.ahk) enumerates every top-level window and
 ; calls several WinGet* functions per window with NO try/catch at all — a
 ; window closing mid-enumeration (a routine race, not a bug) threw
 ; TargetError uncaught, which for the two tap-hold hotkey call sites
@@ -15,7 +15,7 @@
 ; modules/gestures/window_cycle.ahk) was correctly hardened for the identical
 ; race (commit 7b701020d); this file was never touched by that campaign.
 ;
-; SCOPE: source introspection of lib/window_utils.ahk. AltTabMonitor itself is
+; SCOPE: source introspection of infra/window_utils.ahk. AltTabMonitor itself is
 ; not unit-testable without a live desktop (see tests/unit/test_window_utils.ahk).
 ; ==============================================================================
 
@@ -32,7 +32,7 @@
 
 _ATMC_CheckCatchPresentAndContinues() {
 	Body := _DriverFuncBody("AltTabMonitor")
-	Assert(Body != "", "AltTabMonitor must exist in lib/window_utils.ahk")
+	Assert(Body != "", "AltTabMonitor must exist in infra/window_utils.ahk")
 
 	TryPos := InStr(Body, "try {")
 	Assert(TryPos > 0, "AltTabMonitor must wrap the per-window enumeration body in a try")
@@ -58,7 +58,7 @@ Test("window_utils: AltTabMonitor's per-window try has a catch that logs and con
 ; documented "invariant applied per-site, one sibling missed" shape.
 _ATMC_ActivationIsGuardedToo() {
 	Body := _DriverFuncBody("AltTabMonitor")
-	Assert(Body != "", "AltTabMonitor must exist in lib/window_utils.ahk")
+	Assert(Body != "", "AltTabMonitor must exist in infra/window_utils.ahk")
 
 	ActPos := InStr(Body, "WinActivate(")
 	Assert(ActPos > 0, "AltTabMonitor must still activate a window")

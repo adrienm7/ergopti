@@ -12,10 +12,10 @@
 
 local M = {}
 local hs     = hs
-local i18n   = require("lib.i18n")
+local i18n   = require("infra.i18n")
 local Labels = require("menu.labels")
-local text_utils = require("lib.text_utils")
-local dialog = require("lib.dialog_util")
+local text_utils = require("infra.text_utils")
+local dialog = require("infra.dialog_util")
 
 
 

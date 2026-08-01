@@ -10,13 +10,13 @@
 ; — the contract the GitHub Actions workflow relies on to fail the CI build.
 ;
 ; FEATURES & RATIONALE:
-; 1. The runner #Includes the production ``lib/`` files directly. This means
+; 1. The runner #Includes the production ``infra/`` files directly. This means
 ;    a refactor in a lib file is immediately exercised by the corresponding
 ;    test_*.ahk file with no per-test glue to maintain.
 ; 2. ``modules/`` files are deliberately NOT included — they register hotkeys
 ;    at top level and would prevent the runner from exiting cleanly. The
 ;    behaviour exposed by modules (layer / shortcuts / hotstrings) is tested
-;    through the lib/ helpers it shares with production.
+;    through the infra/ helpers it shares with production.
 ; 3. AHK v2 directives at the top mirror those in ErgoptiPlus.ahk so that
 ;    parser quirks (#Warn VarUnset, encoding) are identical between test
 ;    runs and production startup.
@@ -52,11 +52,11 @@ while (_riArgIndex <= A_Args.Length) {
 #Include test_framework.ahk
 
 ; AppState — must come before test_stubs.ahk because the stubs reference
-; AppState fields directly, and before any lib/ file that reads AppState.
-#Include ../lib/app_state.ahk
+; AppState fields directly, and before any infra/ file that reads AppState.
+#Include ../infra/app_state.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
-; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which lib/ files
+; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
 
@@ -81,7 +81,7 @@ _FatalErrorHandler(e, mode) {
 OnError(_FatalErrorHandler)
 
 ; ── Production lib files in dependency order ──
-#Include ../lib/app_state.ahk
+#Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -89,56 +89,56 @@ OnError(_FatalErrorHandler)
 ; (A_IsCompiled is false in the test runner, and it would ExitApp on failure
 ; anyway) — only its pure helpers (_Bundle_ResolveDir, ResolveLocalAppDataDir)
 ; are invoked directly by the regression test.
-#Include ../lib/bundle.ahk
-#Include ../lib/ui_style.ahk
+#Include ../infra/bundle.ahk
+#Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
-#Include ../lib/logger.ahk
-#Include ../lib/toml/toml_helpers.ahk
+#Include ../infra/logger.ahk
+#Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
-#Include ../lib/timings/timings_config.ahk
+#Include ../infra/timings/timings_config.ahk
 
-#Include ../lib/window_utils.ahk
-#Include ../lib/text_utils.ahk
-#Include ../lib/nav_layer_helpers.ahk
-#Include ../lib/hotstrings/hotstring_engine.ahk
-#Include ../lib/hotstrings/hotstring_engine_main.ahk
-#Include ../lib/hotstrings/hotstring_buffer_effects.ahk
-#Include ../lib/hotstrings/hotstring_live_toggle.ahk
-#Include ../lib/hotstrings/hotstring_count_policy.ahk
-#Include ../lib/hotstrings/hotstring_prefix_watcher.ahk
-#Include ../lib/master_gates.ahk
+#Include ../infra/window_utils.ahk
+#Include ../infra/text_utils.ahk
+#Include ../infra/nav_layer_helpers.ahk
+#Include ../infra/hotstrings/hotstring_engine.ahk
+#Include ../infra/hotstrings/hotstring_engine_main.ahk
+#Include ../infra/hotstrings/hotstring_buffer_effects.ahk
+#Include ../infra/hotstrings/hotstring_live_toggle.ahk
+#Include ../infra/hotstrings/hotstring_count_policy.ahk
+#Include ../infra/hotstrings/hotstring_prefix_watcher.ahk
+#Include ../infra/master_gates.ahk
 ; Generated terminator catalogue (shared single source) — exercised by
 ; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
 #Include ../_generated/terminators.ahk
-#Include ../lib/toml/toml_loader.ahk
-#Include ../lib/hotstrings/hotstrings_cache.ahk
-#Include ../lib/toml/toml_config_loader.ahk
-#Include ../lib/tap_hold/tap_hold_loader.ahk
+#Include ../infra/toml/toml_loader.ahk
+#Include ../infra/hotstrings/hotstrings_cache.ahk
+#Include ../infra/toml/toml_config_loader.ahk
+#Include ../infra/tap_hold/tap_hold_loader.ahk
 #Include ../_generated/features_manifest.ahk
-#Include ../lib/manifest_reader.ahk
-#Include ../lib/feature_io.ahk
+#Include ../infra/manifest_reader.ahk
+#Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
 ; is never called here, so its own unseeded global (_PersonalShortcutsRegistry)
 ; is harmless (#Warn VarUnset is off).
-#Include ../lib/personal_features.ahk
-#Include ../lib/hotstrings/hotstrings_config.ahk
+#Include ../infra/personal_features.ahk
+#Include ../infra/hotstrings/hotstrings_config.ahk
 ; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
 ; the F5/F48 regression tests (test_config_io_feature_section_prefix.ahk).
 ; ToggleAllFeatures/SaveFullConfig themselves are never invoked here (they
 ; depend on numerous boot-only globals and end in an unconditional Reload()),
 ; so including this file is safe — only function definitions at top level.
-#Include ../lib/config_io.ahk
+#Include ../infra/config_io.ahk
 #Include ../ui/personal_toml_editor.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
 ; by the dynamic-hotstrings corpus parity test.
-#Include ../lib/menu_helpers.ahk
+#Include ../infra/menu_helpers.ahk
 ; Wrap-symbols persistence: globals and function definitions only, no top-level
 ; side effects, so it loads headlessly. Included so the load/save data-loss
 ; guard (test_wrap_symbols_unreadable_blocks_save.ahk) can drive the real
 ; functions instead of scanning their source.
-#Include ../lib/wrap_symbols_config.ahk
+#Include ../infra/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
@@ -147,16 +147,16 @@ OnError(_FatalErrorHandler)
 #Include ../ui/tooltip/init.ahk
 #Include ../modules/updater.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
-#Include ../lib/registry.ahk
-#Include ../lib/json.ahk
+#Include ../infra/registry.ahk
+#Include ../infra/json.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
 ; management) follows it and calls into the loaders/state it declares.
-#Include ../lib/locale.ahk
+#Include ../infra/locale.ahk
 #Include ../_generated/gesture_emit_actions.ahk
 #Include ../_generated/locale_table.ahk
-#Include ../lib/i18n.ahk
+#Include ../infra/i18n.ahk
 _LogBootProgress("i18n included (t() available)")
 
 ; Install the hotstring hooks for the entire test process so neither real
@@ -189,7 +189,7 @@ InstallHotstringHooks()
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
 ; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
-#Include ../lib/hook_dispatcher.ahk
+#Include ../infra/hook_dispatcher.ahk
 #Include ../adapters/keyboard_hook.ahk
 
 ; Lock _AHK_SendText / _AHK_SendInput to no-ops AFTER the adapter has been
@@ -270,7 +270,7 @@ InstallSendNoOps()
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
-#Include ../lib/metrics/metrics_shortcuts.ahk
+#Include ../infra/metrics/metrics_shortcuts.ahk
 #Include unit/test_metrics_shortcut_named_key.ahk
 #Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
 
@@ -281,7 +281,7 @@ InstallSendNoOps()
 ; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
 _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/models.ahk
-#Include ../lib/llm_defaults.ahk
+#Include ../infra/llm_defaults.ahk
 ; llm_profiles_data.ahk (generated) defines LLM_LEGACY_IDS + LLM_GetBasicPrompt()
 ; which profiles.ahk depends on — see the LLM legacy/basic-prompt single-source tests.
 #Include ../_generated/llm_profiles_data.ahk
@@ -361,11 +361,11 @@ _LogBootProgress("gestures + test included")
 ; here so the class static initialiser does not crash the test runner.
 _LogBootProgress("loading keylogger modules")
 global _VendorDir := A_ScriptDir . "\..\vendor"
-; keylogger_prefetch.ahk normally receives this from lib/boot.ahk.  The
+; keylogger_prefetch.ahk normally receives this from infra/boot.ahk.  The
 ; headless runner loads only the pure worker protocol, so provide its explicit
 ; config-root dependency without executing the full driver boot sequence.
 global _ConfigDir := A_Temp . "\ergopti_test_config\"
-#Include ../lib/sqlite3.ahk
+#Include ../infra/sqlite3.ahk
 #Include ../modules/keylogger/keylogger_walker.ahk
 #Include ../modules/keylogger/keylogger_app_categories.ahk
 #Include ../modules/keylogger/keylogger_reader.ahk
@@ -585,11 +585,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; MenuManifest_LoadTopLevelTail/LoadGlobalActions/LoadDebugMenu — needed so
 ; the gestures-actions-separator regression test can exercise the real
 ; production loader (not a source-scan) against the real shared manifest.
-#Include ../lib/menu_manifest.ahk
+#Include ../infra/menu_manifest.ahk
 ; The generic manifest walker. Pure function definitions — no top-level
 ; statements, no includes — so pulling it in is side-effect free, and it lets
 ; disabled_when tests exercise the real resolver instead of scanning its source.
-#Include ../lib/manifest_menu.ahk
+#Include ../infra/manifest_menu.ahk
 ; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
 #Include meta/test_menu_top_level_drift_gate.ahk
 ; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.

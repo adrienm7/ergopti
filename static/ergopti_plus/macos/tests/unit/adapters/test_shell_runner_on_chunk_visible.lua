@@ -92,11 +92,11 @@ end)
 helpers.describe("ShellRunner: ERROR logged when on_chunk throws (F-HIGH-21 behaviour)", function()
 
 	helpers.it("captures Logger.error when on_chunk throws 'boom' and keeps streaming", function()
-		-- Capture log output via Logger.set_sink — the real contract (lib/logger.lua
+		-- Capture log output via Logger.set_sink — the real contract (infra/logger.lua
 		-- M.set_sink) invokes _test_sink(console_line, sink_variant) with the variant
 		-- as a lowercase string (see test_shell_runner_on_done_visible.lua).
 		local errors_logged = {}
-		local logger = helpers.load_with_stubs("lib.logger")
+		local logger = helpers.load_with_stubs("infra.logger")
 		if type(logger.set_sink) == "function" then
 			logger.set_sink(function(console_line, sink_variant)
 				if sink_variant == "error" then errors_logged[#errors_logged + 1] = console_line end

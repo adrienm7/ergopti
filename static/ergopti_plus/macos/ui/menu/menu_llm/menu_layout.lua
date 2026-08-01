@@ -23,8 +23,8 @@
 local M = {}
 
 local hs     = hs
-local Paths  = require("lib.paths")
-local Logger = require("lib.logger")
+local Paths  = require("infra.paths")
+local Logger = require("infra.logger")
 
 local LOG = "LLMMenuLayout"
 

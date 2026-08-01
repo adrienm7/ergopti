@@ -35,8 +35,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Builds a fresh temp directory path for this test run's KC_LOG_PATH so
 --- concurrent test runs (or repeated `--only` reruns) never collide on the
@@ -89,7 +89,7 @@ local function load_kc_bridge_with_tmp_path()
 	-- Piggyback on load_with_stubs for the hs stub reset, targeting a throwaway
 	-- module so its "ui.menu.*" wipe runs, then reinstall our stub and require
 	-- the real target ourselves.
-	helpers.load_with_stubs("lib.logger", hs_overrides)
+	helpers.load_with_stubs("infra.logger", hs_overrides)
 	package.loaded["ui.menu.menu_paths"] = {
 		get_config_dir = function() return tmp_dir end,
 	}

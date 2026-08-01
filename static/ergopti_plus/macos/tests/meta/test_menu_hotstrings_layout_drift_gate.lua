@@ -8,7 +8,7 @@
 --- hand-assembled imperatively and never read
 --- _shared/modules/menu/menu_manifest.json's hotstrings_menu/layout_menu
 --- arrays — unlike gestures_menu/metrics_menu/shortcuts_menu, which are
---- rendered through lib/manifest_menu.lua's ManifestMenu.build and therefore
+--- rendered through infra/manifest_menu.lua's ManifestMenu.build and therefore
 --- cannot drift from the manifest by construction.
 ---
 --- A full manifest-driven migration of hotstrings/layout is a larger, riskier
@@ -29,7 +29,7 @@
 --- only prevents it from growing silently.
 ---
 --- The AHK half reads both keys generically via MenuRenderer_Build in
---- lib/manifest_menu.ahk (see ui/menu/menu_hotstrings.ahk,
+--- infra/manifest_menu.ahk (see ui/menu/menu_hotstrings.ahk,
 --- ui/menu/menu_layout.ahk) — no equivalent drift gate is needed there.
 --- ==============================================================================
 

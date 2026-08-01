@@ -18,9 +18,9 @@
 ; inflate the count.
 ;
 ; THREE TREES, THREE BASELINES:
-; The ratchet used to scan modules/ and lib/ only, against one combined total.
+; The ratchet used to scan modules/ and infra/ only, against one combined total.
 ; Both halves of that were holes. ui/ was unwatched and carries 130 direct OS
-; calls — 108 of them DllCall, nearly as many as modules/ and lib/ together —
+; calls — 108 of them DllCall, nearly as many as modules/ and infra/ together —
 ; and the entry point carries 8 more; a WebView2 host is exactly the kind of
 ; code that accumulates raw COM and window handles, so leaving the UI tree out
 ; excluded the most OS-bound code in the driver. And a single combined total
@@ -139,7 +139,7 @@ _AOPR_BASELINE_ENTRY := 8
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "lib"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -259,7 +259,7 @@ _AOPR_FAMILY_BASELINE_ENTRY := 11
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "lib"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 

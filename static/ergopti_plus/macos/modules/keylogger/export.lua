@@ -27,8 +27,8 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
 local LOG    = "keylogger.export"
 
 

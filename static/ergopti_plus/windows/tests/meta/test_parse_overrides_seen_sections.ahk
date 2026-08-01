@@ -4,7 +4,7 @@
 ; MODULE: _ParseOverrides Duplicate Section Detection Guard
 ; DESCRIPTION:
 ; Static source guard for the duplicate-section detection fix in
-; lib/hotstrings/hotstrings_config.ahk.
+; infra/hotstrings/hotstrings_config.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original _ParseOverrides function parsed TOML section headers without
@@ -42,11 +42,11 @@ _TPOSS_StripLineComments(Src) {
 ; ===========================================================
 
 _TPOSS_SeenSectionsTracker() {
-	Src := _TPOSS_StripLineComments(_TPOSS_ReadSource("lib/hotstrings/hotstrings_config.ahk"))
-	Assert(Src != "", "lib/hotstrings/hotstrings_config.ahk must be readable")
+	Src := _TPOSS_StripLineComments(_TPOSS_ReadSource("infra/hotstrings/hotstrings_config.ahk"))
+	Assert(Src != "", "infra/hotstrings/hotstrings_config.ahk must be readable")
 
 	Body := _DriverFuncBody("_ParseOverrides")
-	Assert(Body != "", "_ParseOverrides must be defined in lib/hotstrings/hotstrings_config.ahk")
+	Assert(Body != "", "_ParseOverrides must be defined in infra/hotstrings/hotstrings_config.ahk")
 
 	; SeenSections Map must be declared
 	Assert(InStr(Body, "SeenSections := Map()") > 0,

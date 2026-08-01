@@ -19,7 +19,7 @@
  * HOSTS ARE DISCOVERED, NOT LISTED:
  * This guard used to carry a hand-written list of seven hosts. Thirteen files
  * close a WebView2 controller, so six were unwatched — including the WebViewHost
- * factory in lib/webview_utils.ahk, which is the shape every future host is meant
+ * factory in infra/webview_utils.ahk, which is the shape every future host is meant
  * to be built from. The list is now derived from the source.
  *
  * AND IT USED TO PASS FOR THE WRONG REASON:

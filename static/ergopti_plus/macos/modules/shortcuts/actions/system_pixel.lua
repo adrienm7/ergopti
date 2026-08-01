@@ -17,9 +17,9 @@ local M = {}
 
 local hs            = hs
 local pasteboard    = hs.pasteboard
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
 local ShellRunner   = require("adapters.shell_runner")
 
 local LOG = "shortcuts.actions.system"

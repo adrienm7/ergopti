@@ -25,12 +25,12 @@
 ; ===================================================
 ; ===================================================
 
-; Scans the whole lib/metrics/ directory instead of one hardcoded file. The
+; Scans the whole infra/metrics/ directory instead of one hardcoded file. The
 ; assertion below is a PRESENCE check, so widening the scope cannot weaken it —
 ; and _DriverDirConcat throws when the directory moves, instead of dying with an
 ; unreadable-path error that says nothing about the invariant at stake.
 _MFTL_ReadSource() {
-	return _DriverDirConcat("lib/metrics")
+	return _DriverDirConcat("infra/metrics")
 }
 
 

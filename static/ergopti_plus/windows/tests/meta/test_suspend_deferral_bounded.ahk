@@ -27,7 +27,7 @@
 ; 3. Asserts the offending key is named: a wedged deferral that says only
 ;    "still waiting" withholds the one fact that would let the user fix it.
 ;
-; SCOPE: source introspection of lib/lifecycle.ahk.
+; SCOPE: source introspection of infra/lifecycle.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -25,8 +25,8 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
 local LOG     = "keylogger.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.

@@ -14,7 +14,7 @@
 ;
 ; The fix aborts the array (with a WARN) when a continuation line is a section header
 ; and re-processes that line as a header. This test writes such a file and asserts the
-; trailing section survives. ParseTomlFile is in the headless include graph (lib/toml).
+; trailing section survives. ParseTomlFile is in the headless include graph (infra/toml).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

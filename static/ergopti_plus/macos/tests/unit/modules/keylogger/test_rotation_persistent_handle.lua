@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 
 -- lib.logger must load first so every subsequent require can resolve it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local TODAY   = "/tmp/ergopti_rotation_persistent_today.log"
 local DATASQL = "/tmp/ergopti_rotation_persistent_data.sql"

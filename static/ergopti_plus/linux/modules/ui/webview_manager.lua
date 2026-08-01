@@ -346,7 +346,7 @@ local function _read_app_geometry(app_name)
 	-- One resolver, no "try the other depth" dance. The alternate path this used
 	-- to fall back to was simply wrong; keeping both meant the correct one was
 	-- indistinguishable from a lucky guess.
-	local ok_paths, Paths = pcall(require, "lib.paths")
+	local ok_paths, Paths = pcall(require, "infra.paths")
 	local manifest_path = ok_paths and Paths.shared("ui/apps.manifest.json") or nil
 	local fh = manifest_path and io.open(manifest_path, "r") or nil
 	if not fh then return defaults end

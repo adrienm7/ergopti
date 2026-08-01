@@ -6,7 +6,7 @@
 --- parity with the AHK twin (features_manifest.ahk) and because
 --- test-manifest-parity.cjs cross-checks it between the two generated
 --- files — but no Lua module on macOS reads entry.description_key today
---- (confirmed via a repo-wide grep; lib/manifest_reader.lua's own
+--- (confirmed via a repo-wide grep; infra/manifest_reader.lua's own
 --- docstring documents it as exposing only what macOS modules actually
 --- consume). The AHK driver genuinely resolves every description_key via
 --- its menu builder. Removing the field from this side alone would break

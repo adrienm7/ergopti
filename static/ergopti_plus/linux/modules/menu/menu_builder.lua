@@ -30,7 +30,7 @@ local Logger = require("logger.shim")
 local LOG = "modules.menu.menu_builder"
 
 -- Single source of the driver version.
-local Version = require("lib.version")
+local Version = require("infra.version")
 
 --- Substitutes a single placeholder in a translated template.
 ---
@@ -591,7 +591,7 @@ local function _build_language(_ctx)
 
 	-- Try to load i18n for real locale list + switching.
 	local i18n = nil
-	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 	if ok_i18n then i18n = i18n_mod end
 
 	if i18n then
@@ -629,7 +629,7 @@ local function _build_config_folder(ctx)
 		fn = function()
 			-- Through the resolver: this concatenated a possibly-nil HOME, which
 			-- throws and takes the whole menu build with it.
-			local ConfigPaths = require("lib.config_paths")
+			local ConfigPaths = require("infra.config_paths")
 			local dir = ConfigPaths.config("hotstrings")
 			Logger.info(LOG, "Opening config folder: %s", dir)
 			if ctx.on_open_config then ctx.on_open_config(dir) end
@@ -855,7 +855,7 @@ end
 --- @param key string i18n key.
 --- @return string The translation, or the key itself.
 function i18n_safe(key)
-	local ok, i18n = pcall(require, "lib.i18n")
+	local ok, i18n = pcall(require, "infra.i18n")
 	if ok and i18n and type(i18n.get) == "function" then
 		local val = i18n.get(key)
 		if val and val ~= key then return val end

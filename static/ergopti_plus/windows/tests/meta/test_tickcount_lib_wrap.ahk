@@ -1,10 +1,10 @@
 ﻿; tests/meta/test_tickcount_lib_wrap.ahk
 
 ; ==============================================================================
-; MODULE: A_TickCount Wrap Guard — lib/ files meta test
+; MODULE: A_TickCount Wrap Guard — infra/ files meta test
 ; DESCRIPTION:
 ; Static source guard for the A_TickCount 49-day wrap-around fix applied to
-; four lib/ files: tooltip.ahk, metrics/metrics_filters.ahk, healthcheck.ahk,
+; four infra/ files: tooltip.ahk, metrics/metrics_filters.ahk, healthcheck.ahk,
 ; and crash_reporter.ahk.
 ;
 ; ROOT CAUSE ENCODED:
@@ -58,8 +58,8 @@ Test("tickcount-wrap: tooltip.ahk LLM grace comparison uses & 0xFFFFFFFF mask", 
 ; =========================================================================
 
 _TCLW_MetricsFocusWrapSafe() {
-	Src := _TCLW_ReadSource("lib/metrics/metrics_filters.ahk")
-	Assert(Src != "", "lib/metrics/metrics_filters.ahk must be readable")
+	Src := _TCLW_ReadSource("infra/metrics/metrics_filters.ahk")
+	Assert(Src != "", "infra/metrics/metrics_filters.ahk must be readable")
 
 	Assert(!InStr(Src, "(A_TickCount - MetricsFocusCache.state.last_at) < MF_FOCUS_TTL_MS"),
 		"metrics_filters.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")

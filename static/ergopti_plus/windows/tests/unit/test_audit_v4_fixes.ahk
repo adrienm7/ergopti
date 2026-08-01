@@ -56,7 +56,7 @@ TestAuditV4_MaxHotkeysNotInHotkey() {
 	; The fix: move assignment to module top-level (runs at #Include time).
 
 	; Confirm the assignment exists (somewhere before the hotkey section).
-	; Single-sourced from lib/nav_layer_helpers.ahk's NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
+	; Single-sourced from infra/nav_layer_helpers.ahk's NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 	; constant (F16) rather than a duplicated literal.
 	AssertTrue(
 		InStr(Src, "A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL"),

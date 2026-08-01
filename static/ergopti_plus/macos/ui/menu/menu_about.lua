@@ -22,10 +22,10 @@
 
 local M = {}
 local hs        = hs
-local Logger    = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n      = require("lib.i18n")
-local dialog    = require("lib.dialog_util")
+local Logger    = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n      = require("infra.i18n")
+local dialog    = require("infra.dialog_util")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
 local LOG       = "menu_about"

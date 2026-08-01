@@ -20,8 +20,8 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
 local FileSystem = require("adapters.file_system")   -- OS-pure file read (port FileSystem)
 local JsonCodec  = require("adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)
 local LOG    = "llm.api_common"

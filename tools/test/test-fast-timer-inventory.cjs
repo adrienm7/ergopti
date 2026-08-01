@@ -47,7 +47,7 @@ const FAST_MS = 1000;
  * The interval is read from the source, not repeated here — one source of truth.
  */
 const INVENTORY = {
-	'lib/lifecycle.ahk:_SuspendPendingPoll':
+	'infra/lifecycle.ahk:_SuspendPendingPoll':
 		'Runs ONLY while a suspend is deferred waiting for held prefix keys to be released, ' +
 		'and stops as soon as they are. 25 ms because the user is mid-chord and any visible ' +
 		'lag between releasing the keys and the driver suspending reads as a stuck modifier.',

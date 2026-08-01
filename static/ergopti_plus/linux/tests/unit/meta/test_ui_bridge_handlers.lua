@@ -493,10 +493,10 @@ helpers.describe("ui.bridge_handlers", function()
     -- Stubs lib.i18n.get_locale, runs fn, then restores package.loaded so the
     -- stub never leaks into later test files.
     local function with_locale_module(mod, fn)
-      local prev = package.loaded["lib.i18n"]
-      package.loaded["lib.i18n"] = mod
+      local prev = package.loaded["infra.i18n"]
+      package.loaded["infra.i18n"] = mod
       local ok, err = pcall(fn)
-      package.loaded["lib.i18n"] = prev
+      package.loaded["infra.i18n"] = prev
       if not ok then error(err, 0) end
     end
 

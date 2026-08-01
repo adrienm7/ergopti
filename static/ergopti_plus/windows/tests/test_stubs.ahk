@@ -4,7 +4,7 @@
 ; MODULE: Test Stubs
 ; DESCRIPTION:
 ; Minimal stubs for the runtime globals and helper functions that the
-; production lib/ files reference. Tests need to load those lib files to
+; production infra/ files reference. Tests need to load those lib files to
 ; exercise the pure helpers, but the lib files happen to also reference
 ; functions / Maps initialised by ErgoptiPlus.ahk top-level code (Features,
 ; ScriptInformation, SendNewResult, …). This file declares dummy versions
@@ -340,10 +340,10 @@ global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 
 ; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
-; lib/i18n.ahk to build the path to the locale JSON files. Without this stub,
+; infra/i18n.ahk to build the path to the locale JSON files. Without this stub,
 ; the very first t() call (e.g. from modules/gestures.ahk's top-level
 ; GESTURE_SLOT_LABELS builder) raised "global variable has not been assigned a
-; value" inside lib/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
+; value" inside infra/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
 ; error as a MsgBox under default settings — invisible but blocking on the
 ; headless CI runner, which is the root cause of the recurring "5-minute
 ; timeout" failures of the AHK test suite.
@@ -367,7 +367,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 ; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in
-; lib/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk
+; infra/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk
 ; (false) so the canonicaliser knows it is allowed to run; the test runner
 ; does not include ErgoptiPlus.ahk, so the helper would otherwise raise
 ; "global variable has not been assigned a value" the first time a test
@@ -375,7 +375,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Hotstring engine globals normally maintained by modules/keymap/layout.ahk.
-; The LastSentCharacters ring buffer is defined in lib/hotstring_engine.ahk;
+; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
 global RemappedList := Map()
@@ -414,8 +414,8 @@ global DeadkeyMappingCurrency := Map()
 ; =================================
 
 ; AHK refuses duplicate function definitions, so we can only stub functions
-; that are NOT defined in any included lib/ file. The list below covers the
-; functions that production lib/ files reference but live in modules/
+; that are NOT defined in any included infra/ file. The list below covers the
+; functions that production infra/ files reference but live in modules/
 ; (which run_all.ahk deliberately does not #Include).
 ; Production helpers like SendNewResult / CreateHotstring / ReloadPersonalSection
 ; are exercised through their real implementations; their downstream effects
@@ -480,7 +480,7 @@ ToggleSuspend() {
     _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
-; The pause-preserving reload. The real one lives in lib/lifecycle.ahk, which
+; The pause-preserving reload. The real one lives in infra/lifecycle.ahk, which
 ; this runner cannot include: it defines ToggleSuspend, colliding with the stub
 ; above, and loading the genuine article would let a test actually Suspend(1) the
 ; runner and arm its watchdog timers. Stubbed rather than IsSet-guarded at the

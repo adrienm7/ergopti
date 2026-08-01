@@ -7,7 +7,7 @@
 ; MODULE: Logger Sub-file Routing Table (Windows)
 ; DESCRIPTION:
 ; The [[sub_files]] entries whose platforms list includes "ahk", as the array
-; lib/logger.ahk fans log lines out with. A line is routed to a sub-file when
+; infra/logger.ahk fans log lines out with. A line is routed to a sub-file when
 ; ANY of its tags is a substring of the complete line; it is always also
 ; written to the main daily log.
 ;
@@ -19,7 +19,7 @@
 
 ; A function rather than a global initialiser so include ORDER cannot matter:
 ; the logger calls this when it initialises, long after every #Include has been
-; processed. A global would have to be declared before lib/logger.ahk to be
+; processed. A global would have to be declared before infra/logger.ahk to be
 ; visible, which is a constraint the generated file has no way to enforce.
 LoggerSubFilesData() {
 	return [

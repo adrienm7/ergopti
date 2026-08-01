@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Parses the hotstrings TOML format produced by the generation scripts.
 --- Canonical source shared by all Lua-based drivers (Hammerspoon, future Linux
---- driver). Previously lived at hammerspoon/lib/toml_reader.lua; moved here so
+--- driver). Previously lived at hammerspoon/infra/toml_reader.lua; moved here so
 --- both drivers share one implementation without duplication.
 ---
 --- FEATURES & RATIONALE:
@@ -25,9 +25,9 @@ local M = {}
 -- macOS driver. The macOS driver logger (ring buffer + file, read by the
 -- healthcheck diagnostic) is preferred when present so on-macOS routing is
 -- unchanged; otherwise the platform-neutral print shim takes over. A hard
--- require("lib.logger") here was the impurity that forced the Linux driver to
+-- require("infra.logger") here was the impurity that forced the Linux driver to
 -- fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "lib.logger")
+local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end

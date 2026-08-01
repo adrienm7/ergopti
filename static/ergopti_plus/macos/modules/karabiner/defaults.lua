@@ -20,7 +20,7 @@
 --- there is no driver-side fallback table (would mask a broken install).
 --- ==============================================================================
 
-local TomlReader = require("lib.toml.reader")
+local TomlReader = require("infra.toml.reader")
 
 local D = {}
 

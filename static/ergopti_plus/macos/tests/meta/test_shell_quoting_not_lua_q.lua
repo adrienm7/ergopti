@@ -25,7 +25,7 @@
 
 local helpers = require("tests.helpers")
 
-local SOURCE_DIRS = { "adapters", "lib", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
 
 
 

@@ -17,7 +17,7 @@ _TBA_ReadSource(RelPath) {
 }
 
 _TBA_BatchWriteIsAtomic() {
-	Src := _TBA_ReadSource("lib/toml/toml_helpers.ahk")
+	Src := _TBA_ReadSource("infra/toml/toml_helpers.ahk")
 	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 	

@@ -29,7 +29,7 @@ _G.hs.settings = {
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("lib.config_overrides")
+local Overrides = helpers.load_with_stubs("infra.config_overrides")
 -- helpers.load_with_stubs may call __reset() which reinstalls the canonical
 -- hs.settings stub; re-apply the inspectable override so the suites below
 -- still write into the local `stored` table.

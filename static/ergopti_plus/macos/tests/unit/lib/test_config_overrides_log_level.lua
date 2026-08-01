@@ -23,7 +23,7 @@ _G.hs.settings = {
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("lib.config_overrides")
+local Overrides = helpers.load_with_stubs("infra.config_overrides")
 _G.hs.settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,

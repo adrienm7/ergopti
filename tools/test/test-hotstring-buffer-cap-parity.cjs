@@ -49,8 +49,8 @@ try {
 
 	// Windows mirrors — AHK cannot require the shared Lua, so the two literals
 	// must equal the canon (and each other).
-	const winInputhook = extract('windows/lib/hotstrings/hotstring_inputhook.ahk', /_MAX_BUFFER_LEN\s*:=\s*(\d+)/, '_MAX_BUFFER_LEN');
-	const winEngine = extract('windows/lib/hotstrings/hotstring_engine_main.ahk', /HSE_MAX_BUFFER_LEN\s*:=\s*(\d+)/, 'HSE_MAX_BUFFER_LEN');
+	const winInputhook = extract('windows/infra/hotstrings/hotstring_inputhook.ahk', /_MAX_BUFFER_LEN\s*:=\s*(\d+)/, '_MAX_BUFFER_LEN');
+	const winEngine = extract('windows/infra/hotstrings/hotstring_engine_main.ahk', /HSE_MAX_BUFFER_LEN\s*:=\s*(\d+)/, 'HSE_MAX_BUFFER_LEN');
 
 	if (winInputhook !== canon) {
 		errors.push(`windows _MAX_BUFFER_LEN (${winInputhook}) != shared BUFFER_MAX_CHARS (${canon})`);

@@ -17,10 +17,10 @@ local helpers = require("tests.helpers")
 -- Stub the TOML codec so we can control decode behaviour.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
 package.loaded["toml_codec"]     = _toml_stub
-package.loaded["lib.toml.codec"] = _toml_stub
+package.loaded["infra.toml.codec"] = _toml_stub
 
 -- Capture Logger calls via the runtime capture helper.
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local captured = {}
 local original_fn = {}
 for _, level in ipairs({"debug", "info", "warn", "error"}) do

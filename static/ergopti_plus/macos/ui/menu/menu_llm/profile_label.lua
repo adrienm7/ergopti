@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local M = {}
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 
 -- The canonical default prediction count lives in the LLM module's DEFAULT_STATE
 -- (single source of truth — CLAUDE.md §5.2). Resolving the fallback here means no

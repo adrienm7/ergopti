@@ -11,7 +11,7 @@
 ; ("this remaps the physical Delete/Suppr key (SC053)"), which is why several
 ; audits read past it.
 ;
-; The driver already knew the right value: lib/script_altgr_hotkeys.ahk binds the
+; The driver already knew the right value: infra/script_altgr_hotkeys.ahk binds the
 ; extended Delete scancode in four places. This was the single forgotten sibling.
 ;
 ; FEATURES & RATIONALE:

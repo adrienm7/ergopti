@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: i18n Unit Tests
 --- DESCRIPTION:
---- Behavioral tests for lib/i18n.lua — the iOS UI locale manager. Covers
+--- Behavioral tests for infra/i18n.lua — the iOS UI locale manager. Covers
 --- system-locale detection, persistence via hs.settings, locale switching
 --- (with debounced reload), language-menu building, locale sorting, and
 --- the get() → lib.locale delegation with key fallback.
 ---
---- Before this file, lib/i18n.lua had zero test coverage — every function
+--- Before this file, infra/i18n.lua had zero test coverage — every function
 --- (detect_system_locale, init, set_locale, build_language_menu_items, etc.)
 --- was exercised only by manual end-to-end interaction. This test locks the
 --- contract: supported-locale detection, persistence ordering, debounce
@@ -31,12 +31,12 @@ package.loaded["menu.labels"] = {
 
 -- Stub lib.locale so get() returns controlled values.
 local _locale_store = {}
-package.loaded["lib.locale"] = {
+package.loaded["infra.locale"] = {
 	get = function(key) return _locale_store[key] end,
 }
 
 -- Stub lib.logger (silent no-op).
-package.loaded["lib.logger"] = helpers.make_logger_stub()
+package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 -- Save original hs.host.locale so we can override it per test.
 local _orig_host_locale = hs.host.locale
@@ -53,8 +53,8 @@ end
 
 --- Load a fresh i18n module (wipes upvalues _locale, _reload_timer, etc.).
 local function load_i18n()
-	package.loaded["lib.i18n"] = nil
-	return require("lib.i18n")
+	package.loaded["infra.i18n"] = nil
+	return require("infra.i18n")
 end
 
 -- Save the original hs.reload so we can restore it if a test overrides it.
@@ -531,5 +531,5 @@ end)
 -- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
 -- stub-wired lib.i18n / lib.locale pair must not leak either.
 package.loaded["menu.labels"] = nil
-package.loaded["lib.locale"]  = nil
-package.loaded["lib.i18n"]    = nil
+package.loaded["infra.locale"]  = nil
+package.loaded["infra.i18n"]    = nil

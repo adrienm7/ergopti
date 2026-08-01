@@ -8,9 +8,9 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
-local Notifications  = require("lib.notifications")
-local i18n           = require("lib.i18n")
+local Logger         = require("infra.logger")
+local Notifications  = require("infra.notifications")
+local i18n           = require("infra.i18n")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
 local ApiMlxInference = require("modules.llm.api_mlx_inference")  -- request mechanics (post_and_parse / streaming)
@@ -21,8 +21,8 @@ local _check_client  = require("adapters.http_client").new()  -- Dedicated clien
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("lib.timings")
-local Paths          = require("lib.paths")
+local Timings        = require("infra.timings")
+local Paths          = require("infra.paths")
 local LOG            = "llm.api_mlx"
 
 -- MLX warmup timeout comes from the shared cross-driver registry ([llm]).

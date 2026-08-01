@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "keylogger.aggregator"
 
 local S      = require("modules.keylogger.aggregator.state")

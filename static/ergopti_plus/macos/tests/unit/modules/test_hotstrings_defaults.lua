@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local defaults_path = helpers.shared("modules/hotstrings/defaults.toml")
 
@@ -43,7 +43,7 @@ end
 
 --- Parse the canonical shared file directly (same reader both drivers use).
 local function read_defaults()
-	local reader = require("lib.toml.reader")
+	local reader = require("infra.toml.reader")
 	local parsed = reader.parse(defaults_path)
 	return parsed and parsed.sections or nil
 end

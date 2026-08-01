@@ -39,7 +39,7 @@ _HRA_ReadSource(RelPath) {
 ; ===================================================
 
 _HRA_RegisterIsAtomic() {
-	Src := _HRA_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
+	Src := _HRA_ReadSource("infra/hotstrings/hotstring_engine_main.ahk")
 	Body := _DriverFuncBody("HSE_Register")
 	Assert(Body != "", "HSE_Register must exist in hotstring_engine_main.ahk")
 	

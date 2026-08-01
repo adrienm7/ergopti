@@ -7,7 +7,7 @@ local hs_stub = helpers.load_with_stubs("tests.stubs.hs")
 
 helpers.describe("shortcuts.actions.system", function()
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 
@@ -48,7 +48,7 @@ end)
 helpers.describe("shortcuts.actions.system: keep_awake persistent alert", function()
 	-- Builds a fresh module instance with spied alert + timer stubs.
 	local function make_sys_with_alert_spy()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local show_calls      = {}
@@ -77,7 +77,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	end)
 
 	helpers.it("closes the banner on manual toggle OFF", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local close_calls = 0
@@ -97,7 +97,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	end)
 
 	helpers.it("closes the banner on stop_awake", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local close_calls = 0
@@ -121,7 +121,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- call handed us an id, the close must target exactly that id and must never
 	-- reach closeAll, which is a screen-wide sweep.
 	helpers.it("closes only its own alert when an id was captured (never closeAll)", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local close_all_calls = 0
@@ -149,7 +149,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- (older Hammerspoon builds). This was the root cause of banners persisting after
 	-- auto-deactivation — the ID was nil so nothing was ever closed.
 	helpers.it("calls closeAll even when hs.alert.show returned nil (no ID captured)", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local close_all_calls = 0
@@ -173,7 +173,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- we can step past the activation grace window. Returns the module, a mutable
 	-- clock, a closeAll counter, and the captured callback holder.
 	local function activate_with_watcher()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 		local hs  = _G.hs
@@ -239,7 +239,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- no-op key (F18) every tick so the HID idle counter resets and Teams stays
 	-- "available". Warping the mouse alone never resets that counter. The watcher
 	-- must recognise THIS key as synthetic and not self-deactivate.
-	local F18 = require("lib.keycodes").F18_WAKE_OS
+	local F18 = require("infra.keycodes").F18_WAKE_OS
 
 	-- A fake keyDown CGEvent with the given keycode and no modifiers.
 	local function fake_key_event(keycode)
@@ -252,7 +252,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	end
 
 	helpers.it("_emit_activity_keystroke posts the F18 wake key (down + up)", function()
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 		local hs  = _G.hs
@@ -301,7 +301,7 @@ end)
 --   2. When no selection is readable (nothing selected, or an app like VS Code
 --      that hides AXSelectedText), the symbol must pass through (never swallowed).
 helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
-	package.loaded["lib.keycodes"] = nil
+	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local PAIRS = { ["("] = { left = "(", right = ")" }, [")"] = { left = "(", right = ")" } }
@@ -351,11 +351,11 @@ end)
 -- updating an upvalue after the function returns cannot be seen by the caller).
 -- window_override: optional `window` stub table (defaults to a window with id=42).
 local function make_sys_screenshot_spies(window_override)
-	package.loaded["lib.keycodes"] = nil
+	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
-	package.loaded["lib.notifications"] = { notify = function() end }
+	package.loaded["infra.notifications"] = { notify = function() end }
 	-- The capture goes through adapters.shell_runner, which captures `local hs = hs`
 	-- at require-time. Cached from an earlier test file it stays bound to THAT file's
 	-- hs stub, so the module under test spawns correctly while the assertions below
@@ -613,7 +613,7 @@ end)
 
 -- Regression: bind_wrap_text_if_selected's eventtap callback called text_acts.read_ax_selection()
 -- (two synchronous cross-process AX calls) on every keystroke matching a wrap symbol, with zero
--- caching. lib/vscode_bridge.lua documents this exact failure mode and mitigates it with a
+-- caching. infra/vscode_bridge.lua documents this exact failure mode and mitigates it with a
 -- short-lived TTL cache; this call site had none — a slow AX call risks
 -- kCGEventTapDisabledByTimeout, killing the tap. The fix mirrors vscode_bridge's cache pattern.
 helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache (shortcuts-wrap-ax-uncached regression)", function()
@@ -627,7 +627,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	local function make_sys_with_ax_spy(selection)
 		if selection == nil then selection = "selected text" end
 		if selection == "" then selection = nil end
-		package.loaded["lib.keycodes"] = nil
+		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
 
@@ -706,7 +706,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	-- every wrap-key press re-paid both synchronous cross-process AX calls inline on
 	-- the CGEventTap thread. nil is the COMMON result — nothing selected, or an app
 	-- that hides AXSelectedText — so the cache was effectively inert exactly when it
-	-- mattered. Same defect and same fix as lib/vscode_bridge.lua (3e403b254), whose
+	-- mattered. Same defect and same fix as infra/vscode_bridge.lua (3e403b254), whose
 	-- sibling site this is. The spy above could not express it: it hardcoded a
 	-- positive selection.
 	helpers.it("N rapid presses with NO selection also trigger at most 1 real AX call", function()

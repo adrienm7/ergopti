@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; Tooltip GUI state, font/style constants, the dequeue + safety timers, style refresh, and the public API (TooltipShow / TooltipHide / TooltipIsVisible).
 ;
-; Split out of the former lib/tooltip.ahk (the module split); see ui/tooltip/init.ahk
+; Split out of the former infra/tooltip.ahk (the module split); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
 ; across the tooltip/*.ahk files is irrelevant.
 ; ==============================================================================
@@ -256,7 +256,7 @@ TooltipDequeueInit() {
     SetTimer(_TooltipDequeuePollFn, 100)
 }
 
-; Style constants — sourced from lib/ui_style.ahk (included before this file
+; Style constants — sourced from infra/ui_style.ahk (included before this file
 ; in ErgoptiPlus.ahk). All visual values are defined there and mapped to
 ; module-local aliases below so the rest of this file reads naturally.
 ;

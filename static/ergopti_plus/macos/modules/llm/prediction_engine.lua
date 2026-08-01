@@ -30,10 +30,10 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
-local Logger           = require("lib.logger")
-local Timings          = require("lib.timings")
-local i18n             = require("lib.i18n")
-local Keycodes         = require("lib.keycodes")
+local Logger           = require("infra.logger")
+local Timings          = require("infra.timings")
+local i18n             = require("infra.i18n")
+local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keylogger        = require("modules.keylogger")
 
@@ -623,7 +623,7 @@ function M.perform_check(force_trigger, profile_name)
 	-- Delegate prompt parameter building to PromptBuilder.
 	-- Guarded: perform_check is the body of the module-level debounce timer, and
 	-- hs.timer callbacks are pcall'd by Hammerspoon — a throw here would be routed
-	-- to the Hammerspoon Console and never reach lib/logger. The failure mode is
+	-- to the Hammerspoon Console and never reach infra/logger. The failure mode is
 	-- invisible and permanent: the health dot stays green, the backend stays
 	-- ready, and no prediction ever appears again for the session. Surfacing the
 	-- error through Logger.error makes it diagnosable from the unified log.

@@ -4,13 +4,13 @@
 ; MODULE: LLM Tooltip UI
 ; DESCRIPTION:
 ; Floating, Gui-based tooltip that displays one or more LLM text predictions
-; near the current caret position. Delegates all rendering to lib/tooltip.ahk
+; near the current caret position. Delegates all rendering to infra/tooltip.ahk
 ; (the shared Gui engine) so the LLM tooltip is visually identical to the
 ; hotstring tooltip: rounded corners, per-group tint, 1 px border overlay.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared renderer: uses TooltipShow() / LLM_TooltipShow() from
-;    lib/tooltip.ahk instead of the OS-native ToolTip() function. This gives
+;    infra/tooltip.ahk instead of the OS-native ToolTip() function. This gives
 ;    diff-chunk coloring (green corrections, orange next-words, gray inactive
 ;    slots) and visual parity with the Hammerspoon renderer.
 ; 2. Backwards-compatible public surface: all external callers (prediction_engine,

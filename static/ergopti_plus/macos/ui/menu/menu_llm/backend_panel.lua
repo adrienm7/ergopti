@@ -15,8 +15,8 @@
 local M = {}
 
 local llm_mod  = require("modules.llm")
-local i18n     = require("lib.i18n")
-local Logger   = require("lib.logger")
+local i18n     = require("infra.i18n")
+local Logger   = require("infra.logger")
 
 local LOG = "backend_panel"
 

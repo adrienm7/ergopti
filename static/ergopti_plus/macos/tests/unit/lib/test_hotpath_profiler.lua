@@ -16,9 +16,9 @@ local helpers = require("tests.helpers")
 
 local captured = {}
 local function reset_capture() captured = {} end
-local _real_logger = package.loaded["lib.logger"]
+local _real_logger = package.loaded["infra.logger"]
 local function noop() end
-package.loaded["lib.logger"] = {
+package.loaded["infra.logger"] = {
 	info    = noop,
 	warn    = function(tag, fmt, ...) captured[#captured + 1] = { tag = tag, fmt = fmt, args = { ... } } end,
 	debug   = noop, trace = noop, done = noop, start = noop, success = noop, error = noop,
@@ -27,8 +27,8 @@ package.loaded["lib.logger"] = {
 }
 
 package.loaded["adapters.timer_scheduler"] = nil
-package.loaded["lib.hotpath_profiler"] = nil
-local hot = require("lib.hotpath_profiler")
+package.loaded["infra.hotpath_profiler"] = nil
+local hot = require("infra.hotpath_profiler")
 
 -- Controllable nanosecond clock, restored at file end.
 local NS        = 0
@@ -37,7 +37,7 @@ hs.timer.absoluteTime = function() return NS end
 
 local NS_PER_MS = 1e6
 
-helpers.describe("lib.hotpath_profiler.log_if_slow", function()
+helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 	helpers.it("logs a WARNING when the segment exceeds the threshold", function()
 		reset_capture()
 		NS = 1000 * NS_PER_MS
@@ -83,5 +83,5 @@ helpers.describe("lib.hotpath_profiler.log_if_slow", function()
 end)
 
 hs.timer.absoluteTime = orig_abs
-package.loaded["lib.logger"] = _real_logger
+package.loaded["infra.logger"] = _real_logger
 package.loaded["adapters.timer_scheduler"] = nil

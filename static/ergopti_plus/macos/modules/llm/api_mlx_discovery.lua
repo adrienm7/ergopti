@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
+local Logger         = require("infra.logger")
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("lib.timings")
+local Timings        = require("infra.timings")
 local ApiCommon = require("modules.llm.api_common")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.

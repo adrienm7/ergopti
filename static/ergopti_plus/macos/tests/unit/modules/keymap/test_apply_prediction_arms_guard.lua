@@ -32,8 +32,8 @@ local helpers = require("tests.helpers")
 
 -- Warm the hs stub so _G.hs and package.loaded["hs"] are set for the entire
 -- dependency chain loaded below.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 
 --- =========================================
@@ -180,7 +180,7 @@ package.loaded["modules.llm"] = {
 -- ===== 1.8) Keycodes stub =================
 --- =========================================
 
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	ESCAPE           = 53,
 	RETURN           = 36,
 	F16_LLM_CHAIN_SIGNAL = 106,
@@ -192,7 +192,7 @@ package.loaded["lib.keycodes"] = {
 -- ===== 1.9) text_utils stub ===============
 --- =========================================
 
-package.loaded["lib.text_utils"] = {
+package.loaded["infra.text_utils"] = {
 	is_letter_char      = function() return false end,
 	trig_lower          = function(s) return s:lower() end,
 	conform_replacement = function(repl) return repl end,
@@ -335,13 +335,13 @@ helpers.describe("apply_prediction: guard-arm ordering invariant", function()
 	helpers.it("text_utils stub does not leak into subsequent test files (stub-isolation regression)", function()
 		-- This file installs a partial lib.text_utils stub at module level (section 1.9)
 		-- that lacks utf8_len, repl_title, etc. Without helpers.load_with_stubs clearing
-		-- package.loaded["lib.text_utils"], subsequent test files (test_expander.lua,
+		-- package.loaded["infra.text_utils"], subsequent test files (test_expander.lua,
 		-- test_utils.lua, test_hotstring_properties.lua) receive the stub instead of the
 		-- real module and crash with "attempt to call a nil value (field 'utf8_len')".
 		-- This regression test verifies that after load_with_stubs is called, the real
 		-- lib.text_utils with utf8_len is available.
-		package.loaded["lib.text_utils"] = nil
-		local real_tu = helpers.load_with_stubs("lib.text_utils")
+		package.loaded["infra.text_utils"] = nil
+		local real_tu = helpers.load_with_stubs("infra.text_utils")
 		helpers.assert_eq(type(real_tu), "table",
 			"lib.text_utils must be a table after load_with_stubs")
 		helpers.assert_eq(type(real_tu.utf8_len), "function",

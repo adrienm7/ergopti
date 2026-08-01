@@ -21,10 +21,10 @@
 local M = {}
 
 local llm_mod       = require("modules.llm")
-local i18n          = require("lib.i18n")
-local Logger        = require("lib.logger")
-local dialog        = require("lib.dialog_util")
-local notifications = require("lib.notifications")
+local i18n          = require("infra.i18n")
+local Logger        = require("infra.logger")
+local dialog        = require("infra.dialog_util")
+local notifications = require("infra.notifications")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 
 local LOG = "model_switcher"

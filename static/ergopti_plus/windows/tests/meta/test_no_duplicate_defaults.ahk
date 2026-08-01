@@ -40,7 +40,7 @@ _MetaRunDuplicateDefaultsTests() {
 		'""', true, "300", true, "100", true, "50", true
 	)
 	Seen := Map()
-	for Sub in ["lib", "modules"] {
+	for Sub in ["infra", "modules"] {
 		for AbsPath in _MetaListAhkFilesDups(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -100,7 +100,7 @@ _MetaRunDuplicateDefaultsTests() {
 		; — a moved tree, a failed RunWait — would otherwise report zero duplicates
 		; and pass.
 		Assert(Seen.Count > 50,
-			"the constant scan found only " . Seen.Count . " global declaration(s) across lib/ and "
+			"the constant scan found only " . Seen.Count . " global declaration(s) across infra/ and "
 			. "modules/ — the file listing is broken, so a duplicate count of " . DupCount
 			. " means nothing")
 		Assert(DupCount <= DUPLICATE_BASELINE,

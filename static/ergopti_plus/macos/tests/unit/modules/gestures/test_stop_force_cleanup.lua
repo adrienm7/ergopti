@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 -- -------------------------------------------------------
 -- Stub sub-modules before loading gestures so no OS calls
 -- -------------------------------------------------------
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 local force_cleanup_called = false
 

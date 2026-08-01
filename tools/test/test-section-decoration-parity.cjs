@@ -11,9 +11,9 @@
  *
  * This guard locks the root cause three ways (text-scan, no runtime needed —
  * runs in CI on any OS):
- *   1. macOS kernel: lib/i18n.lua exposes M.decorate_section wrapping text in
+ *   1. macOS kernel: infra/i18n.lua exposes M.decorate_section wrapping text in
  *      the canonical dashes.
- *   2. AHK kernel: lib/menu_helpers.ahk's MenuSectionTitle uses the identical
+ *   2. AHK kernel: infra/menu_helpers.ahk's MenuSectionTitle uses the identical
  *      "— … —" decoration.
  *   3. Ratchet: NO macOS menu file re-inlines the decoration ("— " .. …) — every
  *      builder must route through the kernel (M.decorate_section / M.section /
@@ -32,7 +32,7 @@ const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MACOS_ROOT = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
-const I18N_KERNEL = path.join(MACOS_ROOT, 'lib/i18n.lua');
+const I18N_KERNEL = path.join(MACOS_ROOT, 'infra/i18n.lua');
 const SHARED_LABELS = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/lua/menu/labels.lua');
 
 let total_pass = 0;
@@ -90,15 +90,15 @@ check(
 );
 
 check(
-	'macOS: lib/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
-	'static/ergopti_plus/macos/lib/i18n.lua',
+	'macOS: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
+	'static/ergopti_plus/macos/infra/i18n.lua',
 	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
 );
 
 // 2. AHK kernel uses the identical decoration.
 check(
-	'AHK: lib/menu_helpers.ahk MenuSectionTitle uses the identical "— … —" decoration',
-	'static/ergopti_plus/windows/lib/menu_helpers.ahk',
+	'AHK: infra/menu_helpers.ahk MenuSectionTitle uses the identical "— … —" decoration',
+	'static/ergopti_plus/windows/infra/menu_helpers.ahk',
 	/MenuSectionTitle\(Text\)\s*\{[\s\S]*return "— " \. Text \. " —"/
 );
 

@@ -95,7 +95,7 @@ function M.init(opts)
 	end
 
 	-- Resolve personal_info.toml path.
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	local default_path = home .. "/.config/ergopti/personal_info.toml"
 	local info_path = options.personal_info_path or default_path
 

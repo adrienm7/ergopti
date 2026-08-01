@@ -50,7 +50,7 @@ _PTLFG_ReadSource(RelPath) {
 ; ==================================================
 
 _PTLFG_EnterFlushReachesBridgeFromWatcher() {
-	Src := _PTLFG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
+	Src := _PTLFG_ReadSource("infra/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; Locate the live Tab/Enter clause and confirm it feeds the bridge  -  the

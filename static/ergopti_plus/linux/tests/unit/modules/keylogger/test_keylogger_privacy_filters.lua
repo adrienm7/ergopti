@@ -77,7 +77,7 @@ end
 
 helpers.describe("keylogger privacy — the posture is read, not re-typed", function()
 	helpers.it("exposes every flag the shared manifest declares", function()
-		local Manifest = require("lib.manifest_reader")
+		local Manifest = require("infra.manifest_reader")
 		local kl = fresh_keylogger()
 		local state = kl.get_privacy_state()
 

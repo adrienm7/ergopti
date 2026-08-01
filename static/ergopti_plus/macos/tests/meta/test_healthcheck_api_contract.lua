@@ -28,7 +28,7 @@ local helpers = require("tests.helpers")
 -- The exact external surface ui/healthcheck/helpers.lua's collectors rely on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
-	{ mod = "lib.logger",                       constants = { "UNIFIED_LOG_FILE", "ERRORS_LOG_FILE" }, fns = { "ring_buffer_snapshot" } },
+	{ mod = "infra.logger",                       constants = { "UNIFIED_LOG_FILE", "ERRORS_LOG_FILE" }, fns = { "ring_buffer_snapshot" } },
 	{ mod = "modules.keylogger",                fns = { "get_live_stats" } },
 	{ mod = "modules.llm.init",                 fns = { "get_runtime_llm_enabled", "get_backend", "get_active_profile" } },
 	{ mod = "adapters.key_state",               fns = { "is_right_altgr_held", "isDown" } },
@@ -54,7 +54,7 @@ helpers.describe("meta: healthcheck diagnostic API contract", function()
 			-- target module. load_with_stubs injects a minimal modules.llm.init
 			-- stub and returns the requested module shadowed, so we clear the
 			-- package cache for the exact module and require it directly.
-			helpers.load_with_stubs("lib.logger")
+			helpers.load_with_stubs("infra.logger")
 			package.loaded[entry.mod] = nil
 			local ok, mod = pcall(require, entry.mod)
 			helpers.assert_true(ok and type(mod) == "table",
@@ -87,14 +87,14 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	-- Self-syncing companion to the contract above: actually run the collectors
 	-- against the real modules and assert none logged a stale-API warning. Catches
 	-- a broken probe even if someone forgets to update the CONTRACT list.
-	helpers.load_with_stubs("lib.logger")
+	helpers.load_with_stubs("infra.logger")
 	-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
 	package.loaded["modules.llm.init"] = nil
 	package.loaded["ui.healthcheck"] = nil
 	package.loaded["ui.healthcheck.core"] = nil
 	package.loaded["ui.healthcheck.helpers"] = nil
 
-	local Logger = require("lib.logger")
+	local Logger = require("infra.logger")
 	local stale_probes = {}
 	local orig_warn = Logger.warn
 	Logger.warn = function(log_obj, fmt, ...)

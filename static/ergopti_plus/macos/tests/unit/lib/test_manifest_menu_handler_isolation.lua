@@ -54,10 +54,10 @@ end
 
 helpers.describe("ManifestMenu.build: dispatch isolates each handler under pcall (F-HIGH-18)", function()
 	helpers.it("a throwing dynamic handler does not prevent a sibling good handler's item from appearing", function()
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 
 		local tmp_dir = write_fixture_manifest()
-		package.loaded["lib.paths"].shared = function(rel)
+		package.loaded["infra.paths"].shared = function(rel)
 			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
 			return tmp_dir
 		end

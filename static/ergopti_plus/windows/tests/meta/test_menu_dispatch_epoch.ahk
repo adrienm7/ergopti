@@ -2,7 +2,7 @@
 #Requires AutoHotkey v2.0
 
 Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity() {
-	Source := FileRead(A_ScriptDir . "\..\lib\menu_dispatcher.ahk", "UTF-8")
+	Source := FileRead(A_ScriptDir . "\..\infra\menu_dispatcher.ahk", "UTF-8")
 	CommandBody := _DriverFuncBody("_OnMenuCommandWmCommand")
 	RetryBody := _DriverFuncBody("_DispatchIfMissed")
 	TrackedBody := _DriverFuncBody("_TrackedDispatch")

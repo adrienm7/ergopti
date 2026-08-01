@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AHK v2 implementation of the Storage port contract. Uses the Windows Registry
 ; under HKCU\Software\Ergopti\Storage as the persistent key-value store.
-; Wraps the Reg_* helper functions (loaded by run_all.ahk via lib/registry.ahk)
+; Wraps the Reg_* helper functions (loaded by run_all.ahk via infra/registry.ahk)
 ; behind the canonical ST_* interface so domain modules persist data without
 ; coupling to Registry-specific APIs.
 ;

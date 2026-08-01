@@ -13,7 +13,7 @@
 ; advertised descriptive JSON-position error. The fix validates the slice
 ; (``^-?\d``) and throws Error("JSON: invalid number at position ...") first.
 ;
-; This is a behavioral test (it actually calls JsonParse) because lib/json.ahk
+; This is a behavioral test (it actually calls JsonParse) because infra/json.ahk
 ; is #Included by run_all.ahk and JsonParse is a pure function with no OS / COM
 ; / network / hotkey side effects. It captures the thrown message and asserts it
 ; names JSON and a position rather than the generic numeric-coercion message —

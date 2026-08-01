@@ -20,13 +20,13 @@
 
 local M = {}
 
-local i18n         = require("lib.i18n")
-local toml_writer  = require("lib.toml.writer")
-local toml_codec   = require("lib.toml.codec")
-local notifications = require("lib.notifications")
-local Paths        = require("lib.paths")
-local Logger       = require("lib.logger")
-local text_utils   = require("lib.text_utils")
+local i18n         = require("infra.i18n")
+local toml_writer  = require("infra.toml.writer")
+local toml_codec   = require("infra.toml.codec")
+local notifications = require("infra.notifications")
+local Paths        = require("infra.paths")
+local Logger       = require("infra.logger")
+local text_utils   = require("infra.text_utils")
 local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
@@ -443,7 +443,7 @@ local function commit(answers)
 	if not ok then
 		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
 		close_webview()
-		local dialog = require("lib.dialog_util")
+		local dialog = require("infra.dialog_util")
 		dialog.block_alert(
 			i18n.get("onboarding.error.title"),
 			i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err),

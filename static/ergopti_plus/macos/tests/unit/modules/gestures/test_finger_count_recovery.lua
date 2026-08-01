@@ -124,10 +124,10 @@ helpers.describe("a full lift-off still ends the gesture", function()
 		-- every drop would mean a real lift-off never terminates the gesture, so this
 		-- drives the real engine and asserts nothing fires after the fingers leave.
 		package.loaded["modules.gestures.engine"] = nil
-		package.loaded["lib.logger"]  = nil
-		package.loaded["lib.timings"] = nil
-		local _ = helpers.load_with_stubs("lib.logger")
-		package.loaded["lib.timings"] = {
+		package.loaded["infra.logger"]  = nil
+		package.loaded["infra.timings"] = nil
+		local _ = helpers.load_with_stubs("infra.logger")
+		package.loaded["infra.timings"] = {
 			sec = function(_, key)
 				if key == "tap_max_ms" then return 0.5
 				elseif key == "finger_confirm_ms" then return 0.05

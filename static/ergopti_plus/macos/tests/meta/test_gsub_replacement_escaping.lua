@@ -32,7 +32,7 @@
 local helpers = require("tests.helpers")
 
 -- Subtrees that ship in the driver.
-local SOURCE_DIRS = { "adapters", "lib", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
 
 -- Replacement expressions that are safe by construction and need no escaping:
 -- string literals, and calls that already escape.

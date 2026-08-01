@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Guards for F-25, F-26, F-27, F-28 and F-29.
 ;
-; The whole cluster has ONE mechanism behind it: lib/webview_utils.ahk defines a
+; The whole cluster has ONE mechanism behind it: infra/webview_utils.ahk defines a
 ; WebViewHost factory that handles every documented gotcha correctly — and has
 ; zero consumers. All 14 windows are hand-rolled copies, so each cross-cutting
 ; guard was applied only to the sites its regression test happened to name.
@@ -52,7 +52,7 @@ _A0720WV_MessageHandlers() {
 	Pos := 1
 	while (Pos := RegExMatch(Src, "WebMessageReceived\(\s*([A-Za-z0-9_]+)", &m, Pos)) {
 		Name := m[1]
-		; lib/webview_utils.ahk's WebViewHost registers a BOUND METHOD
+		; infra/webview_utils.ahk's WebViewHost registers a BOUND METHOD
 		; (this._OnWebMessage.Bind(this)), which resolves to the token "this" and
 		; has no top-level function body to look up. That factory has zero
 		; consumers — every window is a hand-rolled copy, which is the whole

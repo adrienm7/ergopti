@@ -57,7 +57,7 @@ local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
 local function _resolve_paths()
 	if _config_dir then return end
 
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	_config_dir = home .. "/.config/kanata"
 
 	-- Generated kanata config destination.
@@ -77,7 +77,7 @@ local function _resolve_paths()
 
 	-- Through the resolver: _shared is a sibling of the driver folder, and
 	-- letting each module rediscover that is how one of them gets it wrong.
-	local ok_paths, Paths = pcall(require, "lib.paths")
+	local ok_paths, Paths = pcall(require, "infra.paths")
 	_shared_dir = ok_paths and Paths.shared_root() or nil
 
 	-- Verify the template exists (fail-loud: kanata cannot work without it).
@@ -153,7 +153,7 @@ local function _load_tap_hold_config(user_toml_path)
 	-- depended on the process's current directory, so a driver started from
 	-- anywhere but one exact folder read no defaults and silently used none.
 	if not defaults_path then
-		local ok_paths, Paths = pcall(require, "lib.paths")
+		local ok_paths, Paths = pcall(require, "infra.paths")
 		defaults_path = ok_paths and Paths.shared("tap_hold/defaults.toml") or nil
 	end
 
@@ -280,7 +280,7 @@ function M.generate_kbd()
 	-- hardcoded fallback: the value lives once in the shared registry, so a
 	-- missing registry or key is a broken install to surface loudly, not to mask
 	-- with a duplicated literal that would silently override the canonical value.
-	local ok_timings, Timings = pcall(require, "lib.timings")
+	local ok_timings, Timings = pcall(require, "infra.timings")
 	if not ok_timings or type(Timings) ~= "table" or type(Timings.ms) ~= "function" then
 		Logger.error(LOG, "Timings registry unavailable — cannot generate kanata config without the canonical one-shot timeout.")
 		return nil

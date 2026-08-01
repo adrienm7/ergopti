@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Keycodes = helpers.load_with_stubs("lib.keycodes")
+local Keycodes = helpers.load_with_stubs("infra.keycodes")
 
 
 

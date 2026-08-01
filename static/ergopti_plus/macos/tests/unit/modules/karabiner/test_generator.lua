@@ -23,8 +23,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Stub adapters.file_system so load_json_file never hits the real disk.
 -- Tests that need FileSystem.read to return data override _fs_data below.
@@ -41,7 +41,7 @@ package.loaded["ui.menu.menu_paths"] = {
 }
 
 -- Stub lib.keycodes with the minimal surface used by generator.lua.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	to_name              = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN   = 105,
 	F14_KARABINER_BACKSPACE = 107,

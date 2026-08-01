@@ -4,7 +4,7 @@
 ; MODULE: Navigation Layer Helpers Tests
 ; DESCRIPTION:
 ; Unit-tests for the five nav-layer state helpers extracted to
-; lib/nav_layer_helpers.ahk: ActivateLayer, DisableLayer,
+; infra/nav_layer_helpers.ahk: ActivateLayer, DisableLayer,
 ; SetNumberOfRepetitions, ResetNumberOfRepetitions, and ActionLayer.
 ; ==============================================================================
 

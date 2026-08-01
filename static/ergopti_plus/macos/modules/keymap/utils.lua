@@ -21,12 +21,12 @@
 local hs = hs
 local M  = {}
 
-local text_utils  = require("lib.text_utils")
+local text_utils  = require("infra.text_utils")
 local shared_utils = require("keymap.utils")
 local keyStrokes  = hs.eventtap.keyStrokes
 local keyStroke   = hs.eventtap.keyStroke
-local Logger      = require("lib.logger")
-local Timings     = require("lib.timings")
+local Logger      = require("infra.logger")
+local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "keymap.utils"

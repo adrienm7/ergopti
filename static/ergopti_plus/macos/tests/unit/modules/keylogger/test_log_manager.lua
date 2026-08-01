@@ -31,10 +31,10 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- Must be registered BEFORE load_with_stubs so downstream requires resolve them.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t = function(key) return key end,
 }
 
@@ -89,7 +89,7 @@ package.loaded["modules.keylogger.export"] = {
 local _TIMINGS_MS = {
 	keylogger = { max_keystroke_delay_ms = 5000 },
 }
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	ms  = function(section, key)
 		return (_TIMINGS_MS[section] or {})[key] or 1000
 	end,

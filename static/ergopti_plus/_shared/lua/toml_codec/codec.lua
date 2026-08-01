@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
 --- Canonical source shared by all Lua-based drivers (Hammerspoon, future Linux
---- driver). Previously lived at hammerspoon/lib/toml_codec.lua; moved here so
+--- driver). Previously lived at hammerspoon/infra/toml_codec.lua; moved here so
 --- both drivers share one implementation without duplication.
 ---
 --- FEATURES & RATIONALE:

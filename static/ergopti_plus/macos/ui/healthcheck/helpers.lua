@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Helpers
 --- DESCRIPTION:
 --- State-gathering probes for the healthcheck diagnostic. Extracted from the
---- former monolithic lib/healthcheck.lua (audit F2) so the macOS driver mirrors
+--- former monolithic infra/healthcheck.lua (audit F2) so the macOS driver mirrors
 --- the Windows ui/healthcheck/{init,core,helpers} layout.
 ---
 --- FEATURES & RATIONALE:
@@ -30,8 +30,8 @@
 local H = {}
 
 local hs       = hs
-local Logger   = require("lib.logger")
-local text_utils = require("lib.text_utils")
+local Logger   = require("infra.logger")
+local text_utils = require("infra.text_utils")
 local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"

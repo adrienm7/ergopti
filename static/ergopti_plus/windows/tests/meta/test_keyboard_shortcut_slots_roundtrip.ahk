@@ -23,7 +23,7 @@
 ;    exactly these non-default slots. The clear path and the read path must agree
 ;    about which slots exist, and this asserts both consult the same source.
 ;
-; SCOPE: source introspection of lib/config_io.ahk.
+; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -40,7 +40,7 @@
 
 _KSSR_ReadCoversPersistedSlots() {
 	Body := _DriverFuncBody("ReadKeyboardShortcutsConfig")
-	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in lib/config_io.ahk")
+	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in infra/config_io.ahk")
 
 	Assert(InStr(Body, "_IniCache") > 0,
 		"ReadKeyboardShortcutsConfig must consult the persisted config section — reading only KEYBOARD_SHORTCUT_DEFAULTS silently drops every slot the user added, on the very reload that was meant to save it")

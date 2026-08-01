@@ -53,7 +53,7 @@ _IIDLC_ReadSource(RelPath) {
 ; ==================================================
 
 _IIDLC_InsertResolvesByPositionFirst() {
-	Src := _IIDLC_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _IIDLC_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("RegisterMenuItemInsert")
 	Assert(Seg != "", "RegisterMenuItemInsert must exist in menu_dispatcher.ahk")
 	Assert(InStr(Seg, "_ParseInsertPosition(BeforeItem)") > 0,
@@ -65,7 +65,7 @@ Test("menu_dispatcher: RegisterMenuItemInsert resolves ID by position first (ins
 
 
 _IIDLC_NameFallbackIsUniquenessChecked() {
-	Src := _IIDLC_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _IIDLC_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("RegisterMenuItemInsert")
 	Assert(InStr(Seg, "_FindUniqueMenuItemIdByName(") > 0,
 		"RegisterMenuItemInsert text fallback must use _FindUniqueMenuItemIdByName so a duplicate label degrades to native dispatch instead of binding the wrong ID")
@@ -76,7 +76,7 @@ Test("menu_dispatcher: RegisterMenuItemInsert name fallback is uniqueness-checke
 
 
 _IIDLC_UniqueFinderRejectsCollisions() {
-	Src := _IIDLC_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _IIDLC_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("_FindUniqueMenuItemIdByName")
 	Assert(Seg != "", "_FindUniqueMenuItemIdByName must be defined in menu_dispatcher.ahk")
 	; The finder must count matches and only return when exactly one was found,

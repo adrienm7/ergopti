@@ -39,7 +39,7 @@ _LSFR_ReadSource(RelPath) {
 
 ; ── F11 / F19a — now asserted on the DATA, not on the parser's spelling ──────
 ;
-; These two used to grep lib/logger.ahk: F11 for the shared-file path the parser
+; These two used to grep infra/logger.ahk: F11 for the shared-file path the parser
 ; built, F19a for the "ahk" token its platform filter compared against. Both were
 ; pins on the current spelling of a hand-rolled parser — and that parser is gone,
 ; because the routing table is generated from the canonical TOML now.
@@ -113,7 +113,7 @@ Test("meta logger sub_files: the generated table matches the canonical file's ah
 
 ; F19b — fan-out must use substring match (InStr) not exact tag equality
 _LSFR_F19b_FanOutSubstringMatch() {
-	Src := _LSFR_ReadSource("lib\logger.ahk")
+	Src := _LSFR_ReadSource("infra\logger.ahk")
 	; Old broken form: (Tag = TagPattern)
 	HasExactEquality := false
 	for _, Line in StrSplit(Src, "`n", "`r") {
@@ -130,7 +130,7 @@ Test("meta logger sub_files: F19b — fan-out uses InStr substring match", _LSFR
 
 ; F19c — fallback patterns must be bracketed, not bare tag names
 _LSFR_F19c_FallbackBracketedPatterns() {
-	Src := _LSFR_ReadSource("lib\logger.ahk")
+	Src := _LSFR_ReadSource("infra\logger.ahk")
 	; The canonical bracketed pattern for the layout sub-file
 	HasBracketed := InStr(Src, Chr(34) . "[LayoutShift]" . Chr(34))
 	; The old bare form must not appear in the fallback definition

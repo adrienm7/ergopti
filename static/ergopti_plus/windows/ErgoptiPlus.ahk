@@ -100,7 +100,7 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 ; a keystroke during early init causes a #HotIf expression to be evaluated.
 ;
 ; ``Bundle_Init()`` below shells out to PowerShell via ``RunWait`` (see
-; ``lib/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
+; ``infra/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
 ; ~250ms unzip would otherwise trigger #HotIf evaluation on hotkeys like
 ; ``#HotIf CapsWordEnabled`` or ``#HotIf LayerEnabled`` while those globals
 ; are still unset — assigning them here keeps the very first message pump
@@ -110,7 +110,7 @@ global LayerEnabled := False
 global TapHold := Map("keys", Map(), "layers", Map())
 ; Read in FIRST position by a parse-time #HotIf (modules/tap_holds/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
-; lib/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
+; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
@@ -126,8 +126,8 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 ; this global. Assigned in the pre-pump block so it exists before the first
 ; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
-#Include lib/manifest_reader.ahk
-#Include lib/feature_io.ahk
+#Include infra/manifest_reader.ahk
+#Include infra/feature_io.ahk
 
 ; ===== Global error net — armed BEFORE the first message pump =====
 ; Without this, any uncaught error pops an AHK dialog mid-keystroke and can leave
@@ -138,7 +138,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; parse-time #HotIf and throw with no net at all. error_net.ahk has no dependency
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
-#Include lib/error_net.ahk
+#Include infra/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
@@ -146,9 +146,9 @@ OnError(ErgoptiGlobalErrorHandler)
 ; bootstrapper extracts it next to the .exe on first launch so the rest of
 ; the driver can keep reading from _StaticDir without caring whether it runs
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
-#Include lib/bundle.ahk
+#Include infra/bundle.ahk
 Bundle_Init()
-; First of the retroactive boot stamps (lib/boot_profiler.ahk). Everything from
+; First of the retroactive boot stamps (infra/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
 ; number, so a slow start could be attributed to "pre-boot" and no further. A
 ; stamp only records a tick — the logger does not exist yet — and BootProfile_Begin
@@ -196,8 +196,8 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
 ; message-pumping RunWait — see the "Global error net" block there.
-#Include lib/personal_features.ahk
-#Include lib/menu_helpers.ahk
+#Include infra/personal_features.ahk
+#Include infra/menu_helpers.ahk
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
@@ -207,7 +207,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
 ; with the keylogger's ~6 background timers + mouse/keyboard hooks. The
-; menu-dispatcher bypass in lib/menu_dispatcher.ahk also relies on a free
+; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
 
@@ -215,21 +215,21 @@ SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
 ; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
 
-; Logger pulled in first so every other lib/module can call it during init.
+; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
 ; Generated sub-file routing table, included before the logger that calls it.
 ; It defines a FUNCTION rather than a global, so this ordering is a convenience
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
-#Include lib/logger.ahk
-#Include lib/boot_profiler.ahk
-#Include lib/hotpath_profiler.ahk
-#Include lib/registry.ahk
-#Include lib/app_state.ahk
+#Include infra/logger.ahk
+#Include infra/boot_profiler.ahk
+#Include infra/hotpath_profiler.ahk
+#Include infra/registry.ahk
+#Include infra/app_state.ahk
 
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
-; WinGet* from the domain modules. Loaded before any lib/ or module/ file
+; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
 #Include adapters/crypto.ahk
 #Include adapters/clipboard.ahk
@@ -255,43 +255,43 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include lib/toml/toml_helpers.ahk
+#Include infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
-#Include lib/timings/timings_config.ahk
+#Include infra/timings/timings_config.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
-#Include lib/window_utils.ahk
-#Include lib/text_utils.ahk
+#Include infra/window_utils.ahk
+#Include infra/text_utils.ahk
 #Include ui/spotlight/init.ahk
-#Include lib/nav_layer_helpers.ahk
+#Include infra/nav_layer_helpers.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower) extracted into dedicated submodules so the main file
 ; stays focused on ErgoptiPlus-specific logic.
-#Include lib/hotstrings/hotstring_engine.ahk
-#Include lib/hotstrings/hotstring_engine_main.ahk
-#Include lib/hotstrings/hotstring_buffer_effects.ahk
-#Include lib/hotstrings/hotstring_live_toggle.ahk
-#Include lib/hotstrings/hotstring_count_policy.ahk
+#Include infra/hotstrings/hotstring_engine.ahk
+#Include infra/hotstrings/hotstring_engine_main.ahk
+#Include infra/hotstrings/hotstring_buffer_effects.ahk
+#Include infra/hotstrings/hotstring_live_toggle.ahk
+#Include infra/hotstrings/hotstring_count_policy.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
-#Include lib/toml/toml_loader.ahk
-#Include lib/toml/toml_config_loader.ahk
+#Include infra/toml/toml_loader.ahk
+#Include infra/toml/toml_config_loader.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
-#Include lib/first_boot.ahk
-#Include lib/tap_hold/tap_hold_loader.ahk
-#Include lib/tap_hold/tap_hold_writer.ahk
-; Tap-hold timing constants must load HERE, before lib/boot.ahk calls
+#Include infra/first_boot.ahk
+#Include infra/tap_hold/tap_hold_loader.ahk
+#Include infra/tap_hold/tap_hold_writer.ahk
+; Tap-hold timing constants must load HERE, before infra/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural
 ; spot (inside modules/tap_holds.ahk, far below boot.ahk) the sentinel 0s would
@@ -299,54 +299,54 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; so the later include via modules/tap_holds.ahk is a no-op (mirrors the
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
 #Include modules/tap_holds/constants.ahk
-#Include lib/master_gates.ahk
-#Include lib/manifest_descriptions.ahk
-#Include lib/menu_dispatcher.ahk
-#Include lib/hook_dispatcher.ahk
-#Include lib/menu_manifest.ahk
-#Include lib/manifest_menu.ahk
-#Include lib/llm_defaults.ahk
+#Include infra/master_gates.ahk
+#Include infra/manifest_descriptions.ahk
+#Include infra/menu_dispatcher.ahk
+#Include infra/hook_dispatcher.ahk
+#Include infra/menu_manifest.ahk
+#Include infra/manifest_menu.ahk
+#Include infra/llm_defaults.ahk
 #Include modules/updater.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
-#Include lib/json.ahk
+#Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
-#Include lib/locale.ahk
+#Include infra/locale.ahk
 #Include _generated/gesture_emit_actions.ahk
 #Include _generated/locale_table.ahk
-#Include lib/i18n.ahk
+#Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
-#Include lib/hotstrings/hotstrings_config.ahk
+#Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
 #Include ui/prompt_editor/init.ahk
-#Include lib/wrap_symbols_config.ahk
-#Include lib/ui_style.ahk
+#Include infra/wrap_symbols_config.ahk
+#Include infra/ui_style.ahk
 #Include ui/tooltip/init.ahk
-#Include lib/llm_diff.ahk
-#Include lib/hotstrings/hotstring_prefix_watcher.ahk
+#Include infra/llm_diff.ahk
+#Include infra/hotstrings/hotstring_prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
 ; with a gitignored flat .tsv read at registration — the same pattern as the i18n
 ; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
-#Include lib/hotstrings/hotstrings_cache.ahk
+#Include infra/hotstrings/hotstrings_cache.ahk
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
-#Include lib/app_picker.ahk
-#Include lib/config_shortcuts.ahk
-#Include lib/metrics/metrics_shortcuts.ahk
-#Include lib/metrics/metrics_filters.ahk
+#Include infra/app_picker.ahk
+#Include infra/config_shortcuts.ahk
+#Include infra/metrics/metrics_shortcuts.ahk
+#Include infra/metrics/metrics_filters.ahk
 #Include ui/wpm/init.ahk
-#Include lib/sqlite3.ahk
+#Include infra/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
-#Include lib/webview_utils.ahk
+#Include infra/webview_utils.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
 #Include modules/keylogger/keylogger_walker.ahk
@@ -419,9 +419,9 @@ BootProfile_Stamp("Module includes initialised")
 ; ======= 1.1) Variables initialization =======
 ; =============================================
 
-#Include lib/boot.ahk
+#Include infra/boot.ahk
 
-#Include lib/feature_state.ahk
+#Include infra/feature_state.ahk
 
 ; AHK-21: clear the stock AHK tray items (Pause/Suspend/Reload/Exit/Edit)
 ; BEFORE the blocking onboarding wizard so those stock actions are never live
@@ -478,7 +478,7 @@ try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", DriverPid, bootScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
-; diagnosed from the log alone (see lib/boot_profiler.ahk).
+; diagnosed from the log alone (see infra/boot_profiler.ahk).
 BootProfile_Begin()
 
 ; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
@@ -873,16 +873,16 @@ global _FmtCountCache := Map()
 
 
 
-#Include lib/config_io.ahk
+#Include infra/config_io.ahk
 
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk
 
-#Include lib/lifecycle.ahk
+#Include infra/lifecycle.ahk
 
-#Include lib/script_altgr_hotkeys.ahk
+#Include infra/script_altgr_hotkeys.ahk
 _RegisterScriptAltGrHotkeys()
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
@@ -911,7 +911,7 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; Clear any phantom modifier carried across a Reload BEFORE the input hook starts
 ; observing keystrokes, so a Reload that landed mid-AltGr cannot leave this fresh
 ; process stuck on the AltGr layer for the first keystrokes (transient
-; « AltGr bloqué »). See _ReleasePhantomModifiers in lib/lifecycle.ahk.
+; « AltGr bloqué »). See _ReleasePhantomModifiers in infra/lifecycle.ahk.
 _ReleasePhantomModifiers()
 ; Ready is an output contract: every advertised trigger, including emoji/symbol
 ; sections and its preview index, must exist before the driver publishes ready.
@@ -989,7 +989,7 @@ global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
 global _PENDING_KEYBOARD_HKL := 0
 
-; The quiescence decision is a pure function extracted to lib/ so the headless
+; The quiescence decision is a pure function extracted to infra/ so the headless
 ; test suite can exercise it without #including this whole entry point (which
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.

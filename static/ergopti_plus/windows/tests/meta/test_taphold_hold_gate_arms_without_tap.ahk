@@ -97,7 +97,7 @@ Test("tap-holds: a hold gate never requires a configured tap action (taphold-hol
 ; TapHoldIsConfigured). The picker still offers all 32 hold options for them,
 ; which is a real open defect — closing it means either honouring the choice
 ; (dropping the `~` and suppressing the physical modifier on three very hot
-; keys) or filtering the picker in lib/tap_hold + ui/menu. Until that is
+; keys) or filtering the picker in infra/tap_hold + ui/menu. Until that is
 ; decided, this ratchet at least stops the class from GROWING: a new key added
 ; to the picker without a hold gate fails here.
 _THG_KnownKeysWithoutHoldGate() {

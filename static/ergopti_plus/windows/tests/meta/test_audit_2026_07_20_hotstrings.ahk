@@ -8,7 +8,7 @@
 ;
 ; F-02  _PREFIX_WORD_BOUNDARIES was a top-level global built by concatenating
 ;       HSE_WORD_TERMINATORS at its own include position — a SNAPSHOT of the
-;       compile-time constant. lib/boot.ahk then REPLACED HSE_WORD_TERMINATORS
+;       compile-time constant. infra/boot.ahk then REPLACED HSE_WORD_TERMINATORS
 ;       with the catalogue-derived set and never recomputed the preview set. The
 ;       two diverged: the tooltip anchored on a set containing the apostrophe
 ;       while the matcher did not, so typing l'ame previewed âme and then simply
@@ -101,7 +101,7 @@ Test("hotstrings: every loader shares one is_case_sensitive mapping (F-03)",
 
 _A0720HS_NbspFlagDescribesTheWinner() {
 	Body := _DriverFuncBody("HSE_FindMatchAtEnd")
-	Assert(Body != "", "HSE_FindMatchAtEnd must exist in lib/hotstrings/hotstring_match.ahk")
+	Assert(Body != "", "HSE_FindMatchAtEnd must exist in infra/hotstrings/hotstring_match.ahk")
 
 	SetPos := InStr(Body, "HSE_TypoNbspStripped := true")
 	Assert(SetPos > 0, "prerequisite: the end-char probe must still record the NBSP strip")

@@ -8,11 +8,11 @@
 
 local M = {}
 local hs            = hs
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local dialog        = require("lib.dialog_util")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local dialog        = require("infra.dialog_util")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
 local LOG           = "menu_hotstrings"
 

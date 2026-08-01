@@ -29,8 +29,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- kc_bridge resolves KC_LOG_PATH via ui.menu.menu_paths at module load time.
 -- Stub the module so the require does not fail.
@@ -376,7 +376,7 @@ helpers.describe("kc_bridge — require_state guard fires Logger.error before in
 	--- @return table module, table error_calls
 	local function load_kc_bridge_with_error_spy()
 		local error_calls = {}
-		package.loaded["lib.logger"] = {
+		package.loaded["infra.logger"] = {
 			debug = function() end, trace = function() end, done = function() end,
 			info  = function() end, start = function() end, success = function() end,
 			warn  = function() end,

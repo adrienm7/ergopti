@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Menu Helpers Tests
 ; DESCRIPTION:
-; Pure-helper tests for lib/menu_helpers.ahk's personal-section label
+; Pure-helper tests for infra/menu_helpers.ahk's personal-section label
 ; disambiguation (duplicate-personal-section-desc-menu-mistarget).
 ; ==============================================================================
 

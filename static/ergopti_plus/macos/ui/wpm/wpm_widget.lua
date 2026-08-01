@@ -20,8 +20,8 @@ local hs         = hs
 local keylogger  = require("modules.keylogger")
 local EventTapGuard = require("adapters.event_tap_guard")
 local WPMShared  = require("ui.wpm.shared")
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
 
 local LOG = "wpm_widget"
@@ -533,7 +533,7 @@ update_widget_body = function()
 				frame = { x = 0, y = strip_y, w = canvas_width, h = h_unit },
 			})
 
-			local ok_i18n, i18n = pcall(require, "lib.i18n")
+			local ok_i18n, i18n = pcall(require, "infra.i18n")
 			local unit_label = (ok_i18n and type(i18n.get) == "function") and i18n.get("menu.metrics.wpm_unit") or "MPM"
 
 			-- WPM number — vertically centred in the upper zone.

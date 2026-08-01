@@ -14,7 +14,7 @@
  *
  * Canonical form (matches the in-driver tests' ``rel = abs - DRIVER_ROOT``):
  *   - under windows/ , macos/ , linux/  → path relative to that driver root
- *     (e.g. ``lib/window_utils.ahk``, ``ui/menu/init.lua``).
+ *     (e.g. ``infra/window_utils.ahk``, ``ui/menu/init.lua``).
  *   - under _shared/                    → ``_shared/<rest>`` (it is shared by all
  *     drivers, so the header keeps the _shared/ identifier).
  *
@@ -38,9 +38,9 @@ const FIX = process.argv.includes('--fix');
 
 // Source trees to validate, and the file extensions that carry a path header.
 const TREES = [
-	'windows/lib', 'windows/modules', 'windows/ui', 'windows/adapters',
-	'macos/lib', 'macos/modules', 'macos/ui', 'macos/adapters',
-	'linux/modules', 'linux/adapters', 'linux/lib', 'linux/bin', 'linux/ui',
+	'windows/infra', 'windows/modules', 'windows/ui', 'windows/adapters',
+	'macos/infra', 'macos/modules', 'macos/ui', 'macos/adapters',
+	'linux/modules', 'linux/adapters', 'linux/infra', 'linux/bin', 'linux/ui',
 	// _shared/core (the port specs) and _shared/modules were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)
 	// where every other tree under _shared/ uses the BASE-relative form.

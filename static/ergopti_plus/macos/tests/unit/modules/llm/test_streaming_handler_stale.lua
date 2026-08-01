@@ -33,7 +33,7 @@
 local helpers = require("tests.helpers")
 
 --- Stubs lib.timings so the module loads without the real TOML registry.
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	sec = function(_section, _key) return 5.0 end,
 	ms  = function(_section, _key) return 5000 end,
 }

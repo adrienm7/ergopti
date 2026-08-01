@@ -11,7 +11,7 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
--- Inject the _shared/lua root into package.path so that lib/ shims for
+-- Inject the _shared/lua root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 do
@@ -76,7 +76,7 @@ do
 	end
 end
 
-local Logger             = require("lib.logger")
+local Logger             = require("infra.logger")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -127,13 +127,13 @@ end
 -- Boot-phase profiler — ported from the AHK driver. Begin timing as early as the
 -- logger is ready so every subsequent Boot.mark() reports its delta + running
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
-local Boot               = require("lib.boot_profiler")
+local Boot               = require("infra.boot_profiler")
 Boot.begin()
 
-local i18n               = require("lib.i18n")
-local locale_mod         = require("lib.locale")
+local i18n               = require("infra.i18n")
+local locale_mod         = require("infra.locale")
 local crash_reporter     = require("modules.diagnostics.crash_reporter")
-local reload_guard       = require("lib.reload_guard")
+local reload_guard       = require("infra.reload_guard")
 
 -- Tell a reload apart from a real quit. A fresh boot starts with the sentinel
 -- cleared, then every controlled hs.reload() drops it again right before the VM
@@ -216,7 +216,7 @@ do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init(TOML_CACHE_DIR)
-		local ok_reader, toml_reader = pcall(require, "lib.toml.reader")
+		local ok_reader, toml_reader = pcall(require, "infra.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
 		end
@@ -311,7 +311,7 @@ hs.shutdownCallback = function()
 
 	-- 5. Stop the VS Code caret bridge HTTP server
 	pcall(function()
-		local ok_vb, vb = pcall(require, "lib.vscode_bridge")
+		local ok_vb, vb = pcall(require, "infra.vscode_bridge")
 		if ok_vb and vb and type(vb.stop_server) == "function" then vb.stop_server() end
 	end)
 
@@ -368,8 +368,8 @@ local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
-local notifications       = require("lib.notifications")
-local ui_restore         = require("lib.ui_restore")
+local notifications       = require("infra.notifications")
+local ui_restore         = require("infra.ui_restore")
 
 -- Wire Logger.error → system notification so every ERROR surfaces to the user
 -- without any module needing to call notifications.notify() directly.
@@ -463,7 +463,7 @@ Boot.mark("Script control engine started (panic-button eventtap)")
 -- so a user who turned the LLM off in the file still paid the synchronous
 -- lsof + curl cleanup on every boot. The two readers of this one setting sat on
 -- opposite sides of the layer that populates it.
-local config_overrides = require("lib.config_overrides")
+local config_overrides = require("infra.config_overrides")
 config_overrides.apply(menu_paths.get("ConfigTomlPath"))
 
 local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
@@ -586,10 +586,10 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 	paths = true,
 }
 
--- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in lib/fs_dir so
+-- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is honoured in exactly one place across the driver; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("lib.fs_dir").entries
+local safe_dir_entries = require("infra.fs_dir").entries
 
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
@@ -793,10 +793,10 @@ Boot.mark("TOML discovery + ordering")
 -- personal_hotstrings.toml lives in <config_dir>/hotstrings/ (configurable via
 -- the paths editor). Additional *.toml files placed in the same folder are loaded
 -- automatically as extra personal extension groups in alphabetical order by stem.
--- The personal group + recursive extension scan live in lib/personal_hotstrings;
+-- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-for _, g in ipairs(require("lib.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
+for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
 end
@@ -878,7 +878,7 @@ Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 -- here previously discarded both return values, so a setup() throw (e.g. a
 -- failed extension install or a port bind failure) vanished with no trace.
 do
-	local ok_vscode, vscode_err = pcall(function() require("lib.vscode_bridge").setup() end)
+	local ok_vscode, vscode_err = pcall(function() require("infra.vscode_bridge").setup() end)
 	if not ok_vscode then
 		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_err))
 	end
@@ -910,9 +910,9 @@ ui_restore.restore()
 -- ================================
 
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
--- in lib/file_watchers; _G.script_watchers (the GC root the shutdown callback
+-- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-require("lib.file_watchers").start({
+require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),

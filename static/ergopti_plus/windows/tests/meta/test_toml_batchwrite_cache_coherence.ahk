@@ -27,7 +27,7 @@ _TBCC_ReadSource(RelPath) {
 ; =============================================
 
 _TBCC_DeepCopyPresent() {
-	Src := _TBCC_ReadSource("lib/toml/toml_helpers.ahk")
+	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
 	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 
@@ -42,7 +42,7 @@ Test("toml_helpers: TOML_BatchWrite deep-copies cached Map before mutation", _TB
 
 
 _TBCC_FailurePathsInvalidateCache() {
-	Src := _TBCC_ReadSource("lib/toml/toml_helpers.ahk")
+	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
 	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 

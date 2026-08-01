@@ -38,7 +38,7 @@ local DELTA_PROPERTY = "scrollWheelEventDeltaAxis1"
 --- scroll tap under test) plus every system key event posted.
 --- @return table ctx {key_cb, scroll_cb, posted=array of {key, isDown}, f19=int}.
 local function make_layer_scroll_ctx()
-	package.loaded["lib.keycodes"] = nil
+	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
@@ -64,7 +64,7 @@ local function make_layer_scroll_ctx()
 	helpers.assert_true(type(ctx.key_cb) == "function",    "the key tap callback must be captured")
 	helpers.assert_true(type(ctx.scroll_cb) == "function", "the scroll tap callback must be captured")
 
-	ctx.f19 = require("lib.keycodes").F19_VOLUME_SCROLL_MODIFIER
+	ctx.f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
 	return ctx
 end
 

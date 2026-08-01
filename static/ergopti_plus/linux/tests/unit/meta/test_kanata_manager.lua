@@ -136,8 +136,8 @@ helpers.describe("kanata manager", function()
     -- broken install. generate_kbd must instead fail loud (return nil).
 
     helpers.it("emits the value from the timings registry, not a hardcoded 2000", function()
-      local real = require("lib.timings")
-      package.loaded["lib.timings"] = {
+      local real = require("infra.timings")
+      package.loaded["infra.timings"] = {
         ms = function(cat, key)
           if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return 4242 end
           return real.ms(cat, key)
@@ -145,7 +145,7 @@ helpers.describe("kanata manager", function()
         sec = real.sec,
       }
       local kbd = km.generate_kbd()
-      package.loaded["lib.timings"] = real
+      package.loaded["infra.timings"] = real
       -- Only assert when a template was resolvable in this environment.
       if kbd then
         helpers.assert_true(kbd:find("4242", 1, true) ~= nil,
@@ -154,8 +154,8 @@ helpers.describe("kanata manager", function()
     end)
 
     helpers.it("fails loud (returns nil) when the canonical timeout is missing", function()
-      local real = require("lib.timings")
-      package.loaded["lib.timings"] = {
+      local real = require("infra.timings")
+      package.loaded["infra.timings"] = {
         ms = function(cat, key)
           if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return nil end
           return real.ms(cat, key)
@@ -163,7 +163,7 @@ helpers.describe("kanata manager", function()
         sec = real.sec,
       }
       local kbd = km.generate_kbd()
-      package.loaded["lib.timings"] = real
+      package.loaded["infra.timings"] = real
       helpers.assert_true(kbd == nil,
         "generate_kbd must return nil when the canonical one-shot timeout is missing — no hardcoded fallback")
     end)

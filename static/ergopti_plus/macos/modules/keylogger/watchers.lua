@@ -25,8 +25,8 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
 local LOG     = "keylogger.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be

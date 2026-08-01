@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; The LLM prediction tooltip backed by the shared Gui engine: multi-slot state, show/hide/loading, slot text building, display-option setters, the chain-timing model, footer/info/nav-hint rendering and the LLM Gui builder.
 ;
-; Split out of the former lib/tooltip.ahk (the module split); see ui/tooltip/init.ahk
+; Split out of the former infra/tooltip.ahk (the module split); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
 ; across the tooltip/*.ahk files is irrelevant.
 ; ==============================================================================

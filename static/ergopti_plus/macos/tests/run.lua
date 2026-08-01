@@ -43,12 +43,12 @@ if not is_absolute then
 end
 
 -- The _shared/ Lua libraries live one level above the HS driver root
--- (i.e. in static/ergopti_plus/_shared/lua/). The shims in lib/ need this
+-- (i.e. in static/ergopti_plus/_shared/lua/). The shims in infra/ need this
 -- entry to resolve lib.toml.codec, lib.toml.reader, and lib.toml.writer modules.
 local drivers_root  = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_lua    = drivers_root .. "/_shared/lua"
 
--- Search the driver root first (so `require("lib.x")` resolves), then the
+-- Search the driver root first (so `require("infra.x")` resolves), then the
 -- shared Lua libraries, then tests/ and stubs/. Order matters: hs.lua stub
 -- must win over any real hs module that might appear in the path.
 package.path = table.concat({
@@ -189,7 +189,7 @@ helpers.reset_results()
 -- red in CI. Cold-starting every file makes the suite order-independent by
 -- construction. tests.* (helpers, stubs) and plain "hs" deliberately survive:
 -- load_with_stubs manages those itself.
-local PURGE_PREFIXES = { "^modules%.", "^adapters%.", "^lib%.", "^ui%." }
+local PURGE_PREFIXES = { "^modules%.", "^adapters%.", "^infra%.", "^ui%." }
 
 --- Evicts every cached driver module so the next test file starts cold, and
 --- installs a pristine hs stub: top-of-file require chains would otherwise

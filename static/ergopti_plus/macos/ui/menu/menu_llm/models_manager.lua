@@ -17,11 +17,11 @@ local M = {}
 local hs        = hs
 local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
-local Logger    = require("lib.logger")
-local dialog    = require("lib.dialog_util")
+local Logger    = require("infra.logger")
+local dialog    = require("infra.dialog_util")
 local llm_mod   = require("modules.llm")
-local i18n      = require("lib.i18n")
-local Paths     = require("lib.paths")
+local i18n      = require("infra.i18n")
+local Paths     = require("infra.paths")
 
 local LOG = "menu_llm.models"
 

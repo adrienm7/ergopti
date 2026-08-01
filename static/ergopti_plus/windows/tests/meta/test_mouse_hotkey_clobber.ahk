@@ -12,7 +12,7 @@
 ; fan-out -- every OTHER subscriber to mouse_ldown stops receiving events.
 ;
 ; Two modules were guilty:
-; - lib/hotstrings/hotstring_prefix_watcher.ahk: _InstallMouseClickResetHooks()
+; - infra/hotstrings/hotstring_prefix_watcher.ahk: _InstallMouseClickResetHooks()
 ;   called Hotkey("~LButton", _OnMouseClickReset) directly.
 ; - modules/keymap/llm_bridge.ahk: _LLM_PointerWatch_Start() called
 ;   Hotkey(key, _LLM_PointerWatch_ActivityFn, "On") for ~LButton through

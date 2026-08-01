@@ -12,7 +12,7 @@
 ;   real boot log showed that contention inflate a single keystroke's dispatch to
 ;   ~480 ms (HSE.Dispatch 476 ms / OnChar 485 ms) and a tooltip build to ~268 ms
 ;   during the warm-up. The graph was rewritten to draw with GDI+ into a per-pixel
-;   alpha layered window (lib/spotlight.ahk's pattern via the GraphicsRenderer
+;   alpha layered window (infra/spotlight.ahk's pattern via the GraphicsRenderer
 ;   adapter), which has zero cold-start. If a future edit reintroduces WebView2 for
 ;   the widget, that whole-keyboard-freeze regression returns — this test makes
 ;   that loud.

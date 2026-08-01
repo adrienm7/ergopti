@@ -21,10 +21,10 @@
 
 local M = {}
 
-local Logger   = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n     = require("lib.i18n")
-local Manifest = require("lib.manifest_reader")
+local Logger   = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n     = require("infra.i18n")
+local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
 local hs       = hs
 local LOG      = "llm.profiles"

@@ -97,7 +97,7 @@ check(
 // Check Dialog Util Fix
 check(
     'Dialog Util: use hs.focus(true) with force flag',
-    'static/ergopti_plus/macos/lib/dialog_util.lua',
+    'static/ergopti_plus/macos/infra/dialog_util.lua',
     /hs\.focus\(true\)/
 );
 

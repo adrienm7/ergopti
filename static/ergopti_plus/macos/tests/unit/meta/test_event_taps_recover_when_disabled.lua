@@ -24,7 +24,7 @@
 local helpers = require("tests.helpers")
 
 -- Directories that ship runtime tap owners. `tests/` is excluded by the walker.
-local SCANNED_DIRS = { "modules", "lib", "adapters", "ui" }
+local SCANNED_DIRS = { "modules", "infra", "adapters", "ui" }
 
 -- The constructor that makes a file a tap owner.
 local TAP_CONSTRUCTOR = "eventtap%.new"

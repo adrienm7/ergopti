@@ -7,7 +7,7 @@
 ; run_all.ahk referenced things outside the suite's include graph.
 ;
 ; Root cause (commit "Fix clipboard ram leak"): meta/test_clipboard_ram_leak.ahk
-; did `#Include ../../lib/testing.ahk` (a file that does not exist) and called
+; did `#Include ../../infra/testing.ahk` (a file that does not exist) and called
 ; _KL_Clip_CharCountFromByteSize (defined only in keylogger_clipboard.ahk, which
 ; run_all.ahk did not include). In AHK v2 BOTH are load-time errors, and a
 ; load-time error pops a modal dialog the headless runner can never dismiss — the
@@ -16,7 +16,7 @@
 ; This test encodes the invariants that prevent it from recurring:
 ;   1. No test file pulled in by run_all.ahk may #Include the production entry
 ;      point ErgoptiPlus.ahk (it registers every hotkey at load) nor the
-;      nonexistent lib/testing.ahk — test files rely on test_framework.ahk, which
+;      nonexistent infra/testing.ahk — test files rely on test_framework.ahk, which
 ;      run_all.ahk includes once up front.
 ;   2. run_all.ahk must include keylogger_clipboard.ahk so the clipboard test's
 ;      direct call to _KL_Clip_CharCountFromByteSize resolves at load time.
@@ -66,7 +66,7 @@ _RAI_TestSuiteIncludeIntegrity() {
 		TestSrc := FileRead(TestPath, "UTF-8")
 		for SubInc in _RAI_IncludeTargets(TestSrc) {
 			Assert(!InStr(SubInc, "ErgoptiPlus.ahk"), "Test file " . Inc . " must not #Include the production entry point ErgoptiPlus.ahk (registers every hotkey, hangs the headless runner)")
-			Assert(!InStr(SubInc, "lib/testing.ahk") && !InStr(SubInc, "lib\testing.ahk"), "Test file " . Inc . " #Includes the nonexistent lib/testing.ahk — use test_framework.ahk via run_all instead")
+			Assert(!InStr(SubInc, "infra/testing.ahk") && !InStr(SubInc, "infra\testing.ahk"), "Test file " . Inc . " #Includes the nonexistent infra/testing.ahk — use test_framework.ahk via run_all instead")
 		}
 		Checked += 1
 	}

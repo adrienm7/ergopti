@@ -45,14 +45,14 @@ _SPDC_CollectCombinationPrefixes() {
 	return Found
 }
 
-; Reads the declared drain list straight from source. lib/lifecycle.ahk is not
+; Reads the declared drain list straight from source. infra/lifecycle.ahk is not
 ; loaded by the headless harness, so the super-global is not available at runtime
 ; — and parsing the declaration is the stronger check anyway: it pins what the
 ; driver ships, not what a test fixture happens to hold.
 _SPDC_DeclaredDrainList() {
 	Src := _DriverSourceNoComments()
 	Assert(RegExMatch(Src, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS\s*:=\s*\[([^\]]*)\]", &M) > 0,
-		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must be declared as an array literal in lib/lifecycle.ahk")
+		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must be declared as an array literal in infra/lifecycle.ahk")
 	Out := []
 	for _, Raw in StrSplit(M[1], ",") {
 		; Trim in stages so neither quote character needs an escape: a
@@ -87,7 +87,7 @@ _SPDC_DrainListCoversEveryCombinationPrefix() {
 			}
 		}
 		Assert(InList,
-			"custom-combination prefix '" . Prefix . "' is registered in the driver but absent from SUSPEND_CUSTOM_COMBO_PREFIX_KEYS — its AHK prefix-down flag latches across Suspend and cannot be cleared by synthetic key events, so holding it while pausing reproduces the « AltGr bloqué » latch for that key. Add it to the list in lib/lifecycle.ahk")
+			"custom-combination prefix '" . Prefix . "' is registered in the driver but absent from SUSPEND_CUSTOM_COMBO_PREFIX_KEYS — its AHK prefix-down flag latches across Suspend and cannot be cleared by synthetic key events, so holding it while pausing reproduces the « AltGr bloqué » latch for that key. Add it to the list in infra/lifecycle.ahk")
 	}
 }
 Test("lifecycle: the suspend prefix drain covers every custom-combination prefix (F-30)",

@@ -67,7 +67,7 @@ _MetaRunFileHeaderTests() {
 	; SplitPath strips the last component to reach autohotkey/
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
-	SrcDirs := ["lib", "modules", "ui"]
+	SrcDirs := ["infra", "modules", "ui"]
 	Checked := 0
 	Mismatches := 0
 

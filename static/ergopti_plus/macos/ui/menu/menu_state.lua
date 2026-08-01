@@ -14,7 +14,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "menu_state"
 
 -- Delay before starting the keylogger engine. Its start (~1.3 s of SQLite +

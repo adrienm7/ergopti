@@ -6,7 +6,7 @@
 --- crash_reporter.prompt_user ended in dialog_util.block_alert, i.e.
 --- hs.dialog.blockAlert. A modal alert runs a NESTED RUN LOOP: the main thread
 --- stops dead — every event tap, timer and hotkey in the driver with it — until a
---- human clicks the button. lib/dialog_util.lua:57-58 documents exactly this
+--- human clicks the button. infra/dialog_util.lua:57-58 documents exactly this
 --- ("Modal dialogs block the main thread and its default runloop, meaning
 --- hs.timer.doAfter will NOT fire until AFTER the dialog is dismissed").
 ---
@@ -65,14 +65,14 @@ local function load_with_tripwires(config_dir)
 
 	-- dialog_util is the only route the module ever used to reach blockAlert; a
 	-- raising stub makes a lingering modal call impossible to miss.
-	package.loaded["lib.dialog_util"] = {
+	package.loaded["infra.dialog_util"] = {
 		block_alert = function()
 			modal.opened = true
 			error("lib.dialog_util.block_alert must never be reached from the crash reporter")
 		end,
 	}
 
-	package.loaded["lib.notifications"] = {
+	package.loaded["infra.notifications"] = {
 		notify = function(title, body, kind)
 			notifications[#notifications + 1] = { title = title, body = body, kind = kind }
 		end,

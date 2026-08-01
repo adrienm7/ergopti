@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Defaults Loader Tests
 ; DESCRIPTION:
-; Regression coverage for lib/llm_defaults.ahk after the hardcoded-fallback
+; Regression coverage for infra/llm_defaults.ahk after the hardcoded-fallback
 ; removal. The 20-key _LLM_DEFAULTS_FALLBACK mirror is gone; only the genuinely
 ; AHK-local _LLM_LOCAL_DEFAULTS (model, backend) remains, and the loader sources
 ; every shared value from _shared/modules/llm/defaults.json, failing fast on a missing

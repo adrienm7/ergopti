@@ -68,7 +68,7 @@ _LTI_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _LTI_WriteTapHoldTomlIsAtomic() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("infra/tap_hold/tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Seg != "", "_TH_WriteTapHoldToml declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
@@ -79,7 +79,7 @@ _LTI_WriteTapHoldTomlIsAtomic() {
 Test("tap_hold_writer: _TH_WriteTapHoldToml uses atomic FileMove (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldTomlIsAtomic)
 
 _LTI_WriteTapHoldDisabledIsAtomic() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("infra/tap_hold/tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldDisabled")
 	Assert(Seg != "", "_TH_WriteTapHoldDisabled declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
@@ -99,7 +99,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses atomic FileMove (loader-tom
 ; ==================================================
 
 _LTI_LoaderWarnsOnTruncatedConfig() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_loader.ahk")
+	Src := _LTI_ReadSource("infra/tap_hold/tap_hold_loader.ahk")
 	Seg := _LTI_FuncBody(Src, "LoadTapHoldToml(FilePath, DefaultsFilePath := " . Chr(34) . Chr(34) . ") {")
 	Assert(Seg != "", "LoadTapHoldToml declaration must exist in tap_hold_loader.ahk")
 	; The sentinel fires only when the parsed config has 0 keys and the user did

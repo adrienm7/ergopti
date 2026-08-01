@@ -5,9 +5,9 @@ SetWorkingDir(A_ScriptDir)
 global _AHK_DRY_RUN := false
 #Include test_framework.ahk
 #Include test_stubs.ahk
-#Include ../lib/json.ahk
-#Include ../lib/toml/toml_helpers.ahk
-#Include ../lib/toml/toml_config_loader.ahk
+#Include ../infra/json.ahk
+#Include ../infra/toml/toml_helpers.ahk
+#Include ../infra/toml/toml_config_loader.ahk
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,

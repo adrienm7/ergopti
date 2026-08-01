@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Shared-Root Resolver Execution Guard
  * DESCRIPTION:
- * Runs the real `lib/paths.lua` resolver of every driver, asks it for every
+ * Runs the real `infra/paths.lua` resolver of every driver, asks it for every
  * `_shared` path the codebase actually requests, and stats the answer. A target
  * that does not exist on disk fails, and so does a resolver that returns nil.
  *
@@ -28,7 +28,7 @@
  * what the broken versions did too.
  *
  * THE USER-DIRECTORY RESOLVER, SAME RULE:
- * `linux/lib/config_paths.lua` is executed with HOME present, HOME absent, and
+ * `linux/infra/config_paths.lua` is executed with HOME present, HOME absent, and
  * both HOME and TMPDIR absent, because the fallback is the part that shipped
  * wrong: nineteen sites once derived $HOME themselves with six different answers
  * for a missing one, including `"~"` (never expanded by io.open, so it addressed
@@ -232,9 +232,9 @@ if (!LUA) {
 } else {
 	for (const drv of RESOLVER_DRIVERS) {
 		const driverRoot = path.join(DRIVERS, drv.name).split(path.sep).join('/');
-		const resolver = path.join(DRIVERS, drv.name, 'lib', 'paths.lua');
+		const resolver = path.join(DRIVERS, drv.name, 'infra', 'paths.lua');
 		if (!fs.existsSync(resolver)) {
-			errors.push(`${drv.name}/lib/paths.lua is missing — the driver has no shared-tree resolver`);
+			errors.push(`${drv.name}/infra/paths.lua is missing — the driver has no shared-tree resolver`);
 			continue;
 		}
 
@@ -352,7 +352,7 @@ const homeProbePath = path.join(tmp, 'home_probe.lua');
 fs.writeFileSync(homeProbePath, HOME_PROBE_LUA, 'utf8');
 
 const LINUX_ROOT = path.join(DRIVERS, 'linux').split(path.sep).join('/');
-const CONFIG_PATHS = path.join(DRIVERS, 'linux', 'lib', 'config_paths.lua');
+const CONFIG_PATHS = path.join(DRIVERS, 'linux', 'infra', 'config_paths.lua');
 
 // Each scenario names the base the resolver must land on, so "it returned a
 // string" is never enough to pass.
@@ -377,7 +377,7 @@ const HOME_CASES = [
 let homeCasesRun = 0;
 
 if (LUA && !fs.existsSync(CONFIG_PATHS)) {
-	errors.push('linux/lib/config_paths.lua is missing — the user-directory SSOT is gone');
+	errors.push('linux/infra/config_paths.lua is missing — the user-directory SSOT is gone');
 } else if (LUA) {
 	for (const c of HOME_CASES) {
 		// Inherit the real environment and override only the keys under test:
