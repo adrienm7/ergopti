@@ -740,8 +740,19 @@ Constraints: **paths before moves, moves before content, data before code.**
      broke in a row (the buffer cap was the first), so the pattern is recorded in
      `PROJECT_MEMORY.md`: a consistency check must model the matching rule, not
      assume the strictest one. ·
-     consumed delimiters, the
-     `individual > section > file` priority levels, `is_word` as a tiebreaker.
+     consumed delimiters, ~~the
+     `individual > section > file` priority levels~~ — **measured, and the Linux
+     skip was too broad.** Of the 6 collision vectors, the shared engine
+     genuinely decides **3** (length primacy via the longest-first sort,
+     first-registered fallback, no-match); those are now replayed on Linux, and a
+     probe reversing the sort is caught by them — nothing on Linux caught that
+     before. The other 3 need priority, and **2 would pass by accident** if
+     replayed naively, because their expected winner happens to be registered
+     first: "just enable the rest" would read as Linux honouring priority when it
+     is blind to it. The skip now **asserts its own premise** (the engine always
+     yields the first-registered mapping) instead of `assert_true(true)`, so it
+     fails the day priority arrives. Tautology ratchet 283 → 282. ·
+     `is_word` as a tiebreaker.
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
