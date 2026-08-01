@@ -33,7 +33,11 @@ const MENU_PATH = resolve(SHARED, 'modules/menu/menu_manifest.json');
 const MANIFEST_PATH = resolve(SHARED, 'modules/features/manifest.toml');
 const LOCALES_DIR = resolve(SHARED, 'data/locales');
 
-const KNOWN_PLATFORMS = new Set(['ahk', 'hs', 'both']);
+// "linux" is expressible even though no row declares it yet: I2 fixes the
+// vocabulary at windows | macos | linux, and a value the schema rejects cannot
+// be adopted incrementally. Rows carrying no platforms list already default to
+// every platform, so admitting the name changes nothing until one is written.
+const KNOWN_PLATFORMS = new Set(['ahk', 'hs', 'linux', 'both']);
 
 // Section sub-keys that are metadata, not nested sections.
 const SECTION_META_KEYS = new Set(['order', 'description_key', 'platforms', 'subsections']);
@@ -136,7 +140,9 @@ function main() {
 				} else {
 					for (const p of item.platforms) {
 						if (!KNOWN_PLATFORMS.has(p)) {
-							violations.push(`${where}: unknown platform "${p}" (expected ahk/hs)`);
+							violations.push(
+								`${where}: unknown platform "${p}" (expected ${[...KNOWN_PLATFORMS].join('/')})`
+							);
 						}
 					}
 				}
