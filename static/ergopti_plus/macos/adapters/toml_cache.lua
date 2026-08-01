@@ -48,7 +48,11 @@ local LOG    = "adapters.toml_cache"
 --- an older parser are rejected (treated as a miss) instead of fed back with a
 --- now-incompatible structure.
 --- Bumped from 1→2 when the content fingerprint field `fp` was added.
-local CACHE_VERSION = 2
+--- Bumped from 2→3 when parse_entry_line started carrying
+--- `is_case_sensitive_strict`: a snapshot written by the older parser has the
+--- field absent, and an absent flag reads as false — the exact silent
+--- mis-registration the version stamp exists to prevent.
+local CACHE_VERSION = 3
 
 --- Number of bytes read from the source file to build the content fingerprint.
 --- 512 bytes is enough to catch any realistic same-second edit while keeping the
