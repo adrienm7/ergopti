@@ -388,7 +388,7 @@ local function _app_title(app_name)
 		token_prompt            = "Token Settings",
 	}
 	return titles[app_name] or app_name:gsub("_", " "):gsub("(%a)([%w_]*)", function(a, b)
-		return a:upper() .. b:gsub("_", " ")
+		return (a:upper() .. b:gsub("_", " "))
 	end)
 end
 

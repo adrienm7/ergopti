@@ -73,7 +73,7 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 --- @return string
 local function canonical_path(p)
 	if type(p) ~= "string" then return "" end
-	return p:gsub("\\", "/"):lower()
+	return (p:gsub("\\", "/"):lower())
 end
 
 --- Arms every auto-reload watcher. Pins them in _G.script_watchers (the GC root

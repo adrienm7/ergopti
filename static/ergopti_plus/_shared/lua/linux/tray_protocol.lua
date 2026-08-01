@@ -17,7 +17,7 @@ local M = {}
 --- @return string
 local function xml_escape(s)
 	if type(s) ~= "string" then return "" end
-	return s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&apos;")
+	return (s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&apos;"))
 end
 
 --- Builds a single D-Bus menu item node XML.

@@ -109,7 +109,7 @@ local function fmt_delay(ms)
 	elseif ms % 1000 == 0 then
 		return tostring(ms // 1000) .. " s"
 	else
-		return string.format("%.1f s", ms / 1000):gsub("%.", ",")
+		return (string.format("%.1f s", ms / 1000):gsub("%.", ","))
 	end
 end
 

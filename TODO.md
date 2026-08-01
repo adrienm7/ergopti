@@ -748,7 +748,22 @@ Constraints: **paths before moves, moves before content, data before code.**
   | ~~Lua assertion library~~ **done** | 737 | 767 | one shared `test/assertions.lua`; see below |
   | Convention invariants | 1 594 | ~450 | one `.cjs` gate per invariant — **the shared linter already IS that gate**; see below |
   | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
-  **Convention invariants — "Linux gains 6 it does not have" is stale; the real
+  **Found while widening the convention scan — `gsub` was returning two values in
+20 places.** `return x:gsub(...)` hands the caller the string *and* gsub's
+replacement COUNT. Measured in the interpreter rather than assumed, because the
+intuition is backwards: `string.format(fmt, x:gsub(..), y)` truncates to one
+value (safe) and `string.format(fmt, y, x:gsub(..))` expands but format ignores
+extras (also safe) — while `{ first, x:gsub(..) }` gives `#t == 3` and a bare
+`return` propagates the count to every caller. The two shapes that look most
+dangerous are fine; the innocuous-looking one is what leaks.
+The codebase already knew the fix — **16 sites used `return (x:gsub(...))` and
+20 did not.** A convention applied to 44 % of its sites is not a convention, and
+the difference is invisible in review because the parentheses read as
+decorative. All 26 single-line cases are wrapped (both suites unchanged at 3 768
+and 1 370), 23 multi-line ones are left for hand review rather than rewritten
+mechanically, and `test-lua-gsub-single-return.cjs` holds the line.
+
+**Convention invariants — "Linux gains 6 it does not have" is stale; the real
 gap was elsewhere.** `tools/lint/lint-conventions.js` is already the one `.cjs`
 gate per invariant, and it already scans the Linux tree (a previous fix widened
 it from macOS-only). What it did **not** scan was `adapters/` on macOS and

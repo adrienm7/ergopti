@@ -58,7 +58,7 @@ function M.install(ctx)
 			for _, family in ipairs(provider.families or {}) do
 				for _, m in ipairs(family.models or {}) do
 					if m.name == model_name and m.urls and m.urls.mlx then
-						return m.urls.mlx:gsub("^https?://huggingface%.co/", "")
+						return (m.urls.mlx:gsub("^https?://huggingface%.co/", ""))
 					end
 				end
 			end

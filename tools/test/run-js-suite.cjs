@@ -105,6 +105,7 @@ const CHECKS = [
 	{ name: 'hotstring flag support per driver (is_case_sensitive_strict is Windows-only)', cmd: 'node', args: ['tools/test/test-hotstring-flag-support-per-driver.cjs'], repro: 'node tools/test/test-hotstring-flag-support-per-driver.cjs' },
 	{ name: 'feature-state boot smoke (4 fixtures, real include graph, own process)', cmd: 'node', args: ['tools/test/test-feature-state-boot-smoke.cjs'], repro: 'node tools/test/test-feature-state-boot-smoke.cjs' },
 	{ name: 'port contract vector traceability (ratchet: ids linked to the macOS mirror)', cmd: 'node', args: ['tools/test/test-port-vector-traceability.cjs'], repro: 'node tools/test/test-port-vector-traceability.cjs --measure' },
+	{ name: 'lua gsub returns one value (bare return leaks the replacement count)', cmd: 'node', args: ['tools/test/test-lua-gsub-single-return.cjs'], repro: 'node tools/test/test-lua-gsub-single-return.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },

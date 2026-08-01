@@ -480,7 +480,7 @@ local function _build_gestures(ctx)
 		local value = pipe:read("*a") or ""
 		local ok = pipe:close()
 		if not ok then return nil end
-		return value:gsub("%s+$", "")
+		return (value:gsub("%s+$", ""))
 	end
 
 	local function assign_action(slot, action)

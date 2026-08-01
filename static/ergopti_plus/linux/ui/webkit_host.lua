@@ -74,7 +74,7 @@ function M.resolve_ui_root(driver_root)
 		if fh then
 			fh:close()
 			-- Normalize to forward slashes
-			return p:gsub("\\", "/")
+			return (p:gsub("\\", "/"))
 		end
 	end
 	return ""
@@ -93,7 +93,7 @@ function M.resolve_locales_dir(driver_root)
 		local fh = io.open(p .. "/fr.json", "r")
 		if fh then
 			fh:close()
-			return p:gsub("\\", "/")
+			return (p:gsub("\\", "/"))
 		end
 	end
 	return ""
