@@ -1123,7 +1123,19 @@ placeholder-parity rule was measured and **rejected**: it fires on correct work
 (Czech drops the `%s` that only pluralises an English noun; `{pct}% du focus`
 reads as a `% d` conversion to a regex and is a literal percent sign). Lua's
 `string.format` tolerates surplus arguments, so there is no defect to gate. ·
-`_shared/tests/corpus/logger/behaviour_vectors.json` ·
+~~`_shared/tests/corpus/logger/behaviour_vectors.json`~~ **done, in the file that
+already existed** — `_shared/modules/logger/test_vectors.json` holds 17 vectors
+and was replayed by **two suites out of three**; its own header said "shared by
+AHK and Hammerspoon test suites". Linux now replays all 17 through the shared
+logger core. Since Linux and macOS run the *same* core, a divergence there could
+only come from the sink, level or timestamp function the driver installs around
+it — the layer each driver owns and nothing was checking. The per-vector
+overrides moved from `message_hs`/`expected_hs` to `message_lua`/`expected_lua`:
+the difference is the **language** (Lua's `%s` vs AutoHotkey's `{1}`), not the
+driver, so keying them by driver name was this backlog's own root cause and left
+no name a second Lua driver could use. A false docstring was corrected too —
+`test_shared_logger.lua` claimed to exercise the corpus while never opening the
+file. ·
 `_shared/tests/conformance/manifest.json` + runner · boot-manifest parity gates ·
 "no hand-written duplicate of shared logic".
 
