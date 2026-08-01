@@ -170,7 +170,7 @@ if use_hs_stub == "1" then
 	hs = stub
 end
 
-local ok, Paths = pcall(require, "lib.paths")
+local ok, Paths = pcall(require, "infra.paths")
 if not ok then
 	print("${MARK}FATAL\\tcannot load lib.paths: " .. tostring(Paths))
 	os.exit(0)
@@ -335,7 +335,7 @@ package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
 	.. driver_root .. "/../_shared/lua/?.lua;"
 	.. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
 
-local ok, CP = pcall(require, "lib.config_paths")
+local ok, CP = pcall(require, "infra.config_paths")
 if not ok then
 	print("${MARK}FATAL\\tcannot load lib.config_paths: " .. tostring(CP))
 	os.exit(0)

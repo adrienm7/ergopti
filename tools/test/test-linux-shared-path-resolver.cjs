@@ -91,7 +91,7 @@ for (const abs of files) {
 		if (/^\s*--/.test(line)) return; // prose may cite the old path
 		if (!HARDCODED.test(line)) return;
 		errors.push(
-			`${rel}:${i + 1}: derives the shared tree by counting ".." — require("lib.paths") and ` +
+			`${rel}:${i + 1}: derives the shared tree by counting ".." — require("infra.paths") and ` +
 				'call Paths.shared(…). A per-file depth cannot be verified, and a wrong one degrades ' +
 				'silently: this is how the language menu came to offer 2 locales of 21.'
 		);
@@ -149,7 +149,7 @@ for (const abs of files) {
 			const m = line.match(USER_ENV);
 			if (!m) return;
 			errors.push(
-				`${rel}:${i + 1}: reads ${m[1]} directly — require("lib.config_paths"). Fifteen files ` +
+				`${rel}:${i + 1}: reads ${m[1]} directly — require("infra.config_paths"). Fifteen files ` +
 					'once did this with six different fallbacks, two of them broken: a bare concatenation ' +
 					'throws on nil, and "~" is never expanded by io.open.'
 			);

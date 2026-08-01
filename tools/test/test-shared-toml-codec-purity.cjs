@@ -7,8 +7,8 @@
  * Regression guard for audit SS-2. The shared TOML codec
  * (_shared/lua/toml_codec/*) is the single implementation meant to load on EVERY
  * Lua runtime — the macOS Hammerspoon driver, the Linux daemon, LuaJIT test
- * runners, and the Node/Lua build scripts. A hard `require("lib.logger")` /
- * `require("lib.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
+ * runners, and the Node/Lua build scripts. A hard `require("infra.logger")` /
+ * `require("infra.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
  * silently broke that promise: those modules could not load off macOS, which is
  * why the Linux driver forked its own zero-dependency TOML parser
  * (linux/modules/hotstrings/loader.lua).
@@ -29,8 +29,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const CODEC_DIR = path.join(ROOT, 'static/ergopti_plus/_shared/lua/toml_codec');
 const FILES = ['reader.lua', 'writer.lua', 'codec.lua', 'init.lua'];
 
-// A HARD require is the call form `require("lib.foo")` / `require('hs')`.
-// The SOFT form `pcall(require, "lib.logger")` uses a comma, not parentheses
+// A HARD require is the call form `require("infra.foo")` / `require('hs')`.
+// The SOFT form `pcall(require, "infra.logger")` uses a comma, not parentheses
 // around the string, so it is intentionally NOT matched here.
 const HARD_REQUIRE = /require\(\s*["'](lib\.[\w.]+|hs(?:\.[\w.]+)?)["']\s*\)/g;
 
@@ -50,7 +50,7 @@ for (const f of FILES) {
 		continue;
 	}
 	// Strip Lua line comments (-- … EOL) first: the module docstrings legitimately
-	// mention `require("lib.logger")` to explain the SS-2 fix, and that prose must
+	// mention `require("infra.logger")` to explain the SS-2 fix, and that prose must
 	// not trip the guard — only real code requires count.
 	const code = src.replace(/--[^\n]*/g, '');
 	const hits = code.match(HARD_REQUIRE);
