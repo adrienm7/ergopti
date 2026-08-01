@@ -32,6 +32,11 @@ local dialog   = require("lib.dialog_util")
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
+-- The WPM formula lives once, in the shared metrics module. This file used to
+-- divide by a literal 5 in two places while _shared/lua/keylogger/metrics.lua
+-- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
+-- docstring says macOS uses — the shared copy existed only to be shadowed.
+local Metrics        = require("keylogger.metrics")
 local Watchers       = require("modules.keylogger.watchers")
 local ProcessLifecycle = require("adapters.process_lifecycle")
 local KeyboardHook   = require("adapters.keyboard_hook")
@@ -1176,11 +1181,11 @@ function M.get_live_stats()
 	if not is_idle then
 		if #CoreState.recent_typing_eff > 1 then
 			local window = math.max(now - CoreState.recent_typing_eff[1], WPM_MIN_DURATION_MS)
-			wpm_eff = math.floor(((#CoreState.recent_typing_eff / 5) / (window / 60000)) + 0.5)
+			wpm_eff = math.floor(Metrics.compute_wpm_from_events(#CoreState.recent_typing_eff, window) + 0.5)
 		end
 		if #CoreState.recent_typing_phys > 1 then
 			local window = math.max(now - CoreState.recent_typing_phys[1], WPM_MIN_DURATION_MS)
-			wpm_phys = math.floor(((#CoreState.recent_typing_phys / 5) / (window / 60000)) + 0.5)
+			wpm_phys = math.floor(Metrics.compute_wpm_from_events(#CoreState.recent_typing_phys, window) + 0.5)
 		end
 	end
 
