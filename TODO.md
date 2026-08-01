@@ -246,8 +246,18 @@ Constraints: **paths before moves, moves before content, data before code.**
   `test_build_inserts_missing_timestamp.lua` stubbed `lib.json` where
   `sqlite_writer` requires `hs.json` and nothing in the driver requires
   `lib.json` at all. None made a test fail, because an inert stub is
-  indistinguishable from a working one from inside the test. All three removed; (c) `ui/`
-  dissolves into `modules/<feature>/{menu,window}`; (d) de-platform `_shared/` and
+  indistinguishable from a working one from inside the test. All three removed; ~~(c) `ui/`
+  dissolves into `modules/<feature>/{menu,window}`~~ — **superseded, and the Linux
+  half is done.** The maintainer's call was to align Linux on the other two
+  rather than move all three, which is both cheaper and the direction the
+  tree-parity report was already pointing: fifteen bridges to
+  `ui/<page>/bridge.lua`, the manager to `ui/webview_manager.lua`, the menu to
+  `ui/menu/menu_builder.lua`. Page names come from `_shared/ui/`, the canonical
+  set. **I1 28.0 % → 46.9 % in one move**, and the union SHRANK — the twelve
+  "missing `ui/*`" were never twelve gaps, they were one structural choice
+  (Linux organised its UI by mechanism, the others by feature). If the
+  `modules/<feature>/window.*` shape is still wanted, it is now one move of three
+  identical trees instead of a reconciliation. (d) de-platform `_shared/` and
   ~~repair `tools/codegen/new-driver.js`~~ — **repaired.** All four paths were
   stale, not three: `REPO_ROOT` resolved to `tools/`, `DRIVERS_DIR` pointed at the
   pre-reorg `static/drivers/`, and both spec dirs had moved under
@@ -936,7 +946,20 @@ Constraints: **paths before moves, moves before content, data before code.**
      `test-wpm-chars-per-word-single-source.cjs` bans the literal in Lua on every
      driver and freezes the **5** WebView copies, which cannot `require` a Lua
      module — generating a JS constant is the remaining half.
-  7. **Remap**: a shared tap-hold IR + three emitters
+  7. **Remap**: ~~a 2.9-5x different threshold (0.2-0.35 s per key vs a flat
+     1000 ms global)~~ — **closed.** macOS's 1000 ms was Karabiner-Elements' own
+     default for `to_if_alone_timeout_milliseconds`, so it arrived by not being
+     decided; it meant every hold waited a full second and any deliberate tap
+     that overran a second silently became a hold. Now 250 ms, inside the range
+     the other two use, so no key is more than 100 ms from its twin against
+     650-800 ms before. `test-tap-hold-threshold-parity.cjs` holds the global
+     inside the per-key range AND every value inside the 100-500 ms band a
+     tap-hold can usefully occupy — the second half because a pure parity check
+     passes when all three drift together.
+     Still open here: macOS has ONE global where the others have one value per
+     key. The generator already supports the per-manipulator override, so it is
+     wiring, blocked on reconciling the id vocabularies. Also still open: a
+     shared tap-hold IR + three emitters
      (`emit_kanata` / `emit_karabiner` / `emit_ahk`) — today only a kanata emitter
      parked in `_shared/`. And `_shared/tap_hold/defaults.toml` must become **one**
      namespace: it is currently two unrelated files in one, describing the same
@@ -1479,7 +1502,7 @@ gate that had a blind spot rather than a one-off correction:
 
 ## 1. A real user-facing bug
 
-### Linux: the daemon never grabs the keyboard — this is the root cause of `abcd` → `acd`
+### ~~Linux: the daemon never grabs the keyboard~~ — **DONE 2026-08-01**
 
 `static/ergopti_plus/linux/adapters/keyboard_hook.lua:65` defaults `_intercept`
 to false, and `:396` only flips it when the caller passes `intercept = true` —
@@ -1555,9 +1578,20 @@ ydotool wire format has no representation for a repeat, `/dev/uinput` does, and
 a pass-through that rewrites what it passes is not one. The divergence between
 the two channels is deliberate and pinned on both sides.
 
-**What still needs real evdev + ydotool hardware:** flipping `intercept = true`,
-the device-coordination question in (2) above, and confirming the kernel accepts
-the virtual device. The code and its contract no longer do.
+**Shipped, on the maintainer's call** ("le driver linux n'a encore jamais ete
+teste, donc fais-le et on verra bien le jour ou je testerai"). The daemon now
+passes `intercept = opts.grab`, and `opts.grab` defaults to TRUE. `--no-grab` is
+the escape hatch, not the default: observe mode is a *known-corrupting* default,
+so it is the flag and not the norm.
+
+Two regression tests pin it — the call must pass the option, and the option must
+default to true. Removing it goes red by name; before, reverting to observe mode
+failed nothing at all, which is why it survived the driver's whole life.
+
+**Still unverified on hardware, deliberately:** the device kanata auto-detects is
+not coordinated with the one `device_finder` picks, so on a machine where they
+differ the grab may take the wrong keyboard — which is what `--no-grab` exists
+for. Confirming the kernel accepts the virtual device also needs real evdev.
 
 ---
 
