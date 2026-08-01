@@ -23,6 +23,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ManifestReader = require("infra.manifest_reader")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
@@ -36,7 +37,10 @@ local LOG = "modules.dynamic_hotstrings.manager"
 -- =========================================
 -- =========================================
 
-local _trigger_char = "★"          -- active trigger character
+-- Active trigger character. Seeded from the shared manifest — the declaration
+-- is the only place the default lives — and overridden by init() when the user
+-- has chosen another one.
+local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
 local _enabled      = true         -- master enable/disable toggle
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table

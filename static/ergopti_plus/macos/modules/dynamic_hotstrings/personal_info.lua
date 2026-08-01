@@ -51,9 +51,16 @@ local _base_dir        = ""
 local _info_toml_path  = ""
 
 local _keymap    = nil
+local ManifestReader = require("infra.manifest_reader")
+
+-- The magic key as declared in the shared feature manifest. Named once here so
+-- the three sites below cannot drift apart from each other or from the manifest.
+local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
 
 local DEFAULT_CONFIG = {
-	trigger_char = "★",
+	-- Read from the shared manifest rather than restated: a second copy of the
+	-- magic key is a second thing to change when the user picks another one.
+	trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
 	info = {
 		first_name            = "Prénom",
 		last_name             = "Nom",
@@ -593,9 +600,9 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- user had stopped typing — while the preview, which has no trigger of its
 	-- own, kept promising the expansion.
 	if type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function" then
-		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or "★")
+		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or DEFAULT_TRIGGER)
 	else
-		_trigger = tostring(config.trigger_char or "★")
+		_trigger = tostring(config.trigger_char or DEFAULT_TRIGGER)
 	end
 
 	-- Materialise defaults to disk if the file did not exist, so the user can

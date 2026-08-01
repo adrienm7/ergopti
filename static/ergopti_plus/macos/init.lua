@@ -156,8 +156,16 @@ i18n.init()
 local menu_paths         = require("ui.menu.menu_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
+local ManifestReader     = require("infra.manifest_reader")
 -- Wire keymap → locale so trigger-character substitutions (★) use the live char.
-locale_mod.set_trigger_provider(function() return keymap.get_trigger_char and keymap.get_trigger_char() or "★" end)
+-- Read from the manifest rather than from the `magic_key` local: that one is
+-- declared ~500 lines below, so naming it here would capture the GLOBAL of the
+-- same name — nil — and every ★ substitution would silently render empty. Same
+-- trap as project-lua-closure-before-local-nil-global.
+locale_mod.set_trigger_provider(function()
+	return keymap.get_trigger_char and keymap.get_trigger_char()
+		or ManifestReader.default_for("hotstrings.trigger_char")
+end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
 -- having to type out require("modules.keymap") each time.
@@ -662,7 +670,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = "★"
+local magic_key = ManifestReader.default_for("hotstrings.trigger_char")
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.

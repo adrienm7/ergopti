@@ -27,6 +27,7 @@ local notifications = require("infra.notifications")
 local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
 local text_utils   = require("infra.text_utils")
+local ManifestReader = require("infra.manifest_reader")
 local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
@@ -236,7 +237,7 @@ local function inject_init_data()
 			-- of the app already calls "the magic key". Step 3 will
 			-- swap this to ù / ; if the user picks a non-Ergopti layout
 			-- on step 2 and the system KB is AZERTY / QWERTY.
-			magic_key    = "★",
+			magic_key    = ManifestReader.default_for("hotstrings.trigger_char"),
 			-- Pre-fill with the current config dir when it diverges from
 			-- the OS default — otherwise leave empty so the placeholder
 			-- shows the default and the wizard treats "no change" as the
@@ -291,7 +292,7 @@ function M._build_config_updates(answers)
 	return {
 		-- use_ergopti = "use the Ergopti hotstring engine" → [hotstrings].enabled.
 		{ section = "hotstrings", key = "enabled",      value = to_bool(answers.use_ergopti)  },
-		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or "★"       },
+		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or ManifestReader.default_for("hotstrings.trigger_char") },
 		{ section = "metrics",    key = "enabled",      value = to_bool(answers.use_metrics)   },
 		{ section = "gestures",   key = "enabled",      value = to_bool(answers.use_gestures)  },
 	}

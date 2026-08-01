@@ -10,6 +10,7 @@ local M = {}
 M.bridge_name = "hsPersonalInfo"
 
 local Logger = require("logger.shim")
+local ManifestReader = require("infra.manifest_reader")
 local LOG = "bridge.hsPersonalInfo"
 
 --- Builds the initial personal info payload.
@@ -40,7 +41,10 @@ local function _build_initial_payload(state)
 
 	return {
 		info = info,
-		trigger_char = "\\",  -- default magic key
+		-- Read from the shared manifest, not restated here. The page renders this
+		-- character in front of every field name it offers, so a second copy shows
+		-- the user a key that expands nothing.
+		trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
 	}
 end
 

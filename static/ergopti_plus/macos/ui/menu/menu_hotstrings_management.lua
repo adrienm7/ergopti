@@ -18,6 +18,7 @@ local dialog            = require("infra.dialog_util")
 local notifications     = require("infra.notifications")
 local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local ManifestReader = require("infra.manifest_reader")
 local LOG               = "menu_hotstrings"
 
 
@@ -443,7 +444,7 @@ function M.build_management(ctx)
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
 	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or "★"),
+		title    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char")),
 		disabled = hs_paused or nil,
 		fn       = not hs_paused and function()
 			if not hs_state then return end
