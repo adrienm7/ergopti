@@ -753,6 +753,14 @@ Constraints: **paths before moves, moves before content, data before code.**
      yields the first-registered mapping) instead of `assert_true(true)`, so it
      fails the day priority arrives. Tautology ratchet 283 → 282. ·
      `is_word` as a tiebreaker.
+     **Corpus hygiene, found while extending it:** every field a vector carries
+     must now be read by a replay or documented — `test-corpus-fields-are-read.cjs`,
+     74 fields across 16 corpora. One was genuinely inert (`notes` in
+     `toml/coercion_vectors.json`). The guard's own development is the lesson: a
+     consumer scan scoped to files named `*corpus*` reported **11** inert fields,
+     all false, and the last survivor (`terminator`) turned out to be injected by
+     all three **e2e** runners — a narrow reader scan over-reports, and each false
+     positive invites deleting something load-bearing.
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
