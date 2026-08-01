@@ -715,7 +715,20 @@ Constraints: **paths before moves, moves before content, data before code.**
      which driver honours which flag and fails in both directions: a driver
      gaining support (good news, update the record) and a flag declared in shared
      data that no engine reads at all), the
-     NBSP typographic rule, the buffer cap, consumed delimiters, the
+     NBSP typographic rule, ~~the buffer cap~~ — **done: 3 vectors**, each
+     measured against the real engine before being written down. A 257-codepoint
+     trigger never matches, one of **exactly 256** still does, and a 300-codepoint
+     buffer still matches on its tail because eviction drops the *oldest*
+     codepoints. The boundary vector is the load-bearing one: an off-by-one in
+     the eviction loop breaks it while leaving the 257 case green. Both
+     implementations declare the same 256 independently
+     (`BUFFER_MAX_CHARS` / `HSE_MAX_BUFFER_LEN`).
+     **Adding them exposed a wrong assumption**: the Windows harness asserted
+     that a non-matched buffer must not end with its trigger, which held only
+     because no vector had reached the cap — there the buffer *does* end with the
+     trigger and the engine cannot see it. Now a second documented exemption
+     beside the word-boundary one, read from the constant. ·
+     consumed delimiters, the
      `individual > section > file` priority levels, `is_word` as a tiebreaker.
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
