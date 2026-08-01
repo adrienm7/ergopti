@@ -1,4 +1,4 @@
-# config_schema/examples/hs_tap_hold.example.toml
+# _shared/core/config_schema/examples/hs_tap_hold.example.toml
 # Example for ``config/ergopti_plus/hammerspoon/tap_hold.toml``.
 # This is the HS driver's COMPLETE tap-hold configuration — there is no runtime
 # merge with any shared base file. The Karabiner generator

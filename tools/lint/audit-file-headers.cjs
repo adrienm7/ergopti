@@ -46,14 +46,14 @@ const TREES = [
 	// where every other tree under _shared/ uses the BASE-relative form.
 	'_shared/lua', '_shared/ui', '_shared/core', '_shared/modules'
 ];
-const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift']);
+const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift', '.toml']);
 const SKIP_DIR = new Set(['tests', 'vendor', '_generated', 'node_modules']);
 
 // Comment marker the fixer emits per extension (Lua uses three dashes per §3).
 function markerFor(ext, base) {
 	if (ext === '.lua') return '---';
 	if (ext === '.ahk') return ';';
-	if (ext === '.py' || ext === '.sh') return '#';
+	if (ext === '.py' || ext === '.sh' || ext === '.toml') return '#';
 	if (ext === '.js' || ext === '.cjs' || ext === '.mjs' || ext === '.swift') return '//';
 	// extensionless executables (e.g. linux/bin/ergopti-hotstrings) are shell scripts
 	if (ext === '') return '#';

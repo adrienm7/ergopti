@@ -11,7 +11,7 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/ergo
 
 if [ -n "$STAGED" ]; then
     for f in $STAGED; do
-        python tools/dev/format_toml.py --hotstrings "$f"
+        python tools/format_toml.py --hotstrings "$f"
         git add "$f"
     done
 fi
