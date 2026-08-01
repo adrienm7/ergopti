@@ -2,6 +2,7 @@
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
 	"description": "Cross-driver regression corpus for hotstring expansion logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'vectors' covers single-trigger matching/arithmetic; 'collision_vectors' covers multi-trigger collision resolution (length > priority > first-registered).",
 	"field_semantics": {
+		"terminator": "The character typed after the trigger. The UNIT replays do not feed it — they match on the buffer tail as the last trigger character is typed, and take the only bit they need from terminator_consumed — but all three E2E runners DO inject it (tests/e2e/run_e2e.lua on macOS and Linux, run_e2e.ahk on Windows), so it is a real input at that layer. Changing it changes what the e2e harnesses type.",
 		"backspace_count": "LOGICAL count: how many codepoints of already-typed text the expansion replaces (trigger length, plus 1 when terminator_consumed is true). It is NOT the number of backspace keystrokes a driver emits. macOS keeps the longest common prefix shared by trigger and replacement, so for 'btw' -> 'by the way' it emits 2 backspaces and types 'y the way' where Windows and Linux emit 3 and type the whole replacement; 6 of the 13 matched vectors below differ this way. All three drivers replace the same codepoints, which is what this field asserts and what makes it portable. A driver conforms by replacing that many codepoints, however few keystrokes it takes to do it."
 	},
 	"version": "1.1.0",
