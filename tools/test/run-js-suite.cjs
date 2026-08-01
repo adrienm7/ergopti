@@ -42,7 +42,7 @@ const CHECKS = [
 	{ name: 'fast repeating timers are inventoried (no silent poller)', cmd: 'node', args: ['tools/test/test-fast-timer-inventory.cjs'], repro: 'node tools/test/test-fast-timer-inventory.cjs' },
 	{ name: 'metrics categories are id-keyed (colours survive a language switch)', cmd: 'node', args: ['tools/test/test-metrics-category-ids.cjs'], repro: 'node tools/test/test-metrics-category-ids.cjs' },
 	{ name: 'action platform declarations match the macOS registry', cmd: 'node', args: ['tools/test/test-action-platform-truth.cjs'], repro: 'node tools/test/test-action-platform-truth.cjs' },
-	{ name: 'every menu-manifest key has a reader', cmd: 'node', args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'], repro: 'node tools/test/test-menu-manifest-keys-have-readers.cjs' },
+	{ name: 'every menu-manifest field and section has a driver that reads it (no decorative declarations)', cmd: 'node', args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'], repro: 'node tools/test/test-menu-manifest-keys-have-readers.cjs' },
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux modules resolve _shared through lib/paths.lua', cmd: 'node', args: ['tools/test/test-linux-shared-path-resolver.cjs'], repro: 'node tools/test/test-linux-shared-path-resolver.cjs' },
 	{ name: 'every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)', cmd: 'node', args: ['tools/test/test-shared-root-resolvers.cjs'], repro: 'node tools/test/test-shared-root-resolvers.cjs' },

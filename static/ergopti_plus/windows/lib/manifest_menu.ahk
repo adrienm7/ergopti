@@ -298,24 +298,41 @@ _MR_RenderLetterPicker(ResultMenu, Item, _CategoryName) {
 
 ; Build a built-in named group that is always rendered the same way.
 _MR_BuildBuiltinGroup(GroupId, CategoryName) {
-	global _SHORTCUTS_SUBMAP_V1V2
+	; The rows come from the manifest section named after the group — the
+	; ``<id>_group`` convention the renderer already uses for hotstrings_params.
+	; Both lists used to be hardcoded here as well as declared in the manifest,
+	; so editing the manifest moved nothing and the code copy was the real source.
+	Section := _MR_GetMenuDef(GroupId . "_group")
 
 	if (GroupId == "modifier_combos") {
 		Sub := Menu()
-		for V1Group, V2Section in _SHORTCUTS_SUBMAP_V1V2 {
+		for Entry in Section {
+			if !_MR_IsForAhk(Entry)
+				continue
+			; ``path`` is a feature-manifest SECTION here: each row expands to
+			; every feature under it, gathered in one labelled submenu.
+			V2Section := _MR_Get(Entry, "path")
+			GroupLabel := _MR_Get(Entry, "group_label")
+			if (V2Section == "" or GroupLabel == "")
+				continue
 			GroupSub := Menu()
-			for Entry in ManifestFeaturesForSection(V2Section) {
-				MenuAddItemFromManifest(GroupSub, Entry, "Shortcuts." . V1Group)
+			for FeatureEntry in ManifestFeaturesForSection(V2Section) {
+				MenuAddItemFromManifest(GroupSub, FeatureEntry, "Shortcuts." . GroupLabel)
 			}
-			Sub.Add(V1Group, GroupSub)
+			Sub.Add(GroupLabel, GroupSub)
 		}
 		return Sub
 	}
 
 	if (GroupId == "accented_letters") {
 		Sub := Menu()
-		for V2Path in ["shortcuts.e_grave", "shortcuts.e_circ", "shortcuts.e_acute", "shortcuts.a_grave"] {
-			MenuAddLetterPicker(Sub, V2Path, "Shortcuts")
+		for Entry in Section {
+			if !_MR_IsForAhk(Entry)
+				continue
+			LetterId := _MR_Get(Entry, "id")
+			if (LetterId == "")
+				continue
+			MenuAddLetterPicker(Sub, "shortcuts." . LetterId, "Shortcuts")
 		}
 		return Sub
 	}
@@ -385,4 +402,30 @@ MenuRenderer_ResolveDisabledWhen(MenuKey, ItemId, Getters) {
 	}
 
 	return false
+}
+
+; Returns the ``i18n_dynamic`` key declared on a manifest item — the locale key
+; a dynamic handler prefixes to a runtime value (a shortcut label, a model name)
+; before rendering its own row.
+;
+; Rows whose label is computed cannot be rendered declaratively, so their
+; handler builds the string. That is not a reason for the handler to also OWN
+; the locale key: two rows declared ``i18n_dynamic`` and no code read it, while
+; the handlers carried their own copy of the same string. Editing the manifest
+; moved nothing, which is the failure this accessor removes.
+;
+; A missing declaration is an ERROR rather than a silent "": the handler is
+; about to concatenate this into a user-visible label, and an empty prefix
+; renders as a bare shortcut with no indication of what it does.
+MenuRenderer_I18nDynamic(MenuKey, ItemId) {
+	Item := _MR_FindItemById(MenuKey, ItemId)
+	if (Item == false) {
+		try LoggerError("MenuRenderer", "No manifest item '{1}.{2}' — no i18n_dynamic key.", MenuKey, ItemId)
+		return ""
+	}
+	Key := _MR_Get(Item, "i18n_dynamic")
+	if (Key == "") {
+		try LoggerError("MenuRenderer", "Item '{1}.{2}' declares no i18n_dynamic key.", MenuKey, ItemId)
+	}
+	return Key
 }
