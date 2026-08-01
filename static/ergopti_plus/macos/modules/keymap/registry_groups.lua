@@ -254,6 +254,10 @@ function M.load_toml(name, path)
 							is_word           = v.is_word,
 							auto_expand       = v.auto_expand,
 							is_case_sensitive = v.is_case_sensitive,
+							-- Selects EXACT matching, where is_case_sensitive above only
+							-- selects literal registration. Omitting it here left the
+							-- registry unable to tell the two apart.
+							is_case_sensitive_strict = v.is_case_sensitive_strict,
 							final_result      = v.final_result,
 							priority          = v.priority,
 						})
@@ -282,6 +286,7 @@ function M.load_toml(name, path)
 					is_word           = entry.is_word,
 					auto_expand       = entry.auto_expand,
 					is_case_sensitive = entry.is_case_sensitive,
+					is_case_sensitive_strict = entry.is_case_sensitive_strict,
 					final_result      = entry.final_result,
 					section           = sec_name,
 					priority          = _callbacks.resolve_priority(entry.priority, override_priority, nil, name),

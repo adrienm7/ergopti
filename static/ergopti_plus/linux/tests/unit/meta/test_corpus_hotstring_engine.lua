@@ -56,6 +56,38 @@ end
 
 local engine_mod = require("hotstring_engine")
 
+--- Every per-entry flag a vector may declare. Driven off a LIST because this
+--- harness used to name the fields one by one and dropped two of them:
+--- `is_case_sensitive_strict` and `final_result` never reached the engine, so a
+--- vector exercising either was replayed as a vector that declared neither and
+--- passed for the wrong reason. A vector whose flag the harness ignores is worse
+--- than an absent vector — it reports coverage it does not have.
+local VECTOR_FLAGS = {
+	"is_word",
+	-- Passed through explicitly: the engine defaults auto_expand to FALSE,
+	-- matching the AutoHotkey loader, so a harness that drops the field silently
+	-- converts every vector into one that waits for a terminator and matches
+	-- nothing.
+	"auto_expand",
+	"is_case_sensitive",
+	"is_case_sensitive_strict",
+	"final_result",
+}
+
+--- Builds the engine mapping a vector (or a collision vector's entry) describes.
+--- @param v table The vector or mapping table from the corpus.
+--- @return table The mapping table to hand to load_mappings.
+local function build_mapping(v)
+	local mapping = {
+		trigger     = v.trigger,
+		replacement = v.replacement or "",
+	}
+	for _, flag in ipairs(VECTOR_FLAGS) do
+		mapping[flag] = v[flag] == true
+	end
+	return mapping
+end
+
 --- Loads the cross-driver hotstrings corpus from disk.
 --- @return table|nil Parsed corpus table with .vectors and .collision_vectors.
 local function load_corpus()
@@ -153,17 +185,7 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 		local passed   = 0
 
 		for _, v in ipairs(vectors) do
-			local mapping = {
-				trigger           = v.trigger,
-				replacement       = v.replacement or "",
-				is_word           = v.is_word == true,
-				is_case_sensitive = v.is_case_sensitive == true,
-				-- Passed through explicitly: the engine defaults auto_expand to
-				-- FALSE, matching the AutoHotkey loader, so a harness that drops
-				-- the field silently converts every vector into one that waits
-				-- for a terminator and matches nothing.
-				auto_expand       = v.auto_expand == true,
-			}
+			local mapping = build_mapping(v)
 
 			local e = engine_mod.new()
 			e:load_mappings({ mapping })
@@ -265,7 +287,11 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 	--- @return string The winning replacement, or "<none>".
 	local function play_collision(v, mappings)
 		local e = engine_mod.new()
-		e:load_mappings(mappings)
+		-- Through build_mapping like the single-vector replay, so the two paths
+		-- cannot disagree about which flags a corpus entry carries.
+		local built = {}
+		for i, m in ipairs(mappings) do built[i] = build_mapping(m) end
+		e:load_mappings(built)
 		local result
 		for _, cp in ipairs(split_codepoints(v.buffer)) do
 			result = e:on_char(cp)

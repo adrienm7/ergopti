@@ -196,42 +196,106 @@ seq_counter             = 0,
 				-- same assumption sat in all three drivers' harnesses.
 				local tlen = #v.trigger
 				local tail = buf:sub(-tlen)
-				local ends_with = (v.is_case_sensitive == true)
-					and (tail == v.trigger)
-					or (tail:lower() == v.trigger:lower())
+				-- Only is_case_sensitive_STRICT makes the comparison exact.
+				-- is_case_sensitive alone selects literal registration and still folds,
+				-- so "Adn" ending a buffer for trigger "adn" is a valid matched vector.
+				local ends_with
+				if v.is_case_sensitive_strict == true then
+					ends_with = (tail == v.trigger)
+				else
+					ends_with = (tail:lower() == v.trigger:lower())
+				end
 				helpers.assert_true(ends_with,
 					"vector '" .. v.id .. "': buffer does not end with trigger")
 			end
 		end
 	end)
 
-	helpers.it("case-sensitive vectors: buffer casing determines match flag", function()
-		if not corpus then return end
-		for _, v in ipairs(corpus.vectors) do
-			if v.is_case_sensitive ~= true then goto continue end
-			local R = helpers.load_with_stubs("modules.keymap.registry")
-			R.init({
-				magic_key               = "★",
-				mappings                = {},
-				mappings_lookup         = {},
-				mappings_by_tail_char   = {},
-				mappings_by_star_tail_char = {},
-				groups                  = {},
-				seq_counter             = 0,
-				current_group           = "corpus",
-				start_is_word_boundary  = true,
-			})
-			R.add(v.trigger, v.replacement or "", { is_case_sensitive = true, is_word = v.is_word == true })
-			local buf  = v.buffer or v.trigger
-			local tlen = #v.trigger
-			local buf_tail = buf:sub(-tlen)
-			-- Case-sensitive: only an exact byte-for-byte match of the tail triggers.
-			local actually_matches = (buf_tail == v.trigger)
-			local expected_matches = (v.expected and v.expected.matched == true)
-			helpers.assert_eq(expected_matches, actually_matches,
-				"vector '" .. v.id .. "': case-sensitive match flag inconsistency")
-			::continue::
-		end
+	-- Every per-entry flag a vector may declare, so the registration cannot quietly
+	-- drop one. Naming them inline is how this harness came to ignore
+	-- is_case_sensitive_strict entirely.
+	local VECTOR_FLAGS = {
+		"is_word", "auto_expand", "is_case_sensitive", "is_case_sensitive_strict", "final_result",
+	}
+
+	--- Registers one vector into a fresh registry and returns the state holding it.
+	--- @param v table The corpus vector.
+	--- @return table The core_state, whose .mappings holds every registered entry.
+	local function register_vector(v)
+		local R     = helpers.load_with_stubs("modules.keymap.registry")
+		local state = {
+			magic_key               = "★",
+			mappings                = {},
+			mappings_lookup         = {},
+			mappings_by_tail_char   = {},
+			mappings_by_star_tail_char = {},
+			groups                  = {},
+			seq_counter             = 0,
+			current_group           = "corpus",
+			start_is_word_boundary  = true,
+		}
+		R.init(state)
+		local opts = {}
+		for _, flag in ipairs(VECTOR_FLAGS) do opts[flag] = v[flag] == true end
+		R.add(v.trigger, v.replacement or "", opts)
+		return state
+	end
+
+	-- This replaces a check that decided the outcome ITSELF — it compared the
+	-- buffer tail to the trigger byte-for-byte and asserted the vector's expected
+	-- flag against its own answer, so it validated the harness's model of case
+	-- rather than the driver's. Every one of the 29 vectors is auto_expand, and
+	-- would_fire is the pure predicate the real engine and the tooltip both call,
+	-- so the whole corpus can be replayed through it — outcome AND output text.
+	helpers.describe("hotstring corpus — replay through the real matcher", function()
+		helpers.it("every vector's matched flag and replacement come from would_fire", function()
+			if not corpus then return end
+			local checked, skipped = 0, 0
+			for _, v in ipairs(corpus.vectors) do
+				-- A vector may declare that its outcome hangs on a constant the drivers
+				-- deliberately do not share — today only the rolling-buffer cap, which is
+				-- 500 codepoints here and 256 in the shared Lua engine. Asserting it
+				-- would pin the other driver's number to this one.
+				if v.driver_specific ~= nil then
+					skipped = skipped + 1
+				elseif v.auto_expand == true then
+					local state = register_vector(v)
+					-- would_fire consults the expander's OWN state for
+					-- start_is_word_boundary, so the expander has to be initialised with
+					-- the same state the registry got. Left uninitialised it reads nil,
+					-- which silently blocks every is_word trigger sitting at the start of
+					-- the buffer — one vector's worth of false red, and it would have been
+					-- false GREEN for a vector expecting no match.
+					local Expander = helpers.load_with_stubs("modules.keymap.expander")
+					local Registry = helpers.load_with_stubs("modules.keymap.registry")
+					-- The LLM bridge is a hard requirement of init(), and would_fire never
+					-- touches it; an empty table satisfies the guard without stubbing a
+					-- module this replay has no opinion about.
+					Expander.init(state, Registry, {})
+					local buffer = v.buffer or v.trigger
+					local fired, produced = false, nil
+					for _, m in ipairs(state.mappings) do
+						local eff = Expander.would_fire(m, buffer)
+						if eff then fired, produced = true, eff ; break end
+					end
+					local want = (v.expected and v.expected.matched == true)
+					helpers.assert_eq(want, fired,
+						"vector '" .. v.id .. "': would_fire disagrees with the corpus")
+					if want and v.expected.replacement then
+						helpers.assert_eq(v.expected.replacement, produced,
+							"vector '" .. v.id .. "': wrong replacement text")
+					end
+					checked = checked + 1
+				end
+			end
+			helpers.assert_true(checked > 0,
+				"no vector was replayed — the corpus shape changed and this test went vacuous")
+			-- The skip is bounded so it cannot become a place to park failures: every
+			-- vector but the declared driver-specific ones must have been replayed.
+			helpers.assert_eq(#corpus.vectors - skipped, checked,
+				"a vector was neither replayed nor declared driver_specific — silently "
+					.. "dropping one is how a corpus reports coverage it does not have")
+		end)
 	end)
 
 	helpers.it("non-matching buffers do not produce suffix hits", function()

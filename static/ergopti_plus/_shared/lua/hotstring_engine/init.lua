@@ -19,8 +19,16 @@
 ---    length descending so a longer trigger is never shadowed by a shorter one.
 --- 3. Word-boundary enforcement: is_word mappings only fire when preceded by a
 ---    non-word character (space, tab, punctuation) or start-of-buffer.
---- 4. Case sensitivity: case-insensitive by default; is_case_sensitive requires
----    an exact-case match.
+--- 4. Case handling in three modes, selected per entry by the TWO schema flags —
+---    see load_mappings for the mapping. Note that the TOML flag
+---    `is_case_sensitive` is NOT the domain spec's `is_case_sensitive`: the
+---    schema flag selects the REGISTRATION shape (literal vs cased family) while
+---    the spec's flag is about the COMPARISON. The spec's notion is this
+---    engine's "exact" mode, which the schema spells `is_case_sensitive_strict`.
+---    Reading the two same-named fields as one thing is what made 592 shared
+---    entries behave differently here than on Windows, so the flags are resolved
+---    once at load time into an internal `match_mode` and the ambiguous name
+---    never reaches the matcher.
 --- 5. No global state: the engine is instantiated via M.new() so multiple
 ---    independent hotstring contexts can coexist in the same process.
 --- 6. Logger shim: works without lib.logger present (standalone daemon outside
@@ -39,6 +47,12 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
+
+-- Case folding, the trigger's Title/UPPER variants and the fire-time replacement
+-- conformance all live in the shared text utilities, which is also where macOS
+-- gets them. Reimplementing any of it here would be a second Unicode case table
+-- — the accented and French-punctuation mappings are the whole difficulty.
+local text_utils = require("text_utils")
 
 local LOG = "shared.hotstring_engine"
 
@@ -74,18 +88,11 @@ local NBSP_CHAR  = "\xc2\xa0"      -- U+00A0 no-break space
 -- =========================================
 -- =========================================
 
---- Returns true when the character is a Unicode word character
---- (letter, digit, or underscore). Punctuation and whitespace return false.
---- Lua pattern %w matches ASCII letters/digits; non-ASCII bytes are treated as
---- word characters so accented letters behave consistently.
---- @param ch string Single UTF-8 character (may be multi-byte).
---- @return boolean
-local function is_word_char(ch)
-	if ch == nil or ch == "" then return false end
-	-- Non-ASCII bytes (accented letters, CJK, etc.) are treated as word chars.
-	if ch:byte(1) > 127 then return true end
-	return ch:match("^[%w_]$") ~= nil
-end
+-- The word-boundary predicate is shared with macOS rather than defined here, so
+-- the two drivers cannot answer differently for the same character. They did:
+-- this engine's own copy omitted "@", so a trigger typed straight after an email
+-- address fired here and not there.
+local is_word_char = text_utils.is_hotstring_word_char
 
 --- Splits a UTF-8 string into a sequence of codepoint byte-strings.
 --- Returns a table of single-codepoint strings and the total codepoint count.
@@ -150,9 +157,29 @@ function M.new()
 	---   trigger           string  — the hotstring the user types
 	---   replacement       string  — the text to inject
 	--- Optional fields:
-	---   is_word           boolean — require word boundary before trigger (default false)
-	---   is_case_sensitive boolean — exact-case match required (default false)
-	---   group             string  — logical group name for enable/disable
+	---   is_word                  boolean — require a word boundary before the trigger
+	---   is_case_sensitive        boolean — register the trigger LITERALLY, i.e. do
+	---                                      not generate the cased family
+	---   is_case_sensitive_strict boolean — compare exactly, no case folding
+	---   auto_expand              boolean — fire on the trigger's own last char
+	---   final_result             boolean — nothing may chain off the replacement
+	---   group                    string  — logical group name for enable/disable
+	---
+	--- The two case flags are ORTHOGONAL and resolve to three match modes, the
+	--- same three the AutoHotkey loader produces (hotstring_builder.ahk):
+	---
+	---   strict                     → "exact"   — only the casing written fires.
+	---   is_case_sensitive, ¬strict → "fold"    — any casing fires, the
+	---                                            replacement is emitted verbatim.
+	---   neither                    → "conform" — any casing fires and the
+	---                                            replacement takes the casing that
+	---                                            was typed.
+	---
+	--- "fold" is what 592 shared entries need and what this engine used to get
+	--- wrong: `"adn" = { output = "ADN", is_case_sensitive = true }` exists so that
+	--- typing adn in ANY casing yields "ADN" — the literal registration is there to
+	--- stop the family generating "Adn" → "Adn". Treating the flag as "compare
+	--- exactly" meant typing "Adn" simply did nothing.
 	--- @param mappings table Array of mapping tables.
 	function engine:load_mappings(mappings)
 		Logger.start(LOG, "Loading mappings…")
@@ -161,47 +188,116 @@ function M.new()
 			Logger.error(LOG, "load_mappings(): expected table, got %s.", type(mappings))
 			return
 		end
-		local count = 0
-		for _, m in ipairs(mappings) do
-			if type(m.trigger) == "string" and type(m.replacement) == "string" then
-				local cps, n = utf8_codepoints(m.trigger)
-				if n > 0 then
-					-- Key the bucket by the lower-cased tail char for case-insensitive lookup.
-					local tail_cp = cps[n]:lower()
-					if not _buckets[tail_cp] then _buckets[tail_cp] = {} end
-					_buckets[tail_cp][#_buckets[tail_cp] + 1] = {
-						trigger           = m.trigger,
-						replacement       = m.replacement,
-						tlen              = n,
-						is_word           = m.is_word           == true,
-						is_case_sensitive = m.is_case_sensitive == true,
-						-- Windows registers three case variants for an ordinary trigger
-						-- (lower / Title / UPPER, each with its output cased to match) —
-						-- that is its case conformance. is_case_sensitive_strict opts out:
-						-- ONLY the exact casing written in the TOML matches. 1 300 magickey
-						-- entries rely on it. "OUi" -> "Oui" exists so that typing "oui"
-						-- does NOT autocorrect, and a case-folding matcher does exactly the
-						-- thing the entry was written to prevent.
-						is_case_sensitive_strict = m.is_case_sensitive_strict == true,
-						-- Absent means NOT auto, matching the AutoHotkey loader: it emits the
-						-- "*" flag only when the TOML says auto_expand = true. An entry that
-						-- does not opt in waits for a terminator, which is the whole point of
-						-- the field — "ya" must not fire in the middle of "yaourt".
-						auto_expand       = m.auto_expand       == true,
-						final_result      = m.final_result      == true,
-						group             = m.group or "",
-					}
-					count = count + 1
+
+		local registered = 0
+
+		--- Files one ready-resolved entry into the bucket of its tail codepoint.
+		--- @param trigger string The trigger exactly as the matcher will compare it.
+		--- @param replacement string The text this trigger injects.
+		--- @param mode string One of "exact", "fold", "conform".
+		--- @param source table The originating mapping, for the flags shared by every
+		---   entry derived from it.
+		local function register(trigger, replacement, mode, source)
+			local cps, n = utf8_codepoints(trigger)
+			if n == 0 then return end
+			-- Bucket key: the tail codepoint, Unicode-folded. trig_lower rather than
+			-- string.lower because the latter is ASCII-only, so an accented tail typed
+			-- as "Ê" probed a bucket registered under "ê" and never matched.
+			local key    = text_utils.trig_lower(cps[n])
+			local bucket = _buckets[key]
+			if not bucket then bucket = {} ; _buckets[key] = bucket end
+			bucket[#bucket + 1] = {
+				trigger      = trigger,
+				-- Canonical side of a "fold" compare, precomputed so the hot path folds
+				-- only what the user typed. The trigger itself stays AS WRITTEN, because
+				-- it is what every consumer of a match result sees.
+				trigger_folded = mode == "fold" and text_utils.trig_lower(trigger) or nil,
+				replacement  = replacement,
+				tlen         = n,
+				match_mode   = mode,
+				is_word      = source.is_word == true,
+				-- Absent means NOT auto, matching the AutoHotkey loader: it emits the
+				-- "*" flag only when the TOML says auto_expand = true. An entry that
+				-- does not opt in waits for a terminator, which is the whole point of
+				-- the field — "ya" must not fire in the middle of "yaourt".
+				auto_expand  = source.auto_expand == true,
+				final_result = source.final_result == true,
+				group        = source.group or "",
+			}
+			registered = registered + 1
+		end
+
+		--- Registers a mapping that has opted into case conformance.
+		---
+		--- One entry suffices whenever the trigger's Title and UPPER forms are each
+		--- unique and the same length as the lowercase form, because conforming at
+		--- fire time then reproduces exactly what registering the three variants
+		--- would have. That is the overwhelming majority and it is also what macOS
+		--- does, for the same reason.
+		---
+		--- It does NOT suffice when a character's shifted form is a different
+		--- character or a different NUMBER of characters — on this layout the comma
+		--- shifts to no-break-space + ";" — because the variant then has its own
+		--- length and its own tail codepoint, so it belongs in its own bucket. Those
+		--- are registered explicitly, exactly as macOS registers them.
+		--- @param m table The source mapping.
+		local function register_case_family(m)
+			local lower      = text_utils.trig_lower(m.trigger)
+			local _, lower_n = utf8_codepoints(lower)
+			local titles     = text_utils.trig_title(lower)
+			local uppers     = text_utils.trig_upper(lower)
+
+			local function same_shape(variants)
+				if #variants ~= 1 then return false end
+				local _, n = utf8_codepoints(variants[1])
+				return n == lower_n
+			end
+
+			if same_shape(titles) and same_shape(uppers) then
+				register(lower, m.replacement, "conform", m)
+				return
+			end
+
+			register(lower, m.replacement, "exact", m)
+			for _, t in ipairs(titles) do
+				if t ~= lower then register(t, text_utils.repl_title(m.replacement), "exact", m) end
+			end
+			for _, u in ipairs(uppers) do
+				-- A single-character body has Title == UPPER. Registering both would put
+				-- two entries with the same trigger and the same replacement in one
+				-- bucket, which the tooltip would then offer twice.
+				local is_title = false
+				for _, t in ipairs(titles) do
+					if u == t then is_title = true ; break end
+				end
+				if u ~= lower and not is_title then
+					register(u, text_utils.repl_upper(m.replacement), "exact", m)
 				end
 			end
 		end
+
+		local loaded = 0
+		for _, m in ipairs(mappings) do
+			if type(m.trigger) == "string" and m.trigger ~= "" and type(m.replacement) == "string" then
+				if m.is_case_sensitive_strict == true then
+					register(m.trigger, m.replacement, "exact", m)
+				elseif m.is_case_sensitive == true then
+					register(m.trigger, m.replacement, "fold", m)
+				else
+					register_case_family(m)
+				end
+				loaded = loaded + 1
+			end
+		end
+
 		-- Sort each bucket longest-first to guarantee longest-match semantics.
 		for _, bucket in pairs(_buckets) do
 			table.sort(bucket, function(a, b) return a.tlen > b.tlen end)
 		end
 		local bucket_count = 0
 		for _ in pairs(_buckets) do bucket_count = bucket_count + 1 end
-		Logger.success(LOG, "Mappings loaded (%d entry(ies), %d bucket(s)).", count, bucket_count)
+		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
+			loaded, registered, bucket_count)
 	end
 
 	--- Appends a character to the rolling buffer and checks for a trigger match.
@@ -240,7 +336,7 @@ function M.new()
 		--- (non-auto entries, which wait for one).
 		local function best_match(body_len, want_auto)
 			if body_len < 1 then return nil end
-			local bucket = _buckets[_buf_cps[body_len]:lower()]
+			local bucket = _buckets[text_utils.trig_lower(_buf_cps[body_len])]
 			if not bucket then return nil end
 
 			for _, mapping in ipairs(bucket) do
@@ -249,14 +345,26 @@ function M.new()
 					-- Suffix check (case-aware), against the body rather than the
 					-- whole buffer so the terminator is excluded on the end-char path.
 					local buf_tail = table.concat(_buf_cps, "", body_len - tlen + 1, body_len)
-					local matched
-					if mapping.is_case_sensitive or mapping.is_case_sensitive_strict then
-						matched = buf_tail == mapping.trigger
+					-- The effective replacement, which is the mapping's own EXCEPT in
+					-- conform mode where it takes the casing that was typed. nil means
+					-- this mapping does not fire: conform_replacement rejects a casing
+					-- that is neither lower, Title nor UPPER, because no variant would
+					-- have been registered for it.
+					local eff
+					local mode = mapping.match_mode
+					if mode == "exact" then
+						if buf_tail == mapping.trigger then eff = mapping.replacement end
+					elseif mode == "fold" then
+						if text_utils.trig_lower(buf_tail) == mapping.trigger_folded then
+							eff = mapping.replacement
+						end
 					else
-						matched = buf_tail:lower() == mapping.trigger:lower()
+						if text_utils.trig_lower(buf_tail) == mapping.trigger then
+							eff = text_utils.conform_replacement(mapping.replacement, buf_tail, mapping.trigger)
+						end
 					end
 
-					if matched then
+					if eff then
 						-- Word-boundary check: the character preceding the trigger must
 						-- not be a word character (or the trigger fills the whole body).
 						local boundary_ok = true
@@ -265,7 +373,7 @@ function M.new()
 						end
 						-- The bucket is sorted longest-first, so the first survivor is
 						-- the longest for this path.
-						if boundary_ok then return mapping, tlen end
+						if boundary_ok then return mapping, tlen, eff end
 					end
 				end
 			end
@@ -273,7 +381,7 @@ function M.new()
 		end
 
 		-- Path A — auto_expand: fires on the trigger's own last character.
-		local auto_map, auto_len = best_match(buf_len, true)
+		local auto_map, auto_len, auto_repl = best_match(buf_len, true)
 
 		-- Path B — end-char: a non-auto trigger fires only when a terminator
 		-- follows it, so the body excludes the character just typed.
@@ -289,7 +397,7 @@ function M.new()
 		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
 		-- hotstring. Only the end-char path is affected; a trigger whose own last
 		-- codepoint is ":" still fires on the auto path untouched.
-		local end_map, end_len, nbsp_stripped = nil, nil, false
+		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
 		if options.is_terminator == true then
 			local typed = _buf_cps[buf_len]
 			local body_len = buf_len - 1
@@ -304,7 +412,7 @@ function M.new()
 				end
 			end
 			if eligible then
-				end_map, end_len = best_match(body_len, false)
+				end_map, end_len, end_repl = best_match(body_len, false)
 			end
 			if not end_map then nbsp_stripped = false end
 		end
@@ -313,17 +421,17 @@ function M.new()
 		-- does (_HSE_EndCharBeats: a star match yields to a strictly longer
 		-- end-char trigger). macOS returns on the first auto hit instead, so the
 		-- two drivers disagree today; length is the rule the three converge on.
-		local mapping, tlen, via_end_char
+		local mapping, tlen, replacement, via_end_char
 		if auto_map and end_map then
 			if end_len > auto_len then
-				mapping, tlen, via_end_char = end_map, end_len, true
+				mapping, tlen, replacement, via_end_char = end_map, end_len, end_repl, true
 			else
-				mapping, tlen, via_end_char = auto_map, auto_len, false
+				mapping, tlen, replacement, via_end_char = auto_map, auto_len, auto_repl, false
 			end
 		elseif auto_map then
-			mapping, tlen, via_end_char = auto_map, auto_len, false
+			mapping, tlen, replacement, via_end_char = auto_map, auto_len, auto_repl, false
 		elseif end_map then
-			mapping, tlen, via_end_char = end_map, end_len, true
+			mapping, tlen, replacement, via_end_char = end_map, end_len, end_repl, true
 		else
 			return nil
 		end
@@ -340,7 +448,10 @@ function M.new()
 			mapping.trigger, bc, tostring(via_end_char))
 		return {
 			trigger            = mapping.trigger,
-			replacement        = mapping.replacement,
+			-- The EFFECTIVE replacement, which in conform mode carries the casing the
+			-- user typed rather than the casing stored at registration. Returning the
+			-- stored one would make every conform entry emit lowercase.
+			replacement        = replacement,
 			backspace_count    = bc,
 			consume_terminator = consumed,
 			end_char           = via_end_char,

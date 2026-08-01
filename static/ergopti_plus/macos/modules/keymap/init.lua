@@ -584,6 +584,71 @@ local function run_trigger_checks()
 	local star_validated = chars == CoreState.magic_key
 
 	local auto_bucket = Registry.mappings_for_tail(tail_chars)
+
+	--- Runs the end-char path over triggers strictly longer than `min_len`.
+	---
+	--- Split out because it is invoked TWICE: once before the auto path to let a
+	--- longer end-char trigger win, once after in case the auto path declined.
+	--- @param min_len number Only mappings with tlen > min_len are considered.
+	--- @return boolean True when an expansion fired.
+	local function run_end_char_checks(min_len)
+		if not chars_is_terminator then return false end
+		local buf        = CoreState.buffer
+		local chars_b    = #chars
+		local before_end = #buf - chars_b
+		if before_end <= 0 then return false end
+		local prev_sub      = buf:sub(1, before_end)
+		local ok_poff, poff = pcall(utf8.offset, prev_sub, -1)
+		-- Malformed UTF-8 in the buffer tail is non-fatal: skip terminator expansion
+		-- for this keystroke rather than propagating a pcall error up the hot path
+		if not (ok_poff and poff) then return false end
+		local prev_char   = prev_sub:sub(poff)
+		local term_bucket = Registry.mappings_for_tail(prev_char)
+		if not term_bucket then return false end
+		-- When ★ is pressed, it is an explicit validation of the displayed
+		-- tooltip — bypass the typing-speed delay so a slow typist never
+		-- gets a repeat-key instead of the intended expansion.
+		local skip_delay = star_validated
+		for _, m in ipairs(term_bucket) do
+			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m))
+				and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+			then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- Longest match wins ACROSS the two paths, which is the rule Windows applies
+	-- (_HSE_EndCharBeats: a star match yields only to a STRICTLY longer end-char
+	-- trigger, so an equal-length tie still goes to the star). Returning on the
+	-- first auto hit made auto win unconditionally here: with a star trigger "b★"
+	-- and a non-star "aab", typing "aab★" fired "aab" on Windows and Linux and
+	-- "b★" on macOS.
+	--
+	-- The length of the winning auto candidate is needed BEFORE the end-char loop
+	-- runs, and would_fire is the pure predicate that answers it without emitting
+	-- anything — it is the same function try_auto_expand consults, so the two
+	-- cannot disagree about which mapping wins. The pre-scan is skipped entirely
+	-- unless the typed character is a terminator: with no end-char competition
+	-- there is nothing to arbitrate, and paying for it on every letter would be
+	-- pure hot-path cost.
+	local auto_len = 0
+	if chars_is_terminator and auto_bucket then
+		for _, m in ipairs(auto_bucket) do
+			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
+				and Expander.would_fire(m, CoreState.buffer)
+			then
+				-- The bucket is sorted longest-first, so the first that would fire is
+				-- the longest.
+				auto_len = m.tlen
+				break
+			end
+		end
+	end
+
+	if run_end_char_checks(auto_len) then return true end
+
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
 			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
@@ -594,37 +659,9 @@ local function run_trigger_checks()
 		end
 	end
 
-	-- Terminator candidates: triggers whose last codepoint equals the char
-	-- *before* the terminator that was just typed. Only meaningful when
-	-- chars is itself a terminator.
-	if chars_is_terminator then
-		local buf        = CoreState.buffer
-		local chars_b    = #chars
-		local before_end = #buf - chars_b
-		if before_end > 0 then
-			local prev_sub      = buf:sub(1, before_end)
-			local ok_poff, poff = pcall(utf8.offset, prev_sub, -1)
-			-- Malformed UTF-8 in the buffer tail is non-fatal: skip terminator expansion
-			-- for this keystroke rather than propagating a pcall error up the hot path
-			if ok_poff and poff then
-				local prev_char  = prev_sub:sub(poff)
-				local term_bucket = Registry.mappings_for_tail(prev_char)
-				if term_bucket then
-					-- When ★ is pressed, it is an explicit validation of the displayed
-					-- tooltip — bypass the typing-speed delay so a slow typist never
-					-- gets a repeat-key instead of the intended expansion.
-					local skip_delay = star_validated
-					for _, m in ipairs(term_bucket) do
-						if not m.auto and (skip_delay or mapping_fires(m))
-							and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
-						then
-							return true
-						end
-					end
-				end
-			end
-		end
-	end
+	-- The auto path declined after all (a no-op replacement, say), so the end-char
+	-- candidates it out-ranked are back in play.
+	if auto_len > 0 and run_end_char_checks(0) then return true end
 
 	local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
 	if (star_allowed == 0 or _tc_dt <= star_allowed)

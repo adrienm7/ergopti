@@ -491,7 +491,16 @@ function M.add(trigger, replacement, opts)
 	opts = type(opts) == "table" and opts or {}
 	local is_word           = opts.is_word           == true
 	local is_auto           = opts.auto_expand        == true
+	-- The two case flags are ORTHOGONAL, exactly as the AutoHotkey loader treats
+	-- them (hotstring_builder.ahk: is_case_sensitive picks the REGISTRAR, the "C"
+	-- flag picks the comparison). is_case_sensitive alone means "register the
+	-- trigger literally, generate no cased family" — matching still folds case and
+	-- the replacement is emitted verbatim. Only strict makes the comparison exact.
+	-- Reading the first flag as "compare exactly" is what stopped 592 shared
+	-- entries — the acronym autocorrections, `"adn" = { output = "ADN" }` — from
+	-- firing on any casing but the one written in the TOML.
 	local is_case_sensitive = opts.is_case_sensitive  == true
+	local is_strict         = opts.is_case_sensitive_strict == true
 	local is_final          = opts.final_result       == true
 	-- Marks a mapping whose trigger AND replacement are user secrets (the
 	-- personal_info.toml phone / SSN / IBAN prefixes). The expander reads this
@@ -522,7 +531,7 @@ function M.add(trigger, replacement, opts)
 	---   caller computes this once per replacement variant and threads it
 	---   through all space-variant calls, so we never tokenize the same
 	---   replacement 3-4× at load time.
-	local function add_raw(t, r, a, plain_r, conform)
+	local function add_raw(t, r, a, plain_r, conform, fold)
 		-- The owning group is part of the dedup identity. Re-adding a trigger from
 		-- the SAME source (a file hot-reload) updates the entry in place for
 		-- idempotency, but the SAME trigger arriving from a DIFFERENT source — e.g.
@@ -578,6 +587,14 @@ function M.add(trigger, replacement, opts)
 			-- the expander conforms the replacement's case to the typed trigger at
 			-- fire time instead of the registry pre-generating three variants.
 			case_conform = conform or nil,
+			-- Match this entry with case folding but emit the replacement verbatim.
+			-- Distinct from case_conform, which also folds but re-cases the output to
+			-- the typed form: an acronym entry must yield "ADN" whether the user typed
+			-- "adn" or "Adn", so conforming it would be wrong in both directions.
+			case_fold    = fold or nil,
+			-- Precomputed folded trigger, the canonical side of a case_fold compare.
+			-- Only the typed text is folded on the hot path.
+			trigger_folded = fold and text_utils.trig_lower(t) or nil,
 			final_result = is_final,
 			has_magic    = has_magic,
 			star_base    = star_base,
@@ -605,14 +622,14 @@ function M.add(trigger, replacement, opts)
 	--- @param t string The trigger.
 	--- @param r string The replacement.
 	--- @param plain_r string Precomputed plain_text of r.
-	local function add_with_space_variants(t, r, plain_r, conform)
-		add_raw(t, r, is_auto, plain_r, conform)
+	local function add_with_space_variants(t, r, plain_r, conform, fold)
+		add_raw(t, r, is_auto, plain_r, conform, fold)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
 		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
 		if not starts_with_space and t:match(" ") then
-			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform)  -- regular nbsp
-			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform) -- narrow nbsp
+			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform, fold)  -- regular nbsp
+			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform, fold) -- narrow nbsp
 		end
 	end
 
@@ -649,8 +666,16 @@ function M.add(trigger, replacement, opts)
 		plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
 	end
 
-	if is_case_sensitive then
+	if is_strict then
+		-- Exact: the casing written in the TOML, and nothing else, fires.
 		add_with_space_variants(trigger, replacement, plain_repl_base, false)
+	elseif is_case_sensitive then
+		-- Literal registration with a folding comparison. The trigger is stored AS
+		-- WRITTEN — folding happens in the comparison, against a precomputed
+		-- trigger_folded — because every other consumer (has_exact_trigger, the
+		-- preview index, the dynamic-hotstring rules engine) looks the mapping up by
+		-- the trigger it registered.
+		add_with_space_variants(trigger, replacement, plain_repl_base, false, true)
 	elseif use_conform then
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, true)
 	else
@@ -688,7 +713,9 @@ function M.add(trigger, replacement, opts)
 	-- whether nbsp/nnbsp are configured as word terminators.
 	local NBSP  = "\194\160"     -- U+00A0
 	local NNBSP = "\226\128\175" -- U+202F
-	local first_char_src = is_case_sensitive and trigger or lower_trig
+	-- Both literal modes keep the casing they were written with; only the cased
+	-- family works from the lowercase canonical.
+	local first_char_src = (is_strict or is_case_sensitive) and trigger or lower_trig
 	local first_char     = first_char_src:match("^[%z\1-\127\194-\244][\128-\191]*")
 	if first_char == "," then
 		local rest = lower_trig:sub(#first_char + 1)

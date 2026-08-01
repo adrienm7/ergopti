@@ -3,7 +3,10 @@
 	"description": "Cross-driver regression corpus for hotstring expansion logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'vectors' covers single-trigger matching/arithmetic; 'collision_vectors' covers multi-trigger collision resolution (length > priority > first-registered).",
 	"field_semantics": {
 		"terminator": "The character typed after the trigger. The UNIT replays do not feed it — they match on the buffer tail as the last trigger character is typed, and take the only bit they need from terminator_consumed — but all three E2E runners DO inject it (tests/e2e/run_e2e.lua on macOS and Linux, run_e2e.ahk on Windows), so it is a real input at that layer. Changing it changes what the e2e harnesses type.",
-		"backspace_count": "LOGICAL count: how many codepoints of already-typed text the expansion replaces (trigger length, plus 1 when terminator_consumed is true). It is NOT the number of backspace keystrokes a driver emits. macOS keeps the longest common prefix shared by trigger and replacement, so for 'btw' -> 'by the way' it emits 2 backspaces and types 'y the way' where Windows and Linux emit 3 and type the whole replacement; 6 of the 13 matched vectors below differ this way. All three drivers replace the same codepoints, which is what this field asserts and what makes it portable. A driver conforms by replacing that many codepoints, however few keystrokes it takes to do it."
+		"backspace_count": "LOGICAL count: how many codepoints of already-typed text the expansion replaces (trigger length, plus 1 when terminator_consumed is true). It is NOT the number of backspace keystrokes a driver emits. macOS keeps the longest common prefix shared by trigger and replacement, so for 'btw' -> 'by the way' it emits 2 backspaces and types 'y the way' where Windows and Linux emit 3 and type the whole replacement; 6 of the 13 matched vectors below differ this way. All three drivers replace the same codepoints, which is what this field asserts and what makes it portable. A driver conforms by replacing that many codepoints, however few keystrokes it takes to do it.",
+		"is_case_sensitive": "Registration shape, NOT comparison: true registers the trigger literally (no lower/Title/UPPER family). Matching still folds case unless is_case_sensitive_strict is also set. The name is inherited from the TOML schema and is the opposite of what it suggests.",
+		"is_case_sensitive_strict": "Comparison: true means only the casing written in the TOML matches. This is the flag the domain spec calls is_case_sensitive.",
+		"driver_specific": "Present when the vector's expected outcome depends on a constant that is deliberately per-driver. A driver whose constant differs must SKIP the vector rather than assert it, and say which constant. Absent means the vector is a cross-driver contract."
 	},
 	"version": "1.1.0",
 	"vectors": [
@@ -37,11 +40,12 @@
 		},
 		{
 			"id": "word_boundary_mid_word_blocked",
-			"description": "is_word trigger does not fire when preceded by a word character.",
+			"description": "is_word trigger does not fire when preceded by a word character. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "othe",
 			"terminator": " ",
 			"expected": {
@@ -50,11 +54,12 @@
 		},
 		{
 			"id": "word_boundary_start_of_buffer",
-			"description": "is_word trigger fires when it is the entire buffer (start-of-line).",
+			"description": "is_word trigger fires when it is the entire buffer (start-of-line). Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "the",
 			"terminator": " ",
 			"expected": {
@@ -65,11 +70,12 @@
 		},
 		{
 			"id": "word_boundary_after_space",
-			"description": "is_word trigger fires when preceded by a space.",
+			"description": "is_word trigger fires when preceded by a space. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "hello the",
 			"terminator": " ",
 			"expected": {
@@ -80,11 +86,12 @@
 		},
 		{
 			"id": "word_boundary_after_punctuation",
-			"description": "is_word trigger fires when preceded by punctuation.",
+			"description": "is_word trigger fires when preceded by punctuation. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": ".the",
 			"terminator": " ",
 			"expected": {
@@ -95,12 +102,13 @@
 		},
 		{
 			"id": "case_sensitive_no_match",
-			"description": "Case-sensitive trigger does not match different case input.",
+			"description": "is_case_sensitive_strict is the flag that makes the COMPARISON exact: a different casing must not fire. The corpus sets is_case_sensitive alongside it because all 1 302 shared entries that declare strict also declare it — see case_literal_folds for what the second flag does on its own.",
 			"trigger": "BTW",
 			"replacement": "by the way",
 			"is_word": false,
 			"auto_expand": true,
 			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
 			"buffer": "btw",
 			"terminator": " ",
 			"expected": {
@@ -109,12 +117,13 @@
 		},
 		{
 			"id": "case_sensitive_exact_match",
-			"description": "Case-sensitive trigger matches exact case.",
+			"description": "A strict trigger fires on the casing written in the TOML, and its replacement is emitted verbatim.",
 			"trigger": "BTW",
 			"replacement": "by the way",
 			"is_word": false,
 			"auto_expand": true,
 			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
 			"buffer": "BTW",
 			"terminator": " ",
 			"expected": {
@@ -125,11 +134,12 @@
 		},
 		{
 			"id": "backspace_count_equals_trigger_length",
-			"description": "backspace_count equals trigger length when terminator is not consumed.",
+			"description": "backspace_count equals trigger length when terminator is not consumed. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "afaik",
 			"replacement": "as far as I know",
 			"is_word": false,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "afaik",
 			"terminator": " ",
 			"terminator_consumed": false,
@@ -211,7 +221,6 @@
 				"matched": false
 			}
 		},
-
 		{
 			"id": "utf8_trigger_two_codepoints",
 			"description": "Trigger containing a 2-byte UTF-8 character (é): backspace_count must equal codepoint count, not byte count.",
@@ -227,7 +236,6 @@
 				"backspace_count": 2
 			}
 		},
-
 		{
 			"id": "utf8_trigger_three_codepoints",
 			"description": "Trigger with 3 multi-byte UTF-8 codepoints (àèù): backspace_count = 3 (codepoints), not 6 (bytes).",
@@ -243,14 +251,14 @@
 				"backspace_count": 3
 			}
 		},
-
 		{
 			"id": "word_boundary_after_newline",
-			"description": "is_word trigger fires when preceded by a newline (\\n is a word boundary).",
+			"description": "is_word trigger fires when preceded by a newline (\\n is a word boundary). Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "line\nthe",
 			"terminator": " ",
 			"expected": {
@@ -259,14 +267,14 @@
 				"backspace_count": 3
 			}
 		},
-
 		{
 			"id": "word_boundary_after_tab",
-			"description": "is_word trigger fires when preceded by a tab (\\t is a word boundary).",
+			"description": "is_word trigger fires when preceded by a tab (\\t is a word boundary). Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "\tthe",
 			"terminator": " ",
 			"expected": {
@@ -277,11 +285,13 @@
 		},
 		{
 			"id": "buffer_cap_trigger_longer_than_window",
-			"description": "A trigger longer than the 256-codepoint rolling buffer can never match: the window cannot hold it in full. The engine states this in a comment and nothing exercised it.",
+			"description": "A trigger longer than the 256-codepoint rolling buffer can never match: the window cannot hold it in full. The engine states this in a comment and nothing exercised it. DRIVER-SPECIFIC: the cap is not shared — the Lua engine holds 256 codepoints and macOS holds 500 — so this vector's outcome is only defined for a driver whose window is 256. A replay on any other driver must skip it; the caps themselves are held by test-hotstring-buffer-cap-parity.cjs. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
+			"driver_specific": "rolling_buffer_cap",
 			"trigger": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"replacement": "X",
 			"is_word": false,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"terminator": " ",
 			"expected": {
@@ -290,11 +300,12 @@
 		},
 		{
 			"id": "buffer_cap_trigger_exactly_at_window",
-			"description": "A trigger of exactly 256 codepoints still matches. Pins the boundary itself, not merely the far side of it — an off-by-one in the eviction loop would break this while leaving the 257 case passing.",
+			"description": "A trigger of exactly 256 codepoints still matches. Pins the boundary itself, not merely the far side of it — an off-by-one in the eviction loop would break this while leaving the 257 case passing. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"replacement": "Y",
 			"is_word": false,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"terminator": " ",
 			"expected": {
@@ -320,7 +331,7 @@
 		},
 		{
 			"id": "case_insensitive_upper_buffer",
-			"description": "The DEFAULT matching mode folds case: an all-caps buffer matches a lower-case trigger. Every other vector used a buffer already identical to its trigger, so the fold itself — buf_tail:lower() == trigger:lower(), and the case-folded tail bucket lookup — was never exercised.",
+			"description": "The DEFAULT mode registers the cased family, so an all-caps buffer matches a lower-case trigger AND the replacement is conformed to the casing that was typed. Windows registers the three variants explicitly, macOS and Linux conform at fire time; the observable result is this one.",
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
@@ -329,13 +340,28 @@
 			"terminator": " ",
 			"expected": {
 				"matched": true,
-				"replacement": "by the way",
+				"replacement": "BY THE WAY",
 				"backspace_count": 3
 			}
 		},
 		{
-			"id": "case_insensitive_no_case_conformance",
-			"description": "A case-folded match returns the replacement VERBATIM. The shared matcher does not conform the replacement to the typed case, so a mixed-case buffer still yields the lower-case replacement — case_conform is a driver-level concern, and this pins that the matcher does not silently do it.",
+			"id": "case_conform_title_buffer",
+			"description": "A Title-cased buffer yields a Title-cased replacement. This vector replaces one that asserted the opposite — that the matcher returns the replacement verbatim and case conformance is 'a driver-level concern'. It is not: Windows produces the conformed output from the registry and both Lua drivers now do the same, so a matcher that skipped it disagreed with every driver.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "Btw",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "By the way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_conform_rejects_mixed",
+			"description": "A casing that is neither lower, Title nor UPPER fires nothing: no variant is registered for it, and conforming would have to invent an output casing. All three drivers decline.",
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
@@ -343,18 +369,33 @@
 			"buffer": "BtW",
 			"terminator": " ",
 			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "case_literal_folds",
+			"description": "is_case_sensitive WITHOUT strict selects the REGISTRATION shape, not the comparison: the trigger is registered literally — no lower/Title/UPPER family — and still matches any casing, emitting its replacement verbatim. 592 shared entries have this shape, all acronym autocorrections like \"adn\" -> \"ADN\": the literal registration exists so the family cannot generate \"Adn\" -> \"Adn\", and the fold is what lets a capitalised \"Adn\" correct at all. Reading the flag as \"compare exactly\" — which its name invites — makes every one of them silently stop firing on any casing but the one written.",
+			"trigger": "adn",
+			"replacement": "ADN",
+			"is_word": false,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"buffer": "Adn",
+			"terminator": " ",
+			"expected": {
 				"matched": true,
-				"replacement": "by the way",
+				"replacement": "ADN",
 				"backspace_count": 3
 			}
 		},
 		{
 			"id": "case_insensitive_word_boundary_still_applies",
-			"description": "Case folding does not bypass the word-boundary rule: a mid-word occurrence stays blocked even when the case differs from the trigger.",
+			"description": "Case folding does not bypass the word-boundary rule: a mid-word occurrence stays blocked even when the case differs from the trigger. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "oThE",
 			"terminator": " ",
 			"expected": {
@@ -378,11 +419,12 @@
 		},
 		{
 			"id": "magic_key_leading_trigger_after_text",
-			"description": "A trigger that begins with the magic key matches at the tail of a longer buffer, so the star is an ordinary codepoint to the matcher rather than a mode switch.",
+			"description": "A trigger that begins with the magic key matches at the tail of a longer buffer, so the star is an ordinary codepoint to the matcher rather than a mode switch. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "★x",
 			"replacement": "STARX",
 			"is_word": false,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "abc★x",
 			"terminator": " ",
 			"expected": {
@@ -393,11 +435,12 @@
 		},
 		{
 			"id": "word_boundary_blocked_after_non_ascii",
-			"description": "is_word_char treats EVERY non-ASCII codepoint as a word character — deliberate, so accented letters behave like letters — and the magic key inherits that. A word-boundary trigger typed straight after the star is therefore blocked. The rule was stated only in a comment; this pins it, so changing is_word_char to consult Unicode categories cannot alter it silently.",
+			"description": "is_word_char treats EVERY non-ASCII codepoint as a word character — deliberate, so accented letters behave like letters — and the magic key inherits that. A word-boundary trigger typed straight after the star is therefore blocked. The rule was stated only in a comment; this pins it, so changing is_word_char to consult Unicode categories cannot alter it silently. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
 			"auto_expand": true,
+			"is_case_sensitive": true,
 			"buffer": "★the",
 			"terminator": " ",
 			"expected": {
@@ -410,61 +453,162 @@
 			"id": "priority_breaks_equal_length_tie",
 			"description": "Two equal-length triggers (same string, two sources) collide; the higher priority wins regardless of registration order. The high-priority mapping is registered LAST here. Case-sensitive triggers isolate the tie-break from case-variant generation. Tie-break order is length > priority > first-registered, identical in the AHK engine and the Hammerspoon registry.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "zz", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "zz", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "zz",
+					"replacement": "LOW",
+					"priority": 10,
+					"group": "low",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "zz",
+					"replacement": "HIGH",
+					"priority": 90,
+					"group": "high",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "zz",
-			"expected": { "matched": true, "winner": "HIGH" }
+			"expected": {
+				"matched": true,
+				"winner": "HIGH"
+			}
 		},
 		{
 			"id": "priority_order_independent",
 			"description": "Same collision as above but the high-priority mapping is registered FIRST; the outcome must not depend on registration order.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "yy", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "yy", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "yy",
+					"replacement": "HIGH",
+					"priority": 90,
+					"group": "high",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "yy",
+					"replacement": "LOW",
+					"priority": 10,
+					"group": "low",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "yy",
-			"expected": { "matched": true, "winner": "HIGH" }
+			"expected": {
+				"matched": true,
+				"winner": "HIGH"
+			}
 		},
 		{
 			"id": "equal_priority_falls_back_to_first_registered",
 			"description": "Equal length AND equal priority falls back to first-registered (seq), the pre-priority default preserved on both drivers.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "ww", "replacement": "FIRST", "priority": 30, "group": "g1", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "ww", "replacement": "SECOND", "priority": 30, "group": "g2", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "ww",
+					"replacement": "FIRST",
+					"priority": 30,
+					"group": "g1",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "ww",
+					"replacement": "SECOND",
+					"priority": 30,
+					"group": "g2",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "ww",
-			"expected": { "matched": true, "winner": "FIRST" }
+			"expected": {
+				"matched": true,
+				"winner": "FIRST"
+			}
 		},
 		{
 			"id": "longer_trigger_beats_higher_priority",
 			"description": "Length stays primary: a longer trigger wins even against a shorter, far-higher-priority one.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "x", "replacement": "SHORT", "priority": 99, "group": "short", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "vx", "replacement": "LONG", "priority": 1, "group": "long", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "x",
+					"replacement": "SHORT",
+					"priority": 99,
+					"group": "short",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "vx",
+					"replacement": "LONG",
+					"priority": 1,
+					"group": "long",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "vx",
-			"expected": { "matched": true, "winner": "LONG" }
+			"expected": {
+				"matched": true,
+				"winner": "LONG"
+			}
 		},
 		{
 			"id": "personal_tier_beats_common_tier",
 			"description": "The personal source default (50) outranks the common source default (10) for an identical trigger — the user-facing 'my personal hotstring always wins' contract. Personal is registered FIRST, as at startup; priority, not load order, decides. This is the case the macOS group-aware dedup fix restored.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "abc", "replacement": "PERSONAL", "priority": 50, "group": "personal", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "abc", "replacement": "COMMON", "priority": 10, "group": "common", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "abc",
+					"replacement": "PERSONAL",
+					"priority": 50,
+					"group": "personal",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "abc",
+					"replacement": "COMMON",
+					"priority": 10,
+					"group": "common",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "abc",
-			"expected": { "matched": true, "winner": "PERSONAL" }
+			"expected": {
+				"matched": true,
+				"winner": "PERSONAL"
+			}
 		},
 		{
 			"id": "no_match_when_buffer_ends_outside_any_trigger",
 			"description": "When the buffer does not end with any registered trigger, nothing fires even though competing mappings exist.",
 			"mappings": [
-				{ "auto_expand": true, "trigger": "qq", "replacement": "Q", "priority": 50, "group": "g1", "is_case_sensitive": true },
-				{ "auto_expand": true, "trigger": "rr", "replacement": "R", "priority": 90, "group": "g2", "is_case_sensitive": true }
+				{
+					"auto_expand": true,
+					"trigger": "qq",
+					"replacement": "Q",
+					"priority": 50,
+					"group": "g1",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "rr",
+					"replacement": "R",
+					"priority": 90,
+					"group": "g2",
+					"is_case_sensitive": true
+				}
 			],
 			"buffer": "hello",
-			"expected": { "matched": false }
+			"expected": {
+				"matched": false
+			}
 		},
 		{
 			"id": "is_word_filters_it_does_not_tiebreak",
