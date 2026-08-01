@@ -290,9 +290,19 @@ Constraints: **paths before moves, moves before content, data before code.**
   (c) and moves in the direction of `modules/<feature>/window.*` for all three —
   a cross-driver rename that cannot be done one driver at a time, because the I1
   ratchet fails on both the shared count and the union while it is half done.
-  The remaining two are the objective, cheap ones: `modules/dynamic_hotstrings`
-  (Windows implements dynamic hotstrings in `modules/hotstrings.ahk`) and
-  `infra/toml` (absent on Linux, which uses the shared codec directly).
+  The remaining two were the objective, cheap ones. ~~`modules/dynamic_hotstrings`~~
+  — **promoted, I1 26.0 % → 28.0 %.** It was section 5 of
+  `hotstrings_text_expansion.ahk` on Windows. The move carried six tests with it,
+  because the code had **none**: `SpacedPrefix`, the three date formatters and the
+  delay resolver had zero references outside their own file, so a pure move could
+  have broken any of them with the whole suite green. `SpacedPrefix` is the one
+  that matters — "shortest prefix holding exactly N non-space characters" is not
+  "first N characters", and an SSN's decorative spaces make the 5-digit trigger 7
+  characters wide. What is NOT movable is the call site: registration order feeds
+  the collision tiebreak, so the call stays where section 5 sat and a test pins
+  that it still precedes the repeat key.
+  Left: `infra/toml` (absent on Linux, which uses the shared codec directly) — and
+  that one is arguably right as it stands rather than a gap to close.
   Note the baseline is a literal: deriving it from the value it constrains would
   make the comparison `x <= x`, which passes for every input — the exact false
   green this repo ratchets against elsewhere. Still to do: the Convention S stubs.
