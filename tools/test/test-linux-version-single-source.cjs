@@ -60,8 +60,8 @@ const CONSUMERS = [
 for (const rel of CONSUMERS) {
 	const raw = read(rel);
 	const code = stripLua(raw);
-	if (!raw.includes('require("lib.version")')) {
-		errors.push(`${rel}: must require("lib.version") for the driver version`);
+	if (!raw.includes('require("infra.version")')) {
+		errors.push(`${rel}: must require("infra.version") for the driver version`);
 	}
 	if (!code.includes('Version.VERSION')) {
 		errors.push(`${rel}: must read the version from Version.VERSION`);

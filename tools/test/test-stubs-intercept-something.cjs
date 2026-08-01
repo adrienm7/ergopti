@@ -13,7 +13,7 @@
  * Lot 3 renames `lib/` to `infra/` across three drivers. There are 1 144 stub
  * assignments in the two Lua suites, and the rename has to move production code
  * and every one of those keys in the same commit — because a stub still keyed to
- * `lib.foo` after the module became `infra.foo` does not fail. It silently stops
+ * `infra.foo` after the module became `infra.foo` does not fail. It silently stops
  * intercepting, the module under test quietly loads the real `infra.foo`, and
  * the test keeps passing while testing something else entirely. That is the
  * single most dangerous property of the whole lot, and until now nothing could
@@ -26,8 +26,8 @@
  *   models_manager_mlx. Both stubs were inert from the day they were written;
  *   the comment above them hedges, "modules that might be missing".
  *
- *   test_build_inserts_missing_timestamp.lua stubs `lib.json`. sqlite_writer
- *   requires `hs.json`. Nothing in the macOS driver requires `lib.json` at all.
+ *   test_build_inserts_missing_timestamp.lua stubs `infra.json`. sqlite_writer
+ *   requires `hs.json`. Nothing in the macOS driver requires `infra.json` at all.
  *
  * None of the three made a test fail, which is the point: an inert stub is
  * indistinguishable from a working one from inside the test.
