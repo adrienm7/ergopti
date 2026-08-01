@@ -107,6 +107,7 @@ const CHECKS = [
 	{ name: 'port contract vector traceability (ratchet: ids linked to the macOS mirror)', cmd: 'node', args: ['tools/test/test-port-vector-traceability.cjs'], repro: 'node tools/test/test-port-vector-traceability.cjs --measure' },
 	{ name: 'lua gsub returns one value (bare return leaks the replacement count)', cmd: 'node', args: ['tools/test/test-lua-gsub-single-return.cjs'], repro: 'node tools/test/test-lua-gsub-single-return.cjs' },
 	{ name: 'tooltip [positioning] constant reach (which driver reads which value)', cmd: 'node', args: ['tools/test/test-tooltip-positioning-reach.cjs'], repro: 'node tools/test/test-tooltip-positioning-reach.cjs' },
+	{ name: 'shared JS is loadable (module.exports in an ESM package exports nothing)', cmd: 'node', args: ['tools/test/test-shared-js-is-loadable.cjs'], repro: 'node tools/test/test-shared-js-is-loadable.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },

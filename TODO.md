@@ -745,6 +745,19 @@ Constraints: **paths before moves, moves before content, data before code.**
      from every tool in the repo. The gate checked that the JSON had 6 and 3
      vectors of the right field types; those numbers came from the JS once and
      had become plain literals.
+     **Follow-up, and the guard caught its own author.** A gate now refuses any
+     `_shared` module that exports via `module.exports` and has no loader — the
+     state that made the tooltip modules unreachable. Its first version passed
+     with a deliberately-planted orphan sitting in the tree: its "is this
+     directory swept?" heuristic matched **its own source**, because the file
+     names the spec-only modules and contains the very tokens the heuristic
+     looked for. Tightening it to recognise the one real sweep by name then
+     surfaced **three more** unreachable modules the loose version had hidden
+     (`Expander.spec.js`, `GestureRecognizer.spec.js`, `ProfileSelector.js` —
+     cited only by `SPEC.md`/`SCHEMA.md`, executed by nothing). Six are now
+     recorded as specification-only with reasons, which is a legitimate role;
+     being unread because of a module-system detail is not, and the two are
+     indistinguishable from outside unless written down.
      The loader is now `tools/lib/load-cjs-module.cjs` (one copy, and it throws
      rather than returning `{}` when a file exports nothing — the empty result
      being the failure itself), the codegen uses it, and the gate now compares
