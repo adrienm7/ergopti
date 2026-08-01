@@ -124,11 +124,15 @@ const FLAGS = [
 	},
 	{
 		flag: 'is_case_sensitive_strict',
-		drivers: ['windows'],
+		drivers: ['windows', 'linux'],
 		note:
-			'Windows turns it into AHK\'s "C" flag. macOS and Linux ignore it, so entries written to ' +
-			'match only in their exact case — "OUi" -> "Oui" — match case-insensitively there and ' +
-			'autocorrect input they were written to leave alone.'
+			'Windows turns it into AHK\'s "C" flag; the shared engine now requires an exact-case match ' +
+			'for it, which covers Linux. Ordinary triggers are registered by Windows in three case ' +
+			'variants (lower / Title / UPPER, each output cased to match) — that is its case ' +
+			'conformance — and this flag opts out so only the casing written in the TOML fires. 1 300 ' +
+			'magickey entries depend on it: "OUi" -> "Oui" exists so that typing "oui" does NOT ' +
+			'autocorrect, and a case-folding matcher does the exact thing the entry prevents. macOS ' +
+			'still ignores it — its registry has its own case handling and is the remaining gap.'
 	}
 ];
 

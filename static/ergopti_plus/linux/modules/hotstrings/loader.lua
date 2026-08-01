@@ -77,6 +77,15 @@ function M.load(paths)
 								replacement       = entry.output,
 								is_word           = entry.is_word           or false,
 								is_case_sensitive = entry.is_case_sensitive or false,
+								-- The three flags the loader used to drop on the floor. Without
+								-- them every entry behaved as auto_expand + non-final +
+								-- case-folding, so "ya" fired inside "yaourt", nothing could
+								-- chain, and the 1 300 strict-case magickey entries matched
+								-- any casing — autocorrecting the very input they exist to
+								-- leave alone.
+								auto_expand       = entry.auto_expand       or false,
+								final_result      = entry.final_result      or false,
+								is_case_sensitive_strict = entry.is_case_sensitive_strict or false,
 								group             = group,
 							}
 						end

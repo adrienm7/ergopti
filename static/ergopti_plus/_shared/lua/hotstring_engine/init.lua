@@ -175,6 +175,14 @@ function M.new()
 						tlen              = n,
 						is_word           = m.is_word           == true,
 						is_case_sensitive = m.is_case_sensitive == true,
+						-- Windows registers three case variants for an ordinary trigger
+						-- (lower / Title / UPPER, each with its output cased to match) —
+						-- that is its case conformance. is_case_sensitive_strict opts out:
+						-- ONLY the exact casing written in the TOML matches. 1 300 magickey
+						-- entries rely on it. "OUi" -> "Oui" exists so that typing "oui"
+						-- does NOT autocorrect, and a case-folding matcher does exactly the
+						-- thing the entry was written to prevent.
+						is_case_sensitive_strict = m.is_case_sensitive_strict == true,
 						-- Absent means NOT auto, matching the AutoHotkey loader: it emits the
 						-- "*" flag only when the TOML says auto_expand = true. An entry that
 						-- does not opt in waits for a terminator, which is the whole point of
@@ -242,7 +250,7 @@ function M.new()
 					-- whole buffer so the terminator is excluded on the end-char path.
 					local buf_tail = table.concat(_buf_cps, "", body_len - tlen + 1, body_len)
 					local matched
-					if mapping.is_case_sensitive then
+					if mapping.is_case_sensitive or mapping.is_case_sensitive_strict then
 						matched = buf_tail == mapping.trigger
 					else
 						matched = buf_tail:lower() == mapping.trigger:lower()
