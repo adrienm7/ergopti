@@ -338,8 +338,14 @@ Constraints: **paths before moves, moves before content, data before code.**
   reason, because a gate that cries wolf on working code gets deleted and then
   guards nothing; (3) make Linux a first-class platform —
   write `_shared/lua/menu/render.lua` (shared macOS+Linux, ~230 l) and
-  `linux/infra/menu_host.lua` (~180 l), delete `menu_builder.lua` (833 l), route
-  its 101 hardcoded French labels through the shared locales; (4) migrate the
+  `linux/infra/menu_host.lua` (~180 l), delete `menu_builder.lua` (**933 l**, not
+  833). ~~route its 101 hardcoded French labels through the shared locales~~ —
+  **stale: measured 2026-08-01, the file has ZERO hardcoded French literals and
+  79 i18n references.** The §3 i18n pass already did that half and this entry was
+  never updated, so the item reads as a translation job when what is left is
+  purely architectural — one renderer instead of a hand-built tree. Worth the
+  correction because the translation framing is what made it look expensive;
+  (4) migrate the
   macOS hotstrings then layout submenus — layout needs `platforms:["macos"]` rows
   for the TIS/bundle features first, because `layout_menu` currently describes a
   Windows-only menu that the macOS drift gate pins without macOS implementing it;
@@ -1711,6 +1717,16 @@ productivity scale (`productive` / `distracting` / `communication` / `neutral` /
 `unknown`) keyed by process name; macOS holds free-text user categories keyed by
 app name. Neither is wrong, but nothing says so anywhere, and "migrate
 app_categories.json" means two different things depending on the driver.
+
+**Re-measured 2026-08-01, and the collision risk is lower than this reads:** the
+two files never meet on disk. Windows writes to the METRICS dir
+(`metrics_dir . "\app_categories.json"`, the directory that syncs between
+devices); macOS writes to `hs.configdir .. "/data/app_categories.json"`, which
+does not. So a user with both drivers does not corrupt one from the other today
+— the hazard is a future path change, and the cost is confusion for whoever
+reads one module's schema and assumes the other's. Left as a naming collision
+with the measurement attached rather than renamed: renaming either file orphans
+existing user data for no present benefit.
 
 ---
 
