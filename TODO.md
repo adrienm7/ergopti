@@ -735,7 +735,17 @@ Constraints: **paths before moves, moves before content, data before code.**
   6. **Metrics**: shared aggregation core (two ~1 330-line walkers whose function
      names map 1:1, one of which says in a comment that it "MIRRORS" the other);
      eight constants declared three times where the shared copy exists only to be
-     shadowed; the WPM formula written **seven** times.
+     shadowed; ~~the WPM formula written **seven** times~~ — **the divisor half is
+     fixed.** Measured: the shared module already defined
+     `DEFAULT_CHARS_PER_WORD` *and* the exact batch formula, its docstring even
+     claimed macOS used it, and **macOS divided by a literal 5 in two places
+     while Linux consumed the module correctly** — the shared copy existing only
+     to be shadowed, precisely as this line predicted. macOS now calls
+     `Metrics.compute_wpm_from_events`, verified equivalent on five sample pairs
+     *before* substituting so the reported numbers do not move.
+     `test-wpm-chars-per-word-single-source.cjs` bans the literal in Lua on every
+     driver and freezes the **5** WebView copies, which cannot `require` a Lua
+     module — generating a JS constant is the remaining half.
   7. **Remap**: a shared tap-hold IR + three emitters
      (`emit_kanata` / `emit_karabiner` / `emit_ahk`) — today only a kanata emitter
      parked in `_shared/`. And `_shared/tap_hold/defaults.toml` must become **one**
