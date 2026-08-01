@@ -1,7 +1,10 @@
 {
   "description": "TOML scalar coercion vectors. Each entry pairs a raw TOML literal (as it appears after the '=' sign) with the expected Lua and AHK coerced values. Used by the macOS and AHK corpus consumer tests to pin the 4 hand-rolled coercion sites against each other.",
   "note": "Lua M.coerce uses SEQUENTIAL gsubs (\\\\->\\ first, then \\n->newline), which is buggy but matches production behavior. AHK UnescapeTomlString uses single-pass (correct). The 'lua' and 'ahk' expected values may differ where the sequential approach produces a different result.",
-  "vectors": [
+  "field_semantics": {
+		"notes": "DESCRIPTIVE, not an input. A short human label for the coercion each vector covers (\"Boolean true\", \"Integer\"). No replay reads it; the behaviour is carried by input/lua/ahk. Recorded here so it is not mistaken for something that steers the vector."
+	},
+	"vectors": [
     {
       "id": "bool-true",
       "input": "true",
