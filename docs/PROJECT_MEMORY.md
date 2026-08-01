@@ -3076,3 +3076,98 @@ reads as "the corpus is wrong" and gets the corpus reverted.
 - When a vector's outcome genuinely depends on a per-driver constant, mark it
   `driver_specific` in the corpus and have the other drivers skip it BY NAME and
   count the skips. A silent skip is indistinguishable from coverage.
+
+
+
+### project-decided-do-not-re-raise
+
+**What:** ten changes that were proposed, examined and deliberately NOT made.
+Each is a live-looking optimisation or fix whose reasoning has already been done
+once. Carried out of TODO.md, which is for work that remains — a decision is not
+a task.
+
+**Why:** every one of these reads as an obvious improvement to a fresh pair of
+eyes, which is exactly why they keep being re-raised. Two of them have already
+been implemented, reverted, and re-proposed at least once.
+
+**How to apply:** read the reasoning before touching any of these areas. If new
+evidence overturns one, say what the evidence is — do not simply re-do it.
+
+Evidence in `docs/PROJECT_MEMORY.md`.
+
+- **Moving the KE ownership mark into `launch_headless_once()`** (the last leg of
+  `ke-prime-force-claims-and-kills-unowned-bridge`): everything else in that finding
+  shipped — the read-only status probe no longer claims the bridge, the poll timeout
+  no longer disowns one we launched, and the settle path's pkill is ownership-gated
+  like every other kill in the driver.
+  What is left is moving `mark_hs_owned_bridge()` from the top of
+  `prime_ke_for_session` into the branch where a headless launch actually ran, plus
+  the two force-path re-marks. It stays undone deliberately. Ownership is what
+  authorises the quit-time bootout, so narrowing it narrows teardown too: a force
+  prime that finds a live, responsive bridge would stop claiming it and would
+  therefore stop tearing it down at quit — which may be right, or may reopen the
+  post-quit-remapping class recorded in PROJECT_MEMORY. The two readings cannot be
+  separated by a unit test, and a previous attempt in this exact area was reverted
+  for precisely that kind of unverifiable side effect. It needs one session on a real
+  machine: force-prime with a foreign bridge alive, quit, and check whether the
+  keyboard is still remapped.
+- **Moving the clipboard transaction off the keystroke tap** (raised as
+  `perform-paste-clipboard-io-inside-eventtap`): the deferral was tried and reverted
+  because it breaks the paste-ordering contract pinned by
+  `tests/unit/modules/keymap/test_emit_tokens_multi_paste.lua`. The two remaining
+  candidates turn out to be already done, which closes the item.
+  One round trip per EXPANSION rather than per token: already the case. The
+  expensive `hs.pasteboard.readAllData()` runs only on the branch where no restore
+  is pending (`keymap/utils.lua` `perform_paste`); every later paste in the same
+  expansion cancels the pending restore and KEEPS the captured original, precisely
+  so it does not re-read and capture its own payload.
+  Moving the RESTORE off the hot path: also already the case — it runs from the
+  `CLIPBOARD_RESTORE_SEC` timer, and its throw-path restore landed in 21c4a0208.
+  What is left inside the tap is one `setContents` plus the Cmd+V, which IS the
+  paste, and one `readAllData` per expansion. Neither can move without breaking the
+  ordering the pinned test exists to protect.
+- **Re-seeding the delay baseline at every remaining flush site** (raised as
+  `shortcut-and-mouse-flush-skip-baseline-reseed`): the three keystroke-path sites
+  were real and 17286ec2e fixed them. Widening it to the rest of the tree is
+  refuted on its stated consequence AND on the semantics.
+  The claim was that a zeroed baseline makes the next keystroke record a
+  zero-millisecond gap and be "recognised as synthetic". It is not: synthetic is
+  carried by the explicit `meta.s` flag (`aggregator/events.lua:101`), never
+  inferred from a delay. The real effect is the one the code's own comment states —
+  the inter-word gap vanishes from the timing data — which is why only the
+  keystroke-path sites needed it.
+  And `last_time == 0` is a deliberate sentinel: `init.lua:631` reads
+  `last_time > 0 and (now - last_time) or 0`, i.e. "no previous keystroke in this
+  buffer". Every remaining flush site is a boundary where that is the correct
+  answer — session end after an idle timeout, the midnight day rollover, native
+  autocorrect, and the stop/teardown paths. Re-seeding there would invent a typing
+  interval across a gap that was not typing.
+- **A resolve memo bypassed on the dynamic-hotstring preview path** (raised as
+  `resolve-not-memoised-on-preview-path`): refuted by reading the file.
+  `_shared/lua/dynamic_hotstrings/init.lua` holds exactly one state table,
+  `local _rules = {}` — there is no cache anywhere in it. `match_buffer` calls
+  `pcall(rule.resolver)` unconditionally on every suffix hit and `M.preview` is a
+  three-line delegation to that same function, so there is no memo for the preview
+  to bypass. The defect shape needs two divergent resolution paths and there is
+  one: `rules_engine.lua`'s interceptor and its preview provider both call the
+  identical `SharedEngine.match_buffer`.
+- **Per-tail cap on the end-char match loop**: five synchronised sites where
+  missing one silently shortens the bound — a hotstring that stops firing — for a
+  sub-microsecond gain four orders of magnitude below the profiler threshold.
+  The same mechanism on the hotter STAR loop was already refuted.
+- **Tooltip window reuse**, **chunking the emoji registration**, **timing tricks
+  around the WebView2 cold start**: tried, reverted, or rejected with blockers.
+- **Reconciling the three word-boundary predicates**: the AHK/Hammerspoon
+  divergence is deliberate — do not fix without a concrete user need.
+- **Descending-index iteration in `HookDispatcher`**: rejected in the code
+  itself; it underflows and skips a subscriber that unsubscribes itself.
+- **Idle-gating the keylogger network ticks** and the AV WMI scan: cost accepted
+  explicitly — in-process, and they only emit on a state change.
+- **Removing the 75 ms tooltip render debounce** as "pure added latency on every
+  preview" (raised as `G4B-02`): refuted by the fix to `G4B-01`. The preview must
+  land after `TOOLTIP_UIA_IDLE_REQUIRED_MS` of physical idle for stage 2 of the
+  position cascade to be reachable, and `_PREFIX_RENDER_DEBOUNCE_MS` (150) plus
+  `TOOLTIP_RENDER_DEBOUNCE_MS` (75) is exactly what clears the 200 ms gate, with
+  25 ms of margin. Dropping the 75 ms puts the render back under the gate and
+  silently disables the position cache. The relationship is pinned by
+  `tests/meta/test_tooltip_debounce_is_load_bearing.ahk`.
