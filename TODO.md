@@ -775,7 +775,17 @@ Constraints: **paths before moves, moves before content, data before code.**
      is blind to it. The skip now **asserts its own premise** (the engine always
      yields the first-registered mapping) instead of `assert_true(true)`, so it
      fails the day priority arrives. Tautology ratchet 283 → 282. ·
-     `is_word` as a tiebreaker.
+     ~~`is_word` as a tiebreaker~~ — **it is a FILTER, not a tie-break**, and
+     asserting it found a harness bug. Mid-word the word-bounded mapping is
+     blocked, so the unbounded one wins in **either** registration order (both
+     replayed, which is what makes it assertable); at a boundary both are
+     eligible and first-registered wins, which is order-dependent and therefore
+     deliberately not a vector. **Windows disagreed** — and it was the harness:
+     the AHK collision replay registered every mapping with hardcoded flags
+     `"*?"`, and `?` means *no word boundary*, so `is_word` was silently
+     discarded for all six existing collision vectors. None of them used it as a
+     discriminator, so nothing had noticed. Flags now derive from the mapping;
+     probed by restoring the hardcoded pair.
      **Corpus hygiene, found while extending it:** every field a vector carries
      must now be read by a replay or documented — `test-corpus-fields-are-read.cjs`,
      74 fields across 16 corpora. One was genuinely inert (`notes` in
