@@ -269,7 +269,18 @@ Constraints: **paths before moves, moves before content, data before code.**
   `menu.gestures` on both sides.
 
 - **Lot 5 — one menu.** The manifest must gain the 14 capabilities that explain
-  every hand-written row: `checked_when` (~14 rows), resolvable `action` id (12),
+  every hand-written row: ~~`checked_when` (~14 rows)~~ — **done, and shipped
+  used**: the three metrics filter rows declare it, their handlers read the
+  predicate instead of restating `MetricsFilters.<field>`, and the getters map
+  gained the three state reads. It **fails OPEN where `disabled_when` fails
+  CLOSED**: a checkmark asserts to the user that something is on, so inventing
+  one when the state cannot be read says a privacy filter is active when it is
+  not — they stop looking for the setting while the data they believed excluded
+  keeps being recorded. Both directions pick the answer that does not overstate
+  what is enabled, and 7 tests pin that asymmetry because "make it consistent
+  with its sibling" is the obvious-looking change that breaks it. The remaining
+  ~11 rows are a mechanical repeat of this shape. ·
+  resolvable `action` id (12),
   `label.format` + `args` with live values (~20), `provider` for dynamic lists
   (~15 slots), `radio_group` (~5), `toggle_shape` (`parent` on macOS/Linux,
   `first_row` on AHK — already solved for the IA submenu only), declarative
@@ -306,7 +317,8 @@ Constraints: **paths before moves, moves before content, data before code.**
   (`preferences.lua`, `menu_state.lua`, `menu_watchers.lua`, `shortcut_utils.lua`,
   `menu_paths.lua`) out; (6) fold `_shared/modules/llm/menu_layout.json` in — its
   schema is a strict subset of v3 with exactly the fields v1 lacked; (7) lay the
-  "no menu row outside the renderer" ratchet.
+  ~~"no menu row outside the renderer" ratchet~~ — **done**
+  (`test-menu-rows-outside-renderer.cjs`, windows 222 / macos 301 / linux 3).
   Measured payoff anchor: the layout submenu is **721 lines on macOS vs 41 on
   Windows (17.6×)** — and Windows is 41 lines *because the manifest does the work*.
   Nothing to invent: do on macOS what Windows already does.
