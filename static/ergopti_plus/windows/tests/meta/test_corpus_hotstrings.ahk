@@ -155,6 +155,15 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
 		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
+		; Skip triggers longer than the rolling window  --  second legitimate
+		; reason a non-matched buffer ends with its trigger, and the one this
+		; enumeration was missing. The buffer holds only the last
+		; HSE_MAX_BUFFER_LEN codepoints, so a longer trigger is never present in
+		; full no matter what the vector's buffer text says. Read from the engine
+		; constant rather than a literal, so raising the cap moves both together.
+		if (TLen > HSE_MAX_BUFFER_LEN) {
+			continue
+		}
 		if Buf = "" {
 			continue
 		}

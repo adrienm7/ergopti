@@ -255,6 +255,46 @@
 				"replacement": "THE",
 				"backspace_count": 3
 			}
+		},
+		{
+			"id": "buffer_cap_trigger_longer_than_window",
+			"description": "A trigger longer than the 256-codepoint rolling buffer can never match: the window cannot hold it in full. The engine states this in a comment and nothing exercised it.",
+			"trigger": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"replacement": "X",
+			"is_word": false,
+			"buffer": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "buffer_cap_trigger_exactly_at_window",
+			"description": "A trigger of exactly 256 codepoints still matches. Pins the boundary itself, not merely the far side of it — an off-by-one in the eviction loop would break this while leaving the 257 case passing.",
+			"trigger": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"replacement": "Y",
+			"is_word": false,
+			"buffer": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "Y",
+				"backspace_count": 256
+			}
+		},
+		{
+			"id": "buffer_cap_retains_tail_after_eviction",
+			"description": "A buffer far longer than the window still matches on its tail: eviction drops the OLDEST codepoints, so the most recent characters — the only ones a trigger can end on — survive.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxbtw",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 3
+			}
 		}
 	],
 	"collision_vectors": [
