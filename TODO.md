@@ -190,7 +190,19 @@ Constraints: **paths before moves, moves before content, data before code.**
   27 have no counterpart outside `lib/` on any driver, so promoting them would be
   taste rather than evidence — which is precisely what the third-driver test
   exists to avoid.
-  **Measured cost of the remaining rename, and the reason it is blocked on
+  ~~**The rename is DONE**~~ — 846 files, ~2 490 replacements, all four suites
+  green. The blocker was never effort: it was that a wrong replacement could not
+  be caught, so `test-packaging-paths-exist.cjs` was built first and immediately
+  caught five stale paths in the deb/rpm/bundle scripts. **Five distinct textual
+  shapes** had to be handled, each found by a different gate rather than by
+  reading: bare `"lib"` with no separator (`DRIVER_ROOT .. "lib"`), the Lua
+  pattern `"^lib%."` in `macos/tests/run.lua` PURGE_PREFIXES (invisible — the
+  per-file purge silently stopped clearing `infra.*`, leaking a partial keycodes
+  stub three files downstream), `tools/build/` being skip-listed, bare
+  `lib/<file>.ahk` in 24 tool files, and `"lib.<module>"` strings in 5 gates.
+  `tests/lib/` and `tests/unit/lib/` are deliberately untouched — different
+  directories. Superseded note follows.
+  **Measured cost of the remaining rename, and the reason it was blocked on
   verification rather than on effort.** Full size: **~1 750 references across
   ~800 files** — Windows 120 `#Include` + 731 path refs in 303 files, macOS 525
   `require` + 408 `package.loaded` stubs in 425 files, Linux 69 + 7 in 48 files,
