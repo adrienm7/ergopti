@@ -327,7 +327,15 @@ _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
 		Id := Vec.Has("id") ? Vec["id"] : "?"
 		HSE_TestReset()
 		for Mapping in Vec["mappings"] {
-			Flags := "*?" . ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
+			; Flags are derived from the mapping, not hardcoded. This read "*?" for
+			; every mapping, and "?" means NO word boundary — so a collision
+			; vector's is_word was silently discarded here and every mapping was
+			; registered unbounded. The first vector to use is_word as a
+			; discriminator resolved to the wrong winner on Windows alone, which
+			; looked like an engine divergence and was this line.
+			IsWordM := Mapping.Has("is_word") and Mapping["is_word"] = true
+			Flags := "*" . (IsWordM ? "" : "?")
+				. ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
 			Grp   := Mapping.Has("group")       ? Mapping["group"]       : "g"
 			Prio  := Mapping.Has("priority")    ? Mapping["priority"]    : HSE_PRIORITY_COMMON
 			Repl  := Mapping.Has("replacement") ? Mapping["replacement"] : ""
