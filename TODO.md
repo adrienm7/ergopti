@@ -714,7 +714,16 @@ Constraints: **paths before moves, moves before content, data before code.**
      engine-side and the record corrected; the exclusion is probed as
      load-bearing. Same shape as `is_case_sensitive_strict`: a vector is only
      writable once the engines agree. ·
-     the terminator path, star/magic-key triggers, `case_conform`,
+     the terminator path, ~~star/magic-key triggers~~ — **done: 3 vectors.** The
+     load-bearing one is `backspace_count = 3` for trigger `"td★"`: the star is
+     **one codepoint and three UTF-8 bytes**, and a harness reaching for a byte
+     length would say 5 (probed — claiming 5 fails Linux and macOS). The third
+     pins a rule that existed only as a comment: `is_word_char` treats **every**
+     non-ASCII codepoint as a word character, so a word-boundary trigger typed
+     straight after the star is blocked. Defensible rule, surprising consequence,
+     and until now "improving" `is_word_char` to consult Unicode categories would
+     have kept accented letters working while silently changing the star. ·
+     `case_conform`,
      `is_case_sensitive_strict` (**1 302 entries use it**, and the figure is exact —
      1 300 in `magickey.toml`, one each in `autocorrection.toml` and
      `rolls.toml`). **Now documented, and the divergence measured:** the flag is
