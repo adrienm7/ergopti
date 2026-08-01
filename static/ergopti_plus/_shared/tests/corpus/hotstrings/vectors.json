@@ -336,6 +336,46 @@
 			"expected": {
 				"matched": false
 			}
+		},
+		{
+			"id": "magic_key_trigger_matches_literally",
+			"description": "A trigger ending in the magic key matches when that key is typed. backspace_count is 3, not 5: the star is ONE codepoint even though it is three UTF-8 bytes, which is the distinction backspace_count exists to make.",
+			"trigger": "td★",
+			"replacement": "2026-08-01",
+			"is_word": false,
+			"buffer": "td★",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "2026-08-01",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "magic_key_leading_trigger_after_text",
+			"description": "A trigger that begins with the magic key matches at the tail of a longer buffer, so the star is an ordinary codepoint to the matcher rather than a mode switch.",
+			"trigger": "★x",
+			"replacement": "STARX",
+			"is_word": false,
+			"buffer": "abc★x",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "STARX",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "word_boundary_blocked_after_non_ascii",
+			"description": "is_word_char treats EVERY non-ASCII codepoint as a word character — deliberate, so accented letters behave like letters — and the magic key inherits that. A word-boundary trigger typed straight after the star is therefore blocked. The rule was stated only in a comment; this pins it, so changing is_word_char to consult Unicode categories cannot alter it silently.",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "★the",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
 		}
 	],
 	"collision_vectors": [
