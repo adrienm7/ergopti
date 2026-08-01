@@ -728,6 +728,18 @@ Constraints: **paths before moves, moves before content, data before code.**
      because no vector had reached the cap — there the buffer *does* end with the
      trigger and the engine cannot see it. Now a second documented exemption
      beside the word-boundary one, read from the constant. ·
+     ~~`case_conform`~~ — **covered as a negative: 3 vectors** pin that the
+     default mode folds case (an all-caps buffer matches a lower-case trigger),
+     that a folded match returns the replacement **verbatim** — the matcher does
+     *not* conform case, so `case_conform` is a driver concern and this pins that
+     it does not silently happen — and that folding does not bypass the
+     word-boundary rule. **All three harnesses failed on arrival**, each
+     asserting a matched buffer ends with its trigger *exactly*; true of every
+     vector that existed, false of the fold. Now compared the way the vector
+     declares itself. That is the **second** harness assumption a new branch
+     broke in a row (the buffer cap was the first), so the pattern is recorded in
+     `PROJECT_MEMORY.md`: a consistency check must model the matching rule, not
+     assume the strictest one. ·
      consumed delimiters, the
      `individual > section > file` priority levels, `is_word` as a tiebreaker.
   3. Generate the single matcher core into both target languages, modelled on
