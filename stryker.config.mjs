@@ -59,7 +59,13 @@ const config = {
 	tempDirName: '.stryker-tmp',
 	cleanTempDir: true,
 
-	ignorePatterns: ['_generated', 'node_modules', 'reports', '.stryker-tmp']
+	// `.claude` holds agent scratch state including git WORKTREES, whose .husky/_
+	// entries are not copyable — Stryker died with EPERM trying to clone one into
+	// its sandbox, so `npm run test:js -- --full` could not complete locally at
+	// all. CI only runs mutation on main, so this stayed invisible on dev. `.git`
+	// is excluded for the same reason: it is large, irrelevant to mutants, and
+	// full of files that resist copying.
+	ignorePatterns: ['_generated', 'node_modules', 'reports', '.stryker-tmp', '.claude', '.git']
 };
 
 export default config;
