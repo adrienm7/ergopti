@@ -399,8 +399,21 @@ Constraints: **paths before moves, moves before content, data before code.**
   `layout.lua` promotion objective — returns nothing here, and picking a target
   directory is taste rather than evidence. Same answer as the 27 remaining macOS
   `lib/` files. Needs a design call on where they belong before the move is worth
-  making; (6) fold `_shared/modules/llm/menu_layout.json` in — its
-  schema is a strict subset of v3 with exactly the fields v1 lacked; (7) lay the
+  making; (6) fold `_shared/modules/llm/menu_layout.json` in — ~~its schema is a strict
+  subset of v3 with exactly the fields v1 lacked~~ **— measured 2026-08-01, and it
+  is not.** The file's 8 rows use 5 fields (`id`, `i18n`, `builder`,
+  `disabled_when_off`, `health_dot`) against v3's 12 (`category`, `checked_when`,
+  `disabled_when`, `group_label`, `i18n`, `i18n_dynamic`, `i18n_off`, `i18n_on`,
+  `id`, `path`, `platforms`, `type`). Three map: `id`, `i18n`, and
+  `disabled_when_off` onto `disabled_when` as a predicate rather than a boolean.
+  **`builder` and `health_dot` have no v3 counterpart at all**, and `builder` —
+  which names the platform function that fills each submenu — is the same need as
+  the `provider` capability listed as still-to-build at the head of this very lot.
+  So this is not a data merge blocked on nothing; it is blocked on an earlier item
+  of its own lot, and doing it first would mean inventing two v3 fields with one
+  consumer each. Worth noting the file is not a duplication either: both renderers
+  already read it and it IS the single source of truth for the row order and the
+  greying policy. The payoff here is consolidation, not a fixed bug; (7) lay the
   ~~"no menu row outside the renderer" ratchet~~ — **done**
   (`test-menu-rows-outside-renderer.cjs`, windows 222 / macos 301 / linux 3).
   Measured payoff anchor: the layout submenu is **721 lines on macOS vs 41 on
