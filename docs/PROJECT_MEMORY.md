@@ -2799,3 +2799,45 @@ occurrences of the pattern it was written to count.
   running it green. Green proves the pattern compiles, not that it looks anywhere.
 
 Related: [[project_ahk_loop_capture_copy_freezes_nothing]].
+
+
+
+
+### project-locale-placeholder-parity-is-not-a-defect
+
+A "every translation must carry the same format placeholders as English" rule
+was measured against the 21 catalogues on 2026-08-01 and **deliberately not
+built**. It fires on correct work in both directions:
+
+- **Dropped specifiers are often right.** `en` has
+  `Disabled in %d application%s`, where `%s` exists only to pluralise an English
+  noun. Czech renders it `Zakázáno v %d aplikaci/aplikacích` — no `%s`, because
+  Czech does not pluralise that way. Danish, Hebrew and Norwegian likewise write
+  `shortcuts.color_picker_result` without the trailing `{2}`, ending the sentence
+  at "copied to the clipboard" instead of appending the value. That is a
+  translator's call, not a bug. **Lua's `string.format` ignores surplus
+  arguments**, so a dropped specifier does not raise; the reverse (more
+  specifiers than arguments) is the only shape that errors.
+- **The "added specifier" hits were all prose.** 21 keys looked like a
+  translation introducing `% d` / `% s` / `% i` / `% f`. Every one is a literal
+  percent sign followed by a space and an ordinary word: `{pct}% du focus`,
+  `{pct}% del focus`. A C-format regex reads `% d` as "space flag + d" and spans
+  straight into "du". These strings are `ui_apps.*` — the metrics WebView, which
+  substitutes `{pct}` by name and never calls a `%`-formatter at all.
+
+**Why:** a gate that fires on correct translations is worse than no gate,
+because the change it demands damages the product. Twenty-five "findings" here
+were 25 pieces of good localisation.
+
+**How to apply:**
+
+- Before writing a parity gate over human-translated text, print the actual
+  strings on both sides. Types and counts cannot distinguish a bug from a
+  language.
+- `%` in a translated string is usually a percent sign. Scope any `%`-format
+  scan to keys that provably reach a formatter, not to the whole catalogue.
+- What *is* worth gating there — and now is, via
+  `test-locale-catalogue-complete.cjs` — is key parity, empty values, and each
+  catalogue's `_meta.locale` matching its filename. Those are objective.
+
+Related: [[feedback-ui-must-be-i18n]].

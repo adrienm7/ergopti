@@ -97,6 +97,7 @@ const CHECKS = [
 	{ name: 'logger scalars single-source (retention/ring/dedup/flush vs the timing registry)', cmd: 'node', args: ['tools/test/test-logger-scalars-single-source.cjs'], repro: 'node tools/test/test-logger-scalars-single-source.cjs' },
 	{ name: 'tap-hold shared defaults lifecycle (docs match what the three loaders do)', cmd: 'node', args: ['tools/test/test-tap-hold-defaults-lifecycle.cjs'], repro: 'node tools/test/test-tap-hold-defaults-lifecycle.cjs' },
 	{ name: 'locale native names single-source (every ordered locale is named, no driver copy)', cmd: 'node', args: ['tools/test/test-locale-names-single-source.cjs'], repro: 'node tools/test/test-locale-names-single-source.cjs' },
+	{ name: 'locale catalogue completeness (all 21 carry en.json key-for-key, nothing renders blank)', cmd: 'node', args: ['tools/test/test-locale-catalogue-complete.cjs'], repro: 'node tools/test/test-locale-catalogue-complete.cjs' },
 	{ name: 'generator registry runs (npm run gen: every declared output is produced)', cmd: 'node', args: ['tools/build/gen-all.cjs'], repro: 'npm run gen' },
 	{ name: 'new-driver scaffold emits one adapter per port spec (not zero)', cmd: 'node', args: ['tools/test/test-new-driver-scaffold.cjs'], repro: 'node tools/test/test-new-driver-scaffold.cjs' },
 	{ name: 'driver tree parity I1 (shared directory ratio, ratcheted)', cmd: 'node', args: ['tools/test/test-driver-tree-parity.cjs'], repro: 'node tools/test/test-driver-tree-parity.cjs --measure' },
