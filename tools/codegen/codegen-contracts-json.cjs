@@ -28,6 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const { shared, sharedRel } = require('../lib/paths.cjs');
+const { loadCjsModule } = require('../lib/load-cjs-module.cjs');
 
 const PORTS_DIR = shared('core/ports');
 const OUTPUT_PATH = path.join(PORTS_DIR, 'contracts.json');
@@ -44,17 +45,18 @@ const OUTPUT_PATH = path.join(PORTS_DIR, 'contracts.json');
 /**
  * Loads a spec.js as a CommonJS module despite the repo being ESM ("type":
  * "module" makes bare .js files ESM, so require() rejects their module.exports).
- * We run the source in a fresh module scope and return its exports.
+ *
+ * The loader lives in tools/lib now rather than here. It was private to this
+ * file, and that mattered: 32 shared modules export only via module.exports, and
+ * the ones with no consumer carrying a copy of this shim — the whole
+ * modules/tooltip/ set — were unreachable from every tool in the repo. Their
+ * "source of truth" functions could not be called by the gate that claimed to
+ * compare against them.
  * @param {string} specPath Absolute path to a *.spec.js file.
  * @returns {object} The module.exports of the spec.
  */
 function loadSpec(specPath) {
-	const src = fs.readFileSync(specPath, 'utf8');
-	const sandbox = { exports: {} };
-	// eslint-disable-next-line no-new-func
-	const factory = new Function('module', 'exports', 'require', src);
-	factory(sandbox, sandbox.exports, require);
-	return sandbox.exports;
+	return loadCjsModule(specPath);
 }
 
 /**

@@ -730,8 +730,28 @@ Constraints: **paths before moves, moves before content, data before code.**
      if a loader stops reading it without the docs changing in the same commit, or
      if the two namespaces stop covering the same physical keys.
   8. **Tooltip**: wire the 1 483 lines of shared JS **as an oracle** (vector
-     generator + conformance harness), not as runtime. Today the gate named
-     "tooltip corpus parity" requires neither JS module it claims to compare, the
+     generator + conformance harness), not as runtime. ~~Today the gate named
+     "tooltip corpus parity" requires neither JS module it claims to compare~~ —
+     **fixed, and the reason it could not was systemic.** `package.json` declares
+     `"type": "module"`, which makes every bare `.js` file ESM — so a file whose
+     only export mechanism is `module.exports = {…}` exports **nothing**:
+     `require()` rejects it and `import()` returns an empty namespace, silently.
+     Measured across `_shared/`: **32 modules are in that state**, including
+     every `core/ports/*.spec.js` and the entire `modules/tooltip/` set.
+     The port specs escaped the consequences only because
+     `codegen-contracts-json.cjs` carried a **private** CommonJS-in-ESM loader.
+     The tooltip modules had no such consumer, so `layoutTestVectors()` and
+     `dequeueTestVectors()` — the declared source of truth — were unreachable
+     from every tool in the repo. The gate checked that the JSON had 6 and 3
+     vectors of the right field types; those numbers came from the JS once and
+     had become plain literals.
+     The loader is now `tools/lib/load-cjs-module.cjs` (one copy, and it throws
+     rather than returning `{}` when a file exports nothing — the empty result
+     being the failure itself), the codegen uses it, and the gate now compares
+     **ids, order and every expected value** field by field. Verified by drifting
+     one coordinate: the old gate saw nothing, the new one names the vector and
+     the field.
+     Still open on this item: the
      macOS test replays a clone defined inside the test file instead of the
      renderer, and the AHK test never compares the 6 golden values. Two
      `[positioning]` constants never reach Windows, with three comments asserting
