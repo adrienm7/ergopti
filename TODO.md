@@ -745,10 +745,30 @@ Constraints: **paths before moves, moves before content, data before code.**
   | Corpus consumers (16 corpora, 258 vectors) | 9 122 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
   | Port contract vectors (129) | 2 001 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
   | e2e harnesses | 1 319 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
-  | Lua assertion library | 352 | 176 | the diff of the two files is **62 lines, all comments, banners and declaration order** |
+  | ~~Lua assertion library~~ **done** | 737 | 767 | one shared `test/assertions.lua`; see below |
   | Convention invariants (8, in 2–3 languages) | 1 594 | ~450 | one `.cjs` gate per invariant over the three trees — and Linux gains 6 it does not have |
   | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
-  Also: **assertion argument order is inverted** between AHK (`AssertEqual(expected, actual)`) and Lua (`assert_eq(actual, expected)`) across **1 587 sites** — still open.
+  **Lua assertion library — consolidated, and the line count went UP.** Measured
+body by body: **six of the seven** assertion functions were byte-identical once
+whitespace was normalised, and the seventh (`assert_throws`) differed by a single
+**comment line** — so the backlog's "62 lines, all comments, banners and
+declaration order" is exactly right. They now live in
+`_shared/lua/test/assertions.lua`, built per harness.
+The totals moved 737 → 767 lines, and that is the honest result rather than a
+disappointing one: the shared module carries the rationale the two copies never
+had, and consolidation was never about line count — it was about an `assert_eq`
+that could be fixed on one driver and not the other, with every other test's
+credibility resting on it.
+**One regression found by checking, not by the suites.** Both suites stayed green
+(1 370 and 3 768) while assertion failures started reporting
+`assertions.lua:57` — the assertion library's line instead of the failing test's.
+`fail_msg_for` skips stack frames matching the harness's own filename, and the
+newly-shared file was not in that pattern. Diagnostics silently pointing at the
+wrong file is invisible to a passing suite and only shows up when someone is
+already debugging. `fail_msg_for` now takes a LIST of patterns, and
+`assertions.build()` takes the harness pattern and adds its own — putting that
+knowledge in the shared module rather than in each caller.
+Also: **assertion argument order is inverted** between AHK (`AssertEqual(expected, actual)`) and Lua (`assert_eq(actual, expected)`) across **1 587 sites** — still open.
 ~~`AssertEqual` is **case-insensitive** (AHK v2 `!=`), so `AssertEqual("BTW","btw")` passes~~ — **fixed**, and `AssertContains` had the identical defect (`InStr` defaults to a case-INSENSITIVE search, so an upper-case needle was satisfied by lower-case output). Both now use the case-sensitive forms (`!==`, `InStr(…, true)`).
   **There were no reds to triage: 3 803 passing before, 3 803 after.** Not a
   disappointing result — a revealing one. Case is the *subject* of large parts of

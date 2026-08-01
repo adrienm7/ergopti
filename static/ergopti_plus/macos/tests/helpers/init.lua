@@ -322,83 +322,29 @@ end
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
---- Asserts strict equality. Tables are pretty-printed in the error message
---- so you see WHICH field differs, not an opaque `table: 0x...`.
---- @param actual   any        Observed value.
---- @param expected any        Expected value.
---- @param msg      string|nil Optional context tag.
-function M.assert_eq(actual, expected, msg)
-	if not deep_equal(actual, expected) then
-		local label = msg or "assert_eq"
-		error(_fail_msg(string.format(
-			"%s:\n  expected: %s\n    actual: %s",
-			label, M.inspect(expected), M.inspect(actual))), 0)
-	end
-end
+-- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- carried their own copy: six of the seven bodies were byte-identical once
+-- whitespace was normalised, and the seventh differed by a single COMMENT line.
+-- Two copies of an assertion library is two places for a fix to land in one of,
+-- and every other test's credibility rests on these.
+--
+-- fail_msg is injected because it is the one genuinely per-driver part: it skips
+-- the stack frames belonging to THIS file so a failure reports the caller's line.
+local _assertions = require("test.assertions").build("helpers[/\\\\]init%.lua$", fmt)
+M.assert_eq        = _assertions.assert_eq
+M.assert_true      = _assertions.assert_true
+M.assert_nil       = _assertions.assert_nil
+M.assert_not_nil   = _assertions.assert_not_nil
+M.assert_type      = _assertions.assert_type
+M.assert_contains  = _assertions.assert_contains
+M.assert_throws    = _assertions.assert_throws
 
---- Asserts a boolean condition. Shows the actual value on failure.
---- @param cond any        Condition to test.
---- @param msg  string|nil Optional context tag.
-function M.assert_true(cond, msg)
-	if not cond then
-		error(_fail_msg(string.format("%s — actual: %s",
-			tostring(msg or "expected truthy"), M.inspect(cond))), 0)
-	end
-end
 
---- Asserts a value is nil. Shows the actual value on failure.
---- @param v   any        Value to test.
---- @param msg string|nil Optional context tag.
-function M.assert_nil(v, msg)
-	if v ~= nil then
-		error(_fail_msg(string.format("%s: expected nil, got %s",
-			tostring(msg or "assert_nil"), M.inspect(v))), 0)
-	end
-end
 
---- Asserts a value is NOT nil.
---- @param v   any        Value to test.
---- @param msg string|nil Optional context tag.
-function M.assert_not_nil(v, msg)
-	if v == nil then
-		error(_fail_msg(tostring(msg or "expected non-nil")), 0)
-	end
-end
 
---- Asserts `haystack` contains substring `needle`.
---- @param haystack string    String to search in.
---- @param needle   string    Substring to find.
---- @param msg      string|nil Optional context tag.
-function M.assert_contains(haystack, needle, msg)
-	if not haystack:find(needle, 1, true) then
-		error(_fail_msg(string.format("%s: %q not found in %s",
-			tostring(msg or "assert_contains"), needle, M.inspect(haystack))), 0)
-	end
-end
 
---- Asserts a function throws an error when called.
---- @param fn  function  0-arg callable expected to throw.
---- @param msg string|nil Optional context tag.
---- @return string The error message thrown (for further assertions).
-function M.assert_throws(fn, msg)
-	local ok, err = pcall(fn)
-	if ok then
-		error(_fail_msg(tostring(msg or "expected exception but none was thrown")), 0)
-	end
-	return err
-end
 
---- Asserts `v` has type `expected_type` (e.g. "string", "table", "function").
---- @param v             any    Value to check.
---- @param expected_type string Lua type name.
---- @param msg           string|nil Optional context tag.
-function M.assert_type(v, expected_type, msg)
-	local actual_type = type(v)
-	if actual_type ~= expected_type then
-		error(_fail_msg(string.format("%s: expected %s, got %s (%s)",
-			tostring(msg or "assert_type"), expected_type, actual_type, M.inspect(v))), 0)
-	end
-end
+
 
 
 
