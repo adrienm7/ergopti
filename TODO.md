@@ -1076,7 +1076,18 @@ skips loudly, rather than passing, on machines without AutoHotkey. 20 test files
 
 `test-driver-tree-parity.cjs` (I1) · ~~`test-shared-root-resolvers.cjs` (executes
 every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) · the "no menu row outside
-the renderer" ratchet · ~~"every manifest array key has a reader"~~ **done** — a
+the renderer" ratchet~~ **done** — `test-menu-rows-outside-renderer.cjs` freezes
+the bypass count per driver: **windows 222, macos 301, linux 3**. The three
+drivers are in completely different places — Linux already builds 97 of its 100
+rows inside `menu_builder.lua`, Windows 8 of 230, macOS 29 of 330 — so banning
+the bypass today would mean rewriting two menu layers in one change. A ratchet
+lets the migration proceed row by row while nothing new accumulates. Each driver
+gets its **own** row predicate: one predicate for all three is how a first
+attempt produced meaningless numbers (`.Add(` matched every AutoHotkey object,
+`title =` matched dialog titles, and Linux scored 6 because it does not use
+`label =` at all). Floors on the total catch a predicate that stops matching,
+which would otherwise drive the bypass count to zero and pass. ·
+~~"every manifest array key has a reader"~~ **done** — a
 guard existed but could not catch the three live cases: it checked **top-level
 keys only** (so `i18n_dynamic`, with zero readers repo-wide, was never examined)
 and counted a mention in a **comment** as a reader — `manifest_menu.ahk` names
