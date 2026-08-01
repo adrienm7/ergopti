@@ -814,7 +814,11 @@ Also: **assertion argument order is inverted** between AHK (`AssertEqual(expecte
   is the only thing preventing that, and it pins the four behaviours that must
   NOT change with the narrower operator — verified against the interpreter first:
   numbers still compare numerically (`1 == "1"`, `1 == 1.0`, `255 == "0xFF"`),
-  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. ~~Two macOS files (593 lines) replay 36 vectors against a **reimplementation
+  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`) — **and the AHK half turned out to be nearly done already.** Of 16 `AssertTrue(true` matches in the Windows suite, **13 are comments** recording placeholders somebody has already replaced; only **3 were live**, and all three are now real assertions rather than a ledger entry:
+`test_personal_toml_editor.ahk` claimed *"personal toml roundtrip must preserve complex French input"* — the single most load-bearing property in a French-first product, asserted by nothing. It now checks that accents pass through untouched, that quotes and backslashes are escaped, and that the escape ORDER holds (escaping the backslash after the quote would double-escape the one the quote just introduced).
+Its sibling claimed *"personal toml editor must respect full pause silence"*; the checkable half at that layer is that the serialisation helpers emit nothing, since a helper that typed or wrote would fire during a pause.
+`test_tap_hold_loader.ahk` claimed *"tap_hold must respect full pause silence"*. That guard is real — four `A_IsSuspended` checks in `modules/tap_holds/constants.ahk` — so the test now pins all four dispatch entry points by name. Neutralising one makes it fail, verified.
+Tautology ratchet **49 → 46**. The remaining Linux ones are genuine capability skips (`menu_builder not available`) and are what the `{status, reason, tracked}` ledger is actually for. ~~Two macOS files (593 lines) replay 36 vectors against a **reimplementation
 defined inside the test**~~ — **measured, and the diagnosis was wrong in the way
 that matters.** `test_adapter_contract_vectors.lua` loads the **real** adapters
 through `load_with_stubs` and calls them directly; it is not a reimplementation,

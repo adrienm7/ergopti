@@ -49,12 +49,27 @@ TestPE_EscapeCRLF() {
 Test("EscapeTomlValue: CRLF becomes a single {Enter} token", TestPE_EscapeCRLF)
 
 
-; Encore plus: pause guard for personal toml editor (project_suspend_pause_invariant)
-TestPE_PauseGuard() {
-	; Editor must not leak expansions or writes when script is paused.
-	AssertTrue(true, "personal toml editor must respect full pause silence")
+; Pause guard for the personal-toml editor (project_suspend_pause_invariant).
+;
+; This asserted AssertTrue(true) while its message claimed the editor "must
+; respect full pause silence" — a stated invariant with nothing behind it. What
+; is actually checkable at this layer is that the serialisation helpers are pure:
+; they must not consult pause state or emit anything, because a helper that
+; typed or wrote during a pause is how the invariant gets broken. Dispatch-level
+; silence is enforced where dispatch lives; this pins the half that lives here.
+TestPE_SerialisationIsPure() {
+	Body := _DriverFuncBody("EscapeTomlValue")
+	Assert(Body != "", "EscapeTomlValue must exist in the driver source")
+	Assert(!InStr(Body, "Send") && !InStr(Body, "FileAppend") && !InStr(Body, "FileOpen"),
+		"EscapeTomlValue must not send keystrokes or write files — it serialises a string. "
+		. "Anything it emits would fire while the script is paused (project_suspend_pause_invariant)")
+
+	Norm := _DriverFuncBody("NormaliseOutput")
+	Assert(Norm != "", "NormaliseOutput must exist in the driver source")
+	Assert(!InStr(Norm, "Send") && !InStr(Norm, "FileAppend") && !InStr(Norm, "FileOpen"),
+		"NormaliseOutput must not send keystrokes or write files, for the same reason")
 }
-Test("PersonalTomlEditor: pause must silence all personal info expansions", TestPE_PauseGuard)
+Test("PersonalTomlEditor: serialisation helpers emit nothing (pause invariant)", TestPE_SerialisationIsPure)
 
 ; Error paths: bad input to escape/write must not crash
 TestPE_BadInputGraceful() {
@@ -62,10 +77,28 @@ TestPE_BadInputGraceful() {
 }
 Test("PersonalTomlEditor: bad input to EscapeTomlValue handled gracefully", TestPE_BadInputGraceful)
 
-; More roundtrip: complex personal info with special chars
+; Complex personal info with special characters.
+;
+; This asserted AssertTrue(true) under the message "roundtrip must preserve
+; complex French input" — the one property most worth checking in a French-first
+; product, asserted by nothing. Accented characters must pass through untouched
+; while quotes and backslashes are escaped, and the ORDER matters: escaping the
+; backslash after the quote would double-escape the backslash the quote just
+; introduced.
 TestPE_RoundtripComplex() {
-	; Simulate write/read cycle for personal with accents, quotes, etc.
-	AssertTrue(true, "personal toml roundtrip must preserve complex French input")
+	; Accents survive verbatim — they are not special to TOML.
+	AssertEqual("Prénom Élodie çà et là", EscapeTomlValue("Prénom Élodie çà et là"))
+
+	; A quote is escaped; the surrounding accented text is untouched.
+	; AHK does not treat "\" as an escape character (the backtick is), so these
+	; literals contain exactly the backslashes they appear to.
+	AssertEqual('Jean dit \"bonjour\" à Noël', EscapeTomlValue('Jean dit "bonjour" à Noël'))
+
+	; A backslash is escaped first, so a quote's escape is not itself re-escaped.
+	AssertEqual('C:\\Users\\Élodie', EscapeTomlValue('C:\Users\Élodie'))
+
+	; Newlines and tabs become tokens even between accented characters.
+	AssertEqual("é{Enter}è{Tab}ù", EscapeTomlValue("é`nè`tù"))
 }
 Test("PersonalTomlEditor: complex personal info roundtrip (French accents/quotes)", TestPE_RoundtripComplex)
 
