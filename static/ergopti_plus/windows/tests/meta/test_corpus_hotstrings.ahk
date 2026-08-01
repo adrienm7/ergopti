@@ -132,8 +132,19 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
-		AssertEqual(Trigger, BufTail,
-			"vector '" . Vec["id"] . "': buffer must end with trigger for matched=true")
+		; Compare the way the vector says the trigger is matched. A
+		; case-SENSITIVE vector must end with the trigger exactly; the default
+		; mode folds case, so its buffer legitimately differs — "BTW" matching
+		; "btw" is the fold working, not a malformed vector. Asserting the
+		; sensitive form for both held only while no vector exercised the fold.
+		if (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
+			AssertEqual(Trigger, BufTail,
+				"vector '" . Vec["id"] . "': case-sensitive vector's buffer must end with the trigger exactly")
+		} else {
+			; "=" is AHK's case-insensitive comparison.
+			AssertTrue(BufTail = Trigger,
+				"vector '" . Vec["id"] . "': buffer must end with trigger (case-folded) for matched=true")
+		}
 	}
 }
 Test("hotstring corpus  --  matched vectors: buffer ends with trigger", _CorpusHS_TriggerLengthMatchesBuffer)

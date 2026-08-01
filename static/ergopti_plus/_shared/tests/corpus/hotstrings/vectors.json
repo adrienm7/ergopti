@@ -295,6 +295,46 @@
 				"replacement": "by the way",
 				"backspace_count": 3
 			}
+		},
+		{
+			"id": "case_insensitive_upper_buffer",
+			"description": "The DEFAULT matching mode folds case: an all-caps buffer matches a lower-case trigger. Every other vector used a buffer already identical to its trigger, so the fold itself — buf_tail:lower() == trigger:lower(), and the case-folded tail bucket lookup — was never exercised.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "BTW",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_insensitive_no_case_conformance",
+			"description": "A case-folded match returns the replacement VERBATIM. The shared matcher does not conform the replacement to the typed case, so a mixed-case buffer still yields the lower-case replacement — case_conform is a driver-level concern, and this pins that the matcher does not silently do it.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "BtW",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_insensitive_word_boundary_still_applies",
+			"description": "Case folding does not bypass the word-boundary rule: a mid-word occurrence stays blocked even when the case differs from the trigger.",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "oThE",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
 		}
 	],
 	"collision_vectors": [
