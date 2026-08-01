@@ -5,16 +5,24 @@
 --- DESCRIPTION:
 --- Validates that the shared logger core in _shared/lua/logger/init.lua
 --- produces lines that conform to the format contract in SPEC.md § 3.
---- Exercises all 8 variants, the ring buffer, severity filtering, and the
---- test vectors from static/ergopti_plus/_shared/modules/logger/test_vectors.json.
+--- Exercises all 8 variants, the ring buffer and severity filtering, against
+--- expectations written inline in this file.
+---
+--- This does NOT replay the shared corpus. It used to claim it did — "and the
+--- test vectors from _shared/modules/logger/test_vectors.json" — while never
+--- opening the file; the only occurrence of that path was the sentence itself.
+--- The corpus replay lives in test_logger_contract.lua (macOS),
+--- test_logger_contract.ahk (Windows) and tests/unit/lib/test_logger_contract.lua
+--- (Linux). Keeping the claim here would have meant three suites believing a
+--- fourth covered something none of them did.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Time-independent: M.timestamp_fn is replaced with a sentinel function
 ---    returning "TIMESTAMP" so expected lines can be hardcoded.
 --- 2. Sink-based capture: a sink function collects emitted lines so the
 ---    test never touches the filesystem or the HS console.
---- 3. Covers both the shared test vectors (driver-neutral cases) and
----    Lua-specific format string vectors (message_hs field).
+--- 3. Covers the variants, ring buffer and level filtering directly, which the
+---    corpus does not describe.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
