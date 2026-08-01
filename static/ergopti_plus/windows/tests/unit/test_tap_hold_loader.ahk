@@ -254,13 +254,30 @@ TestTapHold_DurationDefault() {
 }
 Test("TapHoldDuration: falls back when time_activation_seconds absent", TestTapHold_DurationDefault)
 
-; Encore plus: pause guard in tap_hold loader/dispatch (must not activate under suspend)
-TestTapHold_PauseNoActivation() {
-	; loader must succeed, but dispatch (in gestures/shortcuts) must gate on A_IsSuspended
-	; This test pins the invariant for regression.
-	AssertTrue(true, "tap_hold must respect full pause silence")
+; Pause guard for tap-hold dispatch (project_suspend_pause_invariant).
+;
+; This asserted AssertTrue(true) under the message "tap_hold must respect full
+; pause silence" — the invariant named, and nothing checking it. The guard is
+; real and lives in modules/tap_holds/constants.ahk, so the test now pins the
+; four dispatch entry points that must consult A_IsSuspended.
+;
+; Every one of them can emit a keystroke. A tap-hold that fires while the user
+; has deliberately suspended the script types into whatever they are doing, and
+; the failure is silent from the driver's side — nothing errors, the keystroke
+; simply arrives.
+TestTapHold_DispatchGatesOnSuspend() {
+	Gated := ["TapHoldShouldSuppressHold", "TapHoldSyntheticKeyDown",
+		"TapHoldSyntheticKeyUp", "TapHoldDispatchTap"]
+	for Fn in Gated {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . "() must exist in the driver source — the pause guard moved")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Fn . "() must check A_IsSuspended before acting. It can emit a keystroke, and one "
+			. "that fires while the script is suspended types into whatever the user is doing "
+			. "— with nothing erroring on the driver's side (project_suspend_pause_invariant)")
+	}
 }
-Test("TapHoldLoader: pause must prevent all tap/hold activation (full invariant)", TestTapHold_PauseNoActivation)
+Test("TapHoldLoader: every dispatch entry point gates on suspend (full invariant)", TestTapHold_DispatchGatesOnSuspend)
 
 ; Error path: bad TOML in tap_hold must not crash loader
 TestTapHold_BadTomlGraceful() {
