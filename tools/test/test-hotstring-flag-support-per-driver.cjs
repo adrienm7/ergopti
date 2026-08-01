@@ -102,12 +102,12 @@ const FLAGS = [
 	{ flag: 'is_word', drivers: ['windows', 'macos', 'linux'] },
 	{
 		flag: 'auto_expand',
-		drivers: ['windows', 'macos'],
+		drivers: ['windows', 'macos', 'linux'],
 		note:
-			'Windows turns it into AHK\'s "*" flag and macOS reads it in keymap/registry.lua. The Linux ' +
-			'engine never sees it — the field reaches only the hotstring editor bridges — so its matcher ' +
-			'fires every entry as soon as the trigger completes, and an entry written to wait for a ' +
-			'terminator expands mid-word there.'
+			'CONVERGED. Windows turns it into AHK\'s "*" flag, macOS reads it in keymap/registry.lua, and ' +
+			'the shared engine now honours it for Linux: an entry that does not opt in waits for a ' +
+			'terminator via the end-char path. Before that, Linux fired every entry the moment its ' +
+			'trigger completed, so typing "yaourt" produced "y’aourt" — the "ya" entry firing mid-word.'
 	},
 	{ flag: 'is_case_sensitive', drivers: ['windows', 'macos', 'linux'] },
 	{

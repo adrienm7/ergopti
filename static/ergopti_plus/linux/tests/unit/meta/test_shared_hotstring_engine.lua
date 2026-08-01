@@ -57,7 +57,7 @@ local engine_mod = require("hotstring_engine")
 helpers.describe("shared hotstring engine — suffix matching", function()
 	helpers.it("basic trigger is matched at end of buffer", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		local result
 		for _, ch in ipairs({"b", "t", "w"}) do
 			result = e:on_char(ch)
@@ -69,7 +69,7 @@ helpers.describe("shared hotstring engine — suffix matching", function()
 
 	helpers.it("no match when trigger is not at buffer tail", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		local result
 		for _, ch in ipairs({"b", "t", "w", "x"}) do
 			result = e:on_char(ch)
@@ -80,8 +80,8 @@ helpers.describe("shared hotstring engine — suffix matching", function()
 	helpers.it("longer trigger wins over shorter (longest-match-first)", function()
 		local e = engine_mod.new()
 		e:load_mappings({
-			{ trigger = "btw",  replacement = "short" },
-			{ trigger = "btww", replacement = "long"  },
+			{ auto_expand = true, trigger = "btw",  replacement = "short" },
+			{ auto_expand = true, trigger = "btww", replacement = "long"  },
 		})
 		local result
 		for _, ch in ipairs({"b", "t", "w", "w"}) do
@@ -104,7 +104,7 @@ end)
 helpers.describe("shared hotstring engine — word boundary", function()
 	helpers.it("is_word trigger blocked mid-word", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "the", replacement = "X", is_word = true } })
+		e:load_mappings({ { auto_expand = true, trigger = "the", replacement = "X", is_word = true } })
 		local result
 		for _, ch in ipairs({"o", "t", "h", "e"}) do
 			result = e:on_char(ch)
@@ -114,7 +114,7 @@ helpers.describe("shared hotstring engine — word boundary", function()
 
 	helpers.it("is_word trigger matches after space", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "the", replacement = "X", is_word = true } })
+		e:load_mappings({ { auto_expand = true, trigger = "the", replacement = "X", is_word = true } })
 		local result
 		for _, ch in ipairs({" ", "t", "h", "e"}) do
 			result = e:on_char(ch)
@@ -135,7 +135,7 @@ end)
 helpers.describe("shared hotstring engine — backspace count", function()
 	helpers.it("backspace_count = tlen without terminator", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		local result
 		for _, ch in ipairs({"b", "t", "w"}) do
 			result = e:on_char(ch, { terminator_consumed = false })
@@ -146,7 +146,7 @@ helpers.describe("shared hotstring engine — backspace count", function()
 
 	helpers.it("backspace_count = tlen + 1 with terminator consumed", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		-- Simulate trigger typed, then terminator typed but consumed.
 		e:on_char("b")
 		e:on_char("t")
@@ -168,7 +168,7 @@ end)
 helpers.describe("shared hotstring engine — case sensitivity", function()
 	helpers.it("default is case-insensitive", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		local result
 		for _, ch in ipairs({"B", "T", "W"}) do
 			result = e:on_char(ch)
@@ -178,7 +178,7 @@ helpers.describe("shared hotstring engine — case sensitivity", function()
 
 	helpers.it("is_case_sensitive rejects wrong case", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
+		e:load_mappings({ { auto_expand = true, trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
 		local result
 		for _, ch in ipairs({"b", "t", "w"}) do
 			result = e:on_char(ch)
@@ -188,7 +188,7 @@ helpers.describe("shared hotstring engine — case sensitivity", function()
 
 	helpers.it("is_case_sensitive accepts correct case", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
+		e:load_mappings({ { auto_expand = true, trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
 		local result
 		for _, ch in ipairs({"B", "T", "W"}) do
 			result = e:on_char(ch)
@@ -209,7 +209,7 @@ end)
 helpers.describe("shared hotstring engine — buffer reset", function()
 	helpers.it("reset clears buffer so trigger no longer matches", function()
 		local e = engine_mod.new()
-		e:load_mappings({ { trigger = "btw", replacement = "by the way" } })
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
 		e:on_char("b")
 		e:on_char("t")
 		e:reset()

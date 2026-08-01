@@ -158,6 +158,11 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				replacement       = v.replacement or "",
 				is_word           = v.is_word == true,
 				is_case_sensitive = v.is_case_sensitive == true,
+				-- Passed through explicitly: the engine defaults auto_expand to
+				-- FALSE, matching the AutoHotkey loader, so a harness that drops
+				-- the field silently converts every vector into one that waits
+				-- for a terminator and matches nothing.
+				auto_expand       = v.auto_expand == true,
 			}
 
 			local e = engine_mod.new()
@@ -179,7 +184,10 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				-- Feed the final codepoint with the terminator_consumed flag.
 				-- Per the engine API: {terminator_consumed = true} adds 1 to
 				-- backspace_count so the injector erases the terminator too.
-				local opts = { terminator_consumed = v.terminator_consumed == true }
+				local opts = {
+					terminator_consumed = v.terminator_consumed == true,
+					is_terminator       = v.terminator_consumed == true,
+				}
 				result = e:on_char(cps[#cps], opts)
 			end
 

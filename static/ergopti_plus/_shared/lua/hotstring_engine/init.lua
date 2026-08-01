@@ -169,6 +169,12 @@ function M.new()
 						tlen              = n,
 						is_word           = m.is_word           == true,
 						is_case_sensitive = m.is_case_sensitive == true,
+						-- Absent means NOT auto, matching the AutoHotkey loader: it emits the
+						-- "*" flag only when the TOML says auto_expand = true. An entry that
+						-- does not opt in waits for a terminator, which is the whole point of
+						-- the field — "ya" must not fire in the middle of "yaourt".
+						auto_expand       = m.auto_expand       == true,
+						final_result      = m.final_result      == true,
 						group             = m.group or "",
 					}
 					count = count + 1
@@ -209,55 +215,94 @@ function M.new()
 
 		Logger.debug(LOG, "on_char('%s'): buffer %d codepoint(s).", ch, #_buf_cps)
 
-		-- Look up the bucket for the current tail codepoint (case-folded).
-		local tail_cp = _buf_cps[#_buf_cps]:lower()
-		local bucket  = _buckets[tail_cp]
-		if not bucket then return nil end
-
 		local buf_len = #_buf_cps
 
-		for _, mapping in ipairs(bucket) do
-			local tlen = mapping.tlen
+		--- Finds the best match ending at `body_len`, over mappings selected by
+		--- `want_auto`. Returns the mapping and its length, or nil.
+		---
+		--- Split out because the same search runs twice: once on the buffer as
+		--- typed (auto_expand entries, which fire the moment the trigger
+		--- completes) and once on the buffer minus a just-typed terminator
+		--- (non-auto entries, which wait for one).
+		local function best_match(body_len, want_auto)
+			if body_len < 1 then return nil end
+			local bucket = _buckets[_buf_cps[body_len]:lower()]
+			if not bucket then return nil end
 
-			-- 1. Buffer must be at least as long as the trigger.
-			if buf_len >= tlen then
-
-				-- 2. Suffix check (case-aware).
-				local buf_tail = tail_codepoints(_buf_cps, tlen)
-				local matched
-				if mapping.is_case_sensitive then
-					matched = buf_tail == mapping.trigger
-				else
-					matched = buf_tail:lower() == mapping.trigger:lower()
-				end
-
-				if matched then
-
-					-- 3. Word-boundary check: the character preceding the trigger must not
-					--    be a word character (or the trigger fills the whole buffer).
-					local boundary_ok = true
-					if mapping.is_word and buf_len > tlen then
-						local preceding = _buf_cps[buf_len - tlen]
-						if is_word_char(preceding) then boundary_ok = false end
+			for _, mapping in ipairs(bucket) do
+				local tlen = mapping.tlen
+				if mapping.auto_expand == want_auto and body_len >= tlen then
+					-- Suffix check (case-aware), against the body rather than the
+					-- whole buffer so the terminator is excluded on the end-char path.
+					local buf_tail = table.concat(_buf_cps, "", body_len - tlen + 1, body_len)
+					local matched
+					if mapping.is_case_sensitive then
+						matched = buf_tail == mapping.trigger
+					else
+						matched = buf_tail:lower() == mapping.trigger:lower()
 					end
 
-					if boundary_ok then
-						-- 4. Match confirmed.
-						local bc = tlen + (terminator_consumed and 1 or 0)
-						Logger.debug(LOG, "Match: trigger='%s' backspaces=%d.", mapping.trigger, bc)
-						return {
-							trigger            = mapping.trigger,
-							replacement        = mapping.replacement,
-							backspace_count    = bc,
-							consume_terminator = terminator_consumed,
-							group              = mapping.group,
-						}
+					if matched then
+						-- Word-boundary check: the character preceding the trigger must
+						-- not be a word character (or the trigger fills the whole body).
+						local boundary_ok = true
+						if mapping.is_word and body_len > tlen then
+							if is_word_char(_buf_cps[body_len - tlen]) then boundary_ok = false end
+						end
+						-- The bucket is sorted longest-first, so the first survivor is
+						-- the longest for this path.
+						if boundary_ok then return mapping, tlen end
 					end
 				end
 			end
+			return nil
 		end
 
-		return nil
+		-- Path A — auto_expand: fires on the trigger's own last character.
+		local auto_map, auto_len = best_match(buf_len, true)
+
+		-- Path B — end-char: a non-auto trigger fires only when a terminator
+		-- follows it, so the body excludes the character just typed.
+		local end_map, end_len
+		if options.is_terminator == true then
+			end_map, end_len = best_match(buf_len - 1, false)
+		end
+
+		-- Resolve across the two paths by trigger LENGTH, which is what Windows
+		-- does (_HSE_EndCharBeats: a star match yields to a strictly longer
+		-- end-char trigger). macOS returns on the first auto hit instead, so the
+		-- two drivers disagree today; length is the rule the three converge on.
+		local mapping, tlen, via_end_char
+		if auto_map and end_map then
+			if end_len > auto_len then
+				mapping, tlen, via_end_char = end_map, end_len, true
+			else
+				mapping, tlen, via_end_char = auto_map, auto_len, false
+			end
+		elseif auto_map then
+			mapping, tlen, via_end_char = auto_map, auto_len, false
+		elseif end_map then
+			mapping, tlen, via_end_char = end_map, end_len, true
+		else
+			return nil
+		end
+
+		-- An end-char match always replaces the terminator too: it sits between
+		-- the trigger and the caret, so the driver must erase it to splice the
+		-- replacement in. On the auto path the caller decides.
+		local consumed = via_end_char or terminator_consumed
+		local bc = tlen + (consumed and 1 or 0)
+		Logger.debug(LOG, "Match: trigger='%s' backspaces=%d end_char=%s.",
+			mapping.trigger, bc, tostring(via_end_char))
+		return {
+			trigger            = mapping.trigger,
+			replacement        = mapping.replacement,
+			backspace_count    = bc,
+			consume_terminator = consumed,
+			end_char           = via_end_char,
+			final_result       = mapping.final_result,
+			group              = mapping.group,
+		}
 	end
 
 	--- Clears the rolling typing buffer (e.g., on focus change or Escape key).

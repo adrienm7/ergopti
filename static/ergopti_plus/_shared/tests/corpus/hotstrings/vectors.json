@@ -13,6 +13,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "btw",
 			"terminator": " ",
 			"expected": {
@@ -27,6 +28,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "hello",
 			"terminator": " ",
 			"expected": {
@@ -39,6 +41,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "othe",
 			"terminator": " ",
 			"expected": {
@@ -51,6 +54,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "the",
 			"terminator": " ",
 			"expected": {
@@ -65,6 +69,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "hello the",
 			"terminator": " ",
 			"expected": {
@@ -79,6 +84,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": ".the",
 			"terminator": " ",
 			"expected": {
@@ -93,6 +99,7 @@
 			"trigger": "BTW",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"is_case_sensitive": true,
 			"buffer": "btw",
 			"terminator": " ",
@@ -106,6 +113,7 @@
 			"trigger": "BTW",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"is_case_sensitive": true,
 			"buffer": "BTW",
 			"terminator": " ",
@@ -121,6 +129,7 @@
 			"trigger": "afaik",
 			"replacement": "as far as I know",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "afaik",
 			"terminator": " ",
 			"terminator_consumed": false,
@@ -136,6 +145,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "btw",
 			"terminator": "★",
 			"terminator_consumed": true,
@@ -151,6 +161,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "bt",
 			"terminator": " ",
 			"expected": {
@@ -163,6 +174,7 @@
 			"trigger": "don't",
 			"replacement": "do not",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "don't",
 			"terminator": " ",
 			"expected": {
@@ -177,6 +189,7 @@
 			"trigger": "omw",
 			"replacement": "on my way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "typing omw",
 			"terminator": " ",
 			"expected": {
@@ -191,6 +204,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "",
 			"terminator": " ",
 			"expected": {
@@ -204,6 +218,7 @@
 			"trigger": "cé",
 			"replacement": "c'est",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "cé",
 			"terminator": " ",
 			"expected": {
@@ -219,6 +234,7 @@
 			"trigger": "àèù",
 			"replacement": "accent test",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "àèù",
 			"terminator": " ",
 			"expected": {
@@ -234,6 +250,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "line\nthe",
 			"terminator": " ",
 			"expected": {
@@ -249,6 +266,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "\tthe",
 			"terminator": " ",
 			"expected": {
@@ -263,6 +281,7 @@
 			"trigger": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"replacement": "X",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"terminator": " ",
 			"expected": {
@@ -275,6 +294,7 @@
 			"trigger": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"replacement": "Y",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"terminator": " ",
 			"expected": {
@@ -289,6 +309,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxbtw",
 			"terminator": " ",
 			"expected": {
@@ -303,6 +324,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "BTW",
 			"terminator": " ",
 			"expected": {
@@ -317,6 +339,7 @@
 			"trigger": "btw",
 			"replacement": "by the way",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "BtW",
 			"terminator": " ",
 			"expected": {
@@ -331,6 +354,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "oThE",
 			"terminator": " ",
 			"expected": {
@@ -343,6 +367,7 @@
 			"trigger": "td★",
 			"replacement": "2026-08-01",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "td★",
 			"terminator": " ",
 			"expected": {
@@ -357,6 +382,7 @@
 			"trigger": "★x",
 			"replacement": "STARX",
 			"is_word": false,
+			"auto_expand": true,
 			"buffer": "abc★x",
 			"terminator": " ",
 			"expected": {
@@ -371,6 +397,7 @@
 			"trigger": "the",
 			"replacement": "THE",
 			"is_word": true,
+			"auto_expand": true,
 			"buffer": "★the",
 			"terminator": " ",
 			"expected": {
@@ -383,8 +410,8 @@
 			"id": "priority_breaks_equal_length_tie",
 			"description": "Two equal-length triggers (same string, two sources) collide; the higher priority wins regardless of registration order. The high-priority mapping is registered LAST here. Case-sensitive triggers isolate the tie-break from case-variant generation. Tie-break order is length > priority > first-registered, identical in the AHK engine and the Hammerspoon registry.",
 			"mappings": [
-				{ "trigger": "zz", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true },
-				{ "trigger": "zz", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "zz", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "zz", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true }
 			],
 			"buffer": "zz",
 			"expected": { "matched": true, "winner": "HIGH" }
@@ -393,8 +420,8 @@
 			"id": "priority_order_independent",
 			"description": "Same collision as above but the high-priority mapping is registered FIRST; the outcome must not depend on registration order.",
 			"mappings": [
-				{ "trigger": "yy", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true },
-				{ "trigger": "yy", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "yy", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "yy", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true }
 			],
 			"buffer": "yy",
 			"expected": { "matched": true, "winner": "HIGH" }
@@ -403,8 +430,8 @@
 			"id": "equal_priority_falls_back_to_first_registered",
 			"description": "Equal length AND equal priority falls back to first-registered (seq), the pre-priority default preserved on both drivers.",
 			"mappings": [
-				{ "trigger": "ww", "replacement": "FIRST", "priority": 30, "group": "g1", "is_case_sensitive": true },
-				{ "trigger": "ww", "replacement": "SECOND", "priority": 30, "group": "g2", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "ww", "replacement": "FIRST", "priority": 30, "group": "g1", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "ww", "replacement": "SECOND", "priority": 30, "group": "g2", "is_case_sensitive": true }
 			],
 			"buffer": "ww",
 			"expected": { "matched": true, "winner": "FIRST" }
@@ -413,8 +440,8 @@
 			"id": "longer_trigger_beats_higher_priority",
 			"description": "Length stays primary: a longer trigger wins even against a shorter, far-higher-priority one.",
 			"mappings": [
-				{ "trigger": "x", "replacement": "SHORT", "priority": 99, "group": "short", "is_case_sensitive": true },
-				{ "trigger": "vx", "replacement": "LONG", "priority": 1, "group": "long", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "x", "replacement": "SHORT", "priority": 99, "group": "short", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "vx", "replacement": "LONG", "priority": 1, "group": "long", "is_case_sensitive": true }
 			],
 			"buffer": "vx",
 			"expected": { "matched": true, "winner": "LONG" }
@@ -423,8 +450,8 @@
 			"id": "personal_tier_beats_common_tier",
 			"description": "The personal source default (50) outranks the common source default (10) for an identical trigger — the user-facing 'my personal hotstring always wins' contract. Personal is registered FIRST, as at startup; priority, not load order, decides. This is the case the macOS group-aware dedup fix restored.",
 			"mappings": [
-				{ "trigger": "abc", "replacement": "PERSONAL", "priority": 50, "group": "personal", "is_case_sensitive": true },
-				{ "trigger": "abc", "replacement": "COMMON", "priority": 10, "group": "common", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "abc", "replacement": "PERSONAL", "priority": 50, "group": "personal", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "abc", "replacement": "COMMON", "priority": 10, "group": "common", "is_case_sensitive": true }
 			],
 			"buffer": "abc",
 			"expected": { "matched": true, "winner": "PERSONAL" }
@@ -433,8 +460,8 @@
 			"id": "no_match_when_buffer_ends_outside_any_trigger",
 			"description": "When the buffer does not end with any registered trigger, nothing fires even though competing mappings exist.",
 			"mappings": [
-				{ "trigger": "qq", "replacement": "Q", "priority": 50, "group": "g1", "is_case_sensitive": true },
-				{ "trigger": "rr", "replacement": "R", "priority": 90, "group": "g2", "is_case_sensitive": true }
+				{ "auto_expand": true, "trigger": "qq", "replacement": "Q", "priority": 50, "group": "g1", "is_case_sensitive": true },
+				{ "auto_expand": true, "trigger": "rr", "replacement": "R", "priority": 90, "group": "g2", "is_case_sensitive": true }
 			],
 			"buffer": "hello",
 			"expected": { "matched": false }
@@ -446,11 +473,13 @@
 				{
 					"trigger": "ab",
 					"replacement": "WORD",
+					"auto_expand": true,
 					"is_word": true
 				},
 				{
 					"trigger": "ab",
 					"replacement": "NOWORD",
+					"auto_expand": true,
 					"is_word": false
 				}
 			],

@@ -421,8 +421,18 @@ local function main()
 
 		keylogger.on_keydown(ch, now_ms, app_id, scancode)
 
-		local terminator_consumed = terminators_mod.is_terminator(ch)
-		local result = engine:on_char(ch, { terminator_consumed = terminator_consumed })
+		-- `is_terminator` opens the engine's end-char path, where a trigger that
+		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
+		-- behaved as auto and "ya" expanded in the middle of "yaourt".
+		-- `terminator_consumed` stays separate: it is the caller's statement that
+		-- the terminator should also be erased on the AUTO path. On the end-char
+		-- path the engine sets it itself, because the terminator necessarily sits
+		-- between the trigger and the caret there.
+		local is_terminator = terminators_mod.is_terminator(ch)
+		local result = engine:on_char(ch, {
+			is_terminator       = is_terminator,
+			terminator_consumed = is_terminator,
+		})
 
 		if result then
 			Logger.info(
