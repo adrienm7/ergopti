@@ -112,11 +112,15 @@ const FLAGS = [
 	{ flag: 'is_case_sensitive', drivers: ['windows', 'macos', 'linux'] },
 	{
 		flag: 'final_result',
-		drivers: ['windows', 'macos'],
+		drivers: ['windows', 'macos', 'linux'],
 		note:
-			'Suppresses the rescan of an expansion result, so one expansion cannot trigger another. ' +
-			'Windows and macOS honour it; the Linux engine has no reference to it outside its editor ' +
-			'bridges, so on Linux an expansion is always rescanned and entries marked final can chain.'
+			'CONVERGED. It marks an expansion as the end of the line, so nothing chains off its output. ' +
+			'The divergence ran the OPPOSITE way to what this record used to claim: Linux reset its ' +
+			'buffer after EVERY expansion, so it never chained at all and the flag was unobservable, ' +
+			'while Windows and macOS keep the expanded text and let a later keystroke complete a further ' +
+			'trigger. The shared engine now splices the replacement into the buffer via ' +
+			'apply_expansion() unless the mapping is final, which is what makes the flag mean something ' +
+			'on Linux.'
 	},
 	{
 		flag: 'is_case_sensitive_strict',

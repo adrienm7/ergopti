@@ -311,6 +311,34 @@ function M.new()
 		Logger.debug(LOG, "Buffer reset.")
 	end
 
+	--- Rewrites the buffer to reflect an expansion the driver has just injected:
+	--- drops the codepoints the replacement consumed and appends the replacement
+	--- itself. Call this INSTEAD of reset() when the mapping is not
+	--- `final_result`, so the expanded text stays visible to the matcher and a
+	--- later keystroke can complete a further trigger — which is what Windows and
+	--- macOS both do. A driver that resets unconditionally can never chain.
+	---
+	--- Deliberately does NOT re-run matching. Chaining happens on the next real
+	--- keystroke, exactly as it does on macOS, and that is what makes an
+	--- expansion whose replacement contains its own trigger impossible to loop on.
+	--- @param result table The table returned by on_char.
+	function engine:apply_expansion(result)
+		if type(result) ~= "table" then return end
+		local consumed = tonumber(result.backspace_count) or 0
+		for _ = 1, consumed do
+			if #_buf_cps == 0 then break end
+			table.remove(_buf_cps)
+		end
+		local cps = utf8_codepoints(result.replacement or "")
+		for _, cp in ipairs(cps) do
+			_buf_cps[#_buf_cps + 1] = cp
+		end
+		while #_buf_cps > BUFFER_MAX_CHARS do
+			table.remove(_buf_cps, 1)
+		end
+		Logger.debug(LOG, "Expansion applied: buffer %d codepoint(s).", #_buf_cps)
+	end
+
 	--- Returns the current rolling typing buffer as a UTF-8 string. The LLM
 	--- prediction engine detects its own trigger sequences in the same typing
 	--- context the hotstring matcher sees, so both work off this one buffer rather
