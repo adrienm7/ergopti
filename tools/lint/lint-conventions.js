@@ -577,9 +577,24 @@ function checkAhkStringEscaping(file) {
 	// wrap_symbols_config.ahk legitimately uses `" to embed literal double-quotes
 	// inside TOML strings built via concatenation — no single-quote alternative exists.
 	if (file.includes('wrap_symbols_config.ahk')) return;
-	if (raw.includes('`"')) {
-		warn(file, null, `Found backtick-escaped quote (\`"). Prefer single-quoted strings '...' for cleaner Regex/literals in AHK v2.`);
-	}
+
+	// Line-based, and comments are skipped. The rule discourages WRITING a
+	// backtick-escaped quote in a string literal; a comment explaining why one
+	// was wrong is the opposite of the problem. Widening this linter to
+	// adapters/ surfaced exactly that — shell_runner.ahk documents a historical
+	// StrReplace bug involving `" and was flagged for describing it.
+	//
+	// The old whole-file match also reported no line number, so locating the
+	// offender meant searching by hand.
+	raw.split(/\r?\n/).forEach((line, i) => {
+		if (line.trim().startsWith(';')) return;
+		if (!line.includes('`"')) return;
+		warn(
+			file,
+			i + 1,
+			`Found backtick-escaped quote (\`"). Prefer single-quoted strings '...' for cleaner Regex/literals in AHK v2.`
+		);
+	});
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -604,6 +619,7 @@ console.log('lint-conventions: scanning…');
 
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
+	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/lib'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui')
@@ -620,7 +636,15 @@ const ahkAll = [
 // were never checked for file-path headers, banner alignment or section
 // spacing — the two trees that grew most recently, held to no convention at
 // all. The conventions are language-wide, not driver-wide.
+//
+// adapters/ was the residue of that fix: linux/adapters made it into the list
+// while macos/adapters and windows/adapters did not, leaving 45 files — the
+// entire port layer of two drivers — unchecked while the third was held to the
+// rules. A scan set assembled by hand drifts exactly this way, one directory at
+// a time, and the gap is invisible because the linter still reports a large
+// file count and passes.
 const luaDirs = [
+	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/lib'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),

@@ -746,9 +746,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   | Port contract vectors (129) | 2 001 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
   | e2e harnesses | 1 319 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
   | ~~Lua assertion library~~ **done** | 737 | 767 | one shared `test/assertions.lua`; see below |
-  | Convention invariants (8, in 2–3 languages) | 1 594 | ~450 | one `.cjs` gate per invariant over the three trees — and Linux gains 6 it does not have |
+  | Convention invariants | 1 594 | ~450 | one `.cjs` gate per invariant — **the shared linter already IS that gate**; see below |
   | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
-  **Lua assertion library — consolidated, and the line count went UP.** Measured
+  **Convention invariants — "Linux gains 6 it does not have" is stale; the real
+gap was elsewhere.** `tools/lint/lint-conventions.js` is already the one `.cjs`
+gate per invariant, and it already scans the Linux tree (a previous fix widened
+it from macOS-only). What it did **not** scan was `adapters/` on macOS and
+Windows — `linux/adapters` had made it into the list and the other two had not,
+leaving **45 files, the entire port layer of two drivers, held to no convention
+check** while the third was held to all of them. A scan set assembled by hand
+drifts exactly that way, one directory at a time, and the gap is invisible
+because the linter still reports a large file count and passes.
+Widening it surfaced **36 real violations** across 10 adapter files — banner
+misalignment, wrong blank-line counts before major sections, an unbalanced rule
+line. `npm run fix:all` cleared most; the residue was a five-line banner whose
+*outer* rule pair the autofixer leaves alone, in three files.
+The last one was the linter's own bug: the AHK backtick-quote rule matched the
+whole FILE, so `shell_runner.ahk` was flagged for a **comment documenting a past
+bug** involving that very escape — the rule firing on prose explaining the
+hazard it exists to prevent. It is line-based and comment-aware now, and reports
+a line number, which the whole-file form could not.
+**Lua assertion library — consolidated, and the line count went UP.** Measured
 body by body: **six of the seven** assertion functions were byte-identical once
 whitespace was normalised, and the seventh (`assert_throws`) differed by a single
 **comment line** — so the backlog's "62 lines, all comments, banners and
