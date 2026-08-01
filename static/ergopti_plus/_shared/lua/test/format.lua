@@ -96,13 +96,27 @@ end
 ---                      for macOS).
 --- @param level         number Starting stack level (default 2 = immediate caller).
 --- @return string file:line pair, or "" if unresolvable.
+--- Finds the first stack frame that is not part of the test harness itself.
+---
+--- `skip_pattern` may be one Lua pattern or a LIST of them. The list form exists
+--- because the assertion bodies moved into their own shared file: with a single
+--- pattern only the harness frame was skipped, so every failure reported
+--- `assertions.lua:57` instead of the line of the test that actually failed —
+--- diagnostics pointing at the assertion library rather than the assertion.
 local function _caller_site(skip_pattern, level)
 	level = level or 2
+	local patterns = type(skip_pattern) == "table" and skip_pattern or { skip_pattern }
+	local function skipped(src)
+		for _, pat in ipairs(patterns) do
+			if src:match(pat) then return true end
+		end
+		return false
+	end
 	for lvl = level, level + 10 do
 		local info = debug.getinfo(lvl, "Sl")
 		if info and info.source then
 			local src = info.source:gsub("^@", "")
-			if not src:match(skip_pattern) then
+			if not skipped(src) then
 				local fname = src:match("([^/\\]+)$") or src
 				return fname .. ":" .. (info.currentline or "?")
 			end
