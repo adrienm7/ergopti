@@ -12,7 +12,7 @@
 ---    tap_hold_keys.json and mod_combos.json — single source of truth for
 ---    available actions and keys, loaded once at startup and on every layout change.
 --- 2. Layout-Aware Actions: Actions with a "logical_char" field are resolved
----    to a physical key_code via lib.layout at load time, so the KE config
+---    to a physical key_code via modules.keymap.layout at load time, so the KE config
 ---    always references the correct physical key regardless of the OS layout.
 --- 3. Migration: load_user_config() silently upgrades legacy JSON shapes
 ---    (bare string, {tap,hold} without combo slot) to the current format, and
@@ -28,7 +28,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
-local Layout = require("lib.layout")
+local Layout = require("modules.keymap.layout")
 local Paths  = require("lib.paths")
 
 local Defaults = require("modules.karabiner.defaults")
@@ -144,7 +144,7 @@ end
 
 --- Loads all action definitions from modules/karabiner/data/actions.json.
 --- Entries with a "logical_char" field have their "karabiner_to" resolved at load
---- time via lib.layout, so the physical key_code always matches the current OS
+--- time via modules.keymap.layout, so the physical key_code always matches the current OS
 --- keyboard layout — no hardcoded QWERTY positions.
 --- @param actions_file string Absolute path to actions.json.
 --- @return table|nil List of action definitions, or nil on failure.

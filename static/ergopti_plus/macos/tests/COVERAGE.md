@@ -14,7 +14,7 @@ intentionally skips, and the rationale for each deferral.
 | `lib.logger`                                              | `tests/unit/lib/test_logger.lua`                                  | 10          |
 | `lib.perf`                                                | `tests/unit/lib/test_perf.lua`                                    | 2           |
 | `lib.keycodes`                                            | `tests/unit/lib/test_keycodes.lua`                                | 25          |
-| `lib.layout`                                              | `tests/unit/lib/test_layout.lua`                                  | 8           |
+| `modules.keymap.layout`                                   | `tests/unit/modules/keymap/test_layout.lua`                                  | 8           |
 | `lib.notifications`                                       | `tests/unit/lib/test_notifications.lua`                           | 7           |
 | `modules.llm.parser`                                      | `tests/unit/modules/llm/test_parser.lua` (+ edge cases + helpers) | 14 + 6 + 11 |
 | `modules.llm.backend_detector`                            | `tests/unit/modules/llm/test_backend_detector.lua`                | 7           |

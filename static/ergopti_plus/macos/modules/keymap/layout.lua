@@ -1,4 +1,4 @@
---- lib/layout.lua
+--- modules/keymap/layout.lua
 
 --- ==============================================================================
 --- MODULE: Keyboard Layout Resolver
@@ -20,7 +20,7 @@
 ---    unavailable, which preserves QWERTY behaviour without crashing.
 ---
 --- USAGE:
----   local Layout = require("lib.layout")
+---   local Layout = require("modules.keymap.layout")
 ---   local key_code = Layout.key_code_for_char("c")   -- → "o" on Ergopti
 ---   local char     = Layout.char_for_key_code("o")   -- → "c" on Ergopti
 --- ==============================================================================

@@ -35,7 +35,7 @@ mod_combos JSON files actually resolve). The recipe:
 ## Why no fixture is committed yet
 
 The generator depends on action / key / combo JSON files whose layout-resolved
-key codes vary by macOS keyboard layout (see `lib.layout`). A snapshot recorded
+key codes vary by macOS keyboard layout (see `modules.keymap.layout`). A snapshot recorded
 on Ergopti would not match one recorded on AZERTY/QWERTY. Until we settle on a
 layout-stable schema (e.g. by always invoking the generator with a fixed
 synthetic `hs.keycodes.map`), the snapshot file is omitted on purpose.
