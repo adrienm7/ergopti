@@ -59,6 +59,12 @@ local BUFFER_MAX_CHARS = 256
 local MAGIC_KEY_CHAR = "\xe2\x98\x85"  -- luacheck: ignore 211 (used by callers via M.MAGIC_KEY_CHAR)
 M.MAGIC_KEY_CHAR = MAGIC_KEY_CHAR
 
+-- The two no-break spaces French typography places before ":" and ";". The
+-- layout emits them as part of the keystroke, so they land in the buffer between
+-- the trigger and the terminator and the matcher has to look past them.
+local NNBSP_CHAR = "\xe2\x80\xaf"  -- U+202F narrow no-break space
+local NBSP_CHAR  = "\xc2\xa0"      -- U+00A0 no-break space
+
 
 
 
@@ -263,9 +269,36 @@ function M.new()
 
 		-- Path B — end-char: a non-auto trigger fires only when a terminator
 		-- follows it, so the body excludes the character just typed.
-		local end_map, end_len
+		--
+		-- French typography complicates exactly two terminators. The layout emits
+		-- ":" and ";" as NNBSP+":" / NNBSP+";", so the no-break space lands in the
+		-- buffer BETWEEN the trigger and the terminator and the body must exclude
+		-- it too. Windows (hotstring_match.ahk) and macOS (expander.lua) both do
+		-- this; Linux did not, so a trigger followed by a typographic colon simply
+		-- never matched there.
+		--
+		-- The space is REQUIRED, not merely tolerated: a bare ":" with no nbsp
+		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
+		-- hotstring. Only the end-char path is affected; a trigger whose own last
+		-- codepoint is ":" still fires on the auto path untouched.
+		local end_map, end_len, nbsp_stripped = nil, nil, false
 		if options.is_terminator == true then
-			end_map, end_len = best_match(buf_len - 1, false)
+			local typed = _buf_cps[buf_len]
+			local body_len = buf_len - 1
+			local eligible = true
+			if typed == ":" or typed == ";" then
+				local preceding = body_len >= 1 and _buf_cps[body_len] or nil
+				if preceding == NNBSP_CHAR or preceding == NBSP_CHAR then
+					body_len = body_len - 1
+					nbsp_stripped = true
+				else
+					eligible = false
+				end
+			end
+			if eligible then
+				end_map, end_len = best_match(body_len, false)
+			end
+			if not end_map then nbsp_stripped = false end
 		end
 
 		-- Resolve across the two paths by trigger LENGTH, which is what Windows
@@ -291,7 +324,10 @@ function M.new()
 		-- the trigger and the caret, so the driver must erase it to splice the
 		-- replacement in. On the auto path the caller decides.
 		local consumed = via_end_char or terminator_consumed
-		local bc = tlen + (consumed and 1 or 0)
+		-- +1 for the terminator, +1 more for a stripped no-break space: both sit
+		-- between the trigger and the caret, so both are replaced. Mirrors
+		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
+		local bc = tlen + (consumed and 1 or 0) + ((via_end_char and nbsp_stripped) and 1 or 0)
 		Logger.debug(LOG, "Match: trigger='%s' backspaces=%d end_char=%s.",
 			mapping.trigger, bc, tostring(via_end_char))
 		return {

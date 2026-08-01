@@ -288,3 +288,79 @@ helpers.describe("shared hotstring engine — final_result governs chaining", fu
 			"one expansion only — a self-containing replacement must not recurse")
 	end)
 end)
+
+
+
+
+
+-- ======================================================
+-- ======================================================
+-- ======= 10/ French typographic ":" and ";" ===========
+-- ======================================================
+-- ======================================================
+
+-- The Ergopti layer emits ":" and ";" as NNBSP+":" / NNBSP+";", so the no-break
+-- space lands between the trigger and the terminator. Windows strips it in
+-- hotstring_match.ahk and macOS in expander.lua; Linux did neither, so a trigger
+-- followed by a typographic colon never fired there.
+
+local _NNBSP = string.char(0xE2, 0x80, 0xAF)  -- U+202F narrow no-break space
+local _NBSP  = string.char(0xC2, 0xA0)        -- U+00A0 no-break space
+
+--- Feeds an explicit list of characters, marking " ", ":" and ";" as terminators.
+--- @param chars table Array of single-character strings.
+local function _typo_play(mappings, chars)
+	local e = engine_mod.new()
+	e:load_mappings(mappings)
+	for _, ch in ipairs(chars) do
+		local r = e:on_char(ch, { is_terminator = (ch == " " or ch == ":" or ch == ";") })
+		if r then return r end
+	end
+	return nil
+end
+
+--- Splits an ASCII word into single characters, then appends the given tail.
+local function _chars(word, ...)
+	local out = {}
+	for i = 1, #word do out[#out + 1] = word:sub(i, i) end
+	for _, extra in ipairs({ ... }) do out[#out + 1] = extra end
+	return out
+end
+
+helpers.describe("shared hotstring engine — typographic ':' and ';'", function()
+	local AFAIK = { trigger = "afaik", replacement = "as far as I know", auto_expand = false }
+
+	helpers.it("a trigger followed by NNBSP + ':' fires", function()
+		helpers.assert_true(_typo_play({ AFAIK }, _chars("afaik", _NNBSP, ":")) ~= nil,
+			"the narrow no-break space must be looked past, not treated as text")
+	end)
+
+	helpers.it("the stripped space is counted as replaced", function()
+		local r = _typo_play({ AFAIK }, _chars("afaik", _NNBSP, ":"))
+		-- 5 trigger + 1 terminator + 1 nbsp: all three sit between the trigger's
+		-- start and the caret, so all three are replaced.
+		helpers.assert_eq(7, r and r.backspace_count,
+			"backspace_count must cover the trigger, the terminator AND the stripped space")
+	end)
+
+	helpers.it("the full no-break space works too", function()
+		helpers.assert_true(_typo_play({ AFAIK }, _chars("afaik", _NBSP, ";")) ~= nil,
+			"U+00A0 must behave like U+202F")
+	end)
+
+	helpers.it("a BARE ':' does not end a hotstring", function()
+		-- The ":" of ":D" is mid-sequence text. Requiring the space is what keeps
+		-- an emoticon from triggering an expansion.
+		helpers.assert_true(_typo_play({ AFAIK }, _chars("afaik", ":")) == nil,
+			"a colon with no no-break space before it must not fire the end-char path")
+	end)
+
+	helpers.it("an auto trigger ending in ':' is untouched by the rule", function()
+		-- The rule belongs to the end-char path only; Windows leaves its star path
+		-- alone, and a trigger whose own last codepoint is ":" must still fire.
+		local r = _typo_play({ { trigger = "todo:", replacement = "TODO:", auto_expand = true } },
+			_chars("todo", ":"))
+		helpers.assert_true(r ~= nil and r.replacement == "TODO:",
+			"a star trigger ending in ':' must fire on its own last character")
+	end)
+end)
