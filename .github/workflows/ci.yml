@@ -118,6 +118,16 @@ jobs:
 
       - run: npm ci
 
+      - name: Install Lua 5.4
+        # test-shared-root-resolvers.cjs EXECUTES each driver's lib/paths.lua
+        # rather than reading it — a resolver that returns nil is invisible to
+        # static inspection, which is how the language menu came to offer 2
+        # locales of 21. The gate fails rather than skips when no interpreter is
+        # present, so this job needs one.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
       - name: Port compliance (all 20 ports covered by adapters)
         run: npm run test:port-compliance
 

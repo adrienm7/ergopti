@@ -45,6 +45,7 @@ const CHECKS = [
 	{ name: 'every menu-manifest key has a reader', cmd: 'node', args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'], repro: 'node tools/test/test-menu-manifest-keys-have-readers.cjs' },
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux modules resolve _shared through lib/paths.lua', cmd: 'node', args: ['tools/test/test-linux-shared-path-resolver.cjs'], repro: 'node tools/test/test-linux-shared-path-resolver.cjs' },
+	{ name: 'every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)', cmd: 'node', args: ['tools/test/test-shared-root-resolvers.cjs'], repro: 'node tools/test/test-shared-root-resolvers.cjs' },
 	{ name: 'driver-doc paths (no stale static/drivers in docs)', cmd: 'node', args: ['tools/test/test-doc-paths.cjs'], repro: 'node tools/test/test-doc-paths.cjs' },
 	{ name: 'no new location-pinned source reads in AHK tests (ratchet)', cmd: 'node', args: ['tools/test/test-no-pinned-source-reads.cjs'], repro: 'node tools/test/test-no-pinned-source-reads.cjs' },
 	{ name: 'no new location-pinned source reads in macOS tests (ratchet)', cmd: 'node', args: ['tools/test/test-no-pinned-source-reads-lua.cjs'], repro: 'node tools/test/test-no-pinned-source-reads-lua.cjs' },

@@ -531,9 +531,21 @@ Constraints: **paths before moves, moves before content, data before code.**
   for durable state. `adapters/storage.lua` keeps its `ergopti_plus/` directory
   name rather than being "corrected" to `ergopti/`: that is where existing
   installs have their `storage.json`, and renaming it would orphan every stored
-  setting. 19 sites → 3, all inside the resolver, and the gate holds it. Gate:
-  `test-shared-root-resolvers.cjs` must **execute** each expression and assert the
-  file exists — never merely that the module loaded. (2) Move the macOS
+  setting. 19 sites → 3, all inside the resolver, and the gate holds it.
+  ~~Gate: `test-shared-root-resolvers.cjs` must **execute** each expression and
+  assert the file exists — never merely that the module loaded.~~ **done.** It
+  runs both drivers' `lib/paths.lua` under a real interpreter (the macOS one
+  under the driver's own `hs` stub, not a bespoke one), asks each for all 59
+  `_shared` paths the code requests, and stats every answer; `shared_root()` must
+  land on the tree itself, since a walk that stops one level early still returns
+  something that exists. `config_paths.lua` is executed under three environments
+  — HOME set, HOME absent, HOME and TMPDIR absent — because the fallback is the
+  part that shipped wrong, and `"~"` vs `"/home/user"` vs `"/tmp"` are
+  indistinguishable by type. When no interpreter is present the gate **fails**
+  rather than skips, so CI's `validate-js` job now installs `lua5.4`. Six
+  mutation probes confirm it fires: a wrong literal, each driver's root walking
+  to the wrong place, both bad HOME fallbacks, and the missing interpreter.
+  (2) Move the macOS
   config-path SSOT out of `ui/menu/menu_paths.lua` (25 call sites): today `lib/`
   depends on `ui/menu/`. ~~(3) **Generate the logger sub-file routing tables** from `sub_files.toml`~~ —
   **done.** Both hand-rolled `[[array_of_tables]]` parsers are gone (≈120 lines of
@@ -1062,8 +1074,8 @@ skips loudly, rather than passing, on machines without AutoHotkey. 20 test files
 
 ### 0.6 Gates to build
 
-`test-driver-tree-parity.cjs` (I1) · `test-shared-root-resolvers.cjs` (executes
-every `_shared` resolver) · `test-menu-parity.cjs` (I3) · the "no menu row outside
+`test-driver-tree-parity.cjs` (I1) · ~~`test-shared-root-resolvers.cjs` (executes
+every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) · the "no menu row outside
 the renderer" ratchet · "every manifest array key has a reader" ·
 `test-logger-scalars-single-source.cjs` · `test-locale-catalogue-complete.cjs` ·
 `_shared/tests/corpus/logger/behaviour_vectors.json` ·
