@@ -55,6 +55,7 @@ const CHECKS = [
 	{ name: 'WPM divisor single source (Lua drivers use the shared constant; WebView copies frozen at 5)', cmd: 'node', args: ['tools/test/test-wpm-chars-per-word-single-source.cjs'], repro: 'node tools/test/test-wpm-chars-per-word-single-source.cjs' },
 	{ name: 'prompt-builder constants agree across Lua, JS and the generated AHK (all 10)', cmd: 'node', args: ['tools/test/test-prompt-builder-constants-parity.cjs'], repro: 'node tools/test/test-prompt-builder-constants-parity.cjs' },
 	{ name: 'every corpus field is read by a replay or documented as descriptive', cmd: 'node', args: ['tools/test/test-corpus-fields-are-read.cjs'], repro: 'node tools/test/test-corpus-fields-are-read.cjs' },
+	{ name: 'every source path a packaging script copies exists (no suite runs a build)', cmd: 'node', args: ['tools/test/test-packaging-paths-exist.cjs'], repro: 'node tools/test/test-packaging-paths-exist.cjs' },
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux modules resolve _shared through lib/paths.lua', cmd: 'node', args: ['tools/test/test-linux-shared-path-resolver.cjs'], repro: 'node tools/test/test-linux-shared-path-resolver.cjs' },
 	{ name: 'every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)', cmd: 'node', args: ['tools/test/test-shared-root-resolvers.cjs'], repro: 'node tools/test/test-shared-root-resolvers.cjs' },
