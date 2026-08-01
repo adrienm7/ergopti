@@ -70,6 +70,19 @@ local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
 
 local _state = nil
 
+--- Returns the first non-nil argument. Module-level rather than a closure built
+--- inside M.resolve: it captures nothing, and the preview path calls resolve once
+--- per candidate on every keystroke while a tooltip is eligible, so a fresh
+--- closure per call is an allocation on the HID thread for no benefit.
+--- @return any|nil The first argument that is not nil.
+local function first_set(...)
+	for i = 1, select("#", ...) do
+		local v = select(i, ...)
+		if v ~= nil then return v end
+	end
+	return nil
+end
+
 local function require_state(func_name)
 	if not _state then
 		Logger.error(LOG, "'%s' called before M.init() — shared state not initialized.", func_name)
@@ -386,6 +399,10 @@ function M.init(opts)
 		overrides       = overrides,
 		word_delimiters = word_delimiters,
 		toml_cache      = {},
+		-- Memo for M.resolve, cleared by the three writers that can change an
+		-- answer. Living in _state means M.init() resets it without a separate
+		-- lifecycle to remember.
+		resolve_cache   = {},
 	}
 	Logger.success(LOG, "Initialized (override file: '%s').", opts.override_path)
 end
@@ -413,6 +430,21 @@ function M.resolve(category, section)
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
 	end
 
+	-- Memoised, like the AutoHotkey sibling (_HSResolveCache / _HSResolveGen in
+	-- infra/hotstrings/hotstrings_config.ahk). The answer for a (category, section)
+	-- pair is static between override and TOML changes, and the tooltip preview
+	-- resolves it once per CANDIDATE on every keystroke — so the cascade was being
+	-- re-walked several times per key on the HID thread. The two drivers were
+	-- paying different costs for the same cascade because only one of them had
+	-- reached this conclusion.
+	--
+	-- Invalidated by clearing the table in the three writers that can change the
+	-- answer (set_override, clear_override, reload) rather than by a generation
+	-- counter: the cache lives in _state, so M.init() resets it for free.
+	local cache_key = tostring(category) .. "\0" .. tostring(section or "")
+	local cached = _state.resolve_cache and _state.resolve_cache[cache_key]
+	if cached then return cached end
+
 	local user = _state.overrides[category] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 	local meta = get_toml_meta(category)
@@ -438,13 +470,6 @@ function M.resolve(category, section)
 
 	-- show_tooltip: explicit false anywhere in the chain suppresses the tooltip; default is true
 	local show_tooltip = true
-	local function first_set(...)
-		for i = 1, select("#", ...) do
-			local v = select(i, ...)
-			if v ~= nil then return v end
-		end
-		return nil
-	end
 	local st = first_set(
 		user_sec and user_sec.show_tooltip,
 		user.show_tooltip,
@@ -458,7 +483,9 @@ function M.resolve(category, section)
 		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
 		or false
 
-	return { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
+	local resolved = { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
+	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
+	return resolved
 end
 
 --- Resolves the effective delay and color for an extension hotstring file.
@@ -538,6 +565,10 @@ end
 --- @return boolean True on success.
 function M.set_override(category, section, field, value)
 	if not require_state("set_override") then return false end
+	-- Any write here can change what the cascade resolves to, so the memo goes
+	-- with it. Clearing the whole table rather than one key: an override on a
+	-- CATEGORY changes the answer for every section under it too.
+	if _state.resolve_cache then _state.resolve_cache = {} end
 	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
 		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
 		return false
@@ -566,6 +597,10 @@ end
 --- @return boolean True on success.
 function M.clear_override(category, section, field)
 	if not require_state("clear_override") then return false end
+	-- Any write here can change what the cascade resolves to, so the memo goes
+	-- with it. Clearing the whole table rather than one key: an override on a
+	-- CATEGORY changes the answer for every section under it too.
+	if _state.resolve_cache then _state.resolve_cache = {} end
 	local entry = _state.overrides[category]
 	if not entry then return true end
 
@@ -614,6 +649,10 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") then return false end
+	-- Any write here can change what the cascade resolves to, so the memo goes
+	-- with it. Clearing the whole table rather than one key: an override on a
+	-- CATEGORY changes the answer for every section under it too.
+	if _state.resolve_cache then _state.resolve_cache = {} end
 	local overrides, word_delimiters = parse_overrides(_state.path)
 	_state.overrides       = overrides
 	_state.word_delimiters = word_delimiters
