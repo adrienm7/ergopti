@@ -220,7 +220,7 @@ helpers.describe("file_watchers", function()
 	helpers.describe("file change detection", function()
 
 		if not CAN_STAT then
-			helpers.it("SKIP — stat(1) not available on this system (tests require mtime detection)", function()
+			helpers.it("SKIP [CONF-LINUX-STAT-MTIME] — stat(1) not available on this system (tests require mtime detection)", function()
 				-- A skip must still assert the reason it skipped for. An empty body
 				-- reports a PASS, indistinguishable from the real test running — so a
 				-- broken _can_stat() probe would silently disable this whole section
@@ -393,7 +393,7 @@ helpers.describe("file_watchers", function()
 	helpers.describe("on_reload errors", function()
 
 		if not CAN_STAT then
-			helpers.it("SKIP — stat(1) not available on this system", function()
+			helpers.it("SKIP [CONF-LINUX-STAT-MTIME] — stat(1) not available on this system", function()
 				-- A skip must still assert the reason it skipped for. An empty body
 				-- reports a PASS, indistinguishable from the real test running — so a
 				-- broken _can_stat() probe would silently disable this whole section
@@ -465,7 +465,7 @@ helpers.describe("file_watchers", function()
 		end)
 
 		if not CAN_STAT then
-			helpers.it("SKIP — stat(1) not available for callback-after-restart test", function()
+			helpers.it("SKIP [CONF-LINUX-STAT-MTIME] — stat(1) not available for callback-after-restart test", function()
 				-- A skip must still assert the reason it skipped for. An empty body
 				-- reports a PASS, indistinguishable from the real test running — so a
 				-- broken _can_stat() probe would silently disable this whole section

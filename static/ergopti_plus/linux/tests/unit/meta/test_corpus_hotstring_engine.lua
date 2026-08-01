@@ -243,7 +243,7 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 	end)
 
 	if collisions then
-		it("SKIP — shared engine delegates priority-based resolution to the caller", function()
+		it("SKIP [CONF-LINUX-HOTSTRING-COLLISION] — shared engine delegates priority-based resolution to the caller", function()
 			-- The shared engine sorts mappings by trigger length only (longest
 			-- first). It has no priority field and does not resolve same-length
 			-- collisions by priority. The Linux driver's engine.lua thin re-export
