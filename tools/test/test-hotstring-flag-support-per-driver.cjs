@@ -48,9 +48,18 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 
 const errors = [];
 
-/** Production sources of a driver (tests excluded — they prove nothing here). */
+// A hotstring editor lets the user TICK a flag; it does not make the matcher
+// honour it. Counting `ui/` and `bridge_handlers/` as support recorded Linux as
+// supporting auto_expand and final_result when its engine reads neither — the
+// flags reach a settings panel, get written to the user's TOML, and are then
+// ignored at match time. Measured: Linux has 0 engine-side references to both
+// and 2 UI references to each.
+const UI_PATH = /(^|\/)(ui|bridge_handlers)\//;
+
+/** Engine-side sources of a driver (tests, generated code and UI excluded). */
 function driverSources(driver) {
 	const out = [];
+	const root = path.join(SP, driver);
 	(function walk(d) {
 		if (!fs.existsSync(d)) return;
 		for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -58,6 +67,8 @@ function driverSources(driver) {
 			if (e.isDirectory()) {
 				if (e.name !== 'tests' && e.name !== '_generated') walk(p);
 			} else if (/\.(lua|ahk)$/.test(e.name)) {
+				const rel = path.relative(root, p).split(path.sep).join('/');
+				if (UI_PATH.test(rel)) continue;
 				out.push(fs.readFileSync(p, 'utf8'));
 			}
 		}
@@ -89,9 +100,24 @@ const supports = (driver, flag) => sources[driver].some((s) => s.includes(flag))
 // The recorded state. `drivers` lists every driver that reads the flag today.
 const FLAGS = [
 	{ flag: 'is_word', drivers: ['windows', 'macos', 'linux'] },
-	{ flag: 'auto_expand', drivers: ['windows', 'macos', 'linux'] },
+	{
+		flag: 'auto_expand',
+		drivers: ['windows', 'macos'],
+		note:
+			'Windows turns it into AHK\'s "*" flag and macOS reads it in keymap/registry.lua. The Linux ' +
+			'engine never sees it — the field reaches only the hotstring editor bridges — so its matcher ' +
+			'fires every entry as soon as the trigger completes, and an entry written to wait for a ' +
+			'terminator expands mid-word there.'
+	},
 	{ flag: 'is_case_sensitive', drivers: ['windows', 'macos', 'linux'] },
-	{ flag: 'final_result', drivers: ['windows', 'macos', 'linux'] },
+	{
+		flag: 'final_result',
+		drivers: ['windows', 'macos'],
+		note:
+			'Suppresses the rescan of an expansion result, so one expansion cannot trigger another. ' +
+			'Windows and macOS honour it; the Linux engine has no reference to it outside its editor ' +
+			'bridges, so on Linux an expansion is always rescanned and entries marked final can chain.'
+	},
 	{
 		flag: 'is_case_sensitive_strict',
 		drivers: ['windows'],
