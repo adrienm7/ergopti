@@ -724,8 +724,21 @@ Constraints: **paths before moves, moves before content, data before code.**
      non-`auto_expand` hotstring (its loader does not even read the field), has no
      case propagation and no collision priority, and its default magic key is `\`
      while the shared manifest says `★`.
-  5. **LLM**: prompt-builder constants from one JSON (5 hand-maintained copies
-     today, already diverged); route the **six** implementations of "POST a
+  5. **LLM**: ~~prompt-builder constants from one JSON (5 hand-maintained copies
+     today, already diverged)~~ — **the "already diverged" is stale, and the
+     reason is worth keeping.** Measured: all **10** constants agree across the
+     three declarations (shared Lua, shared JS, generated AHK), because the
+     AutoHotkey copy became a **generator output** — which removed the copy that
+     had drifted. What was left was three declarations agreeing today with
+     nothing checking they still would; `test-max-tokens-single-source.cjs`
+     covers exactly one of the ten, and only for backend adapters.
+     `test-prompt-builder-constants-parity.cjs` now compares all ten across all
+     three. Divergence here is unusually quiet: these shape a *prompt*, so a
+     context window of 40 chars/word on one driver and 30 on another does not
+     error, does not fail a test and does not look wrong — it just predicts
+     slightly worse on one platform, indefinitely. Folding them into one JSON is
+     still worth doing; the parity check is what makes the interim safe. ·
+     route the **six** implementations of "POST a
      completion" through the `HttpClient` port — macOS-MLX already proves the port
      suffices; generate the settings map, which deletes
      `menu_persistence_contract.json` (436 l) and its two unwired Python
