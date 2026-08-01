@@ -699,8 +699,22 @@ Constraints: **paths before moves, moves before content, data before code.**
      The failure this prevents is the plausible one: someone "simplifies" the e2e
      harness to count emitted backspaces, macOS goes red against a corpus that is
      right, and the corpus gets "fixed" to match one driver's optimisation.
-  2. Extend the corpus to the branches measured as absent: `auto_expand`,
-     `final_result`, the terminator path, star/magic-key triggers, `case_conform`,
+  2. Extend the corpus to the branches measured as absent: ~~`auto_expand`,
+     `final_result`~~ — **measured, and neither can become a passing vector yet:
+     the Linux engine reads NEITHER.** Both reach only its hotstring-editor
+     bridges (0 engine-side references, 2 UI references each), so a user ticks
+     them, they are written to the TOML, and the matcher ignores them. Windows
+     turns `auto_expand` into AHK's `*` and macOS reads it in
+     `keymap/registry.lua`; unread, Linux fires every entry the moment its
+     trigger completes, so an entry written to wait for a terminator expands
+     mid-word. `final_result` suppresses the rescan of an expansion, so unread,
+     entries marked final can chain. **The flag-support record claimed Linux
+     supported both** — it decided support by finding the flag name anywhere in
+     the driver, counting the settings panel as engine support. Scope is now
+     engine-side and the record corrected; the exclusion is probed as
+     load-bearing. Same shape as `is_case_sensitive_strict`: a vector is only
+     writable once the engines agree. ·
+     the terminator path, star/magic-key triggers, `case_conform`,
      `is_case_sensitive_strict` (**1 302 entries use it**, and the figure is exact —
      1 300 in `magickey.toml`, one each in `autocorrection.toml` and
      `rolls.toml`). **Now documented, and the divergence measured:** the flag is
