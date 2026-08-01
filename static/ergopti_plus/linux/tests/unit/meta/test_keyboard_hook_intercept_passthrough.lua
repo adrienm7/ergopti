@@ -180,14 +180,48 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 			"observe mode consumes nothing, so it needs no emitter")
 	end)
 
-	helpers.it("the daemon supplies the channel it would need to grab", function()
-		-- The flip to intercept must stay a one-word change. If the daemon ever
-		-- stops wiring onEmitRaw, can_capture would refuse at start() and the
-		-- daemon would exit — so this pins the wiring, not the spelling of a flag.
+	--- Reads the daemon entry point's source once for the wiring assertions below.
+	--- @return string The file contents.
+	local function daemon_source()
 		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-		local src = fh:read("*a"); fh:close()
-		helpers.assert_true(src:find("onEmitRaw", 1, true) ~= nil,
+		local src = fh:read("*a")
+		fh:close()
+		return src
+	end
+
+	helpers.it("the daemon supplies the channel the grab needs", function()
+		-- Without onEmitRaw, can_capture refuses at start() and the daemon exits.
+		-- Pins the wiring, not the spelling of a flag.
+		helpers.assert_true(daemon_source():find("onEmitRaw", 1, true) ~= nil,
 			"ergopti_hotstrings.lua must pass onEmitRaw to keyboard_hook.start")
+	end)
+
+	helpers.it("the daemon grabs the device by default", function()
+		-- THE regression this whole item exists for. Observe mode lets physical
+		-- keystrokes reach the application while an expansion is being typed, so
+		-- the user's next keys interleave with the synthetic backspaces and the
+		-- text is scrambled non-deterministically — "abcd" becoming "acd". The
+		-- daemon shipped in observe mode for its whole life because `intercept`
+		-- was simply never passed, and nothing said so: an absent option reads as
+		-- a default, not as a bug.
+		local src = daemon_source()
+		helpers.assert_true(src:find("intercept%s*=%s*opts%.grab") ~= nil,
+			"keyboard_hook.start must be given intercept = opts.grab — a daemon that "
+				.. "omits the option silently reverts to the corrupting observe mode")
+		helpers.assert_true(src:find("grab%s*=%s*true") ~= nil,
+			"opts.grab must DEFAULT to true; --no-grab is the escape hatch, and a "
+				.. "default of false makes the escape hatch the norm again")
+	end)
+
+	helpers.it("--no-grab still exists as the way out", function()
+		-- The grab has never run on real hardware, and the device kanata
+		-- auto-detects is not coordinated with the one device_finder picks. If the
+		-- grab takes the wrong keyboard there has to be a way back that does not
+		-- need a rebuild.
+		local src = daemon_source()
+		helpers.assert_true(src:find('"%-%-no%-grab"') ~= nil,
+			"the --no-grab flag must remain parseable — it is the only recovery path "
+				.. "if the grab picks the wrong device")
 	end)
 
 end)

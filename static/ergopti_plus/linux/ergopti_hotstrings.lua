@@ -206,6 +206,12 @@ local function parse_args()
 		verbose = false,
 		help    = false,
 		tray    = false,
+		-- Grab the device by default. Observe mode lets every physical keystroke
+		-- reach the application while the daemon is mid-expansion, which is the
+		-- "abcd" -> "acd" corruption: the user's next keys interleave with the
+		-- synthetic backspaces. --no-grab is the escape hatch, not the default,
+		-- because the default has to be the correct behaviour.
+		grab    = true,
 	}
 	local i = 1
 	while i <= #arg do
@@ -214,6 +220,7 @@ local function parse_args()
 		elseif a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
 		elseif a == "--tray"                  then opts.tray    = true
+		elseif a == "--no-grab"               then opts.grab    = false
 		elseif a == "--config"  and arg[i+1]  then i = i + 1; opts.config = arg[i]
 		elseif a == "--device"  and arg[i+1]  then i = i + 1; opts.device = arg[i]
 		elseif a == "--layout"  and arg[i+1]  then i = i + 1; opts.layout = arg[i]
@@ -243,6 +250,10 @@ local function print_usage()
 	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
 	print("                      Default: $XKBLAYOUT, else qwerty.")
 	print("  --tray              Enable the system tray icon (requires yad).")
+	print("  --no-grab           Do NOT take an exclusive grab on the device.")
+	print("                      Physical keys then reach the application while an")
+	print("                      expansion is being typed, which can scramble it.")
+	print("                      Use only if the grab misbehaves on your hardware.")
 	print("  --dry-run           Log matches without injecting.")
 	print("  --verbose           Enable debug messages.")
 	print("  --help              Show this message.")
@@ -577,28 +588,38 @@ local function main()
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
 
-	-- 8.8) Start the keyboard hook adapter.
-	-- NOTE (hotstring race): this starts in OBSERVE mode (no `intercept`), so
-	-- libinput does NOT grab the device and physical keys reach the app directly.
-	-- During a match's erase-then-type injection, keys the user keeps typing can
-	-- therefore interleave with the synthetic backspace+replacement stream and
-	-- scramble the output (the "abcd"→"acd" corruption). The injector's queue
-	-- (_begin/_queue/_end_injection) only helps once the daemon OWNS the output
-	-- stream — i.e. in intercept mode (evtest --grab / EVIOCGRAB).
-	-- onEmitRaw is wired unconditionally: it is inert in observe mode (nothing was
-	-- consumed, so nothing needs putting back), and it is what makes intercept a
-	-- one-word change rather than a rewrite. The grab itself stays off until it
-	-- can be measured on real hardware — one `ydotool key` process per physical
-	-- event is a fork per keystroke, and the device kanata auto-detects is not
-	-- coordinated with the one device_finder picks here.
+	-- 8.8) Start the keyboard hook adapter, in INTERCEPT mode by default.
+	--
+	-- Observe mode does not grab the device, so every physical keystroke reaches
+	-- the application in real time no matter what the daemon is doing. During the
+	-- erase-then-type window of an expansion the user's next keys interleave with
+	-- the synthetic backspaces and the replacement, and the screen ends up
+	-- scrambled non-deterministically — the "abcd" -> "acd" corruption. The
+	-- injector's queue (_begin/_queue/_end_injection) only does anything once the
+	-- daemon OWNS the output stream, which is what the grab buys.
+	--
+	-- What made this affordable: emit_key no longer forks a `ydotool key` process
+	-- per physical event — adapters/uinput_writer.lua writes struct input_event
+	-- straight to /dev/uinput through LuaJIT FFI. A fork per keystroke is what a
+	-- grab could not have paid for.
+	--
+	-- STILL UNVERIFIED ON HARDWARE, and deliberately shipped anyway: the device
+	-- kanata auto-detects is not coordinated with the one device_finder picks
+	-- here, so on a machine where they differ the grab may take the wrong
+	-- keyboard. `--no-grab` restores the old behaviour without a rebuild, which is
+	-- why that flag exists — but observe mode is a known-corrupting default, so it
+	-- is the escape hatch and not the norm.
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,
+		intercept  = opts.grab,
 		onChar  = on_char,
 		onKey   = on_control,
 		onPhysical = on_physical,
 		onEmitRaw  = injector.emit_key,
 	})
+	Logger.info(LOG, "Keyboard hook started in %s mode.",
+		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
 
 	if not keyboard_hook.isRunning() then
 		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
