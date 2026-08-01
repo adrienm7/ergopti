@@ -272,7 +272,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   bundles). Ratcheted in **both** directions: the shared count may not fall, and
   the union may not grow — a new directory in one driver alone dilutes I1 even
   when nothing was removed. `--measure` prints the full breakdown, including the
-  26 macOS-only, 22 Windows-only and 6 Linux-only paths that make up the gap.
+  paths that make up the gap. **Those per-driver counts were wrong-shaped, and
+  the report has been fixed.** It listed every non-shared path under "per driver,
+  unique to it", so a path held by TWO drivers was printed once under each — the
+  strongest promotion candidates read as two separate private directories.
+  `modules/dynamic_hotstrings` is the clearest case: macOS and Linux both have
+  it, Windows does not, and it appeared as if macOS and Linux each had a private
+  folder of that name. The report now separates the two classes, and the real
+  shape is far more tractable than 26/22/6 suggested: **14 paths where two
+  drivers already agree** and only **23 genuinely single-driver** (macOS 12,
+  Windows 8, Linux 3).
+  Twelve of the fourteen are `ui/*` absent on Linux, and that is ONE structural
+  fact rather than twelve gaps: macOS and Windows organise the UI by feature
+  (`ui/<page>/`) while Linux organises it by mechanism
+  (`modules/ui/webview_manager.lua` + `modules/ui/bridge_handlers/<page>_bridge.lua`),
+  which is also why Linux has two `ui` namespaces. Aligning them is Lot 3 step
+  (c) and moves in the direction of `modules/<feature>/window.*` for all three —
+  a cross-driver rename that cannot be done one driver at a time, because the I1
+  ratchet fails on both the shared count and the union while it is half done.
+  The remaining two are the objective, cheap ones: `modules/dynamic_hotstrings`
+  (Windows implements dynamic hotstrings in `modules/hotstrings.ahk`) and
+  `infra/toml` (absent on Linux, which uses the shared codec directly).
   Note the baseline is a literal: deriving it from the value it constrains would
   make the comparison `x <= x`, which passes for every input — the exact false
   green this repo ratchets against elsewhere. Still to do: the Convention S stubs.

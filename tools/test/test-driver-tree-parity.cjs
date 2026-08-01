@@ -139,9 +139,27 @@ if (process.argv.includes('--measure')) {
 	console.log(`shared by all three: ${shared.length} (${ratio.toFixed(1)} %)\n`);
 	console.log('shared:');
 	for (const p of shared) console.log('  ' + p);
-	console.log('\nper driver, unique to it:');
+	// Two classes, not one. The report used to print every non-shared path under
+	// "per driver, unique to it", which listed a path held by TWO drivers once
+	// under each of them — so modules/dynamic_hotstrings appeared as if macOS and
+	// Linux each had a private directory of that name. That is backwards for the
+	// one question this report exists to answer: the repo's objective promotion
+	// test is "where does the same code live in the other drivers?", and a path
+	// two drivers already agree on is the strongest evidence there is. Printing it
+	// as two separate one-driver paths hid the shortest route to raising I1.
+	const holders = (p) => DRIVERS.filter((d) => trees.get(d).has(p));
+
+	const onTwo = [...union].filter((p) => holders(p).length === 2).sort();
+	console.log(`\ntwo drivers agree, one is missing — ${onTwo.length} promotion candidate(s):`);
+	for (const p of onTwo) {
+		const has = holders(p);
+		const missing = DRIVERS.filter((d) => !has.includes(d));
+		console.log(`  ${p}  (on ${has.join(' + ')}, absent on ${missing.join(', ')})`);
+	}
+
+	console.log('\ngenuinely single-driver:');
 	for (const d of DRIVERS) {
-		const only = [...trees.get(d)].filter((p) => !DRIVERS.every((x) => trees.get(x).has(p))).sort();
+		const only = [...trees.get(d)].filter((p) => holders(p).length === 1).sort();
 		console.log(`  ${d} (${only.length}): ${only.join(', ')}`);
 	}
 	process.exit(0);
