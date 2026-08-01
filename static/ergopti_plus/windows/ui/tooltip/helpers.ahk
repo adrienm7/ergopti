@@ -62,6 +62,25 @@ _TooltipRevealSurfaces() {
 ; under it (fall back to the primary monitor, then the full virtual screen). Without
 ; this a wide tooltip anchored near the bottom-right caret overflows the screen and
 ; is clipped — the truncation reported for long predictions in a corner.
+; The clamp maths, with the screen bounds passed IN.
+;
+; Split out of _TooltipClampToScreen so it can be driven with arbitrary bounds.
+; The wrapper below reads the real monitor work area from the OS, which meant no
+; test could ever supply the screenFrame the shared corpus carries — so the AHK
+; tooltip test validated the corpus's SHAPE and never compared one of its 6
+; golden positions. Pure arithmetic, no OS calls, same formula as before.
+;
+; @param X,Y,W,H  Proposed tooltip rect.
+; @param L,Top,R,B  Work-area bounds to clamp within.
+; @param Margin  Clearance kept at every edge.
+_TooltipClampRect(X, Y, W, H, L, Top, R, B, Margin) {
+		; clamp(x, L+margin, R-W-margin); same for y — identical to the macOS renderer.
+		return {
+				X: Max(L + Margin, Min(X, R - W - Margin)),
+				Y: Max(Top + Margin, Min(Y, B - H - Margin))
+		}
+}
+
 _TooltipClampToScreen(X, Y, W, H) {
 		; Margin kept clear of every screen edge — mirrors the shared positioning spec
 		; (constants.toml [positioning].screen_margin = 5) that HS clamps with, so the
@@ -81,10 +100,7 @@ _TooltipClampToScreen(X, Y, W, H) {
 				if !found
 						MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
 		}
-		; clamp(x, L+margin, R-W-margin); same for y — identical to the macOS renderer.
-		X := Max(L + MARGIN, Min(X, R - W - MARGIN))
-		Y := Max(Top + MARGIN, Min(Y, B - H - MARGIN))
-		return { X: X, Y: Y }
+		return _TooltipClampRect(X, Y, W, H, L, Top, R, B, MARGIN)
 }
 
 ; Sub-segmented on purpose. Tooltip.Present is the dominant hot-path offender in
