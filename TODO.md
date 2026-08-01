@@ -277,7 +277,15 @@ Constraints: **paths before moves, moves before content, data before code.**
   make the comparison `x <= x`, which passes for every input — the exact false
   green this repo ratchets against elsewhere. Still to do: the Convention S stubs.
 
-- **Lot 4 — one namespace.** Migrate the **206 of 335 features (61.5 %)** out of
+- **Lot 4 — one namespace.** **First slice landed:** the eight `hotstrings`
+  sections now declare `linux` alongside `ahk`/`hs`, which is what let the Linux
+  driver read the shared magic-key default instead of hardcoding a backslash, and
+  produced its first `_generated/config_template.toml`. It cost one line per
+  section and no gate moved — worth knowing before the rest, because the fear
+  attached to this lot is really about the 223-table RENAME, not about adding a
+  platform to a section that already exists. The remaining work below is
+  unchanged.
+  Migrate the **206 of 335 features (61.5 %)** out of
   the `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry
   `platforms`. **Approved by the maintainer, config-schema break accepted** — the
   user deletes `config.toml` and the driver regenerates it, as the v1→v2 cut-over
@@ -841,9 +849,22 @@ Constraints: **paths before moves, moves before content, data before code.**
      replay because their expected winner is also the mapping registered first.
      `table.sort` is not stable, so before this the winner of an equal-length
      collision was not even deterministic between runs of the same corpus.
-     Still open on this item: **the default magic key is `\` on Linux while the
-     shared manifest says `★`** — a data divergence, not an engine one, so it does
-     not belong with the matcher work above.
+     ~~Still open on this item: the default magic key is `\` on Linux while the
+     shared manifest says `★`~~ — **closed, and the cause was a manifest
+     omission rather than a hardcoded preference.** `[sections.hotstrings]`
+     listed only `["ahk", "hs"]`, and the generator filters per driver, so
+     Linux's manifest carried no `trigger_char` entry and the driver had no
+     choice but to hardcode — in two places, where the @-tag expansions listened
+     for a key nothing else in the product used. The eight hotstrings sections
+     now declare `linux` (a first, small slice of Lot 4, and the driver's first
+     generated `config_template.toml` comes with it).
+     Writing `test-magic-key-single-source.cjs` then found **four more copies**
+     agreeing with the manifest by luck and **seven `or "★"` fallbacks** — the
+     §5.4 shape, where a user who picks another key still gets the literal
+     wherever state is momentarily absent. All read the declaration now. One of
+     them would have become a live bug during the fix: the locale
+     trigger-provider in `macos/init.lua` sits ~500 lines above the `magic_key`
+     local, so naming it there captures the *global* of the same name — nil.
   5. **LLM**: ~~prompt-builder constants from one JSON (5 hand-maintained copies
      today, already diverged)~~ — **the "already diverged" is stale, and the
      reason is worth keeping.** Measured: all **10** constants agree across the
