@@ -211,6 +211,13 @@ local function parse_entry(line)
 		is_word           = result.is_word           or false,
 		auto_expand       = result.auto_expand       or false,
 		is_case_sensitive = result.is_case_sensitive or false,
+		-- Optional in the schema, so it must be carried explicitly: the returned
+		-- table is a fixed field set, not a pass-through of `result`, and every key
+		-- absent from this list is silently dropped. It was, which made the flag
+		-- unreachable from TOML on both Lua drivers — the engines read it, the
+		-- loaders forwarded it, and the value they forwarded was always false.
+		-- 1 302 shared entries declare it.
+		is_case_sensitive_strict = result.is_case_sensitive_strict or false,
 		final_result      = result.final_result      or false,
 		-- Individual collision-priority override (top of the cascade). nil when
 		-- the entry has no `priority` key, so the loader falls back to the
