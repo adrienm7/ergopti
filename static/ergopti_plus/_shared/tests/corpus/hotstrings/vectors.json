@@ -438,6 +438,27 @@
 			],
 			"buffer": "hello",
 			"expected": { "matched": false }
+		},
+		{
+			"id": "is_word_filters_it_does_not_tiebreak",
+			"description": "is_word is a FILTER, not a tie-break. Mid-word the word-bounded mapping is blocked by the boundary rule, so the unbounded one wins whichever order they were registered in — verified by replaying both orders. At a word boundary BOTH are eligible and the engine falls back to first-registered, which is order-dependent and deliberately not asserted: such a vector would pass or fail on registration order rather than on the rule.",
+			"mappings": [
+				{
+					"trigger": "ab",
+					"replacement": "WORD",
+					"is_word": true
+				},
+				{
+					"trigger": "ab",
+					"replacement": "NOWORD",
+					"is_word": false
+				}
+			],
+			"buffer": "xab",
+			"expected": {
+				"matched": true,
+				"winner": "NOWORD"
+			}
 		}
 	]
 }

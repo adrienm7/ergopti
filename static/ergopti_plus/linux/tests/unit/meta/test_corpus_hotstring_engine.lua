@@ -250,6 +250,7 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 		longer_trigger_beats_higher_priority          = true, -- length is primary (the longest-first sort)
 		equal_priority_falls_back_to_first_registered = true, -- first-registered IS the engine's rule
 		no_match_when_buffer_ends_outside_any_trigger = true,
+		is_word_filters_it_does_not_tiebreak          = true, -- the boundary rule excludes, order-independently
 	}
 
 	--- Loads every mapping of a collision vector and types its buffer.
