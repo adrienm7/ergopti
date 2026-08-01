@@ -29,8 +29,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local KU = helpers.load_with_stubs("modules.keymap.utils")
 
@@ -60,7 +60,7 @@ local function make_log_manager()
 		get_device_short_id = function() return "abcd" end, get_sqlite_path = function() return "/tmp/test.sqlite" end,
 		get_db_rev = function() return 0 end, sync_foreign_data_sql = function() end,
 	}
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.timings"] = {
 		ms  = function(_section, _key) return 1000 end,
 		sec = function(_section, _key) return 1.0 end,
 	}

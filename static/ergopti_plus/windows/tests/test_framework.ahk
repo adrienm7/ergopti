@@ -200,7 +200,7 @@ _Enumerate(arr, n) {
 
 ; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
 ; tests/, vendor/ and _generated/ trees — concatenated into one string, so
-; source-introspection tests find a function regardless of which lib/ or ui/ file
+; source-introspection tests find a function regardless of which infra/ or ui/ file
 ; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
 ; resolves to the single definition. Cached after first use.
@@ -240,7 +240,7 @@ _StripFullLineComments(Src) {
 ; Returns the whole driver source (see _DriverSourceConcat) with every
 ; full-line comment stripped. Use for source-scan invariants that count or
 ; match a token across the ENTIRE driver tree (not just one function body) —
-; without this, an explanatory comment anywhere in lib/modules/adapters/ui
+; without this, an explanatory comment anywhere in infra/modules/adapters/ui
 ; can silently trip a naive substring count. Cached after first use.
 _DriverSourceNoComments() {
 	static cache := ""

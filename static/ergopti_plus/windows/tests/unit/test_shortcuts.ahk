@@ -21,9 +21,9 @@
 ;    to its default state after each assertion group.
 ; ==============================================================================
 
-; ── Stubs for symbols that live outside the included lib/ tree ──────────────
+; ── Stubs for symbols that live outside the included infra/ tree ──────────────
 
-; SpotlightMouseAt is in lib/spotlight.ahk, which is not included by run_all.ahk.
+; SpotlightMouseAt is in infra/spotlight.ahk, which is not included by run_all.ahk.
 ; Record calls so the spotlight shortcut test can verify the stub is reachable.
 global _Stub_SpotlightCalls := []
 SpotlightMouseAt(X, Y, DurationMs) {
@@ -523,11 +523,11 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
-	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (lib/lifecycle.ahk).
-	Src := _DriverDirConcat("lib")
+	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (infra/lifecycle.ahk).
+	Src := _DriverDirConcat("infra")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
-	Assert(Body != "", "ToggleSuspend must exist in lib/lifecycle.ahk")
+	Assert(Body != "", "ToggleSuspend must exist in infra/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
 	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,

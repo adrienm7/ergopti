@@ -120,14 +120,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
 	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
-	package.loaded["lib.text_utils"] = nil
+	package.loaded["infra.text_utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
 	-- treat it as a native C library (e.g. test_config.lua). The real codec is
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	package.loaded["lib.toml.codec"]   = nil
+	package.loaded["infra.toml.codec"]   = nil
 	package.loaded["toml_codec"]       = nil
 	package.loaded["toml_codec.codec"] = nil
 
@@ -139,7 +139,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
 	-- (field 'ms')" the moment modules.keylogger is not already cached.
-	package.loaded["lib.timings"] = nil
+	package.loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
@@ -182,13 +182,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
-	-- Tests that need a richer stub should override package.loaded["lib.i18n"]
+	-- Tests that need a richer stub should override package.loaded["infra.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
-	package.loaded["lib.i18n"] = {
+	package.loaded["infra.i18n"] = {
 		get             = function(key) return key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
@@ -212,7 +212,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		-- Single shared-tree resolver: all three helpers delegate to M.shared so
 		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
 		-- production Paths.shared contract (nil/"" → the shared root dir).
@@ -407,7 +407,7 @@ end
 
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
---- @return table Logger stub with the same public API as lib/logger.lua.
+--- @return table Logger stub with the same public API as infra/logger.lua.
 function M.make_logger_stub()
 	local noop = function() end
 	return {

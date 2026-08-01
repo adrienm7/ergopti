@@ -9,7 +9,7 @@
  * shell string is not checked by any compiler, linter or suite.
  *
  * ROOT CAUSE ENCODED:
- * The build scripts `cp` from `linux/lib/...` and install to `/usr/lib/ergopti`
+ * The build scripts `cp` from `linux/infra/...` and install to `/usr/lib/ergopti`
  * and `~/.local/lib/ergopti` — a source path that must track a directory rename
  * sitting on lines next to install paths that must NOT. Most of these copies are
  * written `cp -r … 2>/dev/null || true`, so a path that stops existing produces

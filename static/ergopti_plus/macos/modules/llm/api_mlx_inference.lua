@@ -22,15 +22,15 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
-local text_utils = require("lib.text_utils")
+local Logger         = require("infra.logger")
+local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("lib.timings")
+local Timings        = require("infra.timings")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 

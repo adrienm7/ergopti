@@ -20,8 +20,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- load_with_stubs installs a fresh hs stub (tests/stubs/hs.lua) that includes
 -- pasteboard.readAllData/writeAllData, so no extra setup is needed here.

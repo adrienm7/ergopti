@@ -21,10 +21,10 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n   = require("lib.i18n")
-local Paths  = require("lib.paths")
+local Logger = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n   = require("infra.i18n")
+local Paths  = require("infra.paths")
 local LOG    = "menu_paths"
 
 -- Bootstrap file lives next to init.lua (gitignored).

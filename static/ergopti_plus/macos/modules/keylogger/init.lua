@@ -23,11 +23,11 @@ local M = {}
 
 local hs       = hs
 local utf8     = utf8
-local Logger   = require("lib.logger")
-local Timings  = require("lib.timings")
-local Manifest = require("lib.manifest_reader")
-local i18n     = require("lib.i18n")
-local dialog   = require("lib.dialog_util")
+local Logger   = require("infra.logger")
+local Timings  = require("infra.timings")
+local Manifest = require("infra.manifest_reader")
+local i18n     = require("infra.i18n")
+local dialog   = require("infra.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")

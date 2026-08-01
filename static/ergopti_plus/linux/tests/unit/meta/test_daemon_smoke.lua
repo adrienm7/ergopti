@@ -54,7 +54,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
 
-      helpers.assert_true(src:find('require("lib.monotonic")', 1, true) ~= nil,
+      helpers.assert_true(src:find('require("infra.monotonic")', 1, true) ~= nil,
         "daemon must source its keystroke clock from lib.monotonic")
       helpers.assert_true(src:find("Monotonic.now_ms()", 1, true) ~= nil,
         "the per-keystroke timestamp must come from the monotonic wall clock")

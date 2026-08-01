@@ -10,7 +10,7 @@
 --- 1. Discovery: Scans the apps/ directory at build time so new bundles appear
 ---    automatically without touching this file.
 --- 2. Style Parity: Mirrors the icon + styled-text row format used in
----    lib/app_picker.lua for visual consistency across the menu.
+---    infra/app_picker.lua for visual consistency across the menu.
 --- 3. Icon Loading: Loads icons directly from the .icns file in Resources/ to
 ---    avoid relying on bundle ID registration (which may not be done on first
 ---    install). Falls back to AppIcon.svg, then to no icon.
@@ -21,9 +21,9 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
+local i18n   = require("infra.i18n")
 
 local LOG = "menu_apps"
 

@@ -14,12 +14,12 @@
 local M = {}
 
 local hs               = hs
-local notifications    = require("lib.notifications")
+local notifications    = require("infra.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
-local Logger           = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n             = require("lib.i18n")
-local ui_restore       = require("lib.ui_restore")
+local Logger           = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n             = require("infra.i18n")
+local ui_restore       = require("infra.ui_restore")
 
 local Preferences   = require("ui.menu.preferences")
 local Builder       = require("ui.menu.builder")
@@ -846,7 +846,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
 		open_personal_shortcuts   = function()
-			local ok, ps = pcall(require, "lib.personal_shortcuts")
+			local ok, ps = pcall(require, "infra.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
 		end,
 		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
@@ -858,14 +858,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_today_log            = function()
-			local path = require("lib.logger").UNIFIED_LOG_FILE
+			local path = require("infra.logger").UNIFIED_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 			end
 			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 		end,
 		open_error_log            = function()
-			local path = require("lib.logger").ERRORS_LOG_FILE
+			local path = require("infra.logger").ERRORS_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 			end
@@ -878,7 +878,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end,
 		set_log_level             = function(level)
-			local L = require("lib.logger")
+			local L = require("infra.logger")
 			L.set_level(level)
 			pcall(function() hs.settings.set("ergopti.log_level", level) end)
 			L.info("menu", "Log level set to %s.", level)
@@ -1052,7 +1052,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- driver fully wired. Errors are caught inside the module so a broken
 	-- user file logs to the console without preventing boot.
 	pcall(function()
-		local ok, ps = pcall(require, "lib.personal_shortcuts")
+		local ok, ps = pcall(require, "infra.personal_shortcuts")
 		if ok and type(ps.load) == "function" then ps.load() end
 	end)
 
@@ -1065,7 +1065,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
 	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
 
-	-- The same exclusion list lib/file_watchers already receives. Two recursive
+	-- The same exclusion list infra/file_watchers already receives. Two recursive
 	-- watchers cover this tree and only that one was using it.
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,

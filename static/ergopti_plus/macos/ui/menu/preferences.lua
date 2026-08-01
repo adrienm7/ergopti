@@ -4,7 +4,7 @@
 --- MODULE: Menu Preferences
 --- DESCRIPTION:
 --- Manages the persistence of the global state to and from the disk. The
---- format is TOML — see lib/toml_codec for the encoder/decoder. The file
+--- format is TOML — see infra/toml_codec for the encoder/decoder. The file
 --- lives at <config_dir>/hammerspoon/config.toml; legacy config.json is
 --- no longer read or written.
 ---
@@ -31,8 +31,8 @@
 
 local M = {}
 local hs        = hs
-local TomlCodec = require("lib.toml.codec")
-local Logger    = require("lib.logger")
+local TomlCodec = require("infra.toml.codec")
+local Logger    = require("infra.logger")
 local LOG       = "preferences"
 
 

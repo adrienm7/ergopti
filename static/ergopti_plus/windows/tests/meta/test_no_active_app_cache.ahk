@@ -3,7 +3,7 @@
 #Requires AutoHotkey v2.0
 
 _NAAC_AssertNoActiveAppCache() {
-	if FileExist(A_ScriptDir . "/../lib/active_app_cache.ahk")
+	if FileExist(A_ScriptDir . "/../infra/active_app_cache.ahk")
 		Assert(false, "active_app_cache.ahk must not exist (redundant async state machine removed in audit)")
 	
 	; Search all ahk files for GetActiveApp

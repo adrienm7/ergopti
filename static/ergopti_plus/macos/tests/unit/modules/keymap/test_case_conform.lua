@@ -18,10 +18,10 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _      = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _      = helpers.load_with_stubs("infra.logger")
 local State  = helpers.load_with_stubs("modules.keymap.state")
-local txt    = helpers.load_with_stubs("lib.text_utils")
+local txt    = helpers.load_with_stubs("infra.text_utils")
 
 
 
@@ -76,7 +76,7 @@ local function fresh_registry()
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.utils"]       = nil
-	package.loaded["lib.text_utils"]             = nil
+	package.loaded["infra.text_utils"]             = nil
 	package.loaded["text_utils"]                 = nil
 	local R = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
@@ -162,7 +162,7 @@ local function fresh_engine()
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.expander"]   = nil
 	package.loaded["modules.keymap.utils"]      = nil
-	package.loaded["lib.text_utils"]            = nil
+	package.loaded["infra.text_utils"]            = nil
 	package.loaded["text_utils"]                = nil
 	local R = require("modules.keymap.registry")
 	local E = require("modules.keymap.expander")

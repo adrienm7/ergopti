@@ -10,12 +10,12 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local Paths         = require("lib.paths")
-local Timings       = require("lib.timings")
-local i18n          = require("lib.i18n")
-local text_utils    = require("lib.text_utils")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local Paths         = require("infra.paths")
+local Timings       = require("infra.timings")
+local i18n          = require("infra.i18n")
+local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local ShellRunner   = require("adapters.shell_runner")
 local Click         = require("modules.gestures.actions_click")
@@ -553,7 +553,7 @@ sg("open_today_log",                   function()
 end)
 sg("open_error_log",                   function()
 	local ok_p, path = pcall(function()
-		local ok_l, Logger = pcall(require, "lib.logger")
+		local ok_l, Logger = pcall(require, "infra.logger")
 		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
 			return Logger.ERRORS_LOG_FILE
 		end

@@ -19,7 +19,7 @@
 --- compile coverage.
 ---
 --- THE INVARIANT PINNED HERE:
---- Every .lua file under the driver's production roots (init.lua, lib/, modules/,
+--- Every .lua file under the driver's production roots (init.lua, infra/, modules/,
 --- ui/, adapters/) and under the shared Lua tree (_shared/lua/) must PARSE.
 --- `loadfile` compiles the chunk to a function without executing it, so this
 --- check needs no hs runtime, no filesystem side effects, and no OS access — it
@@ -45,7 +45,7 @@ local ENTRY_POINT = DRIVER_ROOT .. "init.lua"
 -- the module header. The shared Lua tree is resolved through helpers.shared so
 -- the _shared/ folder name stays defined in exactly one place (SHARED_REL).
 local SOURCE_ROOTS = {
-	DRIVER_ROOT .. "lib",
+	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "modules",
 	DRIVER_ROOT .. "ui",
 	DRIVER_ROOT .. "adapters",

@@ -22,7 +22,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "keymap.registry"
 
@@ -177,7 +177,7 @@ function M.load_toml(name, path)
 
 	Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
-	local toml_reader  = require("lib.toml.reader")
+	local toml_reader  = require("infra.toml.reader")
 	local ok, data     = pcall(toml_reader.parse, path)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))

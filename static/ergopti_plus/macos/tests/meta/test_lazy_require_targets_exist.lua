@@ -31,12 +31,12 @@
 local helpers = require("tests.helpers")
 
 -- Driver subtrees to scan, matching the sibling meta guards.
-local SOURCE_DIRS = { "adapters", "lib", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
 
 -- package.path roots the driver injects at boot (init.lua:14-28), in search
 -- order. "../_shared/lua" is the module root shared with the Windows and Linux
 -- drivers, so a shared module resolves from the macOS tree too.
-local REQUIRE_ROOTS = { "", "modules/", "lib/", "ui/", "adapters/", "../_shared/lua/" }
+local REQUIRE_ROOTS = { "", "modules/", "infra/", "ui/", "adapters/", "../_shared/lua/" }
 
 -- Provided by the Hammerspoon runtime rather than this repository, so their
 -- absence from the tree is expected and must not fail the scan.
@@ -190,7 +190,7 @@ helpers.describe("lazily required modules and methods exist", function()
 				local rel = path:sub(#root + 1)
 				-- Walk each `local ok, VAR = pcall(require, "MOD")` and inspect only
 				-- the text up to the point VAR is re-bound (by any assignment form,
-				-- not just another pcall-require). lib/ui_restore.lua is why: its
+				-- not just another pcall-require). infra/ui_restore.lua is why: its
 				-- list entries all name their module `m`, and the next entry rebinds
 				-- it via `local m = package.loaded[…]`. A window bounded only by the
 				-- next pcall-require swallows that entry's own guard and blames it on

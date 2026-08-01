@@ -17,8 +17,8 @@
 _PIRS_SuspendDefersAndResumeReplays() {
 	Rebuild := _DriverFuncBody("HotstringPrefixWatcherRebuildIndex")
 	Resume := _DriverFuncBody("Ergopti_OnSuspendResume")
-	Assert(Rebuild != "", "HotstringPrefixWatcherRebuildIndex must exist in lib/hotstrings/hotstring_inputhook.ahk")
-	Assert(Resume != "", "Ergopti_OnSuspendResume must exist in lib/lifecycle.ahk")
+	Assert(Rebuild != "", "HotstringPrefixWatcherRebuildIndex must exist in infra/hotstrings/hotstring_inputhook.ahk")
+	Assert(Resume != "", "Ergopti_OnSuspendResume must exist in infra/lifecycle.ahk")
 
 	SuspendPos := InStr(Rebuild, "A_IsSuspended")
 	PendPos := InStr(Rebuild, "_PrefixIndexRebuildPending := true")

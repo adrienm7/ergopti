@@ -21,14 +21,14 @@ local helpers = require("tests.helpers")
 
 -- Stub lib.logger and lib.i18n before loading the module so their require
 -- calls resolve without hitting the filesystem.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end,
 }
 
-package.loaded["lib.notifications"] = {
+package.loaded["infra.notifications"] = {
 	notify = function() end,
 }
 
@@ -38,11 +38,11 @@ package.loaded["lib.notifications"] = {
 --- @return table hs stub for inspecting calls.
 local function fresh_ke()
 	package.loaded["modules.karabiner.ke_lifecycle"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
 
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
-	package.loaded["lib.notifications"] = { notify = function() end }
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.notifications"] = { notify = function() end }
 
 	local KE = helpers.load_with_stubs("modules.karabiner.ke_lifecycle")
 	local hs_stub = _G.hs
@@ -114,7 +114,7 @@ helpers.describe("KELifecycle.launch_headless", function()
 		local KE, hs_stub = fresh_ke()
 		hs_stub.__set_exec("pgrep", "", false)
 		-- Unload notifications to test the pcall path in launch_headless
-		package.loaded["lib.notifications"] = nil
+		package.loaded["infra.notifications"] = nil
 		-- Must not raise even though notifications is gone
 		local ok = pcall(function() KE.launch_headless() end)
 		helpers.assert_eq(ok, true, "launch_headless must not propagate errors")

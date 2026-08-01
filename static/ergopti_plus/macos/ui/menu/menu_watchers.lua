@@ -13,8 +13,8 @@
 
 local M = {}
 local hs          = hs
-local Logger      = require("lib.logger")
-local git_status  = require("lib.git_status")
+local Logger      = require("infra.logger")
+local git_status  = require("infra.git_status")
 local reload_gate = require("reload_gate")
 local LOG         = "menu_watchers"
 
@@ -38,7 +38,7 @@ local DEBOUNCE_SEC = 0.5
 -- before the hold is bypassed. Real activity resets the counter (see
 -- reload_config), so a genuine bulk write never trips it — only a quiet-but-stuck
 -- state (a STALE index.lock left by a crashed git) does. Kept identical to
--- lib/file_watchers' GIT_SETTLE_MAX_DEFERRALS.
+-- infra/file_watchers' GIT_SETTLE_MAX_DEFERRALS.
 local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
 
 --- Creates and starts a pathwatcher on base_dir that triggers a reload on .lua/.toml changes.
@@ -87,7 +87,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	fire_reload = function()
 		-- Hold the reload while base_dir is still being written FROM ANY SOURCE, so
 		-- the driver never reloads init.lua against a half-updated tree (the freeze).
-		-- Two signals, shared with lib/file_watchers through reload_gate: quiescence
+		-- Two signals, shared with infra/file_watchers through reload_gate: quiescence
 		-- for a bulk write of many files, and the precise git index.lock guard. Both
 		-- watchers must hold for the same window, or the unguarded one reloads mid-op.
 		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
@@ -135,7 +135,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 				-- watcher fires, the reload rewrites it, and so on).
 				and not file:match("paths%.toml$")
 				-- Directories the DRIVER ITSELF writes into. This watcher is the second
-				-- recursive one on this tree; lib/file_watchers arms the other and is
+				-- recursive one on this tree; infra/file_watchers arms the other and is
 				-- given the same list, but only that one used it. The TOML snapshot
 				-- cache writes files named "<base>_<hash>.lua" — the exact extension
 				-- treated as a source change here — so under the symlink/copy layout a

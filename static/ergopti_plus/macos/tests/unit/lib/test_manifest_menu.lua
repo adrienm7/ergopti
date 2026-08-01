@@ -52,7 +52,7 @@ local function write_fixture_manifest()
 end
 
 --- Builds a logger stub that records every Logger.warn call's format string.
---- @return table logger_stub Injectable package.loaded["lib.logger"] replacement.
+--- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
 --- @return table warn_messages Array of format strings passed to Logger.warn (grows live).
 local function make_warn_capturing_logger()
 	local warn_messages = {}
@@ -69,15 +69,15 @@ end
 helpers.describe("ManifestMenu.build: warns (does not silently skip) on a handler miss (F-HIGH-25)", function()
 	helpers.it("logs Logger.warn when a type=dynamic entry has no matching dynamic_handlers key", function()
 		local logger_stub, warn_messages = make_warn_capturing_logger()
-		-- manifest_menu.lua captures `local Logger = require("lib.logger")` at
+		-- manifest_menu.lua captures `local Logger = require("infra.logger")` at
 		-- require-time, so the stub must be installed BEFORE load_with_stubs
 		-- forces a fresh require of lib.manifest_menu below.
-		package.loaded["lib.logger"] = logger_stub
+		package.loaded["infra.logger"] = logger_stub
 
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 
 		local tmp_dir = write_fixture_manifest()
-		package.loaded["lib.paths"].shared = function(rel)
+		package.loaded["infra.paths"].shared = function(rel)
 			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
 			return tmp_dir
 		end

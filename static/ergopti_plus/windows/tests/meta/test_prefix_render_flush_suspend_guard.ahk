@@ -15,7 +15,7 @@
 ; extracts the function body, asserts A_IsSuspended is present, and asserts it
 ; precedes _LookupAndRender, so a regression that drops the guard fails CI.
 ;
-; SCOPE: source introspection of lib/hotstrings/hotstring_prefix_watcher.ahk.
+; SCOPE: source introspection of infra/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,7 +45,7 @@ _PRFSG_ReadSource(RelPath) {
 ; ==================================================
 
 _PRFSG_FlushGuardsSuspend() {
-	Src := _PRFSG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
+	Src := _PRFSG_ReadSource("infra/hotstrings/hotstring_prefix_watcher.ahk")
 	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
 	Assert(FlushBody != "", "_PrefixRenderFlush() must exist in hotstring_prefix_watcher.ahk")
 

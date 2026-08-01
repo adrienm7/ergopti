@@ -55,7 +55,7 @@ end
 --- @return table|nil
 local function global_actions_items(paused, fired)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("lib.i18n")
+	local i18n = require("infra.i18n")
 	i18n.get = function(k) return k end
 	i18n.build_language_menu_items = function() return {} end
 

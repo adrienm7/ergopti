@@ -30,7 +30,7 @@
  *            no per-app size of its own.
  *
  * Windows migration to the manifest-reading WebViewHost factory
- * (lib/webview_utils.ahk) is the intended end state; until then this value gate
+ * (infra/webview_utils.ahk) is the intended end state; until then this value gate
  * keeps the hardcoded Windows sizes honest.
  *
  * COVERAGE IS DERIVED FROM THE MANIFEST, NOT FROM A HAND-WRITTEN LIST:

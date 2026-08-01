@@ -34,9 +34,9 @@
 _MetaCheckPrefixRenderDeferred() {
 	; Move-resilient: scan the hotstrings lib dir and the _OnPrefixChar body via
 	; the framework helpers instead of a pinned hotstring_prefix_watcher.ahk path.
-	; The _Prefix* render tokens are unique to lib/hotstrings, so the present-string
+	; The _Prefix* render tokens are unique to infra/hotstrings, so the present-string
 	; checks are unambiguous within that scope.
-	DirSrc := _DriverDirConcat("lib/hotstrings")
+	DirSrc := _DriverDirConcat("infra/hotstrings")
 
 	Assert(InStr(DirSrc, "_PrefixScheduleRender(") > 0,
 		"hotstring_prefix_watcher.ahk must define the debounced render scheduler "
@@ -75,7 +75,7 @@ _MetaCheckPrefixRenderCancelledOnFire() {
 	; and the _OnPrefixChar body for the cancel-before-dispatch ordering. Both
 	; _PrefixCancelRender and HSE_DispatchMatch appear once each (as code) inside
 	; the body, so the positional assertion is preserved.
-	DirSrc := _DriverDirConcat("lib/hotstrings")
+	DirSrc := _DriverDirConcat("infra/hotstrings")
 
 	Assert(InStr(DirSrc, "_PrefixCancelRender(") > 0,
 		"hotstring_prefix_watcher.ahk must define _PrefixCancelRender — without it the "

@@ -60,7 +60,7 @@ end
 helpers.describe("meta: section header alignment", function()
 	local total_warns = 0
 	local total_files = 0
-	for _, sub in ipairs({ "lib", "modules", "ui" }) do
+	for _, sub in ipairs({ "infra", "modules", "ui" }) do
 		for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. sub)) do
 			total_files = total_files + 1
 			total_warns = total_warns + check_file(abs)

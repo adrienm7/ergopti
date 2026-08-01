@@ -13,9 +13,9 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}

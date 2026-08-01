@@ -29,7 +29,7 @@ helpers.assert_true(SOURCE ~= nil, "modules/llm/mlx_deps_checker.lua source must
 
 helpers.describe("mlx_deps_checker source invariants", function()
 	helpers.it("imports lib.paths for fallback discovery", function()
-		helpers.assert_true(SOURCE:find("local Paths        = require(\"lib.paths\")", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find("local Paths        = require(\"infra.paths\")", 1, true) ~= nil)
 	end)
 
 	helpers.it("defines resolve_hs_root from current file location", function()
@@ -100,9 +100,9 @@ end)
 --- ======================================
 
 helpers.describe("mlx_deps_checker public API", function()
-	local original_logger = package.loaded["lib.logger"]
+	local original_logger = package.loaded["infra.logger"]
 	local original_window = package.loaded["ui.download_window"]
-	local original_paths = package.loaded["lib.paths"]
+	local original_paths = package.loaded["infra.paths"]
 	local original_checker = package.loaded["modules.llm.mlx_deps_checker"]
 
 	local calls = {
@@ -114,7 +114,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		success = 0,
 	}
 
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		UNIFIED_LOG_FILE = "/tmp/ergopti_test.log",
 		start = function() calls.start = calls.start + 1 end,
 		debug = function() calls.debug = calls.debug + 1 end,
@@ -135,7 +135,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		is_active = function() return false end,
 	}
 
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		find_from_configdir = function() return nil end,
 	}
 
@@ -170,9 +170,9 @@ helpers.describe("mlx_deps_checker public API", function()
 		helpers.assert_eq(checker.get_state(), "pending")
 	end)
 
-	package.loaded["lib.logger"] = original_logger
+	package.loaded["infra.logger"] = original_logger
 	package.loaded["ui.download_window"] = original_window
-	package.loaded["lib.paths"] = original_paths
+	package.loaded["infra.paths"] = original_paths
 	package.loaded["modules.llm.mlx_deps_checker"] = original_checker
 end)
 
@@ -213,7 +213,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 			},
 		}
 
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
 		package.loaded["ui.download_window"] = {

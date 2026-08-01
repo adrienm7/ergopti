@@ -92,13 +92,13 @@ function check(file, name, pattern, expected, note) {
 // ── retention_days ──────────────────────────────────────────────────────────
 
 check(
-	'windows/lib/logger.ahk',
+	'windows/infra/logger.ahk',
 	'LOGGER_RETENTION_DAYS',
 	/LOGGER_RETENTION_DAYS\s*:=\s*(\d+)/g,
 	registry.logger.retention_days
 );
 check(
-	'macos/lib/logger.lua',
+	'macos/infra/logger.lua',
 	'max_age_days default',
 	/max_age_days\s*=\s*max_age_days\s+or\s+(\d+)/g,
 	registry.logger.retention_days,
@@ -108,13 +108,13 @@ check(
 // ── ring_buffer_size ────────────────────────────────────────────────────────
 
 check(
-	'windows/lib/logger.ahk',
+	'windows/infra/logger.ahk',
 	'LOGGER_RING_BUFFER_SIZE',
 	/LOGGER_RING_BUFFER_SIZE\s*:=\s*(\d+)/g,
 	registry.logger.ring_buffer_size
 );
 check(
-	'macos/lib/logger.lua',
+	'macos/infra/logger.lua',
 	'RING_BUFFER_SIZE',
 	/\bRING_BUFFER_SIZE\s*=\s*(\d+)/g,
 	registry.logger.ring_buffer_size
@@ -129,13 +129,13 @@ check(
 // ── dedup_window: the same duration, in two units ───────────────────────────
 
 check(
-	'windows/lib/logger.ahk',
+	'windows/infra/logger.ahk',
 	'LOGGER_DEDUP_WINDOW_MS',
 	/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/g,
 	registry.logger.dedup_window_ms
 );
 check(
-	'macos/lib/logger.lua',
+	'macos/infra/logger.lua',
 	'DEDUP_WINDOW_SEC',
 	/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/g,
 	registry.logger.dedup_window_ms / 1000,
@@ -146,8 +146,8 @@ check(
 // duration. Stated separately because that is the invariant the comments on
 // both sides claim, and the one nothing was checking.
 {
-	const ms = Number((read('windows/lib/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]);
-	const sec = Number((read('macos/lib/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
+	const ms = Number((read('windows/infra/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]);
+	const sec = Number((read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
 	if (Number.isFinite(ms) && Number.isFinite(sec) && ms !== sec * 1000) {
 		errors.push(
 			`the two dedup windows are different durations: AHK ${ms} ms vs HS ${sec} s (= ${sec * 1000} ms). ` +
@@ -159,7 +159,7 @@ check(
 // ── flush_interval_ms ───────────────────────────────────────────────────────
 
 check(
-	'windows/lib/logger.ahk',
+	'windows/infra/logger.ahk',
 	'LOGGER_FLUSH_INTERVAL_MS',
 	/LOGGER_FLUSH_INTERVAL_MS\s*:=\s*(\d+)/g,
 	registry.logger.flush_interval_ms
@@ -170,11 +170,11 @@ check(
 // The whole failure was an unnamed number. A named constant that some other
 // call site bypasses is the same failure wearing a better name.
 {
-	const hs = read('macos/lib/logger.lua');
+	const hs = read('macos/infra/logger.lua');
 	const bare = [...hs.matchAll(/_dedup\.time\)\s*<\s*(\d+)/g)];
 	if (bare.length > 0) {
 		errors.push(
-			'macos/lib/logger.lua compares against the dedup window as a bare literal again — ' +
+			'macos/infra/logger.lua compares against the dedup window as a bare literal again — ' +
 				'use DEDUP_WINDOW_SEC so the value stays greppable and gate-able'
 		);
 	}

@@ -42,13 +42,13 @@ _MetaCheckNativeHotstringsMigrated() {
 	; Both hotstring_engine_main.ahk and hotstring_engine.ahk are shims now
 	; (#Include hotstring_match.ahk/hotstring_dispatch.ahk and
 	; hotstring_send.ahk/hotstring_builder.ahk respectively) -- fold in the whole
-	; lib/hotstrings dir once and reuse it, while the individual FileReads still
+	; infra/hotstrings dir once and reuse it, while the individual FileReads still
 	; prove each shim file itself is present and readable.
-	LibHotstrings := _DriverDirConcat("lib/hotstrings")
+	LibHotstrings := _DriverDirConcat("infra/hotstrings")
 
 	; The HSE engine must provide the raw-callback dispatch path.
 	EngineMainShim := ""
-	try EngineMainShim := FileRead(WindowsDir . "\lib\hotstrings\hotstring_engine_main.ahk")
+	try EngineMainShim := FileRead(WindowsDir . "\infra\hotstrings\hotstring_engine_main.ahk")
 	Assert(EngineMainShim != "", "hotstring_engine_main.ahk must be readable")
 	EngineMain := EngineMainShim . LibHotstrings
 	Assert(InStr(EngineMain, "_HSE_DispatchRawCallback"),
@@ -59,7 +59,7 @@ _MetaCheckNativeHotstringsMigrated() {
 	; hotstring_engine.ahk must (transitively, via hotstring_builder.ahk) provide
 	; the CreateRawCallbackHotstring builder.
 	EngineShim := ""
-	try EngineShim := FileRead(WindowsDir . "\lib\hotstrings\hotstring_engine.ahk")
+	try EngineShim := FileRead(WindowsDir . "\infra\hotstrings\hotstring_engine.ahk")
 	Assert(EngineShim != "", "hotstring_engine.ahk must be readable")
 	Engine := EngineShim . LibHotstrings
 	Assert(InStr(Engine, "CreateRawCallbackHotstring("),

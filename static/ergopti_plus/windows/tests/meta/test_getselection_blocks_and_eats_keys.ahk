@@ -48,7 +48,7 @@ _GSBlk_ReadSource(RelPath) {
 
 ; The public capture API must arm a timer rather than call blocking ClipWait.
 _GSBlk_GetSelectionIsTimerDriven() {
-	Src := _GSBlk_ReadSource("lib/hotstrings/hotstring_engine.ahk")
+	Src := _GSBlk_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Seg := _DriverFuncBody("GetSelectionAsync")
 	Assert(Seg != "", "GetSelectionAsync() declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Seg, "SetTimer(Job[") > 0,
@@ -62,7 +62,7 @@ Test("hotstring_engine: selection capture is timer-driven (getselection-blocks-a
 ; The poll must cancel a stale selection when the user moves on or changes
 ; window, preventing delayed output from targeting a new selection.
 _GSBlk_PollCancelsStaleContexts() {
-	Src := _GSBlk_ReadSource("lib/hotstrings/hotstring_engine.ahk")
+	Src := _GSBlk_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Seg := _DriverFuncBody("_SelectionCapturePoll")
 	Assert(InStr(Seg, "A_TimeIdlePhysical") > 0 and InStr(Seg, "WinExist") > 0,
 		"selection poll must cancel delayed callbacks after physical input or a foreground-window change")

@@ -146,7 +146,7 @@ pour naviguer aujourd'hui :
    physique (couches base/Shift/CapsLock/AltGr, touches mortes) ; sur macOS c'est le moteur
    d'expansion (boucle eventtap, registre, expander). Les deux README sont corrects
    séparément — c'est le *nom* qui est le bug.
-2. **`registry` désigne deux choses.** `windows/lib/registry.ahk` est un wrapper du registre
+2. **`registry` désigne deux choses.** `windows/infra/registry.ahk` est un wrapper du registre
    Windows ; `macos/modules/keymap/registry.lua` est le registre de hotstrings.
 
 ---
@@ -312,7 +312,7 @@ aujourd'hui.
 |---|---|---|
 | 1 | `_shared/lua/hotstring_engine/init.lua` (281 l) | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
 | 2 | `macos/modules/keymap/{registry*,expander}.lua` (2 302 l) | macOS |
-| 3 | `windows/lib/hotstrings/hotstring_match.ahk` + `hotstring_engine_main.ahk` | Windows |
+| 3 | `windows/infra/hotstrings/hotstring_match.ahk` + `hotstring_engine_main.ahk` | Windows |
 | 4 | un matcher **écrit dans un fichier de test AHK** | personne (fixture) |
 | 5 | un algorithme de référence JS dans un script de mutation | personne |
 
@@ -588,7 +588,7 @@ dans un générateur JS, ce qui crée l'illusion d'une transpilation — et ⚠
 `_shared/README.md` documente le contraire comme un fait.
 
 Le prétexte historique « l'AHK ne peut pas lire les données partagées » est **faux** :
-`windows/lib/json.ahk` et `windows/lib/toml/` existent, et l'AHK lit déjà au runtime
+`windows/infra/json.ahk` et `windows/infra/toml/` existent, et l'AHK lit déjà au runtime
 `menu_manifest.json`, `priority.json`, les 21 locales, tous les TOML de hotstrings et
 `profiles.json`. Le codegen n'a donc jamais été une question de **capacité**, seulement de
 **coût de boot** et de **pré-résolution**.
@@ -691,7 +691,7 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
 4. `macos/modules/gestures/actions.lua` : ajouter l'entrée `sg(...)`.
 5. `linux/modules/gestures/manager.lua` : ajouter une branche `elseif` dans
    `_execute_action` **et** une entrée dans la table `ACTION_LABELS` (français en dur).
-6. Pour la lier à un accord clavier : `windows/lib/feature_state.ahk`
+6. Pour la lier à un accord clavier : `windows/infra/feature_state.ahk`
    `KEYBOARD_SHORTCUT_DEFAULTS`, **plus** un support de préfixe dans
    `_KeyboardSlotSendCode` (qui ne comprend que 4 préfixes — `win_alt_` n'existe pas).
 7. macOS : rien à faire, parce qu'**il n'y a aucun sélecteur** capable d'assigner un slot.
@@ -835,7 +835,7 @@ Le plafond de tampon | 4 sites : le moteur partagé, deux fichiers AHK, et `maco
 **Changer la logique de correspondance** — les trois sites, avec ce qu'il faut savoir de
 chacun :
 
-1. **Windows** — `windows/lib/hotstrings/hotstring_match.ahk` : `_HSE_Beats` (départage),
+1. **Windows** — `windows/infra/hotstrings/hotstring_match.ahk` : `_HSE_Beats` (départage),
    `_HSE_EndCharBeats` (étoile vs end-char), `HSE_FindMatchAtEnd` (les deux chemins de
    balayage), `_HSE_WordBoundaryAllows` et `_HSE_WordBoundarySet`. L'état du tampon est dans
    le fichier voisin `hotstring_engine_main.ahk`.

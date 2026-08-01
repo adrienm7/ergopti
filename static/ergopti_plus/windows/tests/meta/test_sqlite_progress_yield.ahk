@@ -4,7 +4,7 @@
 
 _SSPY_AssertYieldOpsParams() {
 	; Move-resilient: scan the whole driver source via the framework helper instead
-	; of a pinned lib/sqlite3.ahk read. The exact signature strings below are unique
+	; of a pinned infra/sqlite3.ahk read. The exact signature strings below are unique
 	; to sqlite3.ahk, so the whole-tree scope cannot trivially satisfy them.
 	Src := _DriverSourceConcat()
 

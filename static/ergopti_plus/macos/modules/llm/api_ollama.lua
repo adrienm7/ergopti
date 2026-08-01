@@ -7,10 +7,10 @@
 --- ==============================================================================
 
 local M = {}
-local Logger  = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Notifications = require("lib.notifications")
-local i18n    = require("lib.i18n")
+local Logger  = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Notifications = require("infra.notifications")
+local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")

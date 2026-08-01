@@ -10,7 +10,7 @@
  * ROOT CAUSE ENCODED:
  * The display ORDER was already single-sourced from locale_order.json and gated.
  * The NAMES were not — three hand-maintained tables — and one had silently
- * fallen behind. `linux/lib/i18n.lua`'s `display_name()` carried a map of 16 of
+ * fallen behind. `linux/infra/i18n.lua`'s `display_name()` carried a map of 16 of
  * the 21 shipped locales and ended in `return names[code] or code`, so `da`,
  * `no`, `cs`, `he` and `hi` rendered in the Linux language menu as those bare
  * two-letter codes, sitting between "Nederlands" and "Русский" while the other

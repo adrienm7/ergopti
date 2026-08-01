@@ -22,10 +22,10 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
+local notifications = require("infra.notifications")
 local ui_builder    = require("ui.ui_builder")
-local i18n          = require("lib.i18n")
-local Paths         = require("lib.paths")
+local i18n          = require("infra.i18n")
+local Paths         = require("infra.paths")
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 

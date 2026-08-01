@@ -23,7 +23,7 @@
 ; be visible in the log. Deliberately mirrors the LLM assertion so the two
 ; callers of the same guarantee cannot drift.
 ;
-; Meta-static because the headless harness loads neither lib/metrics/
+; Meta-static because the headless harness loads neither infra/metrics/
 ; metrics_filters.ahk nor modules/keylogger/keylogger_password.ahk.
 ; ==============================================================================
 

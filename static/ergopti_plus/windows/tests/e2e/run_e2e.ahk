@@ -46,14 +46,14 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../test_stubs.ahk
 
 ; Production engine dependencies (same order as run_all.ahk).
-#Include ../../lib/app_state.ahk
-#Include ../../lib/ui_style.ahk
-#Include ../../lib/logger.ahk
+#Include ../../infra/app_state.ahk
+#Include ../../infra/ui_style.ahk
+#Include ../../infra/logger.ahk
 
-#Include ../../lib/window_utils.ahk
-#Include ../../lib/text_utils.ahk
-#Include ../../lib/hotstrings/hotstring_engine.ahk
-#Include ../../lib/hotstrings/hotstring_engine_main.ahk
+#Include ../../infra/window_utils.ahk
+#Include ../../infra/text_utils.ahk
+#Include ../../infra/hotstrings/hotstring_engine.ahk
+#Include ../../infra/hotstrings/hotstring_engine_main.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()

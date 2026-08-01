@@ -53,7 +53,7 @@ end
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
-	local i18n = require("lib.i18n")
+	local i18n = require("infra.i18n")
 
 	local items = {}
 	local ok_actions, Actions = pcall(require, "modules.gestures.actions")

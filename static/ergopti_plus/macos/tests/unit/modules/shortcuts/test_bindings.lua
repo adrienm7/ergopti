@@ -12,14 +12,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
 -- at module level. The real implementation iterates hs.keycodes.map, which
 -- is not populated in the unit-test stub, so to_name would error. We provide
 -- the two fields that system.lua actually needs.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	F18_WAKE_OS             = 79,
 	F19_VOLUME_SCROLL_MODIFIER = 80,
 	to_name = function(code)
@@ -31,7 +31,7 @@ package.loaded["lib.keycodes"] = {
 -- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
 -- shortcut labels. The real module depends on locale JSON files unavailable
 -- in unit tests.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -142,7 +142,7 @@ helpers.describe("shortcuts.bindings: public API", function()
 		-- Drift guard: the macOS default MUST equal the
 		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
 		-- silently diverge from the AHK driver, which reads the same default.
-		local Manifest = require("lib.manifest_reader")
+		local Manifest = require("infra.manifest_reader")
 		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
 	end)
 end)
@@ -318,7 +318,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 	-- Builds a fresh Bindings instance with hs.hotkey.bind stubbed to capture the
 	-- ctrl_g callback, and hs.urlevent.openURL stubbed to record the URL it opened.
 	local function make_bindings_with_ctrl_g_spy()
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			F18_WAKE_OS                = 79,
 			F19_VOLUME_SCROLL_MODIFIER = 80,
 			to_name = function(code)
@@ -326,7 +326,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 				return MAP[code] or ("keycode_" .. tostring(code))
 			end,
 		}
-		package.loaded["lib.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["modules.shortcuts.bindings"] = nil
 		-- apps.lua captures `local urlevent = hs.urlevent` at module load time, so a
 		-- cached instance from an earlier test would still call the OLD hs stub's

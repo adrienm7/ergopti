@@ -13,7 +13,7 @@ local Logger = require("logger.shim")
 local LOG = "bridge.changelog"
 
 -- Read canonical version from the single-source module (SSoT).
-local Version = require("lib.version")
+local Version = require("infra.version")
 
 --- Builds the initial changelog data payload.
 --- @param state table Daemon state.

@@ -39,9 +39,9 @@ local NOT_RUNNING   = "AppNotRunning"
 --- @return table Export, function probe_count
 local function load_export()
 	package.loaded["modules.keylogger.export"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
 
 	local probes = { get = 0, info = 0 }
 	local Export = helpers.load_with_stubs("modules.keylogger.export", {

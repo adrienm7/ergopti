@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local function fresh_detector()
 	package.loaded["modules.llm.backend_detector"] = nil
-	package.loaded["lib.logger"] = nil
+	package.loaded["infra.logger"] = nil
 	package.loaded["hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()

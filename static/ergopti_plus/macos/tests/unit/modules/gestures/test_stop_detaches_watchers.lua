@@ -32,8 +32,8 @@ local helpers = require("tests.helpers")
 -- =======================================
 
 -- Stub the sub-modules before loading gestures so they do not attempt real OS calls
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 package.loaded["modules.gestures.actions"] = {
 	AX_NAMES             = {},

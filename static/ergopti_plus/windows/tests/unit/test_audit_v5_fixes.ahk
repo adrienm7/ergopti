@@ -9,7 +9,7 @@
 ;   3. DATA_BLOB pointer offset hardcoded to 8 -- wrong on x86 where pbData is at offset 4
 ;      (modules/llm/api_token_crypto.ahk)
 ;   4. HookDispatcher.Unregister lacked a finally block -- inconsistent with Register
-;      (lib/hook_dispatcher.ahk)
+;      (infra/hook_dispatcher.ahk)
 
 ; (test_framework.ahk is provided once by run_all.ahk — do not re-include it here
 ; or the suite errors on duplicate definitions.)
@@ -120,7 +120,7 @@ Test("Audit-v5: DPAPI DATA_BLOB pointer offset uses A_PtrSize (not hardcoded 8)"
 
 TestAuditV5_UnregisterFinally() {
 	; Move-resilient: scan the whole driver source via the framework helper instead
-	; of a pinned lib/hook_dispatcher.ahk read. The "static Unregister(...)" /
+	; of a pinned infra/hook_dispatcher.ahk read. The "static Unregister(...)" /
 	; "static Dispatch(" anchors below are unique to hook_dispatcher.ahk, so the
 	; block extractor stays scoped to the Unregister method.
 	Src := _DriverSourceConcat()

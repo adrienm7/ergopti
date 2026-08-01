@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Final config write and driver reload, plus the GUI utility helpers shared by every step (centering, progress-dots row, dynamic-width nav buttons, active-Gui cleanup).
 ;
-; Split out of the former lib/onboarding.ahk (the module split); see
+; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the onboarding/*.ahk files is irrelevant.
 ; ==============================================================================
@@ -23,7 +23,7 @@
 ; Write all collected wizard answers to config.toml in one atomic call, then
 ; reload so ErgoptiPlus boots with a fully-configured environment.
 ; Persist the chosen config dir to paths.toml. Same format produced by
-; the FilePathsEditor dialog (lib/onboarding-independent helper in
+; the FilePathsEditor dialog (infra/onboarding-independent helper in
 ; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
 ; structurally identical files.
 ; The config folder the wizard's answers will actually land in. _ConfigDir is

@@ -115,7 +115,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- =================================================
 
 	helpers.it("ManifestMenu.resolve_disabled_when enforces AND semantics against the real manifest", function()
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 		for _, c in ipairs(CANON) do
 			-- Every required key true -> enabled.
 			helpers.assert_true(

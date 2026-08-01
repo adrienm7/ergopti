@@ -6,7 +6,7 @@
 --- Regression guard ensuring that modules/hotstrings/loader.lua delegates
 --- TOML parsing to the shared toml_codec.reader module rather than
 --- reimplementing its own parser. The impurity that previously prevented
---- delegation (a hard require("lib.logger") in the shared reader) is now
+--- delegation (a hard require("infra.logger") in the shared reader) is now
 --- fixed; this test locks in the delegation so the fork cannot silently return.
 ---
 --- WHAT WE CHECK:

@@ -21,10 +21,10 @@
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
 ; registry (_shared/modules/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
-; called once at boot from lib/boot.ahk. They start at the sentinel 0 only as a
+; called once at boot from infra/boot.ahk. They start at the sentinel 0 only as a
 ; declaration placeholder. IMPORTANT: AHK v2 executes a file's top-level
 ; `global X := ...` assignments at its #Include POSITION in the auto-execute flow,
-; NOT before it -- so this file MUST be included before lib/boot.ahk (ErgoptiPlus.ahk
+; NOT before it -- so this file MUST be included before infra/boot.ahk (ErgoptiPlus.ahk
 ; does this explicitly in the early include manifest), otherwise these sentinel 0s
 ; would run AFTER TapHoldsLoadTimings() and re-zero the loaded values on every boot.
 

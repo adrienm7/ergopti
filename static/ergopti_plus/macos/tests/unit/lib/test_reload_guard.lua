@@ -18,14 +18,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Loads a fresh reload_guard with a clean stubbed persistent store.
 local function fresh()
 	package.loaded["adapters.storage"] = nil
-	package.loaded["lib.reload_guard"] = nil
-	return helpers.load_with_stubs("lib.reload_guard")
+	package.loaded["infra.reload_guard"] = nil
+	return helpers.load_with_stubs("infra.reload_guard")
 end
 
 helpers.describe("reload_guard: reload-vs-quit signal", function()

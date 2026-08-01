@@ -16,13 +16,13 @@
 local M = {}
 
 local hs            = hs
-local toml_reader   = require("lib.toml.reader")
-local toml_writer   = require("lib.toml.writer")
+local toml_reader   = require("infra.toml.reader")
+local toml_writer   = require("infra.toml.writer")
 local ui_builder    = require("ui.ui_builder")
-local Logger        = require("lib.logger")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
-local Paths         = require("lib.paths")
+local Logger        = require("infra.logger")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
+local Paths         = require("infra.paths")
 local LOG           = "hotstring_editor"
 
 
@@ -36,7 +36,7 @@ local LOG           = "hotstring_editor"
 -- ====================================
 
 -- Fallback only. The live value comes from keymap.PERSONAL_GROUP_NAME, which is
--- the SAME name lib/personal_hotstrings.lua uses to load this very file at boot.
+-- the SAME name infra/personal_hotstrings.lua uses to load this very file at boot.
 -- Reloading it under a different group name did not replace the boot copy: the
 -- dedup key includes the group, so both survived, and the sort comparator broke
 -- the tie on group_order — a first-load-wins counter the boot group always wins.

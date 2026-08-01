@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local function load_reader(open_count)
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,

@@ -196,7 +196,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- could never have caught that, and neither could it catch the raw key being
   -- echoed back, which is what i18n.get returns on a miss.
   helpers.it("labels come from the shared sg_actions catalogue, not from a local table", function()
-    local i18n = require("lib.i18n")
+    local i18n = require("infra.i18n")
     local label = M.get_action_label("vol_up")
     helpers.assert_eq(label, i18n.get("sg_actions.vol_up"),
       "the label must be whatever the shared catalogue says for the active locale")
@@ -205,7 +205,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("the workspace ids resolve through their desktop_* catalogue entries", function()
-    local i18n = require("lib.i18n")
+    local i18n = require("infra.i18n")
     -- This driver says "workspace", the shared catalogue says "desktop". The
     -- alias is what lets an existing user's config.toml keep resolving, so it
     -- has to be exercised rather than assumed.

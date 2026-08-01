@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 -- =============================================================
 
 helpers.describe("updater constants single source", function()
-	package.loaded["lib.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	local updater = helpers.load_with_stubs("modules.updater")
 
 	helpers.it("GH_OWNER is the canonical GitHub owner", function()

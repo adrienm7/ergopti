@@ -47,7 +47,7 @@ local UTF8_BOM = "\239\187\191"
 --- from this file's location. manager.lua lives at
 --- linux/modules/shortcuts/manager.lua, so the 4 trailing path segments are
 --- stripped to reach static/ergopti_plus before descending into the shared tree.
---- Mirrors the debug.getinfo path walk in lib/locale.lua.
+--- Mirrors the debug.getinfo path walk in infra/locale.lua.
 --- @return string Absolute catalogue path, or "" when the location is unresolvable.
 local function resolve_wrap_symbols_path()
 	local src = debug and debug.getinfo and debug.getinfo(1, "S")

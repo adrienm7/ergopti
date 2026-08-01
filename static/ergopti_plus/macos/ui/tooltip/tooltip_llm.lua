@@ -12,14 +12,14 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Keycodes = require("lib.keycodes")
+local Keycodes = require("infra.keycodes")
 local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
-local HotPath = require("lib.hotpath_profiler")
+local HotPath = require("infra.hotpath_profiler")
 
 local MAC_KEYCODES_NUMBERS = {
 	[18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,

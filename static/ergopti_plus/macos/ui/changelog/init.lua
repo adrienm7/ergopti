@@ -23,10 +23,10 @@
 
 local M = {}
 
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
-local i18n       = require("lib.i18n")
+local i18n       = require("infra.i18n")
 
 local LOG = "changelog_window"
 

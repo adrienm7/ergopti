@@ -39,7 +39,7 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
+local Logger         = require("infra.logger")
 local TextSender     = require("adapters.text_sender")
 local TimerScheduler = require("adapters.timer_scheduler")
 

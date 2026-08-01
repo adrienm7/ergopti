@@ -36,7 +36,7 @@
 ; ==========================================
 ; ==========================================
 
-; The platform filter is reimplemented here rather than imported: lib/manifest_menu.ahk
+; The platform filter is reimplemented here rather than imported: infra/manifest_menu.ahk
 ; is not part of the headless harness. This is not a tautology -- the assertions
 ; below run it against the REAL shared menu_manifest.json, so the data under test
 ; is production data, not a fixture built by this file.

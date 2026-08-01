@@ -48,7 +48,7 @@ local LOG = "modules.keylogger.text_cipher"
 local MACHINE_ID_PATH = "/etc/machine-id"
 
 --- Older/alternative location, populated by dbus on non-systemd systems.
-local MACHINE_ID_FALLBACK_PATH = "/var/lib/dbus/machine-id"
+local MACHINE_ID_FALLBACK_PATH = "/var/infra/dbus/machine-id"
 
 
 

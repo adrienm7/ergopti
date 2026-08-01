@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("logger: error notifications respect dedup (no toast storm)", function()
 	helpers.it("fires the notification handler once for N identical errors in the dedup window", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")
 
 		local log_emits  = 0
@@ -50,7 +50,7 @@ helpers.describe("logger: error notifications respect dedup (no toast storm)", f
 	end)
 
 	helpers.it("still fires the handler for a genuinely new error after a deduped run", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")
 
 		local notif = {}

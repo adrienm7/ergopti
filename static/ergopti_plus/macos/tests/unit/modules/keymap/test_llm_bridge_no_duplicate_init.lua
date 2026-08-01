@@ -31,16 +31,16 @@ local helpers = require("tests.helpers")
 -- load_with_stubs() call below gets a truly fresh module graph.
 local STUB_MODULES = {
 	"modules.keymap.utils",
-	"lib.text_utils",
+	"infra.text_utils",
 	"modules.llm",
-	"lib.keycodes",
+	"infra.keycodes",
 	"modules.keylogger",
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
-	"lib.logger",
+	"infra.logger",
 }
 for _, mod in ipairs(STUB_MODULES) do
 	package.loaded[mod] = nil
@@ -48,11 +48,11 @@ end
 
 -- Install hs stub first so that modules which reference `hs` at load time
 -- find a valid global. load_with_stubs() sets _G.hs internally.
-local _ = helpers.load_with_stubs("lib.logger")
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Load a fresh Logger instance that we can attach a capture sink to.
-package.loaded["lib.logger"] = nil
-local Logger = require("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = require("infra.logger")
 Logger.set_level(Logger.LEVELS.DEBUG)
 
 -- Minimal stub for modules.keymap.utils — only the functions referenced at
@@ -65,7 +65,7 @@ package.loaded["modules.keymap.utils"] = {
 }
 
 -- Minimal stub for lib.text_utils.
-package.loaded["lib.text_utils"] = {
+package.loaded["infra.text_utils"] = {
 	is_letter_char  = function(_) return false end,
 	trig_lower      = function(s) return s end,
 	conform_replacement = function(r, _, _) return r end,
@@ -86,7 +86,7 @@ package.loaded["modules.llm"] = {
 }
 
 -- lib.keycodes: only the constants accessed at load time matter.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	ESCAPE             = 53,
 	RETURN             = 36,
 	F16_LLM_CHAIN_SIGNAL = 106,

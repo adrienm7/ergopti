@@ -68,8 +68,8 @@ end)
 --- ========================================
 
 helpers.describe("gestures startup degraded mode", function()
-	local original_logger = package.loaded["lib.logger"]
-	local original_notifications = package.loaded["lib.notifications"]
+	local original_logger = package.loaded["infra.logger"]
+	local original_notifications = package.loaded["infra.notifications"]
 	local original_actions = package.loaded["modules.gestures.actions"]
 	local original_engine = package.loaded["modules.gestures.engine"]
 	local original_conflicts = package.loaded["modules.gestures.conflicts"]
@@ -98,8 +98,8 @@ helpers.describe("gestures startup degraded mode", function()
 		end,
 	}
 
-	package.loaded["lib.logger"] = logger_stub
-	package.loaded["lib.notifications"] = { notify = function() end }
+	package.loaded["infra.logger"] = logger_stub
+	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["modules.gestures.actions"] = {
 		AX_NAMES = {},
 		SG_NAMES = {},
@@ -134,8 +134,8 @@ helpers.describe("gestures startup degraded mode", function()
 		helpers.assert_eq(logs.error, 0)
 	end)
 
-	package.loaded["lib.logger"] = original_logger
-	package.loaded["lib.notifications"] = original_notifications
+	package.loaded["infra.logger"] = original_logger
+	package.loaded["infra.notifications"] = original_notifications
 	package.loaded["modules.gestures.actions"] = original_actions
 	package.loaded["modules.gestures.engine"] = original_engine
 	package.loaded["modules.gestures.conflicts"] = original_conflicts

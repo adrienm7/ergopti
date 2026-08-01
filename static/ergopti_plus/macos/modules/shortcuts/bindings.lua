@@ -19,9 +19,9 @@ local hs          = hs
 local text_acts   = require("modules.shortcuts.actions.text")
 local sys_acts    = require("modules.shortcuts.actions.system")
 local app_acts    = require("modules.shortcuts.actions.apps")
-local Logger      = require("lib.logger")
-local i18n        = require("lib.i18n")
-local Manifest    = require("lib.manifest_reader")
+local Logger      = require("infra.logger")
+local i18n        = require("infra.i18n")
+local Manifest    = require("infra.manifest_reader")
 
 local LOG = "shortcuts.bindings"
 

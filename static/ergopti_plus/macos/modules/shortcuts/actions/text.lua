@@ -20,9 +20,9 @@ local hs         = hs
 local timer      = hs.timer
 local eventtap   = hs.eventtap
 local pasteboard = hs.pasteboard
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
-local Timings    = require("lib.timings")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
+local Timings    = require("infra.timings")
 
 local LOG = "shortcuts.actions.text"
 
@@ -186,7 +186,7 @@ end
 -- snapshots a clipboard the first run had already overwritten with its own
 -- intermediate value, and then "restores" that instead of the user's real
 -- clipboard — silently destroying it. Guarded with the in-flight-flag pattern
--- already used by lib/ui_restore and api_mlx, including their hard timeout: a
+-- already used by infra/ui_restore and api_mlx, including their hard timeout: a
 -- flag that could stick would block every later transform for the session.
 local _transform_in_flight = false
 -- Same guard for the wrap path, declared beside its sibling so the pair stays visible.

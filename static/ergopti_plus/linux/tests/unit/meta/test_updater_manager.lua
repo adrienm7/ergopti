@@ -145,7 +145,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	-- never have caught that, and neither can it catch i18n.get echoing the raw
 	-- key back on a miss.
 	helpers.it("the idle label comes from the shared catalogue", function()
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
 		helpers.assert_eq(label, i18n.get("menu.about.check_for_updates"),
@@ -155,7 +155,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	helpers.it("the update-available label carries the tag through the catalogue template", function()
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		-- A tag containing "%" is the reason the substitution is done on plain
 		-- indices: gsub would read it as a capture reference in the REPLACEMENT
 		-- string and raise "invalid use of '%'".

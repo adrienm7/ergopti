@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 -- Replace hs.console.printStyledtext with a recording stub before loading.
-local Logger = helpers.load_with_stubs("lib.logger")
+local Logger = helpers.load_with_stubs("infra.logger")
 
 local function mkdir_p(path)
 	if package.config:sub(1, 1) == "\\" then
@@ -100,7 +100,7 @@ end)
 helpers.describe("Logger: ring buffer", function()
 	helpers.it("ring_buffer_snapshot returns empty table when no lines emitted", function()
 		-- Fresh logger state — reload to reset internal ring buffer.
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		local snap = FreshLogger.ring_buffer_snapshot()
 		helpers.assert_true(type(snap) == "table", "snapshot must be a table")
@@ -108,7 +108,7 @@ helpers.describe("Logger: ring buffer", function()
 	end)
 
 	helpers.it("ring_buffer_snapshot contains emitted lines in order", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		FreshLogger.info("ring_test", "Line A.")
 		FreshLogger.info("ring_test", "Line B.")
@@ -121,7 +121,7 @@ helpers.describe("Logger: ring buffer", function()
 	end)
 
 	helpers.it("ring_buffer_snapshot respects the 200-entry cap (circular overwrite)", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		-- Emit 205 lines — the first 5 should be overwritten.
 		for i = 1, 205 do
@@ -137,7 +137,7 @@ helpers.describe("Logger: ring buffer", function()
 	end)
 
 	helpers.it("lines suppressed by dedup are NOT pushed to the ring buffer", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		-- Emit the same line 5 times — dedup should suppress lines 2-5.
 		for _ = 1, 5 do
@@ -158,7 +158,7 @@ end)
 
 helpers.describe("Logger: deduplication", function()
 	helpers.it("does not suppress the first occurrence of a repeated line", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		-- First call must always emit.
 		local snap_before = FreshLogger.ring_buffer_snapshot()
@@ -168,7 +168,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("suppresses consecutive identical lines (count > 1)", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		FreshLogger.info("dedup_test", "Repeated.")
 		local snap_after_first = FreshLogger.ring_buffer_snapshot()
@@ -180,7 +180,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("flushes a dedup summary when a different line breaks the run", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		FreshLogger.info("dedup_test", "AAA.")
 		FreshLogger.info("dedup_test", "AAA.")  -- suppressed
@@ -201,7 +201,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("does not suppress lines of different levels even with same text", function()
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 		FreshLogger.info("dedup_test", "Same text.")
 		FreshLogger.warn("dedup_test", "Same text.")
@@ -259,7 +259,7 @@ end)
 
 helpers.describe("Logger: test sink", function()
 	helpers.it("receives every emitted line", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		local captured = {}
 		Logger.set_sink(function(line) captured[#captured + 1] = line end)
 		Logger.set_level("INFO")
@@ -271,7 +271,7 @@ helpers.describe("Logger: test sink", function()
 	end)
 
 	helpers.it("captured line contains the level label", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		local captured = {}
 		Logger.set_sink(function(line) captured[#captured + 1] = line end)
 		Logger.set_level("INFO")
@@ -282,7 +282,7 @@ helpers.describe("Logger: test sink", function()
 	end)
 
 	helpers.it("sink is not called when message is filtered out", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		local calls = 0
 		Logger.set_sink(function() calls = calls + 1 end)
 		Logger.set_level("WARNING")
@@ -292,7 +292,7 @@ helpers.describe("Logger: test sink", function()
 	end)
 
 	helpers.it("sink is removed after set_sink(nil)", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		local calls = 0
 		Logger.set_sink(function() calls = calls + 1 end)
 		Logger.set_sink(nil)
@@ -332,7 +332,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		-- Ensure directory exists (init_log_path uses ShellRunner which may be stubbed in this env)
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base, 14)
 
@@ -379,7 +379,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -401,7 +401,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -423,7 +423,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -454,7 +454,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -481,7 +481,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -506,7 +506,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 	-- Day rollover simulation for the errors filename (critical per user request)
 	helpers.it("simulates day rollover and switches to new ERRORS_LOG_FILE", function()
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 
 		-- Save real date
@@ -576,7 +576,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 
@@ -597,7 +597,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 	-- FS write failure to errors file must not crash anything (user requested)
 	helpers.it("survives hard FS write failure on errors file (best-effort, no crash)", function()
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path("/tmp/ergopti_test_fs_fail/", 14)
 
@@ -632,7 +632,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 		L.init_log_path(test_base)
 

@@ -15,11 +15,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/config_overrides.lua rather than by
+-- Selected by a declaration unique to infra/config_overrides.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function match_quoted_prefix")
-helpers.assert_true(src ~= nil, "lib/config_overrides.lua source must be locatable")
+helpers.assert_true(src ~= nil, "infra/config_overrides.lua source must be locatable")
 
 -- Test 1: The old broken pattern must not appear.
 local has_old_pattern = src:find('[^"]*$', 1, true) ~= nil

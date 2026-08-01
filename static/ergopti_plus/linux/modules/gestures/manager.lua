@@ -30,10 +30,10 @@
 local M = {}
 
 local Logger = require("logger.shim")
-local Timings = require("lib.timings")
-local Monotonic = require("lib.monotonic")
+local Timings = require("infra.timings")
+local Monotonic = require("infra.monotonic")
 local TomlCodec = require("toml_codec")
-local i18n = require("lib.i18n")
+local i18n = require("infra.i18n")
 local LOG = "modules.gestures.manager"
 
 -- Actions the shared catalogue describes as a single xdotool combo, generated
@@ -843,7 +843,7 @@ function M.init(opts)
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
 	end
-	_config_path = opts.config_path or require("lib.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_persist = opts.persist == true
 	if _persist then load_user_config(_config_path) end
 

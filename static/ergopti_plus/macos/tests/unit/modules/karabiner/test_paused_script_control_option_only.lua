@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 local Generator = helpers.load_with_stubs("modules.karabiner.generator")
 
 helpers.describe("paused script-control rules use the real option key, not rcmd", function()

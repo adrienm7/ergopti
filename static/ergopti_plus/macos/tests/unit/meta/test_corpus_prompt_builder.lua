@@ -52,7 +52,7 @@ local function read_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Use hs.json via the stub loader
-	helpers.load_with_stubs("lib.logger")
+	helpers.load_with_stubs("infra.logger")
 	local ok, corpus = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(corpus) end
 	return corpus, nil

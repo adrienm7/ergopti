@@ -27,7 +27,7 @@ local hs   = hs
 local fs   = require("hs.fs")
 local json = require("hs.json")
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "keylogger.rotation"
 
 

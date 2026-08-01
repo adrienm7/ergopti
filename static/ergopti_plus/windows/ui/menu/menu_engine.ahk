@@ -20,7 +20,7 @@
 ;
 ; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
 ; ``path`` (canonical v2), ``id``, ``description_key``, etc. The toggle, state
-; read and label are all driven by that v2 path through lib/feature_io.ahk.
+; read and label are all driven by that v2 path through infra/feature_io.ahk.
 ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
 ; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
@@ -78,7 +78,7 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ;
 ; ``V2Path`` is the canonical v2 path of the feature (e.g.
 ; "hotstrings.personal.<id>", "ahk.shortcuts.personal.<name>"); toggles and state
-; reads go through lib/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
+; reads go through infra/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
@@ -225,10 +225,10 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 }
 
 ; Sets the remap target letter on a feature and enables it. Persists both the
-; enabled flag and the letter to config.toml via lib/feature_io.ahk so the
+; enabled flag and the letter to config.toml via infra/feature_io.ahk so the
 ; change survives reload, then reloads to wire the new shortcut at the layer
 ; level. The Reload runs the boot pipeline which re-derives the v1 Features Map
-; from Features via lib/master_gates.ahk — no need to mutate v1 in-place.
+; from Features via infra/master_gates.ahk — no need to mutate v1 in-place.
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetter(V2Path, Letter) {
 	global Features
@@ -353,7 +353,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 ; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
 ; in-process (no Reload); a Shortcuts modifier-combo sub-Map key forces its
 ; siblings off in the same atomic batch (mutual exclusion); everything else
-; persists the flip and Reloads. Reads + writes go through lib/feature_io.ahk, so
+; persists the flip and Reloads. Reads + writes go through infra/feature_io.ahk, so
 ; no v1 PascalCase path or rename table is consulted.
 ToggleFeatureV2(V2Path) {
 	global Features

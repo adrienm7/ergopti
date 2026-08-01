@@ -35,7 +35,7 @@
 
 ; A symbol and a directory chosen so no plausible refactor ever creates them.
 global _DSHFL_ABSENT_FUNC := "_DshflNoSuchFunctionEverDefined"
-global _DSHFL_ABSENT_DIR := "lib/no_such_directory_ever_created"
+global _DSHFL_ABSENT_DIR := "infra/no_such_directory_ever_created"
 
 
 _DSHFL_MissingFunctionThrows() {
@@ -85,7 +85,7 @@ Test("meta source-helpers: a real symbol still resolves (driver-source-helpers-r
 
 
 _DSHFL_RealDirectoryStillResolves() {
-	Src := _DriverDirConcat("lib/hotstrings")
+	Src := _DriverDirConcat("infra/hotstrings")
 	Assert(StrLen(Src) > 1000,
 		"_DriverDirConcat must still concatenate a directory that exists — a helper that throws on everything would otherwise pass section 1")
 }

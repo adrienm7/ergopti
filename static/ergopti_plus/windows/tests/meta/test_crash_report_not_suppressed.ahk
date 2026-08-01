@@ -25,7 +25,7 @@
 ;    throws, so an unguarded read there aborts the whole report — the exact
 ;    failure the healthcheck's own degradation was added to prevent.
 ;
-; SCOPE: source introspection of lib/error_net.ahk and modules/diagnostics/crash_reporter.ahk.
+; SCOPE: source introspection of infra/error_net.ahk and modules/diagnostics/crash_reporter.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

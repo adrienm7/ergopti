@@ -15,10 +15,10 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local Manifest      = require("lib.manifest_reader")
-local Timings       = require("lib.timings")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local Manifest      = require("infra.manifest_reader")
+local Timings       = require("infra.timings")
 local LOG           = "gestures"
 
 local function load_touchdevice_module()

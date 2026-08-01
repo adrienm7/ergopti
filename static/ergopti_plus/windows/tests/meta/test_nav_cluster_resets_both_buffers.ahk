@@ -169,7 +169,7 @@ _NCR_BoundaryPromiseMatchesTheContract() {
 _NCR_EngineContractStillNamesTheCluster() {
 	Src := _StripFullLineComments(_DriverSourceConcat())
 	Assert(Src != "", "the driver source must be readable")
-	Doc := _DriverDirConcat("lib/hotstrings")
+	Doc := _DriverDirConcat("infra/hotstrings")
 	for Needle in ["Home", "End", "PgUp", "PgDn", "Insert", "Delete"]
 		Assert(InStr(Doc, Needle) > 0,
 			"the hotstring engine's documented buffer-invalidation contract must keep naming '" . Needle . "' — that list is the only statement of which keys belong to this cluster, and it is what revealed that only half of them were wired")

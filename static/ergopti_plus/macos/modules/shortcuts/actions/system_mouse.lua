@@ -18,11 +18,11 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("lib.logger")
+local Logger        = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local text_utils = require("lib.text_utils")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
+local text_utils = require("infra.text_utils")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
 local MouseControl  = require("adapters.mouse_control")
 local ShellRunner   = require("adapters.shell_runner")
 

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the menu-dispatch-callbacks-unbounded-growth finding.
 ;
-; The dispatch-bypass layer (lib/menu_dispatcher.ahk) records one entry per
+; The dispatch-bypass layer (infra/menu_dispatcher.ahk) records one entry per
 ; tracked menu item in _MenuDispatchCallbacks / _MenuDispatchLastFire. A full
 ; tray rebuild calls MenuDispatcher_Reset() to clear both Maps, but
 ; LLM_Menu_Build() rebuilds ONLY the LLM submenu and is invoked very frequently
@@ -18,7 +18,7 @@
 ; prune, MenuDispatcher_PruneMenu(MenuObj), keyed off the live HMENU, and calls
 ; it from LLM_Menu_Build() after the staged submenu is published.
 ;
-; This is a meta-static test because lib/menu_dispatcher.ahk installs an
+; This is a meta-static test because infra/menu_dispatcher.ahk installs an
 ; OnMessage(0x0111) hook at include time and the LLM tray menu modules register
 ; top-level state, so neither can be #Included by the headless runner without
 ; blocking a clean exit. If the prune helper is removed, or LLM_Menu_Build stops
@@ -56,14 +56,14 @@ _MDCUG_ReadSource(RelPath) {
 ; ===================================================
 
 _MDCUG_PruneHelperExists() {
-	Src := _MDCUG_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDCUG_ReadSource("infra/menu_dispatcher.ahk")
 	Assert(InStr(Src, "MenuDispatcher_PruneMenu(MenuObj) {") > 0,
 		"menu_dispatcher.ahk must define MenuDispatcher_PruneMenu(MenuObj) - the per-menu prune that drops dead item IDs after a single-menu rebuild")
 }
 Test("menu_dispatcher: MenuDispatcher_PruneMenu prune helper exists (menu-dispatch-callbacks-unbounded-growth)", _MDCUG_PruneHelperExists)
 
 _MDCUG_PruneDeletesMapEntries() {
-	Src := _MDCUG_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDCUG_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("MenuDispatcher_PruneMenu")
 	Assert(Seg != "", "MenuDispatcher_PruneMenu(MenuObj) declaration must exist in menu_dispatcher.ahk")
 	Assert(InStr(Seg, "_MenuDispatchCallbacks.Delete(") > 0,

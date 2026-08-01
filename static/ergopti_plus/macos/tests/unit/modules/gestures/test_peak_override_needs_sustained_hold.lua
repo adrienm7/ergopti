@@ -53,7 +53,7 @@ local SWIPE_FRAMES    = 10
 --- @return table Array of action names, in fire order.
 local function swipe_with_one_frame_spike()
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.timings"] = {
 		sec = function(_, key)
 			-- tap_max_ms is deliberately short so a 200 ms gesture is unambiguously
 			-- a swipe; the confirm windows keep their production values so the

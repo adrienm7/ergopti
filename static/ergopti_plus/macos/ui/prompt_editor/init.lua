@@ -17,9 +17,9 @@ local M = {}
 
 local hs         = hs
 local ui_builder = require("ui.ui_builder")
-local Logger     = require("lib.logger")
-local i18n       = require("lib.i18n")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local i18n       = require("infra.i18n")
+local Paths      = require("infra.paths")
 
 local LOG = "prompt_editor"
 

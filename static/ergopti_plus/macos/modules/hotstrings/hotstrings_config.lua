@@ -28,9 +28,9 @@
 --- ==============================================================================
 
 local M = {}
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
-local TomlReader = require("lib.toml.reader")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
+local TomlReader = require("infra.toml.reader")
 local LOG        = "hotstrings_config"
 
 

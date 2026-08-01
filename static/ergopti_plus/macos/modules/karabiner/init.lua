@@ -27,13 +27,13 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("lib.logger")
+local Logger      = require("infra.logger")
 local Defaults    = require("modules.karabiner.defaults")
 local Config      = require("modules.karabiner.config")
 local Generator   = require("modules.karabiner.generator")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local Watchers    = require("modules.karabiner.watchers")
-local Timings     = require("lib.timings")
+local Timings     = require("infra.timings")
 
 -- Optional: keylogger may not be loaded in all deployments
 local ok_kcb, KcBridge = pcall(require, "modules.keylogger.kc_bridge")

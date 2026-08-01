@@ -48,7 +48,7 @@
 ; ================================================================
 ; ================================================================
 
-; Mirror of LLM_TooltipInGracePeriod() in lib/tooltip.ahk. The production
+; Mirror of LLM_TooltipInGracePeriod() in infra/tooltip.ahk. The production
 ; predicate reads four globals; this pure form takes them as parameters so the
 ; branch logic is testable without loading the Gui engine.
 _SimulateInGracePeriod(visible, loading, shownAt, nowTick, windowMs) {

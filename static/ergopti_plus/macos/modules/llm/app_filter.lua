@@ -22,7 +22,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local km_utils = require("modules.keymap.utils")
 
 local LOG = "llm.app_filter"

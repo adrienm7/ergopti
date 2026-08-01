@@ -16,12 +16,12 @@
 
 local M = {}
 
-local Logger      = require("lib.logger")
+local Logger      = require("infra.logger")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local MenuUtils   = require("ui.menu.menu_utils")
 local LOG         = "menu.karabiner"
-local i18n        = require("lib.i18n")
-local text_utils  = require("lib.text_utils")
+local i18n        = require("infra.i18n")
+local text_utils  = require("infra.text_utils")
 
 
 
@@ -217,14 +217,14 @@ local function _load_left_hand_from_catalog()
 		spacebar      = true,
 	}
 	-- Reuse manifest_menu's cached root to avoid a duplicate JSON parse (MG-3).
-	local ok_mm, mm = pcall(require, "lib.manifest_menu")
+	local ok_mm, mm = pcall(require, "infra.manifest_menu")
 	local data = nil
 	if ok_mm and mm and type(mm.get_root) == "function" then
 		data = mm.get_root()
 	end
 	if type(data) ~= "table" then
 		-- Fallback: direct read (manifest_menu may not be loaded yet).
-		local Paths = require("lib.paths")
+		local Paths = require("infra.paths")
 
 
 

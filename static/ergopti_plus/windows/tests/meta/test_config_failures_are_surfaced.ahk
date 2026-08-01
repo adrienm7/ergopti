@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Config-Write Failure Surfacing Meta Test
 ; DESCRIPTION:
-; Four places in lib/config_io.ahk where an operation the user explicitly asked
+; Four places in infra/config_io.ahk where an operation the user explicitly asked
 ; for could fail, or decline to run, without saying anything.
 ;
 ; ReloadWithDefaultConfig was the worst of them. Its delete loop sat in a bare
@@ -23,7 +23,7 @@
 ; swallowed the one write that disables tap-holds, so "tout desactiver" could
 ; report success while they stayed enabled on disk.
 ;
-; SCOPE: source introspection of lib/config_io.ahk.
+; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -155,13 +155,13 @@ Test("meta config: a bulk toggle recovers when its write fails",
 ; agree. None has a caller that reaches it today, which is precisely why they
 ; would have surfaced as a puzzle rather than a regression.
 _CFAS_LatentContractsAreConsistent() {
-	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in lib/, so the
+	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in infra/, so the
 	; headless harness does not load it. Guarding one global of a pair and not
 	; the other means the unguarded read throws before the guard can apply.
 	Body := _DriverFuncBody("_HSRestoreCategory")
 	Assert(Body != "", "_HSRestoreCategory() must exist")
 	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
-		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside lib/, so reading it first throws under the headless harness")
+		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
 
 	; AltGr is Ctrl + right Alt. Without its own case it fell through to the
 	; default and returned "", dropping the modifier from the sent keystroke.

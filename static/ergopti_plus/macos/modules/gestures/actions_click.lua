@@ -22,9 +22,9 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("lib.logger")
+local Logger  = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Timings = require("lib.timings")
+local Timings = require("infra.timings")
 local LOG     = "gestures.click"
 
 -- Delay to ignore the spurious mouseUp from the gesture's own finger-lift.

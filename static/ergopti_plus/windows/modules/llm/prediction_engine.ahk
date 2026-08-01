@@ -27,11 +27,11 @@
 ; =======================================
 
 ; Runtime state — populated at first LLM_Engine_Init() call from LLM_Defaults
-; (loaded by lib/llm_defaults.ahk at boot) so all values come from the shared
+; (loaded by infra/llm_defaults.ahk at boot) so all values come from the shared
 ; defaults.json rather than being hardcoded here.
 ; Timer/cache keys are always initialised to their zero values regardless.
 ; String/numeric placeholder values — always overwritten by LLM_Engine_ApplySharedDefaults()
-; which reads from LLM_Defaults (lib/llm_defaults.ahk → _shared/modules/llm/defaults.json).
+; which reads from LLM_Defaults (infra/llm_defaults.ahk → _shared/modules/llm/defaults.json).
 global _LLM_Engine := Map(
 	"enabled",                    false,
 	"model",                      "",
@@ -166,7 +166,7 @@ LLM_Engine_Init(opts) {
 			_LLM_Engine[k] := opts[k]
 
 	; The prediction language follows the active UI locale (the i18n single source
-	; of truth, lib/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
+	; of truth, infra/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
 	; own language gets predictions in it. An explicit opts["language"] still wins.
 	if (!opts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
 		_LLM_Engine["language"] := _I18nLocale

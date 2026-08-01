@@ -2,8 +2,8 @@
 local helpers = require("tests.helpers")
 
 -- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- No models_mgr stub here. Two used to sit at this spot — "modules.llm.models_mgr"
 -- and "ui.menu.menu_llm.models_mgr" — and neither module has ever existed:
@@ -13,7 +13,7 @@ helpers.load_with_stubs("lib.logger")
 -- inert stub is indistinguishable from a working one from inside the test, which
 -- is why they survived; test-stubs-intercept-something.cjs now says so out loud.
 
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end
 }
 

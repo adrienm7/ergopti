@@ -1,10 +1,10 @@
 --- tests/unit/lib/test_file_watchers.lua
 
 --- ==============================================================================
---- MODULE: lib/file_watchers smoke contract
+--- MODULE: infra/file_watchers smoke contract
 --- DESCRIPTION:
 --- The auto-reload watchers were extracted from init.lua Section 7 into
---- lib/file_watchers. The Lua suite never loads init.lua, so without this test a
+--- infra/file_watchers. The Lua suite never loads init.lua, so without this test a
 --- missing require, a renamed dep, or a typo in M.start would only surface as a
 --- boot failure on the maintainer's Mac. This exercises M.start under stubbed
 --- hs.pathwatcher/timer/fs so the require graph + arming logic are verified, and
@@ -16,21 +16,21 @@ local helpers = require("tests.helpers")
 
 -- ui_restore is UI glue not meant to load headless; mock it so the test isolates
 -- file_watchers' own logic. notifications/i18n load fine under the stub harness.
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,
 }
 
-helpers.describe("lib/file_watchers — arming contract", function()
+helpers.describe("infra/file_watchers — arming contract", function()
 	helpers.it("loads and exposes start()", function()
-		package.loaded["lib.file_watchers"] = nil
-		local FW = require("lib.file_watchers")
+		package.loaded["infra.file_watchers"] = nil
+		local FW = require("infra.file_watchers")
 		helpers.assert_true(type(FW.start) == "function", "must expose start()")
 	end)
 
 	helpers.it("arms watchers and pins them all in _G.script_watchers", function()
-		local FW = require("lib.file_watchers")
+		local FW = require("infra.file_watchers")
 
 		-- Stub the OS-touching hs surface M.start uses.
 		local prev_pw, prev_timer, prev_attr = hs.pathwatcher, hs.timer, hs.fs.attributes
@@ -67,12 +67,12 @@ helpers.describe("lib/file_watchers — arming contract", function()
 		-- a directory again — a growing-path cycle indistinguishable, from this
 		-- module's point of view, from a real filesystem symlink loop. Before the
 		-- depth guard, M.start would recurse until Lua's C-stack limit aborted.
-		local prev_fs_dir = package.loaded["lib.fs_dir"]
-		package.loaded["lib.fs_dir"] = {
+		local prev_fs_dir = package.loaded["infra.fs_dir"]
+		package.loaded["infra.fs_dir"] = {
 			entries = function(_dir) return { "loop" } end,
 		}
-		package.loaded["lib.file_watchers"] = nil
-		local FW = require("lib.file_watchers")
+		package.loaded["infra.file_watchers"] = nil
+		local FW = require("infra.file_watchers")
 
 		local prev_pw, prev_timer, prev_attr = hs.pathwatcher, hs.timer, hs.fs.attributes
 		hs.pathwatcher = { new = function(_path, _cb)
@@ -91,8 +91,8 @@ helpers.describe("lib/file_watchers — arming contract", function()
 		})
 
 		hs.pathwatcher, hs.timer, hs.fs.attributes = prev_pw, prev_timer, prev_attr
-		package.loaded["lib.fs_dir"] = prev_fs_dir
-		package.loaded["lib.file_watchers"] = nil
+		package.loaded["infra.fs_dir"] = prev_fs_dir
+		package.loaded["infra.file_watchers"] = nil
 		_G.script_watchers = nil
 
 		helpers.assert_true(ok, "start() must terminate and not throw/hang on a directory cycle: " .. tostring(err))

@@ -56,7 +56,7 @@ helpers.describe("logger — sub-file routing falls back instead of vanishing", 
 		local logs_dir  = test_base .. "hammerspoon/logs/"
 		pcall(function() mkdir_p(logs_dir) end)
 
-		local L = helpers.load_with_stubs("lib.logger")
+		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 
 		-- Pre-load the shell adapter so its own require never runs under the stub.

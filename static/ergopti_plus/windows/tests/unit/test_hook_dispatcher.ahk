@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: HookDispatcher Regression Tests
 ; DESCRIPTION:
-; Locks the subscriber-registration contract of lib/hook_dispatcher.ahk.
+; Locks the subscriber-registration contract of infra/hook_dispatcher.ahk.
 ;
 ; Regression guard for the critical BoundFunc ".Ptr" bug: Register() and
 ; Unregister() compared callbacks via `existing.Ptr = callback_fn.Ptr`, but a

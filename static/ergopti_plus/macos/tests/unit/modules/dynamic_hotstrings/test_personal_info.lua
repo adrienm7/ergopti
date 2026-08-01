@@ -18,8 +18,8 @@ helpers.describe("Personal info pause guard", function()
 	end)
 end)
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local PI = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 

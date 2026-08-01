@@ -51,7 +51,7 @@ _PIRSG_ReadSource(RelPath) {
 ; ==================================================
 
 _PIRSG_RebuildHasSuspendGuard() {
-	Src := _PIRSG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
+	Src := _PIRSG_ReadSource("infra/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("HotstringPrefixWatcherRebuildIndex")
 	Assert(Seg != "", "HotstringPrefixWatcherRebuildIndex must exist in hotstring_prefix_watcher.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -60,7 +60,7 @@ _PIRSG_RebuildHasSuspendGuard() {
 Test("PrefixWatcher: RebuildIndex has an A_IsSuspended guard (prefix-index-rebuild-no-suspend-guard)", _PIRSG_RebuildHasSuspendGuard)
 
 _PIRSG_RebuildIsBuildThenSwap() {
-	Src := _PIRSG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
+	Src := _PIRSG_ReadSource("infra/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("HotstringPrefixWatcherRebuildIndex")
 	Assert(Seg != "", "HotstringPrefixWatcherRebuildIndex must exist in hotstring_prefix_watcher.ahk")
 	; Build-then-swap: fresh locals are populated, then assigned to the globals.

@@ -31,7 +31,7 @@ local helpers = require("tests.helpers")
 -- a stub that fires synchronously there is no gap between the decision and the
 -- reload, and the fire-time re-check below would pass against the unfixed code.
 local _held_reload = nil
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) _held_reload = fn end,
 	snapshot     = function() end,
 	restore      = function() end,
@@ -53,14 +53,14 @@ local CACHE_DIR  = DRIVER_DIR .. "cache/toml_hotstrings"
 --- @return table driver
 local function arm_watchers(busy_repos)
 	local probed = {}
-	package.loaded["lib.git_status"] = {
+	package.loaded["infra.git_status"] = {
 		operation_in_progress = function(dir)
 			probed[#probed + 1] = dir
 			return busy_repos[dir] == true
 		end,
 	}
-	package.loaded["lib.file_watchers"] = nil
-	local FW = require("lib.file_watchers")
+	package.loaded["infra.file_watchers"] = nil
+	local FW = require("infra.file_watchers")
 
 	local prev_pw, prev_timer, prev_attr, prev_reload =
 		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
@@ -117,8 +117,8 @@ local function arm_watchers(busy_repos)
 			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
 				prev_pw, prev_timer, prev_attr, prev_reload
 			_G.script_watchers = nil
-			package.loaded["lib.git_status"] = nil
-			package.loaded["lib.file_watchers"] = nil
+			package.loaded["infra.git_status"] = nil
+			package.loaded["infra.file_watchers"] = nil
 		end,
 	}
 end
@@ -232,6 +232,6 @@ helpers.describe("reload gate: the TOML snapshot cache does not trigger a reload
 end)
 
 -- Restore the real modules for later test files.
-package.loaded["lib.ui_restore"] = nil
-package.loaded["lib.git_status"] = nil
-package.loaded["lib.file_watchers"] = nil
+package.loaded["infra.ui_restore"] = nil
+package.loaded["infra.git_status"] = nil
+package.loaded["infra.file_watchers"] = nil

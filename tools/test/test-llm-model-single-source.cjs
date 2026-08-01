@@ -5,7 +5,7 @@
  * MODULE: AHK Default-Literal Single-Source Guard (LLM model + GPT link)
  * DESCRIPTION:
  * Two AHK-local default literals must each live in exactly ONE production place:
- *   1. The local LLM model name lives only in lib/llm_defaults.ahk
+ *   1. The local LLM model name lives only in infra/llm_defaults.ahk
  *      (_LLM_LOCAL_DEFAULTS["llm_model"]). models.ahk and menu_llm/actions.ahk
  *      previously re-typed the same "Qwen3.5-0.8B" string as a fallback (a §5.2
  *      violation); they now read the canonical map.
@@ -16,7 +16,7 @@
  * ROOT CAUSE ENCODED:
  * Unifying the value is not enough — the moment a literal reappears in a second
  * production file it can drift again silently (no runtime gate catches it). This
- * guard fails if the model literal appears outside lib/llm_defaults.ahk, or if
+ * guard fails if the model literal appears outside infra/llm_defaults.ahk, or if
  * the GPT URL literal reappears in gestures/init.ahk. Mirrors the proven
  * test-ollama-port-single-source.cjs pattern. Comments are stripped so a
  * documentation mention is not flagged.
@@ -32,7 +32,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const WIN = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 
 // The model literal must live ONLY here (its single canonical AHK source).
-const MODEL_SSOT = 'lib/llm_defaults.ahk';
+const MODEL_SSOT = 'infra/llm_defaults.ahk';
 const MODEL_LITERAL = 'Qwen3.5-0.8B';
 // The GPT link literal must not be re-typed in the gesture action (it reads the
 // manifest-backed Features map instead).

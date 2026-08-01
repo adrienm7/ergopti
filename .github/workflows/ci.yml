@@ -199,7 +199,7 @@ jobs:
         # Surface warnings without failing — pre-existing style issues
         # must not block the test step.
         run: |
-          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/lib \
+          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/infra \
             static/ergopti_plus/macos/modules || true
 
       - name: Run unit + meta tests

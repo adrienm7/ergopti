@@ -113,8 +113,8 @@ local function start_real_keylogger()
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
-	package.loaded["lib.i18n"] = { t = function(key) return key end, get = function(key) return key end }
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.i18n"] = { t = function(key) return key end, get = function(key) return key end }
+	package.loaded["infra.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function(_section, _key) return 1.0 end,
 	}
@@ -289,7 +289,7 @@ local function load_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Reuse the hs.json.decode stub that the test harness provides
-	helpers.load_with_stubs("lib.logger")
+	helpers.load_with_stubs("infra.logger")
 	local ok, decoded = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(decoded) end
 	return decoded, nil

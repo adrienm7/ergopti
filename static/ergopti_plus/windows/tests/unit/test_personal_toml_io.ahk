@@ -62,7 +62,7 @@ Test("personal TOML: [letters] aliases load and cache atomically (personal-toml-
 ; the reader-shared cache via _ParseTomlGroupConfig_InvalidatePath.
 _PTIO_WriteEvictsReaderSharedCache() {
 	Body := _DriverFuncBody("WritePersonalToml")
-	Assert(Body != "", "WritePersonalToml must exist in lib/hotstrings/personal_toml_io.ahk")
+	Assert(Body != "", "WritePersonalToml must exist in infra/hotstrings/personal_toml_io.ahk")
 	Assert(InStr(Body, "_ParseTomlGroupConfig_InvalidatePath") > 0,
 		"WritePersonalToml must evict the reader-shared _TomlFileCache (via _ParseTomlGroupConfig_InvalidatePath) so a live rebuild reads the saved edit, not the stale boot-time content")
 }

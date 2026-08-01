@@ -26,8 +26,8 @@ helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScree
 	local function load_widget_with_nil_screen()
 		local logged_errors = {}
 		package.loaded["modules.keylogger"] = { get_live_stats = function() return { wpm = 5 } end }
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		local Widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
@@ -43,13 +43,13 @@ helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScree
 		})
 		-- Re-bind the logger the widget module already captured a local reference
 		-- to at require-time — load_with_stubs sets package.loaded before require,
-		-- so the module's `local Logger = require("lib.logger")` sees our stub.
+		-- so the module's `local Logger = require("infra.logger")` sees our stub.
 		-- Release the stub from the cache now that wpm_widget has already bound
 		-- its own upvalue to it — otherwise this incomplete stub (no .LEVELS/
-		-- .current_level) leaks into every later require("lib.logger") for the
+		-- .current_level) leaks into every later require("infra.logger") for the
 		-- rest of the full-suite process (the exact test-harness stale-cache
 		-- class documented for F-HIGH-23).
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Widget, logged_errors
 	end
 
@@ -98,8 +98,8 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 		package.loaded["modules.keylogger"] = {
 			get_live_stats = function() error("simulated keylogger failure") end,
 		}
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
@@ -110,7 +110,7 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 		})
 		-- See load_widget_with_nil_screen() above: release the stub from the
 		-- cache now that wpm_menubar has already bound its own upvalue to it.
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Menubar, logged_errors
 	end
 

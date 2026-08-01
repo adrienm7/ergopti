@@ -16,7 +16,7 @@
 ---    callback. Nothing raises, nothing is logged and `:isEnabled()` is never
 ---    read again — so the tap is disabled for the rest of the session. On the
 ---    typing tap that is the entire driver going silent mid-sentence.
---- 2. Keeps the event-type constants out of `modules/` and `lib/`. Those two
+--- 2. Keeps the event-type constants out of `modules/` and `infra/`. Those two
 ---    trees are measured by the `hs.` purity ratchet, so the comparison lives
 ---    here in the OS-isolation layer and call sites stay free of `hs.` tokens.
 --- 3. Logs at WARNING, not DEBUG. A disabled tap is the symptom of a callback
@@ -27,7 +27,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.event_tap_guard"
 

@@ -94,8 +94,8 @@ local function load_log_manager()
 		_last_complete_batch_offset = 0,
 	}
 
-	package.loaded["lib.i18n"]    = { t = function(key) return key end }
-	package.loaded["lib.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	package.loaded["infra.i18n"]    = { t = function(key) return key end }
+	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
 
 	package.loaded["modules.keylogger.log_manager"] = nil
 	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", {

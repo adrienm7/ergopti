@@ -20,7 +20,7 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("lib.logger")
+local Logger      = require("infra.logger")
 local GestActions = require("modules.gestures.actions")
 
 local LOG = "shortcuts.keyboard_shortcuts"

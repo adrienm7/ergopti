@@ -23,9 +23,9 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")

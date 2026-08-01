@@ -29,11 +29,11 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Timings = require("lib.timings")
-local Notifications = require("lib.notifications")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Timings = require("infra.timings")
+local Notifications = require("infra.notifications")
+local i18n   = require("infra.i18n")
 
 local LOG = "karabiner"
 
@@ -467,7 +467,7 @@ end
 function M.launch_headless()
 	if not M.is_grabber_running() then
 		Logger.warn(LOG, "karabiner_grabber not running — Karabiner-Elements may not be installed.")
-		local ok_notif, notifications = pcall(require, "lib.notifications")
+		local ok_notif, notifications = pcall(require, "infra.notifications")
 		if ok_notif then
 			notifications.notify(
 				i18n.get("karabiner.lifecycle.unavailable"),

@@ -678,7 +678,7 @@ SC029:: {
 }
 #HotIf
 
-; SpotlightMouseAt is defined in lib/spotlight.ahk and included globally before this module.
+; SpotlightMouseAt is defined in infra/spotlight.ahk and included globally before this module.
 
 if Features["shortcuts"]["open_downloads"] {
 		; Win + D (Downloads)
@@ -737,5 +737,5 @@ if Features["shortcuts"]["open_downloads"] {
 				return ""
 		}
 
-		; UriDecode is defined in lib/text_utils.ahk and visible globally.
+		; UriDecode is defined in infra/text_utils.ahk and visible globally.
 }

@@ -351,7 +351,7 @@ _Updater_BuildChangelogGui(Json, Channel) {
 			; Parent the WebView2 to the RightPane control directly so Fill()
 			; covers exactly that control's client area — no manual coordinate
 			; arithmetic needed, and resize is handled automatically by the OS.
-			; Reuse the shared session environment (lib/webview_utils.ahk) so no
+			; Reuse the shared session environment (infra/webview_utils.ahk) so no
 			; second Chromium process boots and reopens are near-instant.
 			WVC := WebView2.create(RightPane.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC

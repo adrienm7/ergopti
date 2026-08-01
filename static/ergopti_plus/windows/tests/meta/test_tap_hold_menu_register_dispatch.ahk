@@ -9,7 +9,7 @@
 ; _TH_DynDisableAll, _TH_DynKeys, _BuildHoldPickerSubmenu) used raw
 ; Menu.Add(Label, Callback) for every actionable callback. AHK 2.0's
 ; WM_COMMAND -> menu-callback dispatch silently drops ~1 click in 3.
-; lib/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
+; infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
 ; for items registered via RegisterMenuItem(MenuObj, Label, Callback).
 ;
 ; Since the Tap-Hold block used raw .Add, those items were never in the retry

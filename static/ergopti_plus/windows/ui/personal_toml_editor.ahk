@@ -23,7 +23,7 @@
 ;    the ini so they survive script reloads.
 ; ==============================================================================
 
-#Include ../lib/hotstrings/personal_toml_io.ahk
+#Include ../infra/hotstrings/personal_toml_io.ahk
 
 
 

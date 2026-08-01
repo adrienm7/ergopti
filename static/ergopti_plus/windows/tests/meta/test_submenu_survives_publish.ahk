@@ -29,7 +29,7 @@
 ;    path, where it is captured at click time and correctly voids a retry that
 ;    spans a rebuild. Removing it there would be a different regression.
 ;
-; SCOPE: source introspection of lib/menu_dispatcher.ahk and ui/menu/menu_rebuild.ahk.
+; SCOPE: source introspection of infra/menu_dispatcher.ahk and ui/menu/menu_rebuild.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()
-local SRC_DIRS    = { "lib", "modules", "ui" }
+local SRC_DIRS    = { "infra", "modules", "ui" }
 
 --- Returns true if the file path is a Lua source file we expect to validate.
 --- @param path string Absolute path.

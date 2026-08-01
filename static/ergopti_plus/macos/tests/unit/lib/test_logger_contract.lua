@@ -79,7 +79,7 @@ end
 
 helpers.describe("Logger: shared contract vectors", function()
 	-- Load Logger with level forced to DEBUG so every variant is emitted
-	local Logger = helpers.load_with_stubs("lib.logger")
+	local Logger = helpers.load_with_stubs("infra.logger")
 	Logger.set_level(Logger.LEVELS.DEBUG)
 
 	local VARIANT_FN = {

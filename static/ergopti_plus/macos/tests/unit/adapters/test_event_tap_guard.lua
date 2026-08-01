@@ -34,7 +34,7 @@ local function load_guard()
 			table.insert(captured[level], ok and line or tostring(fmt))
 		end
 	end
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		warn = sink("warn"), error = sink("error"), info = sink("info"),
 		debug = function() end, trace = function() end, done = function() end,
 		start = function() end, success = function() end,

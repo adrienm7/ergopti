@@ -18,10 +18,10 @@
 local helpers = require("tests.helpers")
 
 -- lib.timings logs through lib.logger; load the stub first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local Timings = require("lib.timings")
+local Timings = require("infra.timings")
 
 -- The exact (section, key) -> value pairs each wired module is now sourced from.
 -- Mirror these against constants.toml; a change there must be deliberate.
@@ -124,22 +124,22 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- unreachable, and returns whatever the module raised.
 	--- @return boolean,string The pcall status and the raised message.
 	local function reload_timings_without_shared_tree()
-		local saved_paths   = package.loaded["lib.paths"]
-		local saved_timings = package.loaded["lib.timings"]
+		local saved_paths   = package.loaded["infra.paths"]
+		local saved_timings = package.loaded["infra.timings"]
 
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			shared          = function() return nil end,
 			shared_root     = function() return nil end,
 			shared_llm_path = function() return nil end,
 			find_from_configdir = function() return nil end,
 		}
-		package.loaded["lib.timings"] = nil
+		package.loaded["infra.timings"] = nil
 
-		local ok, err = pcall(require, "lib.timings")
+		local ok, err = pcall(require, "infra.timings")
 
 		-- Restore the real modules so later suites are unaffected by this probe.
-		package.loaded["lib.timings"] = saved_timings
-		package.loaded["lib.paths"]   = saved_paths
+		package.loaded["infra.timings"] = saved_timings
+		package.loaded["infra.paths"]   = saved_paths
 
 		return ok, tostring(err)
 	end
@@ -168,26 +168,26 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- lib.paths real. The three cases above all trip the FIRST guard (the shared
 	--- tree is unreachable), so the second guard — a tree that resolves but whose
 	--- constants.toml is missing, unreadable or empty — was never exercised. That
-	--- is the guard the comment in lib/timings.lua says was added because
+	--- is the guard the comment in infra/timings.lua says was added because
 	--- TomlReader.parse returns a well-formed result with empty `sections` on BOTH
 	--- of its failure exits, so the earlier type-only test could never fire.
 	--- @return boolean ok, string err
 	local function reload_timings_with_empty_registry()
-		local saved_reader  = package.loaded["lib.toml.reader"]
-		local saved_timings = package.loaded["lib.timings"]
+		local saved_reader  = package.loaded["infra.toml.reader"]
+		local saved_timings = package.loaded["infra.timings"]
 
 		-- Exactly what the real reader returns when the file is absent or malformed:
 		-- a well-formed table whose sections map is empty. Returning nil instead
 		-- would test a shape the production reader never produces.
-		package.loaded["lib.toml.reader"] = {
+		package.loaded["infra.toml.reader"] = {
 			parse = function(_path) return { sections = {} } end,
 		}
-		package.loaded["lib.timings"] = nil
+		package.loaded["infra.timings"] = nil
 
-		local ok, err = pcall(require, "lib.timings")
+		local ok, err = pcall(require, "infra.timings")
 
-		package.loaded["lib.timings"]     = saved_timings
-		package.loaded["lib.toml.reader"] = saved_reader
+		package.loaded["infra.timings"]     = saved_timings
+		package.loaded["infra.toml.reader"] = saved_reader
 
 		return ok, tostring(err)
 	end

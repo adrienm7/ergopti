@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Feature I/O Locator Tests
 ; DESCRIPTION:
-; Validates FeatureLocateV2 (lib/feature_io.ahk) — the v2-native replacement for
+; Validates FeatureLocateV2 (infra/feature_io.ahk) — the v2-native replacement for
 ; the v1->v2 path translator. Asserts that a canonical v2 manifest path resolves
 ; to the correct config.toml {section, key} and is_alpha classification purely by
 ; introspecting a Features fixture, with no PascalCase rename tables. Covers the

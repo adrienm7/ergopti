@@ -77,7 +77,7 @@ function readLines(file) {
 
 const AHK_COMMENT = /^;\s*\S/;
 const LUA_COMMENT = /^---?\s*\S/;
-// Path-like: contains a slash and a dot (e.g. "lib/logger.ahk")
+// Path-like: contains a slash and a dot (e.g. "infra/logger.ahk")
 const PATH_LIKE = /[/\\][^/\\]+\.[a-z]+/i;
 
 function checkFileHeader(file) {
@@ -620,7 +620,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
-	join(REPO_ROOT, 'static/ergopti_plus/windows/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui')
 ];
@@ -645,12 +645,12 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
-	join(REPO_ROOT, 'static/ergopti_plus/linux/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),

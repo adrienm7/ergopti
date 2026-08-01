@@ -20,8 +20,8 @@
 _SRHC_SuspendHardResetsEngineBuffer() {
 	EnterBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	ResumeBody := _DriverFuncBody("Ergopti_OnSuspendResume")
-	Assert(EnterBody != "", "Ergopti_OnSuspendEnter must exist in lib/lifecycle.ahk")
-	Assert(ResumeBody != "", "Ergopti_OnSuspendResume must exist in lib/lifecycle.ahk")
+	Assert(EnterBody != "", "Ergopti_OnSuspendEnter must exist in infra/lifecycle.ahk")
+	Assert(ResumeBody != "", "Ergopti_OnSuspendResume must exist in infra/lifecycle.ahk")
 	Assert(InStr(EnterBody, "HSE_HardReset") > 0,
 		"Ergopti_OnSuspendEnter must hard-reset the hotstring engine buffer (suspend is a context-unknown boundary)")
 	Assert(InStr(ResumeBody, "_ResetPrefixBuffer") > 0,

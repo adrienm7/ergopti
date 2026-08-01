@@ -18,7 +18,7 @@
 ; AltGr+Enter could no longer resume and AltGr+BackSpace could no longer
 ; reload — the script became unrecoverable from the keyboard once paused.
 ;
-; SCOPE: source introspection of lib/script_altgr_hotkeys.ahk.
+; SCOPE: source introspection of infra/script_altgr_hotkeys.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,11 +46,11 @@ _ADSG_ReadSource(RelPath) {
 ; ===================================================
 
 _ADSG_CheckActionAlwaysRuns() {
-	Src := _ADSG_ReadSource("lib/script_altgr_hotkeys.ahk")
-	Assert(Src != "", "lib/script_altgr_hotkeys.ahk must be readable")
+	Src := _ADSG_ReadSource("infra/script_altgr_hotkeys.ahk")
+	Assert(Src != "", "infra/script_altgr_hotkeys.ahk must be readable")
 
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")
-	Assert(Body != "", "_ScriptAltGrDispatch must be present in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_ScriptAltGrDispatch must be present in infra/script_altgr_hotkeys.ahk")
 
 	ActionPos := InStr(Body, "RunScriptShortcutAction(Slot)")
 	Assert(ActionPos > 0, "_ScriptAltGrDispatch must call RunScriptShortcutAction(Slot)")
@@ -70,7 +70,7 @@ _ADSG_CheckActionAlwaysRuns() {
 
 _ADSG_CheckSuspendedFallbackHotkeysStillRegistered() {
 	Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be present in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be present in infra/script_altgr_hotkeys.ahk")
 	Assert(InStr(Body, "A_IsSuspended and GetKeyState(") > 0,
 		"_RegisterScriptAltGrHotkeys must still register the dedicated already-suspended fallback hotkeys (SC01C/SC00E/SC153/SC001 gated on A_IsSuspended) so paused-state control stays reachable")
 }
@@ -88,7 +88,7 @@ Test("meta altgr-dispatch-suspend-guard: suspended-state fallback hotkeys remain
 ; breaking "pause = tout éteint".
 _ADSG_SuspendExemptionIsScopedToManagement() {
 	Body := _DriverFuncBody("RunScriptShortcutAction")
-	Assert(Body != "", "RunScriptShortcutAction must exist in lib/config_io.ahk")
+	Assert(Body != "", "RunScriptShortcutAction must exist in infra/config_io.ahk")
 	GatePos := InStr(Body, "A_IsSuspended")
 	InvokePos := InStr(Body, "GestureInvokeAction(")
 	Assert(GatePos > 0 && InvokePos > GatePos,

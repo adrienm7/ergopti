@@ -13,7 +13,7 @@
 ; process name and/or verbatim private-browsing window title into today.log
 ; and data.sql.
 ;
-; THE FIX: lib/metrics/metrics_filters.ahk exposes MF_ShouldFilterFor(app,
+; THE FIX: infra/metrics/metrics_filters.ahk exposes MF_ShouldFilterFor(app,
 ; title), an explicit-argument variant of the same predicate. KL_AppendLog
 ; calls it against entry["prev_app"] (app_switch) / entry["app"] +
 ; entry["prev_title"] (window_switch) and drops the entry when the OUTGOING
@@ -52,7 +52,7 @@ _KLSPF_ReadSource(RelPath) {
 _KLSPF_ShouldFilterForExists() {
 	Body := _DriverFuncBody("MF_ShouldFilterFor")
 	Assert(Body != "",
-		"lib/metrics/metrics_filters.ahk must define MF_ShouldFilterFor(app, title) — "
+		"infra/metrics/metrics_filters.ahk must define MF_ShouldFilterFor(app, title) — "
 		. "an explicit-argument privacy predicate independent of the live focus cache (F9)")
 	Assert(InStr(Body, "MetricsFocusCache") = 0,
 		"MF_ShouldFilterFor must NOT read MetricsFocusCache.state — it must evaluate the "

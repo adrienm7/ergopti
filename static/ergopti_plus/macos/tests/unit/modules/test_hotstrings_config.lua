@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Build a unique writable temp path (the module itself creates the file).
 --- @param name string A short discriminator so concurrent cases never collide.

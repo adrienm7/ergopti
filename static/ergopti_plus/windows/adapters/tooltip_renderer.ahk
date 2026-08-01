@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AHK v2 implementation of the TooltipRenderer port contract defined in
 ; static/ergopti_plus/_shared/core/ports/TooltipRenderer.spec.js. Wraps the existing
-; lib/tooltip.ahk subsystem behind the four canonical functions
+; infra/tooltip.ahk subsystem behind the four canonical functions
 ; (TooltipRShow, TooltipRHide, TooltipRIsVisible, TooltipRUpdateElement) so
 ; domain modules can control tooltip display without coupling to the AHK-
 ; specific Gui / tooltip implementation.
@@ -17,11 +17,11 @@
 ;   isVisible()            → TooltipRIsVisible()
 ;   updateElement(drawCall) → TooltipRUpdateElement(DrawCall)
 ;
-; The "R" suffix prevents collision with the lib/tooltip.ahk public symbols
+; The "R" suffix prevents collision with the infra/tooltip.ahk public symbols
 ; (TooltipShow, TooltipHide) which use the same root name.
 ;
 ; DELEGATION MODEL:
-; This adapter is a thin facade over lib/tooltip.ahk. No rendering logic lives
+; This adapter is a thin facade over infra/tooltip.ahk. No rendering logic lives
 ; here — the adapter only translates port contract calls into existing function
 ; calls. TooltipRShow unpacks the payload's "items" array if present; otherwise
 ; it passes the payload directly to TooltipShow.

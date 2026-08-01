@@ -30,13 +30,13 @@
 ;
 ; Cannot modify vendor/UIA.ahk (third-party) and an ordinary try/catch cannot
 ; intercept a __Delete-time exception, so the fix lives in the process-wide net
-; itself (lib/error_net.ahk): a narrow predicate recognises this exact benign
+; itself (infra/error_net.ahk): a narrow predicate recognises this exact benign
 ; signature (PropertyError, Extra == "ptr", What starting with
 ; "UIA.IUIAutomationBase.Prototype.Release") and short-circuits to a quiet
 ; WARNING log, skipping the disruptive crash-report prompt/toast -- every other
 ; error still goes through the full net unchanged.
 ;
-; SCOPE: source introspection of lib/error_net.ahk (ErgoptiPlus.ahk registers
+; SCOPE: source introspection of infra/error_net.ahk (ErgoptiPlus.ahk registers
 ; hotkeys at load time and cannot be #Included headless).
 ; ==============================================================================
 
@@ -53,7 +53,7 @@
 
 _ENUOS_PredicateHelperExists() {
 	Body := _DriverFuncBody("_IsBenignUiaOrphanedPatternError")
-	Assert(Body != "", "_IsBenignUiaOrphanedPatternError(Exc) must exist in lib/error_net.ahk")
+	Assert(Body != "", "_IsBenignUiaOrphanedPatternError(Exc) must exist in infra/error_net.ahk")
 	Assert(InStr(Body, "PropertyError") > 0,
 		'_IsBenignUiaOrphanedPatternError must check Type(Exc) == "PropertyError" -- the crash signature is specifically a PropertyError, not a generic Error')
 	Assert(InStr(Body, "ptr") > 0,
@@ -66,7 +66,7 @@ Test("meta error-net-uia-orphan: _IsBenignUiaOrphanedPatternError exists and che
 
 _ENUOS_HandlerChecksGuardFirst() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler(Exc, Mode) must exist in lib/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler(Exc, Mode) must exist in infra/error_net.ahk")
 	GuardPos := InStr(Body, "_IsBenignUiaOrphanedPatternError(")
 	Assert(GuardPos > 0,
 		"ErgoptiGlobalErrorHandler must call _IsBenignUiaOrphanedPatternError to short-circuit the benign UIA orphaned-pattern signature")

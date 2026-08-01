@@ -19,8 +19,8 @@
 local helpers = require("tests.helpers")
 
 -- The shared parser logs through logger.shim; load the lib.logger stub first.
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- Put _shared/lua on the path so require("llm.parser") resolves to the oracle.
 local shared_lua  = helpers.shared("lua/")

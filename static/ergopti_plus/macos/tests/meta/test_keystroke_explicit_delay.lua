@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 
 -- Source subtrees that ship in the driver. tests/, vendor/ and _generated/ are
 -- excluded: stubs legitimately declare keyStroke with a two-argument signature.
-local SOURCE_DIRS = { "adapters", "lib", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
 
 -- Minimum argument count for a correct call: (modifiers, character, delay).
 local REQUIRED_ARG_COUNT = 3

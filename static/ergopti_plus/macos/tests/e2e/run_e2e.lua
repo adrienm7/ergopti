@@ -156,9 +156,9 @@ local function make_vkb(trigger, replacement, opts)
 	-- so it MUST be in the same load wave as expander to guarantee that the
 	-- KEYSTROKES table written by utils and the __keystrokes table read by the
 	-- harness are the same object.
-	package.loaded["lib.logger"]                 = nil
-	package.loaded["lib.text_utils"]             = nil
-	package.loaded["lib.i18n"]                   = nil
+	package.loaded["infra.logger"]                 = nil
+	package.loaded["infra.text_utils"]             = nil
+	package.loaded["infra.i18n"]                   = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.utils"]       = nil
 	package.loaded["modules.keymap.registry"]    = nil
@@ -184,7 +184,7 @@ local function make_vkb(trigger, replacement, opts)
 	-- the same require chain and share the same KEYSTROKES table.
 	local Expander = helpers.load_with_stubs("modules.keymap.expander")
 	local Registry = require("modules.keymap.registry")
-	local text_utils = require("lib.text_utils")
+	local text_utils = require("infra.text_utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
 	-- instance the expander armed — a second instance would hold an empty slot.
 	local TerminatorReplay = require("modules.keymap.terminator_replay")

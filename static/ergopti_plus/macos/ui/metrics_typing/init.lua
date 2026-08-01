@@ -26,9 +26,9 @@ local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
-local i18n       = require("lib.i18n")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
+local i18n       = require("infra.i18n")
 
 local LOG = "metrics_typing"
 

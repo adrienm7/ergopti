@@ -9,7 +9,7 @@
 ; token rather than being split at the accent boundary.
 ;
 ; APPROACH: source scan.
-; llm_diff.ahk lives in lib/ and is #Include-safe, but adding it to run_all.ahk
+; llm_diff.ahk lives in infra/ and is #Include-safe, but adding it to run_all.ahk
 ; solely for this one guard would pull in a whole tokenizer that is already
 ; tested functionally elsewhere. The condition that makes accented characters work
 ; is a single, unique line that can be asserted directly from the source text —
@@ -27,7 +27,7 @@
 #Requires AutoHotkey v2.0
 
 _TLDA_Check() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 
 	; The tokenizer must extend word-character detection to non-ASCII codepoints.
 	; This single condition is what makes "café" tokenize as one word token

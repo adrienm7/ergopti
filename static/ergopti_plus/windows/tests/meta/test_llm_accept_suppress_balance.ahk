@@ -22,7 +22,7 @@
 ;      decrementing on false, never going below zero.
 ;
 ; SCOPE: source introspection of modules/keymap/llm_bridge.ahk and
-;        lib/hotstrings/hotstring_prefix_watcher.ahk.
+;        infra/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,7 +41,7 @@ _LASB_ReadLlmSrc() {
 }
 
 _LASB_ReadPwSrc() {
-	return _DriverDirConcat("lib/hotstrings")
+	return _DriverDirConcat("infra/hotstrings")
 }
 
 
@@ -100,7 +100,7 @@ Test("llm_bridge: LLM_Bridge_OnAccept finally block gates suppress release on _t
 
 _LASB_PrefixWatcherSuppressIsDepthCounter() {
 	Src := _LASB_ReadPwSrc()
-	Assert(Src != "", "lib/hotstrings/ source must be readable")
+	Assert(Src != "", "infra/hotstrings/ source must be readable")
 
 	Body := _DriverFuncBody("PrefixWatcherSuppress")
 	Assert(Body != "", "PrefixWatcherSuppress must be defined in the prefix-watcher module")

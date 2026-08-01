@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Hotstring Engine Tests
 ; DESCRIPTION:
-; Covers pure helpers from lib/hotstring_engine.ahk: case helpers,
+; Covers pure helpers from infra/hotstring_engine.ahk: case helpers,
 ; lookup primitives and the time-activation guard. Send primitives and
 ; CreateHotstring* are exercised through their stubs (test_stubs.ahk).
 ; ==============================================================================
@@ -226,7 +226,7 @@ Test("GetLastSentCharacterAt: single-element buffer, -1 ok, -2 empty",
 ; driver, and a duplicated guard in a pure helper makes the helper's result
 ; depend on global state its callers already checked.
 TestHE_PauseGuardNoExpansion() {
-	Dispatch := _DriverDirConcat("lib\hotstrings")
+	Dispatch := _DriverDirConcat("infra\hotstrings")
 	Assert(InStr(Dispatch, "A_IsSuspended") > 0,
 		"some hotstring dispatch path must early-return on A_IsSuspended — without it a paused "
 		. "driver still expands")

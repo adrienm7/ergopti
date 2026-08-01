@@ -16,7 +16,7 @@ local M = {}
 local hs       = hs
 local eventtap = hs.eventtap
 local timer    = hs.timer
-local Logger   = require("lib.logger")
+local Logger   = require("infra.logger")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -268,7 +268,7 @@ local function do_expand(combo)
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
 			_keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
-				local ok_tu, text_utils = pcall(require, "lib.text_utils")
+				local ok_tu, text_utils = pcall(require, "infra.text_utils")
 				for i, value in ipairs(parts) do
 					eventtap.keyStrokes(value)
 					if ok_tu and type(text_utils.utf8_len) == "function" then

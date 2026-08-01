@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Hotstring Count Display Policy Tests
 ; DESCRIPTION:
-; Regression guard for the tray-menu hotstring count (lib/hotstrings/
+; Regression guard for the tray-menu hotstring count (infra/hotstrings/
 ; hotstring_count_policy.ahk). The menu must show the number of ACTIVE
 ; hotstrings; a gated-off scope (e.g. the whole Hotstrings menu toggled off)
 ; must contribute 0, NOT the full "what would reactivate" count. Reproduces the

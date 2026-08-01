@@ -36,14 +36,14 @@ local M = {}
 
 local hs      = hs
 local fs      = require("hs.fs")
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local i18n    = require("lib.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
+local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
 local LOG     = "keylogger.log_manager"
 

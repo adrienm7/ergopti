@@ -28,8 +28,8 @@
 local M = {}
 
 local hs         = hs
-local Logger     = require("lib.logger")
-local Keycodes   = require("lib.keycodes")
+local Logger     = require("infra.logger")
+local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 
 local LOG = "karabiner"

@@ -61,7 +61,7 @@ const MIN_DRIVERS = 3;
 // linux / "missing required property 'script'": [sections.script] in the feature
 // manifest is platforms = ["ahk", "hs"], so the Linux template carries no
 // [script] block at all. That is not an oversight in the template — the Linux
-// driver keeps its locale in its own XDG store (lib/i18n.lua's s.get("locale")),
+// driver keeps its locale in its own XDG store (infra/i18n.lua's s.get("locale")),
 // not in config.toml. Closing it means re-platforming the section, which is the
 // one-namespace migration's job, not a gate's. Until then the divergence is
 // written down rather than invisible.

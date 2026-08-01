@@ -26,8 +26,8 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keylogger.text_cipher")

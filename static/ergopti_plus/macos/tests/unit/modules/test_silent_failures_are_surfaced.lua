@@ -27,7 +27,7 @@ local function capture_logger()
 			table.insert(captured[level], ok and line or tostring(fmt))
 		end
 	end
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		error = sink("error"), warn = sink("warn"), success = sink("success"),
 		debug = sink("debug"), info = sink("info"), start = sink("start"),
 		trace = function() end, done = function() end,

@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.tooltip_renderer"
 

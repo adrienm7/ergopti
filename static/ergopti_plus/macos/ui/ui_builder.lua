@@ -16,8 +16,8 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
-local Paths = require("lib.paths")
+local Logger = require("infra.logger")
+local Paths = require("infra.paths")
 local LOG = "ui_builder"
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
@@ -93,7 +93,7 @@ function M.build_injected_html(assets_dir, html_name)
 	-- that i18n.js fetch() resolves locale JSON files correctly even when HTML
 	-- is loaded inline (no file:// base URL).  The locale is read at build time
 	-- from lib.i18n so the page renders in the user's active language.
-	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
 	local i18n_boot = string.format(
 		'<script>window.__i18n_base="%s";window._i18n_locale="%s";</script>',
@@ -361,7 +361,7 @@ function M.show_webview(opts)
 			if action == "didFinishNavigation" and opts.inject_i18n ~= false then
 				hs.timer.doAfter(0.08, function()
 					if not wv or not wv2 then return end
-					local ok_mod, locale_mod = pcall(require, "lib.locale")
+					local ok_mod, locale_mod = pcall(require, "infra.locale")
 					if not ok_mod or not locale_mod then return end
 					local all_strings = locale_mod.all()
 					if type(all_strings) ~= "table" then return end

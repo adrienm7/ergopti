@@ -14,9 +14,9 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("lib.logger")
+local Logger   = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
-local Timings  = require("lib.timings")
+local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
 local LOG      = "gestures.engine"
 

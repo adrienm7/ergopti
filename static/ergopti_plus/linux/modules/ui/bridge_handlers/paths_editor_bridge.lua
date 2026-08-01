@@ -14,7 +14,7 @@ local Logger = require("logger.shim")
 local LOG = "bridge.hsPaths"
 
 -- Read canonical version from the single-source module (SSoT).
-local Version = require("lib.version")
+local Version = require("infra.version")
 
 -- Lazy-loaded writer for config.toml persistence.
 local _writer = nil
@@ -27,7 +27,7 @@ end
 
 -- Path to the daemon config file.
 local function _config_path()
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	return home .. "/.config/ergopti/config.toml"
 end
 
@@ -35,7 +35,7 @@ end
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state)
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	local paths = {
 		config_dir = home .. "/.config/ergopti/",
 		data_dir   = home .. "/.local/share/ergopti/",

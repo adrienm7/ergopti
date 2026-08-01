@@ -55,9 +55,9 @@ _RKVO_ReadSource(RelPath) {
 ; ====================================================
 
 _RKVO_KeyExistsEnumeratesValues() {
-	Src := _RKVO_ReadSource("lib/registry.ahk")
+	Src := _RKVO_ReadSource("infra/registry.ahk")
 	Seg := _DriverFuncBody("Reg_KeyExists")
-	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in lib/registry.ahk")
+	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in infra/registry.ahk")
 	; Opening the key itself is stronger than enumerating its values: it also
 	; recognises an empty key. KEY_QUERY_VALUE is sufficient and avoids reading
 	; any user value merely to prove the container exists.

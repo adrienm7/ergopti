@@ -28,8 +28,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- Minimal core_llm surface: prediction_engine reads DEFAULT_STATE at load time
 -- and queries the backend during perform_check, which this test never reaches.
@@ -66,8 +66,8 @@ package.loaded["modules.llm.api_common"] = {
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
-package.loaded["lib.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
-package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["infra.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
+package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 -- set_navigate_callback and set_enter_validates are called at module load time.
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,

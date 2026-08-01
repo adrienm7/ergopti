@@ -20,7 +20,7 @@
 local M = {}
 
 local hs        = hs
-local Logger    = require("lib.logger")
+local Logger    = require("infra.logger")
 local llm_mod   = require("modules.llm")
 local shortcut_ui = require("ui.menu.shortcut_utils")
 

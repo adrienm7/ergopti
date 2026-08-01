@@ -12,7 +12,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Shared UX: one editor frontend for both drivers — fixing a wording or a
 ;    behaviour there updates Windows and macOS at once. The bridge mirrors the
-;    proven onboarding WebView2 host (lib/webview_utils + vendor/WebView2), and
+;    proven onboarding WebView2 host (infra/webview_utils + vendor/WebView2), and
 ;    carries the same four hard-won gotcha fixes (see PROJECT_MEMORY
 ;    project-webview2-bridge-gotchas): show-before-create, virtual-host origin,
 ;    stored WebMessageReceived subscription, and fire-and-forget ExecuteScript.

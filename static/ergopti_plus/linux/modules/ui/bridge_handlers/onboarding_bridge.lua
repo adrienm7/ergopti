@@ -25,7 +25,7 @@ end
 
 -- Path to the daemon config file.
 local function _config_path()
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	return home .. "/.config/ergopti/config.toml"
 end
 
@@ -35,7 +35,7 @@ end
 --- override of the persisted locale.
 --- @return string Locale code (e.g. "de"), or "fr" on failure.
 local function _resolve_locale()
-	local ok, i18n = pcall(require, "lib.i18n")
+	local ok, i18n = pcall(require, "infra.i18n")
 	if ok and type(i18n) == "table" and type(i18n.get_locale) == "function" then
 		local ok2, loc = pcall(i18n.get_locale)
 		if ok2 and type(loc) == "string" and loc ~= "" then return loc end

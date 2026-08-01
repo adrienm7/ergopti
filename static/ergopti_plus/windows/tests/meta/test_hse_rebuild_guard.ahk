@@ -40,7 +40,7 @@ _HRG_ReadSource(RelPath) {
 
 _HRG_RebuildIsGuarded() {
 	; 1. Verify flag exists in engine.
-	EngineSrc := _HRG_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
+	EngineSrc := _HRG_ReadSource("infra/hotstrings/hotstring_engine_main.ahk")
 	Assert(InStr(EngineSrc, "global HSE_RebuildInProgress := false") > 0,
 		"HSE_RebuildInProgress global flag must be defined in hotstring_engine_main.ahk")
 	

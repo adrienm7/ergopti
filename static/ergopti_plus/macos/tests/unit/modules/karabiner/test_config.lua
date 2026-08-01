@@ -10,15 +10,15 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- toml_codec is a native C library not available in the headless test runner;
 -- stub it out so the module loads without crashing. _load_toml_file is then
 -- monkey-patched per test where TOML parsing matters.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
 package.loaded["toml_codec"]     = _toml_stub
-package.loaded["lib.toml.codec"] = _toml_stub
+package.loaded["infra.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("modules.karabiner.config")
 

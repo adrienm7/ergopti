@@ -32,7 +32,7 @@ _LRNC_NoCriticalAcrossRegistration() {
 
 	; The fence is what makes dropping Critical safe: the matcher must bail while set.
 	Match := _DriverFuncBody("HSE_FindMatchAtEnd")
-	Assert(Match != "", "HSE_FindMatchAtEnd must exist in lib/hotstrings/hotstring_match.ahk")
+	Assert(Match != "", "HSE_FindMatchAtEnd must exist in infra/hotstrings/hotstring_match.ahk")
 	Assert(InStr(Match, "HSE_RebuildInProgress") > 0,
 		"HSE_FindMatchAtEnd must return no match while HSE_RebuildInProgress is set — that fence replaces the removed Critical, so an OnChar never sees a half-built registry")
 }

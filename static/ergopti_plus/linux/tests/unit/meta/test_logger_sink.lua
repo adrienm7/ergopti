@@ -101,7 +101,7 @@ helpers.describe("logger sink — production wiring", function()
 	end)
 
 	helpers.it("the entry point requires the sink module", function()
-		helpers.assert_contains(entry, 'require("lib.logger_sink")',
+		helpers.assert_contains(entry, 'require("infra.logger_sink")',
 			"the daemon must require lib.logger_sink")
 	end)
 
@@ -134,7 +134,7 @@ end)
 
 helpers.describe("logger sink — output reaches disk", function()
 	helpers.it("an info line is written to the daily file", function()
-		local Sink   = helpers.load_module("lib.logger_sink")
+		local Sink   = helpers.load_module("infra.logger_sink")
 		local Logger = helpers.load_module("logger")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
@@ -156,7 +156,7 @@ helpers.describe("logger sink — output reaches disk", function()
 	end)
 
 	helpers.it("an error line is mirrored into the errors-only file", function()
-		local Sink   = helpers.load_module("lib.logger_sink")
+		local Sink   = helpers.load_module("infra.logger_sink")
 		local Logger = helpers.load_module("logger")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
@@ -181,7 +181,7 @@ helpers.describe("logger sink — output reaches disk", function()
 	end)
 
 	helpers.it("uninstall clears the sink so the core stops emitting", function()
-		local Sink   = helpers.load_module("lib.logger_sink")
+		local Sink   = helpers.load_module("infra.logger_sink")
 		local Logger = helpers.load_module("logger")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
@@ -211,7 +211,7 @@ end)
 
 helpers.describe("logger sink — date rollover", function()
 	helpers.it("both handles are repointed when the date changes", function()
-		local src = read_file(DRIVER_ROOT .. "/lib/logger_sink.lua")
+		local src = read_file(DRIVER_ROOT .. "/infra/logger_sink.lua")
 		helpers.assert_not_nil(src, "logger_sink.lua must be readable")
 
 		-- open_handles() must assign BOTH handles; a rollover that only repoints
@@ -242,7 +242,7 @@ end)
 
 helpers.describe("logger sink — quoting parity with shell_runner", function()
 	helpers.it("shell_quote matches adapters/shell_runner.quote", function()
-		local Sink  = helpers.load_module("lib.logger_sink")
+		local Sink  = helpers.load_module("infra.logger_sink")
 		local Shell = helpers.load_module("adapters.shell_runner")
 
 		local cases = {

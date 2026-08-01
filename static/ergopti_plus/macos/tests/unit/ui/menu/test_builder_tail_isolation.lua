@@ -29,14 +29,14 @@ local helpers = require("tests.helpers")
 --- real M.LEVELS / M.current_level for the log-level submenu, so a fully
 --- synthetic make_logger_stub() is too minimal here) and records every
 --- Logger.error call's already-formatted message.
---- @return table logger_spy Injectable package.loaded["lib.logger"] replacement.
+--- @return table logger_spy Injectable package.loaded["infra.logger"] replacement.
 --- @return table error_messages Array of formatted strings passed to Logger.error (grows live).
 local function make_error_capturing_logger()
 	local error_messages = {}
 	-- Real logger module, loaded fresh so it is unaffected by any stub a
 	-- previous test file may have left in package.loaded.
-	package.loaded["lib.logger"] = nil
-	local real_logger = require("lib.logger")
+	package.loaded["infra.logger"] = nil
+	local real_logger = require("infra.logger")
 	local logger_spy = setmetatable({}, { __index = real_logger })
 	logger_spy.error = function(module_name, fmt, ...)
 		local ok, formatted = pcall(string.format, fmt, ...)
@@ -67,10 +67,10 @@ end
 helpers.describe("Builder.generate: tail calls (download item, canvas badge) are pcall-isolated (F-MED-11)", function()
 	helpers.it("a throwing build_download_item does not prevent M.generate from returning the rest of the menu", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		package.loaded["lib.logger"] = logger_stub
+		package.loaded["infra.logger"] = logger_stub
 
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -99,7 +99,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 
 	helpers.it("a throwing CanvasBadge.prepend_to does not prevent M.generate from returning the rest of the menu", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		package.loaded["lib.logger"] = logger_stub
+		package.loaded["infra.logger"] = logger_stub
 
 		-- load_with_stubs unconditionally wipes every cached "ui.menu.*" module
 		-- (so a leaked i18n stub can never survive between test files — see its
@@ -115,7 +115,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 		package.loaded["ui.menu.builder"] = nil
 		builder = require("ui.menu.builder")
 
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 

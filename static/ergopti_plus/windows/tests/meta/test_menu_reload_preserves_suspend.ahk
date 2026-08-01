@@ -27,7 +27,7 @@
 ; scan covered ui/menu ONLY — the directory the fix touched — while the guarantee
 ; is transitive: ANY path reachable while paused that reloads must carry the
 ; pause. Twenty-one bare Reload sites existed; fourteen were outside ui/menu, in
-; lib/config_io.ahk (ten), lib/i18n.ahk, modules/updater/core.ahk, ui/editors.ahk
+; infra/config_io.ahk (ten), infra/i18n.ahk, modules/updater/core.ahk, ui/editors.ahk
 ; (three), ui/action_picker, ui/paths_editor, ui/personal_info_editor,
 ; ui/onboarding (two) and modules/gestures/actions.ahk. Changing the interface
 ; language while paused, or saving from any editor, silently brought the driver
@@ -87,7 +87,7 @@ _MRS_NoBareReloadAnywhereReachable() {
 	; directory, so scanning by directory excludes it structurally rather than by
 	; a name this test would have to keep in step.
 	Src := ""
-	for Dir in ["lib", "ui", "modules", "adapters"]
+	for Dir in ["infra", "ui", "modules", "adapters"]
 		Src .= "`n" . _StripFullLineComments(_DriverDirConcat(Dir))
 	Assert(StrLen(Src) > 200000,
 		"the driver source trees must be readable for this scan to mean anything (read " . StrLen(Src) . " chars)")

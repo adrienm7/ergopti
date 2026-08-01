@@ -40,23 +40,23 @@ local helpers = require("tests.helpers")
 --- files" path and with every notification channel raising.
 --- @return table bridge, function server_started
 local function load_bridge_with_throwing_notice()
-	package.loaded["lib.vscode_bridge"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.vscode_bridge"] = nil
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
 
 	-- Both plausible notification channels raise, so the test does not encode
 	-- WHICH one the fix chooses — only that neither can stop the server.
-	package.loaded["lib.dialog_util"] = {
+	package.loaded["infra.dialog_util"] = {
 		alert = function() error("dialog raised", 0) end,
 		block_alert = function() error("dialog raised", 0) end,
 	}
-	package.loaded["lib.notifications"] = {
+	package.loaded["infra.notifications"] = {
 		notify = function() error("notify raised", 0) end,
 	}
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
 
 	local started = { count = 0 }
-	local bridge = helpers.load_with_stubs("lib.vscode_bridge", {
+	local bridge = helpers.load_with_stubs("infra.vscode_bridge", {
 		httpserver = {
 			new = function()
 				started.count = started.count + 1
@@ -114,13 +114,13 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 	helpers.it("still starts the server when nothing throws", function()
 		-- Without this case the assertion above would pass against a setup() that
 		-- starts the server twice, or against a stub that counts a call nobody made.
-		package.loaded["lib.vscode_bridge"] = nil
-		package.loaded["lib.dialog_util"] = { alert = function() end, block_alert = function() end }
-		package.loaded["lib.notifications"] = { notify = function() end }
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.vscode_bridge"] = nil
+		package.loaded["infra.dialog_util"] = { alert = function() end, block_alert = function() end }
+		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 
 		local started = { count = 0 }
-		local bridge = helpers.load_with_stubs("lib.vscode_bridge", {
+		local bridge = helpers.load_with_stubs("infra.vscode_bridge", {
 			httpserver = {
 				new = function()
 					started.count = started.count + 1
@@ -169,7 +169,7 @@ helpers.describe("dialog_util.alert: every call site agrees on the shape", funct
 		-- own file: the mismatch is between a definition here and callers elsewhere.
 		local offenders = {}
 		for _, rel in ipairs({
-			"lib/vscode_bridge.lua", "ui/metrics_apps/init.lua", "modules/keylogger/init.lua",
+			"infra/vscode_bridge.lua", "ui/metrics_apps/init.lua", "modules/keylogger/init.lua",
 		}) do
 			local fh = io.open(helpers.driver_root() .. rel, "r")
 			if fh then

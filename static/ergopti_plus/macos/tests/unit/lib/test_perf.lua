@@ -25,15 +25,15 @@ local REQUIRED_API = { "set_enabled", "is_enabled", "now", "sample", "report", "
 helpers.describe("lib.perf: the profiling API exists and is callable", function()
 
 	helpers.it("loads under the test stubs", function()
-		package.loaded["lib.perf"] = nil
-		local perf = helpers.load_with_stubs("lib.perf")
+		package.loaded["infra.perf"] = nil
+		local perf = helpers.load_with_stubs("infra.perf")
 		helpers.assert_type(perf, "table",
 			"a module that stops loading must fail here, not report a passing skip")
 	end)
 
 	helpers.it("exposes every function the driver calls", function()
-		package.loaded["lib.perf"] = nil
-		local perf = helpers.load_with_stubs("lib.perf")
+		package.loaded["infra.perf"] = nil
+		local perf = helpers.load_with_stubs("infra.perf")
 		for _, name in ipairs(REQUIRED_API) do
 			helpers.assert_type(perf[name], "function",
 				"lib.perf." .. name .. " is called by the driver; an 'if present' check would "
@@ -42,8 +42,8 @@ helpers.describe("lib.perf: the profiling API exists and is callable", function(
 	end)
 
 	helpers.it("the sample/report/reset lifecycle runs and the toggle is observable", function()
-		package.loaded["lib.perf"] = nil
-		local perf = helpers.load_with_stubs("lib.perf")
+		package.loaded["infra.perf"] = nil
+		local perf = helpers.load_with_stubs("infra.perf")
 		local ok, err = pcall(function()
 			perf.set_enabled(true)
 			helpers.assert_true(perf.is_enabled(), "set_enabled(true) must be observable")

@@ -10,7 +10,7 @@
 ---
 --- Cumulative AX latency inside a tap callback is exactly what gets a CGEventTap
 --- disabled by macOS (kCGEventTapDisabledByTimeout), and this driver has already
---- been bitten by that class twice (lib/vscode_bridge's frame cache, the wrap-text
+--- been bitten by that class twice (infra/vscode_bridge's frame cache, the wrap-text
 --- selection cache). Halving the traffic is the smallest correct step.
 ---
 --- The resolver is LAZY on purpose: the combinations that resolve nothing today —
@@ -19,7 +19,7 @@
 --- regression for them. Both directions are asserted.
 ---
 --- NOTE ON SCOPE: this removes the DUPLICATE resolution. A cross-keystroke cache
---- (the TTL pattern in lib/vscode_bridge, or the event-driven invalidation in
+--- (the TTL pattern in infra/vscode_bridge, or the event-driven invalidation in
 --- keymap/utils) would remove the rest, and is deliberately left as separate work
 --- rather than smuggled into a latency fix.
 --- ==============================================================================

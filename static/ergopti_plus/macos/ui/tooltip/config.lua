@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Cross-driver parity: every constant here has a named equivalent in
----    constants.toml and in lib/ui_style.ahk (AHK side). Divergences between
+---    constants.toml and in infra/ui_style.ahk (AHK side). Divergences between
 ---    the three files are bugs.
 --- 2. No magic numbers: all tooltip renderer values originate here.
 --- 3. Future-proof: a Linux or web driver reads constants.toml directly;
@@ -44,7 +44,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG = "tooltip_config"
 
 -- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
@@ -204,7 +204,7 @@ end
 --- Reads _shared/modules/tooltip/constants.toml at require-time. Missing file, section,
 --- or key → error (fail fast — no driver-side fallback values).
 local function load_from_shared()
-	local toml_reader = require("lib.toml.reader")
+	local toml_reader = require("infra.toml.reader")
 
 	-- Locate shared dir by walking up from this file:
 	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared
@@ -223,7 +223,7 @@ local function load_from_shared()
 	-- well-formed but EMPTY result on both of its failure exits, so a type test can
 	-- never fire and an unreadable file was reported further down as a missing
 	-- [typography] section — sending the reader after a section that was never the
-	-- problem. Mirrors the emptiness check landed in lib/timings.lua, and names the
+	-- problem. Mirrors the emptiness check landed in infra/timings.lua, and names the
 	-- path so the message identifies the file that could not be read.
 	if type(c) ~= "table" or type(c.sections) ~= "table" or next(c.sections) == nil then
 		error("[tooltip/config] cannot read constants.toml (missing or empty): " .. tostring(toml_path))

@@ -70,7 +70,7 @@ function M.init(engine, config_dir)
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
-		local home = require("lib.config_paths").home()
+		local home = require("infra.config_paths").home()
 		local xdg = home .. "/.config/ergopti/hotstrings"
 		local fh = io.open(xdg, "r")
 		if fh then fh:close(); _config_dir = xdg end
@@ -104,7 +104,7 @@ function M.load_all()
 			local dir = s:match("^(.*[/\\])") or ""
 			-- Two steps up from modules/hotstrings/, not three: three lands outside
 			-- the tree entirely, so this bundled fallback found nothing.
-			local ok_paths, Paths = pcall(require, "lib.paths")
+			local ok_paths, Paths = pcall(require, "infra.paths")
 			local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
 			_toml_paths = Loader.find_toml_files(bundled)
 		else

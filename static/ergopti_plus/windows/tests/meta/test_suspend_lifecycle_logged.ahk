@@ -21,7 +21,7 @@
 ; 2. Pins ORDER, not just presence: a SUCCESS emitted before the teardown work
 ;    would satisfy a substring check while asserting something untrue.
 ;
-; SCOPE: source introspection of lib/lifecycle.ahk.
+; SCOPE: source introspection of infra/lifecycle.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,7 +41,7 @@
 _SLL_ReactorsAreBracketed() {
 	for Name in ["Ergopti_OnSuspendEnter", "Ergopti_OnSuspendResume"] {
 		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Name . "() must exist in lib/lifecycle.ahk")
+		Assert(Body != "", Name . "() must exist in infra/lifecycle.ahk")
 
 		StartPos := InStr(Body, "LoggerStart(")
 		SuccessPos := InStr(Body, "LoggerSuccess(")

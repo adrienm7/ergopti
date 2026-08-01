@@ -24,8 +24,8 @@
 
 local M = {}
 local hs           = hs
-local Logger       = require("lib.logger")
-local i18n         = require("lib.i18n")
+local Logger       = require("infra.logger")
+local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
 
 local LOG = "ollama_deps"

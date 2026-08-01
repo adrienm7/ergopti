@@ -52,7 +52,7 @@ _HDGA_ReadSource(RelPath) {
 ; ===================================================
 
 _HDGA_DisableGroupRebuildIsAtomic() {
-	Src := _HDGA_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
+	Src := _HDGA_ReadSource("infra/hotstrings/hotstring_engine_main.ahk")
 	Body := _DriverFuncBody("HSE_DisableGroup")
 	Assert(Body != "", "HSE_DisableGroup(Group) declaration must exist in hotstring_engine_main.ahk")
 

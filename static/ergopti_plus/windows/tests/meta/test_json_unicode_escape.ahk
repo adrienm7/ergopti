@@ -9,7 +9,7 @@
 #Requires AutoHotkey v2.0
 
 _TJU_Check() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Assert(InStr(Src, "^[0-9A-Fa-f]{4}$") > 0, "json.ahk must validate \\u hex escapes")
 	Assert(InStr(Src, "JSON: invalid \u escape") > 0, "json.ahk must throw descriptive error on invalid \\u escape")
 }

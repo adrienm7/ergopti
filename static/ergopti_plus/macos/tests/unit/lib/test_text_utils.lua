@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local tu = helpers.load_with_stubs("lib.text_utils")
+local tu = helpers.load_with_stubs("infra.text_utils")
 
 
 

@@ -49,10 +49,10 @@ local BOOT_STDOUT = "{ sec = " .. BOOT_TS .. ", usec = 0 } Mon Jan  1 00:00:00 2
 --- @return table KE
 local function fresh_ke()
 	package.loaded["modules.karabiner.ke_lifecycle"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
-	package.loaded["lib.notifications"] = { notify = function() end }
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.notifications"] = { notify = function() end }
 	return helpers.load_with_stubs("modules.karabiner.ke_lifecycle")
 end
 

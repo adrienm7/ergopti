@@ -218,8 +218,8 @@ helpers.describe("file_system.write — parent directory creation (filesystem-ad
 		}
 
 		package.loaded["adapters.file_system"] = nil
-		package.loaded["lib.logger"] = nil
-		local _ = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local _ = helpers.load_with_stubs("infra.logger")
 		-- Inject mock hs.fs via hs_overrides so it survives the fresh-stub replacement
 		local FS = helpers.load_with_stubs("adapters.file_system", { fs = mock_fs })
 

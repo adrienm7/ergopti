@@ -22,8 +22,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local Logger = require("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = require("infra.logger")
 
 
 

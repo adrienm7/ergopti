@@ -17,8 +17,8 @@
 local helpers = require("tests.helpers")
 
 local Onboarding  = helpers.load_with_stubs("ui.onboarding")
-local toml_writer = require("lib.toml.writer")
-local toml_codec  = require("lib.toml.codec")
+local toml_writer = require("infra.toml.writer")
+local toml_codec  = require("infra.toml.codec")
 
 local function enabled_value(updates, section)
 	for _, u in ipairs(updates) do

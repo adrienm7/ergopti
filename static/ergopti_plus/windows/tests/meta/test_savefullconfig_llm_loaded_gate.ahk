@@ -18,7 +18,7 @@
 
 _SFLG_LlmPersistGatedOnLoaded() {
 	Body := _DriverFuncBody("SaveFullConfig")
-	Assert(Body != "", "SaveFullConfig must exist in lib/config_io.ahk")
+	Assert(Body != "", "SaveFullConfig must exist in infra/config_io.ahk")
 
 	First := InStr(Body, "_LLM_Menu_Loaded")
 	Second := InStr(Body, "_LLM_Menu_Loaded", , First + 1)

@@ -14,7 +14,7 @@
 
 ; Raise the per-interval hotkey limit once at load time so rapid wheel events
 ; never trigger the "too many hotkeys" warning before the first WheelUp/Down
-; fires. Single-sourced from lib/nav_layer_helpers.ahk (loaded earlier, see
+; fires. Single-sourced from infra/nav_layer_helpers.ahk (loaded earlier, see
 ; ErgoptiPlus.ahk's #Include order) so ActivateLayer/DisableLayer restore
 ; this exact same ceiling instead of drifting to a different hardcoded number.
 A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
@@ -30,7 +30,7 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 ; ====================================
 
 ; ActivateLayer, DisableLayer, ResetNumberOfRepetitions, SetNumberOfRepetitions,
-; and ActionLayer are defined in lib/nav_layer_helpers.ahk and loaded globally.
+; and ActionLayer are defined in infra/nav_layer_helpers.ahk and loaded globally.
 
 ; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer.
 ; The group-enabled test is delegated to _AnyShortcutEnabled(), the same single

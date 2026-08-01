@@ -101,7 +101,7 @@ helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", fun
 		-- Load the HS shim with the real shared module (not a stub)
 		package.loaded["modules.llm.prompt_builder"] = nil
 		-- The shim requires "llm.prompt_builder" which is already in package.loaded from above
-		helpers.load_with_stubs("lib.logger")
+		helpers.load_with_stubs("infra.logger")
 		local ok_shim, ShimPB = pcall(require, "modules.llm.prompt_builder")
 		helpers.assert_true(ok_shim, "modules.llm.prompt_builder shim must be loadable")
 

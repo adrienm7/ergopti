@@ -308,7 +308,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 	lines.push('--- parity with the AHK twin (features_manifest.ahk) and because');
 	lines.push('--- test-manifest-parity.cjs cross-checks it between the two generated');
 	lines.push('--- files — but no Lua module on macOS reads entry.description_key today');
-	lines.push('--- (confirmed via a repo-wide grep; lib/manifest_reader.lua\'s own');
+	lines.push('--- (confirmed via a repo-wide grep; infra/manifest_reader.lua\'s own');
 	lines.push('--- docstring documents it as exposing only what macOS modules actually');
 	lines.push('--- consume). The AHK driver genuinely resolves every description_key via');
 	lines.push('--- its menu builder. Removing the field from this side alone would break');

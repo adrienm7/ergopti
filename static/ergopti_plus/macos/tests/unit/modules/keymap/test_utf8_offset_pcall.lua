@@ -26,8 +26,8 @@ local helpers = require("tests.helpers")
 
 -- Isolate the hs stub before loading any production module so every
 -- require("hs.*") call shares the same stub instance.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 
 
@@ -387,23 +387,23 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.llm.prediction_engine",
 			"modules.keylogger",
 			"modules.hotstrings.hotstrings_config",
-			"lib.text_utils",
-			"lib.keycodes",
-			"lib.perf",
-			"lib.hotpath_profiler",
+			"infra.text_utils",
+			"infra.keycodes",
+			"infra.perf",
+			"infra.hotpath_profiler",
 			"ui.tooltip",
 		}
 		for _, mod in ipairs(to_clear) do package.loaded[mod] = nil end
 
 		-- Stub every dependency that is not under test.
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			ESCAPE            = 53,
 			RETURN            = 36,
 			BACKSPACE         = 51,
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name           = function(_) return "f16" end,
 		}
-		package.loaded["lib.text_utils"] = {
+		package.loaded["infra.text_utils"] = {
 			is_letter_char       = function(_) return false end,
 			trig_lower           = function(s) return s:lower() end,
 			conform_replacement  = function(repl, _, _) return repl end,
@@ -411,14 +411,14 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			utf8_sub             = function(s, i, j) return s:sub(i, j) end,
 			get_common_prefix_utf8 = function(_, _) return 0 end,
 		}
-		package.loaded["lib.perf"] = {
+		package.loaded["infra.perf"] = {
 			is_enabled = function() return false end,
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
 			sample     = function() end,
 			set_enabled = function() end,
 		}
-		package.loaded["lib.hotpath_profiler"] = {
+		package.loaded["infra.hotpath_profiler"] = {
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
 			log_if_slow = function() end,
@@ -525,9 +525,9 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			is_ignored_window = function() return false end,
 		}
 
-		-- Reload lib.logger with the fresh hs stub so require("lib.logger") works.
-		package.loaded["lib.logger"] = nil
-		helpers.load_with_stubs("lib.logger")
+		-- Reload lib.logger with the fresh hs stub so require("infra.logger") works.
+		package.loaded["infra.logger"] = nil
+		helpers.load_with_stubs("infra.logger")
 
 		local bridge = require("modules.keymap.llm_bridge")
 

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Sibling regression for macos-reload-during-git-pull. menu_watchers'
 --- start_config_watcher is the SECOND auto-reload watcher on base_dir (alongside
---- lib/file_watchers); both fire on a `git pull`, so guarding only one still lets
+--- infra/file_watchers); both fire on a `git pull`, so guarding only one still lets
 --- the other reload mid-pull and leave Hammerspoon dead. This drives the config
 --- watcher's callback and steps the debounce timer by hand while flipping an
 --- injected git gate:
@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 
 -- Controllable git gate, injected before the module is required.
 local git_busy = false
-package.loaded["lib.git_status"] = {
+package.loaded["infra.git_status"] = {
 	operation_in_progress = function() return git_busy end,
 }
 

@@ -7,20 +7,20 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, groups) is read from
----    ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic
+---    ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.  Dynamic
 ---    blocks (ctrl group, cmd group, script control, extensions, edit action)
 ---    are supplied as handlers so platform-specific logic stays in Lua.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
-local Logger        = require("lib.logger")
-local fs_dir       = require("lib.fs_dir")
-local dialog        = require("lib.dialog_util")
+local Logger        = require("infra.logger")
+local fs_dir       = require("infra.fs_dir")
+local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
-local i18n          = require("lib.i18n")
-local ManifestMenu  = require("lib.manifest_menu")
+local i18n          = require("infra.i18n")
+local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local LOG           = "menu_shortcuts"
 

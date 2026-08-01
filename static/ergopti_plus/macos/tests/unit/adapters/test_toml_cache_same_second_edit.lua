@@ -76,8 +76,8 @@ end
 --- @return table
 local function fresh_cache()
 	package.loaded["adapters.toml_cache"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
 
 	local cache = helpers.load_with_stubs("adapters.toml_cache", {
 		fs = {

@@ -23,7 +23,7 @@
 ;   2. the .Has() guard chain must survive -- "master_gates" is ABSENT from the
 ;      real manifest, and an unguarded Map["missing_key"] THROWS in AHK v2, so
 ;      dropping a guard turns every menu build into an exception;
-;   3. the sibling _MG_LoadSubCategories (lib/master_gates.ahk) must NOT get the
+;   3. the sibling _MG_LoadSubCategories (infra/master_gates.ahk) must NOT get the
 ;      same treatment -- its non-memoization is a deliberate fail-fast contract
 ;      pinned by tests/unit/test_master_gates.ahk.
 ;

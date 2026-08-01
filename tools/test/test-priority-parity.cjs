@@ -44,7 +44,7 @@ let fail = 0;
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, '_shared/modules/hotstrings/priority.json'), 'utf8'));
 const expected = { common: src.common, package: src.package, personal: src.personal };
 
-const AHK = fs.readFileSync(path.join(ROOT, 'windows/lib/hotstrings/hotstring_engine_main.ahk'), 'utf8');
+const AHK = fs.readFileSync(path.join(ROOT, 'windows/infra/hotstrings/hotstring_engine_main.ahk'), 'utf8');
 const LUA = fs.readFileSync(path.join(ROOT, 'macos/modules/keymap/registry.lua'), 'utf8');
 
 // AHK: `global HSE_PRIORITY_COMMON := 10`. Lua: `local PRIORITY_COMMON = 10`.
@@ -138,7 +138,7 @@ const PRIORITY_LITERAL_RE = /priority\w*["'\s)\]]*\s*(?::=|==|=|:|\bor\b|\?\?)\s
 // value must still equal the shared source default.
 const PINNED = [
 	{
-		file: 'windows/lib/hotstrings/hotstring_builder.ahk',
+		file: 'windows/infra/hotstrings/hotstring_builder.ahk',
 		symbol: '_MakeHotstringMeta',
 		want: () => expected.common,
 		why: 'AHK v2 default-parameter expressions cannot reference a global'
@@ -252,12 +252,12 @@ if (!luaResolver) {
 // AHK resolves the same cascade across the cache builder rather than in one
 // function, so the contract is asserted where it is written down: the comment
 // naming the order must still match the shared JSON's description.
-const CACHE = fs.readFileSync(path.join(ROOT, 'windows/lib/hotstrings/hotstrings_cache.ahk'), 'utf8');
+const CACHE = fs.readFileSync(path.join(ROOT, 'windows/infra/hotstrings/hotstrings_cache.ahk'), 'utf8');
 if (/individual\s*>\s*section\s*>\s*file\s*>\s*source/.test(CACHE)) {
 	console.log(`  ${PASS}  windows cache builder documents the same cascade order`);
 	pass++;
 } else {
-	console.log(`  ${FAIL}  windows/lib/hotstrings/hotstrings_cache.ahk no longer states the cascade individual > section > file > source`);
+	console.log(`  ${FAIL}  windows/infra/hotstrings/hotstrings_cache.ahk no longer states the cascade individual > section > file > source`);
 	fail++;
 }
 

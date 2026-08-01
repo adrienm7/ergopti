@@ -48,7 +48,7 @@ local ENTRY_POINT = DRIVER_ROOT .. "init.lua"
 local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "ui",
 	DRIVER_ROOT .. "modules",
-	DRIVER_ROOT .. "lib",
+	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "adapters",
 	helpers.shared("lua"),
 }
@@ -145,10 +145,10 @@ helpers.describe("meta: hs.fs.dir is always consumed by a generic-for (init-fsdi
 	-- Stronger invariant than "flows into a generic-for". That shape keeps the
 	-- state object alive but still THROWS on a missing or unreadable directory,
 	-- and five call sites shipped exactly that: a menu that crashed the moment the
-	-- extensions folder did not exist. lib/fs_dir.entries() is the only form that
+	-- extensions folder did not exist. infra/fs_dir.entries() is the only form that
 	-- is both state-correct AND throw-safe, and it is now the only form in the
 	-- tree — so the guard can demand it rather than merely tolerate the weaker one.
-	helpers.it("no driver file outside lib/fs_dir.lua references hs.fs.dir directly", function()
+	helpers.it("no driver file outside infra/fs_dir.lua references hs.fs.dir directly", function()
 		local direct = {}
 		for _, path in ipairs(files) do
 			if not path:find("fs_dir", 1, true) then
@@ -157,7 +157,7 @@ helpers.describe("meta: hs.fs.dir is always consumed by a generic-for (init-fsdi
 			end
 		end
 		helpers.assert_true(#direct == 0,
-			string.format("%d file(s) call hs.fs.dir directly instead of lib/fs_dir.entries(); "
+			string.format("%d file(s) call hs.fs.dir directly instead of infra/fs_dir.entries(); "
 				.. "the raw call throws on a missing directory, which is a crash on a path the "
 				.. "user can simply not have created yet: %s",
 				#direct, table.concat(direct, ", ")))
@@ -184,18 +184,18 @@ end)
 --- ==================================================
 --- ==================================================
 
-helpers.describe("lib/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsdir-pcall)", function()
+helpers.describe("infra/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsdir-pcall)", function()
 	helpers.it("fs_dir.entries wraps an hs.fs.dir loop in pcall so a bad directory cannot abort boot", function()
 		-- The blessed wrapper (formerly the inline safe_dir_entries in init.lua) now
-		-- lives in lib/fs_dir; init.lua and the hotstrings config window both alias it
-		-- (`local safe_dir_entries = require("lib.fs_dir").entries`), so the protection
+		-- lives in infra/fs_dir; init.lua and the hotstrings config window both alias it
+		-- (`local safe_dir_entries = require("infra.fs_dir").entries`), so the protection
 		-- is enforced in exactly one place. A pcall'd closure that contains the
 		-- hs.fs.dir loop is the shape that both catches the throw AND preserves the
 		-- state object. `.` spans newlines in Lua patterns, so this matches across lines.
-		local code = strip_comments(read_file(DRIVER_ROOT .. "lib/fs_dir.lua"))
+		local code = strip_comments(read_file(DRIVER_ROOT .. "infra/fs_dir.lua"))
 		helpers.assert_true(
 			code:match("pcall%s*%(%s*function.-hs%.fs%.dir") ~= nil,
-			"lib/fs_dir.entries must iterate hs.fs.dir inside a pcall'd closure so an "
+			"infra/fs_dir.entries must iterate hs.fs.dir inside a pcall'd closure so an "
 				.. "inaccessible directory is logged, not fatal (init-fsdir-pcall)")
 	end)
 end)

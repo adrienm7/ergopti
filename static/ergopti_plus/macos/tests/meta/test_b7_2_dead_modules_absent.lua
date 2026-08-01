@@ -10,7 +10,7 @@
 --- Targets removed in B7.2:
 ---   • macos/ui/menu/menu_script_control.lua — superseded by dyn_script_control
 ---     in menu_shortcuts.lua; zero require() callers in the runtime.
----   • macos/lib/color_utils.lua + _shared/lua/color_utils/init.lua — one-line
+---   • macos/infra/color_utils.lua + _shared/lua/color_utils/init.lua — one-line
 ---     identity re-export with zero production callers (tests used lib.color_utils
 ---     directly; test file deleted alongside the shim).
 ---   • _shared/lua/keycodes/qwerty_names.lua — platform-neutral mapping table
@@ -50,10 +50,10 @@ helpers.describe("B7.2: dead modules must not be present (§5.6)", function()
 		)
 	end)
 
-	helpers.it("lib/color_utils.lua is absent (zero-caller identity shim)", function()
+	helpers.it("infra/color_utils.lua is absent (zero-caller identity shim)", function()
 		helpers.assert_true(
-			file_absent(DRIVER_ROOT .. "lib/color_utils.lua"),
-			"lib/color_utils.lua must not exist — dead shim deleted in B7.2 (§5.6)"
+			file_absent(DRIVER_ROOT .. "infra/color_utils.lua"),
+			"infra/color_utils.lua must not exist — dead shim deleted in B7.2 (§5.6)"
 		)
 	end)
 

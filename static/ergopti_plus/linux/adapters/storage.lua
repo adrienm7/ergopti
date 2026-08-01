@@ -43,7 +43,7 @@ local function _config_dir()
 	-- Preserved deliberately: this is where existing installs keep their
 	-- storage.json, and unifying the name would orphan every stored setting
 	-- with no migration. The HOME fallback is the shared one.
-	local ConfigPaths = require("lib.config_paths")
+	local ConfigPaths = require("infra.config_paths")
 	return ConfigPaths.config_home() .. "/ergopti_plus/"
 end
 

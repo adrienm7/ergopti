@@ -160,7 +160,7 @@ local function _read_schema()
 	-- made schema loading depend on the process's current directory rather than
 	-- on where the driver is installed. Started from anywhere but one exact
 	-- directory, the keylogger came up with no schema at all.
-	local Paths = require("lib.paths")
+	local Paths = require("infra.paths")
 	local schema_path = Paths.shared("data/db/schema.sql")
 	if not schema_path then
 		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")

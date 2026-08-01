@@ -36,7 +36,7 @@
 ; brace at one-tab indentation (class methods close with a tab + "}"). Returns ""
 ; when the declaration is absent. Kept (rather than _DriverFuncBody) because the
 ; targets are ``static`` class methods, which the framework helper's column-0
-; name anchor does not match — the source comes from _DriverDirConcat("lib").
+; name anchor does not match — the source comes from _DriverDirConcat("infra").
 _DSG_MethodBody(Src, MethodDef) {
 	Idx := InStr(Src, MethodDef)
 	if !Idx
@@ -59,7 +59,7 @@ _DSG_MethodBody(Src, MethodDef) {
 ; ==================================================
 
 _DSG_StartReusesLiveInputHook() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Seg := _DSG_MethodBody(Src, "static Start() {")
 	Assert(Seg != "", "HookDispatcher.Start() must exist in hook_dispatcher.ahk")
 	Assert(InStr(Seg, "_ih is InputHook") > 0,
@@ -68,7 +68,7 @@ _DSG_StartReusesLiveInputHook() {
 Test("HookDispatcher: Start() reuses a live InputHook (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_StartReusesLiveInputHook)
 
 _DSG_StartSetsStartedBeforeMouseHotkeys() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Seg := _DSG_MethodBody(Src, "static Start() {")
 	StartedIdx := InStr(Seg, "_started := true")
 	HotkeyIdx := InStr(Seg, "_SafeHotkey(")
@@ -80,7 +80,7 @@ _DSG_StartSetsStartedBeforeMouseHotkeys() {
 Test("HookDispatcher: Start() sets _started before mouse hotkeys (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_StartSetsStartedBeforeMouseHotkeys)
 
 _DSG_SafeHotkeyGuardsRegistration() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Seg := _DSG_MethodBody(Src, "static _SafeHotkey(key_name, callback_fn) {")
 	Assert(Seg != "", "HookDispatcher._SafeHotkey() helper must exist")
 	Assert(InStr(Seg, "try") > 0 && InStr(Seg, "catch") > 0,
@@ -91,7 +91,7 @@ _DSG_SafeHotkeyGuardsRegistration() {
 Test("HookDispatcher: _SafeHotkey guards each Hotkey registration (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_SafeHotkeyGuardsRegistration)
 
 _DSG_MouseHotkeysMatchWithHeldModifiers() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	StartSeg := _DSG_MethodBody(Src, "static Start() {")
 	StopSeg := _DSG_MethodBody(Src, "static Stop() {")
 	DQ := Chr(34)
@@ -114,7 +114,7 @@ _DSG_MouseHotkeysMatchWithHeldModifiers() {
 Test("HookDispatcher: mouse hotkeys use wildcard variants while modifiers are held (ctrl-wheel-delayed-cancel)", _DSG_MouseHotkeysMatchWithHeldModifiers)
 
 _DSG_IhInitializedToFalse() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	; `unset` static properties raise PropertyError when read via `is` —
 	; `false` lets the reuse guard evaluate without throwing on first boot
 	Assert(InStr(Src, "static _ih := false") > 0,
@@ -123,7 +123,7 @@ _DSG_IhInitializedToFalse() {
 Test("HookDispatcher: static _ih is initialized to false, not left unset (hook-dispatcher-ih-property-error)", _DSG_IhInitializedToFalse)
 
 _DSG_InputHookConstructionGuarded() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Seg := _DSG_MethodBody(Src, "static Start() {")
 	Assert(Seg != "", "HookDispatcher.Start() must exist in hook_dispatcher.ahk")
 
@@ -149,7 +149,7 @@ _DSG_InputHookConstructionGuarded() {
 Test("HookDispatcher: Start()'s InputHook construction is guarded by try/catch with LoggerError on failure (dispatcher-start-inputhook-unguarded)", _DSG_InputHookConstructionGuarded)
 
 _DSG_PartialStartupCleanupUsesOwnedResources() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	StopSeg := _DSG_MethodBody(Src, "static Stop() {")
 	StartSeg := _DSG_MethodBody(Src, "static Start() {")
 	Assert(InStr(StopSeg, "!(HookDispatcher._ih is InputHook)") > 0,
@@ -162,7 +162,7 @@ _DSG_PartialStartupCleanupUsesOwnedResources() {
 Test("HookDispatcher: partial startup resources are rolled back by ownership", _DSG_PartialStartupCleanupUsesOwnedResources)
 
 _DSG_BootDoesNotPublishReadyWithoutHook() {
-	DispatcherStart := _DSG_MethodBody(_DriverDirConcat("lib"), "static Start() {")
+	DispatcherStart := _DSG_MethodBody(_DriverDirConcat("infra"), "static Start() {")
 	Main := _DriverDirConcat("")
 	Assert(InStr(DispatcherStart, "return false") > 0 && InStr(DispatcherStart, "return true") > 0,
 		"HookDispatcher.Start must return an explicit success state so boot can enforce its readiness contract")

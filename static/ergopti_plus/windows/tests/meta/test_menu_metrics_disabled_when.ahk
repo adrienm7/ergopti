@@ -200,7 +200,7 @@ Test("menu-metrics-disabled-when: ToggleMetricsEnabled has a real call site (F2)
 ; writes a dead ToggleCategoryAllFeatures("Metrics", ...) key. Mirrors the
 ; gestures_menu toggle entry, which already carries platforms:["hs"].
 _MMDW_ManifestToggleExcludesAhk() {
-	; NOTE: this file's tests are static-source-scan only — lib/manifest_menu.ahk
+	; NOTE: this file's tests are static-source-scan only — infra/manifest_menu.ahk
 	; (which defines _MR_Get/MenuRenderer_Build) is deliberately NOT #Included by
 	; run_all.ahk, so this reads the parsed JSON directly via Map access rather
 	; than calling into manifest_menu.ahk's helpers.

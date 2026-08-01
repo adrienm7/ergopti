@@ -28,7 +28,7 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("lib.logger")
+local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Crypto      = require("adapters.crypto")
 

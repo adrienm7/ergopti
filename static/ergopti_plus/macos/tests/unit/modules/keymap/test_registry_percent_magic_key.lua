@@ -88,7 +88,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 		-- space becomes "%20", whose "%2" reads as capture reference #2. That raised
 		-- inside an hs.timer callback, where the error reaches only the HS Console,
 		-- so the search silently never opened for any multi-word selection.
-		local text_utils = helpers.load_with_stubs("lib.text_utils")
+		local text_utils = helpers.load_with_stubs("infra.text_utils")
 
 		local encoded  = "hello%20world%2Ffoo"
 		local template = "https://example.com/search?q=%s"

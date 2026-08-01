@@ -27,7 +27,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 -- Async Keychain read (F-MED-9): M.decrypt() below is a synchronous
 -- hs.execute shell-out that can raise a modal Keychain-unlock prompt,
 -- freezing the ENTIRE Hammerspoon run loop (all keystroke processing, every

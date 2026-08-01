@@ -480,7 +480,7 @@ Test("i18n _I18nSortedLocales: does not mutate original I18N_LOCALES", _I18nSort
 
 _I18nSLP_SetLocaleOmitsStart() {
 	Body := _DriverFuncBody("I18nSetLocale")
-	AssertTrue(Body != "", "I18nSetLocale must be defined in lib/i18n.ahk")
+	AssertTrue(Body != "", "I18nSetLocale must be defined in infra/i18n.ahk")
 	AssertTrue(InStr(Body, "LoggerStart") == 0,
 		"I18nSetLocale must not call LoggerStart directly - it used to fire once per call regardless of debounce coalescing, leaving intermediate switches with an unpaired START")
 }
@@ -488,7 +488,7 @@ Test("i18n I18nSetLocale: no longer logs LoggerStart at the call site (F51)", _I
 
 _I18nSLP_DoReloadLogsPair() {
 	Body := _DriverFuncBody("_I18nDoReload")
-	AssertTrue(Body != "", "_I18nDoReload must be defined in lib/i18n.ahk")
+	AssertTrue(Body != "", "_I18nDoReload must be defined in infra/i18n.ahk")
 	AssertTrue(InStr(Body, "LoggerStart") > 0,
 		"_I18nDoReload must log LoggerStart right before the real reload work happens (F51)")
 	AssertTrue(InStr(Body, "LoggerSuccess") > 0,

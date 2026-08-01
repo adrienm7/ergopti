@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Earlier test files (karabiner layout polling) install a shell_runner stub
 -- without exec(); purge it so conflicts.lua captures the real adapter — the
@@ -83,7 +83,7 @@ local function load_with_macos_preferences(defaults_output)
 	local warnings = {}
 	local commands = {}
 	package.loaded["modules.gestures.conflicts"] = nil
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		debug   = function() end,
 		info    = function() end,
 		warn    = function(_, message) table.insert(warnings, message) end,
@@ -103,7 +103,7 @@ local function load_with_macos_preferences(defaults_output)
 	local conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
 	local function cleanup()
 		package.loaded["modules.gestures.conflicts"] = nil
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 	end
 	return conflicts, warnings, commands, cleanup

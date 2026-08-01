@@ -20,8 +20,8 @@ local helpers = require("tests.helpers")
 
 -- Reset modules so we can load with fresh stubs.
 package.loaded["modules.keymap.llm_bridge"] = nil
-package.loaded["lib.logger"]                = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"]                = nil
+helpers.load_with_stubs("infra.logger")
 
 
 
@@ -72,7 +72,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 
 		-- Intercept tooltip before the module loads so the module-level wiring
 		-- binds to our stub instead of the real tooltip.
-		-- llm_bridge.lua requires "ui.tooltip", not "lib.tooltip".
+		-- llm_bridge.lua requires "ui.tooltip", not "infra.tooltip".
 		local show_cb = nil
 		local orig_tooltip = package.loaded["ui.tooltip"] or {}
 		local orig_set_on_show = orig_tooltip.set_on_show_callback

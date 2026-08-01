@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 helpers.describe("clipboard.save counts UTI types via pairs(), not #", function()
 	helpers.it("logs the real type count for a hash-keyed pasteboard", function()
 		local logged
-		package.loaded["lib.logger"] = {
+		package.loaded["infra.logger"] = {
 			debug   = function(_l, fmt, ...) logged = string.format(fmt, ...) end,
 			error   = function() end, info = function() end, warn = function() end,
 			trace   = function() end, done = function() end, start = function() end, success = function() end,
@@ -30,7 +30,7 @@ helpers.describe("clipboard.save counts UTI types via pairs(), not #", function(
 		helpers.assert_true(logged ~= nil and logged:find("2 type(s)", 1, true) ~= nil,
 			"save() must report 2 type(s) for a 2-UTI hash table, got: " .. tostring(logged))
 
-		package.loaded["lib.logger"]         = nil
+		package.loaded["infra.logger"]         = nil
 		package.loaded["adapters.clipboard"] = nil
 	end)
 end)

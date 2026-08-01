@@ -260,7 +260,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 
 	; Effective activation delay for the dynamic hotstrings: the user's
 	; "dynamichotstrings" delay override when set, otherwise the shared default
-	; DYN_HOTSTRINGS_DEFAULT_DELAY (defined in lib/hotstrings/hotstrings_config.ahk,
+	; DYN_HOTSTRINGS_DEFAULT_DELAY (defined in infra/hotstrings/hotstrings_config.ahk,
 	; the early-loaded layer the tray menu also reads). No category TOML backs this
 	; key, so HotstringsResolve reports HasOverride=false until the user sets one
 	; from the tray "Delays" submenu (mirrors the macOS dynamichotstrings delay item).

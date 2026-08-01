@@ -21,8 +21,8 @@ local helpers = require("tests.helpers")
 -- ==================================================
 
 -- Minimal logger stub (already in hs stub, but ensure no leftover state)
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- Expander stub: llm_bridge now routes apply_prediction through
 -- expander.perform_text_replacement. The stub mirrors the contract so
@@ -150,7 +150,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		}
 
 		-- keycodes stub
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			TAB              = 48,
 			RETURN           = 36,
 			ENTER            = 76,
@@ -160,11 +160,11 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 			to_name          = function(c) return tostring(c) end,
 		}
 
-		local hs_stub = helpers.load_with_stubs("lib.logger")  -- ensure hs is fresh
+		local hs_stub = helpers.load_with_stubs("infra.logger")  -- ensure hs is fresh
 		-- (load_with_stubs already sets _G.hs)
 
 		-- Minimal timings stub
-		package.loaded["lib.timings"] = { sec = function() return 0.1 end }
+		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
 
 		-- Load the real bridge module
 		package.loaded["modules.keymap.llm_bridge"] = nil
@@ -232,14 +232,14 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 			get_current_model = function() return "stub-model" end,
 		}
 
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			TAB = 48, RETURN = 36, ENTER = 76,
 			F16_LLM_CHAIN_SIGNAL = 106,
 			ARROW_MIN = 123, ARROW_MAX = 126,
 			to_name = function(c) return tostring(c) end,
 		}
 
-		package.loaded["lib.timings"] = { sec = function() return 0.1 end }
+		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
 		package.loaded["modules.keymap.llm_bridge"] = nil
 		local ok, bridge = pcall(require, "modules.keymap.llm_bridge")
 		if not ok then return end  -- stubs not sufficient in this env, skip

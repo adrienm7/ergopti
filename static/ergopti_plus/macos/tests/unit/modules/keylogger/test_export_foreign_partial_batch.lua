@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.i18n"] = { get = function(k) return k end, t = function(k) return k end }
+package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keylogger.export")
 
 local BATCH = "\nBEGIN TRANSACTION;\nINSERT OR IGNORE INTO events VALUES (1);\nCOMMIT;\n"

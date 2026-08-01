@@ -43,7 +43,7 @@
 ; this asserts the explanation sits next to the code.
 _A0720B4_SuppressSeparationIsDocumented() {
 	Body := _DriverFuncBody("PrefixWatcherSuppress")
-	Assert(Body != "", "PrefixWatcherSuppress must exist in lib/hotstrings/hotstring_inputhook.ahk")
+	Assert(Body != "", "PrefixWatcherSuppress must exist in infra/hotstrings/hotstring_inputhook.ahk")
 	Assert(InStr(Body, "HSE_Suppress(YesNo)") = 0,
 		"PrefixWatcherSuppress must NOT delegate to HSE_Suppress — the render guard and the engine suppression window are deliberately separate, and delegating drops physical input typed near an output transaction (F46)")
 }
@@ -53,7 +53,7 @@ Test("hotstrings: the render guard stays separate from engine suppression (F-14)
 
 _A0720B4_GlobalKeyWriteFailureIsSurfaced() {
 	Body := _DriverFuncBody("_SaveGlobalKey")
-	Assert(Body != "", "_SaveGlobalKey must exist in lib/hotstrings/hotstrings_io.ahk")
+	Assert(Body != "", "_SaveGlobalKey must exist in infra/hotstrings/hotstrings_io.ahk")
 	Assert(InStr(Body, "catch") > 0 and InStr(Body, "LoggerError") > 0,
 		"_SaveGlobalKey must catch and LOG a failed write — the in-memory value has already changed by then, so a bare try made a read-only or cloud-locked config indistinguishable from a successful save until the setting silently reverted at next boot (copilot-instructions 5.3)")
 	Assert(InStr(Body, ".Close()") > 0,
@@ -72,7 +72,7 @@ Test("hotstrings: a failed global-key write is surfaced (F-15)", _A0720B4_Global
 ; the keyboard-hook starvation path. Correctness beat the micro-optimisation.
 _A0720B4_SubCategoryManifestStaysFailFast() {
 	Body := _DriverFuncBody("_MG_LoadSubCategories")
-	Assert(Body != "", "_MG_LoadSubCategories must exist in lib/master_gates.ahk")
+	Assert(Body != "", "_MG_LoadSubCategories must exist in infra/master_gates.ahk")
 	Assert(InStr(Body, "static _Cache") = 0,
 		"_MG_LoadSubCategories must NOT memoize its parsed result — an invalid canonical manifest has to fail fast on every call, and a cache would return the last good value instead of throwing")
 
@@ -135,7 +135,7 @@ Test("keylogger-webview: the dashboard is served from a virtual host (F-24)",
 
 _A0720B4_TapHoldDurationIsValidated() {
 	Body := _DriverFuncBody("TapHoldDuration")
-	Assert(Body != "", "TapHoldDuration must exist in lib/tap_hold/tap_hold_loader.ahk")
+	Assert(Body != "", "TapHoldDuration must exist in infra/tap_hold/tap_hold_loader.ahk")
 	Assert(InStr(Body, "IsNumber(") > 0,
 		"TapHoldDuration must type-check the TOML value: it is concatenated into a KeyWait option string, so a non-numeric entry produces an invalid timeout and KeyWait THROWS on the hook thread with a synthetic modifier already armed")
 	Assert(InStr(Body, "TAPHOLD_MAX_ACTIVATION_SECONDS") > 0,

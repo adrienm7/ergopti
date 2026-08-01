@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Config Shortcuts Unescape Ordering Meta Test
 ; DESCRIPTION:
-; Regression guard for AHK-22: CS_Unescape (lib/config_shortcuts.ahk), the
+; Regression guard for AHK-22: CS_Unescape (infra/config_shortcuts.ahk), the
 ; reader for the metrics-lib persistence layer (MetricsShortcuts + MetricsFilters
 ; via CS_Load), used the exact sequential-StrReplace ordering bug already fixed
 ; twice elsewhere in the codebase (TOML_Unescape in toml_helpers.ahk, guarded by
@@ -39,7 +39,7 @@
 
 _TCSUO_CheckUnescapeOrdering() {
 	Body := _DriverFuncBody("CS_Unescape")
-	Assert(Body != "", "CS_Unescape must exist in lib/config_shortcuts.ahk")
+	Assert(Body != "", "CS_Unescape must exist in infra/config_shortcuts.ahk")
 
 	; (a) Must be a single-pass while-loop scan, not a chain of StrReplace calls
 	Assert(InStr(Body, "while"),

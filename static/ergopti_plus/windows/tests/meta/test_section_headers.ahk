@@ -66,7 +66,7 @@ _MetaRunSectionHeaderTests() {
 	TotalFiles := 0
 	TotalWarns := 0
 
-	for Sub in ["lib", "modules"] {
+	for Sub in ["infra", "modules"] {
 		for AbsPath in _MetaListAhkFilesSection(StrReplace(DriverRoot . Sub, "/", "\")) {
 			TotalFiles++
 			try {

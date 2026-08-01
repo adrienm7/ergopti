@@ -15,9 +15,9 @@ local M = {}
 
 local hs      = hs
 local utf8    = utf8
-local Logger  = require("lib.logger")
-local Paths   = require("lib.paths")
-local Timings = require("lib.timings")
+local Logger  = require("infra.logger")
+local Paths   = require("infra.paths")
+local Timings = require("infra.timings")
 local KUtils    = require("keylogger.utils")
 local AggHelper = require("keylogger.aggregator_helpers")
 local LOG       = "keylogger.aggregator"

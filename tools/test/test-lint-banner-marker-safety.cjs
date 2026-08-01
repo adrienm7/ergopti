@@ -9,7 +9,7 @@
  * prefix assumption (isAhk ? '; ' : '--- ') instead of the marker actually
  * captured on the title line. Lua section banners legitimately use either "--"
  * (the language's own comment marker — the dominant convention, e.g.
- * macos/lib/manifest_menu.lua) or "---" (the EmmyLua docstring marker). Against
+ * macos/infra/manifest_menu.lua) or "---" (the EmmyLua docstring marker). Against
  * a correctly-aligned "--"-marker banner, the hardcoded 4-char '--- ' assumption
  * was off by one character, so:
  *   1. checkBannerAlignment WARNed on an already-correct banner (false positive).
@@ -32,16 +32,16 @@ const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LINT_SCRIPT = path.join(REPO_ROOT, 'tools/lint/lint-conventions.js');
-// Placed inside the actual scanned tree (static/ergopti_plus/macos/lib/) so the
+// Placed inside the actual scanned tree (static/ergopti_plus/macos/infra/) so the
 // CLI's hardcoded scan roots pick it up — lint-conventions.js has no directory
 // override flag, so an isolated fixture directory would never be walked.
-const FIXTURE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/macos/lib');
+const FIXTURE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/macos/infra');
 const FIXTURE_PATH = path.join(FIXTURE_DIR, '_zzz_lint_banner_marker_safety_fixture.lua');
 
 /**
  * Builds a genuinely self-consistent 5-line major-section banner using the
  * Lua "--" (2-dash) comment marker — the dominant real-world convention (see
- * macos/lib/manifest_menu.lua sections 1-5).
+ * macos/infra/manifest_menu.lua sections 1-5).
  * @param {string} title
  * @returns {string} The 5-line banner block (2 fill, title, 2 fill), newline-joined.
  */

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Linux Version Single-Source Guard
  * DESCRIPTION:
- * The Linux driver version lives exactly once, in linux/lib/version.lua
+ * The Linux driver version lives exactly once, in linux/infra/version.lua
  * (M.VERSION) — the counterpart to the macOS/Windows BUNDLE_VERSION stamp. Every
  * surface that shows a version reads it from there.
  *
@@ -42,10 +42,10 @@ function stripLua(src) {
 const errors = [];
 
 // ── Single source: version.lua must define M.VERSION as a version string ──
-const versionSrc = read('lib/version.lua');
+const versionSrc = read('infra/version.lua');
 const m = versionSrc.match(/M\.VERSION\s*=\s*"(\d+\.\d+\.\d+)"/);
 if (!m) {
-	errors.push('lib/version.lua: must define M.VERSION = "<x.y.z>" (the single source)');
+	errors.push('infra/version.lua: must define M.VERSION = "<x.y.z>" (the single source)');
 }
 const VERSION = m ? m[1] : null;
 
@@ -75,11 +75,11 @@ for (const rel of CONSUMERS) {
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Linux driver version is not single-sourced from lib/version.lua:\x1b[0m');
+	console.error('\x1b[31m[ERROR] Linux driver version is not single-sourced from infra/version.lua:\x1b[0m');
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }
 
 console.log(
-	`\x1b[32m[OK] Linux version single-sourced — lib/version.lua (${VERSION}) read by ${CONSUMERS.length} consumers; no re-typed literals.\x1b[0m`
+	`\x1b[32m[OK] Linux version single-sourced — infra/version.lua (${VERSION}) read by ${CONSUMERS.length} consumers; no re-typed literals.\x1b[0m`
 );

@@ -32,7 +32,7 @@
 ; ===================================================
 ; ===================================================
 
-; Verbatim copy of the fixed _ScriptAltGrChordDebounce from lib/script_altgr_hotkeys.ahk.
+; Verbatim copy of the fixed _ScriptAltGrChordDebounce from infra/script_altgr_hotkeys.ahk.
 ; Keeping it inline lets the test run headless without #Including the full
 ; driver (which registers global hotkeys incompatible with the test runner).
 _TestDebounce(Slot) {
@@ -84,7 +84,7 @@ Test("F45: AltGr chord debounce is per-slot (distinct chords within 80ms are not
 _ACDS_AssertNoSharedLastTick() {
 	; Move-resilient: locate the function bodies across the whole driver source
 	Body := _DriverFuncBody("_ScriptAltGrChordDebounce")
-	Assert(Body != "", "_ScriptAltGrChordDebounce must exist in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_ScriptAltGrChordDebounce must exist in infra/script_altgr_hotkeys.ahk")
 
 	; Must use a Map, not a plain scalar last_tick
 	Assert(!InStr(Body, "last_tick"),
@@ -94,7 +94,7 @@ _ACDS_AssertNoSharedLastTick() {
 
 	; Call site must pass Slot argument
 	DispBody := _DriverFuncBody("_ScriptAltGrDispatch")
-	Assert(DispBody != "", "_ScriptAltGrDispatch must exist in lib/script_altgr_hotkeys.ahk")
+	Assert(DispBody != "", "_ScriptAltGrDispatch must exist in infra/script_altgr_hotkeys.ahk")
 	Assert(RegExMatch(DispBody, "_ScriptAltGrChordDebounce\s*\(Slot\)") > 0,
 		"_ScriptAltGrDispatch must call _ScriptAltGrChordDebounce(Slot) with the Slot argument (F45)")
 }

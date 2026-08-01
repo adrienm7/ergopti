@@ -8,7 +8,7 @@
 ; _LOGGER_SUB_PENDING and drained in batches by _LoggerFlush, the same pattern
 ; used by the main log queue.
 ;
-; SCOPE: source introspection of lib/logger.ahk.
+; SCOPE: source introspection of infra/logger.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,31 +36,31 @@ _LFOB_ReadSource(RelPath) {
 ; ===================================================
 
 _LFOB_CheckFanOutNoDirectAppend() {
-	Src := _LFOB_ReadSource("lib/logger.ahk")
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	FanOut := _DriverFuncBody("_LoggerFanOut")
-	Assert(FanOut != "", "_LoggerFanOut must exist in lib/logger.ahk")
+	Assert(FanOut != "", "_LoggerFanOut must exist in infra/logger.ahk")
 
 	Assert(!InStr(FanOut, "FileAppend"),
 		"_LoggerFanOut must not call FileAppend directly — buffer in _LOGGER_SUB_PENDING and drain in _LoggerFlush")
 }
 
 _LFOB_CheckSubPendingQueue() {
-	Src := _LFOB_ReadSource("lib/logger.ahk")
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	Assert(InStr(Src, "_LOGGER_SUB_PENDING"),
-		"lib/logger.ahk must declare _LOGGER_SUB_PENDING for batched fan-out line buffering")
+		"infra/logger.ahk must declare _LOGGER_SUB_PENDING for batched fan-out line buffering")
 }
 
 _LFOB_CheckFlushDrainsSubPending() {
-	Src := _LFOB_ReadSource("lib/logger.ahk")
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	; Target the function definition, not the earlier call site inside LoggerInit
 	Flush := _DriverFuncBody("_LoggerFlush")
-	Assert(Flush != "", "_LoggerFlush must exist in lib/logger.ahk")
+	Assert(Flush != "", "_LoggerFlush must exist in infra/logger.ahk")
 
 	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),
 		"_LoggerFlush must drain _LOGGER_SUB_PENDING to write batched fan-out lines")

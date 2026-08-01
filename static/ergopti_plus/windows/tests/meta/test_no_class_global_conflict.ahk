@@ -14,7 +14,7 @@
 ; 1. Regression guard: prevents the specific crash that was triggered by
 ;    `global Keylogger` in crash_reporter.ahk conflicting with the
 ;    `class Keylogger` definition in keylogger.ahk.
-; 2. Codebase-wide: scans both lib/ and modules/ so new modules are covered
+; 2. Codebase-wide: scans both infra/ and modules/ so new modules are covered
 ;    automatically without updating this file.
 ; ==============================================================================
 
@@ -71,11 +71,11 @@ _MetaRunClassGlobalConflictTests() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 
-	; Pass 1 — collect all class names defined anywhere in lib/ and modules/
+	; Pass 1 — collect all class names defined anywhere in infra/ and modules/
 	ClassNames := Map()
 	GlobalDecls := []   ; array of {name, file} objects
 
-	for Sub in ["lib", "modules"] {
+	for Sub in ["infra", "modules"] {
 		for AbsPath in _MetaListAhkFilesCC(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

@@ -28,7 +28,7 @@ _HSE_SRL_ReadSource(RelPath) {
 }
 
 _HSE_SuppressReleaseBounded() {
-	Src := _HSE_SRL_ReadSource("lib\hotstrings\hotstring_dispatch.ahk")
+	Src := _HSE_SRL_ReadSource("infra\hotstrings\hotstring_dispatch.ahk")
 	Assert(Src != "", "hotstring_dispatch.ahk must be readable")
 
 	; 1. Constant exists and is bounded to <= 100 ms.

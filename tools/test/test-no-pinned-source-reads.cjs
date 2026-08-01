@@ -102,7 +102,7 @@ function collectTests(dir, acc) {
 /**
  * Drops every full-line `;` comment. Without this the scan counted PROSE: a
  * module docstring saying "source-introspection (FileRead + pattern match)"
- * plus an assertion message naming "lib/webview_utils.ahk" was enough to book a
+ * plus an assertion message naming "infra/webview_utils.ahk" was enough to book a
  * file as location-pinned when it never opens a file at all. A ratchet inflated
  * by its own explanatory comments cannot be driven to zero.
  * @param {string} src Full file content.

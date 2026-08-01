@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
+local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
 local TimerScheduler = require("adapters.timer_scheduler")

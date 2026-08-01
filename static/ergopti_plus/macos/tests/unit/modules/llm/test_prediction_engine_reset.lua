@@ -34,8 +34,8 @@ local helpers = require("tests.helpers")
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-local hs_stub = helpers.load_with_stubs("lib.logger") and _G.hs
+package.loaded["infra.logger"] = nil
+local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed. fetch_llm_prediction is
@@ -117,13 +117,13 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 

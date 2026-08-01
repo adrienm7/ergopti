@@ -10,13 +10,13 @@
  *     _shared/data/locales/ (no missing, no extra, no duplicates) — so adding
  *     or removing a locale forces a matching order edit.
  *   - The macOS locale table (macos/_generated/locale_table.lua) is emitted in
- *     that order. It used to be hand-written in lib/i18n.lua, with the native
+ *     that order. It used to be hand-written in infra/i18n.lua, with the native
  *     NAMES hand-written in three places — and the Linux copy had fallen five
  *     locales behind, so both columns are generated now.
  *   - The Windows locale table (windows/_generated/locale_table.ahk) is emitted in
  *     that order.
  *   - The site loader (routes/ergopti-plus/+page.server.js) and the Linux
- *     driver (linux/lib/i18n.lua) read locale_order.json at runtime rather
+ *     driver (linux/infra/i18n.lua) read locale_order.json at runtime rather
  *     than sorting on their own.
  *
  * ROOT CAUSE ENCODED:
@@ -94,9 +94,9 @@ const site = read('src/routes/ergopti-plus/+page.server.js');
 if (!/locale_order\.json/.test(site)) {
 	errors.push('+page.server.js does not read locale_order.json — it must single-source the order.');
 }
-const linux = read('static/ergopti_plus/linux/lib/i18n.lua');
+const linux = read('static/ergopti_plus/linux/infra/i18n.lua');
 if (!/locale_order\.json/.test(linux)) {
-	errors.push('linux/lib/i18n.lua does not read locale_order.json — it must single-source the order.');
+	errors.push('linux/infra/i18n.lua does not read locale_order.json — it must single-source the order.');
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

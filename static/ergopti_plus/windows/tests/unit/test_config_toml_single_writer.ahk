@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Regression — config.toml must have exactly ONE writer
 ; DESCRIPTION:
-; lib/config_shortcuts.ahk used to carry a second, section-splicing writer for
+; infra/config_shortcuts.ahk used to carry a second, section-splicing writer for
 ; config.toml (CS_WriteShortcutsSection + its CS_ReplaceSection /
 ; CS_RenderSection / CS_RenderValue / CS_Join helpers), reached from CS_Save
 ; whenever the canonical writer was not yet armed.
@@ -27,7 +27,7 @@
 ; were removed is a load-time "call to nonexistent function", i.e. a driver
 ; that does not start at all).
 ;
-; SCOPE: source introspection. lib/config_shortcuts.ahk registers no hotkeys but
+; SCOPE: source introspection. infra/config_shortcuts.ahk registers no hotkeys but
 ; its writer path is only reachable pre-boot, which the headless harness cannot
 ; reproduce, so the guarantee is asserted against the driver source.
 ; ==============================================================================

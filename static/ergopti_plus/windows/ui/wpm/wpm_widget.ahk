@@ -145,7 +145,7 @@ WPMWidget_EnsureGdip() {
 ; Renders the WPM graph into the layered graph window with GDI+ — the native
 ; replacement for the WebView2 canvas (no ~3-5 s browser cold-start, no per-key
 ; contention). Delegates the DIB + UpdateLayeredWindow lifecycle to the
-; GraphicsRenderer adapter (the same path lib/spotlight.ahk uses); GR_DrawBitmap
+; GraphicsRenderer adapter (the same path infra/spotlight.ahk uses); GR_DrawBitmap
 ; positions the bitmap at the window's current rect, so a drag never causes a jump.
 WPMWidget_RenderGraph(Label, AccentHex) {
 		g := WPMWidget._graph_gui

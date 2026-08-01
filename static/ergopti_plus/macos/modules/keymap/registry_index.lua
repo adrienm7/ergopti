@@ -13,9 +13,9 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local Groups = require("modules.keymap.registry_groups")
-local i18n   = require("lib.i18n")
+local i18n   = require("infra.i18n")
 local LOG    = "keymap.registry"
 
 local _state = nil

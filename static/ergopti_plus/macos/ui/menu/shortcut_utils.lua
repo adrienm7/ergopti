@@ -9,8 +9,8 @@
 
 local M = {}
 local hs     = hs
-local dialog = require("lib.dialog_util")
-local i18n   = require("lib.i18n")
+local dialog = require("infra.dialog_util")
+local i18n   = require("infra.i18n")
 
 
 

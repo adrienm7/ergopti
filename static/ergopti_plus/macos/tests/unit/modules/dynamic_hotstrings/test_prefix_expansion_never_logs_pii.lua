@@ -35,8 +35,8 @@ local helpers = require("tests.helpers")
 local SENTINEL_SSN    = "9SENTINEL9"
 local SENTINEL_PREFIX = "9SENT"  -- rules_engine registers ssn_raw:sub(1, 5)
 
-package.loaded["lib.logger"] = nil
-local Logger = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = helpers.load_with_stubs("infra.logger")
 
 
 --- Installs a keylogger stub that records every log_hotstring invocation.

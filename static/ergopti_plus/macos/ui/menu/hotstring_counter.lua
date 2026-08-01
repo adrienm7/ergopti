@@ -13,8 +13,8 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local fs_dir       = require("lib.fs_dir")
+local Logger = require("infra.logger")
+local fs_dir       = require("infra.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
 

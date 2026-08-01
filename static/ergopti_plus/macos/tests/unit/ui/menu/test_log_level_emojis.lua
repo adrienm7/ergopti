@@ -7,8 +7,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Menu — log level emojis", function()
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n    = require("lib.i18n")
-	local Logger  = require("lib.logger")
+	local i18n    = require("infra.i18n")
+	local Logger  = require("infra.logger")
 
 	helpers.it("includes correct emojis in log level selection labels", function()
 		local old_level = Logger.current_level
@@ -30,7 +30,7 @@ helpers.describe("Menu — log level emojis", function()
 		}
 		
 		-- Mock i18n.get to return keys for easier verification
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		local old_get = i18n.get
 		i18n.get = function(k) return k end
 		-- Also need this for builder.lua line 488

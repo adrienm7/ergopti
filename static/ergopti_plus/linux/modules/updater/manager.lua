@@ -43,7 +43,7 @@ if not ok_timer then Timer = nil end
 local LOG = "modules.updater.manager"
 
 -- Single source of the driver version.
-local DriverVersion = require("lib.version")
+local DriverVersion = require("infra.version")
 
 -- =========================================
 -- =========================================
@@ -141,7 +141,7 @@ M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	return home .. "/.cache/ergopti/updater_etag_" .. (channel or "stable") .. ".txt"
 end
 
@@ -520,7 +520,7 @@ function M.download_update(url)
 
 	_state = "downloading"
 
-	local home = require("lib.config_paths").home()
+	local home = require("infra.config_paths").home()
 	local dest = home .. "/.cache/ergopti/ergopti_update.tar.gz"
 
 	-- Ensure cache directory exists.
@@ -762,7 +762,7 @@ end
 --- Returns a user-facing label for the update menu item.
 --- @return string
 function M.get_menu_label()
-	local i18n = require("lib.i18n")
+	local i18n = require("infra.i18n")
 	if _state == "checking" then
 		return i18n.get("menu.about.update_checking")
 	end

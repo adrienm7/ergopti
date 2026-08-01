@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — the editor must reload into the group the boot loader used
 --- DESCRIPTION:
---- lib/personal_hotstrings loads personal_hotstrings.toml at boot under one group
+--- infra/personal_hotstrings loads personal_hotstrings.toml at boot under one group
 --- name; the editor reloaded the SAME file under a different one on save. The
 --- registry's dedup key includes the owning group, so both copies survived, and
 --- the sort comparator broke the tie on group_order — a monotonic first-load-wins

@@ -16,7 +16,7 @@
 
 _STS_TransitionSerialized() {
 	Body := _DriverFuncBody("_SuspendStateWatchdog")
-	Assert(Body != "", "_SuspendStateWatchdog must exist in lib/lifecycle.ahk")
+	Assert(Body != "", "_SuspendStateWatchdog must exist in infra/lifecycle.ahk")
 
 	BusyPos := InStr(Body, "_TransitionBusy")
 	EnterPos := InStr(Body, "Ergopti_OnSuspendEnter()")

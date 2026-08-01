@@ -101,7 +101,7 @@ function emitLua() {
 		'--- MODULE: Logger Sub-file Routing Table (macOS)\n' +
 		'--- DESCRIPTION:\n' +
 		'--- The [[sub_files]] entries whose platforms list includes "hs", as the table\n' +
-		'--- lib/logger.lua fans log lines out with. A line is routed to a sub-file when\n' +
+		'--- infra/logger.lua fans log lines out with. A line is routed to a sub-file when\n' +
 		'--- ANY of its patterns is a substring of the complete line; it is always also\n' +
 		'--- written to the main daily log.\n' +
 		'---\n' +
@@ -138,7 +138,7 @@ function emitAhk() {
 		'; MODULE: Logger Sub-file Routing Table (Windows)\n' +
 		'; DESCRIPTION:\n' +
 		'; The [[sub_files]] entries whose platforms list includes "ahk", as the array\n' +
-		'; lib/logger.ahk fans log lines out with. A line is routed to a sub-file when\n' +
+		'; infra/logger.ahk fans log lines out with. A line is routed to a sub-file when\n' +
 		'; ANY of its tags is a substring of the complete line; it is always also\n' +
 		'; written to the main daily log.\n' +
 		';\n' +
@@ -150,7 +150,7 @@ function emitAhk() {
 		'\n' +
 		'; A function rather than a global initialiser so include ORDER cannot matter:\n' +
 		'; the logger calls this when it initialises, long after every #Include has been\n' +
-		'; processed. A global would have to be declared before lib/logger.ahk to be\n' +
+		'; processed. A global would have to be declared before infra/logger.ahk to be\n' +
 		'; visible, which is a constraint the generated file has no way to enforce.\n' +
 		'LoggerSubFilesData() {\n' +
 		'\treturn [\n' +

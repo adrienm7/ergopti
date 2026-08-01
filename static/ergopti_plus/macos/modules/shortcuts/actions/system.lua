@@ -30,13 +30,13 @@ local hs            = hs
 local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
-local notifications = require("lib.notifications")
+local notifications = require("infra.notifications")
 local EventTapGuard = require("adapters.event_tap_guard")
 local ShellRunner   = require("adapters.shell_runner")
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Timings       = require("lib.timings")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Timings       = require("infra.timings")
+local i18n          = require("infra.i18n")
 
 local LOG = "shortcuts.actions.system"
 
@@ -69,7 +69,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- Physical key-code for the @ / # key (position-based, not character-based)
 local KEYCODE_AT_HASH        = 10
 
-local Keycodes               = require("lib.keycodes")
+local Keycodes               = require("infra.keycodes")
 
 -- Keep-awake jitter parameters. The tick interval bounds + return delay come
 -- from the shared cross-driver registry ([keep_awake]); the pixel offsets are
@@ -157,7 +157,7 @@ local schedule_awake_tick
 -- AX selection cache for the wrap-text eventtap: read_ax_selection() is two
 -- synchronous cross-process Accessibility calls, and the eventtap fires on
 -- EVERY keystroke matching a wrap symbol with no caching at all — a slow AX
--- call here risks kCGEventTapDisabledByTimeout. Mirrors lib/vscode_bridge.lua's
+-- call here risks kCGEventTapDisabledByTimeout. Mirrors infra/vscode_bridge.lua's
 -- get_editor_ax_frame() TTL-cache pattern (shortcuts-wrap-ax-uncached).
 local _wrap_ax_selection_cache = nil
 local _wrap_ax_selection_ts    = 0
@@ -692,7 +692,7 @@ function M.wrap_event_decision(flags, ch, pairs_tbl, has_selection)
 end
 
 --- Reads the current AX selection with a short-lived cache, mirroring
---- lib/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
+--- infra/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
 --- two synchronous cross-process Accessibility calls; without caching, a run of
 --- rapid wrap-symbol keystrokes (e.g. a held key, or fast typing that repeats a
 --- wrap char) would each pay that cost inline on the CGEventTap thread, risking
@@ -706,7 +706,7 @@ local function read_wrap_ax_selection_cached()
 	-- (VS Code / Electron, where it is nil every time). Every wrap-symbol keystroke
 	-- therefore paid both synchronous cross-process AX calls inline on the
 	-- CGEventTap thread — precisely the cost this cache exists to avoid. Same defect
-	-- and same fix as lib/vscode_bridge.lua's _ax_frame_valid (3e403b254).
+	-- and same fix as infra/vscode_bridge.lua's _ax_frame_valid (3e403b254).
 	if _wrap_ax_selection_valid and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
 		return _wrap_ax_selection_cache
 	end

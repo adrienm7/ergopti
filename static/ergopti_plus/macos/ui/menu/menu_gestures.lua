@@ -7,7 +7,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (slot groups, separators, action buttons) is
----    read from ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.
+---    read from ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.
 ---    Dynamic blocks (slot items, disable_all, restore_defaults) are supplied
 ---    as handlers so runtime state stays in Lua.
 --- ==============================================================================
@@ -16,9 +16,9 @@ local M = {}
 local hs = hs
 
 local gestures_mod  = require("modules.gestures")
-local dialog        = require("lib.dialog_util")
-local i18n          = require("lib.i18n")
-local ManifestMenu  = require("lib.manifest_menu")
+local dialog        = require("infra.dialog_util")
+local i18n          = require("infra.i18n")
+local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 

@@ -22,10 +22,10 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("lib.logger")
-local Timings       = require("lib.timings")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local Timings       = require("infra.timings")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local LOG           = "menu.keyboard_layout"

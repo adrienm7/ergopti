@@ -22,7 +22,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
 
 local LOG = "adapters.keyboard_hook"

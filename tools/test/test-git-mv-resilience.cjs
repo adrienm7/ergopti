@@ -63,8 +63,10 @@ const AHK_FILE_PIN_RE =
  */
 const INTENTIONALLY_ABSENT = new Map([
 	[
-		'lib/testing.ahk',
-		'test_run_all_include_integrity.ahk asserts no test #Includes it — a historical typo that aborted the whole suite',
+		'infra/testing.ahk',
+		'test_run_all_include_integrity.ahk asserts no test #Includes it — a historical typo that aborted ' +
+			'the whole suite. Named infra/ since the lib/ -> infra/ rename: the directory a mistaken ' +
+			'#Include would now point into is infra/, and a stale lib/ one cannot resolve at all.',
 	],
 ]);
 

@@ -3,7 +3,7 @@
 
 Test_HSE_EndCharMatchUsesBoundedFullTriggerIndex() {
 	MatchBody := _DriverFuncBody("HSE_FindMatchAtEnd")
-	Engine := _DriverDirConcat("lib/hotstrings")
+	Engine := _DriverDirConcat("infra/hotstrings")
 	; _DriverFuncBody returns "" for an unknown name, which would make the
 	; ABSENCE assertion below pass against a driver that no longer has this
 	; function at all — a guard that cannot fail is worse than none.

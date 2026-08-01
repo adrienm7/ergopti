@@ -82,7 +82,7 @@ function productionSources() {
  * Uniqueness is the whole safety argument: read_driver_source concatenates every
  * file containing the symbol, so a selector matching two files changes what the
  * calling test is actually asserting about.
- * @param {string} relTarget - Driver-relative path of the module, e.g. "lib/logger.lua".
+ * @param {string} relTarget - Driver-relative path of the module, e.g. "infra/logger.lua".
  * @returns {string|null} A proven-unique selector, or null when none exists.
  */
 function uniqueSelectorFor(relTarget) {

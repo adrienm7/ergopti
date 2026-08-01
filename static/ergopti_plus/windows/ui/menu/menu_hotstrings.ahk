@@ -106,7 +106,7 @@ _HS_DelaysColors(M, _Cat) {
 	; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
 	; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
 	; key, so its no-override default is the UI constant (20 s); the live tooltip
-	; timer reads the same override (lib/tooltip.ahk).
+	; timer reads the same override (infra/tooltip.ahk).
 	Sub.Add()
 	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC), (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC))
 	; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
@@ -230,7 +230,7 @@ _HS_BuildDelimiterSubMenu() {
 		if HSE_TerminatorAnyCharIn(Chars, Consumed)
 			Lbl .= " " . t("menu.hotstrings.consumed_suffix")
 		; Actionable toggle — route through the dispatcher so AHK 2.0 never
-		; silently drops the click (see lib/menu_dispatcher.ahk).
+		; silently drops the click (see infra/menu_dispatcher.ahk).
 		RegisterMenuItem(Sub, Lbl, ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars))
 		if HSE_TerminatorEntryEnabled(Chars, Current)
 			Sub.Check(Lbl)
@@ -260,7 +260,7 @@ _HS_BuildDelimiterSubMenu() {
 }
 
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
-; toggle logic lives in HSE_TerminatorToggleString (lib/hotstrings_config.ahk)
+; toggle logic lives in HSE_TerminatorToggleString (infra/hotstrings_config.ahk)
 ; so it is shared with the config window and unit-tested.
 _HS_DelimToggleEntry(CharsArr) {
 	HotstringsSetWordDelimiters(HSE_TerminatorToggleString(HotstringsGetWordDelimiters(), CharsArr))

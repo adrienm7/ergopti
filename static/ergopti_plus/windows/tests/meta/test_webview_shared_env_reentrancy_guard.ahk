@@ -17,7 +17,7 @@
 ; to drive a genuine concurrent boot (same class as SendInstant's clipboard
 ; reentrancy guard).
 ;
-; SCOPE: source introspection of lib/webview_utils.ahk.
+; SCOPE: source introspection of infra/webview_utils.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -33,7 +33,7 @@
 
 _WSERG_AssertGuardDeclared() {
 	Body := _DriverFuncBody("WebView_SharedEnvironment")
-	Assert(Body != "", "WebView_SharedEnvironment must exist in lib/webview_utils.ahk")
+	Assert(Body != "", "WebView_SharedEnvironment must exist in infra/webview_utils.ahk")
 	Assert(InStr(Body, "_WebView_SharedEnvCreating") > 0,
 		"WebView_SharedEnvironment must declare/use a _WebView_SharedEnvCreating reentrancy guard (webview-shared-env-reentrancy)")
 }

@@ -71,7 +71,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		-- literal: hardcoding "Enregistrer" pinned the test to a French spelling
 		-- that only held while the button itself was hardcoded, so routing it
 		-- through i18n turned this green test red for no behavioural reason.
-		local dialog = package.loaded["lib.dialog_util"]
+		local dialog = package.loaded["infra.dialog_util"]
 		if type(dialog) == "table" then
 			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
 				return confirm, "https://example.com"
@@ -100,7 +100,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			set_action_parameter = function() stored = stored + 1 end,
 		}
 		-- Echo the CANCEL label the caller passed, for the same reason as above.
-		local dialog = package.loaded["lib.dialog_util"]
+		local dialog = package.loaded["infra.dialog_util"]
 		if type(dialog) == "table" then
 			dialog.text_prompt = function(_title, _prompt, _prior, _confirm, cancel)
 				return cancel, nil

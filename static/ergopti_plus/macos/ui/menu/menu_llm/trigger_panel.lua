@@ -15,8 +15,8 @@ local M = {}
 
 local llm_mod      = require("modules.llm")
 local shortcut_ui  = require("ui.menu.shortcut_utils")
-local AppPickerLib = require("lib.app_picker")
-local i18n         = require("lib.i18n")
+local AppPickerLib = require("infra.app_picker")
+local i18n         = require("infra.i18n")
 
 
 

@@ -13,7 +13,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Shared UX: one onboarding frontend for both drivers — fixing a wording or
 ;    a step there updates Windows and macOS at once. The bridge mirrors the
-;    proven model_browser WebView2 host (lib/webview_utils + vendor/WebView2).
+;    proven model_browser WebView2 host (infra/webview_utils + vendor/WebView2).
 ; 2. Reuses the existing commit: the frontend collects exactly the six answers
 ;    the native wizard collects (locale, config_dir, use_ergopti, magic_key,
 ;    use_metrics, use_gestures). The "finish" handler funnels them into the

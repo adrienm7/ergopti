@@ -31,7 +31,7 @@ let fail = 0;
 // Each check: a file, a forbidden regex, and why it must stay gone.
 const CHECKS = [
 	{
-		file: 'windows/lib/llm_defaults.ahk',
+		file: 'windows/infra/llm_defaults.ahk',
 		forbid: /_LLM_DEFAULTS_FALLBACK/,
 		why: 'the 20-key AHK defaults mirror is gone — read every shared key from defaults.json (fail fast)'
 	},

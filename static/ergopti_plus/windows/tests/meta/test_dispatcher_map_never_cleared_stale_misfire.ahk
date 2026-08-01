@@ -51,7 +51,7 @@ _DMNCSM_ReadSource(RelPath) {
 ; ==================================================
 
 _DMNCSM_ResetHelperClearsBothMaps() {
-	Src := _DMNCSM_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _DMNCSM_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("MenuDispatcher_Reset")
 	Assert(Seg != "", "MenuDispatcher_Reset() must be defined in menu_dispatcher.ahk")
 	; Whitespace-tolerant: the assignments are alignment-padded in the source

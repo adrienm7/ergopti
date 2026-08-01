@@ -6,7 +6,7 @@
 --- MODULE: Logger Sub-file Routing Table (macOS)
 --- DESCRIPTION:
 --- The [[sub_files]] entries whose platforms list includes "hs", as the table
---- lib/logger.lua fans log lines out with. A line is routed to a sub-file when
+--- infra/logger.lua fans log lines out with. A line is routed to a sub-file when
 --- ANY of its patterns is a substring of the complete line; it is always also
 --- written to the main daily log.
 ---

@@ -21,7 +21,7 @@
 ---
 --- WHY IT WAS FATAL: PromptBuilder.build runs inside perform_check, which is the
 --- body of the module-level hs.timer debounce. Hammerspoon pcalls timer
---- callbacks, so the throw went to the Console and never reached lib/logger —
+--- callbacks, so the throw went to the Console and never reached infra/logger —
 --- not even "Request signature accepted." was emitted. The health dot stayed
 --- green, the backend stayed ready, and no prediction ever appeared again for
 --- the session.
@@ -38,8 +38,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 
 
@@ -119,12 +119,12 @@ package.loaded["modules.llm.api_common"] = {
 	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
 
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
-package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
@@ -366,7 +366,7 @@ helpers.describe("prediction_engine — a throwing PromptBuilder is contained an
 			"perform_check must actually reach PromptBuilder.build — otherwise this case proves nothing")
 		helpers.assert_true(ok,
 			"perform_check must pcall PromptBuilder.build — an unguarded throw is invisible (hs.timer routes it to the " ..
-			"Console, never to lib/logger) and permanently kills predictions for the session: " .. tostring(err))
+			"Console, never to infra/logger) and permanently kills predictions for the session: " .. tostring(err))
 		helpers.assert_true(dispatched == false,
 			"a failed build must abort the request, not fall through to the dispatcher")
 	end)

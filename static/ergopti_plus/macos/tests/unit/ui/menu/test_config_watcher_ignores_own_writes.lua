@@ -5,7 +5,7 @@
 ---         cache writes
 --- DESCRIPTION:
 --- Two independent RECURSIVE pathwatchers cover the same tree, and only one
---- carries exclusions. `lib/file_watchers.lua` filters out runtime artefacts and is
+--- carries exclusions. `infra/file_watchers.lua` filters out runtime artefacts and is
 --- fed `ignored_dirs = { TOML_CACHE_DIR }`. `ui/menu/menu_watchers.lua` arms a
 --- second recursive watcher on the same `base_dir` whose entire filter is
 --- ".lua or .toml, not under logs/, not paths.toml" — no ignored directories at
@@ -36,8 +36,8 @@ local CACHE_DIR = BASE_DIR .. "/cache/toml_hotstrings"
 --- @return table Watchers, function armed_count
 local function load_watchers()
 	package.loaded["ui.menu.menu_watchers"] = nil
-	package.loaded["lib.logger"] = nil
-	_ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	_ = helpers.load_with_stubs("infra.logger")
 
 	local armed = { n = 0 }
 	local Watchers = helpers.load_with_stubs("ui.menu.menu_watchers", {

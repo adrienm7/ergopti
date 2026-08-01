@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_file_watchers.lua
 ---
---- Unit tests for lib/file_watchers.lua. Exercises the public API —
+--- Unit tests for infra/file_watchers.lua. Exercises the public API —
 --- has_inotify(), start/stop lifecycle, debounce deadline logic, and
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
@@ -95,12 +95,12 @@ helpers.describe("file_watchers", function()
 	helpers.describe("has_inotify", function()
 
 		helpers.it("returns a boolean", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			helpers.assert_type(fw.has_inotify(), "boolean")
 		end)
 
 		helpers.it("is stable across calls", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local a = fw.has_inotify()
 			local b = fw.has_inotify()
 			helpers.assert_eq(a, b, "has_inotify must return the same value every call")
@@ -115,12 +115,12 @@ helpers.describe("file_watchers", function()
 	helpers.describe("lifecycle", function()
 
 		helpers.it("stop() before start() is safe (no-op)", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			fw.stop()
 		end)
 
 		helpers.it("stop() is idempotent (second call no-op)", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			fw.stop()
 			fw.stop()
 		end)
@@ -128,7 +128,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("start() then stop() then restart() works", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/test.toml")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.stop()
@@ -140,21 +140,21 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("start() with empty opts is a no-op", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			fw.start({})
 			fw.pump()
 			fw.stop()
 		end)
 
 		helpers.it("start() with nil opts is a no-op", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			fw.start(nil)
 			fw.pump()
 			fw.stop()
 		end)
 
 		helpers.it("start() with no readable directories still finishes gracefully", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({
 				hotstrings_dir = "/nonexistent/path/xyz",
@@ -175,7 +175,7 @@ helpers.describe("file_watchers", function()
 	helpers.describe("start (pump mode)", function()
 
 		helpers.it("pump() with no entries is a no-op (no crash)", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -189,7 +189,7 @@ helpers.describe("file_watchers", function()
 			write_file(dir .. "/a.toml")
 			write_file(dir .. "/b.toml")
 			write_file(dir .. "/not_a_toml.txt", "ignored")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -201,7 +201,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("skips directories with no .toml files", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/readme.txt", "hello")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -232,7 +232,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("fires on_reload after .toml mtime changes and deadline passes", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired_count = 0
 				-- Drive the debounce deadline through an injected wall clock so the
 				-- test is deterministic and independent of os.clock semantics.
@@ -262,7 +262,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("debounces — multiple rapid changes fire only once", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired_count = 0
 				local now_ms = 1000
 				fw.start({
@@ -298,7 +298,7 @@ helpers.describe("file_watchers", function()
 				local dir = make_temp_dir()
 				local N = reload_gate.BULK_THRESHOLD + 5
 				for i = 1, N do write_file(dir .. "/g" .. i .. ".toml") end
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired_count = 0
 				local now_ms = 1000
 				fw.start({
@@ -331,7 +331,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("detects .lua file changes in base_dir", function()
 				local dir = make_non_tmp_dir()
 				write_file(dir .. "/init.lua", "return {}")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired_count = 0
 				fw.start({ base_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
 
@@ -352,7 +352,7 @@ helpers.describe("file_watchers", function()
 				local sub = dir .. "/sub"
 				os.execute("mkdir -p '" .. sub:gsub("'", "'\\''") .. "' 2>/dev/null")
 				write_file(sub .. "/personal.toml")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired = 0
 				fw.start({ personal_dir = dir, on_reload = function() fired = fired + 1 end })
 
@@ -373,7 +373,7 @@ helpers.describe("file_watchers", function()
 				local sub = dir .. "/sub"
 				os.execute("mkdir -p '" .. sub:gsub("'", "'\\''") .. "' 2>/dev/null")
 				write_file(sub .. "/readme.txt", "hello")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired = 0
 				fw.start({ personal_dir = dir, on_reload = function() fired = fired + 1 end })
 				fw.pump()
@@ -405,7 +405,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("pcall-guards the callback so a thrown error never reaches pump()", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 				local fired = false
 				fw.start({
 					hotstrings_dir = dir,
@@ -447,7 +447,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("clears all pump entries and the pending deadline", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/hotstrings.toml")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 
@@ -477,7 +477,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("stop() prevents old callback from firing after restart", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module("lib.file_watchers")
+				local fw = helpers.load_module("infra.file_watchers")
 
 				local old_fired = 0
 				fw.start({ hotstrings_dir = dir, on_reload = function() old_fired = old_fired + 1 end })
@@ -517,7 +517,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("base_dir with no .lua files does not crash", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/readme.txt", "hello")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ base_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -529,7 +529,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("base_dir with .lua file does not crash on load", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/init.lua", "return {}")
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ base_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -539,7 +539,7 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("personal_dir that does not exist is a no-op", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ personal_dir = "/nonexistent_personal_dir", on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -548,7 +548,7 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("base_dir with temp files from /tmp is still safe", function()
-			local fw = helpers.load_module("lib.file_watchers")
+			local fw = helpers.load_module("infra.file_watchers")
 			local fired = 0
 			fw.start({ base_dir = "/tmp", on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -581,11 +581,11 @@ helpers.describe("file_watchers debounce clock source", function()
 		return s
 	end
 
-	local src = read_file(helpers.driver_root() .. "/lib/file_watchers.lua")
+	local src = read_file(helpers.driver_root() .. "/infra/file_watchers.lua")
 
 	helpers.it("computes the debounce deadline from the monotonic clock, not os.clock", function()
-		helpers.assert_true(src ~= "", "could not read lib/file_watchers.lua")
-		helpers.assert_true(src:find('require("lib.monotonic")', 1, true) ~= nil,
+		helpers.assert_true(src ~= "", "could not read infra/file_watchers.lua")
+		helpers.assert_true(src:find('require("infra.monotonic")', 1, true) ~= nil,
 			"file_watchers must source its clock from lib.monotonic")
 		helpers.assert_true(src:find("os.clock", 1, true) == nil,
 			"file_watchers must not use os.clock() — CPU time breaks the debounce on Linux")

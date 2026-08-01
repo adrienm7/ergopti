@@ -215,7 +215,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "lib", "modules", "ui" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "ui" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a
@@ -268,7 +268,7 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 
 		-- The walk has two implementations — an lfs recursion and a shell fallback
 		-- — and they must enumerate the same tree. The lfs branch descended only
-		-- into adapters/lib/modules/ui and skipped every ROOT-level source,
+		-- into adapters/infra/modules/ui and skipped every ROOT-level source,
 		-- init.lua included, so coverage silently depended on which branch ran:
 		-- complete on a machine without lfs, blind on one with it. Asserting a
 		-- known root file is present holds whichever branch executes here.
@@ -335,7 +335,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
-		local src = read_source("lib/dialog_util.lua")
+		local src = read_source("infra/dialog_util.lua")
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
 		assert(not src:find("hs%.task%.new", 1, false),

@@ -11,11 +11,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/perf.lua rather than by
+-- Selected by a declaration unique to infra/perf.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("function M.report_all")
-helpers.assert_true(src ~= nil, "lib/perf.lua source must be locatable")
+helpers.assert_true(src ~= nil, "infra/perf.lua source must be locatable")
 
 -- Test 1: the raw dereference `hs.timer.secondsSinceEpoch()` without guard
 -- must no longer appear as a bare fallback (unguarded form).

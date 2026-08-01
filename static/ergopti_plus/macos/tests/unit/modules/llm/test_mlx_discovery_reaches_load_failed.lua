@@ -37,9 +37,9 @@ local MODEL = "some-model"
 local function load_api_mlx()
 	for _, m in ipairs({
 		"modules.llm.api_mlx", "modules.llm.api_mlx_discovery",
-		"adapters.timer_scheduler", "lib.logger",
+		"adapters.timer_scheduler", "infra.logger",
 	}) do package.loaded[m] = nil end
-	_ = helpers.load_with_stubs("lib.logger")
+	_ = helpers.load_with_stubs("infra.logger")
 
 	local ctl = { now = 0, notifications = {}, pending = nil }
 
@@ -61,12 +61,12 @@ local function load_api_mlx()
 		get_completions_endpoint = function() return nil end,
 		get_chat_endpoint      = function() return nil end,
 	}
-	package.loaded["lib.notifications"] = {
+	package.loaded["infra.notifications"] = {
 		notify = function(title, body, kind)
 			table.insert(ctl.notifications, { title = title, body = body, kind = kind })
 		end,
 	}
-	package.loaded["lib.i18n"] = { get = function(k) return k end }
+	package.loaded["infra.i18n"] = { get = function(k) return k end }
 
 	local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 	return ApiMlx, ctl

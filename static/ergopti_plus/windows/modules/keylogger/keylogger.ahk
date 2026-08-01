@@ -163,7 +163,7 @@ class Keylogger {
     static _ingest_timer    := unset
     static _midnight_timer  := unset
 
-    ; Logger reference (lib/logger.ahk).
+    ; Logger reference (infra/logger.ahk).
     static log              := unset
 
     ; In-RAM queue of entries awaiting ingest. Populated by KL_AppendLog

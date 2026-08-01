@@ -53,7 +53,7 @@ LAltCapsLockShortcut() {
 				return
 		; All ten possible actions are simple, no Shift inversion or modifier
 		; bracketing needed -- inline v2 if/else cascade (action table is the
-		; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
+		; SIMPLE_ACTIONS Map that used to live in infra/dispatchers.ahk).
 		if Features["shortcuts"]["lalt_caps_lock"].Get("backspace", false) {
 				TextPressKey("BackSpace", [])
 		} else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_lock", false) {
