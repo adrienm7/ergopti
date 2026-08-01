@@ -862,6 +862,42 @@ Constraints: **paths before moves, moves before content, data before code.**
   for all six of its vectors. That is the argument for item 2 preceding items
   3–4: generating a shared matcher core against harnesses in that state would
   have encoded their blind spots.
+  **CONVERGENCE SPEC (measured 2026-08-01 by a 4-flag × 3-driver analysis with an
+  adversarial verify pass; all four prescriptions came back REFUTED, so what
+  follows is the corrected version).** The user has authorised full convergence
+  with no backwards compatibility.
+
+  * **A live Linux bug, not just a gap.** Linux ignores `auto_expand`, and the
+    shared engine fires the instant a trigger completes. `ya` is bucketed under
+    `a`, so typing **"yaourt" fires mid-word and yields "y’aourt"**. Reproducible
+    today: the bundled TOMLs are loaded via
+    `Paths.shared("modules/hotstrings")` at `ergopti_hotstrings.lua:272`.
+  * **Windows and macOS ALREADY diverge on star-vs-end-char.**
+    `hotstring_match.ahk:74-82` `_HSE_EndCharBeats` line 79 returns
+    `Cand.Length > Best.Length` — Windows resolves across both paths by LENGTH.
+    macOS `run_trigger_checks` (`modules/keymap/init.lua:586-595`) returns on the
+    first successful auto expansion before reaching the terminator loop at :600,
+    so auto wins **unconditionally**. Register star `b★` (len 2) and non-star
+    `aab` (len 3), type `aab★`: **Windows fires `aab`, macOS fires `b★`.**
+    Converging Linux onto macOS would therefore lock in a divergence from
+    Windows — the three-way target must pick Windows's length rule.
+  * **macOS's e2e replay cannot distinguish auto from non-auto.**
+    `macos/tests/e2e/run_e2e.lua:228` omits `auto_expand` from `Registry.add`, so
+    `registry.lua:493` makes every vector `is_auto = false`, and
+    `expander.lua:704-760` never reads `m.auto`. Any corpus vector claiming to
+    prove auto-expansion there proves nothing until that harness passes the flag.
+  * **Corpus convention:** all 27 vectors exclude the terminator from `buffer`
+    (`field_semantics.terminator` says the e2e runners inject it). A vector
+    shipping `"buffer": "ya "` with `"terminator": " "` double-feeds on macOS
+    (`run_e2e.lua:433` → `expander.lua:727`) and mis-derives `terminator_consumed`
+    on Linux (`run_e2e.lua:196`). Corpus counts are **27 vectors + 7
+    collision_vectors**.
+  * Adding any new vector FIELD is governed by `test-corpus-fields-are-read.cjs`.
+  * `linux/tests/unit/meta/test_injector_terminator_contract.lua:59-95` asserts
+    `M.inject`'s parameters must not contain "terminator" — the daemon-side
+    change survives it but lands on its stated rationale and must be reconciled
+    in that file's header, not silently.
+
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
