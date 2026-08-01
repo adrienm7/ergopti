@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/personal_info_editor_bridge.lua
+--- ui/personal_info_editor/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Personal Info Editor

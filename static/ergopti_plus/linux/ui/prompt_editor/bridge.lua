@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/prompt_editor_bridge.lua
+--- ui/prompt_editor/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: LLM Prompt Editor

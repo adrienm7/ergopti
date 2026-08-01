@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/metrics_typing_bridge.lua
+--- ui/metrics_typing/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Typing Metrics Dashboard
@@ -12,7 +12,7 @@
 local M = {}
 M.bridge_name = "metrics_typing_bridge"
 
-local AppsBridge = require("modules.ui.bridge_handlers.metrics_apps_bridge")
+local AppsBridge = require("ui.metrics_apps.bridge")
 local Logger = require("logger.shim")
 local LOG = "bridge.metrics_typing"
 

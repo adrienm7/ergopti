@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/changelog_bridge.lua
+--- ui/changelog/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Changelog / Release Notes Viewer

@@ -104,7 +104,7 @@ for (const ref of ['HttpBridge', 'PromptBuilder']) {
 }
 
 // ── 3. model_browser_bridge must not re-type localhost:11434 ─────────────
-const modelBrowser = stripLua(read('linux/modules/ui/bridge_handlers/model_browser_bridge.lua'));
+const modelBrowser = stripLua(read('linux/ui/model_browser/bridge.lua'));
 if (!modelBrowser.includes('HttpBridge.OLLAMA_DEFAULT_HOST') || !modelBrowser.includes('HttpBridge.OLLAMA_DEFAULT_PORT')) {
 	errors.push('model_browser_bridge.lua: must resolve Ollama URL via HttpBridge.OLLAMA_DEFAULT_HOST / OLLAMA_DEFAULT_PORT');
 }

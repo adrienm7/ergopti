@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/healthcheck_bridge.lua
+--- ui/healthcheck/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Healthcheck Dashboard

@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/action_picker_bridge.lua
+--- ui/action_picker/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Action Picker

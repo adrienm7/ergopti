@@ -1,4 +1,4 @@
---- modules/ui/webview_manager.lua
+--- ui/webview_manager.lua
 
 --- ==============================================================================
 --- MODULE: WebView Manager (Linux)
@@ -27,7 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
-local LOG = "modules.ui.webview_manager"
+local LOG = "ui.webview_manager"
 
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
@@ -92,16 +92,58 @@ end
 local function _driver_root()
 	local src = debug.getinfo(1, "S").source
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
-	return (src:match("^(.*)[/\\\\]modules[/\\\\]ui[/\\\\]webview_manager%.lua$")
-		or src:match("^(.*)[/\\\\]modules[/\\\\]ui$")
+	-- One level up from ui/, not three: the manager moved out of modules/ui/ when
+	-- the driver's UI was reorganised by feature to match macOS and Windows, and a
+	-- stale depth here resolves to a directory that exists but holds nothing —
+	-- which is how every other wrong-depth path in this driver failed.
+	return (src:match("^(.*)[/\\\\]ui[/\\\\]webview_manager%.lua$")
+		or src:match("^(.*)[/\\\\]ui$")
 		or "."):gsub("\\", "/")
 end
 
+--- Where each shared-UI app's bridge lives, as an explicit table rather than a
+--- composed string.
+---
+--- The module name used to be built as
+--- `"modules.ui.bridge_handlers." .. app_name .. "_bridge"`, which meant no
+--- bridge module name appeared as a literal anywhere — so a rename that moved
+--- them all found nothing to rewrite here, and the drivers' own gates could not
+--- see the dependency either. It is the same composed-name trap that made two
+--- menu-manifest sections look unreferenced and Windows look short of thirteen
+--- gesture actions it implements.
+---
+--- The directory names come from `_shared/ui/`, which is the canonical set of
+--- pages — not from what this driver felt like calling them. Four app names do
+--- not equal their directory, and `personal_toml_editor` is not even a page of
+--- its own: it is a second bridge onto `personal_info_editor`, the TOML flavour.
+--- That is the whole reason a lookup beats a suffix rule.
+local BRIDGE_MODULES = {
+	action_picker         = "ui.action_picker.bridge",
+	changelog             = "ui.changelog.bridge",
+	dl                    = "ui.download_window.bridge",
+	healthcheck           = "ui.healthcheck.bridge",
+	hotstring_editor      = "ui.hotstring_editor.bridge",
+	hotstrings_config     = "ui.hotstrings_config_window.bridge",
+	metrics_apps          = "ui.metrics_apps.bridge",
+	metrics_typing        = "ui.metrics_typing.bridge",
+	model_browser         = "ui.model_browser.bridge",
+	onboarding            = "ui.onboarding.bridge",
+	paths_editor          = "ui.paths_editor.bridge",
+	personal_info_editor  = "ui.personal_info_editor.bridge",
+	personal_toml_editor  = "ui.personal_info_editor.bridge_toml",
+	prompt_editor         = "ui.prompt_editor.bridge",
+	token                 = "ui.token_prompt.bridge",
+}
+
 --- Loads a bridge handler module by pcall-requiring it.
---- @param app_name string The app directory name (also the handler module name suffix).
+--- @param app_name string The shared-UI app directory name.
 --- @return table|nil The handler module, or nil if not found.
 local function _load_handler(app_name)
-	local module_name = "modules.ui.bridge_handlers." .. app_name .. "_bridge"
+	local module_name = BRIDGE_MODULES[app_name]
+	if not module_name then
+		Logger.warn(LOG, "No bridge module declared for app '%s'.", tostring(app_name))
+		return nil
+	end
 	local ok, mod = pcall(require, module_name)
 	if ok and type(mod) == "table" and type(mod.on_message) == "function" then
 		Logger.debug(LOG, "Bridge handler loaded: %s", module_name)

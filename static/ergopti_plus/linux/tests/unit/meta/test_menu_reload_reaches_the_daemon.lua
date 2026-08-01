@@ -80,7 +80,7 @@ end
 helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 	helpers.it("invokes ctx.on_reload rather than signalling a spawned shell", function()
 		local calls = 0
-		local mb = helpers.load_module("modules.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.menu_builder")
 		local items = mb.build({
 			config = make_config(),
 			_version = "9.9.9",
@@ -113,7 +113,7 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 		end
 
 		local ok, err = pcall(function()
-			local mb = helpers.load_module("modules.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.menu_builder")
 			local items = mb.build({
 				config = make_config(),
 				_version = "9.9.9",
@@ -140,7 +140,7 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 	helpers.it("reports loudly when the daemon supplied no reload callback", function()
 		-- A Reload item that quietly does nothing is precisely the bug being
 		-- fixed, so the missing-callback path must be visible rather than silent.
-		local mb = helpers.load_module("modules.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.menu_builder")
 		local items = mb.build({ config = make_config(), _version = "9.9.9" })
 
 		local reload = find_item(items, "recharg") or find_item(items, "reload")

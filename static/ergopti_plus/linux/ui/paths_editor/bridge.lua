@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/paths_editor_bridge.lua
+--- ui/paths_editor/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Paths / Config Editor

@@ -1,4 +1,4 @@
---- modules/menu/menu_builder.lua
+--- ui/menu/menu_builder.lua
 
 --- ==============================================================================
 --- MODULE: Menu Builder (Linux)
@@ -27,7 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
-local LOG = "modules.menu.menu_builder"
+local LOG = "ui.menu.menu_builder"
 
 -- Single source of the driver version.
 local Version = require("infra.version")

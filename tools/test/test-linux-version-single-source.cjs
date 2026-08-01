@@ -51,10 +51,10 @@ const VERSION = m ? m[1] : null;
 
 // ── Consumers must read Version.VERSION, never re-type the literal ────────
 const CONSUMERS = [
-	'modules/menu/menu_builder.lua',
-	'modules/ui/bridge_handlers/healthcheck_bridge.lua',
-	'modules/ui/bridge_handlers/changelog_bridge.lua',
-	'modules/ui/bridge_handlers/paths_editor_bridge.lua',
+	'ui/menu/menu_builder.lua',
+	'ui/healthcheck/bridge.lua',
+	'ui/changelog/bridge.lua',
+	'ui/paths_editor/bridge.lua',
 	'ergopti_hotstrings.lua'
 ];
 for (const rel of CONSUMERS) {

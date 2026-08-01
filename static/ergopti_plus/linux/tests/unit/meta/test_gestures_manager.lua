@@ -297,7 +297,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- ==========================================================================
 
   helpers.it("menu_builder renders gestures section when context present", function()
-    local ok_mb, menu_builder = pcall(require, "modules.menu.menu_builder")
+    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
     if not ok_mb or not menu_builder then
       helpers.assert_true(true, "menu_builder not available — skipping")
       return
@@ -323,7 +323,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("menu_builder handles nil gestures gracefully", function()
-    local ok_mb, menu_builder = pcall(require, "modules.menu.menu_builder")
+    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
     if not ok_mb or not menu_builder then
       helpers.assert_true(true, "menu_builder not available — skipping")
       return

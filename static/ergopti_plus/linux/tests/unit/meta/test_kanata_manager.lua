@@ -281,7 +281,7 @@ helpers.describe("kanata manager", function()
   helpers.describe("menu builder integration", function()
 
     helpers.it("menu_builder Kanata section items have valid shape", function()
-      local mb = helpers.load_module("modules.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.menu_builder")
       local items = mb.build({ _version = "test", on_quit = function() end })
 
       -- Find the Kanata section.

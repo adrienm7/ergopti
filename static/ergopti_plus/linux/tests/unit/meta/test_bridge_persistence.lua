@@ -77,7 +77,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("paths_editor_bridge.save persists {paths,key,value} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.paths_editor_bridge",
+			"ui.paths_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "save", key = "config_dir", value = "/tmp/test" }, {})
 			end)
@@ -90,7 +90,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("prompt_editor_bridge.set_model persists {llm,model} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.prompt_editor_bridge",
+			"ui.prompt_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "set_model", model = "llama3" }, {})
 			end)
@@ -102,7 +102,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("prompt_editor_bridge.save_prompt persists {llm,prompt} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.prompt_editor_bridge",
+			"ui.prompt_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "save_prompt", title = "My Prompt" }, {})
 			end)
@@ -114,7 +114,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("onboarding_bridge layout step persists {script,layout} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.onboarding_bridge",
+			"ui.onboarding.bridge",
 			function(handler)
 				handler.on_message({ step = "layout", data = { layout = "azerty" } }, {})
 			end)
@@ -127,7 +127,7 @@ helpers.describe("bridge handler TOML persistence", function()
 	helpers.it("hotstrings_config_bridge.add_hotstring persists the entry via write", function()
 		local state = { config = { get_config_dir = function() return "/home/user/.config/ergopti/hotstrings" end } }
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.hotstrings_config_bridge",
+			"ui.hotstrings_config_window.bridge",
 			function(handler)
 				handler.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
 			end)
@@ -143,7 +143,7 @@ helpers.describe("bridge handler TOML persistence", function()
 	helpers.it("hotstring_editor_bridge.save persists the entry via write", function()
 		local state = { config = { get_config_dir = function() return "/home/user/.config/ergopti/hotstrings" end } }
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.hotstring_editor_bridge",
+			"ui.hotstring_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
 			end)

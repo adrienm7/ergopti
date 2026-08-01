@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/metrics_apps_bridge.lua
+--- ui/metrics_apps/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Metrics Apps Dashboard (per-app statistics)

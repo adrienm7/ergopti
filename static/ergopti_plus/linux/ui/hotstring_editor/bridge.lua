@@ -1,17 +1,17 @@
---- modules/ui/bridge_handlers/hotstrings_config_bridge.lua
+--- ui/hotstring_editor/bridge.lua
 
 --- ==============================================================================
---- BRIDGE HANDLER: Hotstrings Config Window
---- Handles JS→Lua messages from _shared/ui/hotstrings_config_window/.
---- Bridge name: "hotstrings_config_bridge"
---- Persists add/delete operations via the shared toml_codec.writer.
+--- BRIDGE HANDLER: Hotstring Editor
+--- Handles JS->Lua messages from _shared/ui/hotstring_editor/.
+--- Bridge name: "hsEditor"
+--- Persists save/delete operations via the shared toml_codec.writer.
 --- ==============================================================================
 
 local M = {}
-M.bridge_name = "hotstrings_config_bridge"
+M.bridge_name = "hsEditor"
 
 local Logger = require("logger.shim")
-local LOG = "bridge.hotstrings_config"
+local LOG = "bridge.hsEditor"
 
 -- Lazy-loaded writer for hotstring TOML persistence.
 local _writer = nil
@@ -32,7 +32,7 @@ local function _get_reader()
 end
 
 --- Reads the group's TOML, applies `mutate` to its entry list, then writes the
---- whole merged set back so a single-entry add/delete never clobbers the other
+--- whole merged set back so a single-entry save/delete never clobbers the other
 --- hotstrings already stored in that group file.
 --- @param config_dir string Absolute hotstrings config directory.
 --- @param group      string Target group (the TOML file's basename).
@@ -46,7 +46,7 @@ local function _persist_group(config_dir, group, mutate)
 	local path = config_dir .. "/" .. group .. ".toml"
 
 	-- Read the current set so we merge into it; a missing file parses to an
-	-- empty structure, which is exactly a first-time add.
+	-- empty structure, which is exactly a first-time save.
 	local ok_read, existing = pcall(reader.parse, path)
 	if not ok_read or type(existing) ~= "table" then
 		existing = { meta = {}, sections_order = {}, sections = {} }
@@ -72,37 +72,25 @@ local function _persist_group(config_dir, group, mutate)
 	return writer.write(path, existing)
 end
 
---- Builds the initial data payload for the config UI.
+--- Builds the initial editor data payload.
 --- @param state table Daemon state.
---- @return table Data the JS UI expects.
+--- @return table
 local function _build_initial_payload(state)
+	local hotstrings = {}
 	local groups = {}
-	if state.config and type(state.config.get_groups) == "function" then
-		local raw = state.config:get_groups()
-		for _, g in ipairs(raw) do
-			local enabled = false
-			if type(state.config.is_group_enabled) == "function" then
-				enabled = state.config:is_group_enabled(g)
-			end
-			groups[#groups + 1] = { name = g, enabled = enabled }
-		end
-	end
 
-	local mapping_count = 0
-	local error_count = 0
 	if state.config then
-		if type(state.config.mapping_count) == "function" then
-			mapping_count = state.config:mapping_count()
+		if type(state.config.get_groups) == "function" then
+			groups = state.config:get_groups() or {}
 		end
-		if type(state.config.parse_error_count) == "function" then
-			error_count = state.config:parse_error_count()
+		if type(state.config.get_all_hotstrings) == "function" then
+			hotstrings = state.config:get_all_hotstrings() or {}
 		end
 	end
 
 	return {
+		hotstrings = hotstrings,
 		groups = groups,
-		mapping_count = mapping_count,
-		parse_errors = error_count,
 		config_dir = state.config and type(state.config.get_config_dir) == "function"
 			and state.config:get_config_dir() or nil,
 	}
@@ -110,16 +98,20 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state.
 --- @return any|nil  Response to send back to JS.
 function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" then
-			Logger.info(LOG, "Hotstrings config UI ready.")
+			Logger.info(LOG, "Hotstring editor UI ready.")
 			return _build_initial_payload(state)
 		end
 		if payload == "refresh" then
 			return _build_initial_payload(state)
+		end
+		if payload == "close" then
+			Logger.info(LOG, "Hotstring editor close requested.")
+			return nil
 		end
 		return nil
 	end
@@ -128,28 +120,14 @@ function M.on_message(payload, state)
 
 	local action = payload.action
 
-	if action == "toggle_group" and payload.group then
-		if state.config and type(state.config.toggle_group) == "function" then
-			state.config:toggle_group(payload.group)
-		end
-		return _build_initial_payload(state)
-	end
-
-	if action == "reload" then
-		if state.config and type(state.config.reload) == "function" then
-			state.config:reload()
-		end
-		return _build_initial_payload(state)
-	end
-
-	if action == "add_hotstring" and payload.trigger and payload.replacement then
+	if action == "save" and payload.trigger and payload.replacement then
 		local group = payload.group or "default"
-		Logger.info(LOG, "Add hotstring: %s → %s (group=%s)",
+		Logger.info(LOG, "Save hotstring: %s -> %s (group=%s)",
 			payload.trigger, payload.replacement, group)
 
 		local config_dir = state.config and type(state.config.get_config_dir) == "function"
 			and state.config:get_config_dir() or nil
-		local added = false
+		local saved = false
 		if config_dir then
 			local entry = {
 				trigger           = payload.trigger,
@@ -160,26 +138,26 @@ function M.on_message(payload, state)
 				final_result      = payload.final_result == true,
 			}
 			local ok, err = _persist_group(config_dir, group, function(entries)
-				-- Upsert by trigger so editing an existing hotstring never
-				-- appends a duplicate.
+				-- Upsert by trigger: re-saving an existing hotstring edits it in
+				-- place instead of appending a duplicate.
 				for i, e in ipairs(entries) do
 					if e.trigger == entry.trigger then entries[i] = entry return end
 				end
 				entries[#entries + 1] = entry
 			end)
-			added = ok == true
-			if added then
-				Logger.success(LOG, "Hotstring persisted: %s → %s", payload.trigger, payload.replacement)
+			saved = ok == true
+			if saved then
+				Logger.success(LOG, "Hotstring saved to disk: %s", payload.trigger)
 			else
-				Logger.error(LOG, "Failed to persist hotstring: %s", tostring(err))
+				Logger.error(LOG, "Failed to save hotstring: %s", tostring(err))
 			end
 		else
-			Logger.warn(LOG, "Add hotstring: no config directory — nothing persisted.")
+			Logger.warn(LOG, "Save hotstring: no config directory — nothing persisted.")
 		end
-		return { added = added }
+		return { saved = saved }
 	end
 
-	if action == "delete_hotstring" and payload.trigger then
+	if action == "delete" and payload.trigger then
 		local group = payload.group or "default"
 		Logger.info(LOG, "Delete hotstring: %s (group=%s)", payload.trigger, group)
 
@@ -195,7 +173,7 @@ function M.on_message(payload, state)
 			end)
 			deleted = ok == true
 			if deleted then
-				Logger.success(LOG, "Hotstring deleted: %s", payload.trigger)
+				Logger.success(LOG, "Hotstring deleted from disk: %s", payload.trigger)
 			else
 				Logger.error(LOG, "Failed to delete hotstring: %s", tostring(err))
 			end
@@ -203,6 +181,23 @@ function M.on_message(payload, state)
 			Logger.warn(LOG, "Delete hotstring: no config directory — nothing persisted.")
 		end
 		return { deleted = deleted }
+	end
+
+	if action == "test" and payload.trigger then
+		Logger.info(LOG, "Test hotstring: %s", payload.trigger)
+		-- Expand the hotstring in the current context.
+		if state.engine and payload.replacement then
+			local injector_ok, injector = pcall(require, "modules.hotstrings.injector")
+			if injector_ok and injector then
+				pcall(injector.inject, #payload.trigger, payload.replacement)
+			end
+		end
+		return { tested = true }
+	end
+
+	if action == "duplicate" and payload.trigger then
+		Logger.info(LOG, "Duplicate hotstring: %s", payload.trigger)
+		return { duplicated = true }
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))

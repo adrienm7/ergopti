@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/model_browser_bridge.lua
+--- ui/model_browser/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: LLM Model Browser
