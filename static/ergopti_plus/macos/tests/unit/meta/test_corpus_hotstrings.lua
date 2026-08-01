@@ -187,9 +187,19 @@ seq_counter             = 0,
 				local buf = v.buffer or v.trigger
 				helpers.assert_true(R.has_trigger_suffix(v.trigger),
 					"vector '" .. v.id .. "': trigger not a known suffix after add()")
-				-- Verify the buffer indeed ends with the trigger (corpus consistency)
+				-- Verify the buffer indeed ends with the trigger (corpus consistency),
+				-- compared the way the vector says the trigger is matched. A
+				-- case-SENSITIVE vector must end with it exactly; the default mode
+				-- folds case, so "BTW" ending a buffer for trigger "btw" is the fold
+				-- working rather than a malformed vector. Asserting the sensitive
+				-- form for both held only while no vector exercised the fold — the
+				-- same assumption sat in all three drivers' harnesses.
 				local tlen = #v.trigger
-				helpers.assert_true(buf:sub(-tlen) == v.trigger,
+				local tail = buf:sub(-tlen)
+				local ends_with = (v.is_case_sensitive == true)
+					and (tail == v.trigger)
+					or (tail:lower() == v.trigger:lower())
+				helpers.assert_true(ends_with,
 					"vector '" .. v.id .. "': buffer does not end with trigger")
 			end
 		end
