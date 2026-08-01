@@ -1075,7 +1075,20 @@ skips loudly, rather than passing, on machines without AutoHotkey. 20 test files
 ### 0.6 Gates to build
 
 `test-driver-tree-parity.cjs` (I1) · ~~`test-shared-root-resolvers.cjs` (executes
-every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) · the "no menu row outside
+every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) — **the
+`action_id` ↔ handler half is done**
+(`test-menu-action-handler-bijection.cjs`): every `action`/`dynamic` row the
+manifest declares for a platform must have its id named in that driver. Windows
+is held at **zero** unresolved and cannot regress; macOS (20) and Linux (27) are
+frozen. The label-tree diff half is **not** built, and deliberately: the manifest
+carries **no `linux` platform value anywhere** — 27 rows are `[ahk]`, 19 `[hs]`,
+2 both — so Linux "sees" 76 rows only because an unrestricted row defaults to
+every platform, while `menu_builder.lua` builds its 97 rows by hand. Diffing the
+three trees today reports that migration, not a defect. Note the bijection check
+is a **necessary, not sufficient** condition: a tighter "id bound to a callable"
+rule was tried and rejected because it flagged `"tap_hold_keys", _TH_DynKeys` —
+a function reference rather than a lambda — and a gate that flags correct
+bindings demands rewriting working code. · the "no menu row outside
 the renderer" ratchet~~ **done** — `test-menu-rows-outside-renderer.cjs` freezes
 the bypass count per driver: **windows 222, macos 301, linux 3**. The three
 drivers are in completely different places — Linux already builds 97 of its 100
