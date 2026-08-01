@@ -213,6 +213,51 @@ end
 --- @param blocks table|userdata The text payloads to draw.
 --- @param state table The orchestrator state object.
 --- @param start_watchers_callback function Function to execute event watchers post-render.
+--- Resolves where the tooltip canvas goes, given an anchor and a screen frame.
+---
+--- Pure: the only OS-derived inputs are the two parameters, so a test can drive
+--- it with the shared corpus's synthetic screenFrame. That is the whole reason
+--- it exists as a function. This maths used to be inline in M.render(), so the
+--- corpus test replayed a CLONE of it defined inside the test file — while its
+--- docstring claimed to catch "any divergence in clamping or positioning". It
+--- pinned the clone; a divergence here was caught by nothing.
+---
+--- Mirrors _shared/modules/tooltip/layout.js resolvePosition + clampToScreen,
+--- and the Windows _TooltipClampRect.
+--- @param anchor table|nil { type = "caret"|…, x, y, w, h }; nil = screen centre-bottom.
+--- @param canvas table { w, h } The canvas size in layout units.
+--- @param screen_frame table { x, y, w, h } The frame to place and clamp within.
+--- @return table { x, y } The clamped top-left corner.
+function M.compute_position(anchor, canvas, screen_frame)
+	local canvas_width, canvas_height = canvas.w, canvas.h
+	local pos_x, pos_y
+
+	if anchor then
+		if anchor.type == "caret" then
+			pos_x = anchor.x + Config.layout.caret_offset_x
+			pos_y = anchor.y + (anchor.h or 0) + Config.layout.caret_offset_y
+		else
+			pos_x = anchor.x - canvas_width / 2
+			pos_y = anchor.y + Config.layout.window_offset_y
+			-- Flip above the anchor when the tooltip would fall off the bottom.
+			if pos_y + canvas_height > screen_frame.y + screen_frame.h then
+				pos_y = anchor.y - canvas_height - Config.layout.window_offset_y
+			end
+		end
+	else
+		pos_x = screen_frame.x + (screen_frame.w - canvas_width) / 2
+		pos_y = screen_frame.y + screen_frame.h - canvas_height - Config.layout.window_offset_y
+	end
+
+	local margin = Config.layout.screen_margin
+	return {
+		x = math.max(screen_frame.x + margin,
+			math.min(pos_x, screen_frame.x + screen_frame.w - canvas_width - margin)),
+		y = math.max(screen_frame.y + margin,
+			math.min(pos_y, screen_frame.y + screen_frame.h - canvas_height - margin)),
+	}
+end
+
 function M.render(blocks, state, start_watchers_callback)
 	local ok, err = pcall(function()
 		if not M.canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then return end
@@ -307,25 +352,8 @@ function M.render(blocks, state, start_watchers_callback)
 		end
 		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
 
-		local pos_x, pos_y
-		if anchor then
-			if anchor.type == "caret" then
-				pos_x = anchor.x + Config.layout.caret_offset_x
-				pos_y = anchor.y + anchor.h + Config.layout.caret_offset_y
-			else
-				pos_x = anchor.x - canvas_width / 2
-				pos_y = anchor.y + Config.layout.window_offset_y
-				if pos_y + canvas_height > screen_frame.y + screen_frame.h then 
-					pos_y = anchor.y - canvas_height - Config.layout.window_offset_y 
-				end
-			end
-		else
-			pos_x = screen_frame.x + (screen_frame.w - canvas_width) / 2
-			pos_y = screen_frame.y + screen_frame.h - canvas_height - Config.layout.window_offset_y
-		end
-
-		pos_x = math.max(screen_frame.x + Config.layout.screen_margin, math.min(pos_x, screen_frame.x + screen_frame.w - canvas_width - Config.layout.screen_margin))
-		pos_y = math.max(screen_frame.y + Config.layout.screen_margin, math.min(pos_y, screen_frame.y + screen_frame.h - canvas_height - Config.layout.screen_margin))
+		local placed = M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
+		local pos_x, pos_y = placed.x, placed.y
 
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
 		M.canvas[2].frame = { x = 0, y = 0, w = canvas_width, h = canvas_height }
