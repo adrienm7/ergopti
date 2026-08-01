@@ -1149,7 +1149,21 @@ missing when it may have been restored), a `platform_gap` with nothing tracking
 the work, and a row missing its reason. It does **not** try to verify a reason is
 still true — that is a statement about the product, not something a regex can
 check. · boot-manifest parity gates ·
-"no hand-written duplicate of shared logic".
+~~"no hand-written duplicate of shared logic"~~ — **measured, and not built.**
+A name-based lint (a driver file sharing a name with a `_shared/lua` module)
+finds **36 candidates and all 36 are legitimate**: most are `init.lua` collisions
+that exist in every module directory, several are documented delegation shims —
+`macos/lib/toml/codec.lua` is literally `return require("toml_codec")` — and the
+substantial ones are OS-specific wiring *around* shared pure logic. Both
+`text_migration.lua` copies require the shared `keylogger.text_migration` for the
+plan and add only their driver's I/O, which is the intended architecture rather
+than a violation. Separately, **every one of the 38 shared Lua modules is
+required by name somewhere** (a first pass reported `linux.tray_protocol` as an
+orphan; it is required as `pcall(require, "linux.tray_protocol")`, which the
+regex missed). Detecting a genuine reimplementation needs semantic comparison,
+not name matching, and the mechanism that actually enforces I5 already exists:
+per-behaviour corpora replayed by all three suites, which is what the logger
+corpus item above extended to its third driver.
 
 ### 0.7 Gates to extend (each hole measured)
 
