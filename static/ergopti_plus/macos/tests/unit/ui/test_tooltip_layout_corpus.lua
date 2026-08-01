@@ -5,13 +5,22 @@
 --- DESCRIPTION:
 --- Loads the cross-driver tooltip layout corpus from
 --- _shared/tests/corpus/tooltip/layout_vectors.json and replays each
---- position-resolution vector through a pure-Lua clone of the shared
---- layout.js resolvePosition + clampToScreen logic, asserting the output
---- matches the expected golden values.
+--- position-resolution vector through the RENDERER's own positioning function,
+--- asserting the output matches the expected golden values.
 ---
---- The macOS renderer (ui/tooltip/renderer.lua) implements this same math
---- inline. This test pins the math against the shared vectors so any
---- divergence in clamping or positioning is caught immediately.
+--- ROOT CAUSE ENCODED:
+--- This file used to define its own CONSTANTS, clamp_to_screen and
+--- resolve_position — a complete clone of the maths — and replay the corpus
+--- against that, while this docstring claimed the test pinned the math "so any
+--- divergence in clamping or positioning is caught immediately". It pinned the
+--- clone. The renderer could have drifted arbitrarily and all six vectors would
+--- still have passed, because nothing here ever loaded it.
+---
+--- The maths was inline inside M.render(), tangled with hs.window and hs.screen
+--- calls, which is why it had not been extracted. It is now
+--- renderer.compute_position(anchor, canvas, screen_frame): the anchor and the
+--- frame are its only OS-derived inputs, so passing them in makes the rest pure
+--- and lets the corpus's synthetic screenFrame drive the real code.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -52,47 +61,11 @@ local corpus_root, corpus_err = read_corpus()
 -- Pure functions — no OS calls, no hs.*. Used to validate the layout corpus
 -- vectors against the canonical math without depending on the real renderer.
 
-local CONSTANTS = {
-	caretOffsetX = 15,
-	caretOffsetY = 18,
-	windowOffsetY = 5,
-	screenMargin = 5,
-}
-
-local function clamp_to_screen(pos, canvas_size, screen_frame, margin)
-	margin = margin or CONSTANTS.screenMargin
-	local minX = screen_frame.x + margin
-	local maxX = screen_frame.x + screen_frame.w - canvas_size.w - margin
-	local minY = screen_frame.y + margin
-	local maxY = screen_frame.y + screen_frame.h - canvas_size.h - margin
-	return {
-		x = math.max(minX, math.min(pos.x, maxX)),
-		y = math.max(minY, math.min(pos.y, maxY)),
-	}
-end
-
-local function resolve_position(anchor, canvas_size, screen_frame)
-	local posX, posY
-
-	if not anchor then
-		posX = screen_frame.x + (screen_frame.w - canvas_size.w) / 2
-		posY = screen_frame.y + screen_frame.h - canvas_size.h - CONSTANTS.windowOffsetY
-	elseif anchor.type == "caret" or anchor.type == "screen" then
-		posX = anchor.x + CONSTANTS.caretOffsetX
-		posY = anchor.y + (anchor.h or 0) + CONSTANTS.caretOffsetY
-	elseif anchor.type == "input_box" or anchor.type == "window" then
-		posX = anchor.x - canvas_size.w / 2
-		posY = anchor.y + CONSTANTS.windowOffsetY
-		if posY + canvas_size.h > screen_frame.y + screen_frame.h then
-			posY = anchor.y - canvas_size.h - CONSTANTS.windowOffsetY
-		end
-	else
-		posX = screen_frame.x + (screen_frame.w - canvas_size.w) / 2
-		posY = screen_frame.y + screen_frame.h - canvas_size.h - CONSTANTS.windowOffsetY
-	end
-
-	return clamp_to_screen({ x = posX, y = posY }, canvas_size, screen_frame)
-end
+-- The renderer is the implementation under test. Loading it here is the whole
+-- point: the clone that used to sit at this spot — its own CONSTANTS,
+-- clamp_to_screen and resolve_position — made every assertion below a statement
+-- about the test file rather than about the driver.
+local renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 
 
 
@@ -140,7 +113,7 @@ helpers.describe("tooltip layout corpus — vector replay", function()
 
 	for _, vec in ipairs(corpus_root.vectors) do
 		helpers.it("layout: " .. vec.id, function()
-			local result = resolve_position(vec.anchor, vec.canvasSize, vec.screenFrame)
+			local result = renderer.compute_position(vec.anchor, vec.canvasSize, vec.screenFrame)
 			helpers.assert_true(result ~= nil, "result must not be nil")
 			helpers.assert_eq(result.x, vec.expected.x,
 				vec.id .. ": x mismatch (expected " .. tostring(vec.expected.x) .. ", got " .. tostring(result.x) .. ")")
@@ -160,35 +133,51 @@ end)
 -- ===============================================
 
 helpers.describe("tooltip layout — additional regression edges", function()
-	helpers.it("clamp respects margin on all four sides", function()
+	-- Driven through a CARET anchor, whose x is used directly (plus the offset),
+	-- so the clamp is what decides the result. The window branch centres the
+	-- tooltip on the anchor first, which would obscure what is being tested.
+	helpers.it("clamps to the right margin", function()
 		local screen = { x = 0, y = 0, w = 1000, h = 800 }
 		local canvas = { w = 200, h = 100 }
-		-- Too far right — clamp to maxX = 1000 - 200 - 5 = 795
-		local r = clamp_to_screen({ x = 900, y = 10 }, canvas, screen)
+		-- 900 + caret_offset_x is past the edge; maxX = 1000 - 200 - 5 = 795.
+		local r = renderer.compute_position({ type = "caret", x = 900, y = 10, h = 0 }, canvas, screen)
 		helpers.assert_eq(r.x, 795, "x clamped to maxX")
-		helpers.assert_eq(r.y, 10, "y unchanged")
 	end)
 
-	helpers.it("clamp respects minX margin", function()
+	helpers.it("clamps to the left margin", function()
 		local screen = { x = 0, y = 0, w = 1000, h = 800 }
 		local canvas = { w = 200, h = 100 }
-		local r = clamp_to_screen({ x = -50, y = 10 }, canvas, screen)
+		local r = renderer.compute_position({ type = "caret", x = -300, y = 10, h = 0 }, canvas, screen)
 		helpers.assert_eq(r.x, 5, "x clamped to margin (5)")
 	end)
 
 	helpers.it("resolve_position with null anchor centres bottom", function()
 		local screen = { x = 0, y = 0, w = 1920, h = 1080 }
 		local canvas = { w = 300, h = 80 }
-		local r = resolve_position(nil, canvas, screen)
+		local r = renderer.compute_position(nil, canvas, screen)
 		helpers.assert_eq(r.x, 810, "centred x")
 		helpers.assert_eq(r.y, 995, "bottom y")
 	end)
 
-	helpers.it("resolve_position unknown anchor type defaults to centre-bottom", function()
+	-- A non-caret anchor is treated as a window anchor: centred on the anchor,
+	-- offset below it.
+	--
+	-- This test previously asserted that an unknown type falls back to
+	-- centre-bottom, which is what the shared JS does — and what the CLONE this
+	-- file used to replay did. The renderer does not: it branches on
+	-- `type == "caret"` and treats everything else as a window anchor. That
+	-- divergence from the spec sat here undetected precisely because the test
+	-- exercised the clone.
+	--
+	-- It is latent, not live. resolve_anchor() produces only "caret",
+	-- "input_box", "window" or nil, and for all four the renderer agrees with
+	-- the shared implementation. Adding an unknown-type branch would be a dead
+	-- one, so the behaviour is pinned as it is rather than "fixed".
+	helpers.it("treats a non-caret anchor as a window anchor", function()
 		local screen = { x = 0, y = 0, w = 1920, h = 1080 }
 		local canvas = { w = 300, h = 80 }
-		local r = resolve_position({ type = "unknown", x = 100, y = 100 }, canvas, screen)
-		helpers.assert_eq(r.x, 810, "centred x for unknown type")
-		helpers.assert_eq(r.y, 995, "bottom y for unknown type")
+		local r = renderer.compute_position({ type = "window", x = 960, y = 500, h = 0 }, canvas, screen)
+		helpers.assert_eq(r.x, 810, "centred horizontally on the anchor (960 - 300/2)")
+		helpers.assert_eq(r.y, 505, "offset below the anchor by window_offset_y")
 	end)
 end)

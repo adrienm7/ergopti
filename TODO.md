@@ -752,8 +752,32 @@ Constraints: **paths before moves, moves before content, data before code.**
      one coordinate: the old gate saw nothing, the new one names the vector and
      the field.
      Still open on this item: the
-     macOS test replays a clone defined inside the test file instead of the
-     renderer, ~~and the AHK test never compares the 6 golden values~~ — **now it does, and
+     ~~macOS test replays a clone defined inside the test file instead of the
+     renderer~~ — **fixed, and it was concealing a real divergence.** The file
+     defined its own `CONSTANTS`, `clamp_to_screen` and `resolve_position` and
+     replayed all 6 vectors against that, while its docstring claimed it pinned
+     the math "so any divergence in clamping or positioning is caught
+     immediately". It pinned the clone: the renderer could have drifted
+     arbitrarily and every vector would still have passed.
+     The maths was inline in `M.render()`, tangled with `hs.window`/`hs.screen`,
+     which is why it had never been extracted. It is now
+     `renderer.compute_position(anchor, canvas, screen_frame)` — those two are
+     its only OS-derived inputs — and the test drives the real function.
+     Behaviour-neutral: the suite sat at 3 768 before and after.
+     **What the clone was hiding:** it branched four ways, faithfully mirroring
+     the shared JS (`caret`/`screen` → caret offsets; `input_box`/`window` →
+     centred with a bottom-flip; anything else → centre-bottom). The renderer
+     branches **two** ways: `caret`, and everything else as a window anchor. So
+     the renderer diverges from the declared source of truth on `type ==
+     "screen"` and on unknown types — and the test that promised to catch
+     exactly that could not, because it never loaded the renderer.
+     Left as-is deliberately: `resolve_anchor()` produces only `caret`,
+     `input_box`, `window` or nil, and for all four the renderer agrees with the
+     shared implementation. The divergence is **latent, not live**, and adding
+     the missing branches would add dead code. The behaviour is pinned as it is,
+     with the reason recorded in the test.
+     Verified by drifting `caret_offset_x` 6 px in the renderer: two corpus
+     vectors now fail by name and axis, where before nothing would have. ~~and the AHK test never compares the 6 golden values~~ — **now it does, and
      the reason it could not is the interesting part.** The test loaded the JSON,
      asserted that every vector *had* an expected x and y, and never compared one
      — so a Windows clamp that disagreed with the shared implementation would
