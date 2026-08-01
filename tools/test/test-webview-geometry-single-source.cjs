@@ -25,7 +25,7 @@
  *            BUILT from the manifest at test time, so if the manifest changes the
  *            Windows literal must follow or this test fails.
  *
- *   Linux  — modules/ui/webview_manager.lua reads the manifest generically for
+ *   Linux  — ui/webview_manager.lua reads the manifest generically for
  *            every app id, so the check is that it keeps doing so and hardcodes
  *            no per-app size of its own.
  *
@@ -148,7 +148,7 @@ const WINDOWS_EXCLUSIONS = {
 // ── Linux: the manager must resolve geometry generically, for every app ───────
 // Linux is the one driver that already reads the manifest for all 14 ids, so the
 // check is that it keeps doing so rather than growing per-app literals.
-const LINUX_MANAGER = 'modules/ui/webview_manager.lua';
+const LINUX_MANAGER = 'ui/webview_manager.lua';
 
 const errors = [];
 const apps = readManifest();

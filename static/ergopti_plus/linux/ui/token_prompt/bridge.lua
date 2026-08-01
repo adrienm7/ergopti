@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/token_bridge.lua
+--- ui/token_prompt/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Token / Prompt Settings

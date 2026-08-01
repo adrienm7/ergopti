@@ -39,7 +39,7 @@ const WIN_HOST = 'static/ergopti_plus/windows/ui/action_picker_webview.ahk';
 const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
 const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
-const LINUX_HOST = 'static/ergopti_plus/linux/modules/ui/bridge_handlers/action_picker_bridge.lua';
+const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
 
 let total_pass = 0;

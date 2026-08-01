@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/onboarding_bridge.lua
+--- ui/onboarding/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Onboarding Wizard (first-run setup)

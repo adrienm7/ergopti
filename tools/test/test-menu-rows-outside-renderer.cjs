@@ -79,7 +79,7 @@ const DRIVER_SPEC = {
 		// Same row shape as macOS — `{ title = …, fn = … }`.
 		patterns: [/\btitle\s*=\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		renderers: new Set(['modules/menu/menu_builder.lua'])
+		renderers: new Set(['ui/menu/menu_builder.lua'])
 	}
 };
 

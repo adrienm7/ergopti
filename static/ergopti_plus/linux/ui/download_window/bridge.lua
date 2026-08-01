@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/dl_bridge.lua
+--- ui/download_window/bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Download Window

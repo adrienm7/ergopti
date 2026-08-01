@@ -93,7 +93,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 
 // ── The ratchet ─────────────────────────────────────────────────────────────
 //
-// 2026-08-01: 14 of 50 distinct paths are present in all three drivers (28.0 %).
+// 2026-08-01: 23 of 49 distinct paths are present in all three drivers (46.9 %).
 // Raise BASELINE_SHARED as Lots 3–6 land; never lower it to make a change pass.
 //
 // History, so the ratchet reads as a trajectory rather than a number:
@@ -112,18 +112,27 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    to print a two-driver path once under each driver's
 //                    "unique to it" list, so the strongest promotion candidate
 //                    in the tree read as two unrelated private folders.
+////   23/49 (46.9 %) — the Linux UI, reorganised by FEATURE to match the other
+//                    two. It was the only driver with two `ui` namespaces:
+//                    modules/ui/ held one webview manager plus a flat folder of
+//                    per-page bridge handlers, and modules/menu/ held the menu.
+//                    Nine paths became shared at once and the union SHRANK, so
+//                    the twelve "missing ui/*" were never twelve gaps — they
+//                    were one structural choice. Page names come from
+//                    _shared/ui/, the canonical set, rather than from what this
+//                    driver happened to call them.
 //
 // Written as a literal, not as `shared.length`. Deriving the baseline from the
 // value it is supposed to constrain makes the comparison `x <= x` — a check that
 // passes for every possible input, which is the precise definition of the false
 // green this repo already ratchets against elsewhere.
-const BASELINE_SHARED = 14;
+const BASELINE_SHARED = 23;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
 // the programme drifting sideways — adding structure to one driver while the
 // shared count stands still.
-const BASELINE_UNION = 50;
+const BASELINE_UNION = 49;
 
 if (shared.length < BASELINE_SHARED) {
 	errors.push(

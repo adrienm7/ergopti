@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Menu Builder Group-Call Regression Guard
 --- DESCRIPTION:
---- Regression test for a method-call mismatch in modules/menu/menu_builder.lua.
+--- Regression test for a method-call mismatch in ui/menu/menu_builder.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The builder called config:is_group_enabled(group_name) / config:toggle_group(...)
@@ -41,7 +41,7 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 			reload = function() end,
 		}
 
-		local mb = helpers.load_module("modules.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.menu_builder")
 		local items = mb.build({ config = mock_config, _version = "9.9.9" })
 
 		-- is_group_enabled must have been called with the first group name.

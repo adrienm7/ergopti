@@ -21,7 +21,7 @@
  * Linux renders **none** of it: the manifest carries no `linux` platform value
  * anywhere (27 rows are `[ahk]`, 19 `[hs]`, 2 both), so its 27 rows are visible
  * to Linux only because an unrestricted row defaults to every platform — while
- * `modules/menu/menu_builder.lua` builds its 97 rows by hand.
+ * `ui/menu/menu_builder.lua` builds its 97 rows by hand.
  *
  * That gap is the I2/I3 migration, not a defect to fix here. Freezing it is what
  * this guard is for: Windows cannot regress from zero, and the other two cannot

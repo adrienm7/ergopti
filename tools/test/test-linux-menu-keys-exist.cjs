@@ -31,7 +31,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'modules', 'menu', 'menu_builder.lua');
+const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'menu_builder.lua');
 const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json');
 
 // Measured at 30 calls when this landed. Set below that so ordinary growth does

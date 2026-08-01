@@ -162,14 +162,14 @@ helpers.describe("tray_menu SNI compliance", function()
   helpers.describe("menu builder integration", function()
 
     helpers.it("menu_builder.build() returns a non-empty item list", function()
-      local mb = helpers.load_module("modules.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.menu_builder")
       local items = mb.build({})
       helpers.assert_true(type(items) == "table" and #items > 0,
         "menu_builder.build({}) returns a non-empty table")
     end)
 
     helpers.it("menu_builder output is accepted by tray_menu.setMenu", function()
-      local mb = helpers.load_module("modules.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.menu_builder")
       local items = mb.build({
         _version = "test",
         config   = nil,
@@ -186,7 +186,7 @@ helpers.describe("tray_menu SNI compliance", function()
     end)
 
     helpers.it("menu_builder output with all sections exercised does not crash", function()
-      local mb = helpers.load_module("modules.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.menu_builder")
       local items = mb.build({
         _version       = "test",
         config         = nil,

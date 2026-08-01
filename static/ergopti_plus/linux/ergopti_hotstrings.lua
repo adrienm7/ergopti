@@ -113,7 +113,7 @@ local event_loop = require("adapters.event_loop")
 
 -- Menu builder (builds rich submenus from daemon state).
 local menu_builder = nil
-local ok_menu, menu_mod = pcall(require, "modules.menu.menu_builder")
+local ok_menu, menu_mod = pcall(require, "ui.menu.menu_builder")
 if ok_menu then menu_builder = menu_mod end
 
 -- LLM prediction engine (optional — daemon runs without it).
@@ -155,7 +155,7 @@ if ok_pl then process_lifecycle = pl_mod end
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
 local webview_manager = nil
-local ok_wm, wm_mod = pcall(require, "modules.ui.webview_manager")
+local ok_wm, wm_mod = pcall(require, "ui.webview_manager")
 if ok_wm then webview_manager = wm_mod end
 
 -- Kanata manager (optional — key remapping daemon lifecycle).

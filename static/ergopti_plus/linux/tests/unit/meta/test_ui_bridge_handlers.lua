@@ -126,7 +126,7 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("webview_manager", function()
     -- Use require (not load_module) so windows persist across tests.
     -- webview_manager auto-inits on load, and load_module would wipe state.
-    local wm = require("modules.ui.webview_manager")
+    local wm = require("ui.webview_manager")
 
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
@@ -176,7 +176,7 @@ helpers.describe("ui.bridge_handlers", function()
       wm.show("action_picker", "fr")
       wm.set_daemon_state(build_mock_state())
       local confirmed = nil
-      local handler = require("modules.ui.bridge_handlers.action_picker_bridge")
+      local handler = require("ui.action_picker.bridge")
       handler.on_confirm = function(id) confirmed = id end
       wm.route_message("action_picker_bridge", { action = "confirm", id = "tab_new" })
       handler.on_confirm = nil
@@ -238,7 +238,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("action_picker_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.action_picker_bridge")
+    local handler = helpers.load_module("ui.action_picker.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -297,7 +297,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("prompt_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.prompt_editor_bridge")
+    local handler = helpers.load_module("ui.prompt_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -333,7 +333,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("metrics_apps_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.metrics_apps_bridge")
+    local handler = helpers.load_module("ui.metrics_apps.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -378,7 +378,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ===========================================================================
 
   helpers.describe("metrics_typing_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.metrics_typing_bridge")
+    local handler = helpers.load_module("ui.metrics_typing.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -408,7 +408,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("healthcheck_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+    local handler = helpers.load_module("ui.healthcheck.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -452,7 +452,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("onboarding_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.onboarding_bridge")
+    local handler = helpers.load_module("ui.onboarding.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -501,7 +501,7 @@ helpers.describe("ui.bridge_handlers", function()
     end
 
     helpers.it("healthcheck payload uses the persisted locale, not a hardcoded 'fr'", function()
-      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      local hc = helpers.load_module("ui.healthcheck.bridge")
       with_locale_module({ get_locale = function() return "de" end }, function()
         local result = hc.on_message("ready", build_mock_state())
         helpers.assert_eq(result.locale, "de",
@@ -510,7 +510,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
 
     helpers.it("onboarding init uses the persisted locale, not a hardcoded 'fr'", function()
-      local ob = helpers.load_module("modules.ui.bridge_handlers.onboarding_bridge")
+      local ob = helpers.load_module("ui.onboarding.bridge")
       with_locale_module({ get_locale = function() return "de" end }, function()
         local result = ob.on_message({ step = "init" }, build_mock_state())
         helpers.assert_eq(result.current_locale, "de",
@@ -519,7 +519,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
 
     helpers.it("falls back to 'fr' when lib.i18n resolves no locale", function()
-      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      local hc = helpers.load_module("ui.healthcheck.bridge")
       with_locale_module({ get_locale = function() return nil end }, function()
         local result = hc.on_message("ready", build_mock_state())
         helpers.assert_eq(result.locale, "fr",
@@ -533,7 +533,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("hotstrings_config_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.hotstrings_config_bridge")
+    local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -564,7 +564,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'add_hotstring' merges into the existing group and reports the write result", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
         helpers.assert_true(result.added, "a successful write must report added = true")
         -- Root cause: a single-entry payload used to overwrite the whole group,
@@ -579,14 +579,14 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'add_hotstring' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
         helpers.assert_eq(result.added, false, "a failed write must not report success")
       end)
     end)
     helpers.it("'delete_hotstring' removes only the target and keeps siblings", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "delete_hotstring", trigger = "omw", group = "english" }, state)
         helpers.assert_true(result.deleted)
         -- Root cause: delete used to write an empty entry list, wiping the group.
@@ -602,7 +602,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("changelog_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.changelog_bridge")
+    local handler = helpers.load_module("ui.changelog.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -633,7 +633,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("dl_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.dl_bridge")
+    local handler = helpers.load_module("ui.download_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -661,7 +661,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("hotstring_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.hotstring_editor_bridge")
+    local handler = helpers.load_module("ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -675,7 +675,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' merges into the existing group and reports the write result", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
         helpers.assert_true(result.saved, "a successful write must report saved = true")
         local entries = captured.data.sections.english.entries
@@ -688,14 +688,14 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
         helpers.assert_eq(result.saved, false, "a failed write must not report success")
       end)
     end)
     helpers.it("'delete' removes only the target and keeps siblings", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
         local result = h.on_message({ action = "delete", trigger = "omw", group = "english" }, state)
         helpers.assert_true(result.deleted)
         local entries = captured.data.sections.english.entries
@@ -715,7 +715,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("paths_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.paths_editor_bridge")
+    local handler = helpers.load_module("ui.paths_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -740,7 +740,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("personal_info_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_info_editor_bridge")
+    local handler = helpers.load_module("ui.personal_info_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -771,7 +771,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("model_browser_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.model_browser_bridge")
+    local handler = helpers.load_module("ui.model_browser.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -810,7 +810,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("token_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.token_bridge")
+    local handler = helpers.load_module("ui.token_prompt.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -840,7 +840,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("personal_toml_editor", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_toml_editor_bridge")
+    local handler = helpers.load_module("ui.personal_info_editor.bridge_toml")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
