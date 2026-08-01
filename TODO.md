@@ -1077,7 +1077,19 @@ skips loudly, rather than passing, on machines without AutoHotkey. 20 test files
 `test-driver-tree-parity.cjs` (I1) · ~~`test-shared-root-resolvers.cjs` (executes
 every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) · the "no menu row outside
 the renderer" ratchet · "every manifest array key has a reader" ·
-`test-logger-scalars-single-source.cjs` · `test-locale-catalogue-complete.cjs` ·
+`test-logger-scalars-single-source.cjs` · ~~`test-locale-catalogue-complete.cjs`~~
+**done** — all 21 catalogues carry en.json key-for-key (2 339 today), no value
+renders blank, each declares its own `_meta.locale`/name/flag. Four locale gates
+already existed and **none compared two catalogues**: the translations audit
+walks the code and checks each key exists in `en.json` alone, the order gate
+matches the file set against `locale_order.json`, the names gate checks every
+ordered locale is named. So "a key added to `en.json` exists in all 21" was held
+by discipline, not by a gate — and the fallback chain hides a breach, since a key
+missing from `de.json` renders the English string with nothing logged. A
+placeholder-parity rule was measured and **rejected**: it fires on correct work
+(Czech drops the `%s` that only pluralises an English noun; `{pct}% du focus`
+reads as a `% d` conversion to a regex and is a literal percent sign). Lua's
+`string.format` tolerates surplus arguments, so there is no defect to gate. ·
 `_shared/tests/corpus/logger/behaviour_vectors.json` ·
 `_shared/tests/conformance/manifest.json` + runner · boot-manifest parity gates ·
 "no hand-written duplicate of shared logic".
