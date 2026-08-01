@@ -2908,3 +2908,42 @@ repo as CRLF rather than being normalised on the way in.
   fresh clone because `.gitattributes` pins those extensions.
 
 Related: [[feedback-ahk-source-encoding]].
+
+
+
+
+### project-corpus-harness-must-model-the-matching-rule
+
+Adding a corpus vector that exercises a **new branch** of the hotstring matcher
+broke a consistency assumption in the driver harnesses twice on 2026-08-01, in
+the same shape both times:
+
+- **The buffer cap.** Windows asserted "a non-matched buffer must not end with
+  its trigger". At the 256-codepoint cap the buffer *does* end with the trigger
+  and the engine cannot see it, because the window is shorter than the trigger.
+- **Case folding.** All **three** harnesses asserted that a matched vector's
+  buffer ends with its trigger *exactly*. In the default (case-insensitive)
+  mode, `"BTW"` ending a buffer for trigger `"btw"` is the fold working.
+
+Both assumptions were true of every vector that existed when they were written,
+and both were statements about the corpus rather than about the matcher.
+
+**Why:** a harness that checks corpus consistency has to model the matching
+rule. Assuming the strictest form passes for years and then rejects the first
+vector that exercises a legitimate branch — and the natural reaction is to
+"fix" the new vector, which deletes the coverage that just proved the harness
+wrong.
+
+**How to apply:**
+
+- When a new vector fails a *consistency* check rather than the replay, ask
+  first whether the check models the rule. Both times here the vector was right.
+- Compare the way the vector declares itself: exact for `is_case_sensitive`,
+  folded otherwise; skip length checks when the trigger cannot fit the window.
+- Read the exemptions already present. Both harnesses already skipped
+  `is_word` vectors for exactly this reason — the enumeration was incomplete,
+  not wrong in principle.
+- Measure the branch against the real engine before writing the vector, so a
+  failure is known to be the harness rather than a guessed expectation.
+
+Related: [[feedback-regression-tests]].
