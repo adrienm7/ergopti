@@ -1219,10 +1219,24 @@ produced a permanent red for the wrong reason. It takes a fixture name; all
 stops handling one — a fixture silently removed is coverage silently lost. It
 skips loudly, rather than passing, on machines without AutoHotkey. 20 test files are named after a date or a plan phase (~2 900 lines).
 
-- **Lot 10 — pruning.** Port the macOS reachability gate to Windows and Linux, then
-  delete the **3 101 lines of dead adapter code** (12 of 21 Windows adapters and 11
-  of 21 Linux ones have no production caller; the 11 Linux files come from a single
-  commit written to green a presence gate). Each deletion carries the measured
+- **Lot 10 — pruning.** ~~Port the macOS reachability gate to Windows and Linux~~
+  — **done** (`test-adapter-reachability.cjs`), and it corrected the figure this lot
+  was sized on. Re-measured: **macOS 24 adapters / 0 unreferenced, Windows 21 / 0,
+  Linux 23 / 9 (1 549 lines)**. The record said 12 of 21 on Windows and 11 of 21 on
+  Linux, i.e. ~3 101 lines; the real total is **half that and confined to one
+  driver**. The earlier count almost certainly matched the adapter's NAME rather
+  than its module path — "clipboard" appears in three Linux production files and
+  every one is prose, a comment about the clipboard injection mode, while nothing
+  requires `adapters.clipboard`. Searching for a word finds discussion; searching
+  for the require finds wiring.
+  **The nine are NOT deleted, and that is a decision waiting rather than an
+  oversight.** Two of them (`notifier`, `tooltip_renderer`) are named by
+  `test_port_adapter_presence.lua`, which asserts every declared port has an
+  adapter file — so they exist because the architecture declares the port, not by
+  accident. Removing them means shrinking `contracts.json` to the ports with real
+  traffic and superseding ADR-001, which is a call about the hexagonal boundary.
+  The count is frozen at 9 so it cannot grow while that call is pending.
+   Each deletion carries the measured
   zero-consumer proof in the commit body. Shrink `contracts.json` to the ports with
   real traffic and supersede ADR-001 with the measured reality; honest demotion
   candidates: `AppLauncher`, `Crypto`, `Storage`, `ProcessLifecycle`,
