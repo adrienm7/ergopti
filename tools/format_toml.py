@@ -443,7 +443,11 @@ def sort_hotstring_file(path: Path, check: bool = False) -> bool:
         return changed
 
     if changed:
-        path.write_text(formatted, encoding="utf-8")
+        # The explicit newline is not optional: on Windows the default
+        # translates every line feed to CRLF, and this repo is LF-only. The
+        # hotstrings hook had been calling a moved path for long enough that
+        # its first working run rewrote _index.toml entirely in CRLF.
+        path.write_text(formatted, encoding="utf-8", newline="\n")
         print(f"  formatted  {rel}")
     else:
         print(f"  ok         {rel}")
@@ -514,7 +518,7 @@ def format_mode():
         print("\n" + "=" * 70)
         print("Preview mode: no changes written to disk")
     else:
-        with open(toml_path, "w", encoding="utf-8") as f:
+        with open(toml_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(formatted_content)
         print(f"✓ Formatted: {toml_path}")
 
