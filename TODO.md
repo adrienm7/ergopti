@@ -1136,7 +1136,19 @@ driver, so keying them by driver name was this backlog's own root cause and left
 no name a second Lua driver could use. A false docstring was corrected too —
 `test_shared_logger.lua` claimed to exercise the corpus while never opening the
 file. ·
-`_shared/tests/conformance/manifest.json` + runner · boot-manifest parity gates ·
+~~`_shared/tests/conformance/manifest.json` + runner~~ **done** — the nine
+skipped cases across the three suites are now seven ledger rows, each naming a
+status that carries the distinction the prose lost: **5 `platform_gap`** (all
+Linux — tap-hold, LLM parser, prompt builder, locale cascade, tooltip layout),
+**1 `by_design`** (hotstring collision resolution, which the shared engine
+delegates to its caller), **1 `environment`** (`stat(1)` for mtime detection —
+skips on one host, runs on another including CI). Each site names its row
+inline, so the link is exact. `test-conformance-skips-declared.cjs` fails on a
+skip with no row, a row nothing references (a stale excuse claims coverage is
+missing when it may have been restored), a `platform_gap` with nothing tracking
+the work, and a row missing its reason. It does **not** try to verify a reason is
+still true — that is a statement about the product, not something a regex can
+check. · boot-manifest parity gates ·
 "no hand-written duplicate of shared logic".
 
 ### 0.7 Gates to extend (each hole measured)
