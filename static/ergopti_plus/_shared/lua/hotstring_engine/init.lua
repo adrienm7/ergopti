@@ -222,7 +222,17 @@ function M.new()
 				-- the field — "ya" must not fire in the middle of "yaourt".
 				auto_expand  = source.auto_expand == true,
 				final_result = source.final_result == true,
+				-- Collision priority, already through the cascade by the time it gets
+				-- here (the loader owns the source tier, because only it knows which
+				-- file an entry came from). Absent means "the caller has no opinion",
+				-- and every such entry scores the same, so relative order is unchanged.
+				priority     = tonumber(source.priority) or 0,
 				group        = source.group or "",
+				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
+				-- stable, so two entries equal on every other key came out in an order
+				-- that depended on the sort's internals — a collision could elect a
+				-- different winner between two runs of the same corpus.
+				seq          = registered + 1,
 			}
 			registered = registered + 1
 		end
@@ -290,9 +300,16 @@ function M.new()
 			end
 		end
 
-		-- Sort each bucket longest-first to guarantee longest-match semantics.
+		-- Sort each bucket longest-first, then by collision priority, then by
+		-- registration order. Same key order as the macOS registry and the
+		-- AutoHotkey engine: LENGTH is primary, so a longer trigger beats a
+		-- higher-priority shorter one — priority only arbitrates a genuine tie.
 		for _, bucket in pairs(_buckets) do
-			table.sort(bucket, function(a, b) return a.tlen > b.tlen end)
+			table.sort(bucket, function(a, b)
+				if a.tlen ~= b.tlen then return a.tlen > b.tlen end
+				if a.priority ~= b.priority then return a.priority > b.priority end
+				return a.seq < b.seq
+			end)
 		end
 		local bucket_count = 0
 		for _ in pairs(_buckets) do bucket_count = bucket_count + 1 end

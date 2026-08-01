@@ -585,6 +585,33 @@
 			}
 		},
 		{
+			"id": "personal_tier_order_independent",
+			"description": "The personal tier wins even when the common entry is registered FIRST. personal_tier_beats_common_tier registers them the other way round, so a driver that resolved collisions by registration order alone would pass it — and did. Both orders are needed for the tier itself to be load-bearing.",
+			"mappings": [
+				{
+					"auto_expand": true,
+					"trigger": "abc",
+					"replacement": "COMMON",
+					"priority": 10,
+					"group": "common",
+					"is_case_sensitive": true
+				},
+				{
+					"auto_expand": true,
+					"trigger": "abc",
+					"replacement": "PERSONAL",
+					"priority": 50,
+					"group": "personal",
+					"is_case_sensitive": true
+				}
+			],
+			"buffer": "abc",
+			"expected": {
+				"matched": true,
+				"winner": "PERSONAL"
+			}
+		},
+		{
 			"id": "no_match_when_buffer_ends_outside_any_trigger",
 			"description": "When the buffer does not end with any registered trigger, nothing fires even though competing mappings exist.",
 			"mappings": [

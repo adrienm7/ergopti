@@ -30,8 +30,44 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Reader = require("toml_codec.reader")
+local Priority = require("hotstring_priority")
+local Paths  = require("infra.paths")
 
 local LOG = "modules.hotstrings.loader"
+
+--- Canonical collision tiers, read once from the shared JSON. Kept as a lazily
+--- resolved local rather than a require-time read so a driver that never loads a
+--- hotstring never touches the filesystem for it.
+local _tiers = nil
+
+--- Loads _shared/modules/hotstrings/priority.json, falling back to the module's
+--- own defaults. A missing file is logged, never silently absorbed: the tiers
+--- decide which of two colliding hotstrings the user actually gets.
+--- @return table The tier table.
+local function tiers()
+	if _tiers then return _tiers end
+	_tiers = Priority.DEFAULT_TIERS
+	local ok, result = pcall(function()
+		local path = Paths.shared("modules/hotstrings/priority.json")
+		local fh   = io.open(path, "r")
+		if not fh then return nil end
+		local raw = fh:read("*a")
+		fh:close()
+		return require("json").decode(raw)
+	end)
+	if not ok or type(result) ~= "table" then
+		Logger.warn(LOG, "priority.json unreadable — keeping the default tiers (%s).", tostring(result))
+		return _tiers
+	end
+	local merged = {}
+	for key, fallback in pairs(Priority.DEFAULT_TIERS) do
+		merged[key] = type(result[key]) == "number" and result[key] or fallback
+	end
+	_tiers = merged
+	Logger.debug(LOG, "Priority tiers: common=%d, package=%d, personal=%d.",
+		merged.common, merged.package, merged.personal)
+	return _tiers
+end
 
 
 -- =========================================
@@ -66,6 +102,11 @@ function M.load(paths)
 		else
 			-- Derive the group name from the parent directory.
 			local group = path:match("[/\\]([^/\\]+)[/\\][^/\\]+%.toml$") or "unknown"
+			-- File-level priority override, the third rung of the cascade.
+			local file_priority = type(data.meta) == "table" and type(data.meta.priority) == "number"
+				and data.meta.priority or nil
+			local section_priorities = (type(data.meta) == "table"
+				and type(data.meta.section_priorities) == "table") and data.meta.section_priorities or {}
 
 			for _, sec_name in ipairs(data.sections_order or {}) do
 				local section = data.sections[sec_name]
@@ -86,6 +127,14 @@ function M.load(paths)
 								auto_expand       = entry.auto_expand       or false,
 								final_result      = entry.final_result      or false,
 								is_case_sensitive_strict = entry.is_case_sensitive_strict or false,
+								-- Resolved here rather than in the engine because only the
+								-- loader knows which file and section an entry came from,
+								-- which is what the lower rungs of the cascade are. An
+								-- unresolved priority defaults to 0 in the engine, and 0
+								-- would let a deliberately low individual priority beat an
+								-- undeclared personal hotstring.
+								priority          = Priority.resolve(
+									entry.priority, section_priorities[sec_name], file_priority, group, tiers()),
 								group             = group,
 							}
 						end
