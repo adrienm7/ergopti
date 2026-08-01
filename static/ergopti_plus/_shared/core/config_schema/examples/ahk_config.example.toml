@@ -1,4 +1,4 @@
-# config_schema/examples/ahk_config.example.toml
+# _shared/core/config_schema/examples/ahk_config.example.toml
 # Example AHK v2 configuration — target schema after the Scope C refactor.
 # Generated at first boot by the AHK driver from _shared/modules/features/manifest.toml.
 # The user edits this file freely; any unknown key triggers a warn at boot
