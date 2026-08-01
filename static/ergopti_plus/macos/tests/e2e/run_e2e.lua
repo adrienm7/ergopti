@@ -84,6 +84,10 @@ local helpers = require("tests.helpers")
 
 local pass_count = 0
 local fail_count = 0
+-- Vectors the corpus itself declares driver-specific. Counted and printed rather
+-- than passed over quietly: a skip nobody sees is indistinguishable from
+-- coverage.
+local skip_count = 0
 
 --- Asserts equality and records pass/fail.
 --- @param label string Human-readable name for the assertion.
@@ -144,7 +148,9 @@ end
 ---   backspaces()               — returns the number of synthetic backspaces issued
 --- @param trigger string The hotstring trigger to register.
 --- @param replacement string The expansion text.
---- @param opts table Optional flags: is_word, is_case_sensitive.
+--- @param opts table Per-entry flags exactly as the shared corpus declares them
+---   (is_word, auto_expand, is_case_sensitive, is_case_sensitive_strict,
+---   final_result).
 --- @return table Virtual keyboard context.
 local function make_vkb(trigger, replacement, opts)
 	opts = opts or {}
@@ -225,11 +231,15 @@ local function make_vkb(trigger, replacement, opts)
 		current_group              = "e2e",
 		start_is_word_boundary     = true,
 	})
-	Registry.add(trigger, replacement, {
-		is_word           = opts.is_word           == true,
-		is_case_sensitive = opts.is_case_sensitive == true,
-		group             = "e2e",
-	})
+	-- Every per-entry flag, driven off a list. Naming a subset is how this harness
+	-- came to register `is_case_sensitive_strict` vectors as ordinary ones and then
+	-- report that macOS matched a casing the vector says it must not.
+	local add_opts = { group = "e2e" }
+	for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive",
+		"is_case_sensitive_strict", "final_result" }) do
+		add_opts[flag] = opts[flag] == true
+	end
+	Registry.add(trigger, replacement, add_opts)
 	Registry.sort_mappings()
 
 	-- Stub LLMBridge — Expander.init requires it but we never call LLM paths.
@@ -415,10 +425,17 @@ end
 --- @param v table A vector from vectors.json.
 local function run_corpus_vector(v)
 	local prefix = string.format("e2e[%s]", v.id)
-	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, {
-		is_word           = v.is_word,
-		is_case_sensitive = v.is_case_sensitive,
-	})
+	-- A vector may declare that its outcome hangs on a constant the drivers
+	-- deliberately do not share — today the rolling-buffer cap, 500 codepoints here
+	-- against the shared Lua engine's 256. Replaying it would pin the other
+	-- driver's number to this one.
+	if v.driver_specific ~= nil then
+		skip_count = skip_count + 1
+		print(string.format("  SKIP  %s  (driver-specific: %s)", prefix, tostring(v.driver_specific)))
+		return
+	end
+	-- The vector itself IS the flag set.
+	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, v)
 
 	if not ok_vkb then
 		-- If the expander module is unavailable (e.g. missing dependency on this
@@ -430,7 +447,27 @@ local function run_corpus_vector(v)
 
 	local vkb        = vkb_or_err
 	local terminator = v.terminator or " "
-	vkb.inject(v.buffer, terminator)
+	-- inject(text, last_char) means "the buffer already holds `text`, the user now
+	-- types `last_char`". An auto_expand trigger fires on its OWN last character,
+	-- so the keystroke to simulate is the last character of the buffer — not the
+	-- terminator, which arrives afterwards and cannot complete the trigger. Driving
+	-- every vector with the terminator sent every one of them down the end-char
+	-- path, so the auto path was replayed by nothing here and a conform entry (auto
+	-- by construction) could not fire at all.
+	--
+	-- A vector that declares terminator_consumed is describing the END-CHAR path
+	-- whatever its auto_expand says: consumption is what that path does with the
+	-- terminator, and there is no terminator to consume on the auto path.
+	if v.auto_expand == true and v.terminator_consumed == nil then
+		local ok_off, off = pcall(utf8.offset, v.buffer, -1)
+		if ok_off and off then
+			vkb.inject(v.buffer:sub(1, off - 1), v.buffer:sub(off))
+		else
+			vkb.inject(v.buffer, terminator)
+		end
+	else
+		vkb.inject(v.buffer, terminator)
+	end
 
 	if v.expected.matched then
 		assert_eq(
@@ -510,8 +547,11 @@ local function run_hardcoded_scenarios()
 	end
 
 
-	-- Scenario 5: case-sensitive trigger does not match wrong case.
-	local ok5, vkb5 = pcall(make_vkb, "BTW", "by the way", { is_case_sensitive = true })
+	-- Scenario 5: a STRICT trigger does not match a different case. is_case_sensitive
+	-- alone would not be enough — on its own it selects literal registration and the
+	-- comparison still folds.
+	local ok5, vkb5 = pcall(make_vkb, "BTW", "by the way",
+		{ is_case_sensitive = true, is_case_sensitive_strict = true, auto_expand = true })
 	if ok5 then
 		vkb5.inject("btw", " ")
 		assert_eq("scenario5 — case-sensitive no match on wrong case", "", vkb5.emitted())
@@ -552,6 +592,9 @@ end
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
 print(string.format("# pass %d / %d", pass_count, total))
+if skip_count > 0 then
+	print(string.format("# skip %d driver-specific vector(s)", skip_count))
+end
 if fail_count > 0 then
 	print(string.format("# FAIL %d test(s) failed.", fail_count))
 	os.exit(1)

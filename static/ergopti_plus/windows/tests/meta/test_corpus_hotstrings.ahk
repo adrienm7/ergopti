@@ -137,9 +137,9 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 		; mode folds case, so its buffer legitimately differs — "BTW" matching
 		; "btw" is the fold working, not a malformed vector. Asserting the
 		; sensitive form for both held only while no vector exercised the fold.
-		if (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
+		if (Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true) {
 			AssertEqual(Trigger, BufTail,
-				"vector '" . Vec["id"] . "': case-sensitive vector's buffer must end with the trigger exactly")
+				"vector '" . Vec["id"] . "': strict vector's buffer must end with the trigger exactly")
 		} else {
 			; "=" is AHK's case-insensitive comparison.
 			AssertTrue(BufTail = Trigger,
@@ -271,11 +271,15 @@ _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches corpus", _CorpusHS_Utf8BackspaceCountUsesCodepoints)
 
 _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
-	; Validates that case_sensitive=true vectors correctly reflect whether the
-	; buffer casing matches the trigger casing.
+	; Validates that strict vectors correctly reflect whether the buffer casing
+	; matches the trigger casing.
 	Corpus := _CorpusHS_Parse()
 	for Vec in Corpus["vectors"] {
-		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
+		; STRICT is the flag that makes the comparison exact. is_case_sensitive on its
+		; own selects literal registration and still folds, so gating this check on it
+		; asserted an exact match for a vector that legitimately matches "Adn"
+		; against "adn".
+		if not (Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true) {
 			continue
 		}
 		Expected := Vec["expected"]
@@ -393,18 +397,28 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 		Id := Vec.Has("id") ? Vec["id"] : "?"
 		HSE_TestReset()
 
-		; Build flags: star trigger fires on the last trigger char.
-		; ? flag allows in-word matching; C flag requires exact case.
-		IsWord  := Vec.Has("is_word")  ? Vec["is_word"]  : true
-		IsCS    := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
-		Flags   := "*"
+		; Build the flags EXACTLY as the TOML loader does, then hand them to the
+		; single source of truth for the flag -> registrar mapping. This used to map
+		; is_case_sensitive straight onto the "C" flag and register one bare spec,
+		; which is a THIRD model of case handling: the real loader routes
+		; is_case_sensitive to CreateHotstring (literal, no family) and only
+		; is_case_sensitive_strict to "C". The harness therefore validated its own
+		; reading rather than the driver's, and agreed with the Lua drivers'
+		; misreading of the same flag.
+		IsWord   := Vec.Has("is_word")  ? Vec["is_word"]  : true
+		IsAuto   := Vec.Has("auto_expand") and Vec["auto_expand"] = true
+		IsCS     := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
+		IsStrict := Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true
+		Repl     := Vec.Has("replacement") ? Vec["replacement"] : ""
+		Flags    := ""
+		if IsAuto
+			Flags .= "*"
 		if not IsWord
 			Flags .= "?"
-		if IsCS
+		if IsStrict
 			Flags .= "C"
 
-		HSE_Register(Flags, Vec["trigger"], () => 0,
-			Map("Repl", Vec.Has("replacement") ? Vec["replacement"] : ""))
+		HSE_RegisterFromTomlFlags(IsCS, Flags, Vec["trigger"], Repl, Map("Category", "corpus"))
 		HSE_FeedReset(true)
 
 		; Read the buffer and feed characters one at a time.
@@ -419,6 +433,26 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 		Expected := Vec["expected"]
 		ExpMatch := Expected.Has("matched") and Expected["matched"] = true
 
+		; A conform spec decides at FIRE time whether the typed casing corresponds to
+		; a variant that would have been registered; a mixed casing corresponds to
+		; none and the hotstring must not fire. HSE_FindMatchAtEnd still returns the
+		; spec — the verdict belongs to HSE_DispatchMatch — so a replay that stops at
+		; the match reports a fire that never happens.
+		ActualRepl := ""
+		if Match != "" {
+			ActualRepl := Match.Replacement
+			if (Match.HasOwnProp("CaseConform") and Match.CaseConform) {
+				DoFire := true
+				ActualRepl := _HSE_ConformReplacement(Match.Replacement,
+					SubStr(HSE_Buffer, -Match.Length), Match.Trigger,
+					(Match.HasOwnProp("ConformOneChar") and Match.ConformOneChar), &DoFire)
+				if not DoFire {
+					Match      := ""
+					ActualRepl := ""
+				}
+			}
+		}
+
 		; 1. Verify matched vs not-matched.
 		if ExpMatch {
 			if Match = "" {
@@ -426,18 +460,27 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 				FileAppend("  FAIL '" . Id . "': expected match, got none`n", "*")
 				continue
 			}
-			; 2. Verify trigger identity.
-			if Match.Trigger != Vec["trigger"] {
+			; 2. Verify trigger identity. A vector that does not opt into strict
+			; matching is registered as a cased FAMILY, so the winning spec's trigger
+			; is the lower / Title / UPPER variant that matched, not the spelling in
+			; the corpus. "!=" is AutoHotkey's case-insensitive comparison and "!=="
+			; the case-sensitive one, which is exactly the distinction wanted here.
+			TriggerOk := IsStrict ? (Match.Trigger == Vec["trigger"]) : (Match.Trigger = Vec["trigger"])
+			if not TriggerOk {
 				Failures += 1
 				FileAppend("  FAIL '" . Id . "': trigger mismatch '"
 					. Match.Trigger . "' vs '" . Vec["trigger"] . "'`n", "*")
 				continue
 			}
-			; 3. Verify replacement text.
-			if Vec.Has("replacement") and Match.Repl != Vec["replacement"] {
+			; 3. Verify the replacement TEXT the driver would emit — conformance
+			; already applied above. Reading Spec.Replacement raw reports "by the way"
+			; for a buffer of "BTW", which is precisely what the case vectors exist to
+			; catch.
+			if Vec.Has("replacement") and Expected.Has("replacement")
+				and ActualRepl !== Expected["replacement"] {
 				Failures += 1
 				FileAppend("  FAIL '" . Id . "': replacement mismatch '"
-					. Match.Repl . "' vs expected '" . Vec["replacement"] . "'`n", "*")
+					. ActualRepl . "' vs expected '" . Expected["replacement"] . "'`n", "*")
 				continue
 			}
 			; 4. Verify backspace count.

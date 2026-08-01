@@ -225,7 +225,12 @@ local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_i
 	-- Treat malformed UTF-8 the same as an absent left-hand char: no block
 	if not ok_utf8 then prev_off = nil end
 	local prev_char = prev_off and before:sub(prev_off) or ""
-	return text_utils.is_letter_char(prev_char) or prev_char == "@"
+	-- Shared with the Linux engine so the two cannot disagree about which
+	-- characters open a word. The previous local rule — is_letter_char plus "@" —
+	-- let "_" and every non-ASCII codepoint open one here and nowhere else, so a
+	-- word-boundary trigger typed straight after the magic key fired on macOS and
+	-- was blocked on Windows and Linux.
+	return text_utils.is_hotstring_word_char(prev_char)
 end
 
 --- Chooses the right emitter for a mapping's replacement: plain_text uses
@@ -295,6 +300,12 @@ function M.would_fire(m, buffer)
 		-- which no variant was ever registered: the hotstring must NOT fire.
 		if conformed == nil then return nil end
 		eff_repl, eff_plain = conformed, conformed
+	elseif m.case_fold then
+		-- Literal registration, folding comparison: any casing fires and the
+		-- replacement is emitted exactly as registered. Conforming it here would
+		-- turn "ADN" into "Adn" for a user who capitalised the trigger.
+		if text_utils.trig_lower(typed) ~= m.trigger_folded then return nil end
+		eff_repl, eff_plain = m.repl, m.plain_repl
 	else
 		if typed ~= trigger then return nil end
 		eff_repl, eff_plain = m.repl, m.plain_repl
@@ -452,7 +463,20 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	local effective_chars_bytes = chars_bytes + extra_bs_bytes
 	if #buf < tb + effective_chars_bytes then return false end
 	local buf_start   = #buf - effective_chars_bytes - tb + 1
-	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
+	-- The trigger exactly as it sits on screen. Kept, rather than compared and
+	-- discarded, because a case_fold entry's registered trigger is the LOWERCASE
+	-- canonical while the screen may hold any casing — and the common-prefix
+	-- optimisation below decides how many characters to erase from the screen.
+	local typed_trigger = buf:sub(buf_start, buf_start + tb - 1)
+	if m.case_fold then
+		-- Non-auto entries reach this path, and 592 of the shared ones are
+		-- case_fold: `"adn" = { output = "ADN", auto_expand = false }` fires on a
+		-- terminator, so folding only in try_auto_expand would have left the
+		-- majority of them still matching exactly.
+		if text_utils.trig_lower(typed_trigger) ~= m.trigger_folded then return false end
+	elseif typed_trigger ~= trigger then
+		return false
+	end
 	-- Precomputed trigger length; avoids a hot-path utf8.len call.
 	local trig_len    = m.tlen
 
@@ -467,7 +491,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	-- pass-through so the terminating character is NOT consumed. It must
 	-- stay on screen — returning true would suppress it with nothing
 	-- injected (the dropped-terminator-chars bug).
-	if m.plain_repl == trigger then
+	-- Compared against what is on screen rather than against the registered
+	-- canonical: for a case_fold entry those differ, and "adn" -> "ADN" is a real
+	-- expansion when the user typed "adn" but a no-op when they typed "ADN".
+	if m.plain_repl == typed_trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 		return false
@@ -494,8 +521,12 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		local replay_spec      = nil
 
 		if repl_text == m.repl then
-			-- Simple text: keep common prefix to reduce backspaces.
-			local common = text_utils.get_common_prefix_utf8(trigger, repl_text)
+			-- Simple text: keep common prefix to reduce backspaces. Compared against
+			-- the trigger AS TYPED, not the registered canonical, so the characters
+			-- left on screen are the ones actually there — they differ for a
+			-- case_fold entry, and keeping a "matching" prefix that is cased
+			-- differently would leave the user's capital in front of the expansion.
+			local common = text_utils.get_common_prefix_utf8(typed_trigger, repl_text)
 			deletes = trig_len - common
 			to_type = text_utils.utf8_sub(repl_text, common + 1)
 		end

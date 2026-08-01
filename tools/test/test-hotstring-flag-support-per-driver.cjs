@@ -8,31 +8,28 @@
  * every flag. This gate records which, so a flag that exists in the data but in
  * only one engine is a documented divergence rather than a surprise.
  *
- * WHAT WAS MEASURED:
- * `is_case_sensitive_strict` is declared on **1 302 entries** of the SHARED
- * corpus — 1 300 of them in magickey.toml, plus one each in autocorrection.toml
- * and rolls.toml — and implemented in **Windows only**:
- * three production files parse it and turn it into AutoHotkey's `C` hotstring
- * flag. macOS and Linux read the same files and have **zero** references to it.
+ * WHAT THIS RECORDS TODAY:
+ * every flag in the shared corpus is honoured by all three drivers. The record
+ * is kept because getting here took four rounds of a single failure mode — a
+ * flag that is declared in the data, forwarded by the loaders, and read by
+ * nobody that matters — and each round was invisible until something counted.
  *
- * The consequence is behavioural, not cosmetic. `"OUi" = { output = "Oui", …,
- * is_case_sensitive_strict = true }` exists so that typing `oui` does NOT
- * autocorrect — only the exact miscapitalisation `OUi` should. On Windows that
- * holds. On macOS and Linux the flag is ignored, so the entry matches
- * case-insensitively and the autocorrection fires on input it was explicitly
- * written not to fire on.
- *
- * WHY THIS IS A GATE AND NOT A FIX:
- * Implementing the flag means changing the matching path of both engines, and
- * the shared corpus has no vectors for it — the backlog lists exactly that as
- * the precondition, and its figure of 1 302 is exact. Changing case-matching
- * semantics on faith, in the code with the worst bug history in the repo, is how
- * silent regressions get shipped. Recording the divergence is what makes the fix
- * safe to attempt later.
+ * `is_case_sensitive_strict` is declared on **1 302 entries** (1 300 in
+ * magickey.toml, one each in autocorrection.toml and rolls.toml). It reached the
+ * two Lua engines only after the shared TOML reader stopped dropping it: the
+ * reader returns a FIXED field set rather than the parsed keys, so the flag was
+ * read as false for every one of them while three layers above it looked
+ * correct.
  *
  * The gate fails in BOTH directions: a flag gaining an implementation is good
  * news that should update this record, and a flag appearing in shared data with
  * no implementation anywhere is a new silent divergence.
+ *
+ * WHAT IT DELIBERATELY DOES NOT MEASURE: whether the drivers AGREE about what a
+ * flag means. They did not — `is_case_sensitive` was read as "compare exactly"
+ * on the Lua side and as "register literally" on Windows — and no amount of
+ * counting references would have shown it. That is the shared corpus's job, and
+ * the case vectors in _shared/tests/corpus/hotstrings/vectors.json now pin it.
  * ==============================================================================
  */
 
@@ -124,15 +121,19 @@ const FLAGS = [
 	},
 	{
 		flag: 'is_case_sensitive_strict',
-		drivers: ['windows', 'linux'],
+		drivers: ['windows', 'macos', 'linux'],
 		note:
-			'Windows turns it into AHK\'s "C" flag; the shared engine now requires an exact-case match ' +
-			'for it, which covers Linux. Ordinary triggers are registered by Windows in three case ' +
-			'variants (lower / Title / UPPER, each output cased to match) — that is its case ' +
-			'conformance — and this flag opts out so only the casing written in the TOML fires. 1 300 ' +
-			'magickey entries depend on it: "OUi" -> "Oui" exists so that typing "oui" does NOT ' +
-			'autocorrect, and a case-folding matcher does the exact thing the entry prevents. macOS ' +
-			'still ignores it — its registry has its own case handling and is the remaining gap.'
+			'CONVERGED, and the convergence changed what the OTHER flag means everywhere. The two are ' +
+			'orthogonal: `is_case_sensitive` selects the REGISTRATION shape (register the trigger ' +
+			'literally, generate no lower/Title/UPPER family) and `is_case_sensitive_strict` selects ' +
+			'the COMPARISON (no case folding). Windows had this right — its loader maps the first flag ' +
+			'to a registrar and the second to AutoHotkey\'s "C" — while macOS and Linux read the first ' +
+			'as "compare exactly", which is what its name invites. 592 shared entries have ' +
+			'is_case_sensitive WITHOUT strict, all acronym autocorrections of the shape ' +
+			'"adn" -> "ADN": the literal registration exists so the family cannot generate ' +
+			'"Adn" -> "Adn", and folding is what lets a capitalised "Adn" correct at all. On the two ' +
+			'Lua drivers it silently did not. 1 302 entries declare strict, and until the TOML reader ' +
+			'was fixed to carry the field, NEITHER Lua driver ever saw it as anything but false.'
 	}
 ];
 
@@ -177,6 +178,7 @@ if (errors.length > 0) {
 
 const strict = declaredCount('is_case_sensitive_strict');
 console.log(
-	`\x1b[32m[OK] hotstring flag support matches the record — including is_case_sensitive_strict, ` +
-		`declared on ${strict} shared entr(ies) and honoured by Windows only.\x1b[0m`
+	`\x1b[32m[OK] hotstring flag support matches the record — every recorded flag, including ` +
+		`is_case_sensitive_strict (declared on ${strict} shared entr(ies)), is honoured by all three ` +
+		`drivers.\x1b[0m`
 );

@@ -421,6 +421,31 @@ function M.is_letter_char(c)
 	return string.upper(c) ~= string.lower(c)
 end
 
+--- Word character, for the hotstring word-boundary rule ONLY.
+---
+--- An `is_word` trigger fires only when the character in front of it is not one
+--- of these. Shared because the three drivers had three different answers and
+--- nothing compared them: this engine treated every non-ASCII codepoint as a word
+--- character, macOS asked is_letter_char (so "★" and "_" opened a word there but
+--- nowhere else), and AutoHotkey tests membership of the word-terminator set.
+--- Only the macOS/Linux pair can share an implementation; the AHK side is pinned
+--- by the shared corpus instead.
+---
+--- @param ch string A single UTF-8 character.
+--- @return boolean True when `ch` is part of a word.
+function M.is_hotstring_word_char(ch)
+	if type(ch) ~= "string" or ch == "" then return false end
+	-- Every non-ASCII codepoint counts, deliberately: accented letters must behave
+	-- like letters and there is no Unicode category table here. The magic key
+	-- inherits it, which is why a word-boundary trigger typed straight after ★ does
+	-- not fire — surprising, but the alternative treats "é" as punctuation.
+	if ch:byte(1) > 127 then return true end
+	-- "@" is not a letter and opens no word either: what follows it is the rest of
+	-- an address or a handle, never a new word.
+	if ch == "@" then return true end
+	return ch:match("^[%w_]$") ~= nil
+end
+
 --- Safely converts a trigger string to lowercase.
 --- @param s string The string to convert.
 --- @return string The lowercase string.

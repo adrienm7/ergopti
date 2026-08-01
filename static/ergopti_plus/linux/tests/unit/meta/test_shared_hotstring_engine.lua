@@ -176,24 +176,103 @@ helpers.describe("shared hotstring engine — case sensitivity", function()
 		helpers.assert_true(result ~= nil, "uppercase input should match lowercase trigger")
 	end)
 
-	helpers.it("is_case_sensitive rejects wrong case", function()
+	--- Types `text` into a fresh engine holding exactly `mapping`.
+	--- @param mapping table One mapping table.
+	--- @param text string The characters to type, one codepoint per byte-safe char.
+	--- @return table|nil The last on_char result.
+	local function type_into(mapping, text)
 		local e = engine_mod.new()
-		e:load_mappings({ { auto_expand = true, trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
+		e:load_mappings({ mapping })
 		local result
-		for _, ch in ipairs({"b", "t", "w"}) do
+		for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 			result = e:on_char(ch)
 		end
-		helpers.assert_true(result == nil, "lowercase should not match case-sensitive uppercase trigger")
+		return result
+	end
+
+	-- The two schema flags are orthogonal, and reading them as one thing is the
+	-- bug these three tests exist to prevent. `is_case_sensitive` selects the
+	-- REGISTRATION shape (literal, no cased family); `is_case_sensitive_strict`
+	-- selects the COMPARISON (no folding). Only the second rejects a wrong case.
+
+	helpers.it("is_case_sensitive_strict rejects wrong case", function()
+		local r = type_into({ auto_expand = true, trigger = "BTW", replacement = "by the way",
+			is_case_sensitive = true, is_case_sensitive_strict = true }, "btw")
+		helpers.assert_true(r == nil, "strict must reject a casing other than the one written")
 	end)
 
-	helpers.it("is_case_sensitive accepts correct case", function()
+	helpers.it("is_case_sensitive_strict accepts the exact case", function()
+		local r = type_into({ auto_expand = true, trigger = "BTW", replacement = "by the way",
+			is_case_sensitive = true, is_case_sensitive_strict = true }, "BTW")
+		helpers.assert_true(r ~= nil and r.replacement == "by the way", "exact case must match")
+	end)
+
+	helpers.it("is_case_sensitive without strict still folds, and emits verbatim", function()
+		-- The 592-entry shape: `"adn" = { output = "ADN", is_case_sensitive = true }`.
+		-- The literal registration exists so the cased family does not generate
+		-- "Adn" → "Adn"; the entry still has to fire whatever casing was typed, and
+		-- its output is emitted exactly as written. Folding this flag into "compare
+		-- exactly" made typing "Adn" do nothing at all.
+		local r = type_into({ auto_expand = true, trigger = "adn", replacement = "ADN",
+			is_case_sensitive = true }, "Adn")
+		helpers.assert_true(r ~= nil, "a literal-registered entry must still fold case when matching")
+		helpers.assert_eq("ADN", r.replacement,
+			"a literal-registered entry emits its replacement verbatim — never conformed")
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 6/ Case Conformance =============
+-- =========================================
+-- =========================================
+
+-- An entry that declares neither case flag gets the cased family: lower, Title
+-- and UPPER all fire and the replacement takes the casing that was typed. That
+-- is what Windows registers through CreateCaseSensitiveHotstrings and what macOS
+-- calls its conform fast path. Linux emitted the stored lowercase for all three,
+-- so typing "ABIM " corrected to "abîm" instead of "ABÎM" on 1 100 entries.
+
+helpers.describe("shared hotstring engine — case conformance", function()
+	local function conform_result(text)
 		local e = engine_mod.new()
-		e:load_mappings({ { auto_expand = true, trigger = "BTW", replacement = "by the way", is_case_sensitive = true } })
-		local result
-		for _, ch in ipairs({"B", "T", "W"}) do
-			result = e:on_char(ch)
+		e:load_mappings({ { auto_expand = true, trigger = "abim", replacement = "abîm" } })
+		local r
+		for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			r = e:on_char(ch)
 		end
-		helpers.assert_true(result ~= nil, "exact case should match")
+		return r
+	end
+
+	helpers.it("lowercase input yields the replacement as stored", function()
+		local r = conform_result("abim")
+		helpers.assert_true(r ~= nil, "the lowercase form must fire")
+		helpers.assert_eq("abîm", r.replacement, "lowercase input must not be re-cased")
+	end)
+
+	helpers.it("Title-cased input yields a Title-cased replacement", function()
+		local r = conform_result("Abim")
+		helpers.assert_true(r ~= nil, "the Title form must fire")
+		helpers.assert_eq("Abîm", r.replacement, "Title input must produce a Title replacement")
+	end)
+
+	helpers.it("UPPERCASE input yields an UPPERCASE replacement, accents included", function()
+		local r = conform_result("ABIM")
+		helpers.assert_true(r ~= nil, "the UPPER form must fire")
+		-- "î" → "Î" comes from the shared accent table, not string.upper, which is
+		-- ASCII-only and would have left the accented letter lowercase.
+		helpers.assert_eq("ABÎM", r.replacement, "UPPER input must produce an UPPER replacement")
+	end)
+
+	helpers.it("a mixed casing fires nothing", function()
+		-- No variant is registered for "aBiM", so the entry must not fire at all.
+		-- Firing it would have to invent an output casing, and every choice is
+		-- wrong; both other drivers decline for the same reason.
+		helpers.assert_true(conform_result("aBiM") == nil, "mixed casing must not fire")
 	end)
 end)
 
@@ -202,7 +281,7 @@ end)
 
 -- =========================================
 -- =========================================
--- ======= 6/ Reset ========================
+-- ======= 7/ Reset ========================
 -- =========================================
 -- =========================================
 
@@ -259,9 +338,15 @@ helpers.describe("shared hotstring engine — final_result governs chaining", fu
 	end)
 
 	helpers.it("the chained trigger fires on the next keystroke", function()
+		-- "JDx" carries is_case_sensitive because it is mixed case: an entry that
+		-- opts into the cased family registers lower / Title / UPPER only, so a
+		-- mixed casing matches no variant and fires on no driver. The literal
+		-- registration is what an acronym trigger needs, and it is what the real
+		-- corpus uses for exactly this shape.
 		local last = _fr_drive({
 			{ trigger = "sig", replacement = "JD",       auto_expand = true, final_result = false },
-			{ trigger = "JDx", replacement = "John Doe", auto_expand = true, final_result = false },
+			{ trigger = "JDx", replacement = "John Doe", auto_expand = true, final_result = false,
+			  is_case_sensitive = true },
 		}, "sigx")
 		helpers.assert_true(last ~= nil and last.replacement == "John Doe",
 			"the second trigger must complete off the first expansion's output")
@@ -270,7 +355,10 @@ helpers.describe("shared hotstring engine — final_result governs chaining", fu
 	helpers.it("final_result clears the buffer so nothing chains", function()
 		local last, e = _fr_drive({
 			{ trigger = "sig", replacement = "JD",       auto_expand = true, final_result = true },
-			{ trigger = "JDx", replacement = "John Doe", auto_expand = true },
+			-- Same literal registration as the chaining case above, so that this test
+			-- fails only when final_result stops suppressing the chain — not because
+			-- a mixed-case trigger could never have matched in the first place.
+			{ trigger = "JDx", replacement = "John Doe", auto_expand = true, is_case_sensitive = true },
 		}, "sigx")
 		helpers.assert_eq("x", e:current_buffer(), "only the post-expansion keystroke may remain")
 		helpers.assert_true(last ~= nil and last.replacement == "JD",
