@@ -2947,3 +2947,35 @@ wrong.
   failure is known to be the harness rather than a guessed expectation.
 
 Related: [[feedback-regression-tests]].
+
+
+
+
+### project-drift-guard-precondition-not-a-flake
+
+`test-drift-guard-covers-every-output.cjs` fails with *"Fix that first — this
+test cannot distinguish its own signal from pre-existing drift"* whenever a
+**generated file differs from HEAD at the moment the suite runs**. It shells out
+to the real drift check, which compares generated outputs against HEAD, so an
+uncommitted regenerated output makes that check red before the test has
+perturbed anything — and it refuses to interpret a signal it cannot attribute.
+
+Observed four times on 2026-08-01, every one immediately after editing a
+generator **source** (`manifest.toml`) and regenerating, before committing. It
+passes standalone and after the commit. I first wrote this off as a flake or a
+staging race; it is neither, and the message says so.
+
+**Why:** the natural reaction to an intermittent failure that clears on re-run is
+to treat the suite as unreliable, which is how a real signal starts getting
+ignored.
+
+**How to apply:**
+
+- Editing a generator source? Regenerate **and commit both** before running
+  `npm run test:js`. Source and output belong in the same commit anyway — the
+  drift check compares against HEAD, not the index.
+- The outputs are listed in `tools/build/generators.cjs`. See
+  [[project-menu-manifest-json-is-generated]] for the same trap from the other
+  direction — hand-editing an output.
+- A failure here is never about the file you are editing; it is about the tree
+  state. Read the message before re-running.
