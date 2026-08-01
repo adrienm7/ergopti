@@ -714,7 +714,16 @@ Constraints: **paths before moves, moves before content, data before code.**
      engine-side and the record corrected; the exclusion is probed as
      load-bearing. Same shape as `is_case_sensitive_strict`: a vector is only
      writable once the engines agree. ·
-     the terminator path, ~~star/magic-key triggers~~ — **done: 3 vectors.** The
+     the terminator path, ~~the
+     NBSP typographic rule~~ — **measured: Windows and macOS implement the
+     strip-and-require rule (`hotstring_match.ahk`, `expander.lua:426-436` +
+     `:503-512`, both adding the extra backspace for the stripped nbsp); **Linux
+     has none**. So it joins `auto_expand` and `final_result` as a Linux feature
+     gap rather than a corpus gap. (First pass wrongly called it Windows-only: a
+     regex requiring the nbsp and the `:` on one line missed macOS, whose
+     implementation spans the two blocks above. Third time a narrow pattern
+     misled me in this item — measured again before recording.) ·
+     ~~star/magic-key triggers~~ — **done: 3 vectors.** The
      load-bearing one is `backspace_count = 3` for trigger `"td★"`: the star is
      **one codepoint and three UTF-8 bytes**, and a harness reaching for a byte
      length would say 5 (probed — claiming 5 fails Linux and macOS). The third
@@ -794,6 +803,26 @@ Constraints: **paths before moves, moves before content, data before code.**
      all false, and the last survivor (`terminator`) turned out to be injected by
      all three **e2e** runners — a narrow reader scan over-reports, and each false
      positive invites deleting something load-bearing.
+  **Item 2, measured in full — the framing was wrong.** It reads as a corpus
+  gap ("extend the corpus to the branches measured as absent"), and half of it
+  is not. Of the branches listed, **four are Linux FEATURE gaps**, where a
+  correct vector fails because the behaviour does not exist:
+  `auto_expand`, `final_result`, the NBSP typographic rule (all three
+  implemented on Windows **and** macOS), and `is_case_sensitive_strict`
+  (Windows only). Writing those vectors is the easy half; making them pass means
+  changing the Linux matching path, which alters expansion behaviour for every
+  existing Linux user's hotstrings — a decision, not a test.
+  The genuinely writable branches **are now written**: buffer cap (3),
+  `case_conform` (3), magic key (3), `is_word` as a filter (1), priority levels
+  (3 replayed), plus corpus-field hygiene. **Twelve vectors, and every one of
+  the six branches exposed a defect in the test infrastructure rather than in an
+  engine** — two harness assumptions true only until a new branch existed, an
+  over-broad skip hiding a coincidence that would have read as Linux honouring
+  priority, a corpus field misdiagnosed as inert, a gate counting a settings
+  panel as engine support, and a collision harness discarding `is_word` outright
+  for all six of its vectors. That is the argument for item 2 preceding items
+  3–4: generating a shared matcher core against harnesses in that state would
+  have encoded their blind spots.
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
