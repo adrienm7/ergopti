@@ -326,7 +326,14 @@ Constraints: **paths before moves, moves before content, data before code.**
   delete `test_menu_hotstrings_layout_drift_gate.lua` **after**, never before;
   (5) move the 1 812 lines of `macos/ui/menu/` that are not menu layout
   (`preferences.lua`, `menu_state.lua`, `menu_watchers.lua`, `shortcut_utils.lua`,
-  `menu_paths.lua`) out; (6) fold `_shared/modules/llm/menu_layout.json` in — its
+  `menu_paths.lua`) out — ⚠ **the third-driver test yields no destination**:
+  measured, **none of the five has a counterpart on Windows or Linux** (28 644 B,
+  17 964 B, 8 314 B, 9 355 B and 23 436 B respectively, all macOS-only). So "where
+  does the same code live in the other drivers?" — the criterion that made the
+  `layout.lua` promotion objective — returns nothing here, and picking a target
+  directory is taste rather than evidence. Same answer as the 27 remaining macOS
+  `lib/` files. Needs a design call on where they belong before the move is worth
+  making; (6) fold `_shared/modules/llm/menu_layout.json` in — its
   schema is a strict subset of v3 with exactly the fields v1 lacked; (7) lay the
   ~~"no menu row outside the renderer" ratchet~~ — **done**
   (`test-menu-rows-outside-renderer.cjs`, windows 222 / macos 301 / linux 3).
