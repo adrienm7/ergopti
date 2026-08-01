@@ -754,8 +754,28 @@ Constraints: **paths before moves, moves before content, data before code.**
      Still open on this item: the
      macOS test replays a clone defined inside the test file instead of the
      renderer, and the AHK test never compares the 6 golden values. Two
-     `[positioning]` constants never reach Windows, with three comments asserting
-     the opposite.
+     ~~`[positioning]` constants never reach Windows, with three comments
+     asserting the opposite.~~ — **measured, and the shape differs from the
+     note.** Of the 7 `[positioning]` keys: three are genuinely shared
+     (`caret_offset_x`, `caret_offset_y`, `max_caret_height`); two are per-driver
+     **by name** and so not divergences at all (`window_bottom_inset_ahk`,
+     `window_bottom_inset_hs`); `window_offset_y` is **macOS-only**, though its
+     comment describes it as a general layout rule with no caveat; and
+     `anchor_cascade` is read by **no driver whatsoever**.
+     `anchor_cascade` is the one worth reading twice. It is honestly labelled
+     "(informative — drivers implement this)", so nobody consuming it is not a
+     bug — but it is a four-element array, and the comment three lines above it
+     says *"AHK adds a step between 2 and 3: mouse cursor coordinates"*. The data
+     is therefore **already wrong for one driver according to its own
+     documentation**, and no code path could ever notice. An informative constant
+     that contradicts the prose beside it is worse than prose alone.
+     Linux reads none of the seven: its tooltip renderer shares no positioning
+     maths.
+     Not "fixed": making Windows read `window_offset_y` would move where tooltips
+     appear, and the separate bottom-inset constants exist precisely because the
+     two anchors differ — a placement decision, not a cleanup.
+     `test-tooltip-positioning-reach.cjs` records which driver reads which value
+     and fails in both directions, so the asymmetry stops being invisible.
 
 - **Lot 9 — the tests.** Honest ceiling: `meta/` directories alone are **84 956
   lines (44 %)** and each asserts on one driver's source text; the plan must not
