@@ -2841,3 +2841,35 @@ were 25 pieces of good localisation.
   catalogue's `_meta.locale` matching its filename. Those are objective.
 
 Related: [[feedback-ui-must-be-i18n]].
+
+
+
+
+### project-menu-manifest-json-is-generated
+
+`_shared/modules/menu/menu_manifest.json` is **generated** from
+`_shared/modules/features/manifest.toml` `[menu.*]` by
+`tools/build/build-menu-manifest.js`. Editing the JSON by hand works right up
+until anything regenerates it, at which point the edit vanishes with no error —
+the drift check then reports the file as differing from HEAD, which reads like an
+unrelated failure if you do not know the file is an output.
+
+The generated file says so in its own `_comment` key, which is easy to miss when
+you arrive via grep rather than by opening the top of the file.
+
+**Why:** measured on 2026-08-01, after a hand edit to the JSON survived a full
+AHK suite run and then disappeared. The three-line change had to be redone in the
+TOML and regenerated.
+
+**How to apply:**
+
+- Before editing any JSON under `_shared/`, check `tools/build/generators.cjs` —
+  it lists every generated output. `menu_manifest.json`,
+  `terminators_catalogue.lua`, the three `config_template.toml`, the
+  `features_manifest.*` and `keycode_data.js` are all outputs.
+- Edit the source, run the generator (`node tools/build/build-menu-manifest.js`
+  or `npm run gen`), and commit source **and** output together — the drift check
+  compares generated files against HEAD, so a regenerated-but-uncommitted output
+  fails it.
+
+Related: [[project-gate-scripts-must-be-wired]].

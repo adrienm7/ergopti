@@ -1076,7 +1076,16 @@ skips loudly, rather than passing, on machines without AutoHotkey. 20 test files
 
 `test-driver-tree-parity.cjs` (I1) · ~~`test-shared-root-resolvers.cjs` (executes
 every `_shared` resolver)~~ **done** · `test-menu-parity.cjs` (I3) · the "no menu row outside
-the renderer" ratchet · "every manifest array key has a reader" ·
+the renderer" ratchet · ~~"every manifest array key has a reader"~~ **done** — a
+guard existed but could not catch the three live cases: it checked **top-level
+keys only** (so `i18n_dynamic`, with zero readers repo-wide, was never examined)
+and counted a mention in a **comment** as a reader — `manifest_menu.ahk` names
+both dead sections in one. It now checks entry fields too, ignores comments, and
+excludes tests, since a test naming a section proves the section exists, not that
+anything renders from it. The three declarations it surfaced were each duplicated
+in AutoHotkey source and are now the actual source of the render; `group_label`
+moved the last hardcoded piece (the V1 submenu titles) into
+`manifest.toml [menu.*]`. ·
 `test-logger-scalars-single-source.cjs` · ~~`test-locale-catalogue-complete.cjs`~~
 **done** — all 21 catalogues carry en.json key-for-key (2 339 today), no value
 renders blank, each declares its own `_meta.locale`/name/flag. Four locale gates
