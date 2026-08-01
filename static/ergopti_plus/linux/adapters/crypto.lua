@@ -48,7 +48,7 @@ function M.sha256(data)
 			"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)))
 		-- openssl output: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
 		local hex = output:match("[0-9a-f]+%s*$") or ""
-		return hex:gsub("%s+", "")
+		return (hex:gsub("%s+", ""))
 	end)
 	if not ok then
 		Logger.error(LOG, "sha256(): unexpected error — %s", tostring(result))

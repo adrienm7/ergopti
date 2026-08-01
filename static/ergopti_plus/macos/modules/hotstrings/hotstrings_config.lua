@@ -760,7 +760,7 @@ function M.set_word_delimiters(delimiters)
 
 	-- Helper: escape a Lua string for TOML double-quoted value.
 	local function toml_escape(s)
-		return s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\t", "\\t"):gsub("\n", "\\n"):gsub("\r", "\\r")
+		return (s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\t", "\\t"):gsub("\n", "\\n"):gsub("\r", "\\r"))
 	end
 
 	local new_value_line = _state.word_delimiters and

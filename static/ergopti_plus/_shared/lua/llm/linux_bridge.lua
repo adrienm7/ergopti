@@ -95,7 +95,7 @@ function M.json_encode(val)
 		if val ~= val then return "null" end -- NaN
 		if val == math.huge or val == -math.huge then return "null" end
 		return string.format("%.17g", val):gsub("%.%d+", function(frac)
-			return frac:gsub("0+$", "")
+			return (frac:gsub("0+$", ""))
 		end):gsub("%.$", "")
 	end
 	if t == "string" then

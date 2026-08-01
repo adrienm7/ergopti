@@ -85,7 +85,7 @@ end
 --- @return string
 local function _sql_escape(s)
 	if type(s) ~= "string" then return "" end
-	return s:gsub("'", "''")
+	return (s:gsub("'", "''"))
 end
 
 --- Runs a SQL statement against the database via the sqlite3 CLI.

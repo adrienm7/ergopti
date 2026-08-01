@@ -194,7 +194,7 @@ function M.build(ctx)
 
 		-- Escape a string for HTML attribute and text content
 		local function he(s)
-			return s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;")
+			return (s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"))
 		end
 
 		local css = table.concat({

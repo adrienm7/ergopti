@@ -185,7 +185,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- Single source of truth for the escape (lib.text_utils) rather than a fourth
 		-- private copy of the same "%" doubling. Inlined at the use site so the
 		-- class guard can see the escape without having to trace a local.
-		return text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char))
+		return (text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char)))
 	end
 
 	-- Inputs the menubar icon was last rendered for. Declared above update_icon:

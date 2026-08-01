@@ -320,7 +320,7 @@ local function primary_selection()
 	if not pipe then return "" end
 	local value = pipe:read("*a") or ""
 	pipe:close()
-	return value:gsub("%s+$", "")
+	return (value:gsub("%s+$", ""))
 end
 
 local function _execute_action(action_name, go_next, binding)

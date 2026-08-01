@@ -108,7 +108,7 @@ local function enforce_word_limits(text, max_w)
 		rebuilt = rebuilt .. w
 		if count < max_w then rebuilt = rebuilt .. s end
 	end
-	return rebuilt:gsub("%s+$", "")
+	return (rebuilt:gsub("%s+$", ""))
 end
 
 --- Strips conversational filler and markdown from the model’s raw text.

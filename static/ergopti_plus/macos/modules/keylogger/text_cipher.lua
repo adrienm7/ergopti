@@ -198,7 +198,7 @@ function M.encrypt(device_id, event_id, plaintext)
 		return nil
 	end
 
-	return TextCrypto.wrap(iv, (ciphertext:gsub("%s+$", "")))
+	return (TextCrypto.wrap(iv, (ciphertext:gsub("%s+$", ""))))
 end
 
 --- Decrypts one stored value.

@@ -49,7 +49,7 @@ function M.parse_notes(body)
 	if body:match('"body"%s*:%s*null') then return "" end
 	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
 	if not raw then return "" end
-	return raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\")
+	return (raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\"))
 end
 
 

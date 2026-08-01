@@ -153,7 +153,7 @@ end
 --- @param key string The macOS preference key.
 --- @return string The escaped Lua pattern.
 local function escape_lua_pattern(key)
-	return key:gsub("([^%w])", "%%%1")
+	return (key:gsub("([^%w])", "%%%1"))
 end
 
 --- Parses a defaults-read value into a numeric on/off state.

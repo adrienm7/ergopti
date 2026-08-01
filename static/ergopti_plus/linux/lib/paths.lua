@@ -88,7 +88,7 @@ function M.shared(rel)
 	local root = M.shared_root()
 	if not root then return nil end
 	if type(rel) ~= "string" or rel == "" then return root end
-	return root .. "/" .. (rel:gsub("^/", ""))
+	return (root .. "/" .. (rel:gsub("^/", "")))
 end
 
 --- The driver root, for callers that need a driver-relative path.

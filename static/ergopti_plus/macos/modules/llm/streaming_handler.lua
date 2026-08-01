@@ -116,7 +116,7 @@ local function build_dedup_key(pred)
 		table.insert(parts, next_words)
 	end
 
-	return table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+	return (table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 --- Formats the validation modifier shortcut for tooltip display.

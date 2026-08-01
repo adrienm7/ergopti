@@ -100,7 +100,7 @@ end
 function M.config(rel)
 	local base = M.config_home() .. "/ergopti"
 	if type(rel) ~= "string" or rel == "" then return base end
-	return base .. "/" .. (rel:gsub("^/+", ""))
+	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
 
 --- The driver's data directory, optionally with a path appended.
@@ -109,7 +109,7 @@ end
 function M.data(rel)
 	local base = M.data_home() .. "/ergopti"
 	if type(rel) ~= "string" or rel == "" then return base end
-	return base .. "/" .. (rel:gsub("^/+", ""))
+	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
 
 return M

@@ -48,7 +48,7 @@ local function _sha256_hex(s)
 	end)
 	if not ok or type(out) ~= "string" then return "" end
 	local hex = out:match("[0-9a-f]+%s*$") or ""
-	return hex:gsub("%s+", "")
+	return (hex:gsub("%s+", ""))
 end
 
 --- Returns the raw SSID of the active Wi-Fi interface, or nil.
