@@ -73,11 +73,12 @@ _SR_LogError(FormatString, Args*) {
 
 
 
-; ===================================
-; ===================================
-; ======= 2/ Synchronous Shell ======
-; ===================================
-; ===================================
+
+; ====================================
+; ====================================
+; ======= 2/ Synchronous Shell =======
+; ====================================
+; ====================================
 
 /**
  * Executes a shell command synchronously and returns its stdout.
@@ -124,6 +125,7 @@ ShellRunner_Exec(Cmd) {
 
 	return Trim(Result, "`r`n")
 }
+
 
 
 
@@ -265,9 +267,9 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 }
 
 
-; ===================================
-; ===== 3.1) Completion Poller ======
-; ===================================
+; ====================================
+; ====== 3.1) Completion Poller ======
+; ====================================
 
 ; Ensures the global completion-poll timer is running.
 ; Called lazily when the first task is spawned.
