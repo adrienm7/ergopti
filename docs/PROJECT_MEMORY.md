@@ -2873,3 +2873,38 @@ TOML and regenerated.
   fails it.
 
 Related: [[project-gate-scripts-must-be-wired]].
+
+
+
+
+### project-crlf-in-worktree-is-not-a-repo-defect
+
+`core.autocrlf` is **true** on the Windows dev box and `.gitattributes` pins
+`*.lua`, `*.toml`, `*.json`, `*.ahk`, `*.js` and more to `eol=lf`. A file can
+therefore show CRLF when read byte-for-byte from the working copy while being
+**LF in the repository** — `git status` shows no diff, and "converting" it
+produces an empty commit.
+
+Measured on 2026-08-01: `models.json` (3 864 lines) and the LLM
+process-prediction corpus both read as CRLF on disk and were both already LF in
+git. Reporting them as a defect would have been wrong.
+
+The genuinely committed CRLF defect that day was different in kind: a **tool**
+wrote the file. `tools/format_toml.py` used Python's default newline handling,
+which translates every line feed to CRLF on Windows, so its output entered the
+repo as CRLF rather than being normalised on the way in.
+
+**Why:** the two look identical from a byte scan, and only one is a bug.
+
+**How to apply:**
+
+- Before reporting CRLF as a defect, run `git diff --stat HEAD -- <file>`. Empty
+  means the repository copy is already LF and there is nothing to fix.
+- Any Python that writes a tracked file needs `newline="\n"` explicitly —
+  `write_text(..., newline="\n")` or `open(..., newline="\n")`. The default is
+  platform-dependent and Windows is the platform this repo is developed on.
+- `test-shared-sources-are-lf.cjs` guards `.lua`/`.toml`/`.json`; the `.ahk` half
+  (plus the BOM AHK v2 requires) is `test-ahk-encoding.cjs`. Both are stable on a
+  fresh clone because `.gitattributes` pins those extensions.
+
+Related: [[feedback-ahk-source-encoding]].
