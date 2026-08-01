@@ -183,6 +183,25 @@ Constraints: **paths before moves, moves before content, data before code.**
   a directory, not across one, so every scan scoped to `lib` needs re-pointing;
   and the `.cjs` gates are where hardcoded paths hide — the Lua and AHK suites
   went green while three JS gates were still reading the old locations.
+  **The objective test has now been applied to all 28 macOS `lib/` files, and it
+  yields exactly one promotion**: `lib/layout.lua` → `modules/keymap/layout.lua`,
+  because Windows keeps its twin at `modules/keymap/layout.ahk` and macOS already
+  had the directory. **Done**, test mirrored, 8 stub sites moved with it. The other
+  27 have no counterpart outside `lib/` on any driver, so promoting them would be
+  taste rather than evidence — which is precisely what the third-driver test
+  exists to avoid.
+  **Measured cost of the remaining rename, and why it is not churn worth taking
+  blind:** the `lib.` → `infra.` prefix touches **935 macOS sites** (453
+  production `require` in 180 files, 74 test requires, 408 `package.loaded`
+  stubs) and **76 Linux sites**, plus the AHK `#Include` graph, 3 build shell
+  scripts and **7 `.cjs` gates with hardcoded `linux/lib/` paths**. It also
+  **cannot be done one driver at a time**: `test-driver-tree-parity.cjs` ratchets
+  on `shared ≥ 13` and `union ≤ 50`, so renaming one driver drops `lib` out of
+  the shared set *and* adds `infra` to the union — it fails on both counts, which
+  is the gate working correctly. Done atomically across all three it is
+  **I1-neutral** (`lib` leaves the union, `infra` enters; shared stays 13, union
+  stays 50), so the ratio gain everyone expects from it does not exist — the gain
+  was always in promoting features out, and the evidence supports one file.
   Remaining steps: (a) extract `platform/`;
   (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`
   and `lib/toml/*` shims must keep their basenames, and the `lib.` → `infra.`
