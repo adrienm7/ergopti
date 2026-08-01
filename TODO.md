@@ -190,11 +190,22 @@ Constraints: **paths before moves, moves before content, data before code.**
   27 have no counterpart outside `lib/` on any driver, so promoting them would be
   taste rather than evidence — which is precisely what the third-driver test
   exists to avoid.
-  **Measured cost of the remaining rename, and why it is not churn worth taking
-  blind:** the `lib.` → `infra.` prefix touches **935 macOS sites** (453
-  production `require` in 180 files, 74 test requires, 408 `package.loaded`
-  stubs) and **76 Linux sites**, plus the AHK `#Include` graph, 3 build shell
-  scripts and **7 `.cjs` gates with hardcoded `linux/lib/` paths**. It also
+  **Measured cost of the remaining rename, and the reason it is blocked on
+  verification rather than on effort.** Full size: **~1 750 references across
+  ~800 files** — Windows 120 `#Include` + 731 path refs in 303 files, macOS 525
+  `require` + 408 `package.loaded` stubs in 425 files, Linux 69 + 7 in 48 files,
+  plus **26 tooling/CI files** carrying 97 `<driver>/lib` paths.
+  **The blocker is that a wrong replacement cannot be caught by any suite.** The
+  packaging scripts install to `~/.local/lib/ergopti/` and `/usr/lib/ergopti`,
+  which must **not** be renamed, on lines adjacent to `linux/lib/locale.lua` in
+  the bundler manifest, which **must**. Distinguishing them is easy to specify
+  and easy to get subtly wrong, and the install layout is exercised by **no
+  test** — the deb/rpm/AppImage would ship a broken tree with all four suites
+  green. That is the exact failure mode this backlog exists to eliminate, so the
+  rename needs a run of the real packaging builds to be safe, which a Windows dev
+  box cannot provide. (The earlier note here called it "churn not worth taking";
+  that was a judgement about value. This is a measurement about verifiability,
+  and it is the stronger reason.) It also
   **cannot be done one driver at a time**: `test-driver-tree-parity.cjs` ratchets
   on `shared ≥ 13` and `union ≤ 50`, so renaming one driver drops `lib` out of
   the shared set *and* adds `infra` to the union — it fails on both counts, which
