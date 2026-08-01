@@ -2979,3 +2979,100 @@ ignored.
   direction — hand-editing an output.
 - A failure here is never about the file you are editing; it is about the tree
   state. Read the message before re-running.
+
+
+
+### project-fixed-field-lists-drop-flags
+
+**What:** four separate layers of the hotstring pipeline built a table by naming
+its fields one at a time instead of iterating the schema's flag list, and every
+one of them silently dropped a flag that mattered.
+
+- `_shared/lua/toml_codec/reader.lua` returned a fixed entry table without
+  `is_case_sensitive_strict`, so **neither Lua driver ever saw the flag as
+  anything but false** — for all 1 302 shared entries that declare it. The
+  loaders forwarded it and the engines read it; the value they moved around was
+  the default.
+- The macOS registry loader, the Linux corpus replay, the Linux e2e harness and
+  the macOS e2e harness each named their own subset. The Linux e2e dropped
+  `auto_expand`, which meant every "match expected" scenario in it had been
+  failing since `auto_expand` landed, unnoticed.
+
+**Why:** a dropped flag does not error. It reads as its default, which is a
+legal value, so three layers above it keep looking correct. Nothing in a suite
+distinguishes "the driver ignores this flag" from "this entry does not set it".
+
+**How to apply:**
+
+- Build the table from a **named list** (`for _, flag in ipairs(SCHEMA_FLAGS)`),
+  never field by field. In a test harness this is not style — it is the
+  difference between replaying the vector you wrote and replaying a different
+  one.
+- When adding a schema field, grep for the places that enumerate the existing
+  ones. There is no compiler error to lean on.
+- The regression test belongs on the LIST, not on the flag you just fixed. See
+  `linux/tests/unit/meta/test_linux_loader_delegates_toml_codec.lua`.
+
+
+
+### project-hotstring-case-flags-are-orthogonal
+
+**What:** the hotstring schema has two case flags and they mean different
+things. `is_case_sensitive` selects the **registration shape** — register the
+trigger literally, do not generate the lower/Title/UPPER family.
+`is_case_sensitive_strict` selects the **comparison** — no case folding. Only
+the AutoHotkey loader had this right (`HSE_RegisterFromTomlFlags` maps the first
+to a registrar, the second to AHK's `C` flag).
+
+The name of the first flag is the opposite of what it does, which is exactly how
+both Lua drivers came to read it as "compare exactly". Consequence: the 592
+shared acronym autocorrections (`"adn" = { output = "ADN", is_case_sensitive =
+true }`) fired on nothing but their exact lower-case spelling. The literal
+registration exists so the family cannot produce `"Adn" -> "Adn"`; the fold is
+what lets a capitalised `"Adn"` correct at all.
+
+Note also that the domain spec `_shared/core/domain/HotstringMatcher.spec.js`
+uses the name `is_case_sensitive` for the COMPARISON — i.e. for the TOML's
+`is_case_sensitive_strict`. Two different things with one name, one layer apart.
+
+**Why:** every reading of the flag is defensible from its name, and the shipped
+corpus sets both flags together on the 1 302 entries where it matters, so the
+difference only shows on the 592 where it is set alone.
+
+**How to apply:**
+
+- Resolve both flags into an internal mode at load time and never let the
+  ambiguous name reach the matcher. The shared engine calls them `exact`,
+  `fold` and `conform`.
+- `conform` means the replacement takes the casing that was TYPED. Windows
+  lowercases the replacement for the lower variant, so an entry with an
+  upper-case output must declare `is_case_sensitive` or its casing is discarded.
+- See [[project-fixed-field-lists-drop-flags]] for why this stayed invisible.
+
+
+
+### project-corpus-harness-must-not-decide-the-answer
+
+**What:** the three drivers' hotstring corpus harnesses each computed the
+expected outcome themselves and compared it to the vector, instead of asking the
+driver. macOS compared the buffer tail to the trigger inside the test; the AHK
+replay mapped `is_case_sensitive` straight onto the `C` flag rather than routing
+through the real registrar; both then asserted the vector against their own
+model. They agreed with the bug they existed to catch.
+
+**Why:** a harness that reimplements the rule validates its own reading. It
+passes whatever the driver does, and it fails when the CORPUS changes — which
+reads as "the corpus is wrong" and gets the corpus reverted.
+
+**How to apply:**
+
+- Drive the real entry point. macOS has `Expander.would_fire(m, buffer)` — a
+  pure predicate the engine and the tooltip both call. AutoHotkey has
+  `HSE_RegisterFromTomlFlags` + `HSE_FeedChar`, and the conform verdict lives in
+  `_HSE_ConformReplacement`, not in the match — a replay that stops at the match
+  reports a fire that never happens.
+- Assert the output TEXT, not only whether something matched. Case bugs are
+  invisible to a boolean.
+- When a vector's outcome genuinely depends on a per-driver constant, mark it
+  `driver_specific` in the corpus and have the other drivers skip it BY NAME and
+  count the skips. A silent skip is indistinguishable from coverage.
