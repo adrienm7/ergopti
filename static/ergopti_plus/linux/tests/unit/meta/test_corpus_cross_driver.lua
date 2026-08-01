@@ -156,7 +156,7 @@ describe("Corpus: tap_hold/vectors.json", function()
 	-- uinput events, so there is genuinely no Lua tap-hold engine here — and the
 	-- day someone writes one, this turns red rather than letting a whole corpus
 	-- stay unreplayed behind a stale rationale.
-	it("SKIP is still justified — no Lua tap-hold engine exists on Linux", function()
+	it("SKIP [CONF-LINUX-TAPHOLD] is still justified — no Lua tap-hold engine exists on Linux", function()
 		local ok = pcall(require, "modules.tap_hold")
 		assert_true(not ok,
 			"modules.tap_hold now loads on Linux — replay the tap_hold corpus against it instead of skipping it")
@@ -192,7 +192,7 @@ describe("Corpus: llm/parser_test_vectors.json", function()
 	-- the advanced-block reply format these vectors describe; the Linux engine
 	-- consumes predictions without going through one. Asserting the real reason
 	-- is what stops the rationale rotting again.
-	it("SKIP is still justified — Linux has no Lua reply parser to replay these vectors through", function()
+	it("SKIP [CONF-LINUX-LLM-PARSER] is still justified — Linux has no Lua reply parser to replay these vectors through", function()
 		-- Required directly: if the engine this skip talks about has genuinely
 		-- gone, the throw says so with the real error, and the rationale is wrong
 		-- in the other direction.
@@ -232,7 +232,7 @@ describe("Corpus: prompt_builder/vectors.json", function()
 	-- PromptBuilder, not that the module is missing — so that is what is
 	-- checked. The day the daemon requires it, this turns red and the corpus
 	-- gets replayed instead of skipped.
-	it("SKIP is still justified — the Linux daemon does not load the shared PromptBuilder", function()
+	it("SKIP [CONF-LINUX-PROMPT-BUILDER] is still justified — the Linux daemon does not load the shared PromptBuilder", function()
 		local root = helpers.driver_root()
 		local fh = io.open(root .. "/ergopti_hotstrings.lua", "r")
 		assert_true(fh ~= nil, "the Linux entry point must be readable")
@@ -390,7 +390,7 @@ describe("Corpus: locale/resolution_vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in locale corpus")
 	end)
 
-	it("SKIP — Linux resolves locales via lib/locale.lua (shared cascade replay is a roadmap item)", function()
+	it("SKIP [CONF-LINUX-LOCALE-CASCADE] — Linux resolves locales via lib/locale.lua (shared cascade replay is a roadmap item)", function()
 		-- The shared locale.core cascade (active->en->fr with star substitution)
 		-- is pinned by the macOS consumer (test_corpus_locale_resolution.lua). The
 		-- Linux driver reads locale files through lib/locale.lua and does not yet
@@ -433,7 +433,7 @@ describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 	-- (layout.js, dequeue.js) and is pinned by the macOS Lua clone plus the AHK
 	-- consumer. Linux renders through WebKit2GTK with no Lua port of that math,
 	-- which is the reason for the skip — so that is what is asserted.
-	it("SKIP is still justified — Linux has no Lua tooltip layout port", function()
+	it("SKIP [CONF-LINUX-TOOLTIP-LAYOUT] is still justified — Linux has no Lua tooltip layout port", function()
 		local ok = pcall(require, "modules.tooltip.layout")
 		assert_true(not ok,
 			"a Lua tooltip layout module now loads on Linux — replay the layout corpus against it instead of skipping it")
