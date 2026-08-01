@@ -770,172 +770,80 @@ Constraints: **paths before moves, moves before content, data before code.**
      straight after the star is blocked. Defensible rule, surprising consequence,
      and until now "improving" `is_word_char` to consult Unicode categories would
      have kept accented letters working while silently changing the star. ·
-     `case_conform`,
-     `is_case_sensitive_strict` (**1 302 entries use it**, and the figure is exact —
-     1 300 in `magickey.toml`, one each in `autocorrection.toml` and
-     `rolls.toml`). **Now documented, and the divergence measured:** the flag is
-     implemented in **Windows only**, where it becomes AutoHotkey's `C`
-     hotstring flag. macOS and Linux read the same shared TOML and have **zero**
-     production references to it, so all 1 302 entries match case-insensitively
-     there. The consequence is behavioural: `"OUi" → "Oui"` exists so that typing
-     `oui` does NOT autocorrect, and on two of three drivers it does.
-     Not fixed here on purpose — implementing it changes the matching path of
-     both engines, and the vectors that would make that safe are the very thing
-     this item asks for. `test-hotstring-flag-support-per-driver.cjs` records
-     which driver honours which flag and fails in both directions: a driver
-     gaining support (good news, update the record) and a flag declared in shared
-     data that no engine reads at all), the
-     NBSP typographic rule, ~~the buffer cap~~ — **done: 3 vectors**, each
+     ~~`case_conform`~~ and ~~`is_case_sensitive_strict`~~ — **DONE, and the
+     divergence was not the one recorded here.** This item said the strict flag
+     was Windows-only and that macOS and Linux matched case-insensitively. Both
+     halves were true, and both were downstream of something simpler: the shared
+     TOML reader builds its entry table from a FIXED field list and
+     `is_case_sensitive_strict` was not on it, so neither Lua driver ever saw the
+     flag as anything but false. Fixed at the reader, with the regression test
+     written over the whole flag list rather than this one flag.
+     What the fix then exposed is the real finding. The two case flags are
+     ORTHOGONAL and only the AutoHotkey loader had it right:
+     `is_case_sensitive` selects the REGISTRATION shape (register the trigger
+     literally, generate no lower/Title/UPPER family) and
+     `is_case_sensitive_strict` selects the COMPARISON. The two Lua drivers read
+     the first as "compare exactly" — what its name invites — so **592 shared
+     entries**, the acronym autocorrections of the shape `"adn" -> "ADN"`, fired
+     on nothing but their exact lower-case spelling. And **1 100 entries** that
+     declare neither flag want the cased family, which Linux had no notion of:
+     typing "ABIM " corrected to "abîm" instead of "ABÎM". All three drivers now
+     produce the same three modes, and the corpus pins the output TEXT, not just
+     whether something matched.
+     Two neighbouring divergences fell out of the same work, neither of them on
+     any list: the word-boundary predicate had **three** different answers
+     (this engine counted every non-ASCII codepoint as a word character, macOS
+     asked `is_letter_char` so `_` and `★` opened a word there and nowhere else,
+     AutoHotkey tests the terminator set) — the two Lua drivers now share one;
+     and macOS resolved star-vs-end-char by returning on the first auto hit, so a
+     star trigger won unconditionally instead of yielding to a strictly longer
+     end-char trigger.
+     **The reason none of it was catchable is the part worth keeping.** All three
+     corpus harnesses decided the outcome themselves instead of asking the
+     driver: macOS compared the buffer tail to the trigger in the test and
+     asserted the vector against its own answer; AutoHotkey mapped
+     `is_case_sensitive` straight onto the `C` flag rather than routing through
+     `HSE_RegisterFromTomlFlags`, so it agreed with the misreading it existed to
+     catch; and every one of them built its mapping from a hand-named subset of
+     the flags. The Linux e2e harness dropped `auto_expand` and never announced a
+     terminator, so **every "match expected" scenario in it had been failing
+     since `auto_expand` landed** and nobody was reading it. Each harness now
+     drives the real matcher and builds its mapping from the flag LIST. ·
+     the NBSP typographic rule, ~~the buffer cap~~ — **done: 3 vectors**, each
      measured against the real engine before being written down. A 257-codepoint
      trigger never matches, one of **exactly 256** still does, and a 300-codepoint
      buffer still matches on its tail because eviction drops the *oldest*
      codepoints. The boundary vector is the load-bearing one: an off-by-one in
-     the eviction loop breaks it while leaving the 257 case green. Both
-     implementations declare the same 256 independently
-     (`BUFFER_MAX_CHARS` / `HSE_MAX_BUFFER_LEN`).
+     the eviction loop breaks it while leaving the 257 case green.
+     One correction to this note: the two implementations do **not** declare the
+     same 256. macOS holds 500 (`BUFFER_MAX_CHARS` in `modules/keymap/init.lua`)
+     against the shared Lua engine's 256, so the 257-codepoint vector has no
+     defined answer there. It now carries a `driver_specific` field and the macOS
+     replays skip it by name and say so; the caps themselves stay held by
+     `test-hotstring-buffer-cap-parity.cjs`.
      **Adding them exposed a wrong assumption**: the Windows harness asserted
      that a non-matched buffer must not end with its trigger, which held only
      because no vector had reached the cap — there the buffer *does* end with the
      trigger and the engine cannot see it. Now a second documented exemption
-     beside the word-boundary one, read from the constant. ·
-     ~~`case_conform`~~ — **covered as a negative: 3 vectors** pin that the
-     default mode folds case (an all-caps buffer matches a lower-case trigger),
-     that a folded match returns the replacement **verbatim** — the matcher does
-     *not* conform case, so `case_conform` is a driver concern and this pins that
-     it does not silently happen — and that folding does not bypass the
-     word-boundary rule. **All three harnesses failed on arrival**, each
-     asserting a matched buffer ends with its trigger *exactly*; true of every
-     vector that existed, false of the fold. Now compared the way the vector
-     declares itself. That is the **second** harness assumption a new branch
-     broke in a row (the buffer cap was the first), so the pattern is recorded in
-     `PROJECT_MEMORY.md`: a consistency check must model the matching rule, not
-     assume the strictest one. ·
-     consumed delimiters, ~~the
-     `individual > section > file` priority levels~~ — **measured, and the Linux
-     skip was too broad.** Of the 6 collision vectors, the shared engine
-     genuinely decides **3** (length primacy via the longest-first sort,
-     first-registered fallback, no-match); those are now replayed on Linux, and a
-     probe reversing the sort is caught by them — nothing on Linux caught that
-     before. The other 3 need priority, and **2 would pass by accident** if
-     replayed naively, because their expected winner happens to be registered
-     first: "just enable the rest" would read as Linux honouring priority when it
-     is blind to it. The skip now **asserts its own premise** (the engine always
-     yields the first-registered mapping) instead of `assert_true(true)`, so it
-     fails the day priority arrives. Tautology ratchet 283 → 282. ·
-     ~~`is_word` as a tiebreaker~~ — **it is a FILTER, not a tie-break**, and
-     asserting it found a harness bug. Mid-word the word-bounded mapping is
-     blocked, so the unbounded one wins in **either** registration order (both
-     replayed, which is what makes it assertable); at a boundary both are
-     eligible and first-registered wins, which is order-dependent and therefore
-     deliberately not a vector. **Windows disagreed** — and it was the harness:
-     the AHK collision replay registered every mapping with hardcoded flags
-     `"*?"`, and `?` means *no word boundary*, so `is_word` was silently
-     discarded for all six existing collision vectors. None of them used it as a
-     discriminator, so nothing had noticed. Flags now derive from the mapping;
-     probed by restoring the hardcoded pair.
-     **Corpus hygiene, found while extending it:** every field a vector carries
-     must now be read by a replay or documented — `test-corpus-fields-are-read.cjs`,
-     74 fields across 16 corpora. One was genuinely inert (`notes` in
-     `toml/coercion_vectors.json`). The guard's own development is the lesson: a
-     consumer scan scoped to files named `*corpus*` reported **11** inert fields,
-     all false, and the last survivor (`terminator`) turned out to be injected by
-     all three **e2e** runners — a narrow reader scan over-reports, and each false
-     positive invites deleting something load-bearing.
-  **Item 2 is now complete to the limit of what a test can do.** Every listed
-  branch has been measured; the writable ones are written and the rest are not
-  test debt. **The framing was wrong**: it reads as a corpus gap ("extend the
-  corpus to the branches measured as absent"), and half of it is not. Of the branches listed, **four are Linux FEATURE gaps**, where a
-  correct vector fails because the behaviour does not exist:
-  `auto_expand`, `final_result`, the NBSP typographic rule (all three
-  implemented on Windows **and** macOS), and `is_case_sensitive_strict`
-  (Windows only). Writing those vectors is the easy half; making them pass means
-  changing the Linux matching path, which alters expansion behaviour for every
-  existing Linux user's hotstrings — a decision, not a test.
-  The genuinely writable branches **are now written**: buffer cap (3),
-  `case_conform` (3), magic key (3), `is_word` as a filter (1), priority levels
-  (3 replayed), plus corpus-field hygiene. **Twelve vectors, and every one of
-  the six branches exposed a defect in the test infrastructure rather than in an
-  engine** — two harness assumptions true only until a new branch existed, an
-  over-broad skip hiding a coincidence that would have read as Linux honouring
-  priority, a corpus field misdiagnosed as inert, a gate counting a settings
-  panel as engine support, and a collision harness discarding `is_word` outright
-  for all six of its vectors. That is the argument for item 2 preceding items
-  3–4: generating a shared matcher core against harnesses in that state would
-  have encoded their blind spots.
-  **CONVERGENCE SPEC (measured 2026-08-01 by a 4-flag × 3-driver analysis with an
-  adversarial verify pass; all four prescriptions came back REFUTED, so what
-  follows is the corrected version).** The user has authorised full convergence
-  with no backwards compatibility.
-
-  * **A live Linux bug, not just a gap.** Linux ignores `auto_expand`, and the
-    shared engine fires the instant a trigger completes. `ya` is bucketed under
-    `a`, so typing **"yaourt" fires mid-word and yields "y’aourt"**. Reproducible
-    today: the bundled TOMLs are loaded via
-    `Paths.shared("modules/hotstrings")` at `ergopti_hotstrings.lua:272`.
-  * **Windows and macOS ALREADY diverge on star-vs-end-char.**
-    `hotstring_match.ahk:74-82` `_HSE_EndCharBeats` line 79 returns
-    `Cand.Length > Best.Length` — Windows resolves across both paths by LENGTH.
-    macOS `run_trigger_checks` (`modules/keymap/init.lua:586-595`) returns on the
-    first successful auto expansion before reaching the terminator loop at :600,
-    so auto wins **unconditionally**. Register star `b★` (len 2) and non-star
-    `aab` (len 3), type `aab★`: **Windows fires `aab`, macOS fires `b★`.**
-    Converging Linux onto macOS would therefore lock in a divergence from
-    Windows — the three-way target must pick Windows's length rule.
-  * **macOS's e2e replay cannot distinguish auto from non-auto.**
-    `macos/tests/e2e/run_e2e.lua:228` omits `auto_expand` from `Registry.add`, so
-    `registry.lua:493` makes every vector `is_auto = false`, and
-    `expander.lua:704-760` never reads `m.auto`. Any corpus vector claiming to
-    prove auto-expansion there proves nothing until that harness passes the flag.
-  * **Corpus convention:** all 27 vectors exclude the terminator from `buffer`
-    (`field_semantics.terminator` says the e2e runners inject it). A vector
-    shipping `"buffer": "ya "` with `"terminator": " "` double-feeds on macOS
-    (`run_e2e.lua:433` → `expander.lua:727`) and mis-derives `terminator_consumed`
-    on Linux (`run_e2e.lua:196`). Corpus counts are **27 vectors + 7
-    collision_vectors**.
-  * Adding any new vector FIELD is governed by `test-corpus-fields-are-read.cjs`.
-  * `linux/tests/unit/meta/test_injector_terminator_contract.lua:59-95` asserts
-    `M.inject`'s parameters must not contain "terminator" — the daemon-side
-    change survives it but lands on its stated rationale and must be reconciled
-    in that file's header, not silently.
-
-  **CONVERGENCE STATUS (implemented).** Linux now honours all four flags; the
-  Linux loader had been building mappings from three fields and dropping the
-  rest, so every real entry behaved as auto_expand + non-final + case-folding
-  regardless of its TOML. Fixed and pinned by 9 probed regression tests:
-  `auto_expand` (typing "yaourt" produced "y’aourt"), `final_result` (Linux reset
-  after every expansion so it never chained and the flag was unobservable), the
-  NBSP typographic rule (a trigger before a typographic ":" never fired; the
-  space is REQUIRED so ":D" stays literal), and `is_case_sensitive_strict` (1 300
-  magickey entries matched any casing — `"OUi" → "Oui"` exists so typing `oui`
-  does NOT autocorrect). Star-vs-end-char resolves by trigger LENGTH, Windows's
-  rule.
-
-  **macOS is now the only outlier, on two counts, both measured:**
-  * **`is_case_sensitive_strict` is unread.** macOS registers case VARIANTS at
-    load time (`registry.lua:652-670`): `is_case_sensitive` → one registration of
-    the exact trigger; otherwise a conform fast-path (`use_conform`, which
-    collapses ~2 119 magic-key specs to ~1 000) or explicit lower/Title/UPPER.
-    Windows's `is_case_sensitive` is ALSO single-registration — the two flags
-    differ only in the AHK `C` flag, i.e. whether matching itself is exact. So
-    the macOS change is not "register fewer variants" but "make the compare
-    exact", and it must not disturb `use_conform`, the space variants, or the
-    magic-key exclusions.
-  * **Star-vs-end-char ordering.** `run_trigger_checks`
-    (`modules/keymap/init.lua:586-595`) returns on the first auto hit before
-    reaching the terminator loop at :600, so auto wins unconditionally. Windows
-    and Linux both resolve by length. With star `b★` (len 2) and non-star `aab`
-    (len 3), typing `aab★` fires `aab` on Windows and Linux, `b★` on macOS.
-
-  Once both land, corpus vectors for all four flags become writable and Lot 8
-  item 2 closes completely.
-
+     beside the word-boundary one, read from the constant.
   3. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      **the only part of the engine that has never drifted**.
-  4. Close the eight measured divergences, notably: Linux **never** fires a
+  4. Close the eight measured divergences. ~~Linux **never** fires a
      non-`auto_expand` hotstring (its loader does not even read the field), has no
-     case propagation and no collision priority, and its default magic key is `\`
-     while the shared manifest says `★`.
+     case propagation and no collision priority~~ — **all three closed**, together
+     with `final_result`, the NBSP typographic rule, `is_case_sensitive_strict`,
+     the word-boundary predicate and the macOS star-vs-end-char ordering. The
+     collision cascade (individual > section > file > source tier) is now one
+     shared module instead of two Lua copies plus the AutoHotkey one, and all
+     eight collision vectors replay for real on Linux — three of them used to be
+     skipped as "priority-blind", and two of those three would have passed a naive
+     replay because their expected winner is also the mapping registered first.
+     `table.sort` is not stable, so before this the winner of an equal-length
+     collision was not even deterministic between runs of the same corpus.
+     Still open on this item: **the default magic key is `\` on Linux while the
+     shared manifest says `★`** — a data divergence, not an engine one, so it does
+     not belong with the matcher work above.
   5. **LLM**: ~~prompt-builder constants from one JSON (5 hand-maintained copies
      today, already diverged)~~ — **the "already diverged" is stale, and the
      reason is worth keeping.** Measured: all **10** constants agree across the
