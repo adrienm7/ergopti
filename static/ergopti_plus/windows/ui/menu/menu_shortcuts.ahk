@@ -14,17 +14,14 @@
 
 
 
-; v1 group id -> v2 manifest section path for the three Shortcuts sub-Maps
-; (AltGrLAlt / AltGrCapsLock / LAltCapsLock). Each sub-Map renders as a
-; sub-submenu of 10 plain-bool toggles. The label of each sub-submenu in
-; the legacy render was the raw v1 key (e.g. "AltGrLAlt") because the
-; sub-Maps carried no ``__Label`` metadata — preserved verbatim here so
-; the manifest path is visually identical.
-global _SHORTCUTS_SUBMAP_V1V2 := Map(
-	"AltGrLAlt",     "ahk.shortcuts.alt_gr_lalt",
-	"AltGrCapsLock", "ahk.shortcuts.alt_gr_caps_lock",
-	"LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
-)
+; The three Shortcuts sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock) now
+; live in the manifest's ``modifier_combos_group`` section, one entry per
+; sub-submenu carrying its section path and its ``group_label``. They used to be
+; a Map here as well, which made the manifest section decorative: nothing read
+; it, so adding a fourth combo there changed nothing until someone also edited
+; this file. The sub-submenu label is still the raw v1 key, as the legacy render
+; had it — those are key names (AltGr, LAlt, CapsLock), identical in every
+; locale, so they carry no i18n key.
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,

@@ -79,7 +79,7 @@ _MET_ShowTyping(M, _Cat, Getters) {
 
 ; Dynamic handler: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
 _MET_ShortcutTyping(M, _Cat, Getters) {
-	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
+	Label := t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing")
 	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters)
 		M.Disable(Label)
@@ -95,7 +95,7 @@ _MET_ShowApps(M, _Cat, Getters) {
 
 ; Dynamic handler: Apps shortcut picker (ZWS differentiates from typing sc label).
 _MET_ShortcutApps(M, _Cat, Getters) {
-	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
+	Label := t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B)
 	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters)
 		M.Disable(Label)

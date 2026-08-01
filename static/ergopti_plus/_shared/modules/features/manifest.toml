@@ -2866,16 +2866,19 @@ id = "extensions_shortcuts"
 [[menu.modifier_combos_group]]
 type = "feature"
 path = "ahk.shortcuts.alt_gr_lalt"
+group_label = "AltGrLAlt"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
 path = "ahk.shortcuts.alt_gr_caps_lock"
+group_label = "AltGrCapsLock"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
 path = "ahk.shortcuts.lalt_caps_lock"
+group_label = "LAltCapsLock"
 platforms = ["ahk"]
 
 [[menu.metrics_menu]]
