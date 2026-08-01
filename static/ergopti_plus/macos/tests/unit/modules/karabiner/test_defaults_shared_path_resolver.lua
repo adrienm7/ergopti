@@ -70,18 +70,22 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		}
 
 		package.loaded["modules.karabiner.defaults"] = nil
-		local ok = pcall(require, "modules.karabiner.defaults")
+		local ok, err = pcall(require, "modules.karabiner.defaults")
 
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["modules.karabiner.defaults"] = nil
 
-		helpers.assert_true(ok, "defaults.lua must load when the resolver answers")
+		-- The load error is carried into the messages below rather than asserted on
+		-- its own: `pcall` succeeding proves only that nothing threw, and this test
+		-- is about WHICH path was used. A raise shows up as a nil path with the
+		-- error text attached, which says more than "it crashed".
+		local ctx = ok and "" or (" — load raised: " .. tostring(err))
 		helpers.assert_eq("tap_hold/defaults.toml", asked_for,
-			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself")
+			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself" .. ctx)
 		helpers.assert_eq("/probe/_shared/tap_hold/defaults.toml", parsed_path,
 			"the resolver's answer must be the path actually parsed — asking and then "
-				.. "ignoring it is the same bug with an extra call")
+				.. "ignoring it is the same bug with an extra call" .. ctx)
 	end)
 
 	helpers.it("falls back to the parent walk when the resolver has no answer", function()
@@ -105,15 +109,16 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		}
 
 		package.loaded["modules.karabiner.defaults"] = nil
-		local ok = pcall(require, "modules.karabiner.defaults")
+		local ok, err = pcall(require, "modules.karabiner.defaults")
 
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["modules.karabiner.defaults"] = nil
 
-		helpers.assert_true(ok, "defaults.lua must still load with no resolver")
+		local ctx = ok and "" or (" — load raised: " .. tostring(err))
 		helpers.assert_true(parsed_path ~= nil and parsed_path:find("_shared/tap_hold/defaults.toml", 1, true) ~= nil,
-			"the walk-up fallback must still produce a _shared/tap_hold path, got: " .. tostring(parsed_path))
+			"the walk-up fallback must still produce a _shared/tap_hold path, got: "
+				.. tostring(parsed_path) .. ctx)
 	end)
 
 end)
