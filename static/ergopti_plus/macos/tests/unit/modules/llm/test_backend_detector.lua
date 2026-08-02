@@ -41,15 +41,35 @@ helpers.describe("backend_detector.auto_default", function()
 		helpers.assert_eq(det.auto_default(), det.BACKEND_OLLAMA)
 	end)
 
-	helpers.it("pause must leave pure detection unchanged but real backend selection must be gated higher (invariant)", function()
-		helpers.assert_true(true, "backend_detector is pure; pause gate lives in llm core / prediction_engine")
+	-- "backend_detector is pure; the pause gate lives higher" was asserted with
+	-- assert_true(true) and that sentence as the message. It is a true and useful
+	-- claim, and none of it was being checked — the case passed whatever the
+	-- module did. Check the claim.
+	helpers.it("the pause gate is not in this module", function()
+		local src = helpers.read_driver_source("function M.auto_default")
+		helpers.assert_true(src ~= nil, "modules/llm/backend_detector.lua must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"detection must stay pure — a pause check here means the backend silently "
+				.. "changes identity while paused, and the resume picks a different engine")
 	end)
 
-	helpers.it("malformed hs responses + high volume calls must degrade gracefully (no crash)", function()
+	helpers.it("a malformed uname still yields a valid backend, every time", function()
 		local hs_stub, det = fresh_detector()
 		hs_stub.__set_exec("uname -m", "garbage\n")
-		for i=1,80 do det.auto_default() end
-		helpers.assert_true(true)
+		-- The loop used to run and then assert true, which is the same test with
+		-- the answers thrown away. What matters is that garbage in does not
+		-- produce a THIRD answer, and does not produce a different one each call:
+		-- effective_backend() only accepts these three, so a fourth value would be
+		-- silently replaced by the auto-default on the next read.
+		local first = det.auto_default()
+		helpers.assert_true(first == det.BACKEND_MLX or first == det.BACKEND_OLLAMA,
+			"auto_default must answer with a known backend even on unparseable input, got: "
+				.. tostring(first))
+		for _ = 1, 80 do
+			helpers.assert_eq(det.auto_default(), first,
+				"the same unparseable input must give the same answer — a detector that "
+					.. "wobbles makes the engine restart at random")
+		end
 	end)
 end)
 

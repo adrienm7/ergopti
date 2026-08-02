@@ -481,17 +481,27 @@ to filter.
 
 **Where the real work is, measured rather than assumed:**
 
-- **tautology (45): 32 of them are the SOLE assertion in their test case.** 32
-  macOS / 12 Linux / 1 Windows; 15 mention "pause", 9 are skip acknowledgements,
-  13 carry no message at all. The sole-assertion ones are the real find — the
-  whole case certifies nothing. Confirmed examples:
-  `macos/tests/unit/modules/keymap/test_terminators.lua:14,115,122` (body is one
-  comment plus `assert_true(true)`; nothing loads terminators, nothing pauses),
-  `.../keylogger/test_log_manager.lua:255,261`,
-  `.../llm/test_backend_detector.lua:44`,
-  `.../dynamic_hotstrings/test_personal_info.lua:15`,
-  `.../shortcuts/test_actions_system.lua:9` (fixable — assert on the eventtap
-  stub's recorded `watch_types` instead of on `true`).
+- **tautology (45 → 35): the sole-assertion ones are the real find**, and ten are
+  now done. 32 of the original 45 were the ONLY assertion in their case, so the
+  whole case certified nothing; 15 of those mention "pause".
+
+  The pattern in every one fixed so far: the case was a **design claim written as
+  a test** — "this module is pure, the pause gate lives higher" — asserted with
+  `assert_true(true)` and that sentence as the message. The claim is true and
+  worth holding; what it needed was to be checked. Each became an assertion that
+  the pause coupling is absent from the module's source, or that the guard is the
+  first statement of the keystroke path, and each was proved red by reintroducing
+  the coupling.
+
+  ⚠ **One of them was blocked by the harness, not by the test.**
+  `test_actions_system.lua` said in a comment that it "cannot easily assert the
+  exact watch_types without deep introspection of the eventtap stub". The stub
+  was the problem: `hs.eventtap.new` discarded both arguments, and
+  `event.types` carried 5 of the 12 types the driver names. Because keep-awake
+  builds its watch list as a table constructor starting at `ev.scrollWheel`, a
+  missing type left a nil at index 1 and `ipairs` yielded NOTHING — the watcher
+  was created watching an empty set in every test run. When a test says it cannot
+  assert something, check whether the harness is what made it impossible.
 - ~~**unfloored-scan (24): only a handful are genuine** — the rest already carry a
   floor in a shape the detector does not recognise.~~ — **detector fixed, 24 → 4.**
   Four blind spots closed: a Lua collector `t[#t+1] = v` (the regex required AHK

@@ -420,6 +420,9 @@ M.sqlite3 = {
 -- ============================
 
 local KEYSTROKES = {}
+-- Every eventtap built through this stub, in creation order, with the event
+-- types it was asked to watch and its start/stop counts.
+local TAPS = {}
 
 M.mouse = {
 	absolutePosition = function() return { x = 0, y = 0 } end,
@@ -433,9 +436,37 @@ M.eventtap = {
 	-- the omission (see tests/meta/test_keystroke_explicit_delay.lua).
 	keyStroke = function(mods, key, delay) table.insert(KEYSTROKES, { mods = mods, key = key, delay = delay }) end,
 	keyStrokes = function(s) table.insert(KEYSTROKES, { text = s }) end,
-	new = function(_, _) return { start = function() end, stop = function() end } end,
+	-- Both arguments are recorded, for the same reason the keyStroke delay is:
+	-- a stub that discards what it was given makes the harness structurally
+	-- unable to observe a caller that gets it wrong. This one dropped the event
+	-- type list, so "creates an event watcher with the correct events" could only
+	-- ever be written as assert_true(true) — and it was.
+	new = function(types, fn)
+		local tap = { types = types, fn = fn, started = 0, stopped = 0 }
+		tap.start = function(self) local t = self or tap; t.started = t.started + 1; return t end
+		tap.stop  = function(self) local t = self or tap; t.stopped = t.stopped + 1; return t end
+		table.insert(TAPS, tap)
+		return tap
+	end,
 	event = {
-		types = { keyDown = 10, keyUp = 11, flagsChanged = 12, leftMouseUp = 1, rightMouseUp = 2 },
+		-- Every type the driver actually names. It used to carry five, and the
+		-- gap was invisible in the worst way: keep-awake builds its watch list as
+		-- a table CONSTRUCTOR whose first element is ev.scrollWheel, so a missing
+		-- type left a nil at index 1 and `ipairs` over the list yielded nothing.
+		-- The watcher was created watching an empty set, and no test could see it
+		-- because the stub discarded the argument anyway.
+		--
+		-- The numbers are opaque handles here, not CGEventType values: three of
+		-- them predate this list and are relied on by tests that compare against
+		-- hs.eventtap.event.types themselves, so they keep the values they had.
+		types = {
+			keyDown = 10, keyUp = 11, flagsChanged = 12,
+			leftMouseUp = 1, rightMouseUp = 2,
+			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
+			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
+			scrollWheel = 22,
+			tapDisabledByTimeout = 0xFFFFFFFE, tapDisabledByUserInput = 0xFFFFFFFF,
+		},
 		newKeyEvent   = function(mods, key, isDown) return { mods = mods, key = key, isDown = isDown, post = function() end } end,
 		newMouseEvent = function(t, pos) return { t = t, pos = pos, post = function() end } end,
 	},
@@ -443,8 +474,10 @@ M.eventtap = {
 	keyRepeatInterval = function() return 0.05 end,
 	keyRepeatDelay = function() return 0.5 end,
 	__keystrokes = KEYSTROKES,
+	__taps = TAPS,
 	__reset = function()
 		for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
+		for i = #TAPS, 1, -1 do TAPS[i] = nil end
 		-- Tests that overwrite hs.keycodes.map (e.g. test_keycodes.lua) would
 		-- otherwise leak a stripped-down map into later tests. Rebuild the
 		-- metatabled map on every __reset so each test starts from the canonical
