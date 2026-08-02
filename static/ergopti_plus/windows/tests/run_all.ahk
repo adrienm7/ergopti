@@ -531,7 +531,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_poll_deadline.ahk
 #Include meta/test_download_integrity_guard.ahk
 #Include meta/test_no_coauthor_in_commits.ahk
-#Include meta/test_no_pascal_case_in_toml.ahk
 #Include meta/test_bundle_exclusions.ahk
 #Include meta/test_llm_menu_init_order.ahk
 #Include meta/test_llm_ensure_model_ready_guard.ahk
