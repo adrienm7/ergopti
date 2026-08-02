@@ -516,6 +516,24 @@ function M.regenerate()
 
 	Logger.start(LOG, "Regenerating Karabiner config…")
 
+	-- Re-resolve the layout-dependent key codes against the layout that is active
+	-- NOW, immediately before the table is consumed.
+	--
+	-- The refresh and the consumer used to live on different paths. The layout
+	-- watcher refreshed M.AVAILABLE_ACTIONS and then hit the pause guard and
+	-- returned; regenerate() consumed the table and never refreshed. So a layout
+	-- change while paused — which is the normal case, because the pause-layout
+	-- feature switches the user off Ergopti as part of pausing — left the table
+	-- resolved for the PAUSE layout, and the resume deployed a Karabiner config
+	-- built for a layout that was no longer active.
+	--
+	-- Cheap enough to do unconditionally: load_available_actions memoises the
+	-- built list, so this walks the logical_char entries and mutates their key
+	-- codes in place rather than rebuilding 673 action tables.
+	if M.AVAILABLE_ACTIONS then
+		pcall(Config.resolve_layout_actions, M.AVAILABLE_ACTIONS)
+	end
+
 	local ok_build, result = pcall(
 		Generator.build_karabiner_json,
 		_state, M.AVAILABLE_ACTIONS, M.TAP_HOLD_KEYS, M.MOD_COMBOS, M.NON_CANONICAL_COMBOS, _DATA_DIR
