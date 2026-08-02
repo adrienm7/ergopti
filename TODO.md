@@ -372,7 +372,7 @@ The audit report was retired once its findings were adjudicated: 111 candidates,
 shipped, along with roughly half the rest — each with a regression test proven red
 before the fix and green after.
 
-1 did not ship. They are carried here verbatim so nothing was lost with the
+0 did not ship. They are carried here verbatim so nothing was lost with the
 file: location, root cause, proposed fix and proposed test. Two caveats that the
 pass itself established, and that apply to every line below:
 
@@ -453,19 +453,5 @@ relearning: nothing said so, because a deleted section fails no test.
 
 ### MEDIUM
 
-- [ ] **BS-1** (boot-shutdown) — The menu's config pathwatcher — a SECOND recursive watcher on the same base_dir — has neither the TOML-cache exclusion nor the self-written-file exclusion that init.lua so carefully passes to lib/file_watchers
-  - `ui/menu/menu_watchers.lua:110-138 (reload_config filter)`
-  - **Cause:** Two recursive pathwatchers cover base_dir: lib/file_watchers' project_watcher and ui/menu/menu_watchers' configWatcher. init.lua computes TOML_CACHE_DIR once (line 214) precisely so 'the writer and the watcher cannot drift apart again' and threads it plus the self-written paths into lib/file_watchers.start (863-877). menu.start() arms the second watcher with only (base_dir, on_reload, get_suppress_until, ui_restore) — no ignored_dirs, no self_written_files. The exclusion was applied to one of the two watchers on the same tree.
-  - **Fix:** Thread the same context into MenuWatchers.start_config_watcher: pass ignored_dirs (init.lua's TOML_CACHE_DIR) and self_written_files (menu_paths ConfigTomlPath + KarabinerConfigPath) down from menu.start, and apply the exact is_runtime_artefact / is_self_written predicates from lib/file_watchers.lua:110-134 inside reload_config. Better still: delete the duplicate watcher entirely and let lib/file_watchers own base_dir — it already watches the same tree with a strictly stronger filter, a boot-suppress window, the adaptive settle, multi-repo git gating and fire-time re-checking.
-  - **Test:** New tests/unit/ui/menu/test_menu_watchers_runtime_artefacts.lua, mirroring section 3 of tests/unit/lib/test_file_watchers_reload_gate_coverage.lua: stub hs.pathwatcher/hs.timer, arm start_config_watcher on /fake/driver/, fire '/fake/driver/cache/toml_hotstrings/x_1.lua', assert no debounce timer was armed and reloads()==0; then fire '/fake/driver/modules/keymap/init.lua' and assert exactly one reload, so an exclusion that swallows the whole tree also fails.
-  - **Re-measured 2026-08-02: the first half shipped, the second did not.**
-    `menu_watchers.start_config_watcher` now takes `ignored_dirs` and applies it
-    (`:52`, `:114`), with a comment naming the snapshot-cache reload loop it was
-    written for. What is still missing is `self_written_files`: the filter reloads
-    on any `.toml` change outside the ignored dirs, `config.toml` is a `.toml` the
-    driver rewrites on every preference toggle, and the only suppression on this
-    path is a BOOT window (`file_watchers.lua:162 BOOT_SUPPRESS_SEC`), not a
-    per-write one. Either something else prevents the reload — in which case say
-    what, because it is not visible from this file — or every menu toggle arms a
-    reload. Check before fixing: a reload on every toggle would be loud, so the
-    likeliest answer is that a third mechanism exists and is undocumented.
+All thirty are closed. Nineteen had already shipped and were confirmed against the code; six were fixed here; the rest were refuted by the verifier pass or decided against and now live in PROJECT_MEMORY.
+
