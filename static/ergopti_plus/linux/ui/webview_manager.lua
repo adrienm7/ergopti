@@ -273,6 +273,39 @@ end
 -- =========================================
 -- =========================================
 
+--- Evaluates JavaScript inside an app's live webview — the host→page direction.
+---
+--- Everything else here is page→host: the page posts, a handler answers, and the
+--- answer travels back on the same message. That is enough for a request/response
+--- exchange and not enough for the one thing several shared pages need, which is
+--- to be HANDED their data once they report ready. A bridge handler is given only
+--- (payload, state), so without this it had no way to reach its own window and
+--- the action picker rendered empty on Linux while looking wired from both ends.
+---
+--- Silent when the window is not open: a push into a webview that does not exist
+--- is not an error, it is a page the user closed before it finished loading.
+--- @param app_name string The shared UI app directory name (e.g. "action_picker").
+--- @param js_code string JavaScript source to evaluate in the page.
+--- @return boolean True when the call was handed to WebKit.
+function M.eval_js(app_name, js_code)
+	if type(app_name) ~= "string" or type(js_code) ~= "string" or js_code == "" then
+		Logger.warn(LOG, "eval_js: bad arguments (app=%s).", tostring(app_name))
+		return false
+	end
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.webview then
+		Logger.debug(LOG, "eval_js: no live webview for '%s' — nothing to push to.", app_name)
+		return false
+	end
+	local ok, err = pcall(function() wref.webview:run_javascript(js_code, nil, nil, nil) end)
+	if not ok then
+		Logger.error(LOG, "eval_js: run_javascript failed for '%s': %s", app_name, tostring(err))
+		return false
+	end
+	Logger.debug(LOG, "eval_js: pushed %d char(s) to '%s'.", #js_code, app_name)
+	return true
+end
+
 --- Routes a JS message from host_bridge.js to the appropriate bridge handler.
 --- Called by the GTK script-message-received callback or by tests.
 --- @param bridge_name string The bridge handler name (e.g. "action_picker_bridge").

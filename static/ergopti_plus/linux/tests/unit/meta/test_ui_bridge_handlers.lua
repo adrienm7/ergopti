@@ -290,6 +290,68 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message({ action = "invalid" }, state)
       helpers.assert_eq(result, nil)
     end)
+
+    -- The picker is told what to render by an init(...) push after it reports
+    -- ready — there is no reply channel it could learn it from. For a long time
+    -- "ready" was only logged, so the page opened, said ready, and rendered an
+    -- empty list forever. Nothing failed: build_init_payload was correct and
+    -- tested, the handler answered every message, and both halves looked done.
+    --
+    -- Asserting on the emitted JAVASCRIPT, not on the payload function, is the
+    -- point. A test that calls build_init_payload() and checks its keys is the
+    -- test that already existed while the channel did not.
+    local function capture_push(opts, body)
+      local wm_mod = helpers.load_module("ui.webview_manager")
+      local original = wm_mod.eval_js
+      local seen = {}
+      wm_mod.eval_js = function(app, js)
+        seen[#seen + 1] = { app = app, js = js }
+        return true
+      end
+      handler.pending_opts = opts
+      local ok, err = pcall(body, seen)
+      wm_mod.eval_js = original
+      handler.pending_opts = nil
+      if not ok then error(err, 0) end
+      return seen
+    end
+
+    helpers.it("a 'ready' table pushes init(...) into the picker's own window", function()
+      capture_push({ current = "tab_new", allow_native = true }, function(seen)
+        handler.on_message({ action = "ready" }, state)
+        helpers.assert_eq(#seen, 1, "exactly one push per ready — no push, or two, is a bug")
+        helpers.assert_eq(seen[1].app, "action_picker",
+          "the push must be addressed to the picker's window, not broadcast")
+        helpers.assert_true(seen[1].js:sub(1, 5) == "init(",
+          "the page defines init(data); anything else evaluates to nothing and says so nowhere")
+        helpers.assert_true(seen[1].js:find("tab_new", 1, true) ~= nil,
+          "pending_opts must reach the payload — a push carrying defaults renders the "
+            .. "wrong current selection and looks like the user's binding was lost")
+        helpers.assert_true(seen[1].js:find("searchPlaceholder", 1, true) ~= nil,
+          "the i18n strings must be in the pushed JSON, not left for the page to invent")
+      end)
+    end)
+
+    helpers.it("a bare 'ready' string pushes init(...) too", function()
+      -- Two code paths reach "ready": the JSON table and the host_bridge
+      -- fallback that delivers the bare word. Wiring one and not the other is a
+      -- picker that works or not depending on how the page happened to post.
+      capture_push(nil, function(seen)
+        handler.on_message("ready", state)
+        helpers.assert_eq(#seen, 1, "the bare-string path must push as well")
+        helpers.assert_true(seen[1].js:sub(1, 5) == "init(")
+      end)
+    end)
+
+    helpers.it("confirm and cancel push nothing", function()
+      capture_push(nil, function(seen)
+        handler.on_message({ action = "confirm", id = "tab_new" }, state)
+        handler.on_message({ action = "cancel" }, state)
+        helpers.assert_eq(#seen, 0,
+          "init() is a first-render push; re-pushing it on every message would reset "
+            .. "the search box under the user's fingers")
+      end)
+    end)
   end)
 
   -- ==========================================================================

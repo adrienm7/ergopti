@@ -13,11 +13,16 @@
 --- Linux — and it also never received init(…), so it rendered empty. A bridge
 --- answering messages that are never sent looks implemented from both ends.
 ---
---- STILL MISSING, DELIBERATELY MARKED: the host→page push. init(data) has to be
---- evaluated IN the webview after "ready", and a bridge handler is given only
---- (payload, state) — no webview reference — so the channel does not exist yet.
---- build_init_payload() below produces exactly what init(data) expects and is
---- covered by tests, so the day the channel lands the payload is already right.
+--- THE HOST→PAGE PUSH. init(data) must be evaluated IN the webview after the
+--- page reports "ready", and a bridge handler is given only (payload, state) —
+--- no webview reference. The channel is webview_manager.eval_js(app, js), which
+--- addresses the window by app name rather than handing the handler a webview it
+--- could then keep past the window's life.
+---
+--- The require is deliberately lazy: this module is loaded BY the manager, so a
+--- top-level require would be a cycle. Resolving it at push time also means a
+--- handler exercised from a test without a GTK stack degrades to "no live
+--- webview" instead of failing to load at all.
 --- ==============================================================================
 
 local M = {}
@@ -95,6 +100,54 @@ function M.build_init_payload(opts)
 	}
 end
 
+--- Options for the next init(…) push, set by whoever opens the picker.
+--- Same shape as build_init_payload's argument; nil means "every default".
+--- Module state rather than a parameter because the opener and the "ready"
+--- message are two separate trips through the bridge, and only the second one
+--- knows the page exists.
+M.pending_opts = nil
+
+--- Pushes init(<payload>) into the live picker page.
+---
+--- Called on "ready" and only on "ready": evaluating init() before the page has
+--- defined it is a silent no-op in the webview, which is exactly the failure this
+--- whole handler was written to stop having.
+--- @return boolean True when the push was handed to WebKit.
+local function _push_init()
+	-- The same JSON module _handle_json decodes with. dkjson is the webview
+	-- manager's optional dependency and is absent on a plain Lua host, so
+	-- encoding through it made the push fail everywhere the decode half worked.
+	local ok_json, json_mod = pcall(require, "json")
+	if not ok_json or type(json_mod.encode) ~= "function" then
+		Logger.error(LOG, "Cannot push init(): the shared json module is unavailable — the page stays empty.")
+		return false
+	end
+	local ok_payload, encoded = pcall(function()
+		return json_mod.encode(M.build_init_payload(M.pending_opts))
+	end)
+	if not ok_payload or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot push init(): payload encoding failed (%s).", tostring(encoded))
+		return false
+	end
+
+	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	if not ok_mgr or type(Manager.eval_js) ~= "function" then
+		Logger.error(LOG, "Cannot push init(): webview_manager.eval_js is unavailable.")
+		return false
+	end
+
+	local pushed = Manager.eval_js("action_picker", "init(" .. encoded .. ")")
+	if pushed then
+		Logger.success(LOG, "Action picker initialised (%d byte(s) of payload).", #encoded)
+	else
+		-- The page said "ready", so a missing webview here means the window went
+		-- away between the two trips. Warn rather than error: nothing is broken,
+		-- but a START with no SUCCESS must not be left unexplained in the log.
+		Logger.warn(LOG, "Action picker reported ready but its window is gone — init() not pushed.")
+	end
+	return pushed
+end
+
 --- Handles a structured table payload — the page's real protocol.
 local function _handle_table(data, state)
 	local action = data.action
@@ -119,7 +172,8 @@ local function _handle_table(data, state)
 	end
 
 	if action == "ready" then
-		Logger.info(LOG, "Action picker UI ready.")
+		Logger.start(LOG, "Action picker UI ready — pushing init()…")
+		_push_init()
 		return nil
 	end
 
@@ -136,7 +190,8 @@ function M.on_message(payload, state)
 		-- "ready" arrives as a bare string from the page's own post({action:…})
 		-- only after JSON encoding, so the bare form is the host_bridge fallback.
 		if payload == "ready" then
-			Logger.info(LOG, "Action picker UI ready.")
+			Logger.start(LOG, "Action picker UI ready — pushing init()…")
+			_push_init()
 			return nil
 		end
 		return _handle_json(payload, state)

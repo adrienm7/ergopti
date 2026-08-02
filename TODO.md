@@ -298,12 +298,13 @@ Constraints: **paths before moves, moves before content, data before code.**
   i18n keys) into the one registry, `holdable` becoming a per-action flag —
   **18 of the 73 already have `sg_actions.*` keys in all 21 languages, 55 do
   not**, and the merge must come before the translations or ~1 700 strings get
-  keyed to ids that are about to change; (5) the host→page push for the Linux
-  `action_picker` — `init(data)` must be evaluated IN the webview after `ready`,
-  and a Linux bridge handler is given only `(payload, state)`, so the channel does
-  not exist (the payload is built and tested); (6) replace the macOS-only
-  `ctrl_shortcuts`/`cmd_shortcuts` and the AHK-only `modifier_combos` groups with
-  one `chord_bindings` group rendered identically everywhere.
+  keyed to ids that are about to change; ~~(5) the host→page push for the Linux
+  `action_picker`~~ — **done.** `webview_manager.eval_js(app, js)` is the channel,
+  addressed by app name so a handler never holds a webview past its window's
+  life. Worth reusing: it is the only host→page direction on Linux, and any other
+  shared page that needs to be HANDED its data now has one; (6) replace the
+  macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the AHK-only `modifier_combos`
+  groups with one `chord_bindings` group rendered identically everywhere.
 
 - **Lot 7 — the cross-cutting layer.** Remaining: (1) move the macOS config-path
   SSOT out of `ui/menu/menu_paths.lua` — today `infra/` depends on `ui/menu/`.
