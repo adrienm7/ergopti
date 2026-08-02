@@ -117,15 +117,22 @@ Two conventions that make asymmetry legible:
 
 Constraints: **paths before moves, moves before content, data before code.**
 
-- **Lot 2 — the safety net.** Residual pinned source reads, both ratchets at
-  their floor (macOS 34, AHK 16). The macOS 15 left need a human: their target
-  module has no declaration unique to it, so `read_driver_source` would
-  concatenate several files and silently change what the test asserts — make the
-  assertion order-independent first, as `test_menu_llm_api_backend_probe.lua`
-  now is. The AHK 16 each pin deliberately.
-  **Known hole:** both ratchets apply `HELPER_RE` per FILE, so one converted read
-  hides every remaining pinned read in the same file. Counting per READ is the
-  fix.
+- **Lot 2 — the safety net.** ~~Both ratchets apply `HELPER_RE` per FILE, so one
+  converted read hides every remaining pinned read in the same file. Counting per
+  READ is the fix.~~ — **done, and it proved itself on this session's own work.**
+  Both gates now report reads as well as files (`40/40 read(s)` on macOS,
+  `235/326 literal(s)` on the AHK side), and the macOS one failed a new test here
+  that added a 42nd read to a file already on the list — which under the old
+  per-file counting would have been free.
+
+  What is left is not a mechanism but a per-site judgement: **40 macOS reads**
+  still pinned, of which the ones that need a human have a target module with no
+  declaration unique to it, so `read_driver_source` would concatenate several
+  files and silently change what the test asserts. Make the assertion
+  order-independent first, as `test_menu_llm_api_backend_probe.lua` now is. The
+  AHK residue each pins deliberately (`run_all.ahk` itself, a `_generated/` file
+  `_DriverSourceConcat` excludes, a runner, or a single file carrying an ABSENCE
+  assertion a directory-wide scan would weaken).
 
 - **Lot 3 — one tree.** Remaining: (a) extract `platform/`; (b) de-platform
   `_shared/`; (c) the Convention S stubs.
