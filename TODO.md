@@ -45,10 +45,10 @@ is a wish.**
 
 | # | Invariant | State |
 | --- | --- | --- |
-| **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it. **23/49 = 46.9 %.** Still to do: the Convention S stubs. |
+| **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it. **25/47 = 53.2 %** after the platform/ extraction. Still to do: the Convention S stubs. |
 | **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. A feature missing on a platform carries a translated `reason_key`. | Namespace half **done** — the ratchet is now an assertion of zero. The `reason_key` half is at 0 of 142 written. |
 | **I3** | One menu. The manifest describes what the user sees; the renderer how this OS draws a row; the driver supplies only named actions, state getters and list providers. | `action_id` ↔ handler bijection done. The label-tree diff is not built — see §0.6. |
-| **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done. Ports (5) and the Karabiner catalogue (7) remain. |
+| **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done. The `HotkeyRegistrar` port and the Karabiner catalogue remain; two of Lot 6's rows turned out not to be actionable as written. |
 | **I5** | One implementation per behaviour. Pure logic in `_shared/lua/`; macOS and Linux `require` it; AHK gets generated **data** or a ported twin **pinned by a shared vector corpus**. | Per-behaviour corpora exist for hotstrings, tooltip, logger, ports. The matcher codegen (Lot 8.3) is the open one. |
 
 **The platform seam, in one sentence:** OS-uniqueness may live in exactly two
@@ -587,7 +587,7 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-02 at pcall-only **136**,
+`unfloored-scan`. It only turns down. Frozen 2026-08-03 at pcall-only **86**,
 unfloored-scan **4**, **the other four at 0**.
 
 The work is burning those floors down. Each occurrence is either a real false
@@ -639,7 +639,7 @@ to filter.
   was created watching an empty set in every test run. When a test says it cannot
   assert something, check whether the harness is what made it impossible.
 
-- **pcall-only: 203 → 136, and the recipe below is what did it.** 135 of the
+- **pcall-only: 203 → 86, and the recipe below is what did it.** 135 of the
   original 203 were the ONLY assertion in their case; macOS 119, Linux 84, AHK
   none — the AHK detector is `vacuous-absence`, already at zero.
 
@@ -655,15 +655,25 @@ to filter.
   for cases whose subject IS the raising — `test_utf8_offset_pcall.lua` is the
   genuine one, and its helper's docstring already says so.
 
-  **Three findings from the first 67, worth having before the next batch.** A
-  SQLite writer with no database must REFUSE, and refusal is a return value the
-  caller advances its watermark on — "did not crash" let a writer report success
-  against a closed database, which loses rows silently and for good. A privacy
-  detector answering `nil` satisfied "did not throw" and reads as falsy at the
-  caller, which is the fail-OPEN direction. And a shell-runner completion
-  callback's real invariant is that it RELEASES the GC pin: a task left pinned is
-  never collected and the process holds its pipes for the session. None of the
-  three was visible through the pcall status.
+  **What converting 117 of them found — the reason this class is worth the
+  effort.** A SQLite writer with no database must REFUSE, and refusal is a return
+  value the caller advances its watermark on: "did not crash" let a writer report
+  success against a closed database, which loses rows silently and for good. A
+  privacy detector answering `nil` satisfied "did not throw" and reads as falsy at
+  the caller — the fail-OPEN direction. A shell-runner completion callback's real
+  invariant is that it RELEASES the GC pin; a task left pinned is never collected
+  and the process holds its pipes for the session. An HTTP client left "active"
+  after a cancel refuses every later request as a duplicate. None of those was
+  visible through a pcall status.
+
+  **And one of them was a live cross-driver bug.** The Clipboard port declared
+  `save()` as `{string|null}`; macOS has never satisfied it — it returns the
+  `readAllData()` TABLE, so a non-text clipboard survives an injection, which
+  makes its `save()` behave like the Windows adapter's separate `save_all()`. The
+  vector that should have caught it was named `save_returns_string_or_null` and
+  asserted that `save()` did not throw. **The id stated the contract while the
+  body checked something else.** The snapshot is documented as opaque now.
+
   ⚠ One conversion introduced `assert_true(X ~= nil or true)` — always true, a
   tautology created while removing tautologies. Run the detector after every
   batch, not at the end.
