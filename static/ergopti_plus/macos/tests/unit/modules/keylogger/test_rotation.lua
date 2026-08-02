@@ -84,10 +84,11 @@ end)
 helpers.describe("rotation — pre-init guard", function()
 	helpers.it("append_log before init does not crash", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local ok = pcall(function()
-			r.append_log({ type = "typing", text = "hello" })
-		end)
-		helpers.assert_true(ok)
+		-- Called directly. An append before init must write NOTHING: the offset is
+		-- still zero, and a line written past it is a line the next flush replays.
+		r.append_log({ type = "typing", text = "hello" })
+		helpers.assert_eq(r.get_offset(), 0,
+			"an append before init must not advance the offset")
 	end)
 
 	helpers.it("read_new_entries before init returns empty list and offset 0", function()
@@ -100,8 +101,9 @@ helpers.describe("rotation — pre-init guard", function()
 
 	helpers.it("rollover before init does not crash", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local ok = pcall(function() r.rollover("/tmp/data.sql") end)
-		helpers.assert_true(ok)
+		r.rollover("/tmp/data.sql")
+		helpers.assert_eq(r.get_offset(), 0,
+			"a rollover before init must leave the offset where it was")
 	end)
 end)
 
