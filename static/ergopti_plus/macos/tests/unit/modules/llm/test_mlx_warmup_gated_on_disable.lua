@@ -45,11 +45,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local path = helpers.driver_root() .. rel_path
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, rel_path .. " must be readable")
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -66,21 +66,21 @@ end
 helpers.describe("M-3: api_mlx self-retry gate (source — public API)", function()
 
 	helpers.it("api_mlx.lua defines M.stop_warmup", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("function M%.stop_warmup", 1, false) ~= nil
 			or src:find("M.stop_warmup", 1, true) ~= nil,
 			"api_mlx must expose M.stop_warmup() so pause_all can stop the self-retry chain")
 	end)
 
 	helpers.it("api_mlx.lua defines M.resume_warmup", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("function M%.resume_warmup", 1, false) ~= nil
 			or src:find("M.resume_warmup", 1, true) ~= nil,
 			"api_mlx must expose M.resume_warmup() so resume_all can re-enable the retry chain")
 	end)
 
 	helpers.it("api_mlx.lua has a _warmup_stopped guard in M.warmup()", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("_warmup_stopped", 1, true) ~= nil,
 			"M.warmup() must check _warmup_stopped to short-circuit mid-pause retries")
 	end)
@@ -99,20 +99,20 @@ end)
 helpers.describe("M-3: script_control wires api_mlx stop/resume (source)", function()
 
 	helpers.it("pause_all calls api.stop_warmup", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		-- The pause block must call stop_warmup() on the api_mlx handle
 		helpers.assert_true(src:find("stop_warmup", 1, true) ~= nil,
 			"script_control.pause_all must call api.stop_warmup() to halt the api_mlx self-retry chain (M-3)")
 	end)
 
 	helpers.it("resume_all calls api.resume_warmup", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		helpers.assert_true(src:find("resume_warmup", 1, true) ~= nil,
 			"script_control.resume_all must call api.resume_warmup() to re-enable the api_mlx self-retry chain (M-3)")
 	end)
 
 	helpers.it("resume_warmup appears before schedule_warmup_with_retry in resume_all", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		local resume_pos = src:find("resume_warmup", 1, true)
 		local sched_pos  = src:find("schedule_warmup_with_retry", 1, true)
 		helpers.assert_true(resume_pos ~= nil and sched_pos ~= nil,

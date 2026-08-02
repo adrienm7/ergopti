@@ -17,13 +17,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -43,8 +42,8 @@ helpers.describe("gestures/engine.lua: diagonal detection uses total distance (a
 	-- gestures/engine.lua into the self-contained gestures/geometry.lua. Read
 	-- both so the guard assertions survive that move (move-resilient).
 	local function read_geometry_src()
-		return (read_source("modules/gestures/engine.lua") or "") ..
-			"\n" .. (read_source("modules/gestures/geometry.lua") or "")
+		return (read_source("local function triggerLiveAxisIfNeeded") or "") ..
+			"\n" .. (read_source("function M.slotForDir") or "")
 	end
 
 	helpers.it("old `adx >= diagMin and ady >= diagMin` pattern is gone", function()
@@ -76,14 +75,14 @@ end)
 helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5)", function()
 
 	helpers.it("declares _pgid_pending_timeout variable", function()
-		local src = read_source("modules/llm/api_mlx.lua")
+		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(
 			src:find("_pgid_pending_timeout", 1, true) ~= nil,
 			"api_mlx.lua must declare _pgid_pending_timeout for the safety-timeout handle")
 	end)
 
 	helpers.it("reset_endpoints arms a TimerScheduler.after(15", function()
-		local src = read_source("modules/llm/api_mlx.lua")
+		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		-- Find the reset_endpoints function body
 		local idx = src:find("function M%.reset_endpoints%(", 1, false)
 		helpers.assert_true(idx ~= nil, "reset_endpoints must exist in api_mlx.lua")
@@ -97,7 +96,7 @@ helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5
 	end)
 
 	helpers.it("timeout callback clears _server_pgid_pending", function()
-		local src = read_source("modules/llm/api_mlx.lua")
+		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		local idx = src:find("function M%.reset_endpoints%(", 1, false)
 		local rest = src:sub(idx)
 		local _, stop = rest:find("\nend\n")
@@ -121,7 +120,7 @@ end)
 helpers.describe("modules/keymap/init.lua: stale synthetic buffer purged on miss (audit-v5)", function()
 
 	helpers.it("else branch clears expected_synthetic_chars after missed match", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		-- The fix adds an `else` after the `elseif dt < 0.02` tolerance window that
 		-- sets CoreState.expected_synthetic_chars = "" when a real keystroke (dt >= 20ms)
 		-- does not match the pending synthetic buffer.
@@ -141,7 +140,7 @@ helpers.describe("modules/keymap/init.lua: stale synthetic buffer purged on miss
 	-- is classified by PROVENANCE, and a stale expectation is purged". That is
 	-- what these two now assert, and neither can pass against the old code.
 	helpers.it("no timing window is allowed to decide whether a keystroke is ours", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		helpers.assert_true(
 			src:find("elseif dt < 0%.02 then", 1, false) == nil,
 			"the dt < 0.02 tolerance window must NOT come back: typing speed is not evidence "
@@ -150,7 +149,7 @@ helpers.describe("modules/keymap/init.lua: stale synthetic buffer purged on miss
 	end)
 
 	helpers.it("the synthetic filter branches on event provenance instead", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		local filter_pos = src:find("CRUCIAL SYNTHETIC FILTER", 1, true)
 		helpers.assert_true(filter_pos ~= nil,
 			"the synthetic filter block must still exist — without it this test guards nothing")
@@ -180,10 +179,11 @@ helpers.describe("boot_cleanup.lua: grep -c . is guarded with || true (audit-v5)
 	helpers.it("grep -c . is followed by || true", function()
 		-- The MLX boot kill_cmd was extracted from init.lua into the
 		-- modules/llm/boot_cleanup.lua sibling; the set -e guard moved with it.
-		local fh = io.open(DRIVER_ROOT .. "modules/llm/boot_cleanup.lua", "r")
-		assert(fh, "cannot open boot_cleanup.lua")
-		local src = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/boot_cleanup.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.run_selective_cleanup")
+		helpers.assert_true(src ~= nil, "modules/llm/boot_cleanup.lua source must be locatable")
 		helpers.assert_true(
 			src:find("grep -c . || true", 1, true) ~= nil,
 			"boot_cleanup.lua kill_cmd must use `grep -c . || true` to survive set -e shells")

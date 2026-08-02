@@ -37,11 +37,11 @@ local DRIVER_ROOT = helpers.driver_root()
 local PIN_LOOKBACK  = 12
 local PIN_LOOKAHEAD = 40
 
-local function read_source(rel_path)
-	local f = io.open(DRIVER_ROOT .. rel_path, "r")
-	if not f then return nil, "cannot open: " .. DRIVER_ROOT .. rel_path end
-	local src = f:read("*a")
-	f:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -335,7 +335,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
-		local src = read_source("infra/dialog_util.lua")
+		local src = read_source("local function focus_hammerspoon") -- infra/dialog_util.lua
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
 		assert(not src:find("hs%.task%.new", 1, false),
@@ -343,7 +343,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("shell_runner: canonical GC-root table is present", function()
-		local src = read_source("adapters/shell_runner.lua")
+		local src = read_source("local function invoke_guarded") -- adapters/shell_runner.lua
 		assert(src, "shell_runner.lua must exist")
 		assert(src:find("_active_tasks", 1, false),
 			"shell_runner: must maintain M._active_tasks as GC root for all spawned tasks")

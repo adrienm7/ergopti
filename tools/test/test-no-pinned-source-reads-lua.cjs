@@ -75,7 +75,15 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    this definition and could generate a selector from a
 //                    constant or an i18n key, it converted 44 reads across 35
 //                    files with no test change.)
-const BASELINE = 70;
+//           70 → 34 (2026-08-02: the local `read_source(rel)` helpers. Two thirds
+//                    of the population was never written at the read site — the
+//                    file declares one helper taking a driver-relative path and
+//                    calls it a dozen times, so converting read sites alone left
+//                    them all. The helper now takes a SELECTOR and each call site
+//                    swaps its literal, keeping the module name as a trailing
+//                    comment: a comment cannot break a test when the file moves,
+//                    it can only go stale.)
+const BASELINE = 34;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -99,7 +107,10 @@ const BASELINE = 70;
 //              which is the shape a per-file ratchet is blind to by
 //              construction: the files worst affected were already on the list.)
 //      281 → 237 (2026-08-02: 44 reads converted, see the file baseline.)
-const READ_BASELINE = 237;
+//      237 → 90 (2026-08-02: 147 more via the path-taking helpers. From 281 to 90
+//              in one pass, so two thirds of what looked like an unbounded
+//              migration was one rewrite applied 147 times.)
+const READ_BASELINE = 90;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

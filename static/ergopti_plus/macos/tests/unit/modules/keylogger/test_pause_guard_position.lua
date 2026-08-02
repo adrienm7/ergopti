@@ -73,11 +73,11 @@ end)
 --- Reads a driver source file.
 --- @param rel string Path relative to the driver root.
 --- @return string File contents.
-local function read_source(rel)
-	local path = helpers.driver_root() .. rel
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. tostring(path))
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -181,7 +181,7 @@ local GATED_FUNCTIONS = {
 
 helpers.describe("keylogger: no context_tracker writer escapes the pause classification", function()
 	helpers.it("every _log_manager.* call site sits in a gated or explicitly exempt function", function()
-		local src = read_source("modules/keylogger/context_tracker.lua")
+		local src = read_source("local function update_secure_field_state") -- modules/keylogger/context_tracker.lua
 
 		-- Walk the file once, tracking the most recent function declaration so
 		-- each writer call can be attributed to its enclosing function.

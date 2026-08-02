@@ -28,13 +28,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -60,21 +59,21 @@ end
 helpers.describe("modules/keymap/init.lua: synthetic-backspace guard checks source PID (audit-v6-bug1)", function()
 
 	helpers.it("guard uses eventSourceUnixProcessID before decrementing deletes counter", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		helpers.assert_true(
 			src:find("eventSourceUnixProcessID", 1, true) ~= nil,
 			"init.lua must check eventSourceUnixProcessID to distinguish human vs synthetic Backspace")
 	end)
 
 	helpers.it("guard uses hs.processInfo.processID for PID comparison", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		helpers.assert_true(
 			src:find("hs.processInfo.processID", 1, true) ~= nil,
 			"init.lua must compare source PID against hs.processInfo.processID")
 	end)
 
 	helpers.it("old unconditional decrement pattern is gone", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		-- The old code decremented immediately on any Backspace; it must now be
 		-- nested inside a source-PID check (the decrement is not at column 2).
 		-- We verify by checking the line structure: no tabs+decrement without a
@@ -101,14 +100,14 @@ end)
 helpers.describe("modules/keymap/utils.lua: paste path uses paste counter, not expected_synthetic_chars (audit-v6-bug2)", function()
 
 	helpers.it("utils.lua exposes take_paste_ops()", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		helpers.assert_true(
 			src:find("function M.take_paste_ops()", 1, true) ~= nil,
 			"utils.lua must expose M.take_paste_ops() for expander to read pending paste count")
 	end)
 
 	helpers.it("emit_text paste path increments _paste_ops_pending", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		local body = func_body(src, "function M.emit_text(")
 		helpers.assert_true(
 			body:find("_paste_ops_pending", 1, true) ~= nil,
@@ -116,7 +115,7 @@ helpers.describe("modules/keymap/utils.lua: paste path uses paste counter, not e
 	end)
 
 	helpers.it("emit_text paste path returns empty emitted_str", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		local body = func_body(src, "function M.emit_text(")
 		-- Must return "", not the text, for the paste path
 		helpers.assert_true(
@@ -125,28 +124,28 @@ helpers.describe("modules/keymap/utils.lua: paste path uses paste counter, not e
 	end)
 
 	helpers.it("expander.lua calls take_paste_ops after emit_action", function()
-		local src = read_source("modules/keymap/expander.lua")
+		local src = read_source("local function word_boundary_blocks") -- modules/keymap/expander.lua
 		helpers.assert_true(
 			src:find("take_paste_ops", 1, true) ~= nil,
 			"expander.lua must call km_utils.take_paste_ops() to consume the paste counter")
 	end)
 
 	helpers.it("expander.lua updates expected_synthetic_pastes from paste ops", function()
-		local src = read_source("modules/keymap/expander.lua")
+		local src = read_source("local function word_boundary_blocks") -- modules/keymap/expander.lua
 		helpers.assert_true(
 			src:find("expected_synthetic_pastes", 1, true) ~= nil,
 			"expander.lua must update _state.expected_synthetic_pastes when paste ops > 0")
 	end)
 
 	helpers.it("init.lua checks expected_synthetic_pastes for Cmd+V echo", function()
-		local src = read_source("modules/keymap/init.lua")
+		local src = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		helpers.assert_true(
 			src:find("expected_synthetic_pastes", 1, true) ~= nil,
 			"init.lua must check expected_synthetic_pastes to swallow Cmd+V echo without wiping buffer")
 	end)
 
 	helpers.it("state.lua initialises expected_synthetic_pastes to 0", function()
-		local src = read_source("modules/keymap/state.lua")
+		local src = read_source("local DEFAULT_SUPPRESS_KEEP_SEC") -- modules/keymap/state.lua
 		helpers.assert_true(
 			src:find("expected_synthetic_pastes", 1, true) ~= nil,
 			"state.lua must declare expected_synthetic_pastes = 0 in the initial state table")
@@ -167,21 +166,21 @@ end)
 helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (audit-v6-bug3)", function()
 
 	helpers.it("clipboard save uses readAllData() instead of getContents()", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		helpers.assert_true(
 			src:find("hs.pasteboard.readAllData()", 1, true) ~= nil,
 			"utils.lua must use readAllData() to save clipboard (preserves images / RTF / files)")
 	end)
 
 	helpers.it("clipboard restore uses writeAllData() instead of setContents()", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		helpers.assert_true(
 			src:find("hs.pasteboard.writeAllData", 1, true) ~= nil,
 			"utils.lua must use writeAllData() to restore clipboard (preserves images / RTF / files)")
 	end)
 
 	helpers.it("old getContents() pattern is gone from the paste save paths", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		-- getContents may still exist in comments; guard is that the actual
 		-- clipboard-save assignment uses readAllData, not getContents.
 		-- Verify neither paste path assigns from getContents().
@@ -191,7 +190,7 @@ helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (a
 	end)
 
 	helpers.it("old setContents() is no longer used in paste restore timers", function()
-		local src = read_source("modules/keymap/utils.lua")
+		local src = read_source("local function invalidate_ignored_win_cache") -- modules/keymap/utils.lua
 		-- setContents is still allowed as a fallback for empty clipboard, but the
 		-- primary restore path must use writeAllData.
 		-- The guard: writeAllData must appear inside a doAfter callback.

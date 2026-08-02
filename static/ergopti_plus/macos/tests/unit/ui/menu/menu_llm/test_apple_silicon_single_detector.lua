@@ -19,11 +19,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local path = helpers.driver_root() .. rel_path
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, rel_path .. " must be readable")
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,7 +40,7 @@ end
 helpers.describe("backend_panel.lua: is_apple_silicon is a single exported source of truth (F-MED-4)", function()
 
 	helpers.it("exports M.is_apple_silicon", function()
-		local src = read_src("ui/menu/menu_llm/backend_panel.lua")
+		local src = read_src("\"menu.llm.backend_ollama_suffix\"") -- ui/menu/menu_llm/backend_panel.lua
 		helpers.assert_true(
 			src:find("M.is_apple_silicon = is_apple_silicon", 1, true) ~= nil,
 			"backend_panel.lua must export M.is_apple_silicon (F-MED-4)"
@@ -51,7 +51,7 @@ helpers.describe("backend_panel.lua: is_apple_silicon is a single exported sourc
 		-- Scope to the is_apple_silicon FUNCTION BODY only, not the whole file —
 		-- the doc comment right above it legitimately mentions the OLD
 		-- /opt/homebrew heuristic in prose to explain why this detector exists.
-		local src = read_src("ui/menu/menu_llm/backend_panel.lua")
+		local src = read_src("\"menu.llm.backend_ollama_suffix\"") -- ui/menu/menu_llm/backend_panel.lua
 		local fn_start = src:find("local function is_apple_silicon()", 1, true)
 		helpers.assert_true(fn_start ~= nil, "backend_panel.lua must define is_apple_silicon()")
 		local fn_end  = src:find("\nend", fn_start, true)
@@ -81,7 +81,7 @@ end)
 helpers.describe("menu_llm/init.lua: delegates Apple-Silicon detection to BackendPanel (F-MED-4)", function()
 
 	helpers.it("does NOT re-declare the /opt/homebrew filesystem heuristic", function()
-		local src = read_src("ui/menu/menu_llm/init.lua")
+		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		helpers.assert_true(
 			src:find('hs.fs.attributes("/opt/homebrew"', 1, true) == nil,
 			"menu_llm/init.lua must not use the /opt/homebrew filesystem heuristic — it is wrong on a fresh arm64 Mac with no Homebrew yet (F-MED-4)"
@@ -89,7 +89,7 @@ helpers.describe("menu_llm/init.lua: delegates Apple-Silicon detection to Backen
 	end)
 
 	helpers.it("calls BackendPanel.is_apple_silicon() for its is_apple_silicon local", function()
-		local src = read_src("ui/menu/menu_llm/init.lua")
+		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		helpers.assert_true(
 			src:find("local is_apple_silicon = BackendPanel.is_apple_silicon()", 1, true) ~= nil,
 			"menu_llm/init.lua must delegate to BackendPanel.is_apple_silicon() (F-MED-4)"
@@ -97,7 +97,7 @@ helpers.describe("menu_llm/init.lua: delegates Apple-Silicon detection to Backen
 	end)
 
 	helpers.it("requires ui.menu.menu_llm.backend_panel BEFORE using is_apple_silicon", function()
-		local src = read_src("ui/menu/menu_llm/init.lua")
+		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		local require_pos = src:find('require("ui.menu.menu_llm.backend_panel")', 1, true)
 		local usage_pos    = src:find("BackendPanel.is_apple_silicon()", 1, true)
 		helpers.assert_true(require_pos ~= nil, "menu_llm/init.lua must require ui.menu.menu_llm.backend_panel")

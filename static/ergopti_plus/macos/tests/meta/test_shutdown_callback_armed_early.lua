@@ -34,10 +34,11 @@ local helpers = require("tests.helpers")
 --- Reads the driver's init.lua.
 --- @return string
 local function init_source()
-	local f = io.open(helpers.driver_root() .. "init.lua", "r")
-	assert(f, "macos/init.lua must be readable")
-	local src = f:read("*a")
-	f:close()
+	-- Selected by a declaration unique to init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+	helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 	return src
 end
 

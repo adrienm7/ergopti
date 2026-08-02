@@ -19,11 +19,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_source(rel)
-	local fh = io.open(helpers.driver_root() .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -48,7 +48,7 @@ end
 helpers.describe("keymap/expander.lua: try_repeat_feature arm time", function()
 
 	helpers.it("try_repeat_feature updates last_synthetic_arm_time after arming", function()
-		local src = strip_comments(read_source("modules/keymap/expander.lua"))
+		local src = strip_comments(read_source("local function word_boundary_blocks"))
 
 		-- Locate try_repeat_feature function body
 		local fn_start = src:find("function M%.try_repeat_feature")
@@ -62,7 +62,7 @@ helpers.describe("keymap/expander.lua: try_repeat_feature arm time", function()
 	end)
 
 	helpers.it("last_synthetic_arm_time is set AFTER expected_synthetic_chars in try_repeat_feature", function()
-		local src = strip_comments(read_source("modules/keymap/expander.lua"))
+		local src = strip_comments(read_source("local function word_boundary_blocks"))
 		local fn_start = src:find("function M%.try_repeat_feature")
 		helpers.assert_true(fn_start ~= nil)
 		local after_fn = src:sub(fn_start)
