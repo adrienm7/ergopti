@@ -21,7 +21,7 @@ local text_utils = require("infra.text_utils")
 local i18n             = require("infra.i18n")
 local ui_restore       = require("infra.ui_restore")
 
-local Preferences   = require("ui.menu.preferences")
+local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")

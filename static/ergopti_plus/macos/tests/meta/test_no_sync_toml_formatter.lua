@@ -23,7 +23,7 @@
 --- WHY THIS TEST IS CLASS-WIDE:
 --- Both defects were found and fixed in modules/karabiner/config.lua, and pinned
 --- by tests/unit/modules/karabiner/test_config_repo_root.lua. That guard asserts
---- against ONE file, so the identical copy in ui/menu/preferences.lua — on the
+--- against ONE file, so the identical copy in infra/preferences.lua — on the
 --- hotter path of the two, since every menu toggle calls save_prefs() — survived
 --- untouched. This test therefore enumerates every driver source file instead of
 --- naming one, which is the documented lesson of

@@ -41,7 +41,7 @@ local function write_temp(contents)
 end
 
 local function preferences()
-	return helpers.load_with_stubs("ui.menu.preferences", {})
+	return helpers.load_with_stubs("infra.preferences", {})
 end
 
 

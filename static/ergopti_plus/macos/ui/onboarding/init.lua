@@ -281,7 +281,7 @@ local function to_bool(value)
 end
 
 --- Builds the config.toml update list from the wizard answers, using the CANONICAL
---- HS config schema (ui/menu/preferences.lua KEY_MAP) — lowercase sections, clean
+--- HS config schema (infra/preferences.lua KEY_MAP) — lowercase sections, clean
 --- ``enabled`` flags. Pure (no I/O) so the schema is unit-testable: a regression
 --- to AHK-style keys (which the macOS loader ignores, silently dropping every
 --- wizard choice) is caught by tests/unit/ui/test_onboarding_config_schema.lua.

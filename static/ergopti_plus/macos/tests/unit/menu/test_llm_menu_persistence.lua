@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)
 --- DESCRIPTION:
---- Ensures every LLM menu setting mapped in ui/menu/preferences.lua is written
+--- Ensures every LLM menu setting mapped in infra/preferences.lua is written
 --- to config.toml and read back. Contract: _shared/modules/llm/menu_persistence_contract.json
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local prefs   = helpers.load_with_stubs("ui.menu.preferences")
+local prefs   = helpers.load_with_stubs("infra.preferences")
 local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 local function contract_path()
@@ -30,7 +30,7 @@ local function load_contract()
 end
 
 local function preferences_source()
-	return helpers.driver_root() .. "ui/menu/preferences.lua"
+	return helpers.driver_root() .. "infra/preferences.lua"
 end
 
 local function deep_equal(a, b)
