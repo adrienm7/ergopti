@@ -73,7 +73,7 @@ function productionFiles(driver) {
 const BASELINE_UNREFERENCED = {
 	macos: 0,
 	windows: 0,
-	linux: 9
+	linux: 0
 };
 
 const errors = [];

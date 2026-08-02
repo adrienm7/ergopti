@@ -49,8 +49,19 @@ check('generator resolves the domain/ spec dir (>=4)', domain.length >= 4, `foun
 // macos, so linux/adapters/ — a full set of them — appeared nowhere in a
 // document titled "the three-layer hexagonal architecture".
 check('generator discovers all three drivers', gen.DRIVERS.length >= 3, `found ${gen.DRIVERS.map((d) => d.name).join(', ')}`);
+// The floor guards the SCAN, not parity between drivers. It used to be >=18,
+// which encoded "every driver implements ~20 adapters" — the reading of ADR-001
+// that produced nine Linux adapters with no caller, all of them deleted under
+// ADR-008. A driver now ships the adapters its features use, so a legitimate
+// count can be well below twenty; what still cannot happen is a stale path
+// resolving to nothing, which is what this check was written for.
+const ADAPTER_SCAN_FLOOR = 5;
 for (const { driver, adapters } of driverData) {
-	check(`generator resolves ${driver.name}/adapters (>=18)`, adapters.length >= 18, `found ${adapters.length} at ${driver.dir}`);
+	check(
+		`generator resolves ${driver.name}/adapters (>=${ADAPTER_SCAN_FLOOR}, not 0)`,
+		adapters.length >= ADAPTER_SCAN_FLOOR,
+		`found ${adapters.length} at ${driver.dir}`
+	);
 }
 
 // (b) Staleness: the committed diagram body must match the freshly built one.

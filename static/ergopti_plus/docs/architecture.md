@@ -35,29 +35,20 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
-        LINUX_app_launcher["AppLauncher.lua"]
-        LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_event_loop["EventLoop.lua"]
         LINUX_file_system["FileSystem.lua"]
-        LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_http_client["HttpClient.lua"]
-        LINUX_key_state["KeyState.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
-        LINUX_mouse_control["MouseControl.lua"]
-        LINUX_network_info["NetworkInfo.lua"]
-        LINUX_notifier["Notifier.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_storage["Storage.lua"]
         LINUX_text_sender["TextSender.lua"]
         LINUX_timer_scheduler["TimerScheduler.lua"]
-        LINUX_tooltip_renderer["TooltipRenderer.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_window_info["WindowInfo.lua"]
-        LINUX_window_manager["WindowManager.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
@@ -120,26 +111,17 @@ graph TD
     end
 
     %% Port implementations: Linux (Lua)
-    P_AppLauncher -->|implements| LINUX_app_launcher
-    P_Clipboard -->|implements| LINUX_clipboard
     P_Crypto -->|implements| LINUX_crypto
     P_FileSystem -->|implements| LINUX_file_system
-    P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_HttpClient -->|implements| LINUX_http_client
-    P_KeyState -->|implements| LINUX_key_state
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
-    P_MouseControl -->|implements| LINUX_mouse_control
-    P_NetworkInfo -->|implements| LINUX_network_info
-    P_Notifier -->|implements| LINUX_notifier
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_Storage -->|implements| LINUX_storage
     P_TextSender -->|implements| LINUX_text_sender
     P_TimerScheduler -->|implements| LINUX_timer_scheduler
-    P_TooltipRenderer -->|implements| LINUX_tooltip_renderer
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info
-    P_WindowManager -->|implements| LINUX_window_manager
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher

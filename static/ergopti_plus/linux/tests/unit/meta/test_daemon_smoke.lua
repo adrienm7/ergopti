@@ -196,10 +196,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("adapter modules", function()
     local adapters = {
-      "adapters.notifier",
       "adapters.http_client",
       "adapters.tray_menu",
-      "adapters.tooltip_renderer",
     }
     for _, name in ipairs(adapters) do
       helpers.it(name .. " loads", function()
