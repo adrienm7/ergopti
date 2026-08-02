@@ -24,7 +24,7 @@ Test("HSE: physical input survives a nearby output transaction", Test_HSE_Physic
 ; Ctrl+A reset in the prefix watcher had the same omission.
 _HSPIP_PhysicalFeedsDeclareProvenance() {
 	Tap := _DriverFuncBody("_SpaceTap")
-	Assert(Tap != "", "_SpaceTap must exist in modules/tap_holds/space.ahk")
+	Assert(Tap != "", "_SpaceTap must exist in platform/remap/space.ahk")
 	Assert(InStr(Tap, 'HSE_FeedChar(" ", true)') > 0,
 		"_SpaceTap must feed its space as PHYSICAL (IsPhysical=true) so it survives the post-expansion suppress window")
 

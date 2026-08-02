@@ -19,7 +19,7 @@
 ; whenever TapHold["inherit_defaults"] is false so every rewrite preserves the
 ; flag.
 ;
-; SCOPE: source introspection of infra/tap_hold/tap_hold_writer.ahk.
+; SCOPE: source introspection of platform/remap/tap_hold_writer.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -47,8 +47,8 @@ _TWHID_ReadSource(RelPath) {
 ; ===================================================
 
 _TWHID_CheckWriterEmitsInheritDefaults() {
-	Src := _TWHID_ReadSource("infra/tap_hold/tap_hold_writer.ahk")
-	Assert(Src != "", "infra/tap_hold/tap_hold_writer.ahk must be readable")
+	Src := _TWHID_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Body != "", "_TH_WriteTapHoldToml must be present in tap_hold_writer.ahk")
@@ -58,8 +58,8 @@ _TWHID_CheckWriterEmitsInheritDefaults() {
 }
 
 _TWHID_CheckWriterEmitsRootSection() {
-	Src := _TWHID_ReadSource("infra/tap_hold/tap_hold_writer.ahk")
-	Assert(Src != "", "infra/tap_hold/tap_hold_writer.ahk must be readable")
+	Src := _TWHID_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Body != "", "_TH_WriteTapHoldToml must be present in tap_hold_writer.ahk")
@@ -70,8 +70,8 @@ _TWHID_CheckWriterEmitsRootSection() {
 }
 
 _TWHID_CheckLoaderReadsInheritDefaults() {
-	Src := _TWHID_ReadSource("infra/tap_hold/tap_hold_loader.ahk")
-	Assert(Src != "", "infra/tap_hold/tap_hold_loader.ahk must be readable")
+	Src := _TWHID_ReadSource("platform/remap/tap_hold_loader.ahk")
+	Assert(Src != "", "platform/remap/tap_hold_loader.ahk must be readable")
 
 	Assert(InStr(Src, "inherit_defaults"),
 		"tap_hold_loader.ahk must read and respect the inherit_defaults key from the TOML file")

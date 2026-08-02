@@ -4,7 +4,7 @@
 ; MODULE: Navigation Layer Helpers
 ; DESCRIPTION:
 ; Pure state-management functions for the navigation layer. Extracted here
-; from modules/tap_holds/nav_layer.ahk so the logic is testable without
+; from platform/remap/nav_layer.ahk so the logic is testable without
 ; loading hotkey-registration code.
 ;
 ; FEATURES & RATIONALE:

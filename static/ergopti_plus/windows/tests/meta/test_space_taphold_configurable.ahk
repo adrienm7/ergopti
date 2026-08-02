@@ -4,7 +4,7 @@
 ; MODULE: SpaceTapHold Configurable Timeout Guard
 ; DESCRIPTION:
 ; Static source guard for the SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant fix in
-; modules/tap_holds/space.ahk.
+; platform/remap/space.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original space tap-hold InputHook used the hardcoded string "L1 T3" where
@@ -41,15 +41,15 @@ _TSTC_ConfigurableTimeout() {
 	; Move-resilient: scan the tap-holds module dir via the framework helper instead
 	; of a pinned modules path; the constant declaration lives at module scope (not
 	; inside a function), so keep the comment-stripping extractor
-	Src := _TSTC_StripLineComments(_DriverDirConcat("modules/tap_holds"))
-	Assert(Src != "", "modules/tap_holds/space.ahk must be readable")
+	Src := _TSTC_StripLineComments(_DriverDirConcat("platform/remap"))
+	Assert(Src != "", "platform/remap/space.ahk must be readable")
 
 	; The constant must be declared
 	Assert(InStr(Src, "SPACE_HOLD_INPUT_TIMEOUT_FACTOR") > 0,
-		"modules/tap_holds/space.ahk must define SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant (replaces hardcoded T3)")
+		"platform/remap/space.ahk must define SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant (replaces hardcoded T3)")
 
 	; The constant must be used in the dynamic timeout calculation
 	Assert(InStr(Src, "TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR") > 0,
-		"modules/tap_holds/space.ahk must compute the InputHook timeout as TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR")
+		"platform/remap/space.ahk must compute the InputHook timeout as TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR")
 }
 Test("tap_holds/space: InputHook timeout uses SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant (not hardcoded T3)", _TSTC_ConfigurableTimeout)

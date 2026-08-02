@@ -139,7 +139,7 @@ _AOPR_BASELINE_ENTRY := 8
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -259,7 +259,7 @@ _AOPR_FAMILY_BASELINE_ENTRY := 11
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 

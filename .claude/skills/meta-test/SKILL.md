@@ -21,7 +21,7 @@ Defined in `tests/test_framework.ahk`:
 | `_DriverDirConcat(RelDir)` | every file under one directory |
 | `_StripFullLineComments(Src)` | comment-stripped copy of any source string |
 
-**Never hardcode a path like `"modules/tap_holds/lalt.ahk"`.** A CI ratchet
+**Never hardcode a path like `"platform/remap/lalt.ahk"`.** A CI ratchet
 (`tools/test/test-no-pinned-source-reads.cjs`) fails the build when the count of
 location-pinned reads rises above `BASELINE = 20`.
 

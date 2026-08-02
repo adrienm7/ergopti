@@ -87,7 +87,7 @@ _MRS_NoBareReloadAnywhereReachable() {
 	; directory, so scanning by directory excludes it structurally rather than by
 	; a name this test would have to keep in step.
 	Src := ""
-	for Dir in ["infra", "ui", "modules", "adapters"]
+	for Dir in ["infra", "ui", "modules", "platform", "adapters"]
 		Src .= "`n" . _StripFullLineComments(_DriverDirConcat(Dir))
 	Assert(StrLen(Src) > 200000,
 		"the driver source trees must be readable for this scan to mean anything (read " . StrLen(Src) . " chars)")

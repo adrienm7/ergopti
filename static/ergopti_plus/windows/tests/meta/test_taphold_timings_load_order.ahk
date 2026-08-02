@@ -4,7 +4,7 @@
 ; MODULE: Tap-hold timing constants load-order guard
 ; DESCRIPTION:
 ; AHK v2 executes a file's top-level `global X := ...` assignments at its #Include
-; POSITION in the auto-execute flow. modules/tap_holds/constants.ahk seeds the
+; POSITION in the auto-execute flow. platform/remap/constants.ahk seeds the
 ; four tap-hold timing constants (TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS,
 ; KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC) to a sentinel 0. infra/boot.ahk
 ; then loads the real registry values via TapHoldsLoadTimings(). If constants.ahk
@@ -23,10 +23,10 @@ _TTLO_ConstantsIncludedBeforeBoot() {
 	Src := _DriverSourceConcat()
 	Assert(Src != "", "driver source must be readable for the tap-hold timings load-order meta-test")
 
-	ConstPos := InStr(Src, "#Include modules/tap_holds/constants.ahk")
+	ConstPos := InStr(Src, "#Include platform/remap/constants.ahk")
 	BootPos := InStr(Src, "#Include infra/boot.ahk")
 	Assert(ConstPos > 0,
-		"ErgoptiPlus.ahk must include modules/tap_holds/constants.ahk in the early manifest (sentinel layer)")
+		"ErgoptiPlus.ahk must include platform/remap/constants.ahk in the early manifest (sentinel layer)")
 	Assert(BootPos > 0,
 		"ErgoptiPlus.ahk must include infra/boot.ahk (which calls TapHoldsLoadTimings)")
 	Assert(ConstPos < BootPos,
@@ -55,7 +55,7 @@ _TTLO_EverySentinelFilePrecedesBoot() {
 
 	; file -> the loader whose values its include-position sentinels would clobber
 	Pairs := Map(
-		"modules/tap_holds/constants.ahk",        "TapHoldsLoadTimings",
+		"platform/remap/constants.ahk",        "TapHoldsLoadTimings",
 		"infra/hotstrings/hotstrings_config.ahk",   "HotstringsConfigLoadSharedDefaults",
 		"modules/keylogger/keylogger_walker.ahk", "KeyloggerWalkerLoadTimings",
 		"modules/llm/api_ollama.ahk",             "LLMApiLoadTimings",

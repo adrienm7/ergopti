@@ -74,7 +74,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("automatic CapsWord probe cleanup stays debug-only", function()
-		local source = read_source("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
+		local source = read_source("local function read_current_layout_from_hitoolbox") -- platform/remap/watchers.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"CapsWord probe timed out", 1, true) ~= nil)
 	end)
 

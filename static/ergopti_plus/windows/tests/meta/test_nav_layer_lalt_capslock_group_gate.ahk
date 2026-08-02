@@ -18,7 +18,7 @@
 ; the manifest. The canonical single source, _AnyShortcutEnabled(Group), already
 ; iterates the sub-map and is what the sibling gate (SC038 & SC03A in
 ; modules/shortcuts/base_modifier.ahk) uses — the same question asked twice.
-; Pinned here as a class invariant over modules/tap_holds: no gate in that tree
+; Pinned here as a class invariant over platform/remap: no gate in that tree
 ; may answer it by naming ids, so an 11th action is covered automatically.
 ;
 ; SCOPE: meta-static. The gate is a #HotIf criterion, which the headless runner
@@ -71,7 +71,7 @@ _NLGG_ManifestActionIds() {
 ; every other SC03A dispatcher of the same function is explicitly gated on
 ; "not LayerEnabled" and is therefore not the rescue.
 _NLGG_RescueGate() {
-	Src := _StripFullLineComments(_DriverDirConcat("modules/tap_holds"))
+	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Lines := StrSplit(Src, "`n", "`r")
 	Gates := []
 	for i, Line in Lines {
@@ -100,7 +100,7 @@ _NLGG_RescueGate() {
 			Gates.Push(Criterion)
 	}
 	Assert(Gates.Length == 1,
-		"exactly one SC03A variant in modules/tap_holds must dispatch LAltCapsLockShortcut() while the navigation layer is engaged (found " . Gates.Length . ") — without it the chord falls through to the layer's own BackSpace mapping")
+		"exactly one SC03A variant in platform/remap must dispatch LAltCapsLockShortcut() while the navigation layer is engaged (found " . Gates.Length . ") — without it the chord falls through to the layer's own BackSpace mapping")
 	return Gates[1]
 }
 
@@ -142,9 +142,9 @@ _NLGG_EveryManifestActionCovered() {
 ; sub-map by hand. Those reads are both the drift vector and a raw Map[key]
 ; access, which throws on a key the manifest later renames.
 _NLGG_NoHandRolledGroupReadInTapHolds() {
-	Src := _StripFullLineComments(_DriverDirConcat("modules/tap_holds"))
+	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Assert(InStr(Src, '["lalt_caps_lock"][') == 0,
-		"modules/tap_holds must not read Features[" . Chr(0x22) . "shortcuts" . Chr(0x22) . "][" . Chr(0x22) . "lalt_caps_lock" . Chr(0x22) . "][<id>] directly — ask _AnyShortcutEnabled(" . Chr(0x22) . "lalt_caps_lock" . Chr(0x22) . ") instead, so the set of actions lives in one place and a raw Map access can never throw inside a #HotIf")
+		"platform/remap must not read Features[" . Chr(0x22) . "shortcuts" . Chr(0x22) . "][" . Chr(0x22) . "lalt_caps_lock" . Chr(0x22) . "][<id>] directly — ask _AnyShortcutEnabled(" . Chr(0x22) . "lalt_caps_lock" . Chr(0x22) . ") instead, so the set of actions lives in one place and a raw Map access can never throw inside a #HotIf")
 }
 
 
@@ -152,5 +152,5 @@ Test("nav-layer lalt+capslock: the rescue gate delegates to _AnyShortcutEnabled"
 	_NLGG_GateDelegatesToAnyShortcutEnabled)
 Test("nav-layer lalt+capslock: every manifest action is covered by the rescue gate and the dispatcher",
 	_NLGG_EveryManifestActionCovered)
-Test("nav-layer lalt+capslock: no hand-rolled lalt_caps_lock group read in modules/tap_holds",
+Test("nav-layer lalt+capslock: no hand-rolled lalt_caps_lock group read in platform/remap",
 	_NLGG_NoHandRolledGroupReadInTapHolds)

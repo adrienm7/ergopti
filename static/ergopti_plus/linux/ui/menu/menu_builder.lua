@@ -379,7 +379,7 @@ local function _build_kanata(ctx)
 
 	-- Fallback: try direct require if not passed via context.
 	if not km then
-		local ok_km, km_mod = pcall(require, "modules.kanata.manager")
+		local ok_km, km_mod = pcall(require, "platform.remap.manager")
 		if ok_km then km = km_mod end
 	end
 

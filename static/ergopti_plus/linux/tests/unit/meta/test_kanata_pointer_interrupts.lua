@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local function template_path()
 	local src = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 	local driver_root = src:match("^(.*)/tests/unit/meta/[^/]+$")
-	return (driver_root or ".") .. "/modules/kanata/data/kanata.kbd"
+	return (driver_root or ".") .. "/platform/remap/data/kanata.kbd"
 end
 
 local function read_template()

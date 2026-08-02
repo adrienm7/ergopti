@@ -628,7 +628,7 @@ sg("script_quit",                         function()
 	-- Lazy-required so this low-level action module carries no load-time
 	-- dependency on the Karabiner module.
 	pcall(function()
-		local ok_kb, karabiner = pcall(require, "modules.karabiner")
+		local ok_kb, karabiner = pcall(require, "platform.remap")
 		if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
 			karabiner.kill()
 		end

@@ -45,7 +45,7 @@ Every file below references the `Features` global or uses `IniCacheGet`. The cut
 16. `modules/hotstrings.ahk` — reads `Features["DistancesReduction"|"SFBsReduction"|"Rolls"|"Autocorrection"|"MagicKey"]…` (~99 occurrences)
 17. `modules/layout.ahk` — reads `Features["Layout"]…`
 18. `modules/shortcuts.ahk` — reads `Features["Shortcuts"]…` (~42 occurrences)
-19. `modules/tap_holds.ahk` — reads `Features["TapHolds"]…` (~70 occurrences) — see Section 7 for the structural change
+19. `platform/remap.ahk` — reads `Features["TapHolds"]…` (~70 occurrences) — see Section 7 for the structural change
 20. `modules/keylogger/keylogger_prefetch.ahk` — reads `Features["Personal"]…`
 21. `ui/tray_menu.ahk` — reads `Features[…]` extensively (~20 occurrences) + `IniCacheGet("LLM", …)`
 22. `tests/test_toml_loader.ahk`, `tests/test_config.ahk` — rewrite to test v2 loader
@@ -394,12 +394,12 @@ The migration must collapse the v1 "multi-variant per key" structure (e.g., `Cap
 
 ### 7.4 Call sites
 
-The ~70 `Features["TapHolds"]…` references in `modules/tap_holds.ahk` plus references in other files all need to read from the new `TapHold` global. The structure is fundamentally different (no more "which variant is enabled" branching — there's only one variant per key), so the migration is **not** mechanical here — it requires understanding what each branch does and replacing it with the equivalent `TapHold["keys"][<key>]["tap_action"]` lookup.
+The ~70 `Features["TapHolds"]…` references in `platform/remap.ahk` plus references in other files all need to read from the new `TapHold` global. The structure is fundamentally different (no more "which variant is enabled" branching — there's only one variant per key), so the migration is **not** mechanical here — it requires understanding what each branch does and replacing it with the equivalent `TapHold["keys"][<key>]["tap_action"]` lookup.
 
 **Action items**:
 
 - Implement a new `lib/tap_hold/tap_hold_loader.ahk` that reads `<config_dir>/ahk/tap_hold.toml` into the `TapHold` global.
-- Rewrite `modules/tap_holds.ahk` to drive its `#HotIf` guards from the new structure.
+- Rewrite `platform/remap.ahk` to drive its `#HotIf` guards from the new structure.
 - Remove `lib/tap_hold_config.ahk` entirely.
 
 ## 8. Gestures — `[Gestures]` → `[ahk.gestures]`
@@ -539,7 +539,7 @@ When you start the cut-over, do these in order:
    11. `ui/tray_menu.ahk` (~20 sites + 7 `IniCacheGet`)
    12. `lib/i18n.ahk` (~1 `IniCacheGet`)
    13. `lib/onboarding.ahk` (~6 `IniCacheGet`)
-   14. `modules/tap_holds.ahk` (~70 sites — but **NOT mechanical**, see Section 7.4)
+   14. `platform/remap.ahk` (~70 sites — but **NOT mechanical**, see Section 7.4)
    15. `ErgoptiPlus.ahk` itself (boot order + remaining `IniCacheGet`)
 5. **Delete legacy files**:
    - `lib/features_config.ahk`

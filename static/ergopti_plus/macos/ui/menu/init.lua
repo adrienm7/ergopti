@@ -76,7 +76,7 @@ local menu_mods = {
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
 	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
-	karabiner       = safe_require("ui.menu.menu_karabiner",       "Karabiner menu"),
+	karabiner       = safe_require("ui.menu.menu_remap",       "Karabiner menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 }
@@ -796,7 +796,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				-- guard entirely, so it could tear down a user-managed KE install that
 				-- Hammerspoon never started (F-MED-13).
 				pcall(function()
-					local ok_kb, karabiner = pcall(require, "modules.karabiner")
+					local ok_kb, karabiner = pcall(require, "platform.remap")
 					if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
 						karabiner.kill()
 					end

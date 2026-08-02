@@ -161,7 +161,7 @@ if ok_wm then webview_manager = wm_mod end
 -- Kanata manager (optional — key remapping daemon lifecycle).
 -- Handles .kbd generation and kanata process start/stop/restart.
 local kanata = nil
-local ok_kan, kan_mod = pcall(require, "modules.kanata.manager")
+local ok_kan, kan_mod = pcall(require, "platform.remap.manager")
 if ok_kan then kanata = kan_mod end
 
 -- File watchers (optional — inotify-based TOML/.lua hot reload).

@@ -4,7 +4,7 @@
 --- MODULE: Karabiner-Elements Vendor Manifest
 --- DESCRIPTION:
 --- Pins the exact Karabiner-Elements version shipped with Ergopti+. Read by
---- modules/karabiner/onboarding.lua to download, verify, and install the
+--- platform/remap/onboarding.lua to download, verify, and install the
 --- correct DMG on first launch when KE is absent from the user's system.
 ---
 --- FEATURES & RATIONALE:

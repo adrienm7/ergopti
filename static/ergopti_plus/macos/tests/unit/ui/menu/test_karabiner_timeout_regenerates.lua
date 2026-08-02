@@ -110,7 +110,7 @@ end
 --- @return table menu_item, table karabiner_double
 local function build_menu()
 	local karabiner = make_karabiner()
-	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_karabiner", {
+	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
 		osascript = {
 			applescript = function(_script)
 				return true, { ["text returned"] = TYPED_DELAY_MS }
@@ -170,7 +170,7 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 	-- a no-op write would rewrite the file on every dismissed prompt.
 	helpers.it("does not regenerate when the user cancels the dialog", function()
 		local karabiner = make_karabiner()
-		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_karabiner", {
+		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
 			osascript = { applescript = function(_script) return false, nil end },
 		})
 		local item = menu_karabiner.build({ karabiner = karabiner, updateMenu = function() end })

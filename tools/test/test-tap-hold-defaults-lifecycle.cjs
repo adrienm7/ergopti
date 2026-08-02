@@ -18,10 +18,10 @@
  *            and merges the user file on top PER KEY. Its docstring says so in
  *            as many words — "editing defaults.toml takes effect on every reload
  *            even when the user file exists".
- *   Linux    modules/kanata/manager.lua reads it, but a user file REPLACES it
+ *   Linux    platform/remap/manager.lua reads it, but a user file REPLACES it
  *            wholesale. Its comment claims this "mirrors the other drivers",
  *            which is precisely what Windows does not do.
- *   macOS    modules/karabiner/defaults.lua reads [hs_*] in its MODULE BODY at
+ *   macOS    platform/remap/defaults.lua reads [hs_*] in its MODULE BODY at
  *            require time, unconditionally.
  *
  * So a maintainer editing this file to tune a threshold, having read the schema
@@ -58,17 +58,17 @@ const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
 
 const LOADERS = [
 	{
-		file: 'windows/infra/tap_hold/tap_hold_loader.ahk',
+		file: 'windows/platform/remap/tap_hold_loader.ahk',
 		needle: 'defaults.toml',
 		lifecycle: 'parses the shared defaults first, then merges the user file on top per key'
 	},
 	{
-		file: 'linux/modules/kanata/manager.lua',
+		file: 'linux/platform/remap/manager.lua',
 		needle: 'tap_hold/defaults.toml',
 		lifecycle: 'reads the shared defaults; a user file replaces them wholesale'
 	},
 	{
-		file: 'macos/modules/karabiner/defaults.lua',
+		file: 'macos/platform/remap/defaults.lua',
 		needle: 'tap_hold/defaults.toml',
 		lifecycle: 'reads [hs_*] in its module body at require time, unconditionally'
 	}

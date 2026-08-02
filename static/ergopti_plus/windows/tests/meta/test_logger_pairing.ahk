@@ -95,7 +95,7 @@ _MetaRunLoggerPairingTests() {
 	Imbalanced := 0
 	Report := ""
 
-	for Sub in ["infra", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -146,7 +146,7 @@ _MetaNoStartBeforeReload() {
 	SplitPath(A_ScriptDir, , &Root)
 	Root := StrReplace(Root, "\", "/")
 	offenders := ""
-	for Sub in ["infra", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		Loop Files, Root . "/" . Sub . "/*.ahk", "FR" {
 			src := FileRead(A_LoopFileFullPath)
 			if RegExMatch(src, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")

@@ -18,7 +18,7 @@
 ; every deactivation path — including the hardware toggle — runs the full
 ; teardown.
 ;
-; SCOPE: source introspection of modules/tap_holds/one_shot_shift.ahk.
+; SCOPE: source introspection of platform/remap/one_shot_shift.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,8 +46,8 @@ _TCDCW_ReadSource(RelPath) {
 ; ===================================================
 
 _TCDCW_CheckCallsDisableCapsWord() {
-	Src := _TCDCW_ReadSource("modules/tap_holds/one_shot_shift.ahk")
-	Assert(Src != "", "modules/tap_holds/one_shot_shift.ahk must be readable")
+	Src := _TCDCW_ReadSource("platform/remap/one_shot_shift.ahk")
+	Assert(Src != "", "platform/remap/one_shot_shift.ahk must be readable")
 
 	Body := _DriverFuncBody("ToggleCapsLock")
 	Assert(Body != "", "ToggleCapsLock must be present in one_shot_shift.ahk")
@@ -57,8 +57,8 @@ _TCDCW_CheckCallsDisableCapsWord() {
 }
 
 _TCDCW_CheckNoDirectFalseAssign() {
-	Src := _TCDCW_ReadSource("modules/tap_holds/one_shot_shift.ahk")
-	Assert(Src != "", "modules/tap_holds/one_shot_shift.ahk must be readable")
+	Src := _TCDCW_ReadSource("platform/remap/one_shot_shift.ahk")
+	Assert(Src != "", "platform/remap/one_shot_shift.ahk must be readable")
 
 	Body := _DriverFuncBody("ToggleCapsLock")
 	Assert(Body != "", "ToggleCapsLock must be present in one_shot_shift.ahk")

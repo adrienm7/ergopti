@@ -126,8 +126,8 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua must guard allWindows() against nil return", function()
-		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
-		assert(src, "modules/karabiner/watchers.lua must be readable")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- platform/remap/watchers.lua
+		assert(src, "platform/remap/watchers.lua must be readable")
 		-- The bug: app:allWindows() can return nil if the app exits mid-call.
 		-- ipairs(nil) would crash with "bad argument #1".
 		assert(
@@ -142,8 +142,8 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua inner hs.task must be nil-checked before :start()", function()
-		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
-		assert(src, "modules/karabiner/watchers.lua must be readable")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- platform/remap/watchers.lua
+		assert(src, "platform/remap/watchers.lua must be readable")
 		-- The bug: hs.task.new(...):start() chained with no nil-check — crashes
 		-- if the CLI binary is missing and hs.task.new() returns nil.
 		-- Use [^\n]* (not .-) because in Lua 5.4 the dot matches newlines,
@@ -160,8 +160,8 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua F17 cycle-windows hotkey must use pcall wrapper", function()
-		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
-		assert(src, "modules/karabiner/watchers.lua must be readable")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- platform/remap/watchers.lua
+		assert(src, "platform/remap/watchers.lua must be readable")
 		-- The other hotkeys (Shift+F17, Alt+F17) already wrap their callback in pcall.
 		-- The plain F17 hotkey must match for consistency.
 		assert(

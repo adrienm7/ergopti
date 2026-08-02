@@ -141,6 +141,8 @@ const CHECKS = [
 	// documents it as a "CI gate".
 	{ name: 'feature read sites resolve against the manifest (UnsetItemError crash class)', cmd: 'node', args: ['tools/test/test-feature-read-sites.js'], repro: 'node tools/test/test-feature-read-sites.js' },
 	{ name: 'manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)', cmd: 'node', args: ['tools/test/test-menu-labels-resolve.cjs'], repro: 'node tools/test/test-menu-labels-resolve.cjs' },
+	{ name: 'Convention P (platform/ is the only OS-specific word; symmetrical across drivers)', cmd: 'node', args: ['tools/test/test-convention-p-platform-only.cjs'], repro: 'node tools/test/test-convention-p-platform-only.cjs' },
+	{ name: 'source-tree scan coverage (no scanner list forgets platform/)', cmd: 'node', args: ['tools/test/test-source-trees-are-scanned.cjs'], repro: 'node tools/test/test-source-trees-are-scanned.cjs' },
 	{ name: 'config schema (v2 TOML shape)', cmd: 'node', args: ['tools/test/test-config-schema.cjs'], repro: 'node tools/test/test-config-schema.cjs' },
 	{ name: 'metrics heatmap translation coverage', cmd: 'node', args: ['tools/test/test-metrics-heatmap-translation.cjs'], repro: 'node tools/test/test-metrics-heatmap-translation.cjs' },
 	// CI verifies AHK encoding with an inline PowerShell step rather than this

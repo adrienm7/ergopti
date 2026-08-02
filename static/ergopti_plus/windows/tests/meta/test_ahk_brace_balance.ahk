@@ -163,7 +163,7 @@ _MetaRunBraceBalanceTests() {
 	NormRoot := StrReplace(DriverRoot, "\", "/")
 	Checked := 0
 
-	for Sub in ["infra", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		for AbsPath in _MetaBrace_ListFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
 			Checked++
 			Test("brace balance: " . RegExReplace(AbsPath, ".*[/\\]"),

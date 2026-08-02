@@ -43,7 +43,7 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 
 -- Sentinel keycodes emitted by Karabiner's script-control rules
--- (modules/karabiner/init.lua → build_script_control_sentinel_rules).
+-- (platform/remap/init.lua → build_script_control_sentinel_rules).
 -- These fire ONLY when the user physically presses right_command + one of the
 -- three target keys. Tap actions that happen to emit backspace/return/escape
 -- (e.g. left_command tap → backspace) can NEVER activate these sentinels,

@@ -26,7 +26,7 @@
 ; reported: the same three lines are repeated across a dozen tap-hold files,
 ; and fixing the reported one would leave eleven identical bugs behind.
 ;
-; SCOPE: source-level. modules/tap_holds/*.ahk register top-level #HotIf
+; SCOPE: source-level. platform/remap/*.ahk register top-level #HotIf
 ; hotkeys and cannot be included by the headless runner.
 ; ==============================================================================
 
@@ -46,7 +46,7 @@
 ; which is where both the re-arm and the DisableLayer live.
 _HLSL_LayerHoldSites() {
 	Sites := []
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Lines := StrSplit(_StripFullLineComments(Src), "`n", "`r")
 	for Idx, Line in Lines {
 		if !InStr(Line, "KeyWait(")
@@ -100,7 +100,7 @@ _HLSL_CapIsNotRemoved() {
 ; reason this misuse was identifiable at all, and the reason a future reader
 ; will not re-apply it to another wait that holds no synthetic key.
 _HLSL_ConstantStillDocumentsItsPurpose() {
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Assert(RegExMatch(Src, "m)^global\s+STUCK_MODIFIER_RELEASE_TIMEOUT_SEC\s*:="),
 		"STUCK_MODIFIER_RELEASE_TIMEOUT_SEC must remain a named constant in the tap-holds layer")
 	Assert(InStr(Src, "SYNTHETIC modifier") > 0,

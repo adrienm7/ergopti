@@ -6,7 +6,7 @@
 --- the process start/stop methods are tested only for crash-freedom.
 
 local helpers = require("tests.helpers")
-local km      = helpers.load_module("modules.kanata.manager")
+local km      = helpers.load_module("platform.remap.manager")
 
 helpers.describe("kanata manager", function()
 
@@ -169,7 +169,7 @@ helpers.describe("kanata manager", function()
     end)
 
     helpers.it("does not hardcode a one-shot fallback in the source", function()
-      local fh = io.open(helpers.driver_root() .. "/modules/kanata/manager.lua", "r")
+      local fh = io.open(helpers.driver_root() .. "/platform/remap/manager.lua", "r")
       helpers.assert_true(fh ~= nil, "manager source must be readable")
       local src = fh:read("*a"); fh:close()
       helpers.assert_true(src:find("one_shot_ms = 2000", 1, true) == nil,
@@ -316,7 +316,7 @@ helpers.describe("kanata manager", function()
     -- in the headless suite (no kanata binary; the .kbd template resolves
     -- off-tree), so a runtime spy cannot observe them — assert pairing on source.
     local function read_manager_source()
-      local path = helpers.driver_root() .. "/modules/kanata/manager.lua"
+      local path = helpers.driver_root() .. "/platform/remap/manager.lua"
       local fh = assert(io.open(path, "r"), "cannot open manager.lua")
       local content = fh:read("*a")
       fh:close()

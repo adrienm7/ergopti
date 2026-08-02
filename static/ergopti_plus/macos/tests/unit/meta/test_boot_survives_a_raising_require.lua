@@ -4,10 +4,10 @@
 --- MODULE: Regression — a module that raises at require time must not cost the
 ---         user their keyboard
 --- DESCRIPTION:
---- `modules/karabiner/defaults.lua` calls `error()` at REQUIRE time — its top-level
+--- `platform/remap/defaults.lua` calls `error()` at REQUIRE time — its top-level
 --- body runs load_sections() and require_section(), and both raise — and the chain
 --- up to root `init.lua` was un-pcall'd: defaults.lua ← config.lua ←
---- karabiner/init.lua ← `karabiner = require("modules.karabiner")`. A raise there
+--- karabiner/init.lua ← `karabiner = require("platform.remap")`. A raise there
 --- aborts the top-level chunk, so every line below it never runs.
 ---
 --- 689d807c9 fixed WHERE the teardown is armed: the shutdown callback is now
@@ -39,9 +39,9 @@ local ARMING = "hs.shutdownCallback = function()"
 
 -- The module whose require chain is proven to reach an error() at load time.
 -- Matched on the NAME rather than on a call spelling, so the guarded form
--- `pcall(require, "modules.karabiner")` is what this test looks at instead of
+-- `pcall(require, "platform.remap")` is what this test looks at instead of
 -- being invisible to it.
-local RISKY_MODULE = '"modules.karabiner"'
+local RISKY_MODULE = '"platform.remap"'
 
 
 
@@ -99,7 +99,7 @@ helpers.describe("boot: one raising module must not abort the rest of init", fun
 
 		local statement = line_at(code, at)
 		helpers.assert_true(statement:find("pcall(", 1, true) ~= nil,
-			"modules.karabiner reaches defaults.lua, which calls error() in its top-level "
+			"platform.remap reaches defaults.lua, which calls error() in its top-level "
 			.. "body, and this require sits above the menubar, the panic-button eventtap and "
 			.. "every other line of boot. Unguarded, a missing or truncated tap_hold "
 			.. "defaults.toml costs the whole session instead of one feature. Statement: "

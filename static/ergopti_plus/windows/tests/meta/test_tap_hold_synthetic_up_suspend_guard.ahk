@@ -16,7 +16,7 @@
 
 _THSU_UntrackedUpGuardedBySuspend() {
 	Body := _DriverFuncBody("TapHoldSyntheticKeyUp")
-	Assert(Body != "", "TapHoldSyntheticKeyUp must exist in modules/tap_holds/constants.ahk")
+	Assert(Body != "", "TapHoldSyntheticKeyUp must exist in platform/remap/constants.ahk")
 
 	; The untracked-key branch's first synthetic Up must be preceded by an
 	; A_IsSuspended guard that returns without injecting.

@@ -160,7 +160,7 @@
 
 **Tap** — La moitié "pression courte" d'un tap-hold : une pression relâchée avant le seuil `TAP_MIN_DURATION_MS` déclenche l'action tap (ex. espace → espace, LAlt → retour arrière).
 
-**Tap-hold** — Technique de double rôle sur une touche physique : pression courte (tap) → une action, maintien (hold) → une autre action (couche ou modificateur). Implémenté dans `modules/tap_holds/`.
+**Tap-hold** — Technique de double rôle sur une touche physique : pression courte (tap) → une action, maintien (hold) → une autre action (couche ou modificateur). Implémenté dans `platform/remap/`.
 
 **today.log** — Fichier JSONL hot-path écrit par le keylogger à chaque flush. Évite d'ouvrir SQLite sur le chemin critique par frappe (latence) ; ingéré dans `db.sqlite` par le walker au prochain tick.
 

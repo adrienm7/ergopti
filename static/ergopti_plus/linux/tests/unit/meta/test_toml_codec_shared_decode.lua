@@ -83,7 +83,7 @@ end)
 
 describe("managers delegate TOML parsing to the shared codec", function()
 
-	local kanata_src  = read_file(DRIVER_ROOT .. "/modules/kanata/manager.lua")
+	local kanata_src  = read_file(DRIVER_ROOT .. "/platform/remap/manager.lua")
 	local dynamic_src = read_file(DRIVER_ROOT .. "/modules/dynamic_hotstrings/manager.lua")
 
 	it("kanata manager calls .decode and drops the bespoke parser", function()

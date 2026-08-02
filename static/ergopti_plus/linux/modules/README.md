@@ -8,7 +8,6 @@ One folder per feature. Measured contents (production `.lua` only):
 | `dynamic_hotstrings/` | 1 | 249 | computed expansions (dates, personal info) |
 | `gestures/` | 1 | 850 | gesture slots + action dispatch. **The libinput reader is a stub**: `start_reading()` sets a flag and logs, nothing spawns a reader |
 | `hotstrings/` | 6 | 1 191 | the expansion engine (`engine.lua` delegates to `_shared/lua/hotstring_engine`), TOML loader, evdev reader, ydotool injector, device finder |
-| `kanata/` | 1 | 419 | generates and supervises the kanata `.kbd` (key remap + tap-hold) |
 | `keylogger/` | 4 | 1 870 | capture, SQLite writer/reader, metrics collector |
 | `llm/` | 3 | 898 | Ollama backend, prediction engine, profiles |
 | `menu/` | 1 | 833 | the tray menu, hand-built. On Windows and macOS the equivalent lives in `ui/menu/` |

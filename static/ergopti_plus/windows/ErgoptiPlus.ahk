@@ -108,7 +108,7 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 global CapsWordEnabled := False
 global LayerEnabled := False
 global TapHold := Map("keys", Map(), "layers", Map())
-; Read in FIRST position by a parse-time #HotIf (modules/tap_holds/altgr.ahk), which
+; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
 ; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
@@ -289,16 +289,16 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
 #Include infra/first_boot.ahk
-#Include infra/tap_hold/tap_hold_loader.ahk
-#Include infra/tap_hold/tap_hold_writer.ahk
+#Include platform/remap/tap_hold_loader.ahk
+#Include platform/remap/tap_hold_writer.ahk
 ; Tap-hold timing constants must load HERE, before infra/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural
-; spot (inside modules/tap_holds.ahk, far below boot.ahk) the sentinel 0s would
+; spot (inside platform/remap.ahk, far below boot.ahk) the sentinel 0s would
 ; re-clobber the registry values boot.ahk just loaded. #Include dedupes by path,
-; so the later include via modules/tap_holds.ahk is a no-op (mirrors the
+; so the later include via platform/remap.ahk is a no-op (mirrors the
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
-#Include modules/tap_holds/constants.ahk
+#Include platform/remap/constants.ahk
 #Include infra/master_gates.ahk
 #Include infra/manifest_descriptions.ahk
 #Include infra/menu_dispatcher.ahk
@@ -896,7 +896,7 @@ _RegisterScriptAltGrHotkeys()
 #InputLevel 2
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
-#Include modules/tap_holds.ahk
+#Include platform/remap.ahk
 #Include modules/hotstrings.ahk
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
