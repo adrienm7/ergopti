@@ -135,6 +135,12 @@ static/ergopti_plus/scratch/
 # by_device/ tree behind, so without this entry a plain test run dirties the
 # working tree with untracked artefacts.
 static/ergopti_plus/macos/tests/scratch_test_dir/
+# The AHK harness's ConfigurationFile sink (test_stubs.ahk). Nothing reads it —
+# it is where the config writers write during a run. It was tracked, so every
+# run dirtied the tree and any `git add -A` committed the residue; by the time
+# it was noticed it held three schema eras at once ([ahk.gestures], [Gestures]
+# and [gestures], all with the same key).
+static/ergopti_plus/windows/tests/test_config.ini
 
 # Stryker mutation testing temporary directory
 .stryker-tmp/
