@@ -223,10 +223,22 @@ Constraints: **paths before moves, moves before content, data before code.**
   1. Generate the single matcher core into both target languages, modelled on
      `codegen-terminators.cjs` — it already emits both targets in one run and is
      the only part of the engine that has never drifted.
-  2. **LLM**: fold the prompt-builder constants into one JSON. All 10 agree
-     across the three declarations today and
-     `test-prompt-builder-constants-parity.cjs` holds them, but three
-     declarations agreeing is not one declaration.
+  2. **LLM**: fold the prompt-builder constants into one JSON.
+     **Re-measured 2026-08-02, and the priority is lower than it reads.** Of the
+     three declarations one is GENERATED (`windows/_generated/prompt_builder.ahk`),
+     so the hand-maintained duplication is two, not three: `_shared/lua/llm/`
+     and `_shared/core/domain/PromptBuilder.js`. And
+     `test-prompt-builder-constants-parity.cjs` catches BOTH classes of drift,
+     verified by probe: a changed VALUE, and a constant added to one declaration
+     and not the others ("declared in 1 of 3 language(s) — absent from shared
+     Lua, generated AHK").
+     So this is consolidation for its own sake rather than risk reduction — the
+     purity argument ("three declarations agreeing is not one declaration")
+     stands, the exposure does not. Doing it properly means a JSON plus a
+     generator emitting the Lua as well as the AHK, on the
+     `codegen-terminators.cjs` pattern, and wiring both into the generator
+     registry and the drift guard. Worth doing when that machinery is already
+     being touched; not worth a dedicated risky pass.
   3. **Metrics**: shared aggregation core — two ~1 330-line walkers whose
      function names map 1:1, one of which says in a comment that it "MIRRORS" the
      other; eight constants declared three times where the shared copy exists
