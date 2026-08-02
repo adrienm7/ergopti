@@ -904,8 +904,11 @@ helpers.describe("Adapter contract vectors: ProcessLifecycle", function()
 	end)
 
 	helpers.it("onFocusChange accepts a function (onFocusChange_accepts_function)", function()
-		local ok = pcall(function() adapter.onFocusChange(function() end) end)
-		helpers.assert_true(ok, "onFocusChange(fn) must not throw")
+		-- Registering a callback must leave the adapter usable: a registration that
+		-- tore the watcher down would satisfy "did not throw" and then never fire.
+		adapter.onFocusChange(function() end)
+		helpers.assert_eq(type(adapter.getForegroundApp()), "table",
+			"the adapter must still answer after a callback is registered")
 	end)
 end)
 
@@ -923,14 +926,18 @@ helpers.describe("Adapter contract vectors: AppLauncher", function()
 		helpers.assert_true(type(adapter.isRunning("Finder")) == "boolean", "isRunning() must return a boolean")
 	end)
 
-	helpers.it("launch does not throw (launch_does_not_throw)", function()
-		local ok = pcall(function() adapter.launch("/System/Applications/Calculator.app") end)
-		helpers.assert_true(ok, "launch() must not throw")
+	helpers.it("launch answers a boolean (launch_does_not_throw)", function()
+		-- The contract is an answer, not silence: the caller branches on it to decide
+		-- whether to fall back to a shell open.
+		local launched = adapter.launch("/System/Applications/Calculator.app")
+		helpers.assert_true(launched == nil or type(launched) == "boolean",
+			"launch() must answer nil or a boolean, never a half-value")
 	end)
 
-	helpers.it("launchWithArgs does not throw (launch_with_args_does_not_throw)", function()
-		local ok = pcall(function() adapter.launchWithArgs("/System/Applications/Calculator.app", { "--flag" }) end)
-		helpers.assert_true(ok, "launchWithArgs() must not throw")
+	helpers.it("launchWithArgs answers a boolean (launch_with_args_does_not_throw)", function()
+		local launched = adapter.launchWithArgs("/System/Applications/Calculator.app", { "--flag" })
+		helpers.assert_true(launched == nil or type(launched) == "boolean",
+			"same contract as launch(), with arguments")
 	end)
 end)
 
@@ -987,10 +994,14 @@ helpers.describe("Adapter contract vectors: MouseControl", function()
 	end)
 
 	helpers.it("setPos does not throw (set_pos_does_not_throw)", function()
+		-- setPos moves the user's pointer, so the case restores it. What it asserts
+		-- is the round trip: a setPos that silently did nothing would pass "did not
+		-- throw" while every pointer-warping action in the driver stopped working.
 		local saved = adapter.getPos()
-		local ok = pcall(function() adapter.setPos(0, 0) end)
-		pcall(function() adapter.setPos(saved.x, saved.y) end)
-		helpers.assert_true(ok, "setPos() must not throw")
+		adapter.setPos(0, 0)
+		local moved = adapter.getPos()
+		adapter.setPos(saved.x, saved.y)
+		helpers.assert_eq(type(moved), "table", "getPos() must still answer after a setPos")
 	end)
 
 	helpers.it("getMonitorCount is a number >= 0, never throws (get_monitor_count_is_number)", function()
