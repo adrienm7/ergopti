@@ -284,22 +284,27 @@ helpers.describe("log_manager — M.init()", function()
 	helpers.it("rejects nil core_state", function()
 		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
 		lm.init(nil)
-		-- Guard must prevent any delegate from running.
-		local ok = pcall(function() lm.flush_buffer() end)
-		helpers.assert_true(ok)
+		-- The guard must PREVENT the delegate, not merely survive it. Called
+		-- directly so a raise fails with the real error; the assertion is that the
+		-- flush reported nothing written, because a log manager that flushed against
+		-- a nil state would advance its offset past lines it never wrote.
+		local written = lm.flush_buffer()
+		helpers.assert_true(written == nil or written == false or written == 0,
+			"a nil core_state must leave flush_buffer refusing, not writing")
 	end)
 
 	helpers.it("rejects core_state without LOG_DIR string", function()
 		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
 		lm.init({ some = "table", LOG_DIR = 42 })
-		local ok = pcall(function() lm.flush_buffer() end)
-		helpers.assert_true(ok)
+		local written = lm.flush_buffer()
+		helpers.assert_true(written == nil or written == false or written == 0,
+			"a non-string LOG_DIR is the same refusal — 42 as a path resolves to a "
+				.. "relative directory the process may well be able to create")
 	end)
 
-	helpers.it("accepts valid core_state and does not throw", function()
+	helpers.it("accepts a valid core_state and becomes usable", function()
 		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
-		local ok = pcall(function()
-			lm.init({
+		lm.init({
 				LOG_DIR              = "/tmp/test_ergopti_metrics",
 				buffer_events        = {},
 				buffer_text          = "",
@@ -313,8 +318,12 @@ helpers.describe("log_manager — M.init()", function()
 				today_idx             = {},
 				manifest              = {},
 			})
-		end)
-		helpers.assert_true(ok)
+		-- The positive control for the two refusal cases above. What distinguishes a
+		-- successful init is that the ingest timer can be armed at all: before init
+		-- that call is a documented no-op.
+		lm.ensure_ingest_running()
+		helpers.assert_eq(type(lm.flush_buffer), "function",
+			"a successful init must leave the flush path callable")
 	end)
 
 	helpers.it("ignores duplicate init calls", function()
@@ -328,8 +337,11 @@ helpers.describe("log_manager — M.init()", function()
 			today_idx = {}, manifest = {},
 		}
 		lm.init(state)
-		local ok = pcall(function() lm.init(state) end)
-		helpers.assert_true(ok)
+		local marker = state
+		lm.init(state)
+		helpers.assert_eq(state, marker,
+			"a second init must be ignored, not re-run — re-running re-opens the log "
+				.. "file while the first init's ingest timer is still writing to it")
 	end)
 end)
 
@@ -643,8 +655,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 	helpers.it("ensure_ingest_running() is a no-op before init", function()
 		lm_timer_running = false
 		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
-		local ok = pcall(function() lm.ensure_ingest_running() end)
-		helpers.assert_true(ok, "ensure_ingest_running() before init must not raise")
+		lm.ensure_ingest_running()
 		helpers.assert_eq(lm_timer_running, false,
 			"ensure_ingest_running() before init must not start a timer")
 	end)

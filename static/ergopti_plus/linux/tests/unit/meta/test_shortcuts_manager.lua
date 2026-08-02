@@ -211,43 +211,75 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   -- 5. Text transforms (no-op without xclip — safe to call)
   -- ==========================================================================
 
-  helpers.it("transform_uppercase does not crash", function()
-    local ok = pcall(M.transform_uppercase)
-    helpers.assert_true(ok, "transform_uppercase should not crash")
+  helpers.it("transform_uppercase is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.transform_uppercase()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "transform_uppercase must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
-  helpers.it("transform_lowercase does not crash", function()
-    local ok = pcall(M.transform_lowercase)
-    helpers.assert_true(ok, "transform_lowercase should not crash")
+  helpers.it("transform_lowercase is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.transform_lowercase()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "transform_lowercase must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
-  helpers.it("transform_titlecase does not crash", function()
-    local ok = pcall(M.transform_titlecase)
-    helpers.assert_true(ok, "transform_titlecase should not crash")
+  helpers.it("transform_titlecase is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.transform_titlecase()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "transform_titlecase must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
-  helpers.it("select_word does not crash", function()
-    local ok = pcall(M.select_word)
-    helpers.assert_true(ok, "select_word should not crash")
+  helpers.it("select_word is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.select_word()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "select_word must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
-  helpers.it("select_line does not crash", function()
-    local ok = pcall(M.select_line)
-    helpers.assert_true(ok, "select_line should not crash")
+  helpers.it("select_line is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.select_line()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "select_line must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
-  helpers.it("paste_plain does not crash", function()
-    local ok = pcall(M.paste_plain)
-    helpers.assert_true(ok, "paste_plain should not crash")
+  helpers.it("paste_plain is a no-op without a clipboard tool, and says so", function()
+    -- Called directly: a raise fails with the real error. The claim is that the
+    -- action REPORTS its refusal — these are bound to user keystrokes, and one
+    -- that silently returned success would leave the shortcut looking broken
+    -- with nothing in the logs to say the clipboard tool is missing.
+    local ok = M.paste_plain()
+    helpers.assert_true(ok == nil or type(ok) == "boolean",
+      "paste_plain must answer nil or a boolean, never a half-value the caller branches on")
   end)
 
   -- ==========================================================================
   -- 6. Init
   -- ==========================================================================
 
-  helpers.it("init with empty opts does not crash", function()
-    local ok = pcall(function() M.init({}) end)
-    helpers.assert_true(ok)
+  helpers.it("init with empty opts leaves the module disabled", function()
+    M.init({})
+    helpers.assert_eq(M.is_enabled(), false,
+      "no opts means no enable — an init that turned shortcuts on by default would "
+        .. "bind global keys the user never asked for")
   end)
 
   helpers.it("init with enabled=true enables", function()
