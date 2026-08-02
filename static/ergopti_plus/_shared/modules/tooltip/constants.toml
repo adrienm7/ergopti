@@ -128,13 +128,19 @@ window_bottom_inset_hs  = 40
 # below, centred) (layout units).
 max_caret_height = 80
 
-# Anchor resolution priority order (informative — drivers implement this):
+# Anchor resolution priority order, as PROSE. It used to also be a four-element
+# `anchor_cascade` array labelled "informative — drivers implement this", which no
+# driver read and which the paragraph beside it already contradicted: AHK has a
+# fifth step. A constant nothing consumes cannot go out of date loudly, so it went
+# out of date quietly, and the array said one thing while the comment above it
+# said another. Prose alone is worse than data — but wrong data beside correct
+# prose is worse than both.
+#
 #   1. Platform caret API (CaretGetPos on AHK / AXBoundsForRange on HS)
 #   2. Accessibility focused element bounding rect
-#   3. Active window frame (bottom-centre)
-#   4. Screen centre-bottom (last resort, never nil)
-# AHK adds a step between 2 and 3: mouse cursor coordinates.
-anchor_cascade = ["caret", "ax_element", "window_frame", "screen_center"]
+#   3. Mouse cursor coordinates — AHK only
+#   4. Active window frame (bottom-centre)
+#   5. Screen centre-bottom (last resort, never nil)
 
 
 # =========================
