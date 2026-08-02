@@ -10,13 +10,13 @@
 ;
 ; SECTION LAYOUT inside autohotkey/config.toml:
 ;
-;   [Metrics]
-;   metrics_enabled                 = true
-;   metrics_shortcut_typing         = "ctrl+alt+m"
-;   metrics_shortcut_apps           = "ctrl+alt+t"
-;   metrics_filter_private_browsing = true
-;   metrics_filter_system_auth      = true
-;   metrics_disabled_apps           = ["chrome.exe", "firefox.exe"]
+;   [metrics]
+;   metrics_enabled            = true
+;   metrics_shortcut_typing    = "ctrl+alt+m"
+;   metrics_shortcut_apps      = "ctrl+alt+t"
+;   private_filter_enabled     = true
+;   system_auth_filter_enabled = true
+;   metrics_disabled_apps      = ["chrome.exe", "firefox.exe"]
 ;
 ; FEATURES & RATIONALE:
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
@@ -269,6 +269,11 @@ CS_Unescape(s) {
 ; untouched.
 CS_Load() {
 		global CS_SECTION
+		; Manifest first, disk second. Doing it here rather than in the class body
+		; keeps the ordering explicit: a class static initialiser would run at an
+		; unspecified point relative to the manifest include, and a privacy default
+		; that depends on include order is one refactor away from flipping.
+		MetricsFiltersApplyManifestDefaults()
 		data := CS_Read()
 		if !data.Has(CS_SECTION) {
 				return
@@ -284,14 +289,16 @@ CS_Load() {
 
 		if s.Has("metrics_wpm_menubar_colors")
 				MetricsShortcuts.wpm_menubar_colors := s["metrics_wpm_menubar_colors"] ? true : false
-		if s.Has("metrics_filter_private_browsing")
-				MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
-		if s.Has("metrics_filter_secure_field")
-				MetricsFilters.secure_field := s["metrics_filter_secure_field"] ? true : false
-		if s.Has("metrics_filter_system_auth")
-				MetricsFilters.system_auth := s["metrics_filter_system_auth"] ? true : false
-		if s.Has("metrics_encrypt") {
-				MetricsFilters.encrypt := s["metrics_encrypt"] ? true : false
+		; Canonical ids, shared with the macOS driver, which reads the same four
+		; through Manifest.default_for("metrics.<id>").
+		if s.Has("private_filter_enabled")
+				MetricsFilters.private_browsing := s["private_filter_enabled"] ? true : false
+		if s.Has("secure_filter_enabled")
+				MetricsFilters.secure_field := s["secure_filter_enabled"] ? true : false
+		if s.Has("system_auth_filter_enabled")
+				MetricsFilters.system_auth := s["system_auth_filter_enabled"] ? true : false
+		if s.Has("encrypt") {
+				MetricsFilters.encrypt := s["encrypt"] ? true : false
 				; Drive the real cipher so a restart with encryption on keeps encrypting.
 				KL_Enc_SetEnabled(MetricsFilters.encrypt)
 		}

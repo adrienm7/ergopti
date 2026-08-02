@@ -435,8 +435,14 @@ wpm_menubar_colors = false
 # ===== 4.1 Disabled / shortcut =====
 # ===================================
 
-# Win-specific: InPrivate Edge / Incognito Chrome detection.
-filter_private_browsing = true   # Win-specific : InPrivate Edge / Incognito Chrome detection
+# The three privacy filters and the at-rest encryption opt-in are declared once
+# and read by every driver. What differs is the DETECTION, not the setting:
+# private_filter_enabled means InPrivate Edge / Incognito Chrome on Windows and
+# the equivalent Safari/Chrome check on macOS.
+private_filter_enabled = true
+secure_filter_enabled = true
+system_auth_filter_enabled = true
+encrypt = false
 
 
 [metrics.shortcuts]

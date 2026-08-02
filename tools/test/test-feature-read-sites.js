@@ -44,7 +44,10 @@ const SKIP_DIRS = new Set(['tests', '_generated', 'vendor']);
 // Top-level keys the runtime map carries that are NOT feature sections.
 const META_KEYS = new Set(['section_order']);
 
-const PLATFORMS = ['ahk', 'hs'];
+// Must stay in step with build-features-manifest.js's KNOWN_PLATFORMS: a
+// platform missing here is a driver whose feature reads go unchecked, which
+// looks exactly like a driver with no unread features.
+const PLATFORMS = ['ahk', 'hs', 'linux'];
 
 
 
