@@ -154,17 +154,41 @@ Constraints: **paths before moves, moves before content, data before code.**
   `modules/<feature>/window.*` shape is still wanted, it is now one move of
   three identical trees rather than a reconciliation.
 
-  **(a) measured 2026-08-02** — 20 production path violations of Convention P.
-  The three remap subsystems are the bulk: `macos/modules/karabiner` (14 files,
-  12 154 lines, 10 production require sites), `windows/modules/tap_holds` +
-  `windows/infra/tap_hold` (19 files, 4 454 lines, 34 tracked `#Include` lines),
-  `linux/modules/kanata` (2 files, 577 lines, 2 hardcoded build-script paths).
-  Start on Linux: it is 2 files and 2 paths, and proves the shape for the
-  other two. Two files are Convention P violations *by path* but are UI rather
-  than remap — `linux/ui/webkit_host.lua` (249 l) and
-  `macos/ui/menu/menu_karabiner.lua` (1 072 l); they need a placement decision,
-  not a mechanical move. And Convention P has **no gate**: without a test
-  asserting the forbidden-word list against paths it is decoration.
+  **(a) measured 2026-08-02, and it cannot be staged by driver.** The Linux move
+  was done and reverted to establish that: `git mv linux/modules/kanata
+  linux/platform/remap` plus 22 reference edits is a 20-minute job and every
+  Linux test stayed green — and then `test-driver-tree-parity.cjs` failed,
+  correctly, because `platform/` now existed on one driver of three. Its own
+  error message offers "raise this deliberately with a note saying why the
+  structure is genuinely per-driver", which would be a lie: the structure is not
+  per-driver, the migration is unfinished. One third of an atomic rename leaves
+  the tree worse than either end, exactly as Lot 4 found.
+
+  **The lot is gated by Windows, and Windows is 4× the estimate.** The recorded
+  "34 tracked `#Include` lines" counts only includes. Counting PATH references —
+  `modules/tap_holds/`, `modules/tap_holds.ahk`, `infra/tap_hold/` — gives
+  **583 across 249 files**: every file's own path header comment, and a large
+  set of meta-tests that assert on the include path itself
+  (`test_taphold_timings_load_order.ahk` pins the literal
+  `#Include modules/tap_holds/constants.ahk`). Careful: the bare identifier
+  `tap_holds` is also a FEATURE id (`category_enabled.tap_holds`, the menu
+  manifest, `timings/constants.toml`) and must not be renamed with the path.
+
+  Per driver, and all three in one commit:
+  - `windows`: `modules/tap_holds.ahk` → `platform/remap.ahk`,
+    `modules/tap_holds/` (17 files) + `infra/tap_hold/` (2) → `platform/remap/`.
+    This is also what dissolves the "plural and singular in the same driver,
+    wired by a `../` include" complaint. Relative includes need per-file rules,
+    not one global replace.
+  - `macos`: `modules/karabiner` (14 files, 12 154 lines, 10 require sites).
+  - `linux`: `modules/kanata` (2 files, 577 lines) — the known-good recipe is in
+    the reverted commit's script.
+
+  Two files are Convention P violations *by path* but are UI rather than remap —
+  `linux/ui/webkit_host.lua` (249 l) and `macos/ui/menu/menu_karabiner.lua`
+  (1 072 l); they need a placement decision, not a mechanical move. And
+  Convention P has **no gate**: without a test asserting the forbidden-word list
+  against paths it is decoration.
 
   ⚠ **(c) is blocked and the TODO said otherwise.** `_shared/core/features.json`
   **does not exist**, so the canonical 25-name list above has no machine-readable
