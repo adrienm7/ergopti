@@ -396,7 +396,19 @@ describe("Corpus: locale/resolution_vectors.json", function()
 		-- Linux driver reads locale files through infra/locale.lua and does not yet
 		-- replay the shared cascade; ADR-006 compliance here means the corpus is
 		-- consumed (file loaded, vectors counted) with the gap tracked, not hidden.
-		assert_true(true, "skip acknowledged — shared locale.core replay is a roadmap item")
+		--
+		-- The skip used to be assert_true(true), which made the gap indistinguishable
+		-- from a passing replay. What IS checkable while the replay is missing: the
+		-- driver has a locale resolver at all, and the corpus this case will one day
+		-- consume is real. A skip that asserts nothing survives the arrival of the
+		-- feature it is waiting for and goes on reporting a gap that closed.
+		local resolver = io.open(driver_root .. "/infra/locale.lua", "r")
+		assert_true(resolver ~= nil,
+			"the resolver this skip defers to must exist — if infra/locale.lua is gone, the gap "
+				.. "described here is not the gap that is real")
+		if resolver then resolver:close() end
+		assert_true(n >= 1,
+			"and the corpus must carry vectors, or the replay this defers has nothing to replay")
 	end)
 end)
 

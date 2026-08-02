@@ -261,7 +261,11 @@ helpers.describe("export — get_native_app_category fallback", function()
 			device_id = "cat-test-uuid-0000-0000-000000000000",
 			get_db    = function() return nil end,
 		})
-		helpers.assert_true(true)
+		-- The setup case earns its place by asserting init took: every case below
+		-- reads through the module's injected state, and each of them would read
+		-- as passing against a module that silently refused its dependencies.
+		helpers.assert_eq(type(e.get_native_app_category), "function",
+			"init must leave the public surface callable")
 	end)
 
 	helpers.it("nil app_name returns a non-empty string", function()
