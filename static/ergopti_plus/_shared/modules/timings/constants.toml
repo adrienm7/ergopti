@@ -85,6 +85,14 @@ discovery_poll_initial_ms = 1000
 # Discovery: cap for the exponential backoff interval.
 discovery_poll_max_ms = 10000
 
+# Discovery: minimum gap between the END of one probe cycle and the START of the
+# next. Distinct from the backoff above, which paces probes WITHIN a cycle and is
+# reset every time a cycle begins — so without this a failed cycle restarted on
+# the next run-loop tick with the backoff back at its initial value, and the
+# pacing that exists never got to apply. The failure path is the one that
+# retries, so the storm happens exactly when the server is not answering.
+discovery_retry_cooldown_ms = 5000
+
 # Streaming watchdog: kill the handler if no token arrives within this window.
 # AHK streaming_handler equivalent; HS streaming_handler.lua STREAM_WATCHDOG_SEC.
 stream_watchdog_ms = 12000
