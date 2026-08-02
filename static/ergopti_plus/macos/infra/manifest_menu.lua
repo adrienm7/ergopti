@@ -381,6 +381,52 @@ function M.resolve_disabled_when(menu_key, item_id, getters)
 end
 
 
+--- Evaluates the declarative ``checked_when`` predicate of a manifest item, the
+--- mirror of ``disabled_when``: an array of canonical state keys, the item
+--- checked only when EVERY getter returns truthy. Items without the array are
+--- never checked by this mechanism (returns ``false``).
+---
+--- FAILS OPEN, unlike its sibling, and the asymmetry is deliberate. A checkmark
+--- is an ASSERTION to the user that something is currently on. Inventing one
+--- when the state cannot be read tells them a filter is active that is not —
+--- they stop looking for the setting, and the data they thought was excluded is
+--- being recorded. ``disabled_when`` fails CLOSED for the same underlying
+--- reason: in both directions the safe answer is the one that does not overstate
+--- what is enabled.
+---
+--- A missing getter is still logged as an ERROR — the manifest and the driver's
+--- getters table have drifted, and a row whose checkmark silently never appears
+--- is exactly the kind of quiet wrong this file exists to make loud.
+--- @param menu_key string
+--- @param item_id string
+--- @param getters table
+--- @return boolean
+function M.resolve_checked_when(menu_key, item_id, getters)
+	local item = find_item_by_id(menu_key, item_id)
+	if item == nil then
+		Logger.error(LOG, "No manifest item '%s.%s' — treating as unchecked.", menu_key, item_id)
+		return false
+	end
+
+	local keys = item.checked_when
+	if type(keys) ~= "table" or #keys == 0 then
+		return false
+	end
+
+	for _, key in ipairs(keys) do
+		if type(getters) ~= "table" or type(getters[key]) ~= "function" then
+			Logger.error(LOG, "No getter for checked_when key '%s' on item '%s.%s' — treating as unchecked.", key, menu_key, item_id)
+			return false
+		end
+		if not getters[key]() then
+			return false
+		end
+	end
+
+	return true
+end
+
+
 
 
 -- ========================================================

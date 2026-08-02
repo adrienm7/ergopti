@@ -229,7 +229,31 @@ Constraints: **paths before moves, moves before content, data before code.**
   so an unstaged regeneration reads as a failure of the change rather than of the
   sequence.
 
-  **Still open, and all of it is the `linux` half:**
+  ~~`KNOWN_GAPS.linux`~~ — **decided and closed 2026-08-02.** `[sections.script]`
+  does NOT gain `linux`; the gap was in the gate. The schema hardcoded
+  `"required": ["script"]` while the manifest already said `["ahk", "hs"]`, and
+  the declaration that was wrong is the one that could not know about Linux.
+  Presence is now derived per driver from the manifest, so the gate checks all
+  eight top-level sections against each driver instead of one against all three,
+  and `KNOWN_GAPS` is empty.
+
+  ~~153 `description_key`s carry a driver name~~ — **done 2026-08-02, and it was
+  not cosmetic.** The entry said "nothing is broken today". Something was:
+  no locale catalogue has ever held a key under a driver prefix, so
+  `menu.ahk.shortcuts.personal` missed, the fallback chain in
+  `infra/manifest_descriptions.ahk` ran to its last step, and the Windows tray
+  menu showed the literal word "personal" — while all 21 catalogues carried
+  `menu.shortcuts.personal` for that exact row. The rename is label-preserving
+  everywhere else (verified by replaying the candidate chain over 1701
+  resolutions). `test-menu-labels-resolve.cjs` now holds both halves: an
+  assertion of zero on driver-namespaced keys, and a **new ratchet nothing had
+  ever counted — 110 of 243 manifest entries have no translated label at all**
+  and fall through to their raw path tail. That failure mode is invisible by
+  construction: the chain always returns something, so a missing translation
+  shows up as an English identifier inside a translated menu, never as an error.
+  Lot 5's menu migration is what drives that number down.
+
+  **Still open, and it is the `linux` half:**
 
   1. **No feature carries `linux`.** 0 of 324. The 73 features Linux sees, it sees
      by inheriting one of 9 sections. Meanwhile the driver really implements
@@ -238,17 +262,9 @@ Constraints: **paths before moves, moves before content, data before code.**
      top-level section it reads gestures 0/109, shortcuts 0/82, llm 0/29,
      metrics 5/18. This is the data half of the problem Lot 5's menu migration
      hits from the other side.
-  2. `KNOWN_GAPS.linux` at `test-config-schema.cjs:68-70` — one pinned gap,
-     `missing required property 'script'`. Contingent on deciding whether
-     `[sections.script]` gains `linux`; the comment there argues it should not
-     (Linux keeps its locale in XDG, `linux/infra/i18n.lua`). Decide, then delete
-     the entry either way.
-  3. **153 `description_key`s still carry a driver name** — `menu.ahk.metrics.*`,
-     `menu.hs.gestures.*`. These are i18n keys, not feature paths, so the
-     namespace gate does not see them and nothing is broken today. But it is the
-     same word in the same file meaning the same wrong thing, and renaming them
-     means touching all 21 locale catalogues — cheap now, expensive once the
-     `reason_key` work adds ~142 more keys beside them.
+     ⚠ Not a data-only edit: adding `linux` to a feature adds it to the Linux
+     `config_template.toml`, and the config-schema gate now checks section
+     presence per driver, so the template and the driver's reader move together.
 
 - **Lot 5 — one menu.** The manifest must gain the capabilities that explain
   every hand-written row: a resolvable `action` id (12), `label.format` + `args`
