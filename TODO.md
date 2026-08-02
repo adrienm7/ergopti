@@ -372,7 +372,7 @@ The audit report was retired once its findings were adjudicated: 111 candidates,
 shipped, along with roughly half the rest — each with a regression test proven red
 before the fix and green after.
 
-3 did not ship. They are carried here verbatim so nothing was lost with the
+1 did not ship. They are carried here verbatim so nothing was lost with the
 file: location, root cause, proposed fix and proposed test. Two caveats that the
 pass itself established, and that apply to every line below:
 
@@ -469,13 +469,3 @@ relearning: nothing said so, because a deleted section fails no test.
     what, because it is not visible from this file — or every menu toggle arms a
     reload. Check before fixing: a reload on every toggle would be loud, so the
     likeliest answer is that a third mechanism exists and is undocumented.
-- [ ] **BS-2** (boot-shutdown) — On the boot that installs/updates the VS Code extension, vscode_bridge.setup() throws before start_server(), so the caret bridge HTTP server never starts for that session — and it steals focus and forks a subprocess with the typing eventtap already armed
-  - `init.lua:817-822 (call site`
-  - **Cause:** Two independent defects compounding. (a) lib/dialog_util.M.alert wraps hs.dialog.alert but both call sites pass the hs.alert.show(message, duration) argument shape — the wrapper was written against the wrong Hammerspoon module. (b) setup() (lib/vscode_bridge.lua:349-352) chains install_extension() and start_server() with no isolation, so a throw in the cosmetic notification kills the functional half. Separately, even when it does not throw, focus_hammerspoon() (dialog_util.lua:41-70) calls hs.focus(true) and app:activate(true) twice and schedules hs.execute("open '<bundlePath>'") — a focus steal plus a fork, during boot, at a point where the typing eventtap armed at init.lua:785 is already l
-  - **Fix:** In lib/vscode_bridge.M.setup, call start_server() FIRST (or wrap install_extension in its own pcall) so a notification failure can never take the server down. Fix lib/dialog_util.M.alert to forward to hs.alert.show(message, duration) — matching what both call sites pass — or fix the two call sites to the real hs.dialog.alert signature. Move install_extension() off the boot critical path (hs.timer.doAfter(0, …), the pattern init.lua already uses at lines 434 and 500) so neither the fork nor the focus steal lands while the typing tap is armed, and replace the os.execute mkdir with adapters/file_system's ensure_dir.
-  - **Test:** tests/unit/lib/test_vscode_bridge_setup_isolation.lua: stub lib.dialog_util with an alert() that raises, stub the extension files so already_ok is false, stub hs.httpserver, call vscode_bridge.setup() and assert hs.httpserver.new was still called — i.e. a throwing notification cannot prevent the server from starting. Plus a meta-test asserting lib/dialog_util.M.alert and its call sites agree on one signature.
-- [ ] **UML-6** (ui-menu-llm) — After a reload, the reattached download shows a per-file percentage as the overall progress and never a total or ETA
-  - `D:/Documents/GitHub/ergopti/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua:624-643`
-  - **Cause:** The reattach path was written as a stripped-down copy of `process_stream` (:346-409) but dropped the two pieces that make the number meaningful: the persistent `_bytes_done`/`_bytes_total` upvalues and the `estimated_bytes_total` lookup from `m.hardware_requirements.mlx.download_gb` in the preset tree. The session JSON carries `repo` and `model`, so the estimate is recoverable — it just is not recomputed.
-  - **Fix:** Hoist `_bytes_done`/`_bytes_total`/`_current_pct` to upvalues of `reattach_download`, seed `_bytes_total` from the preset `download_gb` for `session.model` (the same lookup as :118-133), and compute the percentage from `_bytes_done / _bytes_total` exactly as `process_stream` does instead of regexing a tqdm bar. Drop the unused `_current_pct` local.
-  - **Test:** New case in a tests/unit/ui/menu/menu_llm/test_mlx_reattach_progress.lua: feed `process_stream_reattached` two successive chunks `__BYTES__:1000000000` then `__BYTES__:2000000000` with a preset whose `download_gb = 4`, capture `download_window.update`'s arguments and assert the reported percentage increases monotonically and that `bytes_total > 0`. Fails today (0 and 0).
