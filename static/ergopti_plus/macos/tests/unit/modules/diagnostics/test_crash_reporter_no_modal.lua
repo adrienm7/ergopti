@@ -95,9 +95,11 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 
 		local CrashReporter, modal, notifications = load_with_tripwires(config_dir)
 
-		local ok = pcall(CrashReporter.prompt_user, { timestamp = "2026-07-20T10:00:00Z" })
+		local ok, err = pcall(CrashReporter.prompt_user, { timestamp = "2026-07-20T10:00:00Z" })
 
 		helpers.assert_true(ok, "prompt_user must not throw")
+		helpers.assert_nil(err, "and must report no error — a crash reporter that itself "
+			.. "fails has nowhere left to report it")
 		helpers.assert_true(not modal.opened,
 			"prompt_user must NOT open a blocking modal — it stalls the main thread and its runloop "
 			.. "until a human clicks, freezing the whole driver right after something already failed")
@@ -123,9 +125,10 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 		local CrashReporter, modal, notifications =
 			load_with_tripwires("/tmp/ergopti_test_crash_unwritable_dir_that_does_not_exist/")
 
-		local ok = pcall(CrashReporter.prompt_user, {})
+		local ok, err = pcall(CrashReporter.prompt_user, {})
 
 		helpers.assert_true(ok, "prompt_user must not throw on a failed save")
+		helpers.assert_nil(err, "and must report no error")
 		helpers.assert_true(not modal.opened,
 			"the failure path must not open a blocking modal either — that was the second blockAlert call site")
 		helpers.assert_true(#notifications >= 1,
