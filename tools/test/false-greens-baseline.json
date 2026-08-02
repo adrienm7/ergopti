@@ -1,5 +1,5 @@
 {
-	"tautology": 13,
+	"tautology": 0,
 	"vacuous-absence": 0,
 	"dead-test": 0,
 	"pcall-only": 203,

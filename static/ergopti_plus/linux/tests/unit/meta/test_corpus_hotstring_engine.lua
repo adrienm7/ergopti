@@ -256,7 +256,14 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				.. table.concat(failures, "\n")
 			assert_true(false, msg)
 		else
-			assert_true(true, "all " .. vector_count .. " vector(s) passed")
+			-- The success branch used to be assert_true(true) with the count in the
+			-- message, which reads identically whether the corpus held 300 vectors
+			-- or zero — and a corpus that fails to load yields zero, no failures,
+			-- and this green. Assert the count instead of printing it.
+			assert_eq(passed, vector_count,
+				"every loaded vector must have been replayed")
+			assert_true(vector_count > 0,
+				"the corpus must hold vectors — an empty replay is a broken loader, not a clean run")
 		end
 	end)
 

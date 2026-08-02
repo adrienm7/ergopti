@@ -117,12 +117,12 @@ helpers.describe("llm.init — CoreState seeded with default model names", funct
 			get_model_prices_for = function() return nil end,
 		}
 
+		-- Asserted, not skipped. Every dependency this module needs is stubbed a few
+		-- lines above, so "could not load in this environment" describes an
+		-- environment that no longer exists — while making a genuine load failure
+		-- pass silently, in the file that exists to check what the module seeds.
 		local ok, Core = pcall(helpers.load_with_stubs, "modules.llm")
-		if not ok then
-			-- The module may fail to load in CI without all deps; skip gracefully
-			helpers.assert_true(true, "skipped — modules.llm could not load in this environment")
-			return
-		end
+		helpers.assert_true(ok, "modules.llm must load against the stubs above: " .. tostring(Core))
 
 		-- Without any setter call, get_current_model() must not be nil or ""
 		local model = Core.get_current_model()
@@ -143,10 +143,7 @@ helpers.describe("llm.init — CoreState seeded with default model names", funct
 		}
 
 		local ok, Core = pcall(helpers.load_with_stubs, "modules.llm")
-		if not ok then
-			helpers.assert_true(true, "skipped — modules.llm could not load in this environment")
-			return
-		end
+		helpers.assert_true(ok, "modules.llm must load against the stubs above: " .. tostring(Core))
 
 		Core.set_backend("mlx")
 		local model = Core.get_current_model()
