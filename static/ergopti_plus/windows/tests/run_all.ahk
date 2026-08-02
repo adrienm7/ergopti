@@ -423,8 +423,6 @@ _LogBootProgress("keylogger modules + tests included")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
 #Include meta/test_ahk_brace_balance.ahk
-#Include meta/test_file_headers.ahk
-#Include meta/test_section_headers.ahk
 #Include meta/test_run_all_include_integrity.ahk
 #Include meta/test_runner_only_filter.ahk
 #Include meta/test_runner_failure_ergonomics.ahk
