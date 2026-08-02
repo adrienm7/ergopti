@@ -158,6 +158,21 @@ local function tail_codepoint(s)
 	return s:sub(-1)
 end
 
+--- Returns the first UTF-8 codepoint of a string, the mirror of tail_codepoint
+--- and used to bucket mappings by first character. Written with utf8.offset
+--- rather than a byte-class pattern for the same reason its twin is: the pattern
+--- form carries four numeric escapes that any tool rewriting this file has to
+--- preserve byte for byte, and one that does not produces a pattern that still
+--- compiles and matches the wrong thing.
+--- @param s string The input string.
+--- @return string The first UTF-8 character, or "" when s is empty.
+local function first_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, off = pcall(utf8.offset, s, 2)
+	if ok and off then return s:sub(1, off - 1) end
+	return s:sub(1, 1)
+end
+
 --- True when the trigger ends with the configured magic key (★ by default).
 --- Such triggers are previewed through the case-SENSITIVE star bucket, so they
 --- are excluded from the case-conform fast path to leave that path untouched.
@@ -268,6 +283,13 @@ local function rebuild_tail_indexes()
 	if not _state then return end
 	local tail_idx = {}
 	local star_idx = {}
+	-- Mappings bucketed by the FIRST codepoint of their trigger. classify_trigger
+	-- answers "is `str` a prefix of some trigger?", which no existing index could
+	-- serve: the tail buckets answer the other two questions (a trigger that
+	-- EQUALS or ENDS WITH `str` shares its last codepoint) but say nothing about
+	-- what a trigger starts with. Built here rather than in a second pass so the
+	-- three indexes can never describe different corpora.
+	local first_idx = {}
 	for _, m in ipairs(_state.mappings) do
 		-- tail_char is already Unicode-lowercased (trig_lower) at add_raw() time, so
 		-- it is used directly as the bucket key. The expander's hot path queries the
@@ -280,6 +302,18 @@ local function rebuild_tail_indexes()
 			tail_idx[tc] = bucket
 		end
 		bucket[#bucket + 1] = m
+		-- Same fold as the tail key, for the same reason: the query side lowercases
+		-- what the user typed, so registration must too or an uppercase first letter
+		-- probes an empty bucket.
+		local fc = m.first_char
+		if fc then
+			local fbucket = first_idx[fc]
+			if not fbucket then
+				fbucket = {}
+				first_idx[fc] = fbucket
+			end
+			fbucket[#fbucket + 1] = m
+		end
 		if m.has_magic and m.star_base_tail_char then
 			local sc = m.star_base_tail_char
 			local sbucket = star_idx[sc]
@@ -292,6 +326,7 @@ local function rebuild_tail_indexes()
 	end
 	_state.mappings_by_tail_char      = tail_idx
 	_state.mappings_by_star_tail_char = star_idx
+	_state.mappings_by_first_char     = first_idx
 end
 
 
@@ -397,13 +432,46 @@ function M.classify_trigger(str)
 	local exact = false
 	local pref  = false
 	local suff  = false
-	for _, m in ipairs(_state.mappings) do
-		local t = m.trigger
-		if not exact and t == str              then exact = true end
-		if not pref  and t:sub(1,  n) == str  then pref  = true end
-		if not suff  and t:sub(-n)    == str  then suff  = true end
-		if exact and pref and suff then break end
+
+	-- Two buckets instead of the whole corpus. A trigger that EQUALS `str`, or
+	-- ENDS WITH it, necessarily shares its last codepoint; one that STARTS WITH it
+	-- shares its first. Both buckets are keyed by the FOLDED codepoint and hold a
+	-- superset of the candidates, so the byte-exact comparisons below still decide
+	-- — the index narrows the search, it does not answer the question.
+	--
+	-- On a corpus of ~10-15k mappings this replaced a full scan with two substring
+	-- allocations per entry, run inside the keyDown eventtap. It is memoised above,
+	-- so the scan only ever ran on a miss — but the query is the whole keymap
+	-- buffer plus "@", which is a different string almost every time.
+	--
+	-- The indexes are built by sort_mappings, so between an M.add and the next
+	-- sort there is nothing to read. Rebuilding here rather than falling back to a
+	-- scan keeps ONE implementation of the rule: a fallback loop would be a second
+	-- answer to the same question, free to drift from this one, and it would drift
+	-- silently because both would be right most of the time.
+	if not _state.mappings_by_first_char or not _state.mappings_by_tail_char then
+		rebuild_tail_indexes()
 	end
+
+	local tail_bucket  = _state.mappings_by_tail_char
+		and _state.mappings_by_tail_char[text_utils.trig_lower(tail_codepoint(str))]
+	local first_bucket = _state.mappings_by_first_char
+		and _state.mappings_by_first_char[text_utils.trig_lower(first_codepoint(str))]
+
+	if tail_bucket then
+		for _, m in ipairs(tail_bucket) do
+			local t = m.trigger
+			if not exact and t == str           then exact = true end
+			if not suff  and t:sub(-n) == str   then suff  = true end
+			if exact and suff then break end
+		end
+	end
+	if first_bucket then
+		for _, m in ipairs(first_bucket) do
+			if m.trigger:sub(1, n) == str then pref = true ; break end
+		end
+	end
+
 	_classify_cache[str] = { exact, pref, suff }
 	return exact, pref, suff
 end
@@ -583,6 +651,9 @@ function M.add(trigger, replacement, opts)
 			-- registration. This is what lets a case-conform entry (registered in
 			-- lowercase only) match an UPPERCASE-typed trigger whose tail is accented.
 			tail_char    = text_utils.trig_lower(tail_codepoint(t)),
+			-- First codepoint, folded like tail_char. Buckets the "is this string a
+			-- PREFIX of some trigger?" question, which the tail index cannot answer.
+			first_char   = text_utils.trig_lower(first_codepoint(t)),
 			-- True when this single entry stands in for the lower/Title/UPPER trio:
 			-- the expander conforms the replacement's case to the typed trigger at
 			-- fire time instead of the registry pre-generating three variants.
