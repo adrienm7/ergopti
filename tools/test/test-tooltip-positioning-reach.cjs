@@ -16,16 +16,16 @@
  *       never reads it, though nothing in its comment says so. It is described
  *       as "the vertical gap between the bottom of an input-box or window anchor
  *       and the tooltip top edge", which reads as a shared layout rule.
- *   anchor_cascade                                      NO driver reads it.
+ *   anchor_cascade                                      DELETED — see below.
  *   Linux reads none of them: its tooltip renderer shares no positioning maths.
  *
- * THE anchor_cascade CASE IS WORTH READING TWICE:
- * It is honestly labelled "(informative — drivers implement this)", so nobody
- * consuming it is not a bug. But it is a four-element array, and the comment
- * three lines above it says "AHK adds a step between 2 and 3: mouse cursor
- * coordinates" — so the data is already wrong for one driver, according to its
- * own documentation, and no code path could ever notice. An informative constant
- * that contradicts the prose beside it is worse than prose alone.
+ * THE anchor_cascade CASE, KEPT BECAUSE IT IS THE ARGUMENT FOR THIS GATE:
+ * It was honestly labelled "(informative — drivers implement this)", so nobody
+ * consuming it was not a bug. But it was a four-element array, and the comment
+ * three lines above it said "AHK adds a step between 2 and 3: mouse cursor
+ * coordinates" — so the data was already wrong for one driver, according to its
+ * own documentation, and no code path could ever notice. It is prose now, with
+ * the AHK step in it, and the check below asserts it does not come back.
  *
  * WHY A RECORD RATHER THAN A FIX:
  * Making Windows read window_offset_y would change where tooltips appear, and
@@ -94,8 +94,7 @@ const RECORD = {
 	max_caret_height: ['windows', 'macos'],
 	window_bottom_inset_ahk: ['windows'],
 	window_bottom_inset_hs: ['macos'],
-	window_offset_y: ['macos'],
-	anchor_cascade: []
+	window_offset_y: ['macos']
 };
 
 for (const key of keys) {
@@ -132,27 +131,19 @@ for (const key of Object.keys(RECORD)) {
 	}
 }
 
-// anchor_cascade: informative, and already contradicted by the prose beside it.
-{
-	const m = section.match(/anchor_cascade\s*=\s*\[([^\]]*)\]/);
-	if (!m) {
-		errors.push('anchor_cascade is no longer an array — the record below describes one');
-	} else {
-		const steps = m[1].split(',').filter((x) => x.trim()).length;
-		if (steps !== 4) {
-			errors.push(
-				`anchor_cascade now lists ${steps} step(s); the record describes 4. Its own comment says ` +
-					'"AHK adds a step between 2 and 3", so the array was already wrong for one driver — ' +
-					'if that is being fixed, update this gate deliberately.'
-			);
-		}
-		if (!section.includes('informative')) {
-			errors.push(
-				'anchor_cascade is no longer marked informative. If a driver now reads it, the comment ' +
-					'claiming AHK inserts an extra step must be reconciled with the data first.'
-			);
-		}
-	}
+// anchor_cascade is GONE, and this asserts it stays gone. It was a four-element
+// array labelled "informative — drivers implement this", read by nothing, and the
+// paragraph directly above it said "AHK adds a step between 2 and 3" — so the data
+// contradicted its own documentation and no code path could ever notice. It is
+// prose now. A constant nothing consumes cannot go stale loudly, so it goes stale
+// quietly, which is the whole reason this gate measures reach in the first place.
+if (/^s*anchor_cascades*=/m.test(section)) {
+	errors.push(
+		'anchor_cascade is back in [positioning]. It was deleted because nothing read it and ' +
+			'it disagreed with the comment beside it. If a driver now genuinely consumes an ' +
+			'anchor cascade, the five prose steps — including the AHK-only mouse-cursor step — ' +
+			'must be reconciled with the data before it returns.'
+	);
 }
 
 if (errors.length > 0) {
@@ -164,5 +155,5 @@ if (errors.length > 0) {
 const shared = keys.filter((k) => RECORD[k] && RECORD[k].length > 1).length;
 console.log(
 	`\x1b[32m[OK] all ${keys.length} [positioning] constant(s) are read by the drivers recorded ` +
-		`(${shared} genuinely shared; window_offset_y macOS-only; anchor_cascade informative).\x1b[0m`
+		`(${shared} genuinely shared; window_offset_y macOS-only; anchor_cascade deleted).\x1b[0m`
 );
