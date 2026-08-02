@@ -1051,9 +1051,19 @@ helpers.describe("Adapter contract vectors: Clipboard", function()
 		helpers.assert_eq("ergopti_clipboard_test_42", adapter.read(), "read() must return the written content")
 	end)
 
-	helpers.it("save returns without throwing (save_returns_string_or_null)", function()
-		local ok = pcall(function() return adapter.save() end)
-		helpers.assert_true(ok, "save() must not throw")
+	helpers.it("save returns an opaque snapshot restore() accepts (save_returns_snapshot_or_null)", function()
+		-- The old assertion was "did not throw", and it hid a real divergence.
+		-- Clipboard.spec.js documents save() as {string|null}; macOS returns the
+		-- readAllData() TABLE, deliberately, so a paste of non-text survives an
+		-- injection — i.e. macOS's save() behaves like the Windows adapter's
+		-- separate save_all(). Neither is wrong, but they are not the same
+		-- contract, and only the pcall was standing where that should have been
+		-- noticed. What both honour is that save() yields a value restore() takes
+		-- back, so that is what this asserts.
+		local saved = adapter.save()
+		helpers.assert_true(saved == nil or type(saved) == "string" or type(saved) == "table",
+			"save() must answer a snapshot restore() accepts, or nil for an empty clipboard")
+		adapter.restore(saved)
 	end)
 
 	helpers.it("restore(nil) returns true (restore_null_clears)", function()
@@ -1088,6 +1098,9 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 			adapter.drawBitmap(0, function() end)
 		end)
 		helpers.assert_true(ok, "zero-handle calls must be no-ops without throwing")
+		helpers.assert_eq(type(adapter.createWindow), "function",
+			"and must leave the adapter usable — a zero handle is what every caller has "
+				.. "before its first createWindow")
 	end)
 
 	helpers.it("drawBitmap calls the draw function (draw_bitmap_calls_draw_fn)", function()
@@ -1106,5 +1119,7 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 			adapter.destroyWindow(h)
 		end)
 		helpers.assert_true(ok, "show/hide/destroy lifecycle must not throw")
+		helpers.assert_eq(type(adapter.createWindow), "function",
+			"and a destroyed window must leave the adapter able to create another")
 	end)
 end)
