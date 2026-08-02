@@ -45,7 +45,16 @@ local M = {}
 --- focus. Wrapped in pcall because hs.focus can briefly fail during app
 --- transitions and we never want that to stop the caller from opening its
 --- dialog.
-local function focus_hammerspoon()
+---
+--- @param defer_open boolean|nil True only for the NON-BLOCKING wrapper. The
+---   deferred `open` below cannot run before a modal dialog is dismissed — the
+---   dialog owns the runloop — so for the blocking wrappers it is dead with
+---   respect to its purpose while keeping its side effect: it fires after the
+---   user has dismissed the dialog and moved on, and raises Hammerspoon over
+---   whatever they switched to. Two synchronous do_focus() calls are what
+---   actually focuses the dialog; this third mechanism only helps the case where
+---   the runloop keeps turning.
+local function focus_hammerspoon(defer_open)
 	local function do_focus()
 		local ok, err = pcall(function() return hs.focus(true) end)
 		if not ok then
@@ -59,13 +68,17 @@ local function focus_hammerspoon()
 
 	do_focus()
 	do_focus()
-	-- Modal dialogs (hs.dialog.*) block the main thread and its default runloop,
-	-- meaning hs.timer.doAfter will NOT fire until AFTER the dialog is dismissed!
-	-- To guarantee the dialog receives keyboard focus (especially when opened
-	-- from a menubar click, which steals focus), we defer an hs.execute call by
-	-- 100ms via hs.timer.doAfter. Using hs.timer instead of hs.task avoids the
-	-- GC pitfall: hs.task held only in a local is silently SIGTERM'd if the GC
-	-- runs before the 100ms sleep finishes; hs.timer has its own strong reference.
+	-- Third mechanism: raise the app again a tenth of a second later, for the case
+	-- where the dialog was opened from a menubar click and the click itself steals
+	-- focus back after the two calls above.
+	--
+	-- It only reaches a dialog whose runloop keeps turning. hs.dialog.blockAlert
+	-- and hs.dialog.textPrompt park the main thread and its default runloop until
+	-- the user dismisses them, so a timer armed here cannot fire until after
+	-- dismissal — at which point there is no dialog left to focus and the raise
+	-- lands on whatever the user switched to instead. That is why only the
+	-- non-blocking wrapper asks for it.
+	if not defer_open then return end
 	pcall(function()
 		local bundlePath = hs.processInfo.bundlePath
 		if bundlePath then
@@ -108,7 +121,9 @@ end
 --- Focusing is still useful so the alert renders on top of the user's current
 --- app and its auto-dismiss / button-click behaviour is predictable.
 function M.alert(...)
-	focus_hammerspoon()
+	-- The only wrapper whose dialog does not park the runloop, so the only one
+	-- the deferred raise can reach in time to do what it is for.
+	focus_hammerspoon(true)
 	return hs.dialog.alert(...)
 end
 
