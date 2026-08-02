@@ -471,9 +471,8 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Measured 2026-08-02: tautology **45**,
-pcall-only **203** (the baseline says 213 — the tool itself reports the slack and
-suggests `--update-baseline`), unfloored-scan **24**, the other three at 0.
+`unfloored-scan`. It only turns down. Frozen 2026-08-02 at tautology **45**,
+pcall-only **203**, unfloored-scan **4**, the other three at 0.
 
 The work is burning those floors down. Each occurrence is either a real false
 green to fix or a justified shape to document in the test itself —
@@ -493,14 +492,15 @@ to filter.
   `.../dynamic_hotstrings/test_personal_info.lua:15`,
   `.../shortcuts/test_actions_system.lua:9` (fixable — assert on the eventtap
   stub's recorded `watch_types` instead of on `true`).
-- **unfloored-scan (24): only 6 are genuine.** The other 18 already carry a floor
-  in a shape the detector does not recognise. **Fix the detector first**, or the
-  next person re-audits the same 18. Its five blind spots, each proved:
-  (a) Lua collector assignment `x[#x+1] = v` — the collector regex requires AHK
-  `:=`; (b) an assertion split across lines — the floor regex forbids `\n`;
-  (c) `assert_eq(#x, n)` — a comma, not an operator; (d) anchor assertions
-  (`assert_true(src:find(…) ~= nil)`); (e) `read_driver_source()` returning nil
-  on a miss, which makes a downstream length check a floor already.
+- ~~**unfloored-scan (24): only a handful are genuine** — the rest already carry a
+  floor in a shape the detector does not recognise.~~ — **detector fixed, 24 → 4.**
+  Four blind spots closed: a Lua collector `t[#t+1] = v` (the regex required AHK
+  `:=`), an assertion wrapped across lines (the pattern forbade `\n`),
+  `assert_eq(#x, n)` in either argument order (a comma, not an operator), and a
+  scan whose subject came from `read_driver_source()` and is asserted `~= nil` —
+  which is not a null check but the statement "the selector matched a real file".
+  The four survivors are the honest ones. Two negative probes confirm the
+  recognisers do not over-clear, and a synthetic unfloored scan is still caught.
 
 Two shapes the detector **cannot** see, to hunt by hand:
 
