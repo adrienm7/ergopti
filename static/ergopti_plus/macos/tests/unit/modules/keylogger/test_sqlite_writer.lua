@@ -126,14 +126,44 @@ helpers.describe("sqlite_writer — init validation", function()
 		helpers.assert_eq(ok, true)
 	end)
 
-	helpers.it("pause must gate writes while diagnostic can still read sqlite path + errors sink (project_suspend_pause_invariant)", function()
-		-- sqlite_writer must early-return on pause (no DB writes). Healthcheck must still report the sqlite path and errors sink for troubleshooting.
-		helpers.assert_true(true, "sqlite_writer must be silent under pause; diagnostic must see paths + errors sink")
+	-- The writer records what it is handed; the decision not to record while
+	-- paused is the ingest path's early return. Both cases below stated that with
+	-- assert_true(true) and a sentence.
+	helpers.it("holds no pause state of its own (project_suspend_pause_invariant)", function()
+		-- A gate here would mean two modules decide whether a keystroke is
+		-- written, and the one that loses leaves the rotation offset advanced past
+		-- bytes that were never persisted — a gap in the log with nothing to say
+		-- where it came from.
+		local src = helpers.read_driver_source("local function _read_schema_sql")
+		helpers.assert_true(src ~= nil, "modules/keylogger/sqlite_writer.lua source must be locatable")
+		-- Matched on the STATE spellings, not on "paus": this module's schema has a
+		-- pause_before_ms column — the inter-keystroke gap, a metric it is supposed
+		-- to record — and a substring check reads that as the coupling it forbids.
+		for _, spelling in ipairs({ "processing_paused", "is_paused", "script_control", "suspend" }) do
+			helpers.assert_true(src:find(spelling, 1, true) == nil,
+				"the writer must not gate on '" .. spelling .. "' — the ingest path early-returns "
+					.. "before reaching it, and a second gate here loses keystrokes the first one accepted")
+		end
 	end)
 
-	helpers.it("high volume inserts + pause + pcall on FS error must not crash and diagnostic must retain errors sink visibility", function()
-		-- 150+ inserts under pause transitions + simulated write failure; healthcheck must still surface the dedicated errors log.
-		helpers.assert_true(true, "sqlite_writer volume + pause + FS must be resilient; diagnostic must see errors sink (would have caught silent write under pause or lost errors visibility)")
+	helpers.it("stays usable after 150 inserts against a writer with no database", function()
+		-- The old case claimed volume plus a simulated FS error and asserted true.
+		-- What is checkable without a live SQLite is the guard: a writer whose
+		-- get_db yields nil must refuse every insert the same way, not just the
+		-- first, and must not leave itself wedged for the caller that comes after.
+		local sw = helpers.load_with_stubs("modules.keylogger.sqlite_writer")
+		sw.init({ paths = { sqlite_path = "/tmp/does_not_exist.sqlite" }, device_id = "vol-test" })
+		-- Called directly, not through pcall. "It did not raise" is not the claim —
+		-- the claim is that every call answers the same shape, and a raise here
+		-- fails the case with the real error rather than with a boolean.
+		for i = 1, 150 do
+			local out = sw.build_inserts({ { id = i } })
+			helpers.assert_true(out == nil or type(out) == "table",
+				"insert " .. i .. " must answer nil or a statement list, never a half-built value")
+		end
+		helpers.assert_eq(type(sw.get_next_event_id), "function",
+			"and the writer must still be callable afterwards — a wedged writer loses every "
+				.. "keystroke from here on with no error at the call site")
 	end)
 end)
 

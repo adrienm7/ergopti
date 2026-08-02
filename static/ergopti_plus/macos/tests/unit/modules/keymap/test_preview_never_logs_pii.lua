@@ -99,13 +99,18 @@ end
 --- @param needle string Text that must be absent.
 --- @param message string Assertion message.
 local function assert_absent(lines, needle, message)
+	-- The floor matters more than the scan. An absence assertion over an EMPTY
+	-- log list is vacuous: if the capture stopped recording, every "must not
+	-- leak" case in this file goes green while nothing is being inspected — which
+	-- is the exact failure mode a PII test cannot afford.
+	helpers.assert_true(#lines > 0,
+		"no log lines were captured, so this absence assertion inspected nothing: " .. message)
 	for _, line in ipairs(lines) do
 		if line:find(needle, 1, true) then
 			helpers.assert_true(false, message .. " — leaked line: " .. line)
 			return
 		end
 	end
-	helpers.assert_true(true, message)
 end
 
 
