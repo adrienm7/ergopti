@@ -270,15 +270,22 @@ function M.read_fixture(relative_path)
 	return body
 end
 
---- Returns the concatenated production source containing an optional symbol.
+--- Production sources, read once per process.
 ---
---- Source-invariant tests must not name a production file: the implementation
---- can be split or moved without turning a useful invariant into a path error.
---- The scan deliberately excludes tests/ and works with the plain Lua runner on
---- macOS, Linux CI, and Windows.
---- @param symbol string|nil Optional literal to select relevant source files.
---- @return string|nil Matching production Lua source, or nil when not found.
-function M.read_driver_source(symbol)
+--- The scan used to re-run its `find`/`dir` and re-read all 201 production files
+--- on EVERY call, and there are several hundred call sites: ~3.3 MB of file I/O
+--- per read, ~1.2 GB per suite run, for a tree that no test is allowed to
+--- mutate. Caching it is what makes the symbol-keyed scan affordable enough to
+--- be the DEFAULT way a source invariant is written rather than a reluctant
+--- alternative to naming a path.
+--- @type table|nil
+local _production_sources = nil
+
+--- Loads (once) every production Lua file under the driver root.
+--- @return table Array of file bodies, tests/ excluded.
+local function production_sources()
+	if _production_sources then return _production_sources end
+
 	local root = M.driver_root()
 	local is_windows = package.config:sub(1, 1) == "\\"
 	local command
@@ -288,23 +295,48 @@ function M.read_driver_source(symbol)
 		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
 	end
 
+	local bodies = {}
 	local pipe = io.popen(command, "r")
-	if not pipe then return nil end
-	local parts = {}
+	if not pipe then return bodies end
 	for path in pipe:lines() do
 		local normalized = path:gsub("\\", "/")
 		if not normalized:find("/tests/", 1, true) then
 			local fh = io.open(path, "r")
 			if fh then
-				local body = fh:read("*a")
+				bodies[#bodies + 1] = fh:read("*a")
 				fh:close()
-				if not symbol or body:find(symbol, 1, true) then
-					parts[#parts + 1] = body
-				end
 			end
 		end
 	end
 	pipe:close()
+
+	-- An empty result means the scan itself failed (no popen, wrong root). Do not
+	-- cache that: a cached emptiness would make every later call return nil and
+	-- every source invariant in the run pass vacuously.
+	if #bodies > 0 then _production_sources = bodies end
+	return bodies
+end
+
+--- Returns the concatenated production source containing an optional symbol.
+---
+--- Source-invariant tests must not name a production file: the implementation
+--- can be split or moved without turning a useful invariant into a path error.
+--- The scan deliberately excludes tests/ and works with the plain Lua runner on
+--- macOS, Linux CI, and Windows.
+---
+--- The returned string is the concatenation of every production file containing
+--- `symbol`, so a selector matching two files changes what the caller asserts —
+--- pick one unique to the module under test, and prefer a declaration over a
+--- path-like literal.
+--- @param symbol string|nil Optional literal to select relevant source files.
+--- @return string|nil Matching production Lua source, or nil when not found.
+function M.read_driver_source(symbol)
+	local parts = {}
+	for _, body in ipairs(production_sources()) do
+		if not symbol or body:find(symbol, 1, true) then
+			parts[#parts + 1] = body
+		end
+	end
 	if #parts == 0 then return nil end
 	return table.concat(parts, "\n")
 end
