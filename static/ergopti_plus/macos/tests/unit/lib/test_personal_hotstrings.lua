@@ -7,7 +7,7 @@
 --- infra/personal_hotstrings. The Lua suite never loads init.lua, so without this
 --- test a missing require, a renamed dep, or a regression in the load order would
 --- only surface as a boot failure on the maintainer's Mac. This exercises M.load
---- under stubbed keymap/menu_paths/hotstring_editor/fs_dir and asserts (1) the
+--- under stubbed keymap/config_paths/hotstring_editor/fs_dir and asserts (1) the
 --- personal group is registered FIRST (lowest group_order = highest priority),
 --- (2) extension groups follow in alphabetical-by-stem order, (3) the top-level
 --- personal_hotstrings.toml is never re-registered as an extension, and (4) the
@@ -41,7 +41,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
-		mock("ui.menu.menu_paths", {
+		mock("infra.config_paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
 				if key == "PersonalHotstringsDir" then return "/fake/hot/" end
@@ -105,7 +105,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
-		mock("ui.menu.menu_paths", {
+		mock("infra.config_paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
 				if key == "PersonalHotstringsDir" then return "/fake/hot/" end
@@ -152,7 +152,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
-		mock("ui.menu.menu_paths", {
+		mock("infra.config_paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
 				if key == "PersonalHotstringsDir" then return "/fake/hot/" end

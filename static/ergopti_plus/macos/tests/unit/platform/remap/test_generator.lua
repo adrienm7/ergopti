@@ -36,7 +36,7 @@ package.loaded["adapters.file_system"] = {
 
 -- Stub ui.menu.menu_paths (required at module load time to compute the
 -- KE_PHYSICAL_KC_LOG constant — it must not hit the filesystem).
-package.loaded["ui.menu.menu_paths"] = {
+package.loaded["infra.config_paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
 
