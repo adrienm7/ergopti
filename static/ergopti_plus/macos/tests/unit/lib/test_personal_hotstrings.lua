@@ -133,7 +133,12 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		hs.fs.attributes, hs.json = prev_attr, prev_json
 		restore_all()
 
+		-- Termination is the subject, so the pcall stays. What it was missing is that
+		-- the walk RETURNED something usable: a load that terminated by giving up
+		-- silently would satisfy the old assertion and register no hotstrings.
 		helpers.assert_true(ok, "load() must terminate and not throw/hang on a directory cycle: " .. tostring(err))
+		helpers.assert_true(err == nil or type(err) == "table" or type(err) == "number",
+			"and must answer a result, not a half-value: " .. tostring(err))
 	end)
 
 	helpers.it("warns instead of silently overwriting on a flat/nested group-name collision (F-LOW-5)", function()
@@ -194,6 +199,8 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		restore_all()
 
 		helpers.assert_true(ok, "load() must not throw on a group-name collision: " .. tostring(loaded))
+		helpers.assert_true(loaded == nil or type(loaded) == "table" or type(loaded) == "number",
+			"and must still answer a result for the files it did load: " .. tostring(loaded))
 
 		local collision_warned = false
 		for _, w in ipairs(warnings) do

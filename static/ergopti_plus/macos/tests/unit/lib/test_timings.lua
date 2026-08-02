@@ -71,13 +71,21 @@ helpers.describe("timings: ms / sec accessors", function()
 	end)
 
 	helpers.it("fails fast on an unknown section", function()
-		local ok = pcall(function() return Timings.ms("nope", "whatever_ms") end)
+		-- The raising IS the subject here, so the pcall stays. What it was missing is
+		-- the error TEXT: a fail-fast that raised for an unrelated reason — a nil
+		-- registry, a bad path — reads identically, and the caller debugging a typo
+		-- would be told nothing about which section it got wrong.
+		local ok, err = pcall(function() return Timings.ms("nope", "whatever_ms") end)
 		helpers.assert_eq(ok, false, "ms raises on an unknown section")
+		helpers.assert_true(tostring(err):find("nope", 1, true) ~= nil,
+			"and the error must name the section it refused: " .. tostring(err))
 	end)
 
 	helpers.it("fails fast on an unknown key", function()
-		local ok = pcall(function() return Timings.ms("keylogger", "does_not_exist_ms") end)
+		local ok, err = pcall(function() return Timings.ms("keylogger", "does_not_exist_ms") end)
 		helpers.assert_eq(ok, false, "ms raises on an unknown key")
+		helpers.assert_true(tostring(err):find("does_not_exist_ms", 1, true) ~= nil,
+			"and the error must name the key it refused: " .. tostring(err))
 	end)
 end)
 

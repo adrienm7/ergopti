@@ -114,6 +114,8 @@ local codec_ok, codec = pcall(require, "toml_codec.codec")
 
 helpers.describe("tap_hold corpus — TOML codec round-trip", function()
 	helpers.it("toml_codec is available on the Lua path", function()
+		helpers.assert_eq(type(codec_ok and codec or nil), "table",
+			"the codec must load as a table — every vector below round-trips through it")
 		helpers.assert_true(codec_ok,
 			"toml_codec.codec not found — check package.path in tests/run.lua")
 	end)
@@ -135,6 +137,11 @@ helpers.describe("tap_hold corpus — TOML codec round-trip", function()
 			local ok_enc, toml_str = pcall(codec.encode, input)
 			helpers.assert_true(ok_enc,
 				"vector '" .. v.id .. "': encode failed: " .. tostring(toml_str))
+			-- An encoder that answered "" would satisfy the status check and then make
+			-- the decode below succeed on nothing, so the round-trip assertion would
+			-- be comparing an empty table against an empty table.
+			helpers.assert_true(type(toml_str) == "string" and toml_str ~= "",
+				"vector '" .. v.id .. "': encode produced no TOML")
 			local ok_dec, parsed = pcall(codec.decode, toml_str)
 			helpers.assert_true(ok_dec,
 				"vector '" .. v.id .. "': decode failed: " .. tostring(parsed))
