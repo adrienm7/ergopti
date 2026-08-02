@@ -115,36 +115,33 @@ Two conventions that make asymmetry legible:
 
 Constraints: **paths before moves, moves before content, data before code.**
 
-- **Lot 2 — the safety net.** The per-READ counting is done. What remains is the
-  conversion, and **re-measured 2026-08-02 the gate is lying about its own
-  population.**
+- **Lot 2 — the safety net.** ~~The per-READ counting.~~ ~~The gate's blind spot:
+  `SOURCE_PATH_RE` matched `modules|lib|ui`, the `lib` arm had matched zero since
+  `e97ddbd08` renamed `lib/` to `infra/`, and no arm ever reached the driver-root
+  `init.lua`.~~ — **both done.** The honest population is **41 files / 56 reads**;
+  9 files and 16 reads had been pinned the whole time with no symptom, because an
+  unseen pin looks exactly like no pin.
 
-  1. **Close the blind spot first, before converting anything.**
-     `SOURCE_PATH_RE` in `test-no-pinned-source-reads-lua.cjs` matches
-     `modules|lib|ui`. The `lib` arm has matched **zero** reads since
-     `e97ddbd08` renamed `lib/` to `infra/`, and there is no arm for the
-     driver-root `init.lua`. That hides **19 further production reads** (16
-     `init.lua`, 2 `infra/preferences.lua`, 1 `infra/i18n.lua`). True population
-     is ~57, not 38. Add the two arms and re-freeze at the honest number — a
-     ratchet that cannot see a fifth of its subject is not a safety net.
-  2. Both baselines also carry free slack (32 files / 40 reads frozen against 29
-     / 38 measured). Slack is where a regression lands silently.
-  3. Then convert. **29 of the 38 have a proven-unique declaration** and are
-     mechanical, but `fix-pinned-source-reads.cjs` cannot see them: its
-     `PINNED_RE` only matches `local X = helpers.driver_root() .. "…"`, and 21 of
-     the 38 are the inline `io.open(driver_root() .. "…")` shape. Widening the
-     fixer covers most of the lot.
-  4. The 9 that "need a human" are five menu/UI modules whose only declarations
-     are the non-unique `function M.build` / `function M.new`. They do **not**
-     need restructuring — each has unique constants or i18n keys usable as a
-     selector (`local DISABLED_GESTURE_ACTION`, `"menu.llm.backend_title"`,
-     `local MODEL_ADVANCED_PARAMS_THRESHOLD_B`, …). What they need is the
-     fixer's candidate rule widened beyond `local function` / `function M.`.
-  5. Only **6 of the 30** pinned files carry position arithmetic
+  What remains is the conversion, and the obstacle is the fixer, not the tests:
+
+  1. **Widen `fix-pinned-source-reads.cjs` — it covers most of the lot.** Its
+     `PINNED_RE` only matches `local X = helpers.driver_root() .. "…"`, so it sees
+     12 of the 38 and converts 0. **21 of the 38 are the inline
+     `io.open(driver_root() .. "…")` shape** it never matches, and 4 more are
+     refused as "unrecognised read shape" despite having a unique selector.
+  2. Widen its candidate rule too, beyond `local function` / `function M.`. The 9
+     reads said to "need a human" are five menu/UI modules whose only declarations
+     are the non-unique `function M.build` / `function M.new` — but each has
+     unique constants or i18n keys usable as a selector
+     (`local DISABLED_GESTURE_ACTION`, `"menu.llm.backend_title"`,
+     `local MODEL_ADVANCED_PARAMS_THRESHOLD_B`, …). "Needs a human" means "needs a
+     selector the fixer cannot generate", not "impossible".
+  3. Only **6 of the pinned files carry position arithmetic**
      (`test_ingest_rollback_id_stable.lua` has 6 comparisons on its own); those
-     are the ones that genuinely need the assertion made order-independent
-     before a concat-based read can replace them. The other 24 are plain
-     presence/absence and are unaffected.
+     are the ones that genuinely need the assertion made order-independent before
+     a concat-based read can replace them. The other 24 are plain
+     presence/absence and are unaffected — the "make it order-independent first"
+     caveat applies to a fifth of the population, not to all of it.
 
   The AHK residue each pins deliberately (`run_all.ahk` itself, a `_generated/`
   file `_DriverSourceConcat` excludes, a runner, or a single file carrying an

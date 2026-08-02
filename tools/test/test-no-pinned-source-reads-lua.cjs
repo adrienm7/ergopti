@@ -89,7 +89,15 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     their target module has no declaration unique to it, so
 //                     read_driver_source would concatenate several files and
 //                     silently change what the test asserts.)
-const BASELINE = 32;
+//           32 → 41 (2026-08-02: NOT a regression — the scan was blind. The path
+//                     pattern's `lib` arm had matched nothing since e97ddbd08
+//                     renamed lib/ to infra/, and no arm ever reached the
+//                     driver-root init.lua, the single most-pinned file in the
+//                     suite. Adding `infra` and an init.lua arm surfaced 9 files
+//                     and 16 reads that had been pinned the whole time. Not one
+//                     test changed. Re-frozen at the honest number; anything
+//                     below it now is real conversion.)
+const BASELINE = 41;
 
 // Second frozen baseline — the count of individual pinned READS, not of files.
 //
@@ -103,14 +111,34 @@ const BASELINE = 32;
 // even in a file that is otherwise move-resilient.
 // History: 40 (first measurement, 2026-07-31 — 32 files, so 8 reads were
 //              invisible to the per-file count)
-const READ_BASELINE = 40;
+//       40 → 56 (2026-08-02: the path pattern gained an `infra` arm and an
+//              init.lua arm; see the file baseline's history. 16 reads that were
+//              always there became visible. The measured count before widening
+//              was 38, so the old 40 also carried 2 reads of pure slack — a
+//              ratchet frozen above its own measurement lets the next regression
+//              land for free.)
+const READ_BASELINE = 56;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 // driver_root() concatenated with a quoted relative path into a driver SOURCE
-// tree ending in .lua, e.g. driver_root() .. "modules/keymap/input_sources.lua".
-const SOURCE_PATH_RE = /driver_root\(\)\s*\.\.\s*["'][^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.lua["']/;
+// file, e.g. driver_root() .. "modules/keymap/input_sources.lua".
+//
+// Two arms were missing and the gate under-counted by 19 reads — a third of its
+// own subject — with no symptom, because an unseen pin looks exactly like no pin:
+//
+//   - `infra`. The alternation said `lib`, and commit e97ddbd08 renamed every
+//     driver's lib/ to infra/. The `lib` arm has matched ZERO reads since. It is
+//     kept only so a stray lib/ path cannot slip back in unseen.
+//   - the driver-root `init.lua`. It is in no sub-tree at all, so no directory
+//     arm could ever reach it — and it is the single most-pinned file in the
+//     macOS suite (16 reads).
+//
+// The lesson is the one the counting fix in Lot 2 already taught once: a ratchet
+// is only as honest as the population it can see, and a dead alternation branch
+// reports success by measuring nothing.
+const SOURCE_PATH_RE = /driver_root\(\)\s*\.\.\s*["'](?:[^"'\n]*(?:modules|lib|infra|ui)[\\/][^"'\n]*|\.{0,2}[\\/]*init)\.lua["']/;
 const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'g');
 
 /**
