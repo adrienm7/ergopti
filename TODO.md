@@ -249,16 +249,35 @@ Constraints: **paths before moves, moves before content, data before code.**
 
   **Still open, and it is the `linux` half:**
 
-  1. **No feature carries `linux`.** 0 of 324. The 73 features Linux sees, it sees
-     by inheriting one of 9 sections. Meanwhile the driver really implements
-     `linux/modules/gestures` (858 l), `linux/modules/llm` (988 l) and
-     `linux/modules/shortcuts` (385 l) — none of which the manifest admits, so per
-     top-level section it reads gestures 0/109, shortcuts 0/82, llm 0/29,
-     metrics 5/18. This is the data half of the problem Lot 5's menu migration
-     hits from the other side.
-     ⚠ Not a data-only edit: adding `linux` to a feature adds it to the Linux
-     `config_template.toml`, and the config-schema gate now checks section
-     presence per driver, so the template and the driver's reader move together.
+  1. ⚠ **"No feature carries `linux`, 0 of 324" is true and describes the wrong
+     thing — re-measured 2026-08-02.** It reads like a labelling job. It is not:
+     of the **ten config surfaces the Linux driver actually reads or writes,
+     ZERO are declared for it**, and most do not exist in the manifest at all.
+
+     | Surface | State |
+     | --- | --- |
+     | `script.locale`, `llm.enabled` | declared for `ahk`+`hs` only — Linux writes them anyway |
+     | `script.layout`, `script.onboarding_done` | no manifest entry |
+     | `llm.model` | no entry, **and `llm.models.ollama` already means this** |
+     | `llm.ollama_url`, `llm.prompt` | no entry |
+     | `paths.*` | no section at all |
+     | `linux.gestures`, `linux.action_parameters` | a **driver-namespaced silo** — the exact shape Lot 4 dissolved for `[ahk.*]` and `[hs.*]`, read as a TABLE so no key-level scan ever saw it |
+
+     So adding `linux` tokens to existing features would not have fixed it. The
+     work is: dissolve the `[linux.*]` silo (I2, and it needs `[sections.gestures]`
+     to gain `linux` plus the slot vocabulary reconciled), re-point `llm.model` at
+     the canonical `llm.models.*` rather than declaring a second name for it, and
+     declare the rest with `platforms = ["linux"]` so only the Linux template
+     grows.
+     ⚠ Do not guess the semantics. `llm.models.ollama` is a MODEL NAME while
+     Linux's `ollama_url` is an endpoint — they are not the same key under two
+     names, and mapping one onto the other silently breaks the Linux LLM.
+
+     `test-driver-config-surface-is-declared.cjs` ratchets this at **11** (the
+     eleventh is macOS: `ui/onboarding/init.lua` persists `[hotstrings] enabled`,
+     which the manifest has never declared — its own comment says so). Each row
+     driven to zero is one setting that gains a default, a type, a schema entry
+     and a menu row.
 
 - **Lot 5 — one menu.** The manifest must gain the capabilities that explain
   every hand-written row: a resolvable `action` id (12), `label.format` + `args`
