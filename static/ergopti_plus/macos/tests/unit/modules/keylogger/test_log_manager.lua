@@ -252,15 +252,21 @@ helpers.describe("log_manager — pre-init guards", function()
 	package.loaded["modules.keylogger.rotation"] = real_rotation
 	package.loaded["modules.keylogger.log_manager"] = nil
 
-	helpers.it("diagnostic (healthcheck) must see accurate logs paths (incl. errors sink) + day_rollover status under pause + volume", function()
-		-- Even when paused, healthcheck must be able to report unified + errors_today paths and last rollover
-		-- for user troubleshooting. log_manager data must be readable without triggering writes.
-		helpers.assert_true(true, "log_manager must expose clean data to diagnostic under pause (errors sink visibility, rollover)")
-	end)
-
-	helpers.it("FS failure during rollover + pause + 150+ events must not crash and diagnostic must still report the errors sink", function()
-		-- Hard write on rotation must be caught; healthcheck must still surface the dedicated errors log path.
-		helpers.assert_true(true, "log_manager rollover FS error must be resilient; diagnostic must still see errors sink")
+	-- What log_manager owes a diagnostic is that its read accessors are readable
+	-- WITHOUT causing a write. That is checkable here; "healthcheck must report
+	-- the errors sink" is not — it is a requirement on the healthcheck module,
+	-- and two cases used to state it with assert_true(true) and a sentence.
+	helpers.it("the read accessors answer without writing anything", function()
+		writes.append = 0
+		local sqlite_path = fresh.get_sqlite_path()
+		local device_id   = fresh.get_device_short_id()
+		helpers.assert_true(type(sqlite_path) == "string",
+			"a diagnostic must be able to print where the database is, even before init")
+		helpers.assert_true(type(device_id) == "string",
+			"and which device wrote it")
+		helpers.assert_eq(writes.append, 0,
+			"reading a path must not append anything — a diagnostic run is not allowed "
+				.. "to change the thing it is diagnosing")
 	end)
 end)
 

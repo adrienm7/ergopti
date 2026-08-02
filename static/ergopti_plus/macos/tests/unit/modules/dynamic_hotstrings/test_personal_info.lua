@@ -10,11 +10,34 @@
 
 local helpers = require("tests.helpers")
 
--- Pause invariant for personal info hotstrings (must not expand when paused)
+-- Pause invariant for personal info hotstrings: they must not expand while the
+-- driver is paused. personal_info has no pause state of its own — the guard is
+-- the early return at the top of the keystroke path — so this case used to be
+-- "assert_true(true)" with a comment saying where the real guard lived.
+--
+-- What is checkable is WHERE that guard sits. It has to be the first statement
+-- of onKeyDownRaw: everything after it mutates the buffer, and a pause check
+-- that drifted even one statement down would leave a paused driver still
+-- tracking keystrokes, so the first thing typed after a resume would expand
+-- against a buffer built while the user thought nothing was listening.
 helpers.describe("Personal info pause guard", function()
-	helpers.it("pause blocks personal dynamic expansions (regression)", function()
-		-- Guard in keymap/expander; test documents requirement
-		helpers.assert_true(true)
+	helpers.it("the keystroke path returns on pause before touching anything", function()
+		local src = helpers.read_driver_source("local function onKeyDownRaw")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua must be locatable")
+
+		local body = src:match("local function onKeyDownRaw%s*%(.-%)\n(.-)\n\tlocal keyCode")
+		helpers.assert_true(body ~= nil,
+			"onKeyDownRaw must still open with its guard then read the key code — if this "
+				.. "match fails the function was restructured and the guard needs re-checking")
+
+		-- Only comments and blank lines may precede the guard.
+		local first_stmt
+		for line in body:gmatch("[^\n]+") do
+			local t = line:match("^%s*(.-)%s*$")
+			if t ~= "" and not t:match("^%-%-") then first_stmt = t break end
+		end
+		helpers.assert_eq(first_stmt, "if CoreState.processing_paused then return false end",
+			"the pause check must be the FIRST statement of onKeyDownRaw")
 	end)
 end)
 
