@@ -58,16 +58,37 @@ const MIN_DRIVERS = 3;
 // exemption: an unlisted violation fails, AND a listed one that no longer occurs
 // fails too, so the list cannot outlive the gap it describes.
 //
-// linux / "missing required property 'script'": [sections.script] in the feature
-// manifest is platforms = ["ahk", "hs"], so the Linux template carries no
-// [script] block at all. That is not an oversight in the template — the Linux
-// driver keeps its locale in its own XDG store (infra/i18n.lua's s.get("locale")),
-// not in config.toml. Closing it means re-platforming the section, which is the
-// one-namespace migration's job, not a gate's. Until then the divergence is
-// written down rather than invisible.
-const KNOWN_GAPS = {
-	linux: [": missing required property 'script'"]
-};
+// Empty since 2026-08-02. Its only entry was linux / "missing required property
+// 'script'", and the gap was in the gate rather than in the template: the schema
+// hardcoded `"required": ["script"]` while the feature manifest already said
+// [sections.script] is ["ahk", "hs"]. Two declarations of the same fact, and the
+// one that was wrong is the one that could not know about Linux. The schema no
+// longer carries a root `required`; section presence is derived per driver from
+// the manifest below, which is both stronger (it checks EVERY section, not one)
+// and incapable of disagreeing with the platform data.
+const KNOWN_GAPS = {};
+
+// The manifest is the single source of truth for which driver has which
+// top-level section.
+const MANIFEST_PATH = shared('modules/features/manifest.toml');
+// The manifest names drivers as ahk / hs / linux; the trees are named windows /
+// macos / linux. One mapping, here, rather than a token in either vocabulary
+// that means "the other one".
+const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
+
+/**
+ * Top-level sections the manifest says a platform must carry.
+ * @param {string} platform - Manifest platform token (ahk / hs / linux).
+ * @returns {string[]} Section names, sorted.
+ */
+function requiredSectionsFor(platform) {
+	const manifest = TOML.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+	const sections = manifest.sections || {};
+	return Object.entries(sections)
+		.filter(([, v]) => Array.isArray(v.platforms) && v.platforms.includes(platform))
+		.map(([k]) => k)
+		.sort();
+}
 
 const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
 
@@ -224,6 +245,24 @@ for (const driver of DRIVERS) {
 	}
 	const errors = [];
 	validate(data, schema, '', errors);
+
+	// Section presence, derived from the manifest rather than restated in the
+	// schema. A driver whose manifest lists a section must ship it; one whose
+	// manifest does not is not missing anything.
+	const platform = PLATFORM_OF_DRIVER[driver];
+	if (!platform) {
+		console.log(
+			`  ✗  ${rel} — driver "${driver}" has no manifest platform token. A new driver needs ` +
+				'one in PLATFORM_OF_DRIVER, or this gate silently stops checking its sections.'
+		);
+		totalFail++;
+	} else {
+		for (const section of requiredSectionsFor(platform)) {
+			if (data[section] === undefined) {
+				errors.push(`: missing section '${section}', which the manifest gives to ${platform}`);
+			}
+		}
+	}
 
 	const gaps = KNOWN_GAPS[driver] || [];
 	const unexpected = errors.filter((e) => !gaps.includes(e));

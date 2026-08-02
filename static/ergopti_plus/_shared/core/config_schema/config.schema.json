@@ -5,7 +5,7 @@
 	"description": "JSON Schema strict for the unified config.toml consumed by both the AHK and Hammerspoon drivers. Validated at boot — strict in dev (ERGOPTI_DEV=1), warn-only in prod.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["script"],
+	"_comment_required": "Deliberately absent. Which top-level sections a config.toml must carry is per-driver, and the feature manifest's `platforms` list already says so — [sections.script] is [\"ahk\", \"hs\"] because Linux keeps its locale in its own XDG store. A hardcoded `required` here restated that in a second place, disagreed with the first, and the disagreement had to be pinned as a known gap. test-config-schema.cjs derives the presence rule from the manifest instead, per driver.",
 
 	"properties": {
 		"script": { "$ref": "#/$defs/script" },
