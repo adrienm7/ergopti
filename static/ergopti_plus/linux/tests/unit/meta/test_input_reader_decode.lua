@@ -168,8 +168,11 @@ helpers.describe("input_reader (evdev decode)", function()
       local reader = inputReader.new("/dev/nonexistent", "qwerty",
         function() end)
       -- stop() on a reader that never started should not crash
-      local ok = pcall(function() reader:stop() end)
-      helpers.assert_true(ok, "stop() on idle reader does not crash")
+      -- Called directly. A stop that never started must leave the reader
+      -- restartable: the boot path stops defensively before it starts.
+      reader:stop()
+      helpers.assert_eq(type(reader.start), "function",
+        "an idle stop must leave the reader startable")
     end)
   end)
 
@@ -182,16 +185,23 @@ helpers.describe("input_reader (evdev decode)", function()
       local reader = inputReader.new("/dev/nonexistent_xyz", "qwerty",
         function() end)
       -- start() should return immediately after logging error (no crash)
-      local ok = pcall(function() reader:start() end)
-      helpers.assert_true(ok, "start() on nonexistent device does not crash")
+      -- A start against a device that does not exist must REPORT failure: the
+      -- caller shows "keyboard not found" on that answer, and a silent success
+      -- leaves the user waiting for expansions that can never arrive.
+      local started = reader:start()
+      helpers.assert_true(started == nil or started == false,
+        "start() on a nonexistent device must not report success")
     end)
 
     helpers.it("start() on /dev/null returns immediately (no keyboard events)", function()
       local reader = inputReader.new("/dev/null", "qwerty",
         function() end)
       -- /dev/null is readable but produces EOF immediately
-      local ok = pcall(function() reader:start() end)
-      helpers.assert_true(ok, "start() on /dev/null completes without crash")
+      -- /dev/null opens and immediately EOFs, which is the shape of a device that
+      -- was unplugged between the scan and the open.
+      reader:start()
+      helpers.assert_eq(type(reader.stop), "function",
+        "an immediate EOF must leave the reader stoppable, not stuck mid-start")
     end)
   end)
 

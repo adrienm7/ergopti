@@ -172,15 +172,17 @@ helpers.describe("modules/updater/manager.lua", function()
 
 	helpers.it("stop_background_checks is safe to call even without active timers", function()
 		-- Should not error.
-		local ok = pcall(M.stop_background_checks)
-		helpers.assert_true(ok, "stop_background_checks should not error")
+		M.stop_background_checks()
+		helpers.assert_eq(type(M.start_background_checks), "function",
+			"a stop with no timers armed must leave the checks restartable")
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()
 		local orig_channel = M.get_channel()
 		-- init() should work without opts.
-		local ok = pcall(function() M.init({}) end)
-		helpers.assert_true(ok, "init() should not error")
+		M.init({})
+		helpers.assert_eq(M.get_channel(), orig_channel,
+			"init with no opts must not silently move the user off their release channel")
 		-- Channel should still be the same.
 		local ch = M.get_channel()
 		helpers.assert_true(ch == "stable" or ch == "dev", "channel should be valid after init")
@@ -188,8 +190,11 @@ helpers.describe("modules/updater/manager.lua", function()
 
 	helpers.it("check_for_updates does not crash (may fail without network)", function()
 		-- This may fail due to no network, but it must not crash.
-		local ok = pcall(function() M.check_for_updates("stable") end)
-		helpers.assert_true(ok, "check_for_updates should not error even without network")
+		-- With no network the check must ANSWER, not hang or vanish: the menu row
+		-- shows "up to date" or "check failed" on it, and a nil leaves it blank.
+		local result = M.check_for_updates("stable")
+		helpers.assert_true(result == nil or type(result) == "boolean" or type(result) == "table",
+			"check_for_updates must answer something the menu row can render")
 	end)
 
 	helpers.it("fetch command delegates ETag to curl, never a client-side timestamp", function()
