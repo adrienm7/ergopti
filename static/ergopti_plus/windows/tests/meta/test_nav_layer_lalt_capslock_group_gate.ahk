@@ -54,7 +54,7 @@ _NLGG_ManifestActionIds() {
 	for Line in StrSplit(Toml, "`n", "`r") {
 		Trimmed := Trim(Line, " `t")
 		if (SubStr(Trimmed, 1, 1) == "[") {
-			InSection := (Trimmed == "[[features.ahk.shortcuts.lalt_caps_lock]]")
+			InSection := (Trimmed == "[[features.shortcuts.lalt_caps_lock]]")
 			continue
 		}
 		if !InSection

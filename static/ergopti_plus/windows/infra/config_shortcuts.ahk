@@ -55,7 +55,7 @@ CS_GetTomlPath() {
 ; The single section we own inside config.toml. Other sections
 ; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) belong
 ; to other readers and are never touched from here.
-global CS_SECTION := "ahk.metrics"
+global CS_SECTION := "metrics"
 
 
 
@@ -320,7 +320,7 @@ CS_Save() {
 		; No second writer for config.toml exists here on purpose. The section
 		; splicer that used to live in this branch seeded its rewrite from a bare-try
 		; FileRead: an unreadable file left the body empty, the section merge then
-		; short-circuited to the rendered [ahk.metrics] block alone, and the atomic
+		; short-circuited to the rendered [metrics] block alone, and the atomic
 		; move replaced the user's entire configuration with that one section —
 		; silently, because the only catch covered the write. Every caller reaching
 		; CS_Save is a post-boot menu handler, i.e. long after the full-config writer

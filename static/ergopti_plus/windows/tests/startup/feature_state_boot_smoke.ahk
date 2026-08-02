@@ -53,7 +53,7 @@ _FeatureStateSmokeParsedConfig() {
     TempConfig := A_Temp . "\ergopti_feature_state_boot_" . DllCall("GetCurrentProcessId") . ".toml"
     try {
         try FileDelete(TempConfig)
-        FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source_scan = "SC031"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[ahk.category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
+        FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source_scan = "SC031"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
         Cache := ParseTomlFile(TempConfig)
         ReadScriptConfig(Cache)
         ReadCategoryEnabled(Cache)
@@ -81,7 +81,7 @@ _FeatureStateSmokeMissingSections() {
 _FeatureStateSmokeMalformedCache() {
     global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
     DefaultMagicKey := ScriptInformation["MagicKey"]
-    Cache := Map("hotstrings", true, "script", 1, "ahk.category_enabled", false)
+    Cache := Map("hotstrings", true, "script", 1, "category_enabled", false)
     ReadScriptConfig(Cache)
     ReadCategoryEnabled(Cache)
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "malformed hotstrings default")

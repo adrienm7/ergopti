@@ -11,7 +11,7 @@
 ; ROOT CAUSE ENCODED:
 ; That writer seeded its rewrite from a BARE `try FileRead(path)`. A read that
 ; failed left the body empty, the section merge short-circuited to the rendered
-; [ahk.metrics] block alone, and the atomic FileMove then replaced the user's
+; [metrics] block alone, and the atomic FileMove then replaced the user's
 ; ENTIRE configuration with that single section. Nothing was logged: the only
 ; catch in the function covered the write, so a failed read followed by a
 ; successful write was completely signal-free. The shipped guard for the

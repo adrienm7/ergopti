@@ -20,7 +20,7 @@ global UPDATER_GH_OWNER  := "adrienm7"
 global UPDATER_GH_REPO   := "ergopti"
 global UPDATER_CHANNEL   := "main"    ; overwritten by Updater_LoadChannel()
 global UPDATER_INI_KEY   := "channel"
-global UPDATER_INI_SECTION := "ahk.updater"
+global UPDATER_INI_SECTION := "updater"
 
 ; Background update-check interval. 0 means "never" (disabled). The default
 ; 24h cadence is a sensible balance between freshness and network restraint

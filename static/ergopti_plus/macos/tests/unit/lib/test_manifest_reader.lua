@@ -29,12 +29,12 @@ local Manifest = require("infra.manifest_reader")
 -- Mirror these in the AHK manifest too — they are the cross-driver canon.
 local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua sources)
 local KEYMAP_WIRED = {
-	["hs.hotstrings.expansion_delay"]             = 0.75,
+	["hotstrings.expansion_delay"]             = 0.75,
 	["hotstrings.trigger_char"]                   = STAR,
-	["hs.hotstrings.preview_star_enabled"]        = true,
-	["hs.hotstrings.preview_autocorrect_enabled"] = true,
-	["hs.hotstrings.preview_ai_enabled"]          = true,
-	["hs.hotstrings.preview_colored_tooltips"]    = true,
+	["hotstrings.preview_star_enabled"]        = true,
+	["hotstrings.preview_autocorrect_enabled"] = true,
+	["hotstrings.preview_ai_enabled"]          = true,
+	["hotstrings.preview_colored_tooltips"]    = true,
 }
 
 
@@ -52,7 +52,7 @@ helpers.describe("manifest_reader: load + accessors", function()
 	end)
 
 	helpers.it("find_entry_by_path resolves a known path and returns nil for unknown", function()
-		local e = Manifest.find_entry_by_path("hs.hotstrings.expansion_delay")
+		local e = Manifest.find_entry_by_path("hotstrings.expansion_delay")
 		helpers.assert_true(e ~= nil and e.default == 0.75, "known path resolves to its entry")
 		helpers.assert_nil(Manifest.find_entry_by_path("does.not.exist"), "unknown path -> nil")
 	end)
@@ -72,8 +72,8 @@ end)
 helpers.describe("manifest_reader: default_for", function()
 	helpers.it("returns the declared default for a known path", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.trigger_char"), STAR, "trigger_char default")
-		helpers.assert_eq(Manifest.default_for("hs.hotstrings.expansion_delay"), 0.75, "expansion_delay default")
-		helpers.assert_eq(Manifest.default_for("hs.hotstrings.preview_star_enabled"), true, "preview default")
+		helpers.assert_eq(Manifest.default_for("hotstrings.expansion_delay"), 0.75, "expansion_delay default")
+		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), true, "preview default")
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
@@ -142,6 +142,6 @@ helpers.describe("manifest_reader: extended module wiring parity", function()
 	end)
 
 	helpers.it("gestures space_wrap default", function()
-		helpers.assert_eq(Manifest.default_for("hs.gestures.space_wrap"), true, "space_wrap default")
+		helpers.assert_eq(Manifest.default_for("gestures.space_wrap"), true, "space_wrap default")
 	end)
 end)

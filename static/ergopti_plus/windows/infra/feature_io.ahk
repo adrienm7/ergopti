@@ -5,18 +5,20 @@
 ; DESCRIPTION:
 ; v2-native feature locator + write/batch for the tray menu, replacing the
 ; v1->v2 path translator (infra/path_translator.ahk). Given a canonical v2 manifest
-; path (e.g. "ahk.layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.letter",
+; path (e.g. "layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.letter",
 ; "hotstrings.autocorrection.accents") it resolves the config.toml {section, key}
 ; and the in-memory Features node by INTROSPECTING the Features Map — no
 ; hand-maintained PascalCase rename tables.
 ;
 ; FEATURES & RATIONALE:
-; 1. Derivation, not translation: the v2 manifest path already encodes the full
-;    config section (incl. the ahk. driver-namespace prefix). The Features node is
-;    found by walking Features along the (ahk-stripped) path. A node that is a Map
-;    carrying "enabled" is a Modelisation-alpha feature (its section IS the path so
-;    far; its leaf key is an explicit property or "enabled"); a bool leaf is a
-;    plain feature (section = path minus leaf, key = leaf, node = parent Map).
+; 1. Derivation, not translation: the v2 manifest path IS the config section, and
+;    the Features node is found by walking Features along that same path. Since
+;    Lot 4 dissolved the driver namespaces those two strings are identical, so
+;    the walk and the section no longer need to be kept in step by an offset. A
+;    node that is a Map carrying "enabled" is a Modelisation-alpha feature (its
+;    section IS the path so far; its leaf key is an explicit property or
+;    "enabled"); a bool leaf is a plain feature (section = path minus leaf,
+;    key = leaf, node = parent Map).
 ; 2. Single write path: WriteFeatureV2 mutates the Features node and persists to
 ;    config.toml in lock-step, exactly like the retired translator did, so a tray
 ;    toggle survives reload. WriteFeatureBatchV2 batches the persistence.
@@ -53,35 +55,22 @@ _FeatureJoin(Parts, FromIdx, ToIdx) {
 ; @param FeaturesMap  The Features Map to resolve against. Always passed explicitly
 ;                      by the caller (feedback_loader_target_explicit) — this
 ;                      function never reaches for a global itself.
-; @param V2Path  Canonical v2 path; may carry a leading "ahk." driver prefix.
+; @param V2Path  Canonical v2 path (e.g. "layout.ergopti_base").
 ; @param Prop    Optional explicit alpha property leaf (e.g. "letter"). When set,
 ;                the path is treated as the alpha feature and Prop is the key.
 FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 	if !(FeaturesMap is Map)
 		return false
 
-	SecParts := StrSplit(V2Path, ".")
-	if (SecParts.Length < 1)
-		return false
-
-	; Features keys carry no ahk. namespace — that prefix lives only in the TOML
-	; section. WalkParts drives the Features descent; SecParts builds the section.
-	WalkParts := SecParts
-	if (SecParts[1] == "ahk") {
-		WalkParts := []
-		Loop SecParts.Length - 1 {
-			WalkParts.Push(SecParts[A_Index + 1])
-		}
-	}
-	Offset := SecParts.Length - WalkParts.Length   ; 1 when an ahk. prefix was stripped
-	if (WalkParts.Length < 1)
+	Parts := StrSplit(V2Path, ".")
+	if (Parts.Length < 1)
 		return false
 
 	Node := FeaturesMap
 	Parent := false
 	LastKey := ""
 	Idx := 0
-	for _, Seg in WalkParts {
+	for _, Seg in Parts {
 		Idx += 1
 		if (Type(Node) != "Map" or !Node.Has(Seg))
 			return false
@@ -92,9 +81,9 @@ FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 		; and including this segment; the leaf key is the explicit Prop, the next
 		; path segment (an alpha property like "letter"), or "enabled".
 		if (Type(Node) == "Map" and Node.Has("enabled")) {
-			Section := _FeatureJoin(SecParts, 1, Idx + Offset)
+			Section := _FeatureJoin(Parts, 1, Idx)
 			Key := (Prop != "") ? Prop
-				: (Idx < WalkParts.Length ? WalkParts[Idx + 1] : "enabled")
+				: (Idx < Parts.Length ? Parts[Idx + 1] : "enabled")
 			return Map("section", Section, "key", Key, "v2_node", Node, "is_alpha", true)
 		}
 	}
@@ -103,7 +92,7 @@ FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 	; node = the parent Map that holds it.
 	if (Type(Parent) != "Map")
 		return false
-	Section := _FeatureJoin(SecParts, 1, SecParts.Length - 1)
+	Section := _FeatureJoin(Parts, 1, Parts.Length - 1)
 	return Map("section", Section, "key", LastKey, "v2_node", Parent, "is_alpha", false)
 }
 
@@ -240,23 +229,15 @@ global _FEATURE_MUTEX_GROUPS := Map(
 ; user enables ``V2Path``. Empty list = no mutex semantics (independent toggle).
 ; Siblings are enumerated from the manifest section itself, so the set is always
 ; exactly the group's declared keys — no hand-maintained sibling table.
-; @param V2Path  Canonical v2 path; may carry a leading "ahk." prefix.
-; @return        Array of sibling v2 paths (ahk.shortcuts.<group>.<key>).
+; @param V2Path  Canonical v2 path (e.g. "shortcuts.alt_gr_lalt.backspace").
+; @return        Array of sibling v2 paths (shortcuts.<group>.<key>).
 _MutexSiblingPathsForV2(V2Path) {
 	global _FEATURE_MUTEX_GROUPS
 	Parts := StrSplit(V2Path, ".")
-	; Strip the ahk. driver prefix so the shortcuts sub-Map shape is uniform.
-	if (Parts.Length >= 1 and Parts[1] == "ahk") {
-		Stripped := []
-		Loop Parts.Length - 1 {
-			Stripped.Push(Parts[A_Index + 1])
-		}
-		Parts := Stripped
-	}
 	if (Parts.Length != 3 or Parts[1] != "shortcuts" or !_FEATURE_MUTEX_GROUPS.Has(Parts[2])) {
 		return []
 	}
-	GroupSection := "ahk.shortcuts." . Parts[2]
+	GroupSection := "shortcuts." . Parts[2]
 	CurrentKey := Parts[3]
 	Siblings := []
 	for _, Entry in ManifestFeaturesForSection(GroupSection) {

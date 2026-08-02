@@ -299,6 +299,19 @@ private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true
 encrypt = false
+filter_private_browsing = true
+metrics_enabled = true
+metrics_shortcut_typing = ""
+metrics_shortcut_apps = ""
+metrics_wpm_menubar_colors = false
+metrics_filter_secure_field = true
+metrics_filter_system_auth = true
+metrics_disabled_apps = []
+wpm_widget_visible = false
+wpm_widget_x = -1
+wpm_widget_y = -1
+wpm_widget_colors = false
+wpm_widget_graph = false
 
 [shortcuts]
 chatgpt_url = "https://chat.openai.com"
@@ -312,6 +325,11 @@ spotlight_mouse = true
 surround_with_parentheses = true
 teleport_mouse = true
 wrap_text_if_selected = true
+open_downloads = true
+move = true
+screen = true
+screen_instant = true
+win_caps_lock = true
 
 [shortcuts.gpt]
 enabled = true
@@ -343,21 +361,7 @@ letter = "x"
 enabled = true
 letter = "z"
 
-[ahk.layout]
-ergopti_base = true
-direct_access_digits = true
-ergopti_alt_gr = true
-ergopti_plus = true
-ctrl_magic_save = false
-
-[ahk.shortcuts]
-open_downloads = true
-move = true
-screen = true
-screen_instant = true
-win_caps_lock = true
-
-[ahk.shortcuts.alt_gr_caps_lock]
+[shortcuts.alt_gr_caps_lock]
 backspace = false
 caps_lock = false
 caps_word = false
@@ -369,20 +373,7 @@ escape = false
 one_shot_shift = false
 tab = false
 
-[ahk.gestures]
-enabled = true
-swipe_3_down = "tab_close"
-swipe_3_left = "tab_prev"
-swipe_3_right = "tab_next"
-swipe_3_up = "tab_new"
-swipe_4_down = "win_app_prev"
-swipe_4_left = "desktop_prev"
-swipe_4_right = "desktop_next"
-swipe_4_up = "win_app_next"
-tap_3 = "left_click_toggle"
-tap_4 = "screenshot_window_clipboard"
-
-[ahk.shortcuts.alt_gr_lalt]
+[shortcuts.alt_gr_lalt]
 backspace = false
 caps_lock = false
 caps_word = false
@@ -394,7 +385,7 @@ escape = false
 one_shot_shift = false
 tab = false
 
-[ahk.shortcuts.lalt_caps_lock]
+[shortcuts.lalt_caps_lock]
 backspace = false
 caps_lock = false
 caps_word = true
@@ -406,20 +397,20 @@ escape = false
 one_shot_shift = false
 tab = false
 
-[ahk.shortcuts.personal]
+[shortcuts.personal]
 laptop_broken_key = true
 mouse_drag_window = true
 mouse_tab_switching = true
 professional_environment = false
 programmable_keyboard = true
 
-[ahk.shortcuts.script_control]
+[shortcuts.script_control]
 script_altgr_backspace = "script_reload"
 script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"
 
-[ahk.shortcuts.keyboard]
+[shortcuts.keyboard]
 ctrl_b = "microsoft_bold"
 ctrl_shift_v = "paste_plain"
 win_a = "select_line"
@@ -436,22 +427,27 @@ win_u = "uppercase_selection"
 win_w = "titlecase_selection"
 win_x = "pick_color"
 
-[ahk.metrics]
-filter_private_browsing = true
-metrics_enabled = true
-metrics_shortcut_typing = ""
-metrics_shortcut_apps = ""
-metrics_wpm_menubar_colors = false
-metrics_filter_secure_field = true
-metrics_filter_system_auth = true
-metrics_disabled_apps = []
-wpm_widget_visible = false
-wpm_widget_x = -1
-wpm_widget_y = -1
-wpm_widget_colors = false
-wpm_widget_graph = false
+[gestures]
+enabled = true
+swipe_3_down = "tab_close"
+swipe_3_left = "tab_prev"
+swipe_3_right = "tab_next"
+swipe_3_up = "tab_new"
+swipe_4_down = "win_app_prev"
+swipe_4_left = "desktop_prev"
+swipe_4_right = "desktop_next"
+swipe_4_up = "win_app_next"
+tap_3 = "left_click_toggle"
+tap_4 = "screenshot_window_clipboard"
 
-[ahk.category_enabled]
+[layout]
+ergopti_base = true
+direct_access_digits = true
+ergopti_alt_gr = true
+ergopti_plus = true
+ctrl_magic_save = false
+
+[category_enabled]
 hotstrings = true
 layout = true
 shortcuts = true

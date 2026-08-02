@@ -58,8 +58,6 @@
 
 
 
-
-
 # ================================
 # ================================
 # ======= 1. Manifest meta =======
@@ -72,8 +70,6 @@ config_schema = "https://ergopti.com/schema/config.schema.json"
 
 
 
-
-
 # ===========================
 # ===========================
 # ======= 2. Sections =======
@@ -81,7 +77,7 @@ config_schema = "https://ergopti.com/schema/config.schema.json"
 # ===========================
 
 [sections]
-order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "ahk", "hs"]
+order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled"]
 
 
 
@@ -186,91 +182,52 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs"]
+subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
 
-
-
-# =====================
-# ===== 2.6 ahk.* =====
-# =====================
-
-[sections.ahk]
-description_key = "menu.ahk"
-platforms = ["ahk"]
-subsections = ["category_enabled", "layout", "shortcuts", "gestures", "metrics"]
-
-[sections.ahk.category_enabled]
+[sections.category_enabled]
 description_key = "menu.ahk.category_enabled"
 platforms = ["ahk"]
 
-[sections.ahk.layout]
+[sections.layout]
 description_key = "menu.layout"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts]
-description_key = "menu.ahk.shortcuts"
-platforms = ["ahk"]
-subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
-
-[sections.ahk.shortcuts.alt_gr_caps_lock]
+[sections.shortcuts.alt_gr_caps_lock]
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.alt_gr_lalt]
+[sections.shortcuts.alt_gr_lalt]
 description_key = "menu.ahk.shortcuts.alt_gr_lalt"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.keyboard]
+[sections.shortcuts.keyboard]
 description_key = "menu.ahk.shortcuts.keyboard"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.lalt_caps_lock]
+[sections.shortcuts.lalt_caps_lock]
 description_key = "menu.ahk.shortcuts.lalt_caps_lock"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.personal]
+[sections.shortcuts.personal]
 description_key = "menu.ahk.shortcuts.personal"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.script_control]
+[sections.shortcuts.script_control]
 description_key = "menu.ahk.shortcuts.script_control"
 platforms = ["ahk"]
 
-[sections.ahk.gestures]
+[sections.gestures]
 description_key = "menu.gestures"
-platforms = ["ahk"]
-
-[sections.ahk.metrics]
-description_key = "menu.ahk.metrics"
-platforms = ["ahk"]
-
-
-
-# ====================
-# ===== 2.7 hs.* =====
-# ====================
-
-[sections.hs]
-description_key = "menu.hs"
-platforms = ["hs"]
-subsections = ["gestures", "hotstrings"]
-
-[sections.hs.gestures]
-description_key = "menu.gestures"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 subsections = ["modes", "sensitivities"]
 
-[sections.hs.gestures.modes]
+[sections.gestures.modes]
 description_key = "menu.hs.gestures.modes"
 platforms = ["hs"]
 
-[sections.hs.gestures.sensitivities]
+[sections.gestures.sensitivities]
 description_key = "menu.hs.gestures.sensitivities"
 platforms = ["hs"]
-
-[sections.hs.hotstrings]
-description_key = "menu.hs.hotstrings"
-platforms = ["hs"]
-
 
 
 
@@ -280,6 +237,7 @@ platforms = ["hs"]
 # ======= 3. Features =======
 # ===========================
 # ===========================
+
 
 
 
@@ -326,6 +284,41 @@ default = true
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
 platforms = ["ahk"]
+
+[[features.hotstrings]]
+id = "expansion_delay"
+platforms = ["hs"]
+default = 0.75
+type = "number"
+description_key = "menu.hs.hotstrings.expansion_delay"
+
+[[features.hotstrings]]
+id = "preview_ai_enabled"
+platforms = ["hs"]
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_ai_enabled"
+
+[[features.hotstrings]]
+id = "preview_autocorrect_enabled"
+platforms = ["hs"]
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_autocorrect_enabled"
+
+[[features.hotstrings]]
+id = "preview_colored_tooltips"
+platforms = ["hs"]
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_colored_tooltips"
+
+[[features.hotstrings]]
+id = "preview_star_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_star_enabled"
+platforms = ["hs"]
 
 
 
@@ -1029,6 +1022,97 @@ default = false
 type = "boolean"
 description_key = "menu.metrics.encrypt_toggle"
 
+[[features.metrics]]
+id = "filter_private_browsing"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.filter_private_browsing"
+
+[[features.metrics]]
+id = "metrics_enabled"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_enabled"
+
+[[features.metrics]]
+id = "metrics_shortcut_typing"
+platforms = ["ahk"]
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_typing"
+
+[[features.metrics]]
+id = "metrics_shortcut_apps"
+platforms = ["ahk"]
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_apps"
+
+[[features.metrics]]
+id = "metrics_wpm_menubar_colors"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
+
+[[features.metrics]]
+id = "metrics_filter_secure_field"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_secure_field"
+
+[[features.metrics]]
+id = "metrics_filter_system_auth"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_system_auth"
+
+[[features.metrics]]
+id = "metrics_disabled_apps"
+platforms = ["ahk"]
+default = []
+type = "array"
+description_key = "menu.ahk.metrics.metrics_disabled_apps"
+
+[[features.metrics]]
+id = "wpm_widget_visible"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_visible"
+
+[[features.metrics]]
+id = "wpm_widget_x"
+platforms = ["ahk"]
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_x"
+
+[[features.metrics]]
+id = "wpm_widget_y"
+platforms = ["ahk"]
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_y"
+
+[[features.metrics]]
+id = "wpm_widget_colors"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_colors"
+
+[[features.metrics]]
+id = "wpm_widget_graph"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_graph"
+
 
 
 # =========================
@@ -1139,16 +1223,50 @@ type = "boolean"
 description_key = "shortcuts.label_wrap_text"
 platforms = ["ahk"]
 
+[[features.shortcuts]]
+id = "open_downloads"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.open_downloads"
+
+[[features.shortcuts]]
+id = "move"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.move"
+
+[[features.shortcuts]]
+id = "screen"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.screen"
+
+[[features.shortcuts]]
+id = "screen_instant"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "shortcuts.label_at_hash"
+
+[[features.shortcuts]]
+id = "win_caps_lock"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.win_caps_lock"
 
 
-# ======================================
-# ===== 3.5.1 shortcuts.<accented> =====
-# ======================================
+
+# ===================================
+# ===== 3.5.1 shortcuts.a_grave =====
+# ===================================
 
 # Accented-letter shortcuts. Each entry emits a sub-section
 # [shortcuts.<key>] with enabled + letter (the destination letter to press
 # while the accented key is held).
-
 [[features.shortcuts.a_grave]]
 id = "enabled"
 default = true
@@ -1162,6 +1280,12 @@ default = "v"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
 platforms = ["ahk"]
+
+
+
+# ===================================
+# ===== 3.5.2 shortcuts.e_acute =====
+# ===================================
 
 [[features.shortcuts.e_acute]]
 id = "enabled"
@@ -1177,6 +1301,12 @@ type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
 platforms = ["ahk"]
 
+
+
+# ==================================
+# ===== 3.5.3 shortcuts.e_circ =====
+# ==================================
+
 [[features.shortcuts.e_circ]]
 id = "enabled"
 default = true
@@ -1190,6 +1320,12 @@ default = "x"
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
 platforms = ["ahk"]
+
+
+
+# ===================================
+# ===== 3.5.4 shortcuts.e_grave =====
+# ===================================
 
 [[features.shortcuts.e_grave]]
 id = "enabled"
@@ -1207,654 +1343,506 @@ platforms = ["ahk"]
 
 
 
+# ============================================
+# ===== 3.5.5 shortcuts.alt_gr_caps_lock =====
+# ============================================
 
-
-# ====================================
-# ====================================
-# ======= 4. AHK-only features =======
-# ====================================
-# ====================================
-
-
-
-# ==========================
-# ===== 4.1 ahk.layout =====
-# ==========================
-
-[[features.ahk.layout]]
-id = "ergopti_base"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_base"
-
-[[features.ahk.layout]]
-id = "direct_access_digits"
-default = true
-type = "boolean"
-description_key = "menu.layout.direct_access_digits"
-
-[[features.ahk.layout]]
-id = "ergopti_alt_gr"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_alt_gr"
-
-[[features.ahk.layout]]
-id = "ergopti_plus"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_plus"
-
-[[features.ahk.layout]]
-id = "ctrl_magic_save"
-default = false
-type = "boolean"
-description_key = "menu.layout.ctrl_magic_save"
-
-
-
-# =============================
-# ===== 4.2 ahk.shortcuts =====
-# =============================
-
-[[features.ahk.shortcuts]]
-id = "open_downloads"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.open_downloads"
-
-[[features.ahk.shortcuts]]
-id = "move"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.move"
-
-[[features.ahk.shortcuts]]
-id = "screen"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.screen"
-
-[[features.ahk.shortcuts]]
-id = "screen_instant"
-default = true
-type = "boolean"
-description_key = "shortcuts.label_at_hash"
-
-[[features.ahk.shortcuts]]
-id = "win_caps_lock"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.win_caps_lock"
-
-
-
-# ==============================================
-# ===== 4.3 ahk.shortcuts.alt_gr_caps_lock =====
-# ==============================================
-
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.backspace"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "caps_lock"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_lock"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "caps_word"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_word"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "ctrl_backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_backspace"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "ctrl_delete"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_delete"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.delete"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "enter"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.enter"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "escape"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.escape"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "one_shot_shift"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.one_shot_shift"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "tab"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.tab"
 
 
 
-# ============================
-# ===== 4.4 ahk.gestures =====
-# ============================
+# =======================================
+# ===== 3.5.6 shortcuts.alt_gr_lalt =====
+# =======================================
 
-[[features.ahk.gestures]]
-id = "enabled"
-default = true
-type = "boolean"
-description_key = "menu.gestures.enabled"
-
-[[features.ahk.gestures]]
-id = "swipe_3_down"
-default = "tab_close"
-type = "action"
-description_key = "menu.gestures.swipe_3_down"
-
-[[features.ahk.gestures]]
-id = "swipe_3_left"
-default = "tab_prev"
-type = "action"
-description_key = "menu.gestures.swipe_3_left"
-
-[[features.ahk.gestures]]
-id = "swipe_3_right"
-default = "tab_next"
-type = "action"
-description_key = "menu.gestures.swipe_3_right"
-
-[[features.ahk.gestures]]
-id = "swipe_3_up"
-default = "tab_new"
-type = "action"
-description_key = "menu.gestures.swipe_3_up"
-
-[[features.ahk.gestures]]
-id = "swipe_4_down"
-default = "win_app_prev"
-type = "action"
-description_key = "menu.gestures.swipe_4_down"
-
-[[features.ahk.gestures]]
-id = "swipe_4_left"
-default = "desktop_prev"
-type = "action"
-description_key = "menu.gestures.swipe_4_left"
-
-[[features.ahk.gestures]]
-id = "swipe_4_right"
-default = "desktop_next"
-type = "action"
-description_key = "menu.gestures.swipe_4_right"
-
-[[features.ahk.gestures]]
-id = "swipe_4_up"
-default = "win_app_next"
-type = "action"
-description_key = "menu.gestures.swipe_4_up"
-
-[[features.ahk.gestures]]
-id = "tap_3"
-default = "left_click_toggle"
-type = "action"
-description_key = "menu.gestures.tap_3"
-
-[[features.ahk.gestures]]
-id = "tap_4"
-default = "screenshot_window_clipboard"
-type = "action"
-description_key = "menu.gestures.tap_4"
-
-# =========================================
-# ===== 4.5 ahk.shortcuts.alt_gr_lalt =====
-# =========================================
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.backspace"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "caps_lock"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_lock"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "caps_word"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_word"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "ctrl_backspace"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_backspace"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "ctrl_delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_delete"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.delete"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "enter"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.enter"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "escape"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.escape"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "one_shot_shift"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.one_shot_shift"
 
-[[features.ahk.shortcuts.alt_gr_lalt]]
+[[features.shortcuts.alt_gr_lalt]]
 id = "tab"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.alt_gr_lalt.tab"
 
 
 
-# ============================================
-# ===== 4.6 ahk.shortcuts.lalt_caps_lock =====
-# ============================================
+# ==========================================
+# ===== 3.5.7 shortcuts.lalt_caps_lock =====
+# ==========================================
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.backspace"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "caps_lock"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_lock"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "caps_word"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_word"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "ctrl_backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_backspace"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "ctrl_delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_delete"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.delete"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "enter"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.enter"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "escape"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.escape"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "one_shot_shift"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.one_shot_shift"
 
-[[features.ahk.shortcuts.lalt_caps_lock]]
+[[features.shortcuts.lalt_caps_lock]]
 id = "tab"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.lalt_caps_lock.tab"
 
 
 
-# ======================================
-# ===== 4.7 ahk.shortcuts.personal =====
-# ======================================
+# ====================================
+# ===== 3.5.8 shortcuts.personal =====
+# ====================================
 
-[[features.ahk.shortcuts.personal]]
+[[features.shortcuts.personal]]
 id = "laptop_broken_key"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.personal.laptop_broken_key"
 
-[[features.ahk.shortcuts.personal]]
+[[features.shortcuts.personal]]
 id = "mouse_drag_window"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.personal.mouse_drag_window"
 
-[[features.ahk.shortcuts.personal]]
+[[features.shortcuts.personal]]
 id = "mouse_tab_switching"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.personal.mouse_tab_switching"
 
-[[features.ahk.shortcuts.personal]]
+[[features.shortcuts.personal]]
 id = "professional_environment"
+platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.shortcuts.personal.professional_environment"
 
-[[features.ahk.shortcuts.personal]]
+[[features.shortcuts.personal]]
 id = "programmable_keyboard"
+platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.ahk.shortcuts.personal.programmable_keyboard"
 
 
 
-# ============================================
-# ===== 4.8 ahk.shortcuts.script_control =====
-# ============================================
+# ==========================================
+# ===== 3.5.9 shortcuts.script_control =====
+# ==========================================
 
-[[features.ahk.shortcuts.script_control]]
+[[features.shortcuts.script_control]]
 id = "script_altgr_backspace"
+platforms = ["ahk"]
 default = "script_reload"
 type = "action"
 description_key = "menu.ahk.shortcuts.script_control.script_altgr_backspace"
 
-[[features.ahk.shortcuts.script_control]]
+[[features.shortcuts.script_control]]
 id = "script_altgr_delete"
+platforms = ["ahk"]
 default = "open_personal_shortcuts"
 type = "action"
 description_key = "menu.ahk.shortcuts.script_control.script_altgr_delete"
 
-[[features.ahk.shortcuts.script_control]]
+[[features.shortcuts.script_control]]
 id = "script_altgr_enter"
+platforms = ["ahk"]
 default = "script_pause_toggle"
 type = "action"
 description_key = "menu.ahk.shortcuts.script_control.script_altgr_enter"
 
-[[features.ahk.shortcuts.script_control]]
+[[features.shortcuts.script_control]]
 id = "script_altgr_escape"
+platforms = ["ahk"]
 default = "script_quit"
 type = "action"
 description_key = "menu.ahk.shortcuts.script_control.script_altgr_escape"
 
 
 
-# ==========================================
-# ===== 4.8b ahk.shortcuts.keyboard ========
-# ==========================================
+# =====================================
+# ===== 3.5.10 shortcuts.keyboard =====
+# =====================================
 
-[[features.ahk.shortcuts.keyboard]]
+# ===== 4.8b ahk.shortcuts.keyboard ========
+[[features.shortcuts.keyboard]]
 id = "ctrl_b"
+platforms = ["ahk"]
 default = "microsoft_bold"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "ctrl_shift_v"
+platforms = ["ahk"]
 default = "paste_plain"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_a"
+platforms = ["ahk"]
 default = "select_line"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_a"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_d"
+platforms = ["ahk"]
 default = "open_hotstrings_editor"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_d"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_g"
+platforms = ["ahk"]
 default = "open_url"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_g"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_h"
+platforms = ["ahk"]
 default = "screen_capture"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_h"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_m"
+platforms = ["ahk"]
 default = "activity_simulation"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_m"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_n"
+platforms = ["ahk"]
 default = "take_note"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_n"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_o"
+platforms = ["ahk"]
 default = "surround_parens"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_o"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_s"
+platforms = ["ahk"]
 default = "search_web"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_s"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_sc029"
+platforms = ["ahk"]
 default = "screen_capture_instant"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_sc029"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_t"
+platforms = ["ahk"]
 default = "teleport_mouse"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_t"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_u"
+platforms = ["ahk"]
 default = "uppercase_selection"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_u"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_w"
+platforms = ["ahk"]
 default = "titlecase_selection"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_w"
 
-[[features.ahk.shortcuts.keyboard]]
+[[features.shortcuts.keyboard]]
 id = "win_x"
+platforms = ["ahk"]
 default = "pick_color"
 type = "action"
 description_key = "menu.ahk.shortcuts.keyboard.win_x"
 
 
 
-# ===========================
-# ===== 4.9 ahk.metrics =====
-# ===========================
+# ========================
+# ===== 3.6 gestures =====
+# ========================
 
-[[features.ahk.metrics]]
-id = "filter_private_browsing"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.filter_private_browsing"
-
-[[features.ahk.metrics]]
-id = "metrics_enabled"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_enabled"
-
-[[features.ahk.metrics]]
-id = "metrics_shortcut_typing"
-default = ""
-type = "string"
-description_key = "menu.ahk.metrics.metrics_shortcut_typing"
-
-[[features.ahk.metrics]]
-id = "metrics_shortcut_apps"
-default = ""
-type = "string"
-description_key = "menu.ahk.metrics.metrics_shortcut_apps"
-
-[[features.ahk.metrics]]
-id = "metrics_wpm_menubar_colors"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
-
-[[features.ahk.metrics]]
-id = "metrics_filter_secure_field"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_secure_field"
-
-[[features.ahk.metrics]]
-id = "metrics_filter_system_auth"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_system_auth"
-
-[[features.ahk.metrics]]
-id = "metrics_disabled_apps"
-default = []
-type = "array"
-description_key = "menu.ahk.metrics.metrics_disabled_apps"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_visible"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_visible"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_x"
-default = -1
-type = "number"
-description_key = "menu.ahk.metrics.wpm_widget_x"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_y"
-default = -1
-type = "number"
-description_key = "menu.ahk.metrics.wpm_widget_y"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_colors"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_colors"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_graph"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_graph"
-
-
-
-# =====================================
-# ===== 4.10 ahk.category_enabled =====
-# =====================================
-
-[[features.ahk.category_enabled]]
-id = "hotstrings"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.hotstrings"
-
-[[features.ahk.category_enabled]]
-id = "layout"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.layout"
-
-[[features.ahk.category_enabled]]
-id = "shortcuts"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.shortcuts"
-
-[[features.ahk.category_enabled]]
-id = "tap_holds"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.tap_holds"
-
-
-
-
-
-# ===================================
-# ===================================
-# ======= 5. HS-only features =======
-# ===================================
-# ===================================
-
-
-
-# ===========================
-# ===== 5.1 hs.gestures =====
-# ===========================
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "enabled"
+platforms = ["ahk", "hs"]
 default = true
 type = "boolean"
 description_key = "menu.gestures.enabled"
 
-[[features.hs.gestures]]
+[[features.gestures]]
+id = "swipe_3_down"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "tab_close", hs = "tab_next" }
+type = "action"
+description_key = "menu.gestures.swipe_3_down"
+
+[[features.gestures]]
+id = "swipe_3_left"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "tab_prev", hs = "word_prev" }
+type = "action"
+description_key = "menu.gestures.swipe_3_left"
+
+[[features.gestures]]
+id = "swipe_3_right"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "tab_next", hs = "word_next" }
+type = "action"
+description_key = "menu.gestures.swipe_3_right"
+
+[[features.gestures]]
+id = "swipe_3_up"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "tab_new", hs = "tab_prev" }
+type = "action"
+description_key = "menu.gestures.swipe_3_up"
+
+[[features.gestures]]
+id = "swipe_4_down"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "win_app_prev", hs = "none" }
+type = "action"
+description_key = "menu.gestures.swipe_4_down"
+
+[[features.gestures]]
+id = "swipe_4_left"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "desktop_prev", hs = "none" }
+type = "action"
+description_key = "menu.gestures.swipe_4_left"
+
+[[features.gestures]]
+id = "swipe_4_right"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "desktop_next", hs = "none" }
+type = "action"
+description_key = "menu.gestures.swipe_4_right"
+
+[[features.gestures]]
+id = "swipe_4_up"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "win_app_next", hs = "none" }
+type = "action"
+description_key = "menu.gestures.swipe_4_up"
+
+[[features.gestures]]
+id = "tap_3"
+platforms = ["ahk", "hs"]
+default = "left_click_toggle"
+type = "action"
+description_key = "menu.gestures.tap_3"
+
+[[features.gestures]]
+id = "tap_4"
+platforms = ["ahk", "hs"]
+default_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous" }
+type = "action"
+description_key = "menu.gestures.tap_4"
+
+# --- 2-finger remaining directions ---
+[[features.gestures]]
 id = "space_wrap"
+platforms = ["hs"]
 default = true
 type = "boolean"
 # The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
@@ -1864,525 +1852,506 @@ type = "boolean"
 # point at the surviving key or it resolves to nothing.
 description_key = "menu.gestures.circular_spaces"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = "arrow_up"
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
 
-[[features.hs.gestures]]
-id = "swipe_3_left"
-default = "word_prev"
-type = "action"
-description_key = "menu.gestures.swipe_3_left"
-
-[[features.hs.gestures]]
-id = "swipe_3_right"
-default = "word_next"
-type = "action"
-description_key = "menu.gestures.swipe_3_right"
-
-[[features.hs.gestures]]
-id = "swipe_3_up"
-default = "tab_prev"
-type = "action"
-description_key = "menu.gestures.swipe_3_up"
-
-[[features.hs.gestures]]
-id = "swipe_3_down"
-default = "tab_next"
-type = "action"
-description_key = "menu.gestures.swipe_3_down"
-
-[[features.hs.gestures]]
-id = "swipe_4_up"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_up"
-
-[[features.hs.gestures]]
-id = "swipe_4_down"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_down"
-
-[[features.hs.gestures]]
-id = "swipe_4_left"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_left"
-
-[[features.hs.gestures]]
-id = "swipe_4_right"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_right"
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right"
 
-[[features.hs.gestures]]
-id = "tap_3"
-default = "left_click_toggle"
-type = "action"
-description_key = "menu.gestures.tap_3"
-
-[[features.hs.gestures]]
-id = "tap_4"
-default = "app_window_previous"
-type = "action"
-description_key = "menu.gestures.tap_4"
-
-# --- 2-finger remaining directions ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_diag"
 
-
-
 # --- 3-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_left_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_left_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_right_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_right_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_horiz"
+platforms = ["hs"]
 default = "words"
 type = "action"
 description_key = "menu.gestures.swipe_3_horiz"
 
-
-
 # --- 4-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_left_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_left_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_right_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_right_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_horiz"
+platforms = ["hs"]
 default = "spaces"
 type = "action"
 description_key = "menu.gestures.swipe_4_horiz"
 
-
-
 # --- 5-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right_down"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right_up"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_horiz"
+platforms = ["hs"]
 default = "windows"
 type = "action"
 description_key = "menu.gestures.swipe_5_horiz"
 
-
-
 # --- Taps ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "tap_2"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_2"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "tap_5"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_5"
 
 
 
-# =================================
-# ===== 5.2 hs.gestures.modes =====
-# =================================
+# ================================
+# ===== 3.6.1 gestures.modes =====
+# ================================
 
 # Per-direction firing mode ("x1" or "incremental"). Defaults from the existing
 # HS config are: 2-fingers = x1, 3-fingers = incremental, 4-fingers = x1,
 # 5-fingers horiz = incremental + vert = x1.
 
 # --- 2-finger (all x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_2_right_up"
 
-
-
 # --- 3-finger (all incremental) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_3_right_up"
 
-
-
 # --- 4-finger (all x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_4_right_up"
 
-
-
 # --- 5-finger (horiz incremental, vert x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.hs.gestures.modes.swipe_5_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
@@ -2390,249 +2359,317 @@ description_key = "menu.hs.gestures.modes.swipe_5_right_up"
 
 
 
-# =========================================
-# ===== 5.3 hs.gestures.sensitivities =====
-# =========================================
+# ========================================
+# ===== 3.6.2 gestures.sensitivities =====
+# ========================================
 
 # Activation threshold per direction (travel distance in centimetres).
 
 # All directions default to 3.5 cm of trackpad travel before firing.
-
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_2_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_3_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_4_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
 description_key = "menu.hs.gestures.sensitivities.swipe_5_right_up"
 
 
 
-# =============================
-# ===== 5.4 hs.hotstrings =====
-# =============================
+# ======================
+# ===== 3.7 layout =====
+# ======================
 
-[[features.hs.hotstrings]]
-id = "expansion_delay"
-default = 0.75
-type = "number"
-description_key = "menu.hs.hotstrings.expansion_delay"
-
-[[features.hs.hotstrings]]
-id = "preview_ai_enabled"
+[[features.layout]]
+id = "ergopti_base"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_ai_enabled"
+description_key = "menu.layout.ergopti_base"
 
-[[features.hs.hotstrings]]
-id = "preview_autocorrect_enabled"
+[[features.layout]]
+id = "direct_access_digits"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_autocorrect_enabled"
+description_key = "menu.layout.direct_access_digits"
 
-[[features.hs.hotstrings]]
-id = "preview_colored_tooltips"
+[[features.layout]]
+id = "ergopti_alt_gr"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_colored_tooltips"
+description_key = "menu.layout.ergopti_alt_gr"
 
-[[features.hs.hotstrings]]
-id = "preview_star_enabled"
+[[features.layout]]
+id = "ergopti_plus"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_star_enabled"
+description_key = "menu.layout.ergopti_plus"
+
+[[features.layout]]
+id = "ctrl_magic_save"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.layout.ctrl_magic_save"
 
 
+
+# ================================
+# ===== 3.8 category_enabled =====
+# ================================
+
+[[features.category_enabled]]
+id = "hotstrings"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.hotstrings"
+
+[[features.category_enabled]]
+id = "layout"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.layout"
+
+[[features.category_enabled]]
+id = "shortcuts"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.shortcuts"
+
+[[features.category_enabled]]
+id = "tap_holds"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.tap_holds"
 
 
 
 # =====================================
 # =====================================
-# ======= 6. Tap-hold reference =======
+# ======= 4. Tap-hold reference =======
 # =====================================
 # =====================================
 
@@ -2649,13 +2686,11 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 
 
 
-
-
-# =================================================
-# =================================================
+# ================================================
+# ================================================
 # ======= 5. Tray menu structure (codegen) =======
-# =================================================
-# =================================================
+# ================================================
+# ================================================
 
 # Source of truth for the cross-driver tray-menu tree. Hand-edited here; the
 # codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
@@ -2708,7 +2743,7 @@ id = "shortcuts"
 
 [[menu.top_level]]
 id = "tap_holds"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
 
 [[menu.top_level]]
 id = "karabiner"
@@ -2809,7 +2844,7 @@ category = "Shortcuts"
 
 [[menu.shortcuts_menu]]
 type = "feature"
-path = "ahk.shortcuts.screen_instant"
+path = "shortcuts.screen_instant"
 platforms = ["ahk"]
 
 [[menu.shortcuts_menu]]
@@ -2865,19 +2900,19 @@ id = "extensions_shortcuts"
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.alt_gr_lalt"
+path = "shortcuts.alt_gr_lalt"
 group_label = "AltGrLAlt"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.alt_gr_caps_lock"
+path = "shortcuts.alt_gr_caps_lock"
 group_label = "AltGrCapsLock"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.lalt_caps_lock"
+path = "shortcuts.lalt_caps_lock"
 group_label = "LAltCapsLock"
 platforms = ["ahk"]
 
@@ -3026,7 +3061,7 @@ i18n = "menu.layout.replace"
 
 [[menu.layout_menu]]
 type = "feature"
-path = "ahk.layout.ctrl_magic_save"
+path = "layout.ctrl_magic_save"
 platforms = ["ahk"]
 
 [[menu.accented_letters_group]]

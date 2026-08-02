@@ -108,12 +108,12 @@ _Onboarding_Commit() {
 
 		updates := [
 		{ Section: "script",       Key: "locale",                   Value: _ob_locale    },
-		{ Section: "ahk.layout",   Key: "ergopti_base",             Value: _ob_layout    },
-		{ Section: "ahk.layout",   Key: "ergopti_alt_gr",           Value: _ob_layout    },
-		{ Section: "ahk.layout",   Key: "ergopti_plus",             Value: _ob_layout    },
+		{ Section: "layout",   Key: "ergopti_base",             Value: _ob_layout    },
+		{ Section: "layout",   Key: "ergopti_alt_gr",           Value: _ob_layout    },
+		{ Section: "layout",   Key: "ergopti_plus",             Value: _ob_layout    },
 		{ Section: "hotstrings",   Key: "trigger_char",             Value: _ob_magic_key },
-		{ Section: "ahk.metrics",  Key: "metrics_enabled",          Value: _ob_metrics   },
-		{ Section: "ahk.gestures", Key: "enabled",                  Value: _ob_gestures  },
+		{ Section: "metrics",  Key: "metrics_enabled",          Value: _ob_metrics   },
+		{ Section: "gestures", Key: "enabled",                  Value: _ob_gestures  },
 	]
 
 	; Defer the Precision-Touchpad registry writes to the post-reload pass —
@@ -123,7 +123,7 @@ _Onboarding_Commit() {
 	; (or failed) attempt so subsequent reloads don't keep rewriting the
 	; same values.
 		if _ob_register_pending
-			updates.Push({ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: true })
+			updates.Push({ Section: "gestures", Key: "auto_configure_on_next_start", Value: true })
 
 		; Persist answers to the candidate configuration before making paths.toml
 		; point at it. A failed write leaves both published globals and the boot

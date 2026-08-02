@@ -252,10 +252,10 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
         SearchTemplate := "https://search.example/?q=%s&source=ergopti"
         GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate)
         Parsed := ParseTomlFile(TempConfig)
-        AssertTrue(Parsed.Has("ahk.action_parameters"), "action parameter section must be persisted")
+        AssertTrue(Parsed.Has("action_parameters"), "action parameter section must be persisted")
         Key := GestureActionParameterKey("gesture__tap_3", "open_url")
-        AssertEqual("https://saved.example/path", Parsed["ahk.action_parameters"][Key], "exact URL must round-trip through TOML")
-		AssertEqual(SearchTemplate, Parsed["ahk.action_parameters"][SearchKey], "search template must round-trip through TOML")
+        AssertEqual("https://saved.example/path", Parsed["action_parameters"][Key], "exact URL must round-trip through TOML")
+		AssertEqual(SearchTemplate, Parsed["action_parameters"][SearchKey], "search template must round-trip through TOML")
 
         ; A config reload must both restore the saved value and drop stale
         ; in-memory values that are no longer in the user TOML.

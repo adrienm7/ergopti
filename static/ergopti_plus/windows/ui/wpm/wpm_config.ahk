@@ -79,11 +79,11 @@ WPMWidget_LoadSharedConst() {
 ; Called once at startup to restore position and visibility from config.
 WPMWidget_LoadConfig(Cache) {
 		WPMWidget_LoadSharedConst()
-		raw_vis    := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_VISIBLE)
-		raw_x      := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_X)
-		raw_y      := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_Y)
-		raw_colors := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_COLORS)
-		raw_graph  := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_GRAPH)
+		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
+		raw_x      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_X)
+		raw_y      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_Y)
+		raw_colors := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_COLORS)
+		raw_graph  := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_GRAPH)
 
 		; Position is one atomic configuration value: accepting X while blindly
 		; converting a malformed Y throws during boot after other input subsystems
@@ -128,7 +128,7 @@ _WPMWidget_SaveBatch(Updates, Operation) {
 WPMWidget_SaveVisible(Visible := unset) {
 		TargetVisible := IsSet(Visible) ? !!Visible : WPMWidget.visible
 		return _WPMWidget_SaveBatch([
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
 		], "widget visibility")
 }
 
@@ -136,8 +136,8 @@ WPMWidget_SavePosition(X := unset, Y := unset) {
 		TargetX := IsSet(X) ? X : WPMWidget.pos_x
 		TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
 		return _WPMWidget_SaveBatch([
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
 		], "widget position")
 }
 
@@ -163,9 +163,9 @@ WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset) {
 		TargetX := IsSet(X) ? X : WPMWidget.pos_x
 		TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
 		return _WPMWidget_SaveBatch([
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
-				{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
+				{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
 		], "widget display settings")
 }

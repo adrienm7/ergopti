@@ -132,7 +132,7 @@ GPTLinkEditor(*) {
 
 ModifyLink(gui, NewValue) {
 		global Features, ConfigurationFile
-		if !_EditorWriteToml(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
+		if !_EditorWriteToml(NewValue, ConfigurationFile, "shortcuts.gpt", "link")
 				return false
 		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") {
 				Features["shortcuts"]["gpt"]["link"] := NewValue

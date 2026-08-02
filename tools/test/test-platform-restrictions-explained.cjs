@@ -10,27 +10,41 @@
  *
  * THE INVARIANT:
  * "A feature missing on a platform carries a translated `reason_key`." Today
- * **none** of them does: 93 declarations restrict to a single platform and zero
- * name a reason. The user sees a menu that simply lacks a row, with nothing
- * anywhere saying whether that is deliberate, unimplemented, or impossible.
+ * **none** of them does. The user sees a menu that simply lacks a row, with
+ * nothing anywhere saying whether that is deliberate, unimplemented, or
+ * impossible.
  *
- * WHY THE COUNT HERE IS 76 AND NOT 93:
- * Seventeen of the 93 are **artifacts of the namespace, not statements about the
- * product**: a table that already lives under `sections.ahk.*` and then declares
- * `platforms = ["ahk"]` is saying the AHK section is AHK-only, which is a
- * tautology. Those disappear with the Lot 4 rename, and demanding a translated
- * sentence for each would be writing prose for something that should not exist.
- * The 76 that remain are real — 46 menu rows and 30 features that genuinely
- * appear on one platform and not another.
+ * WHY THE BASELINE ROSE FROM 76 TO 142 ON 2026-08-02 — READ THIS BEFORE
+ * TREATING IT AS A REGRESSION:
+ * Not one feature changed availability. What changed is that the driver silos
+ * were dissolved, and with them the excuse that was hiding two thirds of the
+ * population.
+ *
+ * The rule has always been that a table restating the restriction its own
+ * enclosing section already declares says nothing new. Before Lot 4 that
+ * enclosing section was `sections.ahk.*`, so every AHK-only feature in the AHK
+ * silo was an artifact by construction — 127 of them, excused on the shape of
+ * the file rather than on anything true about the product. The user still met
+ * every one of those missing rows; the gate simply was not counting them.
+ *
+ * After Lot 4 a feature lives under `sections.shortcuts` (ahk + hs) and states
+ * `platforms = ["ahk"]` itself. Same feature, same availability, same missing
+ * row — now visible to the count. The artifact rule survives in the form that
+ * was always the honest one: a restriction the enclosing section already makes
+ * is still excluded, because the user meets ONE missing submenu rather than
+ * fourteen missing rows inside a submenu they never see.
+ *
+ * So 76 was an undercount and 142 is the measurement. Lowering it means writing
+ * reasons, not restoring a namespace.
  *
  * WHY A RATCHET AND NOT A REQUIREMENT:
- * Requiring all 76 now means 76 new locale keys across 21 locales — 1 596
- * translated strings, in 19 languages nobody here can check. Machine-filling
- * them would put unverifiable text in front of users in every language, which is
- * worse than the silence it replaces. The count is frozen instead: a NEW
- * platform restriction must explain itself, and the existing 76 can be described
- * as they are revisited. Lower this baseline as reasons are written. Never raise
- * it.
+ * Requiring all 142 now means 142 new locale keys across 21 locales — nearly
+ * 3 000 translated strings, in 19 languages nobody here can check. Machine-
+ * filling them would put unverifiable text in front of users in every language,
+ * which is worse than the silence it replaces. The count is frozen instead: a
+ * NEW platform restriction must explain itself, and the existing ones can be
+ * described as they are revisited. Lower this baseline as reasons are written.
+ * Never raise it.
  * ==============================================================================
  */
 
@@ -42,9 +56,11 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
 
-// Frozen on 2026-08-01: 46 menu rows + 30 features restricted to one platform
-// with no reason_key. The 17 namespace artifacts are excluded by construction.
-const BASELINE = 76;
+// Frozen on 2026-08-02: 87 features + 45 menu rows + 10 sections restricted to
+// one platform with no reason_key. 127 restrictions that a parent section
+// already makes are excluded by construction — see the header for why this is
+// 142 rather than the 76 measured under the driver silos.
+const BASELINE = 142;
 
 // Floor: the manifest holds 500 tables, so a low parse means the scan broke and
 // the ratchet would pass having measured nothing.
@@ -87,6 +103,36 @@ if (tables.length < MIN_TABLES) {
 	);
 }
 
+// Section path -> the single platform it restricts to, when it restricts to one.
+const sectionRestriction = new Map();
+for (const t of tables) {
+	if (!t.name.startsWith('sections.')) continue;
+	const pm = t.body.join('\n').match(PLATFORMS_LINE);
+	if (!pm) continue;
+	const plats = [...pm[1].matchAll(/"(\w+)"/g)].map((x) => x[1]);
+	if (plats.length === 1 && plats[0] !== 'both') {
+		sectionRestriction.set(t.name.slice('sections.'.length), plats[0]);
+	}
+}
+
+/**
+ * The single platform the nearest enclosing section restricts to, if any.
+ * @param {string} tableName - e.g. "features.shortcuts.keyboard" or "sections.layout".
+ * @returns {string|null}
+ */
+function sectionPlatform(tableName) {
+	const parts = tableName.split('.');
+	parts.shift(); // Drop the "features"/"sections" root.
+	// A section is judged against its PARENT, a feature against its own section.
+	if (tableName.startsWith('sections.')) parts.pop();
+	while (parts.length > 0) {
+		const hit = sectionRestriction.get(parts.join('.'));
+		if (hit) return hit;
+		parts.pop();
+	}
+	return null;
+}
+
 const real = [];
 const artifacts = [];
 
@@ -99,11 +145,19 @@ for (const t of tables) {
 	// more names, means the row is available everywhere it applies.
 	if (plats.length !== 1 || plats[0] === 'both') continue;
 
-	const segments = t.name.split('.');
-	const namespace = segments.length > 1 ? segments[1] : '';
-	// A table under `sections.ahk.*` declaring platforms = ["ahk"] restates its
-	// own namespace. That is a fact about the file's shape, not about the product.
-	const isArtifact = namespace === plats[0];
+	// A table that restates the restriction its own section already declares is
+	// saying nothing new about the product. Before Lot 4 that showed up as a
+	// table under `sections.ahk.*` declaring platforms = ["ahk"] — a tautology
+	// about the file's shape. The silos are gone, but the shape survives: a
+	// feature under `sections.shortcuts.keyboard` (ahk-only) declaring ahk-only
+	// is the same tautology, and the user meets ONE missing submenu, not
+	// fourteen missing rows inside a submenu they never see.
+	//
+	// Counting declarations rather than restrictions is what made this number
+	// triple during Lot 4 without a single feature changing availability: the
+	// moved features had inherited their platform from the silo section, and
+	// pinning it on each of them turned one statement into many.
+	const isArtifact = sectionPlatform(t.name) === plats[0];
 
 	const entry = { name: t.name, platform: plats[0], explained: REASON_LINE.test(body) };
 	(isArtifact ? artifacts : real).push(entry);
@@ -127,8 +181,9 @@ if (REPORT) {
 		console.log('');
 	}
 	console.log(
-		`  ${artifacts.length} namespace artifact(s) excluded — a table under sections.<driver>.* that\n` +
-			'  declares that same driver restates its own namespace and disappears with the Lot 4 rename.'
+		`  ${artifacts.length} restatement(s) excluded — a table whose enclosing section already\n` +
+			'  restricts to that same platform says nothing new: the user meets one missing submenu,\n' +
+			'  not every row inside a submenu they never see.'
 	);
 }
 
@@ -150,5 +205,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] platform restrictions without a reason: ${unexplained.length}/${BASELINE} ` +
-		`(${real.length} real, ${artifacts.length} namespace artifact(s) excluded).\x1b[0m`
+		`(${real.length} real, ${artifacts.length} section restatement(s) excluded).\x1b[0m`
 );

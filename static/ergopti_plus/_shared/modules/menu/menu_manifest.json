@@ -89,7 +89,8 @@
 		{
 			"id": "tap_holds",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -211,7 +212,7 @@
 		},
 		{
 			"type": "feature",
-			"path": "ahk.shortcuts.screen_instant",
+			"path": "shortcuts.screen_instant",
 			"platforms": [
 				"ahk"
 			]
@@ -275,7 +276,7 @@
 	"modifier_combos_group": [
 		{
 			"type": "feature",
-			"path": "ahk.shortcuts.alt_gr_lalt",
+			"path": "shortcuts.alt_gr_lalt",
 			"group_label": "AltGrLAlt",
 			"platforms": [
 				"ahk"
@@ -283,7 +284,7 @@
 		},
 		{
 			"type": "feature",
-			"path": "ahk.shortcuts.alt_gr_caps_lock",
+			"path": "shortcuts.alt_gr_caps_lock",
 			"group_label": "AltGrCapsLock",
 			"platforms": [
 				"ahk"
@@ -291,7 +292,7 @@
 		},
 		{
 			"type": "feature",
-			"path": "ahk.shortcuts.lalt_caps_lock",
+			"path": "shortcuts.lalt_caps_lock",
 			"group_label": "LAltCapsLock",
 			"platforms": [
 				"ahk"
@@ -496,7 +497,7 @@
 		},
 		{
 			"type": "feature",
-			"path": "ahk.layout.ctrl_magic_save",
+			"path": "layout.ctrl_magic_save",
 			"platforms": [
 				"ahk"
 			]

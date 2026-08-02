@@ -36,19 +36,19 @@
 ; =========================================
 ; =========================================
 
-; Keys under [ahk.personal_editor] in the v2 config TOML.
+; Keys under [personal_editor] in the v2 config TOML.
 _EditorPrefGet(Key, Default) {
 	global ConfigurationFile
 	if !IsSet(ConfigurationFile) or !FileExist(ConfigurationFile) {
 		return Default
 	}
-	Val := TOML_Read(ConfigurationFile, "ahk.personal_editor", Key, "_MISSING_")
+	Val := TOML_Read(ConfigurationFile, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }
 _EditorPrefSet(Key, Value) {
 	global ConfigurationFile
 	if IsSet(ConfigurationFile) {
-		TOML_Write(Value, ConfigurationFile, "ahk.personal_editor", Key)
+		TOML_Write(Value, ConfigurationFile, "personal_editor", Key)
 	}
 }
 
@@ -641,7 +641,7 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
 	WritePersonalToml(_PersonalEditorData)
 	_PersonalEditorSection := NewOrder.Length > 0 ? NewOrder[1] : ""
 	; Repoint the PERSISTED pointer too. Without this the deleted section stayed
-	; in [ahk.personal_editor] default_section; the next OpenPersonalEditor() with
+	; in [personal_editor] default_section; the next OpenPersonalEditor() with
 	; no explicit argument read that stale name, and because it is non-empty the
 	; sections_order[1] fallback was skipped — leaving _PersonalEditorSection set
 	; to a section that no longer exists. The dropdown silently fell back to item 1

@@ -406,9 +406,9 @@ _OnbWeb_LoadExistingConfig(Dir) {
 	c := ParseTomlFile(path)
 	if !c.Count
 		return
-	saved := "{use_ergopti:" . (TomlCacheBool(c, "ahk.layout", "ergopti_base") ? "true" : "false")
-		. ",use_metrics:" . (TomlCacheBool(c, "ahk.metrics", "metrics_enabled") ? "true" : "false")
-		. ",use_gestures:" . (TomlCacheBool(c, "ahk.gestures", "enabled") ? "true" : "false")
+	saved := "{use_ergopti:" . (TomlCacheBool(c, "layout", "ergopti_base") ? "true" : "false")
+		. ",use_metrics:" . (TomlCacheBool(c, "metrics", "metrics_enabled") ? "true" : "false")
+		. ",use_gestures:" . (TomlCacheBool(c, "gestures", "enabled") ? "true" : "false")
 	mk := IniCacheGet(c, "hotstrings", "trigger_char")
 	if (mk != "_" && mk != "")
 		saved .= ",magic_key:" . _OnbWeb_JsStr(mk)

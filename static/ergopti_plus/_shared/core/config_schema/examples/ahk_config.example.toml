@@ -6,9 +6,11 @@
 #
 # Conventions:
 #   - All keys are snake_case.
-#   - Universal sections (read by AHK AND HS): [script], [hotstrings],
-#     [llm], [metrics], [shortcuts].
-#   - AHK-only sections are prefixed [ahk.*] (never read by HS).
+#   - Sections are named after what they configure — [script], [hotstrings],
+#     [llm], [metrics], [shortcuts], [gestures], [layout], [category_enabled] —
+#     and never after a driver. Which drivers honour a key is the manifest's
+#     "platforms" field; a driver that does not support a section simply never
+#     writes it, and warns if it finds one.
 #   - Every feature with an activation delay = explicit sub-section with
 #     ``enabled`` (bool, required) + ``time_activation_seconds`` (number, omit
 #     for instant activation).
@@ -433,6 +435,10 @@ wpm_menubar_colors = false
 # ===== 4.1 Disabled / shortcut =====
 # ===================================
 
+# Win-specific: InPrivate Edge / Incognito Chrome detection.
+filter_private_browsing = true   # Win-specific : InPrivate Edge / Incognito Chrome detection
+
+
 [metrics.shortcuts]
 apps = ""
 typing = ""
@@ -451,7 +457,7 @@ list = []
 # ===============================
 
 [shortcuts]
-# Universal section; platform-specific variants live under [ahk.shortcuts.*].
+# Universal section; the modifier-combo variants are the [shortcuts.*] sub-tables.
 get_hex_value = true
 gpt = { enabled = true, link = "https://chatgpt.com/" }
 search = { enabled = true, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
@@ -473,6 +479,16 @@ wrap_text_if_selected = true
 # ===== 5.1 Accented shortcuts =====
 # ==================================
 
+# Windows-only shortcuts. They are not namespaced by driver: a shortcut is a
+# shortcut, and which drivers implement it is the manifest's "platforms" field.
+ctrl_j = false
+open_downloads = true
+move = true
+screen = true
+screen_instant = true
+win_caps_lock = true
+
+
 [shortcuts.a_grave]
 enabled = true
 letter = "v"
@@ -493,47 +509,32 @@ letter = "z"
 
 
 
-# ====================================
-# ====================================
-# ======= 6. AHK-only sections =======
-# ====================================
-# ====================================
+# ======================================
+# ======================================
+# ======= 6. Layout and gestures =======
+# ======================================
+# ======================================
 
-# Sections read only by the AHK driver. HS ignores them (warn if present).
+# Only the Windows driver implements these today. That is recorded in the
+# manifest as a "platforms" list on each feature, not as a namespace here:
+# a driver that does not support a section simply never writes it.
 
 
 
-# ==========================
-# ===== 6.1 ahk.layout =====
-# ==========================
+# ======================
+# ===== 6.1 layout =====
+# ======================
 
-[ahk.layout]
+[layout]
 ergopti_base = true
 direct_access_digits = true
 ergopti_alt_gr = true
 ergopti_plus = true
+# ==========================================
+# ===== 6.3 shortcuts.alt_gr_caps_lock =====
+# ==========================================
 
-
-
-# ============================================
-# ===== 6.2 ahk.shortcuts (Windows-only) =====
-# ============================================
-
-[ahk.shortcuts]
-ctrl_j = false
-open_downloads = true
-move = true
-screen = true
-screen_instant = true
-win_caps_lock = true
-
-
-
-# ==============================================
-# ===== 6.3 ahk.shortcuts.alt_gr_caps_lock =====
-# ==============================================
-
-[ahk.shortcuts.alt_gr_caps_lock]
+[shortcuts.alt_gr_caps_lock]
 backspace = false
 caps_lock = false
 caps_word = false
@@ -547,11 +548,11 @@ tab = false
 
 
 
-# =========================================
-# ===== 6.4 ahk.shortcuts.alt_gr_lalt =====
-# =========================================
+# =====================================
+# ===== 6.4 shortcuts.alt_gr_lalt =====
+# =====================================
 
-[ahk.shortcuts.alt_gr_lalt]
+[shortcuts.alt_gr_lalt]
 backspace = false
 caps_lock = false
 caps_word = false
@@ -565,11 +566,11 @@ tab = false
 
 
 
-# ============================================
-# ===== 6.5 ahk.shortcuts.lalt_caps_lock =====
-# ============================================
+# ========================================
+# ===== 6.5 shortcuts.lalt_caps_lock =====
+# ========================================
 
-[ahk.shortcuts.lalt_caps_lock]
+[shortcuts.lalt_caps_lock]
 backspace = false
 caps_lock = false
 caps_word = true
@@ -583,11 +584,11 @@ tab = false
 
 
 
-# ======================================
-# ===== 6.6 ahk.shortcuts.personal =====
-# ======================================
+# ==================================
+# ===== 6.6 shortcuts.personal =====
+# ==================================
 
-[ahk.shortcuts.personal]
+[shortcuts.personal]
 laptop_broken_key = true
 mouse_drag_window = true
 mouse_tab_switching = true
@@ -596,11 +597,11 @@ programmable_keyboard = true
 
 
 
-# ============================================
-# ===== 6.7 ahk.shortcuts.script_control =====
-# ============================================
+# ========================================
+# ===== 6.7 shortcuts.script_control =====
+# ========================================
 
-[ahk.shortcuts.script_control]
+[shortcuts.script_control]
 script_altgr_backspace = "script_reload"
 script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"
@@ -608,14 +609,14 @@ script_altgr_escape = "script_quit"
 
 
 
-# ============================
-# ===== 6.8 ahk.gestures =====
-# ============================
+# ========================
+# ===== 6.8 gestures =====
+# ========================
 
 # AHK vocabulary is limited to Windows Precision Touchpad gestures (3/4 fingers).
-# The richer HS vocabulary (2/3/4/5 fingers + diagonals) lives under [hs.gestures.*].
+# The richer macOS vocabulary (2/3/4/5 fingers + diagonals) uses the same keys.
 
-[ahk.gestures]
+[gestures]
 enabled = true
 swipe_3_down = "tab_close"
 swipe_3_left = "tab_prev"
@@ -627,12 +628,3 @@ swipe_4_right = "desktop_next"
 swipe_4_up = "win_app_next"
 tap_3 = "left_click_toggle"
 tap_4 = "screenshot_window_clipboard"
-
-
-
-# =======================================
-# ===== 6.9 ahk.metrics (overrides) =====
-# =======================================
-
-[ahk.metrics]
-filter_private_browsing = true   # Win-specific : InPrivate Edge / Incognito Chrome detection
