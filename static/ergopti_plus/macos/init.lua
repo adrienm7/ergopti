@@ -153,7 +153,7 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
-local menu_paths         = require("ui.menu.menu_paths")
+local config_paths       = require("infra.config_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
 local ManifestReader     = require("infra.manifest_reader")
@@ -188,13 +188,17 @@ if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 local base_dir = script_path:match("^(.*[/\\])") or "./"
 if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 
-menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
-Boot.mark("Path: config dir + paths.toml (menu_paths.init)")
+-- Boot initialises the RESOLVER, not the path editor: every consumer below
+-- resolves through it, and none of them draws a UI. The editor's reload
+-- callback is wired later by ui/menu/init.lua, which is the only caller that
+-- can act on it.
+config_paths.init(base_dir)
+Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 
 -- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
 -- the user config dir is known. Earlier boot lines went to the fallback file.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
-Logger.init_log_path(menu_paths.get_config_dir(), 14)
+Logger.init_log_path(config_paths.get_config_dir(), 14)
 Boot.mark("Path: log file open (retention purge deferred)")
 
 -- Make the file log self-sufficient: capture errors that Hammerspoon would
@@ -421,7 +425,7 @@ do
 		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
 		return
 	end
-	local cfg_path = menu_paths.get("ConfigTomlPath")
+	local cfg_path = config_paths.get("ConfigTomlPath")
 	if onboarding_mod.should_run(cfg_path) then
 		onboarding_mod.run(cfg_path)
 		return
@@ -472,7 +476,7 @@ Boot.mark("Script control engine started (panic-button eventtap)")
 -- lsof + curl cleanup on every boot. The two readers of this one setting sat on
 -- opposite sides of the layer that populates it.
 local config_overrides = require("infra.config_overrides")
-config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
 local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 
@@ -544,7 +548,7 @@ end
 
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
-local boot_saved_prefs = Preferences.load(menu_paths.get("ConfigTomlPath"))
+local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
 local boot_llm_enabled = hs.settings.get("llm.enabled")
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
@@ -582,7 +586,7 @@ end
 
 Boot.mark("LLM backend bootstrap")
 
-local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
+local configured_hotstrings_dir = config_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
 
@@ -628,19 +632,19 @@ end
 -- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
 do
 	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-	local override_path = menu_paths.get_config_dir()
+	local override_path = config_paths.get_config_dir()
 	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
 	override_path = override_path .. "hotstrings_config.toml"
 	hotstrings_config.init({
 		override_path = override_path,
 		toml_resolver = function(category)
 			if category == "personal" then
-				return menu_paths.get("PersonalTomlPath")
+				return config_paths.get("PersonalTomlPath")
 			end
 			-- Extension personal TOML groups: personal_ext_<stem> → hotstrings/<stem>.toml
 			local ext_stem = category:match("^personal_ext_(.+)$")
 			if ext_stem then
-				return menu_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
+				return config_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
 			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
@@ -651,7 +655,7 @@ do
 	if ok_cw and cw and type(cw.setup) == "function" then
 		local extensions_dir = base_dir .. "../extensions"
 		cw.setup({
-			personal_dir   = menu_paths.get("PersonalHotstringsDir"),
+			personal_dir   = config_paths.get("PersonalHotstringsDir"),
 			extensions_dir = extensions_dir,
 		})
 	end
@@ -812,7 +816,7 @@ end
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
-local personal_info_toml_path = menu_paths.get("PersonalInfoTomlPath")
+local personal_info_toml_path = config_paths.get("PersonalInfoTomlPath")
 dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
 table.insert(hotfiles, "dynamichotstrings")
 
@@ -923,7 +927,7 @@ ui_restore.restore()
 require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = (menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as
@@ -932,8 +936,8 @@ require("infra.file_watchers").start({
 	-- it again. Resolved from menu_paths so the watcher and the writers cannot
 	-- disagree about where these files are.
 	self_written_files      = {
-		menu_paths.get("ConfigTomlPath"),
-		menu_paths.get("KarabinerConfigPath"),
+		config_paths.get("ConfigTomlPath"),
+		config_paths.get("KarabinerConfigPath"),
 	},
 	-- Runtime store, not source: the TOML snapshot cache lives inside the
 	-- watched driver tree and writes .lua files, so without this every cache
@@ -943,7 +947,7 @@ require("infra.file_watchers").start({
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	git_roots               = {
 		base_dir,
-		(menu_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
+		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
 	},
 })
 

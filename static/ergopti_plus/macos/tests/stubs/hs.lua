@@ -357,7 +357,26 @@ M.fs = {
 	-- Test hook: the lfs-free probe above, so a regression test can assert it
 	-- classifies an existing directory / file / missing path correctly on any OS.
 	__probe_no_lfs = probe_fs_without_lfs,
-	mkdir = function(_) return true end,
+	-- Honest, for the same reason `attributes` above is. It used to return true
+	-- without creating anything, which made every directory-creation invariant
+	-- untestable: production code that verifies its own mkdir with
+	-- hs.fs.attributes — as ensure_dir does, deliberately, because LuaFileSystem
+	-- returns nil rather than raising — saw the create "succeed" and the
+	-- directory stay missing. A stub that reports success for work it did not do
+	-- is the harness-stubs-the-subject false green, and the one class the
+	-- detector cannot see.
+	mkdir = function(path)
+		if type(path) ~= "string" or path == "" then return nil, "invalid path" end
+		local ok_lfs, lfs = pcall(require, "lfs")
+		if ok_lfs and lfs and lfs.mkdir then return lfs.mkdir(path) end
+		local is_windows = package.config:sub(1, 1) == "\\"
+		local quoted = '"' .. path:gsub('"', '') .. '"'
+		local cmd = is_windows
+			and ('cmd /c if not exist ' .. quoted .. ' mkdir ' .. quoted .. ' 2>nul')
+			or ('mkdir -p ' .. quoted .. ' 2>/dev/null')
+		os.execute(cmd)
+		return M.fs.attributes(path) ~= nil
+	end,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
 	-- Test hook: register the names a given absolute path should list.

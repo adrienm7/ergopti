@@ -90,7 +90,7 @@ local function load_kc_bridge_with_tmp_path()
 	-- module so its "ui.menu.*" wipe runs, then reinstall our stub and require
 	-- the real target ourselves.
 	helpers.load_with_stubs("infra.logger", hs_overrides)
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return tmp_dir end,
 	}
 	package.loaded["modules.keylogger.kc_bridge"] = nil

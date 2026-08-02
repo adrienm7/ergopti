@@ -123,7 +123,7 @@ local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED
 -- pointing ConfigDirPath elsewhere; bridge reader resolves the same path.
 local KE_PHYSICAL_KC_LOG
 do
-	local mp = require("ui.menu.menu_paths")
+	local mp = require("infra.config_paths")
 	local d  = mp.get_config_dir()
 	if not d:match("[/\\]$") then d = d .. "/" end
 	KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"

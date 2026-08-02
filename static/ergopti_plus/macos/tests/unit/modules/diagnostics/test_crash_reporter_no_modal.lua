@@ -79,7 +79,7 @@ local function load_with_tripwires(config_dir)
 	}
 
 	if config_dir then
-		package.loaded["ui.menu.menu_paths"] = {
+		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return config_dir end,
 		}
 	end
@@ -114,7 +114,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 		helpers.assert_true(names_path,
 			"the notification must name the saved report path — it is the only actionable detail")
 
-		package.loaded["ui.menu.menu_paths"] = nil
+		package.loaded["infra.config_paths"] = nil
 	end)
 
 	helpers.it("still notifies without a modal when the report cannot be saved", function()
@@ -131,6 +131,6 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 		helpers.assert_true(#notifications >= 1,
 			"a failed save must still be surfaced to the user")
 
-		package.loaded["ui.menu.menu_paths"] = nil
+		package.loaded["infra.config_paths"] = nil
 	end)
 end)

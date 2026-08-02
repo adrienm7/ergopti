@@ -77,7 +77,7 @@ local KARABINER_OUT = nil
 --     <config_dir>/hammerspoon/config_karabiner.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
-	local MenuPaths = require("ui.menu.menu_paths")
+	local MenuPaths = require("infra.config_paths")
 	return MenuPaths.get("KarabinerConfigPath")
 end
 local ACTIONS_FILE    = _DATA_DIR .. "actions.json"

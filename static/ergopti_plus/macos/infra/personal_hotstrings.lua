@@ -26,7 +26,7 @@ local M = {}
 local hs               = hs
 local Logger           = require("infra.logger")
 local fs_dir           = require("infra.fs_dir")
-local menu_paths       = require("ui.menu.menu_paths")
+local menu_paths       = require("infra.config_paths")
 local keymap           = require("modules.keymap")
 local hotstring_editor = require("ui.hotstring_editor")
 

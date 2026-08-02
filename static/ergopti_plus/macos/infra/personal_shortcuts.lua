@@ -22,7 +22,7 @@
 ---
 --- DEPENDENCIES:
 --- - lib.logger
---- - ui.menu.menu_paths (for the resolved path)
+--- - infra.config_paths (for the resolved path)
 --- ==============================================================================
 
 local M = {}
@@ -85,7 +85,7 @@ local TEMPLATE = [[
 --- Resolve the absolute path via the central menu_paths module.
 --- No local fallback — menu_paths handles defaults internally.
 local function resolve_path()
-	local MenuPaths = require("ui.menu.menu_paths")
+	local MenuPaths = require("infra.config_paths")
 	return MenuPaths.get("PersonalShortcutsLuaPath")
 end
 

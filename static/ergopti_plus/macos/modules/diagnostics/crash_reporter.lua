@@ -75,7 +75,7 @@ local COLLECT_SYSTEM_PROBES_DEFAULT = false
 local function _reports_dir()
 	local base = nil
 
-	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
+	local ok_mp, mp = pcall(require, "infra.config_paths")
 	if ok_mp and mp and type(mp.get_config_dir) == "function" then
 		local dir = mp.get_config_dir()
 		if type(dir) == "string" and dir ~= "" then

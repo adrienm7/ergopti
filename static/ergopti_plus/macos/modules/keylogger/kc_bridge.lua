@@ -34,7 +34,7 @@ local LOG     = "keylogger.kc_bridge"
 -- Resolved via the central menu_paths module — no local fallback.
 local KC_LOG_PATH
 do
-	local mp = require("ui.menu.menu_paths")
+	local mp = require("infra.config_paths")
 	local d  = mp.get_config_dir()
 	if not d:match("[/\\]$") then d = d .. "/" end
 	KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
