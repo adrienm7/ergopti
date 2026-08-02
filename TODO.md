@@ -77,13 +77,12 @@ emulation. For a named key (`enter`, `home`…) the bare AHK name is correct.
 > contract in `_shared/core/ports/`, it is `adapters/`. If it is OS-unique, it
 > is `platform/`. Everything else is one flat file in `infra/`.**
 
-Canonical `modules/` list (becomes `_shared/core/features.json`, read by the
-tree-parity gate, by `new:driver` and by the drivers): `action_picker`, `apps`,
-`changelog`, `diagnostics`, `download`, `dynamic_hotstrings`, `gestures`,
-`healthcheck`, `hotstring_editor`, `hotstrings`, `hotstrings_config`, `layout`,
-`llm`, `menu`, `metrics`, `model_browser`, `onboarding`, `paths`,
-`personal_info`, `prompt_editor`, `shortcuts`, `spotlight`, `tooltip`,
-`updater`, `wpm`.
+The canonical list now lives in **`_shared/core/features.json`**, not here —
+`test-driver-tree-parity.cjs` reads it and ratchets how many of the 25 features
+are present on all three drivers (**14** today). Each entry carries the `tree` it
+belongs to, because the one-line rule above is not quite true: a feature the user
+OPERATES is a module, one the user LOOKS AT is a window, and **ten of the 25 are
+windows** under `ui/`.
 
 Renames still to do:
 
