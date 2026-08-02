@@ -330,8 +330,15 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 
 		-- 'lookup' -> M.trigger_lookup() calls hs.timer.doAfter(...) UNPROTECTED
 		-- (no internal pcall), so stubbing it to error() reaches Logger.pcall's guard.
-		local ok = pcall(Actions2.execute_single, "lookup")
+		-- The containment IS the subject, so the pcall stays. What it was missing is
+		-- that the exception was CONTAINED rather than swallowed: Logger.pcall is
+		-- meant to log it, and a guard that silently discarded every failure would
+		-- leave a dead gesture with nothing in the logs to explain it.
+		local ok, result = pcall(Actions2.execute_single, "lookup")
 		helpers.assert_true(ok, "execute_single itself must never raise — Logger.pcall must contain the exception")
+		helpers.assert_true(result ~= nil,
+			"and must still ANSWER its caller — a contained exception that returned nothing "
+				.. "is indistinguishable from an action that was never dispatched")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
@@ -348,8 +355,13 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
 		-- 'lines' next/prev call hs.timer.doAfter(...) UNPROTECTED directly.
-		local ok = pcall(Actions2.execute_axis, "lines", true)
+		-- execute_axis answers nil where execute_single answers true, and both are
+		-- deliberate: the axis dispatcher has no single result to report. Asserted as
+		-- a TYPE so a future change to either is visible here rather than at a caller.
+		local ok, result = pcall(Actions2.execute_axis, "lines", true)
 		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.pcall must contain the exception")
+		helpers.assert_true(result == nil or type(result) == "boolean",
+			"and must answer nil or a boolean, never a half-value")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false

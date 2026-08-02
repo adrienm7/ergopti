@@ -412,8 +412,7 @@ helpers.describe("kc_bridge — require_state guard fires Logger.error before in
 
 	helpers.it("start() before init logs Logger.error and does not crash", function()
 		local kc, error_calls = load_kc_bridge_with_error_spy()
-		local ok = pcall(function() kc.start() end)
-		helpers.assert_true(ok, "M.start() before M.init() must not raise")
+		kc.start()
 		helpers.assert_true(#error_calls > 0,
 			"M.start() called before M.init() must log via Logger.error (require_state contract)")
 	end)
@@ -422,8 +421,7 @@ helpers.describe("kc_bridge — require_state guard fires Logger.error before in
 		local kc, error_calls = load_kc_bridge_with_error_spy()
 		kc.init({ ok = true }, nil, {}, {})
 		error_calls = {} -- clear any init-time noise before the call under test
-		local ok = pcall(function() kc.start() end)
-		helpers.assert_true(ok)
+		kc.start()
 		helpers.assert_eq(#error_calls, 0,
 			"M.start() after a successful M.init() must not trip the require_state guard")
 	end)
