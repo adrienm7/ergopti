@@ -83,7 +83,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    swaps its literal, keeping the module name as a trailing
 //                    comment: a comment cannot break a test when the file moves,
 //                    it can only go stale.)
-const BASELINE = 34;
+//           34 → 33 (2026-08-02: the second-level wrappers, see the read baseline.)
+//           33 → 32 (2026-08-02: the one refusal, split by hand — see the read
+//                    baseline.)
+const BASELINE = 32;
 
 // Second frozen baseline — individual pinned READS, not files.
 //
@@ -110,7 +113,16 @@ const BASELINE = 34;
 //      237 → 90 (2026-08-02: 147 more via the path-taking helpers. From 281 to 90
 //              in one pass, so two thirds of what looked like an unbounded
 //              migration was one rewrite applied 147 times.)
-const READ_BASELINE = 90;
+//       90 → 80 (2026-08-02: the second-level wrappers. assert_gc_pinned(rel)
+//              forwards to read_source(rel) and reads no file itself, so it only
+//              became convertible once its callee had been — and only if the
+//              fixer seeds itself with helpers a PREVIOUS run converted, which
+//              no longer look like reads.)
+//       80 → 75 (2026-08-02: the one refusal, split by hand. A single reader
+//              served both the driver tree and _shared/, so it would have had to
+//              take a selector at three call sites and a path at the fourth;
+//              splitting it in two let the fixer take the driver half.)
+const READ_BASELINE = 75;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).

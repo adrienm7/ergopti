@@ -189,10 +189,59 @@ function uniqueSelectorFor(relTarget) {
  */
 function convertHelpers(src, blocked) {
 	let converted = 0;
-	const defRe = /^([ \t]*)local function (\w+)\((\w+)\)[ \t]*\r?\n([\s\S]*?)\r?\n\1end[ \t]*$/gm;
+	// Helpers converted so far in this file. A second-level wrapper —
+	// assert_gc_pinned(rel) forwarding to read_source(rel) — reads no file itself,
+	// so it only becomes convertible once its callee has been. Ten of the pins in
+	// test_gc_retention.lua are behind exactly that one indirection.
+	const convertedNames = new Set();
+	// Seed with helpers a previous run already converted, or a wrapper around one
+	// of them stays invisible for ever: its callee no longer looks like a read.
+	//
+	// The marker is the parameter NAME. The fixer always emits `(selector, …)`, so
+	// that spelling is a reliable "already done" flag — and it has to be checked,
+	// not merely used for seeding: a converted wrapper still forwards its
+	// parameter to a converted callee, so it matches the detector on every later
+	// run, and its arguments are now selectors that no resolvability check can
+	// accept. The pre-commit hook blocked on exactly that.
+	for (const m of src.matchAll(/local function (\w+)\(selector\b/g)) convertedNames.add(m[1]);
+	for (const m of src.matchAll(
+		/local function (\w+)\((\w+)[^)]*\)\r?\n(?:[^\n]*\r?\n){0,6}?[^\n]*helpers\.read_driver_source\(\s*\2\s*\)/g
+	)) {
+		convertedNames.add(m[1]);
+	}
+	for (let pass = 0; pass < 4; pass++) {
+		const before = converted;
+		converted += convertHelperPass(
+			() => src,
+			(s) => {
+				src = s;
+			},
+			convertedNames,
+			blocked
+		);
+		if (converted === before) break;
+	}
+	return { src, converted };
+}
+
+/**
+ * One fixpoint pass of the helper conversion.
+ * @param {() => string} get - Reads the current source.
+ * @param {(s: string) => void} set - Writes the rewritten source.
+ * @param {Set<string>} convertedNames - Helpers already taking a selector.
+ * @param {string[]} blocked - Accumulator for refusals.
+ * @returns {number} Pins converted in this pass.
+ */
+function convertHelperPass(get, set, convertedNames, blocked) {
+	let src = get();
+	let converted = 0;
+	// The path is always the FIRST parameter; later ones (a marker to look for, a
+	// baseline) ride along untouched. Restricting this to single-parameter
+	// helpers left assert_gc_pinned and check_file behind for no reason.
+	const defRe = /^([ \t]*)local function (\w+)\((\w+)((?:\s*,\s*\w+)*)\)[ \t]*\r?\n([\s\S]*?)\r?\n\1end[ \t]*$/gm;
 
 	for (const def of [...src.matchAll(defRe)]) {
-		const [whole, indent, name, param, body] = def;
+		const [whole, indent, name, param, moreParams, body] = def;
 		const P = param.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 		// Does the body read the file its own parameter names?
@@ -205,10 +254,15 @@ function convertHelpers(src, blocked) {
 				OPEN_CALL('\\2') +
 				READ_TAIL
 		);
+		if (convertedNames.has(name)) continue;
+		// … or does it hand its parameter to a helper already converted?
+		const forwards = [...convertedNames].some((c) =>
+			new RegExp(`(?<![:.\\w])${c}\\(\\s*${P}\\s*[,)]`).test(body)
+		);
 		const hit = body.match(inline) || body.match(varThen);
-		if (!hit) continue;
-		const srcVar = hit[hit.length - 1];
-		const blockIndent = hit[1];
+		if (!hit && !forwards) continue;
+		const srcVar = hit ? hit[hit.length - 1] : null;
+		const blockIndent = hit ? hit[1] : null;
 
 		// Every call site must name a module with a unique selector, or the helper
 		// is left alone: half-converted, it would take two different kinds of
@@ -216,7 +270,7 @@ function convertHelpers(src, blocked) {
 		// The lookbehind excludes a method call: a helper named `read` otherwise
 		// matched `fh:read("*a")`, and the fixer refused the whole file because
 		// "*a" is not a driver source path.
-		const callRe = new RegExp(`(?<![:.\\w])${name}\\(\\s*("[^"\\n]*")\\s*\\)`, 'g');
+		const callRe = new RegExp(`(?<![:.\\w])${name}\\(\\s*("[^"\\n]*")\\s*([,)])`, 'g');
 		const calls = [...src.matchAll(callRe)];
 		if (calls.length === 0) continue;
 		const selectors = new Map();
@@ -244,13 +298,15 @@ function convertHelpers(src, blocked) {
 		// The parameter is renamed because it no longer holds what its name says,
 		// and a message built from it ("cannot open " .. rel) would otherwise print
 		// a selector while calling it a path.
-		let newBody = body.replace(hit[0], `${blockIndent}local ${srcVar} = helpers.read_driver_source(selector)\n`);
+		let newBody = hit
+			? body.replace(hit[0], `${blockIndent}local ${srcVar} = helpers.read_driver_source(selector)\n`)
+			: body;
 		newBody = newBody.replace(new RegExp(`\\b${P}\\b`, 'g'), 'selector');
 		const newDef =
 			`${indent}-- Takes a selector unique to one production file rather than that file's\n` +
 			`${indent}-- path, so moving or splitting a module cannot turn these invariants into\n` +
 			`${indent}-- path errors.\n` +
-			`${indent}local function ${name}(selector)\n${newBody}\n${indent}end`;
+			`${indent}local function ${name}(selector${moreParams})\n${newBody}\n${indent}end`;
 		src = src.replace(whole, newDef);
 
 		// The call site used to name the module it read. A selector does not, and
@@ -261,14 +317,17 @@ function convertHelpers(src, blocked) {
 		// Only when the call ENDS the line: several sites read two modules and
 		// concatenate them across a line continuation, where a trailing comment
 		// would swallow the `..` and everything after it.
-		src = src.replace(callRe, (m, literal, offset, whole_) => {
+		src = src.replace(callRe, (m, literal, closer, offset, whole_) => {
 			const rest = whole_.slice(offset + m.length, whole_.indexOf('\n', offset));
-			const call = `${name}(${JSON.stringify(selectors.get(literal))})`;
-			return /^\s*$/.test(rest) ? `${call} -- ${literal.slice(1, -1)}` : call;
+			const call = `${name}(${JSON.stringify(selectors.get(literal))}${closer}`;
+			const endsLine = closer === ')' && /^\s*$/.test(rest);
+			return endsLine ? `${call} -- ${literal.slice(1, -1)}` : call;
 		});
+		convertedNames.add(name);
 		converted += calls.length;
 	}
-	return { src, converted };
+	set(src);
+	return converted;
 }
 
 /**

@@ -105,13 +105,16 @@ end
 
 --- Asserts a driver file has no unpinned spawn.
 --- @param rel_path string Relative path from the macos/ root.
-local function assert_gc_pinned(rel_path)
-	local src, err = read_source(rel_path)
-	assert(src, (err or "missing") .. " — " .. rel_path)
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function assert_gc_pinned(selector)
+	local src, err = read_source(selector)
+	assert(src, (err or "missing") .. " — " .. selector)
 	local offenders = scan_unpinned_sites(src)
 	if #offenders == 0 then return end
 	local where = {}
-	for _, o in ipairs(offenders) do where[#where + 1] = rel_path .. ":" .. o.line end
+	for _, o in ipairs(offenders) do where[#where + 1] = selector .. ":" .. o.line end
 	error(table.concat(where, ", ") .. ": hs.task.new with no GC-root pin within "
 		.. PIN_LOOKAHEAD .. " lines — add M._active_tasks = {} (own root) or pin via "
 		.. "deps.active_tasks / active_tasks_gc_root (delegated root) before :start()", 0)
@@ -297,19 +300,19 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- _active_tasks table so the task survives until its callback fires.
 
 	helpers.it("menu_about: unzip and rm tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_about.lua")
+		assert_gc_pinned("local function get_update_menu_label") -- ui/menu/menu_about.lua
 	end)
 
 	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_ollama.lua")
+		assert_gc_pinned("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 	end)
 
 	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx.lua")
+		assert_gc_pinned("\"Cause inconnue. Consultez la console Hammerspoon.\"") -- ui/menu/menu_llm/models_manager_mlx.lua
 	end)
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_server.lua")
+		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ui/menu/menu_llm/models_manager_mlx_server.lua
 	end)
 
 	-- F-MED-20: these 2 of the 6 files split out of the old
@@ -319,19 +322,19 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- substring check did not recognize. New unpinned hs.task.new() calls in
 	-- these files could previously ship with the suite still green.
 	helpers.it("models_manager_mlx_download: pull/tail tasks are pinned (F-MED-20)", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_download.lua")
+		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ui/menu/menu_llm/models_manager_mlx_download.lua
 	end)
 
 	helpers.it("models_manager_mlx_hf: hf_login task is pinned (F-MED-20)", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_hf.lua")
+		assert_gc_pinned("local HF_TOKEN_FILE") -- ui/menu/menu_llm/models_manager_mlx_hf.lua
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
-		assert_gc_pinned("modules/karabiner/onboarding.lua")
+		assert_gc_pinned("local function run_pkg_with_sudo_async") -- modules/karabiner/onboarding.lua
 	end)
 
 	helpers.it("menu_apps: open task is pinned", function()
-		assert_gc_pinned("ui/menu/menu_apps.lua")
+		assert_gc_pinned("local function discover_bundled_apps") -- ui/menu/menu_apps.lua
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
