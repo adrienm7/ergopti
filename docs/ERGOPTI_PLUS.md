@@ -131,7 +131,7 @@ pour naviguer aujourd'hui :
 | Infra transverse | `lib/` (39 fichiers plats + 6 dossiers, 24 017 l) | `lib/` (27 + `toml/`) | `lib/` (6 fichiers) |
 | **Moteur de hotstrings** | `lib/hotstrings/` (17 fichiers) | **`modules/keymap/`** | `modules/hotstrings/` |
 | **Remappage clavier** | **`modules/keymap/`** | `platform/remap/` + `modules/keymap/{layout_install,input_sources}.lua` | `platform/remap/` |
-| Tap-hold | `platform/remap/` + `lib/tap_hold/` | `platform/remap/` | `platform/remap/` |
+| Tap-hold | `platform/remap/` | `platform/remap/` | `platform/remap/` |
 | Menu tray | `ui/menu/` (+ barrel `ui/tray_menu.ahk`, **hors dossier**) | `ui/menu/` (barrel `init.lua` **dans** le dossier) | **`modules/menu/`** |
 | Fenêtres webview | `ui/<fenêtre>/` (+ 5 fichiers plats à la racine de `ui/`) | `ui/<fenêtre>/` | **`modules/ui/bridge_handlers/`** + `ui/webkit_host.lua` |
 | Métriques (hôtes) | `modules/keylogger/keylogger_{ui,webview,prefetch}.ahk` | `ui/metrics_{typing,apps}/` | `modules/ui/bridge_handlers/` |
