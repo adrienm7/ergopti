@@ -95,21 +95,64 @@ end)
 
 
 
-helpers.describe("bindings: pause invariant + volume (project_suspend_pause_invariant)", function()
-	helpers.it("pause must leave list/enable/disable safe but real hotkey effects gated higher", function()
-		-- list_shortcuts etc. are pure; the hs.hotkey.bind side and action execution are gated.
-		helpers.assert_true(true, "shortcuts bindings must be callable under pause (no side effects from registry)")
+-- The pause invariant for this module is that it has none: bindings is a
+-- declarative registry, and the decision not to run an action while paused
+-- belongs to the dispatcher. All three cases here used to state that with
+-- assert_true(true) and a sentence — including one that looped 150 times over a
+-- body reading `-- simulate`, so it asserted nothing about nothing. What is
+-- checkable is the claim itself.
+helpers.describe("bindings: the pause gate is not here (project_suspend_pause_invariant)", function()
+	helpers.it("the registry names no pause or suspend state", function()
+		-- A pause check HERE would mean two modules decide whether a shortcut
+		-- fires, and they will disagree: the registry is consulted at bind time,
+		-- the dispatcher at press time, and a shortcut disabled by one and bound
+		-- by the other is a key that does nothing with no error anywhere.
+		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"bindings must stay a declarative registry — the pause gate belongs to the dispatcher")
+		helpers.assert_true(src:find("suspend") == nil,
+			"same for suspend: this table describes what exists, not when it runs")
 	end)
 
-	helpers.it("high volume (150+) enable/disable + list under pause transitions must be stable", function()
-		for i=1,150 do
-			-- simulate
+	helpers.it("enable/disable is idempotent however many times it is repeated", function()
+		-- The old version ran a 150-iteration loop whose body was a comment. The
+		-- volume is worth keeping — repeated toggling is what a paused/resumed
+		-- session actually does to this registry — but only if the state is read
+		-- back afterwards.
+		local names = {}
+		for _, s in ipairs(Bindings.list_shortcuts()) do names[#names + 1] = s.name or s.id end
+		helpers.assert_true(#names > 0, "the registry must list something, or this proves nothing")
+
+		local first = names[1]
+		local was_enabled = Bindings.list_shortcuts()[1].enabled
+		for _ = 1, 150 do
+			Bindings.disable(first)
+			Bindings.enable(first)
 		end
-		helpers.assert_true(true, "volume + pause on bindings must not corrupt registry or leak activations")
+		-- list_shortcuts hands back live state, so leaving `first` enabled here
+		-- made a later case in this same file fail. Restore what was found.
+		if not was_enabled then Bindings.disable(first) end
+
+		local after = Bindings.list_shortcuts()
+		helpers.assert_eq(#after, #names,
+			"150 disable/enable cycles must leave the registry the same size — a leak here is a "
+				.. "shortcut that silently stops being listed in the menu")
+		helpers.assert_eq(after[1].name or after[1].id, first, "and in the same order")
+		helpers.assert_eq(after[1].enabled, was_enabled,
+			"and in the state it started in — 150 round trips must cancel out exactly")
 	end)
 
-	helpers.it("bad/unicode shortcut ids must not crash registry (resilience)", function()
-		helpers.assert_true(true, "bad shortcut ids must degrade gracefully under pause")
+	helpers.it("an unknown or non-string id is refused rather than registered", function()
+		local before = #Bindings.list_shortcuts()
+		-- Each of these used to be covered by "bad shortcut ids must degrade
+		-- gracefully" asserted with true.
+		Bindings.disable("no_such_shortcut_id")
+		Bindings.disable("clé_accentuée_🚀")
+		Bindings.enable("no_such_shortcut_id")
+		helpers.assert_eq(#Bindings.list_shortcuts(), before,
+			"an unknown id must not grow the registry — inventing an entry from a typo is how a "
+				.. "shortcut appears in the menu bound to nothing")
 	end)
 end)
 

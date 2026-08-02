@@ -275,13 +275,13 @@ Constraints: **paths before moves, moves before content, data before code.**
   separator semantics (re-implemented 3 times), an `emoji` field, `visible_when`
   (~8), and a real top-level section list (the 9 head ids are read by nobody).
 
-  ⚠ **`checked_when` is done on WINDOWS only** — re-measured 2026-08-02, and the
-  entry's "done and shipped used" is half true. macOS has no
-  `resolve_checked_when`; it needs a ~30-line mirror of `resolve_disabled_when`
-  (`macos/infra/manifest_menu.lua:353-381`), keeping the deliberate asymmetry the
-  AHK comment documents — `disabled_when` fails closed, `checked_when` fails
-  open. Linux has no manifest renderer at all. So the "~11 remaining rows are a
-  mechanical repeat" only holds for the driver that already has the reader.
+  ~~`checked_when` is done on WINDOWS only~~ — **macOS ported 2026-08-02.**
+  `ManifestMenu.resolve_checked_when` mirrors `resolve_disabled_when` and keeps
+  the deliberate asymmetry (`disabled_when` fails closed, `checked_when` fails
+  open — both refuse to overstate what is enabled). Its test pins the pair in one
+  case: both resolvers are asked about the same missing id and must disagree.
+  Linux still has no manifest renderer at all, so "the remaining rows are a
+  mechanical repeat" now holds for two drivers of three.
 
   ⚠ **Nothing here can be staged data-first.**
   `test-menu-manifest-keys-have-readers.cjs` forbids landing a manifest field
@@ -464,19 +464,21 @@ Constraints: **paths before moves, moves before content, data before code.**
 
   | Target | Today | After | Mechanism |
   | --- | ---: | ---: | --- |
-  | Convention invariants | 392 | ~0 | **the replacement is already live**: `lint-conventions.js --fail-on-violations`. Deletion, not reimplementation. |
+  | ~~Convention invariants~~ | ~~392~~ | **0** | **done** — `lint-conventions.js --fail-on-violations` |
   | Corpus consumers (16 corpora, 258 vectors) | 7 650 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
   | Port contract vectors (129) | 2 138 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
   | Port presence/compliance | 1 473 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
   | e2e harnesses | 1 374 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
 
-  **Convention row: 374 of the 766 lines are deleted.** The four
-  `test_{file,section}_headers.{lua,ahk}` are gone — the alignment pair could only
-  fail if it could not read a file, and the JS gate subsumes the header pair while
-  scanning strictly more (both drivers plus Linux plus `tests/`). What is left in
-  that row is `test_no_pascal_case_in_toml.{lua,ahk}` (239 l): `checkTomlKeys` has
-  the same intent, but the driver tests carry file-scope exclusions of their own,
-  so confirm the JS gate reaches the same TOML files before deleting them.
+  **Convention row closed 2026-08-02.** The four
+  `test_{file,section}_headers.{lua,ahk}` went first — the alignment pair could
+  only fail if it could not read a file. `test_no_pascal_case_in_toml.{lua,ahk}`
+  (239 l) followed, and the check to run first was the right one: the JS gate did
+  NOT reach the same files. It scanned `_shared/` only, while the driver tests
+  scanned their own trees — between them four effective files, and **Linux had no
+  such gate at all**. Widening the linter to the three driver trees (carrying the
+  `paths.toml` exclusion over rather than inventing it) is what made the deletion
+  a net gain in coverage instead of a loss.
 
   Every other row means writing the replacement first.
 

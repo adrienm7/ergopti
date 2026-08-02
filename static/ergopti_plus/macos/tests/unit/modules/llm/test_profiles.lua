@@ -159,22 +159,43 @@ helpers.describe("Profiles.get_active_profile", function()
 		helpers.assert_eq(p.id, "custom")
 	end)
 
-	helpers.it("pause must block all profile resolve and prompt building (project_suspend_pause_invariant)", function()
-		-- resolve_system_prompt and any usage must be gated by script_control.is_paused.
-		helpers.assert_true(true, "LLM profiles must early-return / no-op when paused (no HTTP, no tooltip)")
+	-- Profiles resolve prompt text from configuration; nothing here decides
+	-- whether a request is made. All three cases below stated that with
+	-- assert_true(true) and a sentence, one of them around a 120-iteration loop
+	-- whose results were discarded.
+	helpers.it("resolves without consulting pause state (project_suspend_pause_invariant)", function()
+		-- A pause check here would mean the profile a resumed session gets depends
+		-- on when it was asked, which is exactly the kind of state a pure resolver
+		-- must not carry.
+		local src = helpers.read_driver_source("function M.resolve_system_prompt")
+		helpers.assert_true(src ~= nil, "modules/llm/profiles.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"profile resolution must stay pure — the gate belongs to the caller that would send")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
-	helpers.it("pause transitions + volume resolve must be stable with no activation", function()
-		-- 120+ resolve calls with pause mid-stream: no prompt building, no backend calls.
-		for i=1,120 do
+	helpers.it("resolution is referentially transparent over 120 calls", function()
+		-- The loop is the point of the original case; what it was missing is
+		-- reading the answers. A resolver that drifted after N calls — a cache
+		-- keyed on the wrong thing, a mutated default — would have passed before.
+		local first = Profiles.get_active_profile("basic", nil)
+		helpers.assert_true(first ~= nil, "the basic profile must resolve")
+		for _ = 1, 120 do
 			local p = Profiles.get_active_profile("basic", nil)
+			helpers.assert_eq(p.id, first.id,
+				"asking 120 times must give the same profile — a resolver that drifts changes what "
+					.. "the model is told mid-session, with nothing in the logs to say so")
 		end
-		helpers.assert_true(true, "high volume profile resolve under pause must not leak or degrade")
 	end)
 
-	helpers.it("legacy profile id migration must be idempotent and not leak PII", function()
-		-- Migration of old ids must be safe, produce no raw keys in logs.
-		helpers.assert_true(true)
+	helpers.it("an unknown profile id resolves to something usable rather than nil", function()
+		-- The old case claimed legacy-id migration was "idempotent and leaks no
+		-- PII" and asserted true. What the caller actually depends on is that an
+		-- id it no longer recognises still yields a profile: the prompt builder
+		-- indexes the result immediately.
+		local p = Profiles.get_active_profile("a_profile_id_from_two_versions_ago", nil)
+		helpers.assert_true(p ~= nil, "an unknown id must fall back to a real profile, not nil")
+		helpers.assert_eq(type(p.id), "string", "and it must carry an id the caller can log")
 	end)
 end)
 
