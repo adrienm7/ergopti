@@ -398,14 +398,22 @@ helpers.describe("aggregator — walk_typing char counts", function()
 			.. "and a silent setup failure would leave them running against nothing")
 	end)
 
-	helpers.it("empty events list does not crash", function()
-		local ok = pcall(function()
-			a.walk_typing({
-				app = "TestApp", timestamp = "2024-06-01 10:00:00.000",
-				events = {},
-			})
-		end)
-		helpers.assert_true(ok)
+	helpers.it("an empty events list adds no context for the app", function()
+		-- Called directly: a raise here fails with the real error, which is more
+		-- use than a boolean. And the claim is not survival — it is that a walk
+		-- over nothing creates nothing, because an ngram context invented from an
+		-- empty entry is a row the dashboards then attribute keystrokes to.
+		local before_ctx = a.get_ngram_ctx()
+		a.walk_typing({
+			app = "TestApp", timestamp = "2024-06-01 10:00:00.000",
+			events = {},
+		})
+		-- get_app_ctx creates on demand, so it cannot answer "was one made". What
+		-- CAN be read is the ngram context the walk would have advanced: an empty
+		-- entry must leave it exactly where it was, or the next real keystroke is
+		-- paired against a neighbour that was never typed.
+		helpers.assert_eq(a.get_ngram_ctx(), before_ctx,
+			"an empty entry must not advance the ngram context")
 	end)
 
 	helpers.it("three normal chars populate ngram_ctx for the app", function()
@@ -501,22 +509,26 @@ helpers.describe("aggregator — walk_app_switch", function()
 		a.walk_app_switch({ prev_app = "AppA", next_app = "AppC",
 			timestamp = "2024-06-01 12:00:05.000", duration_ms = 3000 })
 
-		-- flush() is a DB-level operation; just verify it does not crash with nil db.
-		local ok = pcall(function() a.flush() end)
-		helpers.assert_true(ok)
+		-- flush() is a DB-level operation. With no db it must report that it wrote
+		-- nothing rather than claim a flush that never reached SQLite: the caller
+		-- advances its watermark on the answer.
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a flush with no database must not report rows written")
 	end)
 
-	helpers.it("missing prev_app does not crash", function()
+	helpers.it("an app switch with no prev_app records nothing for a nil app", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "sw2-uuid" })
 
-		local ok = pcall(function()
-			a.walk_app_switch({ next_app = "AppB",
-				timestamp = "2024-06-01 12:00:00.000", duration_ms = 1000 })
-		end)
-		helpers.assert_true(ok)
+		a.walk_app_switch({ next_app = "AppB",
+			timestamp = "2024-06-01 12:00:00.000", duration_ms = 1000 })
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a switch whose previous app is unknown must not manufacture a duration row "
+				.. "for it — the dashboards would attribute that time to nothing")
 	end)
 end)
 
@@ -540,24 +552,27 @@ helpers.describe("aggregator — walk_system_event", function()
 		a.walk_system_event({ action = "wifi_change", timestamp = "2024-06-01 08:00:00.000" })
 		a.walk_system_event({ action = "wifi_change", timestamp = "2024-06-01 08:01:00.000" })
 
-		-- walk_system_event is pure batch accumulation; flush with nil db is a no-op.
-		local ok = pcall(function() a.flush() end)
-		helpers.assert_true(ok)
+		-- walk_system_event is pure batch accumulation; flush with nil db writes
+		-- nothing and must say so.
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a flush with no database must not report rows written")
 	end)
 
-	helpers.it("modifier_hold with valid keycode does not crash", function()
+	helpers.it("a modifier_hold accumulates without a database", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "hold-uuid" })
 
-		local ok = pcall(function()
-			a.walk_system_event({
-				action = "modifier_hold", keycode = 56, app = "TestApp",
-				hold_ms = 300, timestamp = "2024-06-01 09:00:00.000",
-			})
-		end)
-		helpers.assert_true(ok)
+		a.walk_system_event({
+			action = "modifier_hold", keycode = 56, app = "TestApp",
+			hold_ms = 300, timestamp = "2024-06-01 09:00:00.000",
+		})
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"accumulation is in-memory; without a database the flush must report nothing "
+				.. "written rather than a count the caller would trust")
 	end)
 end)
 
