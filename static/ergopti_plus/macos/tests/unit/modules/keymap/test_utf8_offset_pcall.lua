@@ -551,30 +551,39 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 	helpers.it("0xBF in buffer does not propagate an error from update_preview", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8
-		local ok = pcall(bridge.update_preview, BAD_UTF8)
-		helpers.assert_true(ok, "update_preview must not raise on malformed UTF-8")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8)
+		helpers.assert_true(ok,
+			"update_preview must not raise on malformed UTF-8: " .. tostring(err))
+		helpers.assert_eq(state.buffer, BAD_UTF8,
+			"and it must not have rewritten the buffer while failing to read it")
 	end)
 
 	helpers.it("0x80 continuation byte as buffer does not raise", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8_80
-		local ok = pcall(bridge.update_preview, BAD_UTF8_80)
-		helpers.assert_true(ok, "update_preview must not raise on 0x80")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8_80)
+		helpers.assert_true(ok, "update_preview must not raise on 0x80: " .. tostring(err))
+		helpers.assert_eq(state.buffer, BAD_UTF8_80, "and must leave the buffer alone")
 	end)
 
 	helpers.it("truncated 2-byte lead byte as buffer does not raise", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8_TRUNCATED
-		local ok = pcall(bridge.update_preview, BAD_UTF8_TRUNCATED)
-		helpers.assert_true(ok, "update_preview must not raise on truncated lead byte")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8_TRUNCATED)
+		helpers.assert_true(ok,
+			"update_preview must not raise on truncated lead byte: " .. tostring(err))
+		helpers.assert_eq(state.buffer, BAD_UTF8_TRUNCATED, "and must leave the buffer alone")
 	end)
 
 	helpers.it("bad UTF-8 appended after valid text does not raise", function()
 		local bridge, state = build_llm_bridge()
 		local buf = "bonjour" .. BAD_UTF8
 		state.buffer = buf
-		local ok = pcall(bridge.update_preview, buf)
-		helpers.assert_true(ok, "update_preview must not raise on valid + bad UTF-8")
+		local ok, err = pcall(bridge.update_preview, buf)
+		helpers.assert_true(ok,
+			"update_preview must not raise on valid + bad UTF-8: " .. tostring(err))
+		helpers.assert_eq(state.buffer, buf,
+			"and the valid prefix must not be truncated by the failed read")
 	end)
 
 	helpers.it("valid UTF-8 buffer still runs without error (no regression on happy path)", function()

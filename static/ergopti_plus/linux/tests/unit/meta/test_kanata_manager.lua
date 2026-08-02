@@ -192,24 +192,31 @@ helpers.describe("kanata manager", function()
     end)
 
     helpers.it("start does not crash when kanata binary is absent", function()
-      local ok = pcall(function() km.start() end)
-      helpers.assert_true(ok, "start does not crash")
+      -- With no kanata binary the start must REPORT failure: the caller shows the
+      -- user a "remapping unavailable" state on that answer, and a silent success
+      -- leaves them believing the keyboard is remapped when it is not.
+      local started = km.start()
+      helpers.assert_true(started == nil or started == false,
+        "start() with no kanata binary must not report success")
     end)
 
     helpers.it("stop does not crash when not running", function()
-      local ok = pcall(function() km.stop() end)
-      helpers.assert_true(ok, "stop when not running is safe")
+      km.stop()
+      helpers.assert_true(km.is_running() == nil or km.is_running() == false,
+        "a stop that never started must leave the manager stopped, not confused")
     end)
 
     helpers.it("double stop is safe", function()
       km.stop()
-      local ok = pcall(function() km.stop() end)
-      helpers.assert_true(ok, "double stop does not crash")
+      km.stop()
+      helpers.assert_true(km.is_running() == nil or km.is_running() == false,
+        "a second stop must be a no-op, not a resurrection")
     end)
 
     helpers.it("restart does not crash (will fail gracefully without kanata)", function()
-      local ok = pcall(function() km.restart() end)
-      helpers.assert_true(ok, "restart does not crash")
+      local restarted = km.restart()
+      helpers.assert_true(restarted == nil or restarted == false,
+        "restart with no kanata binary must fail gracefully AND say so")
     end)
   end)
 

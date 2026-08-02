@@ -254,8 +254,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		local _sys, clock, close_all, captured = activate_with_watcher()
 		local before = close_all.count
 		clock.now = clock.now + 0.1   -- inside the grace window
-		local ok = pcall(captured.cb, fake_activity_event())
-		helpers.assert_true(ok, "watcher callback must not error within the grace window")
+		captured.cb(fake_activity_event())
 		helpers.assert_eq(close_all.count, before, "input within the grace window must not auto-deactivate")
 	end)
 
@@ -298,13 +297,11 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		clock.now = clock.now + 100   -- past the activation grace window
 
 		local before = close_all.count
-		local ok1 = pcall(captured.cb, fake_key_event(F18))
-		helpers.assert_true(ok1, "watcher must not error on the synthetic wake key")
+		captured.cb(fake_key_event(F18))
 		helpers.assert_eq(close_all.count, before, "the F18 jiggle key must NOT auto-deactivate keep-awake")
 
 		-- A genuine, unmodified keypress (keycode 0 = 'a') means the user is back.
-		local ok2 = pcall(captured.cb, fake_key_event(0))
-		helpers.assert_true(ok2, "watcher must not error on a real key")
+		captured.cb(fake_key_event(0))
 		helpers.assert_true(close_all.count > before, "a real keypress must auto-deactivate keep-awake")
 	end)
 end)
@@ -586,8 +583,9 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 		}
 		helpers.assert_true(spy.captured_cb ~= nil, "eventtap must have been registered")
 		-- The callback must not raise even when id() returns nil
-		local ok = pcall(spy.captured_cb, fake_event)
-		helpers.assert_true(ok, "eventtap callback must not raise when window id is nil")
+		-- Called directly: the regression is a raise, so a raise must fail this case
+		-- with its own error rather than with a boolean.
+		spy.captured_cb(fake_event)
 
 		-- Run any deferred work that was scheduled
 		for _, call in ipairs(spy.do_after_calls) do
