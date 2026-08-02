@@ -119,10 +119,19 @@ helpers.describe("hotstrings_config", function()
       helpers.assert_true(ok, "toggle_group does not crash")
     end)
 
-    helpers.it("disable/enable cycle does not crash", function()
+    helpers.it("a disable/enable cycle ends where it started", function()
+      -- "cycle OK" asserted with true. The point of a cycle is that it returns
+      -- the state it found: a disable that persisted past the enable leaves a
+      -- group silently off, which the user reads as expansions that stopped
+      -- working for no reason.
+      local before = config.is_group_enabled("cycle_test")
       config.disable_group("cycle_test")
+      helpers.assert_eq(config.is_group_enabled("cycle_test"), false,
+        "disable must actually disable, or the cycle below proves nothing")
       config.enable_group("cycle_test")
-      helpers.assert_true(true, "cycle OK")
+      helpers.assert_eq(config.is_group_enabled("cycle_test"), true,
+        "and enable must undo it")
+      if not before then config.disable_group("cycle_test") end
     end)
 
     helpers.it("disable_group with nil does not crash", function()

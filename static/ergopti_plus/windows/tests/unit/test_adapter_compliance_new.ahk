@@ -412,10 +412,16 @@ _SR_Spawn_ReturnsHandle() {
 Test("ShellRunner_Spawn: returns handle with start() and terminate()", _SR_Spawn_ReturnsHandle)
 
 _SR_Spawn_TerminateBeforeStart_NoCrash() {
-	; terminate() called before start() must not crash (idempotent).
+	; terminate() called before start() must not crash (idempotent) — and must
+	; leave the handle usable. AssertTrue(1) was the whole assertion, so a
+	; terminate() that nulled the handle's own methods on the way out would have
+	; passed here and failed at the caller, which is a spawn that never starts.
 	local h := ShellRunner_Spawn("cmd.exe", ["/c", "echo test"])
 	h.terminate()
-	AssertTrue(1, "terminate() before start() must not throw")
+	AssertTrue(HasMethod(h, "start"), "terminate() before start() must leave start() callable")
+	AssertTrue(HasMethod(h, "terminate"), "and terminate() itself callable, so it is idempotent")
+	h.terminate()
+	AssertTrue(HasMethod(h, "start"), "a second terminate() must not damage the handle either")
 }
 Test("ShellRunner_Spawn: terminate() before start() is safe", _SR_Spawn_TerminateBeforeStart_NoCrash)
 

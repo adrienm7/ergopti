@@ -230,12 +230,17 @@ helpers.describe("streaming_handler: on_fail() cancels the stream watchdog", fun
 	end)
 
 
-	helpers.it("stop_watchdog() is a no-op and does not crash when called repeatedly", function()
+	helpers.it("stop_watchdog() is idempotent and cancels nothing the second time", function()
 		hs_stub.__reset()
-		-- Drain any leftover watchdog from previous tests, then call again to exercise the nil path
+		-- "Does not crash" was the whole assertion. What the second call must not
+		-- do is cancel a timer it does not own: this module is reused across
+		-- requests, and a stop that reached into the next request's watchdog would
+		-- leave a stream running with nothing left to time it out.
 		Handler.stop_watchdog()
+		local after_first = #hs_stub.timer.__timers
 		Handler.stop_watchdog()
-		helpers.assert_true(true, "stop_watchdog must not raise on repeated calls or when watchdog is nil")
+		helpers.assert_eq(#hs_stub.timer.__timers, after_first,
+			"a second stop must touch no timer — there is none left that belongs to it")
 	end)
 
 

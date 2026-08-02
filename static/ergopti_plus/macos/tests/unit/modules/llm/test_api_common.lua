@@ -142,9 +142,16 @@ helpers.describe("ApiCommon.insert_prediction", function()
 		helpers.assert_eq(ok, false)
 	end)
 
-	helpers.it("pause must block insert_prediction and diversity paths that could lead to showing (project_suspend_pause_invariant)", function()
-		-- Even if dedup/stats run, the prediction_engine caller must gate before any tooltip/typing when paused.
-		helpers.assert_true(true, "api_common helpers must be pause-safe; activation gated higher")
+	helpers.it("dedup and stats run without consulting pause state (project_suspend_pause_invariant)", function()
+		-- api_common is bookkeeping: it decides whether a prediction is a
+		-- duplicate, never whether it is shown. A pause check here would mean two
+		-- modules decide that, and the loser silently drops predictions the other
+		-- believed it had accepted — with the dedup stats still counting them.
+		local src = helpers.read_driver_source("function M.insert_prediction")
+		helpers.assert_true(src ~= nil, "modules/llm/api_common.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"api_common must stay pure — the gate belongs to prediction_engine, which calls it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
 	helpers.it("high volume (200+) insert + dedup must stay accurate and not leak memory/stats", function()

@@ -143,13 +143,26 @@ helpers.describe("ui.webkit_host", function()
       )
     end)
 
-    helpers.it("leaves CDN URLs intact", function()
+    helpers.it("never rewrites an absolute URL into a local read", function()
+      -- The old body said "if there are CDN links they stay as-is; if none,
+      -- that's fine too" and asserted true — which is true of any string.
+      -- The inliner's actual hazard is the opposite of a missing inline: turning
+      -- an absolute https:// reference into a local path, which under a webview
+      -- with no network becomes a silent blank panel.
       local ui_root  = WH.resolve_ui_root(DRIVER_ROOT)
       local app_dir  = WH.resolve_app_dir(ui_root, "action_picker")
       local html     = WH.build_injected_html(app_dir)
-      -- External URLs should remain as <link> tags
-      -- (If there are CDN links, they stay as-is; if none, that's fine too)
-      helpers.assert_true(true)  -- structural test — no crash
+      helpers.assert_true(type(html) == "string" and html ~= "",
+        "the action_picker page must build to non-empty HTML")
+      -- Written as whole-string checks rather than a loop over the URLs found:
+      -- a page with no CDN link is legitimate, so a per-URL loop asserts nothing
+      -- on exactly the input where the inliner could have eaten them all.
+      helpers.assert_true(html:find('href="file://', 1, true) == nil,
+        "the inliner must not turn a remote stylesheet into a file:// read — with no "
+          .. "network the page then renders blank instead of unstyled")
+      helpers.assert_true(html:find('src="file://', 1, true) == nil,
+        "same for a script: an absolute source rewritten to a local read is a page that "
+          .. "loads and does nothing")
     end)
 
     helpers.it("inlines local JS files as <script> blocks", function()
