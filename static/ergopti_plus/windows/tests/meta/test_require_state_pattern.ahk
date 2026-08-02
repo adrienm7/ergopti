@@ -67,7 +67,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
 	"modules/keylogger/keylogger_hook.ahk", true,
-	"infra/tap_hold/tap_hold_loader.ahk", true,
+	"platform/remap/tap_hold_loader.ahk", true,
 	"modules/keymap/llm_bridge.ahk", true,
 	"ui/tray_menu.ahk", true,
 	"modules/gestures/actions.ahk", true,
@@ -122,7 +122,7 @@ _MetaRunRequireStateTestsV2() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "adapters", "ui"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

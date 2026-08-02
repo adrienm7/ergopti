@@ -139,7 +139,7 @@ global Features := Map(
         "a_grave",  Map("enabled", true, "letter", "v"),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
         ; A later refactor migrated the individual reads in modules/shortcuts.ahk
-        ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock); phase 10
+        ; (AltGrLAlt) and platform/remap.ahk (LAltCapsLock); phase 10
         ; added AltGrCapsLock when the dispatcher was inlined.
         "alt_gr_caps_lock", Map(
             "backspace",      false,
@@ -464,7 +464,7 @@ UpdateCapsLockLED() {
 }
 
 ; Toggle helpers consulted by tap-hold and shortcut dispatchers.
-; Real implementations live in modules/tap_holds.ahk (not included by tests).
+; Real implementations live in platform/remap.ahk (not included by tests).
 ToggleCapsLock() {
     global _Stub_SentText
     _Stub_SentText.Push({ kind: "toggle_capslock" })

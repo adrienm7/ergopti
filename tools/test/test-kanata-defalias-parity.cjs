@@ -36,7 +36,7 @@ let fail = 0;
 
 const TOML_PATH = path.join(ROOT, '_shared/tap_hold/defaults.toml');
 const TIMINGS_PATH = path.join(ROOT, '_shared/modules/timings/constants.toml');
-const KANATA_PATH = path.join(ROOT, 'linux/modules/kanata/data/kanata.kbd');
+const KANATA_PATH = path.join(ROOT, 'linux/platform/remap/data/kanata.kbd');
 const GOLDEN_PATH = path.join(ROOT, '_shared/tap_hold/golden_kanata_defalias.kbd');
 
 // Minimal TOML section parser — extracts [tap_hold.keys.<name>] blocks
@@ -290,7 +290,7 @@ function danglingAliases(src) {
 }
 
 /**
- * Reproduces modules/kanata/manager.lua's merge: the LAST `(defalias)` block of
+ * Reproduces platform/remap/manager.lua's merge: the LAST `(defalias)` block of
  * the template is replaced wholesale by the generated one. The golden corpus is
  * pinned byte-for-byte to the generator's output by the Lua suite
  * (linux/tests/unit/meta/test_kanata_generator.lua), so substituting it here

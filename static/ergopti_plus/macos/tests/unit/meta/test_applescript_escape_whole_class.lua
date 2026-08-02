@@ -32,7 +32,7 @@
 local helpers = require("tests.helpers")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
-local SCANNED_DIRS = { "modules", "infra", "adapters", "ui" }
+local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui" }
 
 -- A file joins the corpus when it runs AppleScript at all — through
 -- hs.osascript, through the /usr/bin/osascript binary, or through the

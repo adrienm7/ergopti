@@ -65,7 +65,7 @@ constructs from `tests/helpers`.
 
 ## Updating snapshot fixtures
 
-Snapshot tests under `tests/unit/modules/karabiner/` compare generated output
+Snapshot tests under `tests/unit/platform/remap/` compare generated output
 against committed `.expected.json` files in `tests/fixtures/karabiner_configs/`.
 To regenerate after an intentional change:
 

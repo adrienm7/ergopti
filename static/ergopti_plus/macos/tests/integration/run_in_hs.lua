@@ -12,7 +12,7 @@ local TARGETS = {
 	"infra.text_utils", "infra.toml.reader", "infra.logger",
 	"infra.keycodes", "modules.keymap.layout", "infra.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
-	"modules.karabiner.defaults", "modules.karabiner.config",
+	"platform.remap.defaults", "platform.remap.config",
 	"modules.llm.backend_detector", "modules.llm.parser",
 }
 

@@ -60,7 +60,7 @@ M.F15_KARABINER_ESCAPE = 113
 M.F16_LLM_CHAIN_SIGNAL = 106
 
 --- F17 (keycode 64) — Karabiner-emitted "cycle windows in app" hotkey.
---- Bound by modules/karabiner/watchers.lua so the shortcut is layout-independent.
+--- Bound by platform/remap/watchers.lua so the shortcut is layout-independent.
 M.F17_CYCLE_WINDOWS = 64
 
 --- F18 (keycode 79) — currently used by modules/shortcuts/actions/system.lua as

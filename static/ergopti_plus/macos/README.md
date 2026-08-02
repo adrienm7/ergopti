@@ -10,7 +10,7 @@ The macOS implementation of ErgoptiPlus.
 >
 > Name collision to know first: `modules/keymap/` is the **hotstring expansion
 > engine** here, while on Windows the same path is the **physical layout remap**.
-> The layout remap lives in `modules/karabiner/` plus
+> The layout remap lives in `platform/remap/` plus
 > `modules/keymap/{layout_install,input_sources}.lua`.
 
 ## Entry point

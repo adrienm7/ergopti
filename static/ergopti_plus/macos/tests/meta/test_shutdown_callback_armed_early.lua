@@ -104,7 +104,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- Anchored on the DECLARATION of each name, not on the whole
 		-- `local x = require(...)` line. karabiner is now forward-declared and
 		-- assigned later, because the shutdown callback had to move above the
-		-- requires that can raise: modules/karabiner/defaults.lua calls error()
+		-- requires that can raise: platform/remap/defaults.lua calls error()
 		-- by design when the shared tap-hold TOML is unreadable, and arming the
 		-- teardown after that meant the one failure which leaves the keyboard
 		-- remapped was also the one that prevented the teardown existing.

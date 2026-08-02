@@ -112,7 +112,7 @@ global _ob_s1_debounce_ms := 120   ; delay after last ItemSelect before re-rende
 global _OB_ALTGR_PASSTHROUGH := false
 
 ; Public check used by other modules' #HotIf criteria to neutralise any
-; AltGr-capturing hotkey (e.g. the RAlt tap-hold in modules/tap_holds.ahk)
+; AltGr-capturing hotkey (e.g. the RAlt tap-hold in platform/remap.ahk)
 ; while the wizard is on screen. Standalone hotkeys disappear cleanly when
 ; their #HotIf returns false, restoring the OS-native AltGr typing path.
 IsOnboardingActive() {

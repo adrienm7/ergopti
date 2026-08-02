@@ -12,10 +12,10 @@
 #   - Windows  lib/tap_hold/tap_hold_loader.ahk parses [tap_hold.*] here FIRST,
 #              then merges the user file on top PER KEY. A key the user has not
 #              overridden inherits the value below.
-#   - Linux    modules/kanata/manager.lua reads [tap_hold.*], but a user
+#   - Linux    platform/remap/manager.lua reads [tap_hold.*], but a user
 #              tap_hold.toml, when present, REPLACES these defaults wholesale —
 #              no per-key merge, so an edit here reaches only users without one.
-#   - macOS    modules/karabiner/defaults.lua reads [hs_timeouts], [hs_tap_hold]
+#   - macOS    platform/remap/defaults.lua reads [hs_timeouts], [hs_tap_hold]
 #              and [hs_combos] in its module body at require time. There is no
 #              user file for those sections, so an edit here always applies.
 #
@@ -27,8 +27,8 @@
 # NOT a change to the other.
 #
 # Consumers of the generated per-driver file:
-#   - AHK : ``modules/tap_holds.ahk`` arms the corresponding hotkeys.
-#   - HS  : ``modules/karabiner/generator.lua`` produces the Karabiner JSON.
+#   - AHK : ``platform/remap.ahk`` arms the corresponding hotkeys.
+#   - HS  : ``platform/remap/generator.lua`` produces the Karabiner JSON.
 
 
 
@@ -191,7 +191,7 @@ delete = "delete_word_forward"
 # =================================================
 # =================================================
 
-# Read by macos/modules/karabiner/defaults.lua via lib.toml_reader. These keep
+# Read by macos/platform/remap/defaults.lua via lib.toml_reader. These keep
 # the macOS-specific paradigm (Karabiner key codes, the N*N modifier-combo
 # matrix, a single global tap/hold timeout) that has no AutoHotkey analog, so
 # they live in their own [hs_*] sections rather than the AHK [tap_hold.*] ones
@@ -199,13 +199,13 @@ delete = "delete_word_forward"
 # reader ignores the dotted [tap_hold.*] headers — each driver reads only its
 # own sections from this single shared file.
 #
-# Values mirror the former modules/karabiner/defaults.lua exactly (generated and
+# Values mirror the former platform/remap/defaults.lua exactly (generated and
 # byte-verified against it). "Reset to defaults" on macOS restores these.
 
 # Slot encodings:
 #   [hs_tap_hold]  key = { tap = <action_id>, hold = <action_id> }
 #   [hs_combos]    id  = { combo = <action_id>, tap = <action_id>, hold = <action_id> }
-# Action ids reference macos/modules/karabiner/data/actions.json.
+# Action ids reference macos/platform/remap/data/actions.json.
 
 [hs_timeouts]
 # Global tap-vs-hold threshold (KE basic.to_if_alone_timeout_milliseconds).

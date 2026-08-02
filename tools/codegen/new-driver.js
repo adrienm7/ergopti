@@ -56,7 +56,7 @@ const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'domain');
 
 /** Sub-directories every driver is expected to contain (canonical mirror layout:
  *  see the driver READMEs and docs/PROJECT_MEMORY.md). */
-const DRIVER_SUBDIRS = ['adapters', 'infra', 'modules', 'ui', 'data', '_generated', 'tests'];
+const DRIVER_SUBDIRS = ['adapters', 'infra', 'modules', 'platform', 'ui', 'data', '_generated', 'tests'];
 
 /** Supported target languages. */
 const SUPPORTED_LANGS = ['lua', 'ahk'];

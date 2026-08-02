@@ -93,7 +93,7 @@ Plain `lua5.1` is not viable at all: `goto` (`input_reader.lua:281`, `device_fin
 
 ## kanata: generated config, CI-guarded timeouts, uncoordinated device pick
 
-kanata is the separate daemon doing tap-hold and the Ergo-QWERTY remap; the Lua daemon does hotstrings on top. `modules/kanata/manager.lua` generates the `defalias` block from `_shared/tap_hold/defaults.toml` via the shared `kanata_generator`, merges it into the static `kanata.kbd` template, and writes `~/.config/kanata/ergopti.kbd`.
+kanata is the separate daemon doing tap-hold and the Ergo-QWERTY remap; the Lua daemon does hotstrings on top. `platform/remap/manager.lua` generates the `defalias` block from `_shared/tap_hold/defaults.toml` via the shared `kanata_generator`, merges it into the static `kanata.kbd` template, and writes `~/.config/kanata/ergopti.kbd`.
 
 **Never hand-edit the `defalias` block.** `npm run test:kanata-defalias-parity` (`tools/test/test-kanata-defalias-parity.cjs`) asserts every `tap-hold-press` timeout equals `round(defaults.toml time_activation_seconds * 1000)`, that the one-shot ms matches `_shared/modules/timings/constants.toml`, and that `_shared/tap_hold/golden_kanata_defalias.kbd` matches the committed `kanata.kbd`. Change a timeout in the TOML and regenerate; the gate catches drift in either direction.
 

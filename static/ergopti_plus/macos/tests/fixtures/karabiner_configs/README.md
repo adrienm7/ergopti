@@ -1,7 +1,7 @@
 # Karabiner Generator Snapshot Fixtures
 
 This directory holds **recorded snapshots** of the JSON output produced by
-`modules.karabiner.generator.build_karabiner_json` for known input states.
+`platform.remap.generator.build_karabiner_json` for known input states.
 They exist so that any change to the generator's deterministic shaping logic
 can be diff-tested against a known-good baseline without spinning up a real
 macOS host with Karabiner-Elements installed.
@@ -16,20 +16,20 @@ mod_combos JSON files actually resolve). The recipe:
 2. Bring the karabiner module to a known state (e.g. defaults).
 3. Run something like:
 
-   local kb = require("modules.karabiner")
-   local gen = require("modules.karabiner.generator")
+   local kb = require("platform.remap")
+   local gen = require("platform.remap.generator")
    local out = gen.build_karabiner_json(
    kb.get_state(),
    kb.get_actions(),
    kb.get_tap_hold_keys(),
    kb.get_mod_combos(),
    kb.get_non_canonical(),
-   hs.configdir .. "/modules/karabiner/"
+   hs.configdir .. "/platform/remap/"
    )
    hs.json.write(out, hs.configdir .. "/tests/fixtures/karabiner_configs/defaults.json", true)
 
 4. Commit the resulting JSON file alongside this README.
-5. Add a corresponding `tests/unit/modules/karabiner/test_generator_snapshot.lua`
+5. Add a corresponding `tests/unit/platform/remap/test_generator_snapshot.lua`
    that loads the fixture and compares it against a fresh generator run.
 
 ## Why no fixture is committed yet
@@ -41,4 +41,4 @@ layout-stable schema (e.g. by always invoking the generator with a fixed
 synthetic `hs.keycodes.map`), the snapshot file is omitted on purpose.
 
 A surface-level smoke test that asserts the public functions exist lives at
-`tests/unit/modules/karabiner/test_generator_surface.lua`.
+`tests/unit/platform/remap/test_generator_surface.lua`.

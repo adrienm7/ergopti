@@ -9,7 +9,7 @@
 --- with ZERO teardown on the next quit.
 ---
 --- It was still armed AFTER the config-dependent requires, and one of those can
---- raise by design — modules/karabiner/defaults.lua calls error() when the
+--- raise by design — platform/remap/defaults.lua calls error() when the
 --- shared tap-hold TOML is unreadable or missing a key, which is the intended
 --- fail-fast behaviour. So the one module whose teardown matters most was also
 --- the one whose failure to load prevented that teardown from existing.
@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("boot: the shutdown teardown is armed before the risky requires", function()
 
-	helpers.it("hs.shutdownCallback is assigned before modules.karabiner is required", function()
+	helpers.it("hs.shutdownCallback is assigned before platform.remap is required", function()
 		local src = helpers.read_driver_source("hs.shutdownCallback")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"init.lua must be readable or this asserts nothing")
@@ -31,15 +31,15 @@ helpers.describe("boot: the shutdown teardown is armed before the risky requires
 		local armed = src:find("hs.shutdownCallback = function", 1, true)
 
 		-- Matched on the MODULE NAME, not on a call spelling. That require is now
-		-- `pcall(require, "modules.karabiner")` — the chain below it reaches a
-		-- top-level error() — and pinning `require("modules.karabiner")` would reject
+		-- `pcall(require, "platform.remap")` — the chain below it reaches a
+		-- top-level error() — and pinning `require("platform.remap")` would reject
 		-- the guarded form, i.e. reject a change that makes this invariant matter
 		-- less rather than more. The ordering it asserts is unaffected either way.
-		local require_kb = src:find('"modules.karabiner"', 1, true)
+		local require_kb = src:find('"platform.remap"', 1, true)
 		helpers.assert_not_nil(armed, "the shutdown callback must be armed")
-		helpers.assert_not_nil(require_kb, "modules.karabiner must be required")
+		helpers.assert_not_nil(require_kb, "platform.remap must be required")
 		helpers.assert_true(armed < require_kb,
-			"modules/karabiner/defaults.lua raises at require time when the shared tap-hold "
+			"platform/remap/defaults.lua raises at require time when the shared tap-hold "
 			.. "TOML is missing a key — by design. Arming the teardown after that require "
 			.. "means the one failure that leaves the keyboard remapped is also the one that "
 			.. "prevents the teardown from ever being installed")

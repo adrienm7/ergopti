@@ -13,7 +13,7 @@
 --- Fix: both methods now return a cached boolean immediately (never blocking)
 --- and kick off an async refresh through adapters.shell_runner.spawn() (the
 --- same hs.task-based async pattern used throughout modules/llm/api_*.lua and
---- modules/karabiner/watchers.lua's read_layout_async()).
+--- platform/remap/watchers.lua's read_layout_async()).
 ---
 --- Two angles, matching the style of tests/unit/adapters/test_shell_runner_on_done_visible.lua:
 ---   1. Source check: neither method calls hs.execute directly anymore.

@@ -31,7 +31,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	_Stub_SpotlightCalls.Push({ x: X, y: Y, duration: DurationMs })
 }
 
-; OneShotShiftFix is in modules/tap_holds/one_shot_shift.ahk (not included).
+; OneShotShiftFix is in platform/remap/one_shot_shift.ahk (not included).
 ; The AltGr dispatcher calls it before some Send* actions to cancel a
 ; pending one-shot-shift state; the stub is a no-op.
 global _Stub_OneShotShiftFixCalls := 0

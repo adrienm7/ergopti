@@ -309,8 +309,8 @@ KANATA_CONFIG_DIR="${HOME}/.config/kanata"
 KANATA_SRC=""
 for _kanata_candidate in \
 	"${SCRIPT_DIR}/kanata.kbd" \
-	"${SCRIPT_DIR}/modules/kanata/data/kanata.kbd" \
-	"${SCRIPT_DIR}/linux/modules/kanata/data/kanata.kbd"
+	"${SCRIPT_DIR}/platform/remap/data/kanata.kbd" \
+	"${SCRIPT_DIR}/linux/platform/remap/data/kanata.kbd"
 do
 	if [ -f "${_kanata_candidate}" ]; then
 		KANATA_SRC="${_kanata_candidate}"

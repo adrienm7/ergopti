@@ -41,7 +41,7 @@ end
 
 helpers.describe("meta: logger pairing", function()
 	local imbalanced = 0
-	for _, sub in ipairs({ "infra", "modules", "ui" }) do
+	for _, sub in ipairs({ "infra", "modules", "platform", "ui" }) do
 		for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. sub)) do
 			local fh = io.open(abs, "r") ; if fh then
 				local body = fh:read("*a") ; fh:close()

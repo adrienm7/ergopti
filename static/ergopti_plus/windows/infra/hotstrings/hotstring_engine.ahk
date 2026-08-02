@@ -84,7 +84,7 @@ global _SendHook := 0
 ; Caching the resolved bool at boot lets the hot path skip a Map lookup and
 ; a truthy test on every hotstring firing.
 ; The `global _ALTGR_KANA_FIXUP := False` initializer deliberately does NOT live
-; here: a parse-time #HotIf (modules/tap_holds/altgr.ahk) reads it in FIRST
+; here: a parse-time #HotIf (platform/remap/altgr.ahk) reads it in FIRST
 ; position, and this file's include position is far below the first message pump,
 ; so the global would still be unset when that #HotIf is evaluated. It is seeded in
 ; the pre-pump block of ErgoptiPlus.ahk instead (single source, §5.2);

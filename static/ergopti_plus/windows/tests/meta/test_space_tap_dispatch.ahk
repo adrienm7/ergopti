@@ -6,7 +6,7 @@ _ST_AssertSpaceTapAtomic() {
 	; Move-resilient: locate _SpaceTap() across the whole driver source via the
 	; framework helper instead of a pinned modules path
 	Body := _DriverFuncBody("_SpaceTap")
-	Assert(Body != "", "_SpaceTap must exist in modules/tap_holds/space.ahk")
+	Assert(Body != "", "_SpaceTap must exist in platform/remap/space.ahk")
 	
 	CritOnIdx := InStr(Body, 'Critical("On")')
 	if !CritOnIdx

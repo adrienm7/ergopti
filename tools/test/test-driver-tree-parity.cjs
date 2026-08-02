@@ -24,7 +24,7 @@
  *
  * The metric is the share of DISTINCT directory paths that exist in all three
  * drivers. A path present in one driver only counts against it, which is the
- * point: `windows/modules/updater/` and `macos/modules/karabiner/` are both real
+ * point: `windows/modules/updater/` and `macos/platform/remap/` are both real
  * work that has no counterpart, and the number should say so.
  *
  * WHY IT IS NOT A LINE COUNT:

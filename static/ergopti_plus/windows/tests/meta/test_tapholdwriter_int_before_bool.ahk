@@ -4,7 +4,7 @@
 ; MODULE: TapHoldWriter Integer/Float Before Boolean Guard
 ; DESCRIPTION:
 ; Static source guard for the _TH_TomlFormatLine Integer/Float type-check
-; ordering fix in infra/tap_hold/tap_hold_writer.ahk.
+; ordering fix in platform/remap/tap_hold_writer.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; In AHK v2, integer 0 satisfies (Value == false) because AHK uses truthiness
@@ -43,11 +43,11 @@ _TTIB_StripLineComments(Src) {
 ; ===========================================================================
 
 _TTIB_IntBeforeBool() {
-	Src := _TTIB_StripLineComments(_TTIB_ReadSource("infra/tap_hold/tap_hold_writer.ahk"))
-	Assert(Src != "", "infra/tap_hold/tap_hold_writer.ahk must be readable")
+	Src := _TTIB_StripLineComments(_TTIB_ReadSource("platform/remap/tap_hold_writer.ahk"))
+	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_TomlFormatLine")
-	Assert(Body != "", "_TH_TomlFormatLine must be defined in infra/tap_hold/tap_hold_writer.ahk")
+	Assert(Body != "", "_TH_TomlFormatLine must be defined in platform/remap/tap_hold_writer.ahk")
 
 	; Both checks must be present
 	IntPos  := InStr(Body, "Type(Value) == " . Chr(0x22) . "Integer" . Chr(0x22))

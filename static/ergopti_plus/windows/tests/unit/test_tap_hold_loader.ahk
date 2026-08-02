@@ -258,7 +258,7 @@ Test("TapHoldDuration: falls back when time_activation_seconds absent", TestTapH
 ;
 ; This asserted AssertTrue(true) under the message "tap_hold must respect full
 ; pause silence" — the invariant named, and nothing checking it. The guard is
-; real and lives in modules/tap_holds/constants.ahk, so the test now pins the
+; real and lives in platform/remap/constants.ahk, so the test now pins the
 ; four dispatch entry points that must consult A_IsSuspended.
 ;
 ; Every one of them can emit a keystroke. A tap-hold that fires while the user

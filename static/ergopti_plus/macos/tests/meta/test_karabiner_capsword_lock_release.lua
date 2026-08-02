@@ -4,7 +4,7 @@
 --- MODULE: Karabiner CapsWord Lock Release Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "karabiner-capsword-lock-leak" audit finding in
---- modules/karabiner/watchers.lua.
+--- platform/remap/watchers.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The `deactivate_capsword` function set `_capsword_check_pending = true` and

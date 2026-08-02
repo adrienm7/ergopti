@@ -38,8 +38,8 @@ const FIX = process.argv.includes('--fix');
 
 // Source trees to validate, and the file extensions that carry a path header.
 const TREES = [
-	'windows/infra', 'windows/modules', 'windows/ui', 'windows/adapters',
-	'macos/infra', 'macos/modules', 'macos/ui', 'macos/adapters',
+	'windows/infra', 'windows/modules', 'windows/platform', 'windows/ui', 'windows/adapters',
+	'macos/infra', 'macos/modules', 'macos/platform', 'macos/ui', 'macos/adapters',
 	'linux/modules', 'linux/adapters', 'linux/infra', 'linux/bin', 'linux/ui',
 	// _shared/core (the port specs) and _shared/modules were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)

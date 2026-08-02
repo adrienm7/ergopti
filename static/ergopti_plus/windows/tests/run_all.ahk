@@ -114,7 +114,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/toml/toml_loader.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
-#Include ../infra/tap_hold/tap_hold_loader.ahk
+#Include ../platform/remap/tap_hold_loader.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
@@ -416,7 +416,7 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 ; globals + TapHoldsLoadTimings() and has NO top-level hotkeys, so it is safe to
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
-#Include ../modules/tap_holds/constants.ahk
+#Include ../platform/remap/constants.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_timings_config.ahk
 _LogBootProgress("keylogger modules + tests included")

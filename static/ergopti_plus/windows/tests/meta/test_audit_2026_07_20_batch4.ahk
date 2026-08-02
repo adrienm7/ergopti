@@ -135,7 +135,7 @@ Test("keylogger-webview: the dashboard is served from a virtual host (F-24)",
 
 _A0720B4_TapHoldDurationIsValidated() {
 	Body := _DriverFuncBody("TapHoldDuration")
-	Assert(Body != "", "TapHoldDuration must exist in infra/tap_hold/tap_hold_loader.ahk")
+	Assert(Body != "", "TapHoldDuration must exist in platform/remap/tap_hold_loader.ahk")
 	Assert(InStr(Body, "IsNumber(") > 0,
 		"TapHoldDuration must type-check the TOML value: it is concatenated into a KeyWait option string, so a non-numeric entry produces an invalid timeout and KeyWait THROWS on the hook thread with a synthetic modifier already armed")
 	Assert(InStr(Body, "TAPHOLD_MAX_ACTIVATION_SECONDS") > 0,

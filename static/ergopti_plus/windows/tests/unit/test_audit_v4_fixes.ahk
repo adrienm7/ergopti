@@ -49,7 +49,7 @@ Test("Audit-v4: KL_Net_Start stagger not overwritten by immediate repeating SetT
 ; ===================================================================
 
 TestAuditV4_MaxHotkeysNotInHotkey() {
-	Src := _AuditV4_ReadSrc("modules\tap_holds\nav_layer.ahk")
+	Src := _AuditV4_ReadSrc("platform\remap\nav_layer.ahk")
 
 	; The bug: assignment inside *WheelUp:: and *WheelDown:: hotkey bodies — only
 	; takes effect after the first wheel event, too late to suppress the warning.

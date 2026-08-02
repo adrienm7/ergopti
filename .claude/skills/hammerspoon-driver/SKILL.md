@@ -61,7 +61,7 @@ end, args)
 
 Both halves matter. Without the split you get `nil`; without `if task then` you
 get `table index is nil` thrown *inside* an async callback, where it is
-invisible (next section). `modules/karabiner/watchers.lua:148-149` is the
+invisible (next section). `platform/remap/watchers.lua:148-149` is the
 reference shape.
 
 This has bitten three times and one 2026-06-20 pass fixed **nine** sites at once,

@@ -474,7 +474,7 @@ TextPressKey(Key, Modifiers) {
 	if (Modifiers == "Down" or Modifiers == "Up") {
 		; An empty Key here means an upstream hold_modifier resolver already
 		; logged a WARNING and bailed to "" (see ResolveHoldModifierKey in
-		; infra/tap_hold/tap_hold_loader.ahk). Sending "{ Down}" / "{ Up}" would
+		; platform/remap/tap_hold_loader.ahk). Sending "{ Down}" / "{ Up}" would
 		; silently arm nothing while still consuming the keystroke — refuse it
 		; here too as a second line of defense instead of a blind SendInput
 		; with a blank key name.

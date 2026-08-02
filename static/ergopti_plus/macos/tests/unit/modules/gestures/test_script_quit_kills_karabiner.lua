@@ -28,7 +28,7 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 	helpers.it("calls karabiner.kill() when the quit action runs", function()
 		-- Spy Karabiner module, injected via the action's lazy require.
 		local killed = { count = 0 }
-		package.loaded["modules.karabiner"] = {
+		package.loaded["platform.remap"] = {
 			kill = function() killed.count = killed.count + 1 end,
 		}
 
@@ -43,7 +43,7 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_doAfter
-		package.loaded["modules.karabiner"] = nil
+		package.loaded["platform.remap"] = nil
 
 		helpers.assert_true(ok, "executing script_quit must not raise")
 		helpers.assert_eq(killed.count, 1)  -- Karabiner torn down exactly once
@@ -55,7 +55,7 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		-- so script_quit must perform the identical teardown or the mlx_lm.server
 		-- keeps holding GPU memory + the MLX port and the helper processes orphan.
 		local mlx_stopped, helpers_killed, orphan_killed = 0, 0, 0
-		package.loaded["modules.karabiner"] = { kill = function() end }
+		package.loaded["platform.remap"] = { kill = function() end }
 		package.loaded["ui.menu.menu_llm"] = {
 			stop_mlx_server            = function() mlx_stopped = mlx_stopped + 1 end,
 			terminate_helper_processes = function() helpers_killed = helpers_killed + 1 end,
@@ -74,7 +74,7 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_doAfter
-		package.loaded["modules.karabiner"] = nil
+		package.loaded["platform.remap"] = nil
 		package.loaded["ui.menu.menu_llm"] = nil
 
 		helpers.assert_true(ok, "executing script_quit must not raise")

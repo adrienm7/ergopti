@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: SpaceTapHold Empty-Capture Guard Meta-Test
 ; DESCRIPTION:
-; Structural regression for the phantom-modifier fix in modules/tap_holds/space.ahk.
+; Structural regression for the phantom-modifier fix in platform/remap/space.ahk.
 ;
 ; Before the fix, SpaceTapHold() called HoldFn.Call(ih.Input) unconditionally
 ; after the InputHook window closed. When the user held Space but released it

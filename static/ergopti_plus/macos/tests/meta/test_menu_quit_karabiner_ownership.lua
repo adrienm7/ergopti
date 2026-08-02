@@ -4,10 +4,10 @@
 --- MODULE: Regression — menubar Quit tears down Karabiner via the ownership-gated path (F-MED-13)
 --- DESCRIPTION:
 --- The menubar Quit action tore down Karabiner-Elements via
---- modules.karabiner.ke_lifecycle.run_total_reset_async() directly — a path with
+--- platform.remap.ke_lifecycle.run_total_reset_async() directly — a path with
 --- NO is_hs_owned_bridge() check. The other two quit paths (script_quit in
 --- modules/gestures/actions.lua, and hs.shutdownCallback in init.lua) both call
---- modules.karabiner.kill(), which gates on is_hs_owned_bridge() and leaves a
+--- platform.remap.kill(), which gates on is_hs_owned_bridge() and leaves a
 --- user-managed KE install untouched. The menubar path could therefore kill a
 --- KE install Hammerspoon never started.
 ---

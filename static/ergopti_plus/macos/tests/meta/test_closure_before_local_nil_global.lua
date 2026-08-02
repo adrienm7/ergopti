@@ -38,7 +38,7 @@ local helpers = require("tests.helpers")
 -- Every subtree that ships in the driver. `adapters/` holds the hs.task GC pins,
 -- `ui/` the models managers, `modules/` the API clients — the class has bitten in
 -- all three, so none of them may be left out.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
 
 -- Root-level sources that no subtree walk would reach.
 local ROOT_FILES = { "init.lua" }

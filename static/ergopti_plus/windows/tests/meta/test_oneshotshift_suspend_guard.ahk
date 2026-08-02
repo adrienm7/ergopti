@@ -51,9 +51,9 @@ _OSSG_ReadSource(RelPath) {
 ; ===================================================
 
 _OSSG_OneShotShiftHasSuspendGuard() {
-	Src := _OSSG_ReadSource("modules/tap_holds/one_shot_shift.ahk")
+	Src := _OSSG_ReadSource("platform/remap/one_shot_shift.ahk")
 	Body := _DriverFuncBody("OneShotShift")
-	Assert(Body != "", "OneShotShift must exist in modules/tap_holds/one_shot_shift.ahk")
+	Assert(Body != "", "OneShotShift must exist in platform/remap/one_shot_shift.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"OneShotShift must check A_IsSuspended — starting an InputHook while suspended would intercept keystrokes belonging to other applications and apply an erroneous capitalisation")
 }

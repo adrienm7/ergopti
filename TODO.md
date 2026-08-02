@@ -91,8 +91,8 @@ Renames still to do:
 | --- | --- | --- |
 | `windows/modules/keymap/` (physical remap) | `modules/layout/` | the same name means two opposite subsystems depending on the driver |
 | `macos/modules/keymap/` (expansion engine) | `modules/hotstrings/` | idem |
-| `windows/modules/tap_holds/` + `infra/tap_hold/` | `platform/remap/` | plural and singular in the same driver, wired by a `../` include |
-| `macos/modules/karabiner/`, `linux/modules/kanata/` | `platform/remap/` | three names, no common parent |
+| `windows/platform/remap/` + `platform/remap/` | `platform/remap/` | plural and singular in the same driver, wired by a `../` include |
+| `macos/platform/remap/`, `linux/platform/remap/` | `platform/remap/` | three names, no common parent |
 | `modules/keylogger/` | `modules/metrics/` | "keylogger" is the mechanism; `_shared/ui/` already says metrics |
 | `windows/ui/personal_toml_editor*` | `modules/hotstring_editor/` | the Windows name means something else on Linux |
 | `windows/infra/registry.ahk` | `infra/win_registry.ahk` | name collision with the macOS hotstring registry |
@@ -163,7 +163,7 @@ Constraints: **paths before moves, moves before content, data before code.**
   three identical trees rather than a reconciliation.
 
   **(a) measured 2026-08-02, and it cannot be staged by driver.** The Linux move
-  was done and reverted to establish that: `git mv linux/modules/kanata
+  was done and reverted to establish that: `git mv linux/platform/remap
   linux/platform/remap` plus 22 reference edits is a 20-minute job and every
   Linux test stayed green — and then `test-driver-tree-parity.cjs` failed,
   correctly, because `platform/` now existed on one driver of three. Its own
@@ -174,26 +174,26 @@ Constraints: **paths before moves, moves before content, data before code.**
 
   **The lot is gated by Windows, and Windows is 4× the estimate.** The recorded
   "34 tracked `#Include` lines" counts only includes. Counting PATH references —
-  `modules/tap_holds/`, `modules/tap_holds.ahk`, `infra/tap_hold/` — gives
+  `platform/remap/`, `platform/remap.ahk`, `platform/remap/` — gives
   **583 across 249 files**: every file's own path header comment, and a large
   set of meta-tests that assert on the include path itself
   (`test_taphold_timings_load_order.ahk` pins the literal
-  `#Include modules/tap_holds/constants.ahk`). Careful: the bare identifier
+  `#Include platform/remap/constants.ahk`). Careful: the bare identifier
   `tap_holds` is also a FEATURE id (`category_enabled.tap_holds`, the menu
   manifest, `timings/constants.toml`) and must not be renamed with the path.
 
   Per driver, and all three in one commit:
-  - `windows`: `modules/tap_holds.ahk` → `platform/remap.ahk`,
-    `modules/tap_holds/` (17 files) + `infra/tap_hold/` (2) → `platform/remap/`.
+  - `windows`: `platform/remap.ahk` → `platform/remap.ahk`,
+    `platform/remap/` (17 files) + `platform/remap/` (2) → `platform/remap/`.
     This is also what dissolves the "plural and singular in the same driver,
     wired by a `../` include" complaint. Relative includes need per-file rules,
     not one global replace.
-  - `macos`: `modules/karabiner` (14 files, 12 154 lines, 10 require sites).
-  - `linux`: `modules/kanata` (2 files, 577 lines) — the known-good recipe is in
+  - `macos`: `platform/remap` (14 files, 12 154 lines, 10 require sites).
+  - `linux`: `platform/remap` (2 files, 577 lines) — the known-good recipe is in
     the reverted commit's script.
 
   Two files are Convention P violations *by path* but are UI rather than remap —
-  `linux/ui/webkit_host.lua` (249 l) and `macos/ui/menu/menu_karabiner.lua`
+  `linux/ui/webkit_host.lua` (249 l) and `macos/ui/menu/menu_remap.lua`
   (1 072 l); they need a placement decision, not a mechanical move. And
   Convention P has **no gate**: without a test asserting the forbidden-word list
   against paths it is decoration.
@@ -342,7 +342,7 @@ Constraints: **paths before moves, moves before content, data before code.**
   `get_slot_label` / `get_assignments` have **0** production callers, and the one
   writer is a reset routine for a feature that cannot be configured
   (`test-keyboard-slot-surface-is-dead.cjs` holds the measurement); (4) merge
-  `macos/modules/karabiner/data/actions.json` (73 actions, hardcoded French, no
+  `macos/platform/remap/data/actions.json` (73 actions, hardcoded French, no
   i18n keys) into the one registry, `holdable` becoming a per-action flag —
   **18 of the 73 already have `sg_actions.*` keys in all 21 languages, 55 do
   not**, and the merge must come before the translations or ~1 700 strings get

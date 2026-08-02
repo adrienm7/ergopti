@@ -367,11 +367,11 @@ helpers.describe("Karabiner layout-change must NOT kill the script-control event
 	-- feature triggers on every pause). The handler must rebind via pause_bindings /
 	-- resume_bindings, which leave the keycode-based eventtap alive.
 	helpers.it("karabiner/init.lua rebinds via rebind_for_layout, never shortcuts.stop/start", function()
-		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function build_paused_ke_config")
-		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 
 		-- The layout-rebind path must use the binding-only helper…
@@ -401,11 +401,11 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 	-- pause (full remapping back, user-facing shortcuts live mid-pause). It must
 	-- short-circuit while the script is paused.
 	helpers.it("karabiner/init.lua skips the layout rebuild while the script is paused", function()
-		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function build_paused_ke_config")
-		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
 			"layout-change handler must consult the pause state")

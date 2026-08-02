@@ -73,7 +73,7 @@ _OSLLS_LAltOneShotShiftGuarded() {
 	; Move-resilient: scan the tap_holds module dir via the framework helper
 	; instead of a pinned lalt.ahk path. The left_alt one_shot_shift #HotIf
 	; declaration is unique to lalt.ahk, so the extracted block is unambiguous.
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Body := _OSLLS_Block(Src, "#HotIf TapHoldTapAction(TapHold, " . Chr(34) . "left_alt" . Chr(34) . ") == " . Chr(34) . "one_shot_shift" . Chr(34))
 	Assert(Body != "", "lalt.ahk one_shot_shift #HotIf block must exist")
 	_OSLLS_AssertReleaseInFinally(Body, "lalt.ahk one_shot_shift tap")
@@ -93,7 +93,7 @@ _OSLLS_RCtrlOneShotShiftGuarded() {
 	; Move-resilient: scan the tap_holds module dir via the framework helper
 	; instead of a pinned rctrl.ahk path. The right_ctrl one_shot_shift #HotIf
 	; declaration is unique to rctrl.ahk, so the extracted block is unambiguous.
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Body := _OSLLS_Block(Src, "#HotIf TapHoldTapAction(TapHold, " . Chr(34) . "right_ctrl" . Chr(34) . ") == " . Chr(34) . "one_shot_shift" . Chr(34))
 	Assert(Body != "", "rctrl.ahk one_shot_shift #HotIf block must exist")
 	_OSLLS_AssertReleaseInFinally(Body, "rctrl.ahk one_shot_shift tap")
@@ -113,7 +113,7 @@ _OSLLS_TimeoutConstantDefined() {
 	; Move-resilient: scan the tap_holds module dir via the framework helper.
 	; The global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := definition is unique to
 	; constants.ahk within tap_holds, so the present-string check is unambiguous.
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Assert(InStr(Src, "global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC :=") > 0,
 		"STUCK_MODIFIER_RELEASE_TIMEOUT_SEC must be defined in tap_holds/constants.ahk (the early-loaded constants layer) so both lalt.ahk and rctrl.ahk can reference it when their hotkeys fire")
 }

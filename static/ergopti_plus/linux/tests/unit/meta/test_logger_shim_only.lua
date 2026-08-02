@@ -36,7 +36,7 @@ local DRIVER_ROOT = helpers.driver_root()
 
 -- Production directories to scan — deliberately excludes tests/ (this file
 -- mentions the forbidden pattern in prose) and vendor/ (third-party code).
-local SCAN_DIRS = { "adapters", "modules" }
+local SCAN_DIRS = { "adapters", "modules", "platform" }
 
 -- The forbidden require, in both quote styles AHK/Lua authors might type.
 local FORBIDDEN_PATTERNS = {

@@ -84,7 +84,7 @@ local LOG                = "init"
 -- future rename in only one file used to silently desync the boot-readiness
 -- notification with no error — reading it here instead of re-declaring the
 -- literal makes that impossible.
-local HS_BOOT_READY_SETTING_KEY = require("modules.karabiner.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
+local HS_BOOT_READY_SETTING_KEY = require("platform.remap.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
 
 -- Guard setting consumed by KE lifecycle notifications. It is set to false at
 -- boot start and flipped to true only once init has fully completed.
@@ -291,7 +291,7 @@ hs.shutdownCallback = function()
 			-- that can raise, and it owns both KILL_CMD and is_hs_owned_bridge: exactly
 			-- what karabiner.kill() consumes. So it is the one teardown path guaranteed
 			-- to be reachable here.
-			local ok_kl, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			local ok_kl, kl = pcall(require, "platform.remap.ke_lifecycle")
 			if not ok_kl or type(kl) ~= "table" then
 				Logger.error(LOG, "Shutdown: neither the Karabiner module nor ke_lifecycle "
 					.. "could be loaded — the KE bridge cannot be torn down from here.")
@@ -360,15 +360,15 @@ end
 
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
--- Guarded: modules.karabiner reaches modules/karabiner/defaults.lua, whose
+-- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
 -- This require sits above the menubar, the panic-button eventtap and every other
 -- line of boot, so a missing or truncated tap_hold defaults.toml used to cost the
 -- whole session rather than one feature.
 local ok_karabiner
-ok_karabiner, karabiner = pcall(require, "modules.karabiner")
+ok_karabiner, karabiner = pcall(require, "platform.remap")
 if not ok_karabiner then
-	Logger.error(LOG, "modules.karabiner failed to load: %s — the Karabiner bridge is "
+	Logger.error(LOG, "platform.remap failed to load: %s — the Karabiner bridge is "
 		.. "disabled for this session; everything else continues.", tostring(karabiner))
 	karabiner = nil
 end
@@ -986,7 +986,7 @@ pcall(function()
 	end
 end)
 pcall(function()
-	local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+	local ok_l, kl = pcall(require, "platform.remap.ke_lifecycle")
 	if ok_l and kl and type(kl.flush_pending_ready_notification) == "function" then
 		kl.flush_pending_ready_notification()
 	end

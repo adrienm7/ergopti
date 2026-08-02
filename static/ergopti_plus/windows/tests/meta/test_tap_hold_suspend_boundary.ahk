@@ -39,7 +39,7 @@ Test("tap-holds: in-flight hold-layer candidates cannot activate after Suspend (
 	_THSB_HoldLayerGateChecksSuspendBeforeMutation)
 
 _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(InStr(Lifecycle, "TapHoldReleaseSyntheticKeys()") > 0,
 		"Ergopti_OnSuspendEnter must immediately release synthetic tap-hold keys that were armed before an in-flight KeyWait")
@@ -50,13 +50,24 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 	; constants.ahk and is excluded from this sibling scan.
 	SplitPath(A_ScriptDir, , &Root)
 	Q := Chr(34)
-	Loop Files, Root . "\\modules\\tap_holds\\*.ahk", "FR" {
+	; Floored, because it was not. This loop scanned the directory by a hardcoded
+	; path and asserted per file; when platform/remap was extracted the pattern
+	; matched nothing, the body never ran, and every per-file assertion below
+	; disappeared without a single failure. A scan that finds no file is a broken
+	; scan, never a clean one — the sibling _DriverDirConcat throws for exactly
+	; this reason, and this loop predated it.
+	Scanned := 0
+	Loop Files, Root . "\platform\remap\*.ahk", "FR" {
 		if (A_LoopFileName = "constants.ahk")
 			continue
+		Scanned++
 		FileSrc := FileRead(A_LoopFileFullPath)
-		Assert(!RegExMatch(FileSrc, "TextPressKey\\([^`r`n]+,\\s*" . Q . "Down" . Q . "\\)"),
+		Assert(!RegExMatch(FileSrc, "TextPressKey\([^`r`n]+,\s*" . Q . "Down" . Q . "\)"),
 			A_LoopFileName . " must acquire synthetic keys through TapHoldSyntheticKeyDown so Suspend can release an in-flight candidate immediately")
 	}
+	Assert(Scanned >= 15,
+		"expected the tap-hold key modules to be scanned (got " . Scanned . ") — a moved or renamed "
+			. "directory must fail here, not quietly assert nothing")
 	Assert(InStr(Src, "TapHoldSyntheticKeyDown") > 0 and InStr(Src, "TapHoldSyntheticKeyUp") > 0,
 		"tap-hold modules must use the synthetic-key ownership pair around every cross-KeyWait modifier")
 }
@@ -70,8 +81,8 @@ Test("tap-holds: every pre-armed synthetic key is released by the suspend owner 
 _THSB_WindowVerbsAreGuarded() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
-	try Src := FileRead(WindowsDir . "\modules\tap_holds\nav_layer.ahk")
-	Assert(Src != "", "modules/tap_holds/nav_layer.ahk must be readable")
+	try Src := FileRead(WindowsDir . "\platform\remap\nav_layer.ahk")
+	Assert(Src != "", "platform/remap/nav_layer.ahk must be readable")
 	Code := _StripFullLineComments(Src)
 	for Verb in ["WinMaximize(", "WinMinimize(", "WinRestore("] {
 		Pos := InStr(Code, Verb)
