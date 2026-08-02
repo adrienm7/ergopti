@@ -5,27 +5,31 @@
  * MODULE: Location-Pinned Source-Read Ratchet (macOS Lua tests)
  * DESCRIPTION:
  * macOS twin of test-no-pinned-source-reads.cjs (the AHK ratchet). Freezes the
- * count of macOS test_*.lua files that read a driver SOURCE file by a hardcoded
- * path — io.open(driver_root() .. "modules/keymap/input_sources.lua") and the
- * like — instead of loading the module and asserting behaviour, or scanning via
- * a move-resilient whole-tree helper. These path-pinned introspection tests are
- * the macOS half of the #1 refactor pain (far more numerous than the 19 on AHK):
- * a `git mv` of the cited file breaks them with a path error, never a behaviour
- * signal, so they discourage the structural splits the project wants.
+ * count of macOS tests that name a driver SOURCE file by a hardcoded path —
+ * "modules/keymap/input_sources.lua" and the like — instead of loading the
+ * module and asserting behaviour, or scanning via the move-resilient
+ * symbol-keyed helper. These path-pinned introspection tests are the macOS half
+ * of the #1 refactor pain: a `git mv` of the cited file breaks them with a path
+ * error, never a behaviour signal, so they discourage the structural splits the
+ * project wants.
  *
  * TWO COUNTS, BECAUSE ONE WAS MEASURING THE WRONG THING:
  * The file count says how many test files pin a path; the read count says how
- * many pins exist (31 files, 40 reads). A file already on the list could add
- * pins for free, and the helper exemption is per file. A `git mv` breaks the
- * read, not the file, so the read is the unit that gets ratcheted.
+ * many pins exist. A file already on the list could add pins for free, and the
+ * helper exemption is per file. A `git mv` breaks the read, not the file, so the
+ * read is the unit that gets ratcheted.
  *
  * ROOT CAUSE ENCODED:
- * A test that concatenates driver_root() with a quoted "(modules|lib|ui)/….lua"
- * path is location-pinned. This ratchet counts them and FAILS if the count rises
- * above the frozen baseline. Lower (never raise) the baseline as tests migrate
- * to behaviour assertions or a move-resilient symbol-keyed scan (the
- * move-resilience checks). It is the test twin of the OS-purity ratchets and of the AHK
- * pinned-read ratchet.
+ * A test naming a driver source path is location-pinned. This ratchet counts
+ * them and FAILS if the count rises above the frozen baseline. Lower (never
+ * raise) the baseline as tests migrate to behaviour assertions or to
+ * helpers.read_driver_source(symbol). It is the test twin of the OS-purity
+ * ratchets and of the AHK pinned-read ratchet.
+ *
+ * WHAT COUNTS lives in tools/lint/pinned-source-read.cjs, shared with the
+ * auto-fixer. It has to be shared: while each carried its own regex they
+ * disagreed by a factor of five, and "the fixer covers most of the lot" was a
+ * claim about two different populations.
  * ==============================================================================
  */
 
@@ -33,159 +37,101 @@
 
 const fs = require('fs');
 const path = require('path');
+const { findPinnedPaths, collectLuaTests } = require('../lint/pinned-source-read.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
+const DRIVER_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
+const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 
-// Frozen baseline — the current count of path-pinned source-reading macOS test
-// files. Drive toward zero by migrating each to a behaviour assertion or a
-// move-resilient helper; NEVER raise it to make a new test pass.
-// History: 134 → 133 (one test converted to behaviour)
-//          133 → 134 (H-1 regression: test_menu_state_keeps_script_control.lua §1 is a
-//                     deliberate source invariant; §2 provides the stronger behaviour
-//                     guarantee via spy — intentional, not accidental)
-//          134 → 136 (user audit 2026-06-30: three new deliberate source invariants —
-//                     test_mlx_warmup_timeout_cancel.lua, test_menu_quit_mlx_teardown.lua,
-//                     test_menu_state_keeps_script_control.lua §1 — each backed by a
-//                     stronger behaviour assertion in a companion section)
-//          136 → 140 (four new deliberate source invariants added with bug-fix commits:
-//                     test_day_rollover_drain.lua §2 (drain-loop guard),
-//                     test_api_token_lazy_decrypt.lua (init.lua + api_remote.lua source scan),
-//                     test_ollama_manager_nonblocking.lua §1 (blocking-call source guard))
-//          140 → 153 (2026-07-01 audit implementation pass: 13 new deliberate source
-//                     invariants, each either audit-prescribed (a source-only check is
-//                     the audit's own proposed test for a narrow mechanical fix — e.g.
-//                     test_mlx_manager_delete_nonblocking.lua's "no os.execute('rm -rf'
-//                     remains, hs.task.new + '-rf' + _active_tasks present" check,
-//                     test_api_mlx_discovery_dead_constant_removed.lua's "constant is
-//                     gone" check — behaviorally untestable, absence is inherently a
-//                     source fact) or backed by a stronger companion behaviour section
-//                     in the same file (test_wpm_timer_callbacks_pcall.lua,
-//                     test_tooltip_llm_is_visible_after_render_crash.lua,
-//                     test_disable_all_releases_clicklock.lua,
-//                     test_synthetic_paste_not_logged_as_shortcut.lua,
-//                     test_context_tracker_ax_focused_element_pcall.lua,
-//                     test_wpm_widget_mouse_callback_stale_geometry.lua,
-//                     test_wpm_darken_hex_malformed_input.lua) or a documented
-//                     faithful-mirror test pinned against source because the real
-//                     function is gated behind private module state unreachable from
-//                     the headless stub (test_notify_synthetic_malformed_utf8.lua,
-//                     same accepted shape as test_synth_queue_drain.lua's
-//                     simulate_drain), plus test_api_mlx_discovery_generation_guard.lua,
-//                     test_menu_metrics_master_toggle_pause_gate.lua, and
-//                     test_menu_quit_karabiner_ownership.lua)
-//          153 → 156 (session 2026-07-10: macOS source-scan tests added —
-//                     test_update_preview_early_out.lua (source assertions on
-//                     llm_bridge.lua) and test_ignored_window_deferred_buffer_snapshot.lua
-//                     (source assertions on init.lua). This ratchet scans macos/tests
-//                     ONLY: the .ahk source-scans go to test-no-pinned-source-reads.cjs
-//                     and Linux .lua source-scans (e.g. test_injector_commands.lua) are
-//                     not counted here at all.)
-//          156 → 34 (fix-pinned-source-reads.cjs converted 153 reads once it was
-//                     taught the two other handle shapes in the tree —
-//                     assert(io.open(…)) and an explicit `if not fh then error(…)
-//                     end` — neither of which is any more ambiguous than the bare
-//                     io.open it already accepted. The 20 that remain need a human:
-//                     their target module has no declaration unique to it, so
-//                     read_driver_source would concatenate several files and
-//                     silently change what the test asserts.)
-//           32 → 41 (2026-08-02: NOT a regression — the scan was blind. The path
-//                     pattern's `lib` arm had matched nothing since e97ddbd08
-//                     renamed lib/ to infra/, and no arm ever reached the
-//                     driver-root init.lua, the single most-pinned file in the
-//                     suite. Adding `infra` and an init.lua arm surfaced 9 files
-//                     and 16 reads that had been pinned the whole time. Not one
-//                     test changed. Re-frozen at the honest number; anything
-//                     below it now is real conversion.)
-const BASELINE = 41;
-
-// Second frozen baseline — the count of individual pinned READS, not of files.
+// Frozen baseline — the count of macOS test FILES naming a driver source path.
+// Drive toward zero by migrating each to a behaviour assertion or to
+// helpers.read_driver_source(symbol); NEVER raise it to make a new test pass.
 //
-// Counting files alone left two holes, and both are the kind a ratchet is
-// supposed to make impossible. A file already on the list was free: it could
-// grow from one pinned read to ten and the number never moved. And the helper
-// exemption below is per FILE, so a test that used read_driver_source() once
-// could pin any number of raw paths beside it and disappear from the count
-// entirely. The unit a `git mv` breaks is the read, so the read is what gets
-// ratcheted. This count deliberately ignores HELPER_RE: raw pins are counted
-// even in a file that is otherwise move-resilient.
+// History: 134 → 133 → 134 → 136 → 140 → 153 → 156 as deliberate source
+//          invariants landed with bug fixes, each either audit-prescribed or
+//          backed by a stronger behaviour section in the same file.
+//          156 → 32 (fix-pinned-source-reads.cjs converted 153 reads once it was
+//                    taught the two other handle shapes in the tree.)
+//           32 → 41 (2026-08-02: NOT a regression — the scan was blind. The path
+//                    pattern's `lib` arm had matched nothing since e97ddbd08
+//                    renamed lib/ to infra/, and no arm ever reached the
+//                    driver-root init.lua, the most-pinned file in the suite.)
+//           41 → 104 (2026-08-02, and this is the last widening of its kind: the
+//                    gate stopped matching the READ EXPRESSION and started
+//                    matching the PATH LITERAL. Three separate widenings had
+//                    each surfaced pins that were always there, because each
+//                    guessed at the shapes someone writes around io.open —
+//                    `local p = driver_root() .. "…"`, an inline io.open, and
+//                    finally a local bound to driver_root() lines earlier and
+//                    concatenated further down, which no adjacency pattern can
+//                    reach. Fifteen files do not call driver_root() at all: they
+//                    rebuild the root from debug.getinfo, or open
+//                    "modules/keymap/llm_bridge.lua" relative to the runner's
+//                    cwd. What a `git mv` breaks is the string naming the file,
+//                    not the syntax around it. Not one test changed; 63 files
+//                    that had been pinned the whole time became visible.
+//                    Anything below 104 now is real conversion.)
+const BASELINE = 104;
+
+// Second frozen baseline — individual pinned READS, not files.
+//
+// Counting files alone left two holes, both of the kind a ratchet is supposed to
+// make impossible. A file already on the list was free: it could grow from one
+// pinned read to ten and the number never moved. And the helper exemption below
+// is per FILE, so a test using read_driver_source() once could pin any number of
+// raw paths beside it and disappear from the count entirely. The unit a `git mv`
+// breaks is the read, so the read is what gets ratcheted. This count deliberately
+// ignores HELPER_RE: raw pins are counted even in a file that is otherwise
+// move-resilient.
+//
 // History: 40 (first measurement, 2026-07-31 — 32 files, so 8 reads were
 //              invisible to the per-file count)
-//       40 → 56 (2026-08-02: the path pattern gained an `infra` arm and an
-//              init.lua arm; see the file baseline's history. 16 reads that were
-//              always there became visible. The measured count before widening
-//              was 38, so the old 40 also carried 2 reads of pure slack — a
-//              ratchet frozen above its own measurement lets the next regression
-//              land for free.)
-const READ_BASELINE = 56;
+//       40 → 56 (2026-08-02: an `infra` arm and an init.lua arm; the measured
+//              count before widening was 38, so the old 40 also carried 2 reads
+//              of pure slack — a ratchet frozen above its own measurement lets
+//              the next regression land for free.)
+//       56 → 281 (2026-08-02: literal-based counting, see the file baseline. The
+//              read count rose five-fold where the file count rose 2.5-fold,
+//              which is the shape a per-file ratchet is blind to by
+//              construction: the files worst affected were already on the list.)
+const READ_BASELINE = 281;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
-// driver_root() concatenated with a quoted relative path into a driver SOURCE
-// file, e.g. driver_root() .. "modules/keymap/input_sources.lua".
-//
-// Two arms were missing and the gate under-counted by 19 reads — a third of its
-// own subject — with no symptom, because an unseen pin looks exactly like no pin:
-//
-//   - `infra`. The alternation said `lib`, and commit e97ddbd08 renamed every
-//     driver's lib/ to infra/. The `lib` arm has matched ZERO reads since. It is
-//     kept only so a stray lib/ path cannot slip back in unseen.
-//   - the driver-root `init.lua`. It is in no sub-tree at all, so no directory
-//     arm could ever reach it — and it is the single most-pinned file in the
-//     macOS suite (16 reads).
-//
-// The lesson is the one the counting fix in Lot 2 already taught once: a ratchet
-// is only as honest as the population it can see, and a dead alternation branch
-// reports success by measuring nothing.
-const SOURCE_PATH_RE = /driver_root\(\)\s*\.\.\s*["'](?:[^"'\n]*(?:modules|lib|infra|ui)[\\/][^"'\n]*|\.{0,2}[\\/]*init)\.lua["']/;
-const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'g');
-
-/**
- * Recursively collects every test_*.lua file under a directory.
- * @param {string} dir - Absolute directory to walk.
- * @param {string[]} acc - Accumulator for matched absolute file paths.
- * @returns {string[]} The accumulator, populated with absolute paths.
- */
-function collectTests(dir, acc) {
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		const full = path.join(dir, entry.name);
-		if (entry.isDirectory()) {
-			collectTests(full, acc);
-		} else if (entry.isFile() && /^test_.*\.lua$/.test(entry.name)) {
-			acc.push(full);
-		}
-	}
-	return acc;
-}
 
 const pinned = [];
 const perFileReads = [];
 let reads = 0;
-for (const file of collectTests(TESTS_DIR, [])) {
+for (const file of collectLuaTests(TESTS_DIR, [])) {
 	const src = fs.readFileSync(file, 'utf8');
 	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
 
+	// Only literals resolving to a real file count: a test asserting a module is
+	// GONE must name it, and there is nothing there to convert.
+	const hits = findPinnedPaths(src, DRIVER_ROOT).filter((h) => h.resolves);
+
 	// Read count first, and unconditionally: a helper elsewhere in the file does
 	// not make a raw pin beside it move-resilient.
-	const hits = (src.match(SOURCE_PATH_RE_G) || []).length;
-	if (hits > 0) {
-		reads += hits;
-		perFileReads.push({ rel, hits });
+	if (hits.length > 0) {
+		reads += hits.length;
+		perFileReads.push({ rel, hits: hits.length, paths: hits });
 	}
 
 	if (HELPER_RE.test(src)) continue; // already move-resilient
-	if (!SOURCE_PATH_RE.test(src)) continue; // reads a fixture, not a source file
+	if (hits.length === 0) continue; // reads a fixture, not a source file
 	pinned.push(rel);
 }
 
 const count = pinned.length;
 if (process.argv.includes('--measure')) {
+	const verbose = process.argv.includes('--paths');
 	console.log(`path-pinned macOS source-reading test files: ${count}`);
 	for (const f of pinned) console.log('  ' + f);
 	console.log(`\npinned macOS source READS: ${reads}`);
-	for (const { rel, hits } of perFileReads.sort((a, b) => b.hits - a.hits)) {
+	for (const { rel, hits, paths } of perFileReads.sort((a, b) => b.hits - a.hits)) {
 		console.log(`  ${String(hits).padStart(3)}  ${rel}`);
+		if (verbose) for (const p of paths) console.log(`         ${p.line}: ${p.rel}`);
 	}
 	process.exit(0);
 }
@@ -197,9 +143,9 @@ if (count > BASELINE) {
 		`\x1b[31m[ERROR] Path-pinned source reads in macOS tests rose to ${count} file(s) (baseline ${BASELINE}).\x1b[0m`
 	);
 	console.error(
-		'  A new test reads a driver source file by a hardcoded driver_root() path. Load the\n' +
-		'  module and assert behaviour, or use a move-resilient symbol-keyed scan, so a file\n' +
-		'  move does not break it. Do NOT raise the baseline.'
+		'  A new test names a driver source file by a hardcoded path. Load the module and\n' +
+			'  assert behaviour, or use helpers.read_driver_source(symbol), so a file move does\n' +
+			'  not break it. Do NOT raise the baseline.'
 	);
 }
 if (reads > READ_BASELINE) {
@@ -209,12 +155,14 @@ if (reads > READ_BASELINE) {
 	);
 	console.error(
 		'  A file already on the pinned list gained another hardcoded path — that used to be\n' +
-		'  free, because only files were counted. The read is what a `git mv` breaks, so the\n' +
-		'  read is what is frozen. Do NOT raise the baseline.'
+			'  free, because only files were counted. The read is what a `git mv` breaks, so the\n' +
+			'  read is what is frozen. Do NOT raise the baseline.'
 	);
 }
 if (failed) {
-	console.error('  Run `node tools/test/test-no-pinned-source-reads-lua.cjs --measure` to list them.');
+	console.error(
+		'  Run `node tools/test/test-no-pinned-source-reads-lua.cjs --measure [--paths]` to list them.'
+	);
 	process.exit(1);
 }
 
