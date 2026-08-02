@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_gestures: master toggle is pause-gated (F-MED-5)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_gestures.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open menu_gestures.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_gestures.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local DISABLED_GESTURE_ACTION")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_gestures.lua source must be locatable")
 		return src
 	end
 

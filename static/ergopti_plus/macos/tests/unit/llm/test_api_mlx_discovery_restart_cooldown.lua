@@ -211,10 +211,11 @@ helpers.describe("MLX discovery: the cooldown is a registry value", function()
 	helpers.it("reads discovery_retry_cooldown_ms from the shared timings registry", function()
 		-- A literal here would be a fourth pacing number in a file that already has
 		-- three, and the only one not visible to the cross-driver timings gate.
-		local path = helpers.driver_root() .. "/modules/llm/api_mlx_discovery.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/api_mlx_discovery.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_active_model_arg")
+		helpers.assert_true(src ~= nil, "modules/llm/api_mlx_discovery.lua source must be locatable")
 		helpers.assert_true(src:find('Timings%.sec%("llm", "discovery_retry_cooldown_ms"%)') ~= nil,
 			"the cooldown must come from the shared timings registry, not a literal")
 	end)

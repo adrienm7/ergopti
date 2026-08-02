@@ -31,10 +31,11 @@ local helpers = require("tests.helpers")
 helpers.describe("M-14: onboarding short-circuit before module pre-start", function()
 
 	helpers.it("onboarding.should_run appears before gestures.start() in init.lua", function()
-		local path = helpers.driver_root() .. "init.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "init.lua must be readable")
-		local src  = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 		local ob_pos      = src:find("should_run", 1, true)
 		local gesture_pos = src:find("gestures.start()", 1, true)
@@ -49,10 +50,11 @@ helpers.describe("M-14: onboarding short-circuit before module pre-start", funct
 	end)
 
 	helpers.it("onboarding.should_run appears before boot_cleanup in init.lua", function()
-		local path = helpers.driver_root() .. "init.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "init.lua must be readable")
-		local src  = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 		local ob_pos      = src:find("should_run", 1, true)
 		local cleanup_pos = src:find("boot_cleanup", 1, true)
@@ -84,10 +86,11 @@ helpers.describe("ui.onboarding require failure is fail-fast, not silently skipp
 	-- not-ok case must log a Logger.error and return (abort boot) between the
 	-- require and the first use, and the whole guard must precede gestures.start().
 	helpers.it("aborts with Logger.error + return when ui.onboarding fails to load", function()
-		local path = helpers.driver_root() .. "init.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "init.lua must be readable")
-		local src  = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 		local req_pos     = src:find("pcall(require, \"ui.onboarding\")", 1, true)
 		local should_pos  = src:find("should_run", 1, true)

@@ -16,8 +16,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("sqlite_writer open_db back-fills the rev meta key", function()
 	helpers.it("the meta back-fill loop includes 'rev'", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keylogger/sqlite_writer.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/sqlite_writer.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function _read_schema_sql")
+		helpers.assert_true(src ~= nil, "modules/keylogger/sqlite_writer.lua source must be locatable")
 		-- Locate the INSERT OR IGNORE meta back-fill loop and assert 'rev' is seeded.
 		local loop = src:find('{ "next_event_id"', 1, true)
 		helpers.assert_true(loop ~= nil, "could not find the meta back-fill loop")

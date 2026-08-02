@@ -16,8 +16,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", function()
 	local function read_src()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_metrics.lua", "r"))
-		local s = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_metrics.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local s = helpers.read_driver_source("\"dialog.metrics.security_warning_title\"")
+		helpers.assert_true(s ~= nil, "ui/menu/menu_metrics.lua source must be locatable")
 		return s
 	end
 

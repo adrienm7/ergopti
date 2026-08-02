@@ -34,9 +34,11 @@ local DRIVER_ROOT = helpers.driver_root()
 helpers.describe("karabiner.watchers: deactivate_capsword is never called bare in the eventtap body (F-HIGH-7)", function()
 
 	local function read_source()
-		local fh = io.open(DRIVER_ROOT .. "modules/karabiner/watchers.lua", "r")
-		helpers.assert_true(fh ~= nil, "watchers.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/watchers.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_current_layout_from_hitoolbox")
+		helpers.assert_true(src ~= nil, "modules/karabiner/watchers.lua source must be locatable")
 		return src
 	end
 

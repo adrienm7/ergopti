@@ -85,10 +85,11 @@ helpers.describe("menu drift gate (macOS): top_level tail matches canonical orde
 	end)
 
 	helpers.it("macOS loader keeps the separator immediately before global_actions", function()
-		local fh = io.open(DRIVER_ROOT .. "ui/menu/builder.lua", "r")
-		helpers.assert_true(fh ~= nil, "Cannot open builder.lua")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to ui/menu/builder.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function load_ergopti_groups")
+		helpers.assert_true(source ~= nil, "ui/menu/builder.lua source must be locatable")
 		helpers.assert_true(source:find("previous.id == \"---\"", 1, true) ~= nil,
 			"load_top_level_tail must inspect the manifest entry before global_actions")
 		helpers.assert_true(source:find("tail_start = tail_start - 1", 1, true) ~= nil,

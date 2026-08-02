@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("init.lua: genuine-quit shutdown KE teardown (F-HIGH-3)", function()
 	local function shutdown_region()
-		local path = helpers.driver_root() .. "init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "init.lua not readable at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 		-- The shutdownCallback closure ends at the first column-0 `end` (its own
 		-- nested if/pcall/for ends are all tab-indented).
 		local sc = src:match("hs%.shutdownCallback%s*=%s*function.-\nend")
