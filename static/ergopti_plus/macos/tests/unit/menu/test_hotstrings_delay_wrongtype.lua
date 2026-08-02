@@ -40,7 +40,12 @@ helpers.describe("hotstrings delay item coerces a wrong-typed delay", function()
 			local cur_val = tonumber(value) or default_val
 			return math.floor(cur_val * 1000 + 0.5)
 		end
-		helpers.assert_true(pcall(cur_ms, "default"))   -- crashed pre-fix
+		-- Crashed pre-fix, so the pcall is the regression guard. The value matters
+		-- too: a coercion that survived by answering nil would put nil into the menu
+		-- row's delay, and the expansion timer would never arm.
+		local ok_ms, ms = pcall(cur_ms, "default")
+		helpers.assert_true(ok_ms, "a non-numeric delay must not crash the arithmetic")
+		helpers.assert_eq(type(ms), "number", "and must coerce to a usable millisecond value")
 		helpers.assert_eq(cur_ms("default"), 50)        -- falls back to default
 		helpers.assert_eq(cur_ms(0.1), 100)             -- a real number passes through
 		helpers.assert_eq(cur_ms("0.2"), 200)           -- numeric string coerced

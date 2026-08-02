@@ -77,8 +77,13 @@ helpers.describe("manifest_reader: default_for", function()
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
-		local ok = pcall(function() return Manifest.default_for("nope.not.here") end)
+		-- The raising IS the subject. What it was missing is the error TEXT: a
+		-- fail-fast that raised for an unrelated reason reads identically, and the
+		-- caller debugging a typo would be told nothing about which path it got wrong.
+		local ok, err = pcall(function() return Manifest.default_for("nope.not.here") end)
 		helpers.assert_eq(ok, false, "default_for raises on an unknown path")
+		helpers.assert_true(tostring(err):find("nope.not.here", 1, true) ~= nil,
+			"and the error must name the path it refused: " .. tostring(err))
 	end)
 end)
 

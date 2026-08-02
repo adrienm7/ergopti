@@ -122,6 +122,8 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		fh:close()
 		local ok, grouped = pcall(codec.decode, content)
 		helpers.assert_true(ok, "TOML decode failed")
+		helpers.assert_eq(type(grouped), "table",
+			"a decode that answered nothing would make every key check below pass\n\t\t\tagainst an empty table")
 		local nav = grouped.llm and grouped.llm.navigation
 		helpers.assert_true(type(nav) == "table", "llm.navigation missing")
 		helpers.assert_true(

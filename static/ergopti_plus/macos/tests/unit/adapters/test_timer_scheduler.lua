@@ -203,7 +203,12 @@ helpers.describe("TimerScheduler adapter — every()", function()
 			{ timer = timer_stub })
 		TS.every(1, function() error("boom") end)
 		-- Must not raise even though the callback throws
+		-- The swallowing IS the subject, so the pcall stays. What it was missing:
+		-- a scheduler that swallowed the exception AND stopped scheduling would pass,
+		-- and every later timer in the session would silently never fire.
 		local ok = pcall(function() timer_stub.fire(1) end)
 		helpers.assert_true(ok, "adapter must swallow callback exceptions")
+		helpers.assert_eq(type(TS.after), "function",
+			"and must still be able to schedule the next one")
 	end)
 end)

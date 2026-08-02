@@ -180,6 +180,8 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 			fh:close()
 			local ok, grouped = pcall(codec.decode, content)
 			helpers.assert_true(ok, label .. " TOML decode failed")
+			helpers.assert_eq(type(grouped), "table",
+				label .. ": a decode that answered nothing would make every key check below\n\t\t\t\tpass against an empty table")
 			local on_disk = grouped_get(grouped, hs)
 			if entry.id == "trigger_shortcut" and type(hs.sample) == "table" then
 				local sc = grouped.llm and grouped.llm.trigger and grouped.llm.trigger.shortcut
