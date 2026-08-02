@@ -54,9 +54,12 @@ local LOG    = "adapters.toml_cache"
 --- mis-registration the version stamp exists to prevent.
 local CACHE_VERSION = 3
 
---- Number of bytes read from the source file to build the content fingerprint.
---- 512 bytes is enough to catch any realistic same-second edit while keeping the
---- overhead to a single small read that occurs only when mtime+size already match.
+--- Chunk size used to stream the source file while building the content
+--- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
+--- only the read granularity, not a prefix window. It used to be a 512-byte
+--- prefix, which on a manifest-shaped file covered the `[_meta]` header and not
+--- one entry — so a same-second edit to any actual value was invisible and the
+--- stale cache was served. The read happens only when mtime+size already match.
 local FINGERPRINT_CHUNK_BYTES = 64 * 1024
 
 --- djb2 hash seed and modulus (32-bit) used to derive a collision-resistant

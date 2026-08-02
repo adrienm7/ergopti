@@ -29,10 +29,10 @@ to reproduce that one check** plus the tail of its output.
 **The inventory of checks is the run itself.** `run-js-suite.cjs` prints one
 bullet per check as it goes, so `npm run test:js` on your own tree is the
 authoritative list — and the `CHECKS` array in `tools/test/run-js-suite.cjs` is
-its single source of truth. It carries ~70 checks (drift detection, cross-driver
-parity, single-source ratchets, bridge wiring, encoding and syntax gates…), and
-new ones land regularly; re-typing them here would be stale within a week, so
-this page deliberately does not. Same rule one level down: `build:domain` names
+its single source of truth. It carries drift detection, cross-driver parity,
+single-source ratchets, bridge wiring, encoding and syntax gates, and new ones
+land regularly; re-typing them here would be stale within a week, so this page
+deliberately does not — including their count, which the run prints. Same rule one level down: `build:domain` names
 each of its own steps as it runs them.
 
 Two entries are worth explaining, because the name does not tell you what a
