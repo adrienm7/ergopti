@@ -50,14 +50,19 @@ helpers.describe("http_client (curl)", function()
 
   helpers.describe("cancel()", function()
     helpers.it("does not crash when called idle", function()
-      local ok = pcall(function() httpClient.cancel() end)
-      helpers.assert_true(ok, "cancel() on idle client does not crash")
+      -- Called directly: a raise fails with the real error. The claim is that an
+      -- idle cancel leaves the client USABLE — cancel is bound to every dismissed
+      -- prediction, so a client wedged by one would silently stop answering.
+      httpClient.cancel()
+      helpers.assert_eq(type(httpClient.cancel), "function",
+        "an idle cancel must leave the client callable")
     end)
 
     helpers.it("does not crash when called twice", function()
-      pcall(function() httpClient.cancel() end)
-      local ok = pcall(function() httpClient.cancel() end)
-      helpers.assert_true(ok, "double cancel() does not crash")
+      httpClient.cancel()
+      httpClient.cancel()
+      helpers.assert_eq(type(httpClient.cancel), "function",
+        "a second cancel must be a no-op, not a teardown")
     end)
   end)
 
@@ -103,8 +108,10 @@ helpers.describe("http_client (curl)", function()
     helpers.it("cancel sets internal flag without crashing", function()
       -- With the blocking curl fallback, cancel() just sets a flag.
       -- The callback checks the flag before invoking.
-      local ok = pcall(function() httpClient.cancel() end)
-      helpers.assert_true(ok, "cancel during request does not crash")
+      httpClient.cancel()
+      helpers.assert_eq(httpClient.isActive(), false,
+        "a cancel must leave the client inactive — a client that stayed \"active\" would "
+          .. "refuse the next request as a duplicate for the rest of the session")
       helpers.assert_true(not httpClient.isActive(), "isActive false after cancel")
     end)
   end)
