@@ -39,11 +39,11 @@ local CANON = {
 	{ id = "navigation",      greys_off = true  },
 }
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -89,7 +89,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the menu_layout.lua fallback mirrors the canonical policy", function()
-		local src = read_source("ui/menu/menu_llm/menu_layout.lua")
+		local src = read_source("local function load_policy") -- ui/menu/menu_llm/menu_layout.lua
 		local block = src:match("FALLBACK_GREYS_WHEN_OFF%s*=%s*{(.-)}")
 		helpers.assert_true(block ~= nil, "menu_layout.lua must define FALLBACK_GREYS_WHEN_OFF")
 		for _, c in ipairs(CANON) do
@@ -101,7 +101,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("init.lua resolves every settings row's greying via the shared spec", function()
-		local src = read_source("ui/menu/menu_llm/init.lua")
+		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		for _, c in ipairs(CANON) do
 			helpers.assert_true(src:find('MenuLayout%.row_disabled%("' .. c.id .. '"', 1, false) ~= nil,
 				"init.lua must resolve the '" .. c.id .. "' row greying via MenuLayout.row_disabled (shared spec) — not a hardcoded is_disabled/paused")

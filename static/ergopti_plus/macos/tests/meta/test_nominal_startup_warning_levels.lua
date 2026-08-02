@@ -29,63 +29,62 @@ local helpers = require("tests.helpers")
 --- Reads a production Lua source file from the driver root.
 --- @param relative_path string Path relative to the macOS driver root.
 --- @return string The source contents.
-local function read_source(relative_path)
-	local path = helpers.driver_root() .. relative_path
-	local fh = io.open(path, "r")
-	helpers.assert_not_nil(fh, "cannot open " .. relative_path)
-	local source = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local source = helpers.read_driver_source(selector)
 	return source
 end
 
 helpers.describe("meta: nominal startup diagnostics stay warning-free", function()
 	helpers.it("unavailable optional primer event names are debug-only", function()
-		local source = read_source("modules/gestures/init.lua")
+		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		helpers.assert_true(source:find("primer event type '%%s' is unavailable", 1, false) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"  primer event type", 1, true) ~= nil)
 	end)
 
 	helpers.it("deferred Karabiner suppression configuration is debug-only", function()
-		local source = read_source("modules/keylogger/kc_bridge.lua")
+		local source = read_source("local function build_managed_output_set") -- modules/keylogger/kc_bridge.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"Tap/hold configuration is deferred", 1, true) ~= nil)
 		helpers.assert_true(source:find("No tap_hold_config or available_actions", 1, true) == nil)
 	end)
 
 	helpers.it("the bundled hotstring fallback is informational", function()
-		local source = read_source("init.lua")
+		local source = read_source("local function has_common_hotstring_groups") -- init.lua
 		helpers.assert_true(source:find("Logger.info(LOG, \"No shared hotstring groups", 1, true) ~= nil)
 	end)
 
 	helpers.it("the normal dynamic-hotstring boot order is debug-only", function()
-		local source = read_source("modules/dynamic_hotstrings/rules_engine.lua")
+		local source = read_source("local function register_prefix_entries") -- modules/dynamic_hotstrings/rules_engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"Personal data received before keymap wiring", 1, true) ~= nil)
 		helpers.assert_true(source:find("personal data present but keymap not wired yet", 1, true) == nil)
 	end)
 
 	helpers.it("idempotent keyboard shortcut startup is debug-only", function()
-		local source = read_source("modules/shortcuts/keyboard_shortcuts.lua")
+		local source = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"M.start() called again after menu-state synchronization", 1, true) ~= nil)
 		helpers.assert_true(source:find("M.start() called more than once", 1, true) == nil)
 	end)
 
 	helpers.it("automatic gesture recovery stays debug-only", function()
-		local source = read_source("modules/gestures/init.lua")
+		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"schedule_emergency_recycle: SCHEDULED", 1, true) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"EMERGENCY RECYCLE executing now", 1, true) ~= nil)
 	end)
 
 	helpers.it("automatic CapsWord probe cleanup stays debug-only", function()
-		local source = read_source("modules/karabiner/watchers.lua")
+		local source = read_source("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"CapsWord probe timed out", 1, true) ~= nil)
 	end)
 
 	helpers.it("gesture lift-off drift rejection stays debug-only", function()
-		local source = read_source("modules/gestures/engine.lua")
+		local source = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"commitGesture: dir=%s does not match gesture lockedDir", 1, true) ~= nil)
 	end)
 
 	helpers.it("passive mouse-tap recovery does not pollute warnings", function()
-		local source = read_source("modules/keymap/init.lua")
+		local source = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
 		helpers.assert_true(source:find("name == \"mouse\" and Logger.debug or Logger.warn", 1, true) ~= nil)
 	end)
 end)

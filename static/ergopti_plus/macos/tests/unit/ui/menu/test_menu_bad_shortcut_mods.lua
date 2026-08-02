@@ -31,11 +31,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local path = helpers.driver_root() .. rel_path
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, rel_path .. " must be readable")
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -52,13 +52,13 @@ end
 helpers.describe("M-13: coerce_mods helper present (source)", function()
 
 	helpers.it("menu_hotstrings.lua defines coerce_mods", function()
-		local src = read_src("ui/menu/menu_hotstrings_custom.lua")
+		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
 		helpers.assert_true(src:find("coerce_mods", 1, true) ~= nil,
 			"menu_hotstrings_custom.lua must define coerce_mods to handle string-typed .mods")
 	end)
 
 	helpers.it("menu_metrics.lua defines coerce_mods", function()
-		local src = read_src("ui/menu/menu_metrics.lua")
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		helpers.assert_true(src:find("coerce_mods", 1, true) ~= nil,
 			"menu_metrics.lua must define coerce_mods to handle string-typed .mods")
 	end)
@@ -77,7 +77,7 @@ end)
 helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function()
 
 	helpers.it("menu_hotstrings.lua: ipairs(sc.mods) replaced by coerce_mods", function()
-		local src = read_src("ui/menu/menu_hotstrings_custom.lua")
+		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
 		-- ipairs(sc.mods ...) without coerce_mods wrapping is the crash pattern
 		local bare = src:find("ipairs(sc%.mods")
 		helpers.assert_true(bare == nil,
@@ -85,14 +85,14 @@ helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function
 	end)
 
 	helpers.it("menu_hotstrings.lua: table.concat(sc.mods ...) replaced by coerce_mods", function()
-		local src = read_src("ui/menu/menu_hotstrings_custom.lua")
+		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
 		local bare = src:find("table%.concat%(sc%.mods")
 		helpers.assert_true(bare == nil,
 			"menu_hotstrings_custom.lua must not call table.concat(sc.mods,...) directly — use coerce_mods(sc.mods)")
 	end)
 
 	helpers.it("menu_metrics.lua: no bare ipairs on .mods fields", function()
-		local src = read_src("ui/menu/menu_metrics.lua")
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		-- Check both known field names used in metrics
 		local bare1 = src:find("ipairs(state%.metrics_shortcut%.mods")
 		local bare2 = src:find("ipairs(state%.apps_time_shortcut%.mods")
@@ -101,7 +101,7 @@ helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function
 	end)
 
 	helpers.it("menu_metrics.lua: no bare table.concat on .mods fields", function()
-		local src = read_src("ui/menu/menu_metrics.lua")
+		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		local bare1 = src:find("table%.concat%(state%.metrics_shortcut%.mods")
 		local bare2 = src:find("table%.concat%(state%.apps_time_shortcut%.mods")
 		helpers.assert_true(bare1 == nil and bare2 == nil,
@@ -122,7 +122,7 @@ end)
 helpers.describe("PF-7: sc_fn() no longer crashes on string-typed .mods", function()
 
 	helpers.it("source: sc_fn's current_str build goes through coerce_mods, not a bare .mods read", function()
-		local src = read_src("ui/menu/menu_hotstrings_custom.lua")
+		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
 		local fn_start = src:find("local function sc_fn()", 1, true)
 		helpers.assert_true(fn_start ~= nil, "sc_fn must still exist in menu_hotstrings_custom.lua")
 		local fn_end = src:find("\tend\n", fn_start)

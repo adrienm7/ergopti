@@ -16,11 +16,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_source(rel)
-	local fh = io.open(helpers.driver_root() .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -42,21 +42,21 @@ end
 helpers.describe("karabiner/init.lua: layout rebuild timer stored and cancellable", function()
 
 	helpers.it("_layout_rebuild_timer module-level variable is declared", function()
-		local src = read_source("modules/karabiner/init.lua")
+		local src = read_source("local function build_paused_ke_config") -- modules/karabiner/init.lua
 		helpers.assert_true(
 			src:find("_layout_rebuild_timer", 1, true) ~= nil,
 			"init.lua must declare _layout_rebuild_timer to cancel pending rebuilds")
 	end)
 
 	helpers.it("doAfter result is assigned to _layout_rebuild_timer", function()
-		local src = strip_comments(read_source("modules/karabiner/init.lua"))
+		local src = strip_comments(read_source("local function build_paused_ke_config"))
 		helpers.assert_true(
 			src:find("_layout_rebuild_timer%s*=%s*hs%.timer%.doAfter") ~= nil,
 			"the rebuild doAfter return value must be stored in _layout_rebuild_timer")
 	end)
 
 	helpers.it("pending rebuild is cancelled before arming a new one", function()
-		local src = strip_comments(read_source("modules/karabiner/init.lua"))
+		local src = strip_comments(read_source("local function build_paused_ke_config"))
 		-- The cancellation block must precede the doAfter call
 		local cancel_pos = src:find("_layout_rebuild_timer:stop()", 1, true)
 		local arm_pos    = src:find("_layout_rebuild_timer%s*=%s*hs%.timer%.doAfter")
@@ -67,7 +67,7 @@ helpers.describe("karabiner/init.lua: layout rebuild timer stored and cancellabl
 	end)
 
 	helpers.it("M.stop() cancels the pending rebuild timer", function()
-		local src = strip_comments(read_source("modules/karabiner/init.lua"))
+		local src = strip_comments(read_source("local function build_paused_ke_config"))
 		-- M.stop() must have a _layout_rebuild_timer:stop() call inside it
 		-- We check that the :stop() call appears after the function M.stop() declaration
 		local stop_fn_pos  = src:find("function M.stop()", 1, true)

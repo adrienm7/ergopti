@@ -19,11 +19,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_source(rel)
-	local fh = io.open(helpers.driver_root() .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -45,7 +45,7 @@ end
 helpers.describe("gestures/engine.lua: diagonal reversal detection", function()
 
 	helpers.it("reversal delta for diag axis uses both dx and dy (not only Y)", function()
-		local src = strip_comments(read_source("modules/gestures/engine.lua"))
+		local src = strip_comments(read_source("local function triggerLiveAxisIfNeeded"))
 
 		-- The old bug: a plain ternary `(axis == "horiz") and dx or dy` silently
 		-- fell through to dy for the diag case. The fix adds an explicit diag branch.
@@ -60,14 +60,14 @@ helpers.describe("gestures/engine.lua: diagonal reversal detection", function()
 	helpers.it("the reversal detector references lastFirePos.x for diagonal direction", function()
 		-- When axis is diag, local_delta must depend on the x component from
 		-- lastFirePos — the old code never referenced lastFirePos.x in this block.
-		local src = strip_comments(read_source("modules/gestures/engine.lua"))
+		local src = strip_comments(read_source("local function triggerLiveAxisIfNeeded"))
 		helpers.assert_true(
 			src:find("lastFirePos%.x") ~= nil,
 			"reversal detector must reference lastFirePos.x (previously missing for diag axis)")
 	end)
 
 	helpers.it("signedDistAxis diag branch also uses both dx and dy", function()
-		local src = strip_comments(read_source("modules/gestures/engine.lua"))
+		local src = strip_comments(read_source("local function triggerLiveAxisIfNeeded"))
 		-- signedDistAxis uses dx*dx + dy*dy for the Euclidean magnitude
 		helpers.assert_true(
 			src:find("dx%*dx%s*%+%s*dy%*dy") ~= nil or src:find("dx%s*%*%s*dx%s*%+%s*dy%s*%*%s*dy") ~= nil,

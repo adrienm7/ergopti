@@ -12,16 +12,17 @@
 
 local helpers = require("tests.helpers")
 
-local function read_source(relative_path)
-	local fh = assert(io.open(helpers.driver_root() .. relative_path, "r"))
-	local source = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local source = helpers.read_driver_source(selector)
 	return source
 end
 
 helpers.describe("keylogger: data.sql outbox protects committed local events", function()
 	helpers.it("back-fills the local outbox meta key for existing SQLite caches", function()
-		local source = read_source("modules/keylogger/sqlite_writer.lua")
+		local source = read_source("local function _read_schema_sql") -- modules/keylogger/sqlite_writer.lua
 		helpers.assert_true(
 			source:find('{ "local_data_sql_outbox", "" }', 1, true) ~= nil,
 			"sqlite_writer.open_db must seed local_data_sql_outbox for upgraded caches"
@@ -29,7 +30,7 @@ helpers.describe("keylogger: data.sql outbox protects committed local events", f
 	end)
 
 	helpers.it("flushes an older outbox before reading more today.log entries", function()
-		local source = read_source("modules/keylogger/log_manager.lua")
+		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keylogger/log_manager.lua
 		local flush_pos = assert(source:find("_flush_local_data_sql_outbox(db)", 1, true))
 		local read_pos = assert(source:find("Rotation.read_new_entries()", 1, true))
 		helpers.assert_true(
@@ -39,7 +40,7 @@ helpers.describe("keylogger: data.sql outbox protects committed local events", f
 	end)
 
 	helpers.it("persists the exact batch into the outbox before SQLite COMMIT", function()
-		local source = read_source("modules/keylogger/log_manager.lua")
+		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keylogger/log_manager.lua
 		local persist_pos = assert(source:find("cannot persist data.sql outbox", 1, true))
 		local commit_pos = assert(source:find('db:exec("COMMIT;")', persist_pos, true))
 		helpers.assert_true(
@@ -49,7 +50,7 @@ helpers.describe("keylogger: data.sql outbox protects committed local events", f
 	end)
 
 	helpers.it("advances the in-memory cursor only after creating the durable retry record", function()
-		local source = read_source("modules/keylogger/log_manager.lua")
+		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keylogger/log_manager.lua
 		local persist_pos = assert(source:find("cannot persist data.sql outbox", 1, true))
 		local offset_pos = assert(source:find("Rotation.set_offset(new_offset, Rotation.get_date())", persist_pos, true))
 		helpers.assert_true(
@@ -59,7 +60,7 @@ helpers.describe("keylogger: data.sql outbox protects committed local events", f
 	end)
 
 	helpers.it("does not delete today.log at rollover while the temporary outbox is pending", function()
-		local source = read_source("modules/keylogger/log_manager.lua")
+		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keylogger/log_manager.lua
 		local flush_pos = assert(source:find("day_rollover: local data.sql outbox is not durable", 1, true))
 		local rollover_pos = assert(source:find("Rotation.rollover(_paths.data_sql_path)", flush_pos, true))
 		helpers.assert_true(

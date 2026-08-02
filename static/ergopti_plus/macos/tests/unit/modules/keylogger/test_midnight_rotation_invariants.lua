@@ -36,15 +36,15 @@ helpers.describe("keylogger: midnight rotation invariants (C3)", function()
 		-- self-contained keylogger/watchers.lua. Concatenate both so the body
 		-- introspection survives that move (move-resilient). The shared state is
 		-- the injected CoreState, named _state inside watchers.lua.
-		local function read_one(rel)
-			local path = helpers.driver_root() .. rel
-			local fh = io.open(path, "r")
-			helpers.assert_true(fh ~= nil, "cannot open " .. rel .. " at " .. tostring(path))
-			local s = fh:read("*a"); fh:close()
+		-- Takes a selector unique to one production file rather than that file's
+		-- path, so moving or splitting a module cannot turn these invariants into
+		-- path errors.
+		local function read_one(selector)
+			local s = helpers.read_driver_source(selector)
 			return s
 		end
-		return read_one("modules/keylogger/init.lua")
-			.. "\n" .. read_one("modules/keylogger/watchers.lua")
+		return read_one("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
+			.. "\n" .. read_one("local function poll_mouse_distance") -- modules/keylogger/watchers.lua
 	end
 
 	local function extract_maintenance(src)

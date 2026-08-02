@@ -15,7 +15,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
 -- id -> canonical disabled_when key array (order matches the manifest).
 local CANON = {
@@ -46,11 +45,11 @@ local function all_true_getters()
 	return g
 end
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -141,7 +140,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- ============================================
 
 	helpers.it("menu_metrics.lua resolves every canonical item's greying via the shared resolver", function()
-		local src = read_source("ui/menu/menu_metrics.lua")
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		for _, c in ipairs(CANON) do
 			local needle = 'ManifestMenu.resolve_disabled_when("metrics_menu", "' .. c.id .. '", STATE_GETTERS)'
 			helpers.assert_true(src:find(needle, 1, true) ~= nil,
@@ -150,7 +149,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	end)
 
 	helpers.it("the shared STATE_GETTERS table reads the correct Lua state", function()
-		local src = read_source("ui/menu/menu_metrics.lua")
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		helpers.assert_true(src:find("keylogger_enabled%s*=%s*function%(%) return state%.keylogger_enabled end") ~= nil,
 			"STATE_GETTERS must map keylogger_enabled to state.keylogger_enabled")
 		helpers.assert_true(src:find("wpm_widget_visible%s*=%s*function%(%) return state%.keylogger_float_wpm end") ~= nil,

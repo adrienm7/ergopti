@@ -19,13 +19,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -52,7 +51,7 @@ end
 helpers.describe("gestures/init.lua: M.stop() releases held clicks (gesture-stuck-click-on-stop)", function()
 
 	helpers.it("M.stop() body contains a pcall(Actions.force_cleanup) call", function()
-		local src  = read_source("modules/gestures/init.lua")
+		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		local body = func_body(src, "function M.stop()")
 		helpers.assert_true(body ~= "",
 			"M.stop() must exist in modules/gestures/init.lua")
@@ -62,7 +61,7 @@ helpers.describe("gestures/init.lua: M.stop() releases held clicks (gesture-stuc
 	end)
 
 	helpers.it("force_cleanup call precedes CoreState.enabled = false", function()
-		local src  = read_source("modules/gestures/init.lua")
+		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		local body = func_body(src, "function M.stop()")
 		local cleanup_pos = body:find("pcall%(Actions%.force_cleanup%)")
 		local enabled_pos = body:find("CoreState%.enabled%s*=%s*false")

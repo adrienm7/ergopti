@@ -55,13 +55,13 @@ const QUOTED_PATH = `(${SOURCE_PATH_LITERAL})`;
 // `helpers.driver_root()`, `driver_root()`, or a bare local holding either.
 const ROOT_EXPR = '(?:[\\w.]*driver_root\\(\\)|\\b[A-Za-z_]\\w*\\b)';
 
-// Everything between obtaining the handle and holding the source text. The three
+// Everything between obtaining the handle and holding the source text. The
 // optional lines are all shapes present in the tree: a bare io.open, an
-// assert(io.open(...)) and an io.open followed by an explicit guard. None is any
-// more ambiguous than the others.
+// assert(io.open(...)), a bare assert(fh, …) on its own line, and an io.open
+// followed by an explicit guard. None is any more ambiguous than the others.
 const READ_TAIL =
-	'(?:[ \\t]*helpers\\.assert_[a-z_]+\\([^\\n]*\\r?\\n)?' +
-	'(?:[ \\t]*if not \\w+ then (?:return(?: nil)? end|error\\([^\\n]*\\)[ \\t]*end)[ \\t]*\\r?\\n)?' +
+	'(?:[ \\t]*(?:helpers\\.assert_[a-z_]+|assert)\\([^\\n]*\\r?\\n)?' +
+	'(?:[ \\t]*if not \\w+ then return[^\\n]*end[ \\t]*\\r?\\n|[ \\t]*if not \\w+ then error\\([^\\n]*\\)[ \\t]*end[ \\t]*\\r?\\n)?' +
 	'[ \\t]*local\\s+(\\w+)\\s*=\\s*\\w+:read\\("\\*a"\\)[ \\t]*(?:;[ \\t]*\\w+:close\\(\\))?[ \\t]*\\r?\\n' +
 	'(?:[ \\t]*\\w+:close\\(\\)[ \\t]*\\r?\\n)?';
 
@@ -172,6 +172,106 @@ function uniqueSelectorFor(relTarget) {
 }
 
 /**
+ * Converts the local `read_source(rel)` helpers that most of the tree uses.
+ *
+ * Two thirds of the remaining pins are not written at the read site at all: the
+ * file declares one helper taking a driver-relative path and calls it a dozen
+ * times. Converting the read site alone would have left them all, and the same
+ * rewrite applies — the helper stops taking a PATH and starts taking a SELECTOR,
+ * and each call site swaps its literal for the selector of the module it names.
+ *
+ * Refuses the whole helper unless EVERY call site passes a resolvable literal
+ * with a proven-unique selector: a helper taking a selector at some call sites
+ * and a path at others is worse than one that never changed.
+ * @param {string} src - Test file contents.
+ * @param {string[]} blocked - Accumulator for refusals.
+ * @returns {{src: string, converted: number}} Rewritten source and pin count.
+ */
+function convertHelpers(src, blocked) {
+	let converted = 0;
+	const defRe = /^([ \t]*)local function (\w+)\((\w+)\)[ \t]*\r?\n([\s\S]*?)\r?\n\1end[ \t]*$/gm;
+
+	for (const def of [...src.matchAll(defRe)]) {
+		const [whole, indent, name, param, body] = def;
+		const P = param.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+		// Does the body read the file its own parameter names?
+		const inline = new RegExp(
+			`([ \\t]*)local\\s+(\\w+)\\s*=\\s*(?:assert\\(\\s*)?io\\.open\\(\\s*${ROOT_EXPR}\\s*\\.\\.\\s*${P}\\s*,\\s*"r"\\s*\\)(?:\\s*,[^\\n]*)?\\s*\\)?[ \\t]*\\r?\\n` +
+				READ_TAIL
+		);
+		const varThen = new RegExp(
+			`([ \\t]*)local\\s+(\\w+)\\s*=\\s*${ROOT_EXPR}\\s*\\.\\.\\s*${P}[ \\t]*\\r?\\n` +
+				OPEN_CALL('\\2') +
+				READ_TAIL
+		);
+		const hit = body.match(inline) || body.match(varThen);
+		if (!hit) continue;
+		const srcVar = hit[hit.length - 1];
+		const blockIndent = hit[1];
+
+		// Every call site must name a module with a unique selector, or the helper
+		// is left alone: half-converted, it would take two different kinds of
+		// argument and the next reader could not tell which.
+		// The lookbehind excludes a method call: a helper named `read` otherwise
+		// matched `fh:read("*a")`, and the fixer refused the whole file because
+		// "*a" is not a driver source path.
+		const callRe = new RegExp(`(?<![:.\\w])${name}\\(\\s*("[^"\\n]*")\\s*\\)`, 'g');
+		const calls = [...src.matchAll(callRe)];
+		if (calls.length === 0) continue;
+		const selectors = new Map();
+		let refused = null;
+		for (const c of calls) {
+			const literal = c[1];
+			if (selectors.has(literal)) continue;
+			const rel = literal.slice(1, -1).replace(/^[.\\/]+/, '');
+			if (!fs.existsSync(path.join(MACOS, rel.split('/').join(path.sep)))) {
+				refused = `${name}(${literal}) [not a driver source file]`;
+				break;
+			}
+			const selector = uniqueSelectorFor(rel);
+			if (!selector) {
+				refused = `${rel} [no declaration or constant unique to it]`;
+				break;
+			}
+			selectors.set(literal, selector);
+		}
+		if (refused) {
+			blocked.push(refused);
+			continue;
+		}
+
+		// The parameter is renamed because it no longer holds what its name says,
+		// and a message built from it ("cannot open " .. rel) would otherwise print
+		// a selector while calling it a path.
+		let newBody = body.replace(hit[0], `${blockIndent}local ${srcVar} = helpers.read_driver_source(selector)\n`);
+		newBody = newBody.replace(new RegExp(`\\b${P}\\b`, 'g'), 'selector');
+		const newDef =
+			`${indent}-- Takes a selector unique to one production file rather than that file's\n` +
+			`${indent}-- path, so moving or splitting a module cannot turn these invariants into\n` +
+			`${indent}-- path errors.\n` +
+			`${indent}local function ${name}(selector)\n${newBody}\n${indent}end`;
+		src = src.replace(whole, newDef);
+
+		// The call site used to name the module it read. A selector does not, and
+		// losing that costs more legibility than the move-resilience is worth, so
+		// the path is kept as a trailing comment — a comment cannot break a test
+		// when the file moves, it can only go stale.
+		//
+		// Only when the call ENDS the line: several sites read two modules and
+		// concatenate them across a line continuation, where a trailing comment
+		// would swallow the `..` and everything after it.
+		src = src.replace(callRe, (m, literal, offset, whole_) => {
+			const rest = whole_.slice(offset + m.length, whole_.indexOf('\n', offset));
+			const call = `${name}(${JSON.stringify(selectors.get(literal))})`;
+			return /^\s*$/.test(rest) ? `${call} -- ${literal.slice(1, -1)}` : call;
+		});
+		converted += calls.length;
+	}
+	return { src, converted };
+}
+
+/**
  * Rewrites every convertible pinned read in one test file.
  * @param {string} file - Absolute path to the test file.
  * @param {boolean} apply - Whether to write the result back.
@@ -217,6 +317,10 @@ function convertFile(file, apply) {
 			converted += 1;
 		}
 	}
+
+	const viaHelper = convertHelpers(src, blocked);
+	src = viaHelper.src;
+	converted += viaHelper.converted;
 
 	if (apply && converted > 0) fs.writeFileSync(file, src, 'utf8');
 	return { converted, blocked };

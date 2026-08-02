@@ -18,11 +18,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local path = helpers.driver_root() .. rel_path
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, rel_path .. " must be readable")
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -39,7 +39,7 @@ end
 helpers.describe("M-10: vscode_bridge lifecycle wired in init.lua", function()
 
 	helpers.it("init.lua calls vscode_bridge.setup() after menu.start()", function()
-		local src = read_src("init.lua")
+		local src = read_src("local function has_common_hotstring_groups") -- init.lua
 
 		helpers.assert_true(src:find("vscode_bridge", 1, true) ~= nil,
 			"init.lua must reference vscode_bridge to wire the bridge on boot (M-10)")
@@ -63,7 +63,7 @@ helpers.describe("M-10: vscode_bridge lifecycle wired in init.lua", function()
 	end)
 
 	helpers.it("init.lua shutdownCallback calls stop_server()", function()
-		local src = read_src("init.lua")
+		local src = read_src("local function has_common_hotstring_groups") -- init.lua
 		helpers.assert_true(src:find("stop_server", 1, true) ~= nil,
 			"init.lua shutdownCallback must call stop_server() to clean up the bridge HTTP server (M-10)")
 	end)

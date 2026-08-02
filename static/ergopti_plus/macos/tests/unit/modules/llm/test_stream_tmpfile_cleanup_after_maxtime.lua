@@ -21,11 +21,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local src_path = helpers.driver_root() .. rel_path
-	local fh = io.open(src_path, "r")
-	if not fh then error(rel_path .. " not readable at: " .. src_path) end
-	local src = fh:read("*a") ; fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,7 +40,7 @@ end
 -- ====================================================================
 
 do
-	local src = read_src("modules/llm/api_ollama.lua")
+	local src = read_src("local function read_ollama_port_override") -- modules/llm/api_ollama.lua
 
 	-- Test 1: STREAM_MAX_TIME_SEC constant must be defined.
 	local max_time_def = src:match("local STREAM_MAX_TIME_SEC%s*=%s*(%d+)")
@@ -113,7 +113,7 @@ end
 -- =======================================================================
 
 do
-	local src = read_src("modules/llm/api_mlx_inference.lua")
+	local src = read_src("function M.post_and_parse_streaming") -- modules/llm/api_mlx_inference.lua
 
 	-- Test 1: STREAM_TMPFILE_CLEANUP_SEC constant must be defined, derived from
 	-- (not a bare literal duplicating) STREAM_HARD_TIMEOUT_SEC.

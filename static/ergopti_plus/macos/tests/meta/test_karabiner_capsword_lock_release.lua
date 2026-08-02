@@ -22,13 +22,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -52,7 +51,7 @@ end
 helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsword-lock-leak)", function()
 
 	helpers.it("task is stored in a variable before calling :start()", function()
-		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
+		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		-- The handle must be captured in a local rather than left anonymous
 		-- (`hs.task.new(...):start()`), so the start()-failure branch can release the
 		-- pending lock. BOTH spellings satisfy that:
@@ -72,7 +71,7 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 	end)
 
 	helpers.it("_capsword_check_pending is released when task:start() returns false", function()
-		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
+		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		-- The fix must have: if not task:start() then _capsword_check_pending = false
 		helpers.assert_true(
 			src:match("if not task:start%(%)") ~= nil,
@@ -92,7 +91,7 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 	-- per PF-1 — routing this OS call through adapters/ keeps the hs.* purity ratchet
 	-- meta-test (test_port_adapter_coverage.lua) from re-flagging it as a violation.
 	helpers.it("a watchdog releases the lock if the started task never completes (F-L6)", function()
-		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
+		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		helpers.assert_true(src:find("_capsword_probe_watchdog", 1, true) ~= nil,
 			"deactivate_capsword must arm a watchdog timer (_capsword_probe_watchdog)")
 		helpers.assert_true(src:find("CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
@@ -117,7 +116,7 @@ end)
 helpers.describe("karabiner/watchers.lua: inputSourceChanged save/restore (karabiner-input-source-changed-overwrite)", function()
 
 	helpers.it("previous inputSourceChanged callback is saved before overwriting", function()
-		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
+		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		-- The fix reads the current callback before setting a new one
 		helpers.assert_true(
 			src:match("_previous_input_source_cb") ~= nil,
@@ -128,7 +127,7 @@ helpers.describe("karabiner/watchers.lua: inputSourceChanged save/restore (karab
 	end)
 
 	helpers.it("stop_input_source_watcher restores the previous callback instead of passing nil", function()
-		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
+		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		helpers.assert_true(
 			src:match("hs%.keycodes%.inputSourceChanged%(_previous_input_source_cb%)") ~= nil,
 			"stop_input_source_watcher must call hs.keycodes.inputSourceChanged(_previous_input_source_cb) to restore (karabiner-input-source-changed-overwrite)")

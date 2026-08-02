@@ -11,16 +11,17 @@
 
 local helpers = require("tests.helpers")
 
-local function source(relative_path)
-	local fh = assert(io.open(helpers.driver_root() .. relative_path, "r"))
-	local body = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function source(selector)
+	local body = helpers.read_driver_source(selector)
 	return body
 end
 
 helpers.describe("app-time interval lifecycle boundaries", function()
 	helpers.it("closes the current foreground interval before keylogger shutdown", function()
-		local src = source("modules/keylogger/init.lua")
+		local src = source("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
 		local stop_pos = assert(src:find("function M.stop()", 1, true))
 		local close_pos = assert(src:find("pcall(ContextTracker.close_active_app)", stop_pos, true))
 		local flush_pos = assert(src:find("LogManager.flush_buffer()", close_pos, true))
@@ -29,7 +30,7 @@ helpers.describe("app-time interval lifecycle boundaries", function()
 	end)
 
 	helpers.it("splits an open foreground interval before midnight rollover", function()
-		local src = source("modules/keylogger/watchers.lua")
+		local src = source("local function poll_mouse_distance") -- modules/keylogger/watchers.lua
 		local rotation_pos = assert(src:find("Midnight rotation: archiving", 1, true))
 		local split_pos = assert(src:find("tracker.split_active_app_at_midnight, _current_day", rotation_pos, true))
 		local flush_pos = assert(src:find("LogManager.flush_buffer()", split_pos, true))
@@ -38,7 +39,7 @@ helpers.describe("app-time interval lifecycle boundaries", function()
 	end)
 
 	helpers.it("keeps shutdown and midnight closures out of the app-switch graph", function()
-		local src = source("modules/keylogger/context_tracker.lua")
+		local src = source("local function update_secure_field_state") -- modules/keylogger/context_tracker.lua
 		helpers.assert_true(src:find("_log_manager.log_app_switch(_state.active_app_name, nil, duration_ms)", 1, true) ~= nil,
 			"shutdown must persist next_app as nil")
 		helpers.assert_true(src:find("previous_date .. \" 23:59:59.999\"", 1, true) ~= nil,

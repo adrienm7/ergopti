@@ -14,13 +14,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_src(rel)
-	local f = io.open(DRIVER_ROOT .. rel, "r")
-	if not f then return nil, "cannot open: " .. DRIVER_ROOT .. rel end
-	local s = f:read("*a")
-	f:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local s = helpers.read_driver_source(selector)
 	return s
 end
 
@@ -32,7 +31,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ==================================================
 
 	helpers.it("file_system.lua M.read must close fh even when fh:read() panics", function()
-		local src = read_src("adapters/file_system.lua")
+		local src = read_src("function M.expand_path") -- adapters/file_system.lua
 		assert(src, "adapters/file_system.lua must be readable")
 		-- The fix: inner pcall around fh:read("*a") so fh:close() always runs.
 		assert(
@@ -47,7 +46,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ===================================================
 
 	helpers.it("toml_cache.lua M.store must close fh even when fh:write() panics", function()
-		local src = read_src("adapters/toml_cache.lua")
+		local src = read_src("local function content_fingerprint") -- adapters/toml_cache.lua
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around fh:write(body) with fh:close() outside.
 		assert(
@@ -62,7 +61,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ==========================================================
 
 	helpers.it("toml_cache.lua content_fingerprint must close f even when f:read() panics", function()
-		local src = read_src("adapters/toml_cache.lua")
+		local src = read_src("local function content_fingerprint") -- adapters/toml_cache.lua
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around f:read(...) with f:close() outside.
 		assert(
@@ -77,7 +76,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =========================================================
 
 	helpers.it("engine.lua must compensate lastFirePos on finger-count centroid jump", function()
-		local src = read_src("modules/gestures/engine.lua")
+		local src = read_src("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
 		assert(src, "modules/gestures/engine.lua must be readable")
 		-- The bug: startPos was adjusted by jumpX/jumpY but lastFirePos was not.
 		-- The reversal detector uses (pos - lastFirePos), so the jump appeared as
@@ -104,8 +103,8 @@ helpers.describe("Audit-hs-final fixes", function()
 	helpers.it("actions.lua leftMouseTap must guard on leftClickHeld before re-toggling", function()
 		-- The synthetic click-hold subsystem was extracted into actions_click.lua;
 		-- read both so the guard assertion survives that move (move-resilient).
-		local src = (read_src("modules/gestures/actions.lua") or "") ..
-			"\n" .. (read_src("modules/gestures/actions_click.lua") or "")
+		local src = (read_src("local function switch_to_previous_window_precise") or "") ..
+			"\n" .. (read_src("local function start_click_key_watcher") or "")
 		assert(src ~= "", "gestures actions/actions_click source must be readable")
 		-- The bug: doAfter(0, M.toggle_left_click) fired unconditionally. If
 		-- click_key_watcher had already set leftClickHeld=false, the deferred
@@ -127,7 +126,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua must guard allWindows() against nil return", function()
-		local src = read_src("modules/karabiner/watchers.lua")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The bug: app:allWindows() can return nil if the app exits mid-call.
 		-- ipairs(nil) would crash with "bad argument #1".
@@ -143,7 +142,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua inner hs.task must be nil-checked before :start()", function()
-		local src = read_src("modules/karabiner/watchers.lua")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The bug: hs.task.new(...):start() chained with no nil-check — crashes
 		-- if the CLI binary is missing and hs.task.new() returns nil.
@@ -161,7 +160,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua F17 cycle-windows hotkey must use pcall wrapper", function()
-		local src = read_src("modules/karabiner/watchers.lua")
+		local src = read_src("local function read_current_layout_from_hitoolbox") -- modules/karabiner/watchers.lua
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The other hotkeys (Shift+F17, Alt+F17) already wrap their callback in pcall.
 		-- The plain F17 hotkey must match for consistency.
@@ -177,7 +176,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- =====================================================================
 
 	helpers.it("api_remote.lua must use separate _infer_client and _check_client", function()
-		local src = read_src("modules/llm/api_remote.lua")
+		local src = read_src("local function load_api_providers") -- modules/llm/api_remote.lua
 		assert(src, "modules/llm/api_remote.lua must be readable")
 		-- The bug: single HttpClient used for both POST inference and GET health-checks.
 		-- http_client.lua cancels the in-flight request on every new call, so a

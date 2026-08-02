@@ -74,15 +74,16 @@ helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2
 		-- self-contained watchers.lua, which receives _is_paused as an injected
 		-- predicate and keeps the exact _is_paused() guard at every call site.
 		-- Read both files so the guard count survives that move (move-resilient).
-		local function read_src(rel)
-			local fh = io.open(helpers.driver_root() .. rel, "r")
-			if not fh then return nil end
-			local s = fh:read("*a"); fh:close()
+		-- Takes a selector unique to one production file rather than that file's
+		-- path, so moving or splitting a module cannot turn these invariants into
+		-- path errors.
+		local function read_src(selector)
+			local s = helpers.read_driver_source(selector)
 			return s
 		end
-		local init_src = read_src("modules/keylogger/init.lua")
+		local init_src = read_src("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
 		helpers.assert_true(init_src ~= nil, "keylogger/init.lua must be readable")
-		local src = init_src .. "\n" .. (read_src("modules/keylogger/watchers.lua") or "")
+		local src = init_src .. "\n" .. (read_src("local function poll_mouse_distance") or "")
 		-- Every top-level callback must start with _is_paused(). We assert the
 		-- helper exists and is used more than once (once per callback).
 		local count = 0

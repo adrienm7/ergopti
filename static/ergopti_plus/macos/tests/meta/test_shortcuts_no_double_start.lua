@@ -18,13 +18,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -38,7 +37,7 @@ end
 helpers.describe("shortcuts/script_control.lua: double-start guard (shortcuts-watcher-leak)", function()
 
 	helpers.it("M.start() checks _tap before creating a new eventtap", function()
-		local src = read_source("modules/shortcuts/script_control.lua")
+		local src = read_source("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		-- The fix adds: if _tap then Logger.warn(...) return end
 		-- before the pcall(hs.eventtap.new, ...) call
 		local start_fn = src:match("function M%.start%(.-\nend")
@@ -61,7 +60,7 @@ end)
 helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcuts-watcher-leak)", function()
 
 	helpers.it("M.start() checks _started before rebinding hotkeys", function()
-		local src = read_source("modules/shortcuts/keyboard_shortcuts.lua")
+		local src = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
 		-- The fix adds: if _started then Logger.debug(...) return end at the top of M.start()
 		helpers.assert_true(
 			src:match("if _started then[^\n]*\n[^\n]*debug") ~= nil,
