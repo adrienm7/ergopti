@@ -415,17 +415,21 @@ Constraints: **paths before moves, moves before content, data before code.**
 
   | Target | Today | After | Mechanism |
   | --- | ---: | ---: | --- |
-  | Convention invariants | 766 | ~0 | **the replacement already exists**: `lint-conventions.js --fail-on-violations` + `audit-file-headers.cjs`, both strict and both in the suite. This row is deletion, not reimplementation. |
+  | Convention invariants | 392 | ~0 | **the replacement is already live**: `lint-conventions.js --fail-on-violations`. Deletion, not reimplementation. |
   | Corpus consumers (16 corpora, 258 vectors) | 7 650 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
   | Port contract vectors (129) | 2 138 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
   | Port presence/compliance | 1 473 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
   | e2e harnesses | 1 374 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
 
-  **Start with the convention row.** It is the only one where the replacement is
-  already live, so the work is confirming the JS gate is green and then deleting
-  the eight driver-side duplicates it subsumes (`macos/tests/meta/`'s
-  `test_file_headers.lua`, `test_section_headers.lua`, and their siblings). Every
-  other row means writing the replacement first.
+  **Convention row: 374 of the 766 lines are deleted.** The four
+  `test_{file,section}_headers.{lua,ahk}` are gone — the alignment pair could only
+  fail if it could not read a file, and the JS gate subsumes the header pair while
+  scanning strictly more (both drivers plus Linux plus `tests/`). What is left in
+  that row is `test_no_pascal_case_in_toml.{lua,ahk}` (239 l): `checkTomlKeys` has
+  the same intent, but the driver tests carry file-scope exclusions of their own,
+  so confirm the JS gate reaches the same TOML files before deleting them.
+
+  Every other row means writing the replacement first.
 
 - **Lot 10 — pruning.** ~~Port the macOS reachability gate to Windows and Linux,
   then delete the dead adapter code~~ — **done.** Kept here only for the rule it
