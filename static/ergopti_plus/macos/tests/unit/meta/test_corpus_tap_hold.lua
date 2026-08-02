@@ -145,6 +145,8 @@ helpers.describe("tap_hold corpus — TOML codec round-trip", function()
 			local ok_dec, parsed = pcall(codec.decode, toml_str)
 			helpers.assert_true(ok_dec,
 				"vector '" .. v.id .. "': decode failed: " .. tostring(parsed))
+			helpers.assert_eq(type(parsed), "table",
+				"vector '" .. v.id .. "': decode must answer a table")
 
 			-- Verify the key survives round-trip
 			local survived_key = type(parsed) == "table"
