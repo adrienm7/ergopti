@@ -657,7 +657,7 @@ to filter.
   was created watching an empty set in every test run. When a test says it cannot
   assert something, check whether the harness is what made it impossible.
 
-- **pcall-only: 203 → 86, and the recipe below is what did it.** 135 of the
+- **pcall-only: 203 → 62, and the recipe below is what did it.** 135 of the
   original 203 were the ONLY assertion in their case; macOS 119, Linux 84, AHK
   none — the AHK detector is `vacuous-absence`, already at zero.
 
@@ -673,7 +673,7 @@ to filter.
   for cases whose subject IS the raising — `test_utf8_offset_pcall.lua` is the
   genuine one, and its helper's docstring already says so.
 
-  **What converting 117 of them found — the reason this class is worth the
+  **What converting 141 of them found — the reason this class is worth the
   effort.** A SQLite writer with no database must REFUSE, and refusal is a return
   value the caller advances its watermark on: "did not crash" let a writer report
   success against a closed database, which loses rows silently and for good. A
