@@ -145,13 +145,19 @@ Constraints: **paths before moves, moves before content, data before code.**
   and entry-point compile checks. For those the path IS the subject. Converting
   them means changing what the test asserts, not how it reads.
 
-  Still open: the **AHK twin has not had the same treatment** —
-  `test-no-pinned-source-reads.cjs` still matches a read expression, so its count
-  is probably as understated as the macOS one was. The AHK residue each pins
-  deliberately (`run_all.ahk` itself, a `_generated/` file `_DriverSourceConcat`
-  excludes, a runner, or a single file carrying an ABSENCE assertion a
-  directory-wide scan would weaken), but that is a claim about the count it
-  reports, not about the count.
+  ~~Still open: the AHK twin has not had the same treatment~~ — **done, and the
+  suspicion was right in both directions.** Its alternation said
+  `modules|lib|ui`: `lib` had matched nothing since the rename to `infra/`,
+  `adapters/` was never listed although all three drivers have one, and
+  `ErgoptiPlus.ahk` is in no sub-tree so no directory arm could reach it — 24
+  files and 145 literals had been pinned the whole time. The baseline ALSO
+  carried slack the other way (16 files frozen against a measured 7, 326 literals
+  against 235), which is why neither error ever surfaced. Honest: **31 files /
+  380 literals**, and `platform` is listed ahead of Lot 3 so the extraction could
+  not land unseen. The AHK conversion itself is not started; the residue that
+  pins deliberately (`run_all.ahk`, a `_generated/` file `_DriverSourceConcat`
+  excludes, a runner, an ABSENCE assertion a directory-wide scan would weaken)
+  describes a shape, not that number.
 
 - **Lot 3 — one tree.** ~~(b) de-platform `_shared/`~~ and ~~(a) extract
   `platform/`~~ — **both done.** Remaining: (c) the Convention S stubs.
@@ -509,8 +515,8 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-02 at tautology **22**,
-pcall-only **203**, unfloored-scan **4**, the other three at 0.
+`unfloored-scan`. It only turns down. Frozen 2026-08-02 at pcall-only **203**,
+unfloored-scan **4**, **the other four at 0**.
 
 The work is burning those floors down. Each occurrence is either a real false
 green to fix or a justified shape to document in the test itself —
@@ -519,31 +525,39 @@ to filter.
 
 **Where the real work is, measured rather than assumed:**
 
-- **tautology (45 → 22): the sole-assertion ones are the real find**, and 23 are
-  now done. Of the 22 left, **16 are still the ONLY assertion in their case**, so
-  the whole case certifies nothing.
+- ~~**tautology (45)**~~ — **zero, 2026-08-02.** The whole class is gone. What it
+  taught, in four shapes:
 
-  The pattern in every one fixed so far: the case was a **design claim written as
-  a test** — "this module is pure, the pause gate lives higher" — asserted with
-  `assert_true(true)` and that sentence as the message. The claim is true and
-  worth holding; what it needed was to be checked. Each became an assertion that
-  the pause coupling is absent from the module's source, or that the guard is the
-  first statement of the keystroke path, and each was proved red by reintroducing
-  the coupling.
+  Most were a **design claim written as a test** — "this module is pure, the pause
+  gate lives higher" — asserted with `assert_true(true)` and that sentence as the
+  message. The claim is true and worth holding; what it needed was to be checked.
+  Each became an assertion that the coupling is absent from the module's source,
+  or that the guard is the first statement of the keystroke path.
 
-  Three of them wrapped a **loop whose results were discarded** — 150 iterations
-  over a body reading `-- simulate`, 120 profile resolutions, 80 malformed UTF-8
-  chunks — so the volume the case advertised was measuring nothing. The loop is
-  usually worth keeping; what it needs is to read its answers back.
+  Several wrapped a **loop whose results were discarded** — 150 iterations over a
+  body reading `-- simulate`, 120 profile resolutions, 80 malformed UTF-8 chunks.
+  The loop is usually worth keeping; what it needs is to read its answers back.
 
-  ⚠ Two traps, both hit while doing this: `read_driver_source` needs a selector
+  Eight were a **conditional skip** guarding a module that ships with the driver
+  and is stubbed three lines above — `"menu_builder not available"`,
+  `"modules.llm could not load in this environment"`. The skip never fires, so it
+  buys nothing; if it ever did, six cases across three files would pass while the
+  thing they test failed to load.
+
+  One was an **absence helper over a possibly-empty list**, used by a PII test: a
+  capture that stopped recording would turn every "must not leak" case green
+  while inspecting nothing. Floor the input before asserting the absence.
+
+  ⚠ Four traps, all hit while doing this. `read_driver_source` needs a selector
   unique to ONE production file (`function M.get_active_profile` is declared by
-  both `modules/llm/init.lua` and `modules/llm/profiles.lua`, so the scan
-  concatenated them and the pause check ran against the wrong module), and
-  `list_shortcuts()` hands back LIVE state, so a stress loop that toggles a
-  shortcut must restore it or a later case in the same file fails.
+  both `modules/llm/init.lua` and `modules/llm/profiles.lua`). `list_shortcuts()`
+  hands back LIVE state, so a stress loop that toggles a shortcut must restore it.
+  A substring check for `"paus"` fires on `sqlite_writer`'s `pause_before_ms`
+  COLUMN — a metric it is supposed to record — so match the state spellings
+  (`processing_paused`, `is_paused`, `script_control`, `suspend`). And reaching
+  for `pcall` to fix a tautology just trades it for a pcall-only.
 
-  ⚠ **One of them was blocked by the harness, not by the test.**
+  ⚠ **One was blocked by the harness, not by the test.**
   `test_actions_system.lua` said in a comment that it "cannot easily assert the
   exact watch_types without deep introspection of the eventtap stub". The stub
   was the problem: `hs.eventtap.new` discarded both arguments, and
@@ -552,6 +566,23 @@ to filter.
   missing type left a nil at index 1 and `ipairs` yielded NOTHING — the watcher
   was created watching an empty set in every test run. When a test says it cannot
   assert something, check whether the harness is what made it impossible.
+
+- **pcall-only (203) is the whole remaining class, and it is now measured.**
+  **135 of the 203 are the ONLY assertion in their case** (68 also check a
+  value); macOS 119, Linux 84, AHK none — the AHK detector is `vacuous-absence`
+  and that is already at zero.
+
+  They are one shape: `it("X does not crash", …)` around a `pcall`, so the case
+  certifies survival and nothing else. The fix is the same each time and it is
+  NOT to delete the pcall — it is to assert **what the guard did**. For the
+  `require_state` family (`"start() before init is a safe no-op"`, `"rejects a
+  non-table core_state"`) that means calling a public function afterwards and
+  asserting it still returns the guard's sentinel: a module that swallowed the
+  bad input and initialised anyway passes "did not crash" and fails everything
+  after it.
+  ⚠ Where the call is expected NOT to raise, drop the pcall entirely: a raise
+  then fails the case with the real error instead of a boolean, which is strictly
+  more informative. Reserve `pcall` for cases whose subject IS the raising.
 - ~~**unfloored-scan (24): only a handful are genuine** — the rest already carry a
   floor in a shape the detector does not recognise.~~ — **detector fixed, 24 → 4.**
   Four blind spots closed: a Lua collector `t[#t+1] = v` (the regex required AHK
