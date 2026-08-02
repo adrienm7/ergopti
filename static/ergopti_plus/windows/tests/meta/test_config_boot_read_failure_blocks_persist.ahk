@@ -57,7 +57,7 @@ global _CBRF_EXCLUSIVE_LOCK_FLAGS := "r-rwd"
 _CBRF_UnreadableExistingFileIsFlagged() {
 	Path := A_Temp . "\ergopti_test_cbrf_locked_" . A_TickCount . ".toml"
 	try FileDelete(Path)
-	FileAppend("[ahk.layout]`nenabled = false`n", Path, "UTF-8")
+	FileAppend("[layout]`nenabled = false`n", Path, "UTF-8")
 
 	Lock := FileOpen(Path, _CBRF_EXCLUSIVE_LOCK_FLAGS)
 	Assert(Lock != "" and IsObject(Lock), "the test could not take an exclusive lock — it would otherwise assert nothing")
@@ -105,7 +105,7 @@ _CBRF_ApplyRefusesUnreadableConfig() {
 	Path := A_Temp . "\ergopti_test_cbrf_apply_" . A_TickCount . ".toml"
 	try FileDelete(Path)
 	; A real override: if the apply ever ran, this key would flip in the fixture.
-	FileAppend("[ahk.layout]`nenabled = false`n", Path, "UTF-8")
+	FileAppend("[layout]`nenabled = false`n", Path, "UTF-8")
 
 	Fixture := Map("layout", Map("enabled", true))
 	PrevFlag := _ConfigBootReadFailed
@@ -133,7 +133,7 @@ _CBRF_ApplyStillWorksWhenReadable() {
 	global _ConfigBootReadFailed
 	Path := A_Temp . "\ergopti_test_cbrf_ok_" . A_TickCount . ".toml"
 	try FileDelete(Path)
-	FileAppend("[ahk.layout]`nenabled = false`n", Path, "UTF-8")
+	FileAppend("[layout]`nenabled = false`n", Path, "UTF-8")
 
 	Fixture := Map("layout", Map("enabled", true))
 	PrevFlag := _ConfigBootReadFailed
@@ -176,7 +176,7 @@ _CBRF_SaveDeclinesWhileFlagged() {
 	Target := A_Temp . "\ergopti_test_cbrf_save_" . A_TickCount . ".toml"
 	try FileDelete(Target)
 	; Content that is unmistakably the user's, so any rewrite is visible.
-	FileAppend("[ahk.layout]`nenabled = false`n", Target, "UTF-8")
+	FileAppend("[layout]`nenabled = false`n", Target, "UTF-8")
 	Before := FileRead(Target, "UTF-8")
 
 	PrevFile  := IsSet(ConfigurationFile) ? ConfigurationFile : ""

@@ -166,6 +166,24 @@ function resolveDefault(feature, platform) {
 }
 
 function validate(features) {
+	// A feature is addressed by its dotted path, so two blocks sharing one is a
+	// silent overwrite, not a merge. This was unenforceable while every driver
+	// had its own namespace — [[features.ahk.gestures]] and
+	// [[features.hs.gestures]] could both declare "swipe_3_up" without ever
+	// meeting. Now that they share an address, uniqueness is the invariant that
+	// keeps a per-driver default divergence from being expressed by accident:
+	// it has to go through default_per_platform, where it is visible.
+	const seen = new Map();
+	for (const f of features) {
+		const key = `${f.path}.${f.id}`;
+		if (seen.has(key)) {
+			throw new Error(
+				`duplicate feature "${key}" — declare one block and use ` +
+					`default_per_platform if the drivers disagree on the default`
+			);
+		}
+		seen.set(key, f);
+	}
 	for (const f of features) {
 		const hasDefault = f.default !== undefined;
 		const hasDefaultPerPlatform = f.default_per_platform !== undefined;

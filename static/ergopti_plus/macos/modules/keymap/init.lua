@@ -82,13 +82,13 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
 	keymap                      = true,   -- Module on/off toggle (no manifest entry)
-	expansion_delay             = Manifest.default_for("hs.hotstrings.expansion_delay"),
+	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
-	preview_star_enabled        = Manifest.default_for("hs.hotstrings.preview_star_enabled"),
-	preview_autocorrect_enabled = Manifest.default_for("hs.hotstrings.preview_autocorrect_enabled"),
-	preview_ai_enabled          = Manifest.default_for("hs.hotstrings.preview_ai_enabled"),
-	preview_colored_tooltips    = Manifest.default_for("hs.hotstrings.preview_colored_tooltips"),
+	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
+	preview_autocorrect_enabled = Manifest.default_for("hotstrings.preview_autocorrect_enabled"),
+	preview_ai_enabled          = Manifest.default_for("hotstrings.preview_ai_enabled"),
+	preview_colored_tooltips    = Manifest.default_for("hotstrings.preview_colored_tooltips"),
 }
 
 

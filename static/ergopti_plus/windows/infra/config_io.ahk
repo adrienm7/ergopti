@@ -32,25 +32,25 @@ _GlobalClearAllBindings(Updates) {
 		global GestureAssignments, GESTURE_SLOTS, KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, ScriptShortcutAssignments, _IniCache
 		for Slot in GESTURE_SLOTS {
 				GestureAssignments[Slot] := "none"
-				Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: "none" })
+				Updates.Push({ Section: "gestures", Key: Slot, Value: "none" })
 		}
 		KbWritten := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
 				KeyboardShortcutAssignments[Slot] := "none"
-				Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: "none" })
+				Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
 				KbWritten[Slot] := true
 		}
-		if IsSet(_IniCache) and _IniCache.Has("ahk.shortcuts.keyboard") {
-				for Slot, _ in _IniCache["ahk.shortcuts.keyboard"] {
+		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
+				for Slot, _ in _IniCache["shortcuts.keyboard"] {
 						if !KbWritten.Has(Slot) {
 								KeyboardShortcutAssignments[Slot] := "none"
-								Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: "none" })
+								Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
 						}
 				}
 		}
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
 				ScriptShortcutAssignments[Slot] := "none"
-				Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
+				Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: "none" })
 		}
 		if IsSet(_TH_WriteTapHoldDisabled) {
 				; A bare try here meant "tout desactiver" reported success while the
@@ -69,16 +69,19 @@ _GlobalClearAllBindings(Updates) {
 ; {Section, Key, Value} TOML writes to Updates. Extracted out of ToggleAllFeatures
 ; as a standalone module function (rather than a nested closure) so the flip
 ; logic is directly testable without triggering ToggleAllFeatures's trailing
-; Reload(). Reuses ManifestResolveFeatureSection (infra/manifest_reader.ahk) --
-; the single source of truth introduced for _CollectFeatureUpdates -- to
-; re-derive the ahk.-prefixed TOML section per leaf instead of the raw
-; (already ahk.-stripped) Features nesting.
+; Reload(). The walked nesting IS the TOML section: ManifestBuildFeaturesMap
+; files each feature under its manifest section verbatim, so descending the tree
+; reconstructs that section exactly. It used to need a per-leaf manifest lookup
+; (ManifestResolveFeatureSection) because the tree was built with the ahk. driver
+; prefix stripped, which merged a shared section and an AHK-only one under the
+; same top-level key and made the walked path ambiguous. Lot 4 removed the silos
+; and with them the ambiguity.
 _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 		if (Type(Node) != "Map")
 				return
 		if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
 				Node["enabled"] := Bool
-				Updates.Push({ Section: ManifestResolveFeatureSection(SectionPath . ".enabled", SectionPath), Key: "enabled", Value: Bool })
+				Updates.Push({ Section: SectionPath, Key: "enabled", Value: Bool })
 				return
 		}
 		for K, V in Node {
@@ -86,7 +89,7 @@ _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 						_CollectFeatureFlipUpdates(Bool, SectionPath . "." . K, V, Updates)
 				else {
 						Node[K] := Bool
-						Updates.Push({ Section: ManifestResolveFeatureSection(SectionPath . "." . K, SectionPath), Key: K, Value: Bool })
+						Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
 				}
 		}
 }
@@ -103,14 +106,14 @@ ToggleAllFeatures(Value) {
 		}
 		for Category, _ in CategoryEnabled {
 				CategoryEnabled[Category] := Bool
-				Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
+				Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
 		}
 		WPMWidget.visible := Bool
 		WPMWidget.use_colors := Bool
 		WPMWidget.show_graph := Bool
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
 		if !Bool
 				_GlobalClearAllBindings(Updates)
 		; Everything above mutated MEMORY. If the write fails, memory and disk
@@ -150,7 +153,7 @@ ToggleAllHotstrings(Value) {
 		; category gate). The Hotstrings master gate follows so the change is
 		; immediately effective (on) or the whole tree is off (off).
 		CategoryEnabled["Hotstrings"] := Bool
-		TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
+		TOML_Write(Bool, ConfigurationFile, "category_enabled", "hotstrings")
 		Batch := []
 		for V2Path in _CollectAllHotstringsV2Paths()
 				Batch.Push(Map("path", V2Path, "value", Bool))
@@ -263,7 +266,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 				; otherwise skip the rebuild below too, leaving memory, disk and the live
 				; engine in three different states.
 				try {
-						TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+						TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKey(Category))
 				} catch as Err {
 						try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
 						try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
@@ -280,7 +283,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 		; re-reading disk — but it must still be reported, or the toggle silently
 		; reverts on the next start with no explanation.
 		try {
-				TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+				TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKey(Category))
 		} catch as Err {
 				try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
 				try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
@@ -307,13 +310,13 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 				; Master gate must be on for any hotstring to fire.
 				if !CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"] {
 						CategoryEnabled["Hotstrings"] := true
-						GateUpdates.Push({ Section: "ahk.category_enabled", Key: "hotstrings", Value: true })
+						GateUpdates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
 				}
 				; Lift this category's own gate too, when it has one (flat categories do;
 				; DynamicHotstrings / Personal follow the master directly).
 				if (CategoryEnabled.Has(V1Cat) and !CategoryEnabled[V1Cat]) {
 						CategoryEnabled[V1Cat] := true
-						GateUpdates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
+						GateUpdates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
 				}
 		}
 		if (GateUpdates.Length > 0)
@@ -343,7 +346,7 @@ HS_TogglePersonalAllSections(Enable) {
 		}
 		if (Bool and (!CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"])) {
 				CategoryEnabled["Hotstrings"] := true
-				TOML_Write(true, ConfigurationFile, "ahk.category_enabled", "hotstrings")
+				TOML_Write(true, ConfigurationFile, "category_enabled", "hotstrings")
 		}
 		Data := ReadPersonalToml()
 		Batch := []
@@ -415,33 +418,33 @@ SaveFullConfig() {
 		Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
 				for Slot, Action in ScriptShortcutAssignments
-						Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action })
+						Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: Action })
 		}
 		if IsSet(KeyboardShortcutAssignments) {
 				for Slot, Action in KeyboardShortcutAssignments
-						Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action })
+						Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
 		}
 		if IsSet(GestureAssignments) {
 				for Slot, Action in GestureAssignments
-						Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action })
+						Updates.Push({ Section: "gestures", Key: Slot, Value: Action })
 		}
 		apps := []
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_private_browsing", Value: TOML_Bool(MetricsFilters.private_browsing) })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: TOML_Bool(MetricsFilters.secure_field) })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_system_auth", Value: TOML_Bool(MetricsFilters.system_auth) })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "ahk.metrics", Key: "metrics_disabled_apps", Value: apps })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
-		Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
+		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
+		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
+		Updates.Push({ Section: "metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
+		Updates.Push({ Section: "metrics", Key: "metrics_filter_private_browsing", Value: TOML_Bool(MetricsFilters.private_browsing) })
+		Updates.Push({ Section: "metrics", Key: "metrics_filter_secure_field", Value: TOML_Bool(MetricsFilters.secure_field) })
+		Updates.Push({ Section: "metrics", Key: "metrics_filter_system_auth", Value: TOML_Bool(MetricsFilters.system_auth) })
+		Updates.Push({ Section: "metrics", Key: "metrics_encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
+		Updates.Push({ Section: "metrics", Key: "metrics_disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
 		; Features), so the _LLM_Menu_SyncToFeatures gate above does not cover them. The
 		; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while
@@ -465,7 +468,7 @@ SaveFullConfig() {
 		global CategoryEnabled
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
-						Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
+						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
 		}
 		global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
 		if IsSet(UPDATER_CHECK_INTERVAL)
@@ -570,7 +573,7 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 				if (Type(Value) == "Map")
 						_CollectFeatureUpdates(Updates, Sub, Value)
 				else
-						Updates.Push({ Section: ManifestResolveFeatureSection(Sub, SectionPath), Key: Key, Value: Value })
+						Updates.Push({ Section: SectionPath, Key: Key, Value: Value })
 		}
 }
 
@@ -616,7 +619,7 @@ ReloadWithDefaultConfig(*) {
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				Value := IniCacheGet(_IniCache, "ahk.shortcuts.script_control", Slot)
+				Value := IniCacheGet(_IniCache, "shortcuts.script_control", Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						ScriptShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -678,7 +681,7 @@ SetScriptShortcutAction(Slot, ActionName) {
 		if !GestureEnsureActionParameter(GestureBindingId("script", Slot), ActionName)
 				return
 		ScriptShortcutAssignments[Slot] := ActionName
-		TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.script_control", Slot)
+		TOML_Write(ActionName, ConfigurationFile, "shortcuts.script_control", Slot)
 		ReloadPreservingSuspend()
 }
 
@@ -737,13 +740,13 @@ ReadKeyboardShortcutsConfig() {
 		SlotsToRead := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
 				SlotsToRead[Slot] := true
-		if IsSet(_IniCache) and _IniCache.Has("ahk.shortcuts.keyboard") {
-				for Slot, _ in _IniCache["ahk.shortcuts.keyboard"]
+		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
+				for Slot, _ in _IniCache["shortcuts.keyboard"]
 						SlotsToRead[Slot] := true
 		}
 
 		for Slot, _ in SlotsToRead {
-				Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
+				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -769,7 +772,7 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
 		if !GestureEnsureActionParameter(GestureBindingId("keyboard", SlotId), ActionName)
 				return
 		KeyboardShortcutAssignments[SlotId] := ActionName
-		TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.keyboard", SlotId)
+		TOML_Write(ActionName, ConfigurationFile, "shortcuts.keyboard", SlotId)
 		ReloadPreservingSuspend()
 }
 

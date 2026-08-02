@@ -89,17 +89,26 @@ TestFMv2_ManifestVersion() {
 }
 Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
 
+; section_order drives both the tray-menu order and the order sections are
+; written to config.toml, so it is user-visible twice. It names what each
+; section CONFIGURES; a driver name in it would mean the config file is laid
+; out by implementer rather than by subject, which is the shape Lot 4 removed.
 TestFMv2_SectionOrder() {
 	Order := ManifestSectionOrder()
 	AssertEqual("Array", Type(Order))
-	AssertEqual(7, Order.Length)
+	AssertEqual(8, Order.Length)
 	AssertEqual("script", Order[1])
 	AssertEqual("hotstrings", Order[2])
 	AssertEqual("llm", Order[3])
 	AssertEqual("metrics", Order[4])
 	AssertEqual("shortcuts", Order[5])
-	AssertEqual("ahk", Order[6])
-	AssertEqual("hs", Order[7])
+	AssertEqual("gestures", Order[6])
+	AssertEqual("layout", Order[7])
+	AssertEqual("category_enabled", Order[8])
+	for Name in Order {
+		AssertTrue(Name != "ahk" and Name != "hs" and Name != "linux",
+			"section_order must not name a driver — it orders what is configured, not who implements it")
+	}
 }
 Test("manifest_v2: section_order matches v2 schema design", TestFMv2_SectionOrder)
 
@@ -147,22 +156,29 @@ TestFMv2_BuildHasSectionOrder() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("section_order"))
 	AssertEqual("Array", Type(Built["section_order"]))
-	AssertEqual(7, Built["section_order"].Length)
+	AssertEqual(8, Built["section_order"].Length)
 }
 Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)
 
-TestFMv2_AhkPrefixStripped() {
-	; ahk.layout.ergopti_base in the manifest must land at Features[layout][ergopti_base]
-	; after the ahk. prefix strip. Call sites must NOT see Features[ahk].
+; No driver branch may appear at the root of the Features tree. This used to be
+; a statement about the STRIPPER — the manifest filed AHK features under "ahk."
+; and the builder cut it off, so a missed strip showed up as Features["ahk"].
+; Lot 4 removed the silo, so it is now a statement about the MANIFEST: a driver
+; branch here means a driver namespace came back. Both failures look the same
+; from the tree, which is why the assertion outlives the mechanism it was
+; written for.
+TestFMv2_NoDriverBranchAtRoot() {
 	Built := ManifestBuildFeaturesMap()
-	AssertFalse(Built.Has("ahk"),
-		"ahk prefix must be stripped at build time; found stray ahk branch.")
+	for Name in ["ahk", "hs", "linux"] {
+		AssertFalse(Built.Has(Name),
+			"Features has a '" . Name . "' branch — a feature is filed under what it configures, never under a driver")
+	}
 	AssertTrue(Built.Has("layout"),
-		"Layout (ahk.layout in manifest) must land at Features[layout] after strip.")
+		"layout.ergopti_base must land at Features[layout].")
 }
-Test("ManifestBuildFeaturesMap: ahk. prefix is stripped from section paths",
-	TestFMv2_AhkPrefixStripped)
+Test("ManifestBuildFeaturesMap: no driver branch at the root of the tree",
+	TestFMv2_NoDriverBranchAtRoot)
 
 TestFMv2_LayoutDefaults() {
 	Built := ManifestBuildFeaturesMap()
@@ -374,11 +390,11 @@ TestFMv2_ApplyUniversalScriptOverride() {
 }
 Test("ApplyConfigToml: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
 
-TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
+TestFMv2_ApplyLayoutOverride() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FM_WriteFixture("ahk_layout",
-			"[ahk.layout]`r`nergopti_base = false`r`n")
+		Path := _FM_WriteFixture("layout",
+			"[layout]`r`nergopti_base = false`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual(false, Features["layout"]["ergopti_base"])
@@ -386,8 +402,30 @@ TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
 	}
 	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigToml: [ahk.layout] strips prefix to Features[layout]",
-	TestFMv2_ApplyAhkLayoutOverrideStripsPrefix)
+Test("ApplyConfigToml: [layout] lands on Features[layout]",
+	TestFMv2_ApplyLayoutOverride)
+
+; The loader used to accept "[ahk.layout]" and strip the prefix, because the
+; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
+; the driver namespace is no longer a spelling of anything — reintroducing the
+; strip would make "[ahk.layout]" and "[layout]" two names for one section, and
+; a config carrying both would apply in file order with no warning. Pin the
+; rejection: an unknown section is skipped, not silently rewritten.
+TestFMv2_DriverNamespacedSectionIsRejected() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("ahk_layout",
+			"[ahk.layout]`r`nergopti_base = false`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
+		AssertEqual(true, Features["layout"]["ergopti_base"],
+			"the manifest default must survive an [ahk.layout] section")
+		FileDelete(Path)
+	}
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigToml: [ahk.layout] is rejected, not stripped",
+	TestFMv2_DriverNamespacedSectionIsRejected)
 
 TestFMv2_ApplyNestedSubSection() {
 	OldFeatures := _FM_BeginIsolated()

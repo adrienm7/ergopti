@@ -129,7 +129,8 @@ OnError(_FatalErrorHandler)
 #Include ../infra/personal_features.ahk
 #Include ../infra/hotstrings/hotstrings_config.ahk
 ; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
-; the F5/F48 regression tests (test_config_io_feature_section_prefix.ahk).
+; the section-resolution regression tests
+; (test_config_io_feature_section_resolution.ahk).
 ; ToggleAllFeatures/SaveFullConfig themselves are never invoked here (they
 ; depend on numerous boot-only globals and end in an unconditional Reload()),
 ; so including this file is safe — only function definitions at top level.
@@ -249,7 +250,7 @@ InstallSendNoOps()
 #Include unit/test_config.ahk
 #Include unit/test_feature_state_boot.ahk
 #Include unit/test_features_manifest.ahk
-#Include unit/test_config_io_feature_section_prefix.ahk
+#Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk

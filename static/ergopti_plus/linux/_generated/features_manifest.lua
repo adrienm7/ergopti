@@ -17,7 +17,7 @@ local M = {}
 
 M.version = "2.0.0"
 
-M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "ahk", "hs" }
+M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled" }
 
 M.sections = {
 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -37,24 +37,18 @@ M.sections = {
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs" }, subsections = {  } },
-	["ahk"] = { description_key = "menu.ahk", platforms = { "ahk" }, subsections = { "category_enabled", "layout", "shortcuts", "gestures", "metrics" } },
-	["ahk.category_enabled"] = { description_key = "menu.ahk.category_enabled", platforms = { "ahk" }, subsections = {  } },
-	["ahk.layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts"] = { description_key = "menu.ahk.shortcuts", platforms = { "ahk" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
-	["ahk.shortcuts.alt_gr_caps_lock"] = { description_key = "menu.ahk.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts.alt_gr_lalt"] = { description_key = "menu.ahk.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts.keyboard"] = { description_key = "menu.ahk.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts.lalt_caps_lock"] = { description_key = "menu.ahk.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts.personal"] = { description_key = "menu.ahk.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
-	["ahk.shortcuts.script_control"] = { description_key = "menu.ahk.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
-	["ahk.gestures"] = { description_key = "menu.gestures", platforms = { "ahk" }, subsections = {  } },
-	["ahk.metrics"] = { description_key = "menu.ahk.metrics", platforms = { "ahk" }, subsections = {  } },
-	["hs"] = { description_key = "menu.hs", platforms = { "hs" }, subsections = { "gestures", "hotstrings" } },
-	["hs.gestures"] = { description_key = "menu.gestures", platforms = { "hs" }, subsections = { "modes", "sensitivities" } },
-	["hs.gestures.modes"] = { description_key = "menu.hs.gestures.modes", platforms = { "hs" }, subsections = {  } },
-	["hs.gestures.sensitivities"] = { description_key = "menu.hs.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
-	["hs.hotstrings"] = { description_key = "menu.hs.hotstrings", platforms = { "hs" }, subsections = {  } },
+	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
+	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.ahk.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.alt_gr_lalt"] = { description_key = "menu.ahk.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.keyboard"] = { description_key = "menu.ahk.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.lalt_caps_lock"] = { description_key = "menu.ahk.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.personal"] = { description_key = "menu.ahk.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.script_control"] = { description_key = "menu.ahk.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
+	["category_enabled"] = { description_key = "menu.ahk.category_enabled", platforms = { "ahk" }, subsections = {  } },
+	["layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
+	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs" }, subsections = { "modes", "sensitivities" } },
+	["gestures.modes"] = { description_key = "menu.hs.gestures.modes", platforms = { "hs" }, subsections = {  } },
+	["gestures.sensitivities"] = { description_key = "menu.hs.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
 }
 
 M.features = {

@@ -85,8 +85,8 @@ global _V1CatToV2CatMap := Map(
 ; the bulk/count/collect helpers reach the v2 section. Relocated here from the
 ; retired infra/path_translator.ahk — it is plain menu data, not path translation.
 global _LegacyTopCategoryMap := Map(
-	"Layout",             "ahk.layout",
-	"Gestures",           "ahk.gestures",
+	"Layout",             "layout",
+	"Gestures",           "gestures",
 	"Shortcuts",          "shortcuts",
 	"Autocorrection",     "hotstrings.autocorrection",
 	"DistancesReduction", "hotstrings.distances_reduction",

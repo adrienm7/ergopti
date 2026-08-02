@@ -748,12 +748,22 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 //
 // Resolution rule (mirrors both drivers' boot logic):
 //   resolved = toml[path] ?? manifestDefault
+//
+// A default_per_platform feature is exempt ONLY on the fallback branch. Once
+// the user's config supplies a value, that value is what both drivers resolve
+// to and they must still agree — the per-platform declaration governs the
+// default, not the lookup. Until the driver silos were dissolved this loop
+// never saw a gesture at all: "ahk.gestures.tap_4" and "hs.gestures.tap_4"
+// were different paths, so the lua lookup missed and every gesture skipped the
+// check. The paths agreeing is what made the divergence visible.
 
 for (const [featurePath, ahkInfo] of ahkFeatures) {
 	const luaInfo = luaFeatures.get(featurePath);
 	if (!luaInfo) continue;
 
 	const tomlValue = tomlLookup(fixtureToml, featurePath);
+	if (tomlValue === undefined && PER_PLATFORM_PATHS.has(featurePath)) continue;
+
 	const ahkResolved =
 		tomlValue !== undefined ? tomlValue : parseDefaultValue(ahkInfo.defaultRaw, 'ahk');
 	const luaResolved =

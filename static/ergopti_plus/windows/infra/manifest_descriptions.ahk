@@ -150,12 +150,7 @@ _MenuLabelCandidateKeys(DescKey, Path) {
 		; description_key is missing or non-canonical).
 		if (Path != "" and Path != DescKey) {
 				Out.Push(Path)
-				; Strip ``ahk.`` prefix.
 				Trimmed := Path
-				if (StrLen(Trimmed) > 4 and SubStr(Trimmed, 1, 4) == "ahk.") {
-						Trimmed := SubStr(Trimmed, 5)
-						Out.Push(Trimmed)
-				}
 				; ``hotstrings.X.Y`` -> ``X.Y``.
 				if (StrLen(Trimmed) > 11 and SubStr(Trimmed, 1, 11) == "hotstrings.") {
 						Trimmed := SubStr(Trimmed, 12)

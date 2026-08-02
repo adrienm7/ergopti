@@ -16,7 +16,7 @@
 
 ; Dynamic handler: Ergopti base-layer feature only (ergopti_base).
 _LAY_LayoutFeaturesBase(M, _Cat) {
-	for _, LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if (LayoutEntry["id"] == "ergopti_base") {
 			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
 		}
@@ -29,7 +29,7 @@ _LAY_LayoutFeaturesBase(M, _Cat) {
 ; the layout menu, after the magic-key replace option it depends on.
 _LAY_LayoutFeaturesAltGr(M, _Cat) {
 	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true)
-	for _, LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {
 			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
 		}

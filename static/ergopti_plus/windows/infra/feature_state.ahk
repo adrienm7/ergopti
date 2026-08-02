@@ -160,7 +160,7 @@ global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map(
 ReadCategoryEnabled(Cache) {
 		global CategoryEnabled
 		for Category, _Default in CategoryEnabled {
-				Raw := _FeatureStateIniGet(Cache, "ahk.category_enabled", _FeatureStateCategoryKey(Category))
+				Raw := _FeatureStateIniGet(Cache, "category_enabled", _FeatureStateCategoryKey(Category))
 				if (Raw == "_") {
 						continue
 				}

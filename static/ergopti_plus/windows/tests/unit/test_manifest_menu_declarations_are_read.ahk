@@ -110,7 +110,7 @@ Test("manifest_menu: every accented-letter row names a picker id", () => (
 
 Test("manifest_menu: modifier_combos_group carries the three combos", () => (
 	AssertEqual(
-		"ahk.shortcuts.alt_gr_lalt,ahk.shortcuts.alt_gr_caps_lock,ahk.shortcuts.lalt_caps_lock",
+		"shortcuts.alt_gr_lalt,shortcuts.alt_gr_caps_lock,shortcuts.lalt_caps_lock",
 		_MM_RowValues("modifier_combos_group", "path"),
 		"the modifier-combos submenu expands the features under exactly these sections"
 	)

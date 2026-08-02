@@ -63,18 +63,18 @@ _FIL_AssertLoc(Fixture, V2Path, ExpSection, ExpKey, ExpAlpha, Prop := "") {
 	AssertEqual(ExpAlpha, Loc["is_alpha"] ? 1 : 0, "is_alpha for '" . V2Path . "'")
 }
 
-_FIL_PlainAhkLayout() {
-	_FIL_AssertLoc(_FIL_Fixture(), "ahk.layout.ergopti_base", "ahk.layout", "ergopti_base", 0)
+_FIL_PlainLayout() {
+	_FIL_AssertLoc(_FIL_Fixture(), "layout.ergopti_base", "layout", "ergopti_base", 0)
 }
-Test("feature_io: ahk-prefixed plain feature -> [ahk.layout] ergopti_base", _FIL_PlainAhkLayout)
+Test("feature_io: plain feature -> [layout] ergopti_base", _FIL_PlainLayout)
 
 _FIL_GesturesMaster() {
 	; gestures is a top-level Map carrying "enabled" -> classified alpha, but the
 	; resolved {section, key, node} are identical to the translator's, so the
 	; write is byte-identical.
-	_FIL_AssertLoc(_FIL_Fixture(), "ahk.gestures.enabled", "ahk.gestures", "enabled", 1)
+	_FIL_AssertLoc(_FIL_Fixture(), "gestures.enabled", "gestures", "enabled", 1)
 }
-Test("feature_io: gestures master -> [ahk.gestures] enabled", _FIL_GesturesMaster)
+Test("feature_io: gestures master -> [gestures] enabled", _FIL_GesturesMaster)
 
 _FIL_PlainShortcut() {
 	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.microsoft_bold", "shortcuts", "microsoft_bold", 0)
@@ -120,35 +120,48 @@ Test("feature_io: unknown path returns false", _FIL_Unresolved)
 
 ; The mutex enumerator reads the live manifest (not the Features fixture), so it
 ; certifies that enabling one modifier-combo key forces exactly the other keys
-; of its [ahk.shortcuts.<group>] section off — the v2-native equivalent of the
+; of its [shortcuts.<group>] section off — the v2-native equivalent of the
 ; retired translator's hand-written sibling table.
 
 _FIL_MutexEnumeratesGroupSiblings() {
 	ManifestEnsureLoaded()
-	Siblings := _MutexSiblingPathsForV2("ahk.shortcuts.alt_gr_lalt.backspace")
+	Siblings := _MutexSiblingPathsForV2("shortcuts.alt_gr_lalt.backspace")
 	; The alt_gr_lalt group declares 10 keys; enabling one leaves 9 siblings.
 	AssertEqual(9, Siblings.Length, "alt_gr_lalt has 9 siblings of backspace")
 	for _, P in Siblings {
-		AssertTrue(SubStr(P, 1, 25) == "ahk.shortcuts.alt_gr_lalt", "sibling stays in the group: " . P)
-		AssertTrue(P != "ahk.shortcuts.alt_gr_lalt.backspace", "the toggled key is excluded")
+		AssertEqual(1, InStr(P, "shortcuts.alt_gr_lalt."), "sibling stays in the group: " . P)
+		AssertTrue(P != "shortcuts.alt_gr_lalt.backspace", "the toggled key is excluded")
 	}
 }
 Test("feature_io: mutex enumerator returns the group's other keys", _FIL_MutexEnumeratesGroupSiblings)
 
-_FIL_MutexStripsAhkPrefix() {
+_FIL_MutexResolvesEveryGroup() {
 	ManifestEnsureLoaded()
-	; The bare (ahk-stripped) shape must resolve to the same group + sibling count.
 	Siblings := _MutexSiblingPathsForV2("shortcuts.alt_gr_caps_lock.tab")
-	AssertEqual(9, Siblings.Length, "alt_gr_caps_lock has 9 siblings of tab (bare prefix)")
+	AssertEqual(9, Siblings.Length, "alt_gr_caps_lock has 9 siblings of tab")
 }
-Test("feature_io: mutex enumerator strips the ahk. prefix", _FIL_MutexStripsAhkPrefix)
+Test("feature_io: mutex enumerator resolves every declared group", _FIL_MutexResolvesEveryGroup)
+
+; The enumerator used to accept "ahk.shortcuts.<group>.<key>" and strip the
+; prefix, because the manifest filed these groups under the AHK silo. Lot 4
+; removed the silo. Pinning the rejection matters more than it looks: the
+; enumerator returns [] for anything it does not recognise, and [] means "this
+; key has no mutually exclusive siblings" — so a path shape that silently stops
+; resolving does not fail, it quietly lets two chords bind the same combo.
+_FIL_MutexRejectsDriverNamespacedPath() {
+	ManifestEnsureLoaded()
+	AssertEqual(0, _MutexSiblingPathsForV2("ahk.shortcuts.alt_gr_caps_lock.tab").Length,
+		"a driver-namespaced path is not a path this driver knows")
+}
+Test("feature_io: mutex enumerator rejects a driver-namespaced path",
+	_FIL_MutexRejectsDriverNamespacedPath)
 
 _FIL_MutexEmptyForPlain() {
 	ManifestEnsureLoaded()
 	; A plain (non-mutex) shortcut toggle has no siblings.
 	AssertEqual(0, _MutexSiblingPathsForV2("shortcuts.microsoft_bold").Length,
 		"plain shortcut has no mutex siblings")
-	AssertEqual(0, _MutexSiblingPathsForV2("ahk.layout.ergopti_base").Length,
+	AssertEqual(0, _MutexSiblingPathsForV2("layout.ergopti_base").Length,
 		"layout feature has no mutex siblings")
 }
 Test("feature_io: mutex enumerator empty for non-mutex paths", _FIL_MutexEmptyForPlain)

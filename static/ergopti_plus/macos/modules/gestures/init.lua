@@ -112,7 +112,7 @@ M.DEFAULT_STATE = {
 	gestures = false,
 	modes = {},
 	sensitivities = {},
-	space_wrap = Manifest.default_for("hs.gestures.space_wrap"),
+	space_wrap = Manifest.default_for("gestures.space_wrap"),
 }
 
 -- Initialize modes and sensitivities

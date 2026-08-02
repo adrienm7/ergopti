@@ -317,7 +317,7 @@ GesturesReadConfig()
 ; every subsequent reload (the tray menu's "Auto-configure" action stays the
 ; supported way to retry if something failed here).
 global _IniCache, ConfigurationFile
-RawAutoConfig := IniCacheGet(_IniCache, "ahk.gestures", "auto_configure_on_next_start")
+RawAutoConfig := IniCacheGet(_IniCache, "gestures", "auto_configure_on_next_start")
 if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 		LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
 
@@ -326,7 +326,7 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 		; Clearing after launch would leave the flag set and the auto-relaunched
 		; script could loop forever, never reaching initMenu.
 		try TOML_BatchWrite(ConfigurationFile,
-				[{ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: false }])
+				[{ Section: "gestures", Key: "auto_configure_on_next_start", Value: false }])
 
 		; Defer the registry write + worker launch until the auto-execute tail
 		; (notably initMenu in ErgoptiPlus.ahk) has settled. The PnP operation then

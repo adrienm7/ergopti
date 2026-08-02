@@ -16,12 +16,14 @@
 ; 2. Hierarchical Map builder: ``ManifestBuildFeaturesMap`` rebuilds the legacy
 ;    ``Features`` Map shape from the flat entry list — same nesting semantics
 ;    as the old hardcoded literal in ``features_config.ahk``, but with v2
-;    snake_case keys throughout and the ``ahk.`` prefix stripped so site code
-;    keeps a single level of nesting (``Features["layout"]`` instead of
-;    ``Features["ahk"]["layout"]``).
-; 3. Dormant until cut-over: until ``features_config.ahk`` is replaced with a
-;    call to ``ManifestBuildFeaturesMap``, this module is loaded but unused.
-;    Adding it ahead of the cut-over keeps that PR small and reviewable.
+;    snake_case keys throughout. A manifest section path is used verbatim: a
+;    feature is filed under what it configures (``Features["layout"]``), never
+;    under the driver that implements it.
+; 3. No namespace translation: until Lot 4 the manifest filed AHK features under
+;    an ``ahk.`` silo and this module stripped that prefix on the way in, so
+;    several accessors had to accept both the prefixed and stripped spelling and
+;    every TOML write had to re-derive which of the two a leaf came from. The
+;    silos are gone — one path, one spelling, no translation layer.
 ;
 ; NOTE on AHK source encoding (discovered while writing the v2 test suite,
 ; 2026-05-22): the generated ``features_manifest.ahk`` is emitted by
@@ -129,7 +131,7 @@ ManifestFeatures() {
 }
 
 ; Return the manifest entries whose ``section`` exactly matches ``SectionPath``
-; — e.g. "ahk.layout" returns the four Layout features in their declared
+; — e.g. "layout" returns the four Layout features in their declared
 ; order. The array order in the source manifest is preserved by the codegen
 ; emitter, so callers can use this directly as the render order.
 ManifestFeaturesForSection(SectionPath) {
@@ -140,9 +142,7 @@ ManifestFeaturesForSection(SectionPath) {
 	return _MANIFEST_SECTION_INDEX.Has(SectionPath) ? _MANIFEST_SECTION_INDEX[SectionPath] : []
 }
 
-; Return the manifest entry whose canonical ``path`` matches ``V2Path`` (or
-; "ahk." . V2Path for AHK-only sections — the lookup accepts both
-; shapes since the rest of the driver works with the stripped form).
+; Return the manifest entry whose canonical ``path`` matches ``V2Path``.
 ; Returns ``false`` when no entry matches; callers fall back to whatever
 ; default they had before (e.g. Features.Description).
 ManifestFindEntryByPath(V2Path) {
@@ -150,39 +150,7 @@ ManifestFindEntryByPath(V2Path) {
 		return false
 	}
 	global _MANIFEST_PATH_INDEX
-	if _MANIFEST_PATH_INDEX.Has(V2Path)
-		return _MANIFEST_PATH_INDEX[V2Path]
-	
-	AhkVariant := "ahk." . V2Path
-	if _MANIFEST_PATH_INDEX.Has(AhkVariant)
-		return _MANIFEST_PATH_INDEX[AhkVariant]
-
-	return false
-}
-
-; Resolve the correct (possibly ahk.-prefixed) TOML section for one leaf of the
-; already ahk.-stripped in-memory Features tree. ManifestBuildFeaturesMap strips
-; the ahk. driver namespace uniformly, so several top-level Features keys (e.g.
-; "shortcuts", "metrics", "gestures") merge entries from both a shared
-; (unprefixed) manifest section and an ahk.-only one -- walking the stripped
-; tree alone cannot recover which namespace a given leaf came from. Looking the
-; full leaf path up in the manifest's own path index is the single source of
-; truth; every call site that flattens the Features tree into TOML writes
-; (_CollectFeatureUpdates, _CollectFeatureFlipUpdates) must resolve through
-; this helper instead of re-deriving the section from the stripped nesting.
-; @param StrippedLeafPath  Dot path to the leaf as walked in the stripped
-;                          Features tree (e.g. "shortcuts.personal.laptop_broken_key",
-;                          "gestures.enabled").
-; @param FallbackSection   Section to use when the leaf has no direct manifest
-;                          entry -- true for every property nested under a
-;                          single-entry (table-default) alpha feature (e.g.
-;                          "shortcuts.gpt.enabled", "hotstrings.autocorrection.accents.enabled")
-;                          since none of those ever carry an ahk. prefix, so the
-;                          un-prefixed walked section is already correct.
-; @return                  The resolved TOML section.
-ManifestResolveFeatureSection(StrippedLeafPath, FallbackSection) {
-	Entry := ManifestFindEntryByPath(StrippedLeafPath)
-	return (Entry != false) ? Entry["section"] : FallbackSection
+	return _MANIFEST_PATH_INDEX.Has(V2Path) ? _MANIFEST_PATH_INDEX[V2Path] : false
 }
 
 
@@ -197,12 +165,12 @@ ManifestResolveFeatureSection(StrippedLeafPath, FallbackSection) {
 
 ; Build a hierarchical Features Map from the flat manifest entries. The output
 ; mirrors the shape of the legacy ``Features := Map(...)`` literal in
-; ``features_config.ahk``, but with v2 snake_case keys and the ``ahk.`` prefix
-; stripped from section paths. Called by the cut-over commit to fully replace
-; the hardcoded defaults.
+; ``features_config.ahk``, but with v2 snake_case keys. Section paths are used
+; verbatim — the Features nesting and the TOML section are the same string, which
+; is what lets a write re-derive its section by walking the tree alone.
 ;
 ; Example: a manifest entry
-;   { path: "ahk.layout.ergopti_base", id: "ergopti_base", section: "ahk.layout",
+;   { path: "layout.ergopti_base", id: "ergopti_base", section: "layout",
 ;     default: true, ... }
 ; lands in the returned Map at
 ;   Features["layout"]["ergopti_base"]  →  true
@@ -221,12 +189,6 @@ ManifestBuildFeaturesMap() {
 
 	for Entry in FEATURES_MANIFEST["features"] {
 		SectionPath := Entry["section"]
-
-		; Strip the ``ahk.`` prefix so call sites use a single nesting level
-		; (FeaturesMap["layout"] rather than FeaturesMap["ahk"]["layout"]).
-		if (StrLen(SectionPath) >= 4 and SubStr(SectionPath, 1, 4) == "ahk.") {
-			SectionPath := SubStr(SectionPath, 5)
-		}
 
 		; Walk the section path, creating intermediate Maps as needed.
 		Cursor := FeaturesMap

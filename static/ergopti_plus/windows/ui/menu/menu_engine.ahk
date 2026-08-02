@@ -77,7 +77,7 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ; shortcuts whose descriptions come from _PersonalShortcutsRegistry).
 ;
 ; ``V2Path`` is the canonical v2 path of the feature (e.g.
-; "hotstrings.personal.<id>", "ahk.shortcuts.personal.<name>"); toggles and state
+; "hotstrings.personal.<id>", "shortcuts.personal.<name>"); toggles and state
 ; reads go through infra/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).

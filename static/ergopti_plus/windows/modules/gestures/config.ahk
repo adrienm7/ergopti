@@ -18,12 +18,12 @@
 
 #Requires AutoHotkey v2.0
 
-; Reads gesture assignments from the v2 [ahk.gestures] section.
+; Reads gesture assignments from the v2 [gestures] section.
 GesturesReadConfig() {
 		global GestureAssignments, GestureActionParameters, _IniCache, GESTURE_ACTIONS
 
 		for _, Slot in GESTURE_SLOTS {
-				Value := IniCacheGet(_IniCache, "ahk.gestures", Slot)
+				Value := IniCacheGet(_IniCache, "gestures", Slot)
 				if (Value == "_")
 						continue
 				; Validate exactly as the keyboard-shortcut sibling does. Without this,
@@ -41,18 +41,18 @@ GesturesReadConfig() {
 		; Rebuild this map on every read: a reload must reflect the user TOML
 		; exactly and must not retain a value deleted from disk in this process.
 		GestureActionParameters := Map()
-		if _IniCache.Has("ahk.action_parameters") {
-				for BindingAction, Value in _IniCache["ahk.action_parameters"]
+		if _IniCache.Has("action_parameters") {
+				for BindingAction, Value in _IniCache["action_parameters"]
 						GestureActionParameters[BindingAction] := Value
 		}
 }
 
-; Saves a single gesture assignment to the v2 [ahk.gestures] section.
+; Saves a single gesture assignment to the v2 [gestures] section.
 GestureSaveAssignment(slot, action) {
 		global GestureAssignments, ConfigurationFile
 
 		GestureAssignments[slot] := action
-		TOML_Write(action, ConfigurationFile, "ahk.gestures", slot)
+		TOML_Write(action, ConfigurationFile, "gestures", slot)
 }
 
 ; Parameters are scoped to an action binding, so one gesture, tap-hold or
@@ -75,7 +75,7 @@ GestureSetActionParameter(BindingId, ActionName, Value) {
 		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
 		GestureActionParameters[Key] := Value
-		TOML_Write(Value, ConfigurationFile, "ahk.action_parameters", Key)
+		TOML_Write(Value, ConfigurationFile, "action_parameters", Key)
 }
 
 GestureActionParameterSpec(ActionName) {
@@ -167,7 +167,7 @@ GestureSaveAllAssignments(ActionNameBySlot) {
 		Updates := []
 		for Slot, ActionName in ActionNameBySlot {
 				GestureAssignments[Slot] := ActionName
-				Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: ActionName })
+				Updates.Push({ Section: "gestures", Key: Slot, Value: ActionName })
 		}
 		return TOML_BatchWrite(ConfigurationFile, Updates)
 }

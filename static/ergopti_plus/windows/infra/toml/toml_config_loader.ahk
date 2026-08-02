@@ -10,12 +10,14 @@
 ; and simple array values (``val_modifiers = ["alt"]``).
 ;
 ; FEATURES & RATIONALE:
-; 1. Strips the ``ahk.`` prefix on section headers so a v2 source section like
-;    ``[ahk.layout]`` lands on the in-memory ``Features["layout"]`` Map — same
-;    nesting depth as the legacy hardcoded literal.
-; 2. Skips any ``[hs.*]`` section silently (foreign to this driver). They live
-;    in the same TOML by design (single user-editable file per driver) but the
-;    HS driver is the only consumer.
+; 1. A section header is used verbatim: ``[layout]`` lands on the in-memory
+;    ``Features["layout"]`` Map. There is no namespace translation, because
+;    there is no namespace — a section is named after what it configures.
+; 2. No foreign-section skipping. Until Lot 4 the same schema described an
+;    ``[ahk.*]`` silo and an ``[hs.*]`` one, so this loader stripped the first
+;    and silently ignored the second. Both are gone, which means an unrecognised
+;    header is now unambiguously a mistake and gets the loud treatment in (3)
+;    instead of being written off as another driver's business.
 ; 3. Unknown sections (not present in the post-manifest Features Map) trigger an
 ;    ERROR at boot but never abort — the driver still applies every valid key so
 ;    a single typo or stale section does not wipe the user's configuration. The
@@ -174,28 +176,23 @@ ApplyConfigToml(Features, FilePath) {
 			Header := Trim(SecMatch[1])
 			SkippingForeign := false
 
-			; ``[hs.*]`` belongs to the Hammerspoon driver — skip silently.
-			if (StrLen(Header) >= 3 and SubStr(Header, 1, 3) == "hs.") {
-				CurrentSection := ""
-				SkippingForeign := true
-				continue
-			}
-
 			; ``[_meta]`` and any ``[_*]`` section are TOML metadata blocks, not
-			; driver features. ``[updater]`` / ``[ahk.updater]`` is consumed by the
-			; updater module at start-up independently of the Features Map. Both skip
-			; silently. The ahk. prefix is stripped later, so match both forms here.
-			if (SubStr(Header, 1, 1) == "_" or Header == "updater" or Header == "ahk.updater") {
+			; driver features. ``[updater]`` is consumed by the updater module at
+			; start-up independently of the Features Map. Both skip silently.
+			;
+			; There is no driver-namespace case to handle here any more. Before
+			; Lot 4 this branch also skipped every ``[hs.*]`` header and stripped
+			; the ``ahk.`` prefix off the rest, because the same schema described
+			; two silos and each driver had to ignore half of it. Sections are now
+			; named after what they configure, so a header the manifest does not
+			; know is a genuine mistake and reaches the loud unknown-section error
+			; below instead of being swallowed as "someone else's".
+			if (SubStr(Header, 1, 1) == "_" or Header == "updater") {
 				CurrentSection := ""
 				SkippingForeign := true
 				continue
 			}
 
-			; Strip the ``ahk.`` prefix so the in-memory path matches the
-			; Features Map built by ManifestBuildFeaturesMap (which also strips).
-			if (StrLen(Header) >= 4 and SubStr(Header, 1, 4) == "ahk.") {
-				Header := SubStr(Header, 5)
-			}
 			CurrentSection := Header
 			continue
 		}

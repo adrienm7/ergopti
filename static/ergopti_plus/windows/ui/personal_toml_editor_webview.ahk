@@ -284,7 +284,7 @@ _HsEdWeb_Save(Data) {
 
 ; Persists a single UI preference. The frontend uses its own key names
 ; (compact_view / auto_close / default_section); map them onto the native
-; [ahk.personal_editor] keys so the native editor and the webview agree.
+; [personal_editor] keys so the native editor and the webview agree.
 _HsEdWeb_SavePref(Data) {
 	if (!(Data is Map) || !Data.Has("key"))
 		return
