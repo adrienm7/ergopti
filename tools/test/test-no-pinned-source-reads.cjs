@@ -52,11 +52,25 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 //          20 → 16 (three tap-hold / metrics / menu_llm tests moved to
 //                     _DriverDirConcat, and the scan stopped counting PROSE — see
 //                     stripComments below.)
-// The 16 that remain each pin something on purpose: run_all.ahk itself, a
-// _generated/ file (which _DriverSourceConcat deliberately excludes), a runner
-// script, or a single file carrying an ABSENCE assertion that a directory-wide
-// scan would weaken.
-const BASELINE = 16;
+//          16 → 31 (2026-08-02: the same blind spot the macOS twin had, found by
+//                     porting its lesson back. The alternation said
+//                     `modules|lib|ui`: `lib` has matched nothing since e97ddbd08
+//                     renamed every driver's lib/ to infra/, `adapters/` was never
+//                     listed although all three drivers have one, and the driver
+//                     entry point ErgoptiPlus.ahk is in no sub-tree at all so no
+//                     directory arm could reach it — exactly as init.lua was
+//                     invisible on macOS. 24 files and 145 literals had been
+//                     pinned the whole time. `platform` is listed ahead of Lot 3
+//                     so the extraction cannot land unseen.
+//                     The baseline ALSO carried 9 files of slack: the measured
+//                     count was 7 against a frozen 16, and a ratchet frozen above
+//                     its own measurement lets the next regression land free.)
+// The residue pins on purpose: run_all.ahk itself, a _generated/ file (which
+// _DriverSourceConcat deliberately excludes), a runner script, or a single file
+// carrying an ABSENCE assertion that a directory-wide scan would weaken. That
+// was said of 16 files while the honest count was 7 — it describes a shape, not
+// this number, and the 24 newly visible ones have not been triaged.
+const BASELINE = 31;
 
 // Second frozen baseline — the count of individual pinned path literals, not of
 // files. Counting files alone left two holes: a file already on the list could
@@ -72,13 +86,20 @@ const BASELINE = 16;
 // through a local FileRead wrapper of its own — test_webview2_temp_leak.ahk's
 // _TWTL_ReadSource("modules/llm/ollama_webview.ahk") is the shape. None of that
 // was counted. Do not read 326 as a regression; read 16 as an illusion.
-// History: 326 (first honest measurement, 2026-07-31)
-const READ_BASELINE = 326;
+// History: 326 (first honest measurement, 2026-07-31 — but see below: it was not)
+//      326 → 380 (2026-08-02: 326 was frozen 91 above the measured 235, and the
+//              widened alternation then surfaced 145 more. The two errors ran in
+//              opposite directions, which is why neither showed up as a failure.)
+const READ_BASELINE = 380;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
-// "modules/keylogger/x.ahk" or "..\\lib\\layout\\layout_altgr.ahk".
-const SOURCE_PATH_RE = /["'][^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.ahk["']/i;
+// "modules/keylogger/x.ahk" or "..\\lib\\layout\\layout_altgr.ahk", plus the
+// driver entry point, which belongs to no sub-tree. `lib` is dead since the
+// rename to infra/ and is kept only so a stray lib/ path cannot slip back in
+// unseen; `platform` is listed before it exists so Lot 3 cannot land unseen.
+const SOURCE_PATH_RE =
+	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
 const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'gi');
 
 /**

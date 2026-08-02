@@ -115,37 +115,45 @@ Two conventions that make asymmetry legible:
 
 Constraints: **paths before moves, moves before content, data before code.**
 
-- **Lot 2 — the safety net.** ~~The per-READ counting.~~ ~~The gate's blind spot:
-  `SOURCE_PATH_RE` matched `modules|lib|ui`, the `lib` arm had matched zero since
-  `e97ddbd08` renamed `lib/` to `infra/`, and no arm ever reached the driver-root
-  `init.lua`.~~ — **both done.** The honest population is **41 files / 56 reads**;
-  9 files and 16 reads had been pinned the whole time with no symptom, because an
-  unseen pin looks exactly like no pin.
+- **Lot 2 — the safety net.** ~~The per-READ counting.~~ ~~The gate's blind spots.~~
+  ~~Widen the fixer and convert.~~ — **done 2026-08-02: 281 reads → 75, 104 files
+  → 32.** Four things are worth keeping from it.
 
-  What remains is the conversion, and the obstacle is the fixer, not the tests:
+  *The gate was measuring a fifth of its own subject, for the third time.* Each
+  earlier widening guessed at the syntax people write around `io.open`, and each
+  surfaced pins that had always been there. The gate now counts the **path
+  literal**, unanchored to any concatenation shape, because what a `git mv` breaks
+  is the string naming the file. Fifteen files never called `driver_root()` at
+  all — they rebuilt the root from `debug.getinfo`, or opened
+  `"modules/keymap/llm_bridge.lua"` relative to the runner's cwd. The definition
+  now lives in `tools/lint/pinned-source-read.cjs`, shared with the fixer, which
+  is why the two can no longer disagree by a factor of five.
 
-  1. **Widen `fix-pinned-source-reads.cjs` — it covers most of the lot.** Its
-     `PINNED_RE` only matches `local X = helpers.driver_root() .. "…"`, so it sees
-     12 of the 38 and converts 0. **21 of the 38 are the inline
-     `io.open(driver_root() .. "…")` shape** it never matches, and 4 more are
-     refused as "unrecognised read shape" despite having a unique selector.
-  2. Widen its candidate rule too, beyond `local function` / `function M.`. The 9
-     reads said to "need a human" are five menu/UI modules whose only declarations
-     are the non-unique `function M.build` / `function M.new` — but each has
-     unique constants or i18n keys usable as a selector
-     (`local DISABLED_GESTURE_ACTION`, `"menu.llm.backend_title"`,
-     `local MODEL_ADVANCED_PARAMS_THRESHOLD_B`, …). "Needs a human" means "needs a
-     selector the fixer cannot generate", not "impossible".
-  3. Only **6 of the pinned files carry position arithmetic**
-     (`test_ingest_rollback_id_stable.lua` has 6 comparisons on its own); those
-     are the ones that genuinely need the assertion made order-independent before
-     a concat-based read can replace them. The other 24 are plain
-     presence/absence and are unaffected — the "make it order-independent first"
-     caveat applies to a fifth of the population, not to all of it.
+  *Two thirds of the population was never written at the read site.* A file
+  declares one `local function read_source(rel)` and calls it a dozen times. The
+  first pass converted 44 of 281 and looked like the start of an unbounded
+  migration; it was one rewrite applied 147 times, plus 10 more behind a
+  second-level wrapper (`assert_gc_pinned` → `read_source`), which only becomes
+  visible if the fixer seeds itself with helpers a PREVIOUS run converted.
 
-  The AHK residue each pins deliberately (`run_all.ahk` itself, a `_generated/`
-  file `_DriverSourceConcat` excludes, a runner, or a single file carrying an
-  ABSENCE assertion a directory-wide scan would weaken).
+  *`read_driver_source` had to be made cheap first.* It re-shelled `find` and
+  re-read all 201 production files on every one of its 361 call sites — the
+  prescribed alternative to naming a path was the slow one. Caching it took the
+  macOS suite from 333 s to 171 s.
+
+  **The remaining 75 are a different animal** and should not be forced: tree
+  walkers that enumerate the driver root, exemption inventories keyed by path
+  (`test_require_state_pattern.lua`), purity ratchets over an explicit file list,
+  and entry-point compile checks. For those the path IS the subject. Converting
+  them means changing what the test asserts, not how it reads.
+
+  Still open: the **AHK twin has not had the same treatment** —
+  `test-no-pinned-source-reads.cjs` still matches a read expression, so its count
+  is probably as understated as the macOS one was. The AHK residue each pins
+  deliberately (`run_all.ahk` itself, a `_generated/` file `_DriverSourceConcat`
+  excludes, a runner, or a single file carrying an ABSENCE assertion a
+  directory-wide scan would weaken), but that is a claim about the count it
+  reports, not about the count.
 
 - **Lot 3 — one tree.** ~~(b) de-platform `_shared/`~~ — **done** by `4dd7b6d51`;
   both rows are out of the rename table above. Remaining: (a) extract
