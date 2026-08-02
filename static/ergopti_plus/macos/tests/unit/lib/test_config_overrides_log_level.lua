@@ -62,8 +62,11 @@ end)
 
 helpers.describe("init re-applies the log level after config overrides", function()
 	helpers.it("source: Logger.set_level is re-derived from ergopti.log_level after apply", function()
-		local fh = assert(io.open(helpers.driver_root() .. "init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 		local apply_idx = src:find("config_overrides.apply", 1, true)
 		helpers.assert_true(apply_idx ~= nil, "config_overrides.apply must be called at boot")
 		-- A set_level reading ergopti.log_level must appear AFTER the overrides apply.

@@ -140,10 +140,11 @@ helpers.describe("init.lua: the Karabiner require cannot abort boot", function()
 		-- an un-pcall'd require here ends the session before hs.shutdownCallback is
 		-- armed — and Karabiner keeps remapping the keyboard with no teardown,
 		-- which is the worst possible failure for a keyboard driver.
-		local path = helpers.driver_root() .. "/init.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 		helpers.assert_true(src:find('pcall%(require, "modules%.karabiner"%)') ~= nil,
 			"init.lua must load modules.karabiner through pcall — a bare require lets a "

@@ -73,8 +73,11 @@ end)
 
 helpers.describe("foreign sync + local ingest are transaction-safe at source", function()
 	helpers.it("export advances the watermark to the COMMIT boundary, not the full size", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keylogger/export.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/export.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M._last_complete_batch_offset")
+		helpers.assert_true(src ~= nil, "modules/keylogger/export.lua source must be locatable")
 		helpers.assert_true(src:find("_last_complete_batch_offset(chunk)", 1, true) ~= nil,
 			"sync must apply only through the last complete batch boundary")
 		helpers.assert_true(src:find("watermark + last_commit", 1, true) ~= nil,
@@ -82,8 +85,11 @@ helpers.describe("foreign sync + local ingest are transaction-safe at source", f
 	end)
 
 	helpers.it("local ingest defensively rolls back before its BEGIN", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keylogger/log_manager.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/log_manager.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function _mark_aggregate_cache_rebuilt")
+		helpers.assert_true(src ~= nil, "modules/keylogger/log_manager.lua source must be locatable")
 		local begin_idx = src:find('db:exec("BEGIN TRANSACTION;")', 1, true)
 		helpers.assert_true(begin_idx ~= nil, "ingest must BEGIN a transaction")
 		local rollback_idx = src:find('db:exec("ROLLBACK;")', 1, true)

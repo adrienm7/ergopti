@@ -89,8 +89,11 @@ helpers.describe("menu_llm.terminate_orphan_mlx_server reaps the detached server
 	-- so the pgrep/lsof sweep is pinned at source. The script_quit describe above
 	-- already proves the action invokes terminate_orphan_mlx_server behaviorally.
 	helpers.it("source: defines terminate_orphan_mlx_server with the pgrep + lsof sweep", function()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_llm/init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function format_shortcut_title")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/init.lua source must be locatable")
 		local idx = src:find("function M.terminate_orphan_mlx_server", 1, true)
 		helpers.assert_true(idx ~= nil, "menu_llm must define terminate_orphan_mlx_server")
 		local body = src:sub(idx, idx + 600)
@@ -103,8 +106,11 @@ helpers.describe("menu_llm.terminate_orphan_mlx_server reaps the detached server
 	end)
 
 	helpers.it("source: the shutdown callback delegates to the shared helper (no inline drift)", function()
-		local fh = assert(io.open(helpers.driver_root() .. "init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 		helpers.assert_true(src:find("terminate_orphan_mlx_server", 1, true) ~= nil,
 			"hs.shutdownCallback must call the shared terminate_orphan_mlx_server (not an inline sweep)")
 	end)

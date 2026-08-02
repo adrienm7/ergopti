@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 -- Locate the shutdown MLX kill: look for the literal shutdown-only marker
 -- (the guard comment that exists only in the shutdown block)

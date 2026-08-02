@@ -18,8 +18,11 @@
 local helpers = require("tests.helpers")
 
 local function reset_body()
-	local fh = assert(io.open(helpers.driver_root() .. "modules/llm/prediction_engine.lua", "r"))
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+	helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 	local s = src:find("function M.reset()", 1, true)
 	helpers.assert_true(s ~= nil, "prediction_engine must define M.reset()")
 	local e = src:find("\nend", s, true)

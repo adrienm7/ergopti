@@ -21,8 +21,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("ignored-window deferred expansion snapshots CoreState.buffer", function()
 	helpers.it("the buffer snapshot is captured before doAfter(0) is scheduled", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/modules/keymap/init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_observed_context")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 		-- Find the ignored-window branch.
 		local ign_branch = src:find("if is_ignored then", 1, true)
@@ -47,8 +50,11 @@ helpers.describe("ignored-window deferred expansion snapshots CoreState.buffer",
 	end)
 
 	helpers.it("the deferred closure swaps in the snapshot and restores on no-match", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/modules/keymap/init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_observed_context")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 		-- Find the deferred closure body (after the doAfter scheduling).
 		local do_after = src:find("hs.timer.doAfter(0", 1, true)
@@ -86,8 +92,11 @@ helpers.describe("ignored-window deferred expansion snapshots CoreState.buffer",
 	end)
 
 	helpers.it("the snapshot is taken from CoreState.buffer (not a copy of _tc_* upvalues)", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/modules/keymap/init.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_observed_context")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 		-- Verify the snapshot source is CoreState.buffer, not a derived value.
 		local snapshot_line = src:find("local buf_snapshot = CoreState.buffer", 1, true)

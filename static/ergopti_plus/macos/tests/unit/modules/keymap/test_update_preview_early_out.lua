@@ -17,8 +17,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("update_preview early-out when LLM and both previews are off", function()
 	helpers.it("the early-out guard appears before last_word and scans when everything is off", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- Locate the early-out guard after the empty-buffer early-return.
 		local empty_buf = src:find('if not buf or #buf == 0 then', 1, true)
@@ -50,8 +53,11 @@ helpers.describe("update_preview early-out when LLM and both previews are off", 
 	end)
 
 	helpers.it("provider iteration, star bucket, and tail bucket are all AFTER the early-out guard", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- Find the early-out guard block.
 		local guard = src:find("not llm_on and not is_star_preview_enabled and not is_autocorrect_preview_enabled", 1, true)
@@ -75,8 +81,11 @@ helpers.describe("update_preview early-out when LLM and both previews are off", 
 	end)
 
 	helpers.it("source-level: the guard short-circuits before any per-keystroke allocation", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- The `llm_on` variable is declared before the early-out so it can be checked.
 		local llm_on_line = src:find("local llm_on =", 1, true)

@@ -14,8 +14,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("wpm_menubar color-hold duration is single-sourced", function()
 	helpers.it("source: no bare 3.0 passed to get_active_source; uses COLOR_HOLD_S", function()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/wpm/wpm_menubar.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_menubar.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function update_menubar")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_menubar.lua source must be locatable")
 		helpers.assert_true(src:find("get_active_source(stats, 3.0", 1, true) == nil,
 			"must NOT pass a hardcoded 3.0 to get_active_source")
 		helpers.assert_true(src:find("get_active_source(stats, COLOR_HOLD_S", 1, true) ~= nil,

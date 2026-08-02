@@ -67,8 +67,11 @@ end)
 
 helpers.describe("ApiOllama.reset_ready clears the flag", function()
 	helpers.it("source: reset_ready sets _is_ready = false", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/llm/api_ollama.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/api_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_ollama_port_override")
+		helpers.assert_true(src ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 		local idx = src:find("function M.reset_ready", 1, true)
 		helpers.assert_true(idx ~= nil, "api_ollama must define M.reset_ready")
 		helpers.assert_true(src:find("_is_ready = false", idx, true) ~= nil,

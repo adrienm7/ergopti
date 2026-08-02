@@ -24,11 +24,11 @@ local helpers = require("tests.helpers")
 --- Reads the source of modules/karabiner/init.lua relative to driver_root.
 --- @return string|nil Source text, or nil when the file cannot be opened.
 local function read_karabiner_init_source()
-	local path = helpers.driver_root() .. "modules/karabiner/init.lua"
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local body = fh:read("*a")
-	fh:close()
+	-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local body = helpers.read_driver_source("local function build_paused_ke_config")
+	helpers.assert_true(body ~= nil, "modules/karabiner/init.lua source must be locatable")
 	return body
 end
 

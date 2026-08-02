@@ -119,15 +119,24 @@ function productionSources() {
  */
 function selectorCandidates(body) {
 	const classes = [
-		[...body.matchAll(/^local function ([A-Za-z0-9_]{5,})/gm)],
-		[...body.matchAll(/^function M\.([A-Za-z0-9_]{5,})/gm)],
-		[...body.matchAll(/^function [A-Za-z_]\w*[.:]([A-Za-z0-9_]{5,})/gm)],
-		[...body.matchAll(/^local ([A-Z][A-Z0-9_]{4,})\s*=/gm)],
-	].map((ms) => ms.map((m) => m[0]));
+		[...body.matchAll(/^local function ([A-Za-z0-9_]{5,})/gm)].map((m) => m[0]),
+		[...body.matchAll(/^function M\.([A-Za-z0-9_]{5,})/gm)].map((m) => m[0]),
+		[...body.matchAll(/^function [A-Za-z_]\w*[.:]([A-Za-z0-9_]{5,})/gm)].map((m) => m[0]),
+		// Trailing `= …` deliberately dropped: the alignment spaces around it are
+		// reformatting fodder, and a selector that a formatter can break is a
+		// path pin with extra steps.
+		[...body.matchAll(/^local ([A-Z][A-Z0-9_]{4,})\s*=/gm)].map((m) => `local ${m[1]}`),
+	];
 
-	// Long string literals — i18n keys and log markers. Excluded: anything that
-	// names a .lua file, which would swap one path pin for another.
-	const strings = [...body.matchAll(/"([^"\\\n]{14,})"/g)]
+	// Long string literals — i18n keys and log markers, for the five menu modules
+	// whose only declarations are the non-unique `function M.build`.
+	//
+	// The content must look like a KEY. Matching any quote-delimited run picked up
+	// the code BETWEEN two adjacent string literals — the first pass produced
+	// `") .. string.upper(state.apps_time_shortcut.key or "` as a selector, which
+	// is unique, passes, and pins the exact spelling of an expression. Excluded
+	// too: anything naming a .lua file, which would swap one path pin for another.
+	const strings = [...body.matchAll(/"([A-Za-z][A-Za-z0-9_.\- ]{13,})"/g)]
 		.map((m) => m[0])
 		.filter((s) => !s.includes('.lua'));
 

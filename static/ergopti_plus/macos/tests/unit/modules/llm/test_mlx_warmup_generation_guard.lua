@@ -14,8 +14,11 @@
 local helpers = require("tests.helpers")
 
 local function read_src()
-	local fh = assert(io.open(helpers.driver_root() .. "modules/llm/api_mlx.lua", "r"))
-	local s = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/llm/api_mlx.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local s = helpers.read_driver_source("local function read_user_port_override")
+	helpers.assert_true(s ~= nil, "modules/llm/api_mlx.lua source must be locatable")
 	return s
 end
 
