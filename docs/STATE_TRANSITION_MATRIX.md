@@ -14,7 +14,7 @@ from doing.
 
 ## Driver states
 
-1. `BOOTING` — auto-execute phase, then `BuildTrayMenuDeferred` (`lib/lifecycle.ahk`)
+1. `BOOTING` — auto-execute phase, then `BuildTrayMenuDeferred` (`infra/lifecycle.ahk`)
    builds the tray menu off the boot critical path.
 2. `ACTIVE` — normal operation.
 3. `SUSPEND_PENDING` — the user asked to pause while a custom-combination prefix key

@@ -46,7 +46,7 @@ is a wish.**
 | # | Invariant | State |
 | --- | --- | --- |
 | **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it. **23/49 = 46.9 %.** Still to do: the Convention S stubs. |
-| **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. A feature missing on a platform carries a translated `reason_key`. | Ratcheted at 223 driver-namespaced tables (Lot 4) and at 76 unexplained platform restrictions. |
+| **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. A feature missing on a platform carries a translated `reason_key`. | Namespace half **done** — the ratchet is now an assertion of zero. The `reason_key` half is at 0 of 142 written. |
 | **I3** | One menu. The manifest describes what the user sees; the renderer how this OS draws a row; the driver supplies only named actions, state getters and list providers. | `action_id` ↔ handler bijection done. The label-tree diff is not built — see §0.6. |
 | **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done. Ports (5) and the Karabiner catalogue (7) remain. |
 | **I5** | One implementation per behaviour. Pure logic in `_shared/lua/`; macOS and Linux `require` it; AHK gets generated **data** or a ported twin **pinned by a shared vector corpus**. | Per-behaviour corpora exist for hotstrings, tooltip, logger, ports. The matcher codegen (Lot 8.3) is the open one. |
@@ -95,8 +95,6 @@ Renames still to do:
 | `macos/modules/karabiner/`, `linux/modules/kanata/` | `platform/remap/` | three names, no common parent |
 | `modules/keylogger/` | `modules/metrics/` | "keylogger" is the mechanism; `_shared/ui/` already says metrics |
 | `windows/ui/personal_toml_editor*` | `modules/hotstring_editor/` | the Windows name means something else on Linux |
-| `_shared/lua/linux/tray_protocol.lua` | `_shared/lua/tray/protocol.lua` | a platform-named node inside `_shared/` |
-| `_shared/lua/llm/linux_bridge.lua` | `linux/infra/llm_bridge.lua` | 364 "shared" lines with a single consumer |
 | `windows/infra/registry.ahk` | `infra/win_registry.ahk` | name collision with the macOS hotstring registry |
 | `ErgoptiPlus.ahk` / `init.lua` / `ergopti_hotstrings.lua` | `main.{ahk,lua}` | ⚠ **defer** — 7 consumer families pin these names for near-zero payoff |
 
@@ -117,85 +115,111 @@ Two conventions that make asymmetry legible:
 
 Constraints: **paths before moves, moves before content, data before code.**
 
-- **Lot 2 — the safety net.** ~~Both ratchets apply `HELPER_RE` per FILE, so one
-  converted read hides every remaining pinned read in the same file. Counting per
-  READ is the fix.~~ — **done, and it proved itself on this session's own work.**
-  Both gates now report reads as well as files (`40/40 read(s)` on macOS,
-  `235/326 literal(s)` on the AHK side), and the macOS one failed a new test here
-  that added a 42nd read to a file already on the list — which under the old
-  per-file counting would have been free.
+- **Lot 2 — the safety net.** The per-READ counting is done. What remains is the
+  conversion, and **re-measured 2026-08-02 the gate is lying about its own
+  population.**
 
-  What is left is not a mechanism but a per-site judgement: **40 macOS reads**
-  still pinned, of which the ones that need a human have a target module with no
-  declaration unique to it, so `read_driver_source` would concatenate several
-  files and silently change what the test asserts. Make the assertion
-  order-independent first, as `test_menu_llm_api_backend_probe.lua` now is. The
-  AHK residue each pins deliberately (`run_all.ahk` itself, a `_generated/` file
-  `_DriverSourceConcat` excludes, a runner, or a single file carrying an ABSENCE
-  assertion a directory-wide scan would weaken).
+  1. **Close the blind spot first, before converting anything.**
+     `SOURCE_PATH_RE` in `test-no-pinned-source-reads-lua.cjs` matches
+     `modules|lib|ui`. The `lib` arm has matched **zero** reads since
+     `e97ddbd08` renamed `lib/` to `infra/`, and there is no arm for the
+     driver-root `init.lua`. That hides **19 further production reads** (16
+     `init.lua`, 2 `infra/preferences.lua`, 1 `infra/i18n.lua`). True population
+     is ~57, not 38. Add the two arms and re-freeze at the honest number — a
+     ratchet that cannot see a fifth of its subject is not a safety net.
+  2. Both baselines also carry free slack (32 files / 40 reads frozen against 29
+     / 38 measured). Slack is where a regression lands silently.
+  3. Then convert. **29 of the 38 have a proven-unique declaration** and are
+     mechanical, but `fix-pinned-source-reads.cjs` cannot see them: its
+     `PINNED_RE` only matches `local X = helpers.driver_root() .. "…"`, and 21 of
+     the 38 are the inline `io.open(driver_root() .. "…")` shape. Widening the
+     fixer covers most of the lot.
+  4. The 9 that "need a human" are five menu/UI modules whose only declarations
+     are the non-unique `function M.build` / `function M.new`. They do **not**
+     need restructuring — each has unique constants or i18n keys usable as a
+     selector (`local DISABLED_GESTURE_ACTION`, `"menu.llm.backend_title"`,
+     `local MODEL_ADVANCED_PARAMS_THRESHOLD_B`, …). What they need is the
+     fixer's candidate rule widened beyond `local function` / `function M.`.
+  5. Only **6 of the 30** pinned files carry position arithmetic
+     (`test_ingest_rollback_id_stable.lua` has 6 comparisons on its own); those
+     are the ones that genuinely need the assertion made order-independent
+     before a concat-based read can replace them. The other 24 are plain
+     presence/absence and are unaffected.
 
-- **Lot 3 — one tree.** Remaining: (a) extract `platform/`; (b) de-platform
-  `_shared/`; (c) the Convention S stubs.
+  The AHK residue each pins deliberately (`run_all.ahk` itself, a `_generated/`
+  file `_DriverSourceConcat` excludes, a runner, or a single file carrying an
+  ABSENCE assertion a directory-wide scan would weaken).
+
+- **Lot 3 — one tree.** ~~(b) de-platform `_shared/`~~ — **done** by `4dd7b6d51`;
+  both rows are out of the rename table above. Remaining: (a) extract
+  `platform/`; (c) the Convention S stubs.
   The `ui/` reorganisation is done on all three drivers. If the
   `modules/<feature>/window.*` shape is still wanted, it is now one move of
   three identical trees rather than a reconciliation.
 
-- **Lot 4 — one namespace.** Migrate the **206 driver-namespaced feature blocks**
-  and **17 driver-namespaced sections** out of the `[ahk.*]` / `[hs.*]` silos to
-  their semantic path with per-entry `platforms`. **Approved, config-schema break
-  accepted** — the user deletes `config.toml` and the driver regenerates it, as
-  the v1→v2 cut-over already established.
+  **(a) measured 2026-08-02** — 20 production path violations of Convention P.
+  The three remap subsystems are the bulk: `macos/modules/karabiner` (14 files,
+  12 154 lines, 10 production require sites), `windows/modules/tap_holds` +
+  `windows/infra/tap_hold` (19 files, 4 454 lines, 34 tracked `#Include` lines),
+  `linux/modules/kanata` (2 files, 577 lines, 2 hardcoded build-script paths).
+  Start on Linux: it is 2 files and 2 paths, and proves the shape for the
+  other two. Two files are Convention P violations *by path* but are UI rather
+  than remap — `linux/ui/webkit_host.lua` (249 l) and
+  `macos/ui/menu/menu_karabiner.lua` (1 072 l); they need a placement decision,
+  not a mechanical move. And Convention P has **no gate**: without a test
+  asserting the forbidden-word list against paths it is decoration.
 
-  **Measured 2026-08-02, and the two things that made it look like weeks are both
-  false.**
+  ⚠ **(c) is blocked and the TODO said otherwise.** `_shared/core/features.json`
+  **does not exist**, so the canonical 25-name list above has no machine-readable
+  form and the tree-parity gate cannot read it. Someone must create it and teach
+  the gate to use it, or Convention S stays unenforceable. The `REASON_KEY`
+  reader is likewise still at zero, which
+  `test-menu-manifest-keys-have-readers.cjs` rejects by design.
 
-  *There are no id collisions.* Every id under a driver silo is unique against its
-  semantic target, including the three targets that already exist
-  (`features.metrics`, `features.shortcuts`, `features.hotstrings`). The merge is
-  mechanical — no entry needs a judgement about which of two definitions wins.
+- **Lot 4 — one namespace.** ~~Migrate the 223 driver-namespaced tables out of the
+  `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry
+  `platforms`.~~ — **done 2026-08-02.** The ratchet is now an assertion of zero,
+  and the config-schema break landed as approved. ~~Merge the duplicated privacy
+  toggles~~ — **done**, and worse than described: there were three spellings, not
+  two, and the one the driver persisted matched neither manifest id.
+  ~~Extend `test-config-schema.cjs` to the Linux template~~ and ~~add `linux` to
+  `KNOWN_PLATFORMS`~~ — both were **already done** before the lot was written
+  (`1a3c572c2`, `4b8c635cf`).
 
-  *The reader surface is 22 hand-edited occurrences, not 199.* Counted by shape
-  rather than by grepping `"ahk.` / `"hs.`, which returns 445 hits that are mostly
-  Hammerspoon API names (`"hs.timer"`, `"hs.json"`):
+  Two corrections worth keeping, because both cost time:
 
-  | Where | Count | Nature |
-  | --- | ---: | --- |
-  | `_shared/modules/features/manifest.toml` | 221 | the source being rewritten |
-  | `*/_generated/features_manifest.{lua,ahk}` | 119 | regenerated |
-  | `*/_generated/config_template.toml` | 15 | regenerated |
-  | `menu_manifest.json` | 5 | hand-edited |
-  | the two `config_schema/examples/*.toml` | 15 | hand-edited |
-  | `windows/infra/manifest_reader.ahk` | 2 | hand-edited |
+  *The reader surface was 7x the estimate.* The entry counted manifest path
+  strings (22) and missed that **the section path IS the TOML section name** —
+  154 further literals across 30 Windows files, plus 6 macOS `default_for("hs.…")`
+  call sites that raised at load. Grepping for the *config* sections, not only
+  the manifest paths, is what finds them.
 
-  **No production code addresses a feature by a driver-namespaced path string** —
-  nothing calls `default_for("ahk.…")` or `find_entry_by_path("hs.…")`. Features
-  are reached through the generated manifests and through `config.toml` section
-  headers, both of which follow the source.
+  *"It cannot be staged" was right.* The manifest, the generated files, the config
+  templates and the menu manifest describe the same paths. Regenerate before
+  running anything — the drift guard compares the working tree against the index,
+  so an unstaged regeneration reads as a failure of the change rather than of the
+  sequence.
 
-  The 15 source paths and their targets:
-  `hs.gestures`(45) `hs.gestures.modes`(32) `hs.gestures.sensitivities`(32)
-  `ahk.shortcuts.keyboard`(15) `ahk.metrics`(13) `ahk.gestures`(11)
-  `ahk.shortcuts.alt_gr_caps_lock`(10) `ahk.shortcuts.alt_gr_lalt`(10)
-  `ahk.shortcuts.lalt_caps_lock`(10) `ahk.layout`(5) `ahk.shortcuts`(5)
-  `ahk.shortcuts.personal`(5) `hs.hotstrings`(5) `ahk.shortcuts.script_control`(4)
-  `ahk.category_enabled`(4).
+  **Still open, and all of it is the `linux` half:**
 
-  ⚠ **It cannot be staged.** The manifest, the generated files, the config
-  templates and the menu manifest describe the same paths, so a half-applied
-  rename leaves the tree in a state worse than either end — the same reason the
-  `lib/`→`infra/` rename had to be atomic across three drivers. Budget one focused
-  pass, and regenerate before running anything: the drift guard compares generated
-  output against HEAD, so an unregenerated tree reads as a failure of the change
-  rather than of the sequence.
-
-  Still to do alongside it: add `linux` to the platforms of the features Linux
-  really implements and to `KNOWN_PLATFORMS`; extend `test-config-schema.cjs` to
-  the Linux template; and merge the duplicated privacy toggles — the three filters
-  exist **twice** in the shared manifest (`metrics.*_filter_enabled` **and**
-  `ahk.metrics.filter_*`) and the AHK driver reads neither, it hardcodes `:= true`.
-  Extreme case for the merge: `ahk.gestures` = 11 features against
-  `hs.gestures` + `.modes` + `.sensitivities` = 109, for the same feature, with the
-  same i18n key `menu.gestures` on both sides.
+  1. **No feature carries `linux`.** 0 of 324. The 73 features Linux sees, it sees
+     by inheriting one of 9 sections. Meanwhile the driver really implements
+     `linux/modules/gestures` (858 l), `linux/modules/llm` (988 l) and
+     `linux/modules/shortcuts` (385 l) — none of which the manifest admits, so per
+     top-level section it reads gestures 0/109, shortcuts 0/82, llm 0/29,
+     metrics 5/18. This is the data half of the problem Lot 5's menu migration
+     hits from the other side.
+  2. `KNOWN_GAPS.linux` at `test-config-schema.cjs:68-70` — one pinned gap,
+     `missing required property 'script'`. Contingent on deciding whether
+     `[sections.script]` gains `linux`; the comment there argues it should not
+     (Linux keeps its locale in XDG, `linux/infra/i18n.lua`). Decide, then delete
+     the entry either way.
+  3. **153 `description_key`s still carry a driver name** — `menu.ahk.metrics.*`,
+     `menu.hs.gestures.*`. These are i18n keys, not feature paths, so the
+     namespace gate does not see them and nothing is broken today. But it is the
+     same word in the same file meaning the same wrong thing, and renaming them
+     means touching all 21 locale catalogues — cheap now, expensive once the
+     `reason_key` work adds ~142 more keys beside them.
 
 - **Lot 5 — one menu.** The manifest must gain the capabilities that explain
   every hand-written row: a resolvable `action` id (12), `label.format` + `args`
@@ -205,10 +229,26 @@ Constraints: **paths before moves, moves before content, data before code.**
   counts/badges (~12), the `linux` token, groups nested beyond one level (~4),
   separator semantics (re-implemented 3 times), an `emoji` field, `visible_when`
   (~8), and a real top-level section list (the 9 head ids are read by nobody).
-  `checked_when` is done and shipped used; the remaining ~11 rows are a
-  mechanical repeat of that shape.
+
+  ⚠ **`checked_when` is done on WINDOWS only** — re-measured 2026-08-02, and the
+  entry's "done and shipped used" is half true. macOS has no
+  `resolve_checked_when`; it needs a ~30-line mirror of `resolve_disabled_when`
+  (`macos/infra/manifest_menu.lua:353-381`), keeping the deliberate asymmetry the
+  AHK comment documents — `disabled_when` fails closed, `checked_when` fails
+  open. Linux has no manifest renderer at all. So the "~11 remaining rows are a
+  mechanical repeat" only holds for the driver that already has the reader.
+
+  ⚠ **Nothing here can be staged data-first.**
+  `test-menu-manifest-keys-have-readers.cjs` forbids landing a manifest field
+  before its reader exists, and comment-only mentions are explicitly excluded.
+  Each capability is an atomic change: field + reader + rows, or nothing.
+  There is also **no schema for the menu manifest**, unlike the feature manifest.
+
   Order: (1) pilot on the metrics menu — best-covered, and ~280 lines of handlers
-  across two drivers become ~26 manifest rows + ~26 registry entries;
+  across two drivers become ~26 manifest rows + ~26 registry entries. Port
+  `resolve_checked_when` to macOS first: it is the one capability that is already
+  half-built, and it unblocks the three metrics filter rows that carry
+  `checked_when` in the shared manifest today and are read by one driver;
   (2) write `_shared/lua/menu/render.lua` (shared macOS+Linux, ~230 l) and
   `linux/infra/menu_host.lua` (~180 l), delete `menu_builder.lua` (933 l — it is
   already fully i18n'd, so this is architecture, not translation);
@@ -282,12 +322,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   already uses, so this converges the two drivers as well) and re-pointing those
   two; `ui/menu/menu_paths.lua` then requires it, which is the correct direction.
   Every other caller can move afterwards, or never.
+  ⚠ **It is not a pure cut, and the boundary is wider than "lines 78-350".**
+  Re-read 2026-08-02: resolution is lines 30-379, and that includes
+  `persist_config_dir_for_wizard` (l.364-379), which sits past the stated
+  boundary and is called from `ui/onboarding/init.lua:413`. The GUI half
+  (`apply_and_reload`, `inject_init_data`, `handle_message`, `pick_dir`,
+  `open_editor`) writes `_bootstrap` and calls `save_bootstrap()` / `ensure_dir()`
+  directly, so `infra/config_paths.lua` must expose a WRITE api, not only
+  `get`/`get_config_dir`. The upside is real: `apply_and_reload` is a near-
+  duplicate of `persist_config_dir_for_wizard`, so the extraction collapses two
+  writers of paths.toml into one. `M.init`'s two arguments also split across the
+  two modules, so `init.lua:191` and `ui/menu/init.lua:136-137` must be
+  reconciled in the same commit.
   ⚠ Do it on a fresh context, not at the end of a long pass: this resolves the
   config directory for every personal file, and the failure mode is a path that
   resolves to a directory that EXISTS and holds nothing — silent, and the shape
   of five separate wrong-depth bugs already recorded in this repo. `test-shared-root-resolvers.cjs`
   executes the resolvers for real and stats every answer, so build the equivalent
-  coverage for this one before moving it, not after; (2) **only then** make macOS consume the shared logger core, and
+  coverage for this one before moving it, not after — a macOS phase modelled on
+  its §3, stat every `get(key)` plus `get_config_dir()` and
+  `get_default_config_dir()`, HOME set and unset, paths.toml present and absent;
+  (2) **only then** make macOS consume the shared logger core, and
   only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` — this
   is the module with the worst bug history in the repo.
 
@@ -295,9 +350,16 @@ Constraints: **paths before moves, moves before content, data before code.**
   platform-agnostic core is ~350 lines; the other ~14 000 are emission,
   buffer/screen sync, suppression bookkeeping, TOML I/O, tooltip preview and OS
   quirks, legitimately per-driver.
-  1. Generate the single matcher core into both target languages, modelled on
-     `codegen-terminators.cjs` — it already emits both targets in one run and is
-     the only part of the engine that has never drifted.
+  1. **Adopt the shared matcher core** — re-measured 2026-08-02 and the framing
+     was wrong twice. A 526-line shared core already exists; it reaches Linux
+     only, so the work is bringing macOS and Windows onto it, not generating a
+     new one. And `codegen-terminators.cjs` is not a usable model: its Lua output
+     is 44 lines of *data*, and no generator in this repo emits a Lua function.
+     Two obstacles the entry omitted: Windows carries ~100 lines of star-trigger
+     indexing with no counterpart in the shared engine, and macOS's `would_fire()`
+     is documented as the single source of truth used by the tooltip preview as
+     well — replacing it risks the exact divergence its docstring says was
+     already fixed once.
   2. **LLM**: fold the prompt-builder constants into one JSON.
      **Re-measured 2026-08-02, and the priority is lower than it reads.** Of the
      three declarations one is GENERATED (`windows/_generated/prompt_builder.ahk`),
@@ -349,26 +411,31 @@ Constraints: **paths before moves, moves before content, data before code.**
 
 - **Lot 9 — the tests.** Honest ceiling: `meta/` directories alone are **84 956
   lines (44 %)** and each asserts on one driver's source text; the plan must not
-  promise the suites mutualise like the drivers. Achievable: **≈ −11 500 lines.**
+  promise the suites mutualise like the drivers. Achievable: **≈ −13 400 lines.**
+
+  Re-measured 2026-08-02 — every row's "today" figure had drifted, and one row's
+  mechanism is already built:
 
   | Target | Today | After | Mechanism |
   | --- | ---: | ---: | --- |
-  | Corpus consumers (16 corpora, 258 vectors) | 9 122 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
-  | Port contract vectors (129) | 2 001 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
-  | e2e harnesses | 1 319 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
-  | Convention invariants | 1 594 | ~450 | one `.cjs` gate per invariant — the shared linter already IS that gate |
-  | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
+  | Convention invariants | 766 | ~0 | **the replacement already exists**: `lint-conventions.js --fail-on-violations` + `audit-file-headers.cjs`, both strict and both in the suite. This row is deletion, not reimplementation. |
+  | Corpus consumers (16 corpora, 258 vectors) | 7 650 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
+  | Port contract vectors (129) | 2 138 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
+  | Port presence/compliance | 1 473 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
+  | e2e harnesses | 1 374 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
+
+  **Start with the convention row.** It is the only one where the replacement is
+  already live, so the work is confirming the JS gate is green and then deleting
+  the eight driver-side duplicates it subsumes (`macos/tests/meta/`'s
+  `test_file_headers.lua`, `test_section_headers.lua`, and their siblings). Every
+  other row means writing the replacement first.
 
 - **Lot 10 — pruning.** ~~Port the macOS reachability gate to Windows and Linux,
-  then delete the dead adapter code~~ — **done.** The gate corrected the figure
-  this lot was sized on (recorded ~3 101 lines across two drivers; measured
-  1 549 on one), and the nine Linux adapters it found are deleted under
-  [ADR-008](static/ergopti_plus/docs/adr/008-ports-are-contracts-not-a-checklist.md),
-  which supersedes ADR-001's "adding a new driver requires only implementing the
-  twenty port adapters" — the sentence that produced them. All three drivers are
-  now held at **zero** unreferenced adapters.
-  `contracts.json` is deliberately NOT shrunk: all twenty ports have real traffic
-  on macOS, Windows or both, so the ports were never the thing that was wrong.
+  then delete the dead adapter code~~ — **done.** Kept here only for the rule it
+  established: all three drivers are held at **zero** unreferenced adapters, and
+  `contracts.json` is deliberately NOT shrunk — all twenty ports have real
+  traffic on macOS, Windows or both, so the ports were never the thing that was
+  wrong. See [ADR-008](static/ergopti_plus/docs/adr/008-ports-are-contracts-not-a-checklist.md).
 
 ### Gates to build
 
@@ -398,17 +465,45 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Current floors: tautology 45, pcall-only
-213, unfloored-scan 24, the other three at 0.
+`unfloored-scan`. It only turns down. Measured 2026-08-02: tautology **45**,
+pcall-only **203** (the baseline says 213 — the tool itself reports the slack and
+suggests `--update-baseline`), unfloored-scan **24**, the other three at 0.
 
-The work is burning those three floors down. Each occurrence is either a real
-false green to fix or a justified shape to document in the test itself —
-`--update-baseline` after saying why.
+The work is burning those floors down. Each occurrence is either a real false
+green to fix or a justified shape to document in the test itself —
+`--update-baseline` after saying why. Use `--list` for file:line, `--pattern=<key>`
+to filter.
+
+**Where the real work is, measured rather than assumed:**
+
+- **tautology (45): 32 of them are the SOLE assertion in their test case.** 32
+  macOS / 12 Linux / 1 Windows; 15 mention "pause", 9 are skip acknowledgements,
+  13 carry no message at all. The sole-assertion ones are the real find — the
+  whole case certifies nothing. Confirmed examples:
+  `macos/tests/unit/modules/keymap/test_terminators.lua:14,115,122` (body is one
+  comment plus `assert_true(true)`; nothing loads terminators, nothing pauses),
+  `.../keylogger/test_log_manager.lua:255,261`,
+  `.../llm/test_backend_detector.lua:44`,
+  `.../dynamic_hotstrings/test_personal_info.lua:15`,
+  `.../shortcuts/test_actions_system.lua:9` (fixable — assert on the eventtap
+  stub's recorded `watch_types` instead of on `true`).
+- **unfloored-scan (24): only 6 are genuine.** The other 18 already carry a floor
+  in a shape the detector does not recognise. **Fix the detector first**, or the
+  next person re-audits the same 18. Its five blind spots, each proved:
+  (a) Lua collector assignment `x[#x+1] = v` — the collector regex requires AHK
+  `:=`; (b) an assertion split across lines — the floor regex forbids `\n`;
+  (c) `assert_eq(#x, n)` — a comma, not an operator; (d) anchor assertions
+  (`assert_true(src:find(…) ~= nil)`); (e) `read_driver_source()` returning nil
+  on a miss, which makes a downstream length check a floor already.
 
 Two shapes the detector **cannot** see, to hunt by hand:
 
 - a harness that stubs the very function the test claims to verify;
 - a source-grep pinning the current SPELLING of the code, not the invariant.
+  ~~`test_pause_checked_state.lua`~~ — **fixed**: it ANDed two spellings no single
+  line can carry, so the count was structurally 0. Worth knowing as a *shape*: an
+  AND across alternative spellings is a tautology the detector cannot see, and
+  this file had one. Grep the suites for `find(…) and …find(…)` on the same line.
 
 ---
 
@@ -450,102 +545,3 @@ longer exists — `PROJECT_MEMORY.md` is now the only canonical memory.
 
 `perf_hs.md` and `refactor.md` — check PROJECT_MEMORY before running; the
 refactor cycle the latter belongs to was declared complete.
-
-Also pending from the doc triage: rewrite `docs/STATE_TRANSITION_MATRIX.md`
-against the current PowerShell-worker architecture (the two dangerous
-prescriptions are fixed, but the surrounding symbol names are still stale), and
-refresh the "It bundles:" list in `docs/TESTING.md`, which names four checks
-where `run-js-suite.cjs` now declares about 130.
-
----
-
-## 4. Hammerspoon audit 2026-07-29 — findings still open
-
-The audit report was retired once its findings were adjudicated: 111 candidates,
-92 confirmed, 17 refuted, 2 hypotheses. Everything at CRITICAL and HIGH severity
-shipped, along with roughly half the rest — each with a regression test proven red
-before the fix and green after.
-
-0 did not ship. They are carried here verbatim so nothing was lost with the
-file: location, root cause, proposed fix and proposed test. Two caveats that the
-pass itself established, and that apply to every line below:
-
-**Verified against the tree on 2026-08-02.** Fourteen of the original thirty are
-gone: eleven closed earlier that day, three more here after reading the code
-they name. The proportion is the point — the caveat above says one in six turns
-out stale, and in this batch it was closer to one in two. Two cheap signals sort
-them faster than reading all of them: whether the test the finding PROPOSES now
-exists (the repo's rule is a test per fix), and whether a distinctive identifier
-from its **Fix** paragraph appears in the source it names. Neither is a verdict —
-`karabiner-actions-rebuilt-673` scored zero on both and was fully done — but
-together they say which to read first.
-
-**Verified against the tree on 2026-08-02.** Fourteen of the original thirty are
-gone: eleven closed earlier that day, three more here after reading the code
-they name. The proportion is the point — the caveat above says one in six turns
-out stale, and in this batch it was closer to one in two. Two cheap signals sort
-them faster than reading all of them: whether the test the finding PROPOSES now
-exists (the repo's rule is a test per fix), and whether a distinctive identifier
-from its **Fix** paragraph appears in the source it names. Neither is a verdict —
-`karabiner-actions-rebuilt-673` scored zero on both and was fully done — but
-together they say which to read first.
-
-- **They are leads, not work orders.** Roughly one in six audit findings on this
-  repo turns out to be false, stale, or already fixed once someone opens the
-  file. Three were refuted that way while working through this list — including
-  one whose "obvious" guard would have broken first-run Karabiner priming, and
-  one where the code's own call-site comment explained why the thing called dead
-  is a deliberate safety net.
-- **Two were attempted and deliberately reverted**, because a test that must not
-  be weakened said the fix was wrong: deferring the clipboard transaction off the
-  keystroke tap breaks the paste serialisation contract, and gating the LLM
-  startup backup check on an in-flight marker defeats the backup's entire purpose.
-  Both need a different approach, not a retry of the same one.
-
-
-### Verifier corrections — read these before touching the findings they name
-
-A second adversarial pass (28 agents, each re-deriving the artefacts and each
-finding then handed to a refuter told to kill it) confirmed 17 of the open items
-and refuted 4. Every confirmed one came back with its proposed fix amended. The
-three amendments that will otherwise cost a reverted commit:
-
-- **UML-3** — do NOT gate the 3 s backup check on a dispatch flag.
-  `tests/unit/ui/menu/menu_llm/test_startup_controller_generation_guard.lua`
-  asserts `#captured_checks == 2` in THREE places, under the proposed test's own
-  setup: the naive fix turns them red and the proposed test is their negation.
-  The real defect is that `_startup_check_generation` is an OUTCOME guard asked an
-  IN-FLIGHT question — on the MLX path a terminal outcome is 60-90 s away, so at
-  t=3 s the generation always still matches and the backup always double-dispatches.
-  Fix the SINK instead: promote readiness in `models_manager_mlx_server.lua` from a
-  per-invocation local to module state plus a waiter list, so a duplicate check
-  joins the in-flight one instead of starting a second. That is below the seam the
-  pinned test stubs, so it stays green.
-- **perform-paste-clipboard-io-inside-eventtap** — deferring the paste was already
-  tried and reverted; it breaks the ordering contract pinned by
-  `test_emit_tokens_multi_paste.lua`. Evaluate instead: one pasteboard round trip
-  per EXPANSION rather than per token, or moving only the RESTORE off the hot path.
-  Do not re-propose the deferral.
-- **ADAPT-4** is two claims and only one survives. 4a ("CACHE_VERSION never
-  validated") is REFUTED: `adapters/toml_cache.lua` validates it as the first
-  clause of its invalidation guard, and a snapshot from an older version is
-  rejected. What remains is the 512-byte fingerprint window, which covers the
-  `[_meta]` header and none of the entries — so do not close the item with 4a.
-
-Refuted outright and not to be re-raised: `adapt-4b` as stated,
-`karabiner-delay-dialogs-never-open-newline-in-applescript` (the mechanics
-reproduce but the AppleScript grammar model behind the conclusion is wrong),
-`dynhs-preview-resolve-memo-bypass`, and `UIW-6`.
-
-**RECOVERED 2026-08-01.** These 30 findings were carried here by the audit's
-retirement commit (64aec676f, +318 lines) and then deleted the next day by
-`dcc759e94` — a metrics commit whose message does not mention TODO.md at all.
-74 793 characters of adjudicated defect reports disappeared as a side effect,
-and the section above went on promising them while the heading below it was
-empty. Restored from `dcc759e94^`. The lesson is the one the repo keeps
-relearning: nothing said so, because a deleted section fails no test.
-
-### MEDIUM
-
-All thirty are closed. Nineteen had already shipped and were confirmed against the code; six were fixed here; the rest were refuted by the verifier pass or decided against and now live in PROJECT_MEMORY.
-
