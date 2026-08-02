@@ -45,7 +45,7 @@ is a wish.**
 
 | # | Invariant | State |
 | --- | --- | --- |
-| **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it. **25/47 = 53.2 %** after the platform/ extraction. Still to do: the Convention S stubs. |
+| **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it: **25/47 directories = 53.2 %**, and now **14/25 canonical features on all three** — the list is machine-readable at last. Still to do: the Convention S stubs, blocked on the `REASON_KEY` reader. |
 | **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. A feature missing on a platform carries a translated `reason_key`. | Namespace half **done** — the ratchet is now an assertion of zero. The `reason_key` half is at 0 of 142 written. |
 | **I3** | One menu. The manifest describes what the user sees; the renderer how this OS draws a row; the driver supplies only named actions, state getters and list providers. | `action_id` ↔ handler bijection done. The label-tree diff is not built — see §0.6. |
 | **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done. The `HotkeyRegistrar` port and the Karabiner catalogue remain; two of Lot 6's rows turned out not to be actionable as written. |
@@ -192,12 +192,31 @@ Constraints: **paths before moves, moves before content, data before code.**
   symmetrical with. Windows has WebView2, macOS WKWebView — the same concern
   under three vendor names, exactly like remap was.
 
-  ⚠ **(c) is blocked, and by two things.** `_shared/core/features.json` **does not
-  exist**, so the canonical 25-name list above has no machine-readable form and
-  the tree-parity gate cannot read it. And the `REASON_KEY` reader is still at
-  zero, which `test-menu-manifest-keys-have-readers.cjs` rejects by design —
-  landing ~50 stub folders whose reason nothing displays is decorative data, the
-  exact thing that gate exists to refuse. Order: reader, then list, then stubs.
+  **(c): the list half is done 2026-08-03, the stub half is still blocked.**
+  `_shared/core/features.json` now exists and `test-driver-tree-parity.cjs` reads
+  it, so I1 finally has the measurement it was missing — comparing the drivers to
+  EACH OTHER says nothing about a feature none of them has, and cannot tell a
+  deliberate absence from an oversight. **14 of 25 canonical features are present
+  on all three drivers**, 5 partial, 6 nowhere; frozen, and red if a feature
+  loses its canonical path.
+
+  *Writing the file corrected the list.* The prose said every named feature is
+  `modules/<name>/`. The tree disagrees and the tree is right: a feature the user
+  OPERATES is a module (gestures, llm, shortcuts), one the user LOOKS AT is a
+  window in `ui/` (action_picker, changelog, model_browser) — **ten of the 25 are
+  windows**. Forcing them into `modules/` would have been a rename in service of
+  a sentence, so each entry carries its `tree`.
+
+  *And it named the six that Convention S cannot stub.* `apps`, `download`,
+  `hotstrings_config`, `layout`, `metrics` and `personal_info` have no folder
+  under their canonical name on ANY driver — the capability exists, spread
+  through another module, so there is nothing to stub *around*: the work is
+  extraction, not a README.
+
+  ⚠ **The stubs themselves are still blocked**, on the `REASON_KEY` reader:
+  `test-menu-manifest-keys-have-readers.cjs` rejects a manifest field before its
+  reader exists, and ~50 stub folders whose reason nothing displays is exactly
+  the decorative data it refuses. Order: reader, then stubs.
 
 - **Lot 4 — one namespace.** ~~Migrate the 223 driver-namespaced tables out of the
   `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry

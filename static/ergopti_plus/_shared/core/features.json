@@ -1,0 +1,63 @@
+{
+	"_comment": [
+		"THE canonical feature list. Every user-visible capability of Ergopti+ has",
+		"exactly one name here, and every driver either implements it under that name",
+		"or does not implement it at all — never under a second spelling.",
+		"",
+		"WHY THIS FILE EXISTS: the list lived in prose in TODO.md, so nothing could",
+		"read it. Invariant I1 ('one tree') and Convention S ('the stub with a",
+		"reason') both need a machine-readable canonical list, and without one the",
+		"tree-parity gate could only compare the drivers to EACH OTHER — which says",
+		"nothing about a feature none of them has, and cannot tell a deliberate",
+		"absence from an oversight.",
+		"",
+		"THE `tree` FIELD IS NOT DECORATION, and writing this file is what made that",
+		"clear. The prose list said every named feature is `modules/<name>/`. The tree",
+		"disagrees, and the tree is right: a feature the user OPERATES lives in",
+		"modules/ (gestures, llm, shortcuts), while a feature the user LOOKS AT is a",
+		"window and lives in ui/ (action_picker, changelog, model_browser). Ten of the",
+		"25 are windows. Forcing them into modules/ would have been a rename in",
+		"service of a sentence.",
+		"",
+		"HOW TO USE IT: test-driver-tree-parity.cjs reads it and ratchets how many",
+		"canonical features are present on all three drivers. Add a feature here when",
+		"it gains a name a user could say out loud, not when a folder appears."
+	],
+
+	"features": [
+		{ "name": "action_picker", "tree": "ui", "role": "picker window for gesture and chord actions" },
+		{ "name": "apps", "tree": "modules", "role": "per-application profiles and app-scoped behaviour" },
+		{ "name": "changelog", "tree": "ui", "role": "release-notes window" },
+		{ "name": "diagnostics", "tree": "modules", "role": "crash reporting and the diagnostic dump" },
+		{ "name": "download", "tree": "modules", "role": "asset and model downloads with progress" },
+		{ "name": "dynamic_hotstrings", "tree": "modules", "role": "computed expansions — dates, personal info" },
+		{ "name": "gestures", "tree": "modules", "role": "trackpad gesture slots and their actions" },
+		{ "name": "healthcheck", "tree": "ui", "role": "the health window and its probes" },
+		{ "name": "hotstring_editor", "tree": "ui", "role": "editor window for personal hotstrings" },
+		{ "name": "hotstrings", "tree": "modules", "role": "the expansion engine" },
+		{ "name": "hotstrings_config", "tree": "modules", "role": "which hotstring groups are on" },
+		{ "name": "layout", "tree": "modules", "role": "the physical keyboard layout and its install" },
+		{ "name": "llm", "tree": "modules", "role": "prediction backends, models and prompts" },
+		{ "name": "menu", "tree": "ui", "role": "the tray menu" },
+		{ "name": "metrics", "tree": "modules", "role": "keystroke capture and its aggregates" },
+		{ "name": "model_browser", "tree": "ui", "role": "model catalogue window" },
+		{ "name": "onboarding", "tree": "ui", "role": "the first-run wizard" },
+		{ "name": "paths", "tree": "infra", "role": "resolution of every user file location" },
+		{ "name": "personal_info", "tree": "modules", "role": "the user's own data for dynamic expansions" },
+		{ "name": "prompt_editor", "tree": "ui", "role": "prompt editing window" },
+		{ "name": "shortcuts", "tree": "modules", "role": "chords, text transforms and their bindings" },
+		{ "name": "spotlight", "tree": "ui", "role": "the caret spotlight overlay" },
+		{ "name": "tooltip", "tree": "ui", "role": "the prediction and feedback tooltip" },
+		{ "name": "updater", "tree": "modules", "role": "release checks and self-update" },
+		{ "name": "wpm", "tree": "ui", "role": "the typing-speed widget" }
+	],
+
+	"_absent_everywhere": [
+		"apps, download, hotstrings_config, layout, metrics and personal_info have no",
+		"folder under their canonical name on ANY driver — the capability exists (app",
+		"profiles are read, models are downloaded, hotstring groups are toggled, the",
+		"layout is installed, personal info expands) but each is spread through",
+		"another module. They are the six that Convention S cannot stub, because",
+		"there is nothing to stub AROUND yet: the work is extraction, not a README."
+	]
+}

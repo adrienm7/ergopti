@@ -134,6 +134,54 @@ const BASELINE_SHARED = 23;
 // shared count stands still.
 const BASELINE_UNION = 49;
 
+// ── The canonical features, the third measurement this gate never had ───────
+//
+// Comparing the drivers to EACH OTHER says nothing about a feature none of them
+// has, and cannot tell a deliberate absence from an oversight. _shared/core/
+// features.json is the machine-readable canonical list — it existed only as
+// prose in TODO.md until 2026-08-03, which is why Convention S ("every canonical
+// folder exists on every driver, with a reason where it is unimplemented") had
+// no gate at all: nothing could enumerate the folders it was talking about.
+//
+// Each feature declares the TREE it belongs to, and that field is the finding
+// rather than a formality: the prose said every named feature is
+// `modules/<name>/`, and ten of the 25 are windows that live in `ui/`. A feature
+// the user OPERATES is a module; one the user LOOKS AT is a window.
+const CANONICAL = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared', 'core', 'features.json'), 'utf8')
+).features;
+
+/** True when a driver ships a canonical feature at its declared path. */
+function hasFeature(driver, feature) {
+	const base = path.join(SP, driver, feature.tree, feature.name);
+	if (fs.existsSync(base)) return true;
+	return ['.lua', '.ahk'].some((ext) => fs.existsSync(base + ext));
+}
+
+const canonicalOnAll = CANONICAL.filter((f) => DRIVERS.every((d) => hasFeature(d, f)));
+const canonicalPartial = CANONICAL.filter(
+	(f) => !DRIVERS.every((d) => hasFeature(d, f)) && DRIVERS.some((d) => hasFeature(d, f))
+);
+const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature(d, f)));
+
+// Frozen 2026-08-03 at the first measurement. Raise as features are unified;
+// never lower it to make a change pass.
+//   14/25 on all three, 5 partial, 6 nowhere.
+// The six that are nowhere — apps, download, hotstrings_config, layout,
+// metrics, personal_info — are the ones Convention S cannot stub, because there is
+// nothing to stub around: the capability exists, spread through another module,
+// so the work is extraction rather than a README.
+const BASELINE_CANONICAL_ON_ALL = 14;
+
+if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
+	errors.push(
+		`only ${canonicalOnAll.length} of ${CANONICAL.length} canonical features are present on all ` +
+			`three drivers, below the recorded ${BASELINE_CANONICAL_ON_ALL}. A feature that lost its ` +
+			'canonical path on one driver is exactly what I1 forbids — move it back, or rename it ' +
+			'in _shared/core/features.json if the canonical name itself changed.'
+	);
+}
+
 if (shared.length < BASELINE_SHARED) {
 	errors.push(
 		`only ${shared.length} director(ies) are present in all three drivers, below the recorded ` +
@@ -151,6 +199,16 @@ if (union.size > BASELINE_UNION) {
 }
 
 if (process.argv.includes('--measure')) {
+	console.log(
+		`canonical features (_shared/core/features.json): ${canonicalOnAll.length} on all three, ` +
+			`${canonicalPartial.length} partial, ${canonicalNowhere.length} nowhere`
+	);
+	for (const f of canonicalPartial) {
+		const has = DRIVERS.filter((d) => hasFeature(d, f));
+		console.log(`  partial: ${f.tree}/${f.name} — on ${has.join(' + ')}`);
+	}
+	for (const f of canonicalNowhere) console.log(`  nowhere: ${f.tree}/${f.name} — ${f.role}`);
+	console.log('');
 	console.log(`union: ${union.size} distinct path(s) across ${DRIVERS.length} driver(s)`);
 	console.log(`shared by all three: ${shared.length} (${ratio.toFixed(1)} %)\n`);
 	console.log('shared:');
@@ -190,5 +248,6 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] driver tree parity (I1): ${shared.length}/${union.size} director(ies) shared by all ` +
-		`three drivers — ${ratio.toFixed(1)} %.\x1b[0m`
+		`three drivers — ${ratio.toFixed(1)} %; ${canonicalOnAll.length}/${CANONICAL.length} canonical ` +
+		`features on all three.\x1b[0m`
 );
