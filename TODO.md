@@ -211,8 +211,25 @@ Constraints: **paths before moves, moves before content, data before code.**
   one `chord_bindings` group rendered identically everywhere.
 
 - **Lot 7 — the cross-cutting layer.** Remaining: (1) move the macOS config-path
-  SSOT out of `ui/menu/menu_paths.lua` (25 call sites) — today `infra/` depends on
-  `ui/menu/`; (2) **only then** make macOS consume the shared logger core, and
+  SSOT out of `ui/menu/menu_paths.lua` — today `infra/` depends on `ui/menu/`.
+  **Re-measured 2026-08-02, and it can be staged rather than done in one cut.**
+  The file is 656 lines and holds TWO concerns: path resolution (`init`, `get`,
+  `get_config_dir`, the paths.toml bootstrap load/save — roughly lines 78-350)
+  and a webview form panel (`open_editor`, `build_menu_item`). Only the first
+  belongs in `infra/`.
+  The dependency INVERSION the item names is narrower than the 63 references
+  suggest: exactly **two** `infra/` files import it — `personal_hotstrings.lua`
+  and `personal_shortcuts.lua` — and both use only `get(key)`. So step one is
+  extracting the resolution half into `infra/config_paths.lua` (the name Linux
+  already uses, so this converges the two drivers as well) and re-pointing those
+  two; `ui/menu/menu_paths.lua` then requires it, which is the correct direction.
+  Every other caller can move afterwards, or never.
+  ⚠ Do it on a fresh context, not at the end of a long pass: this resolves the
+  config directory for every personal file, and the failure mode is a path that
+  resolves to a directory that EXISTS and holds nothing — silent, and the shape
+  of five separate wrong-depth bugs already recorded in this repo. `test-shared-root-resolvers.cjs`
+  executes the resolvers for real and stats every answer, so build the equivalent
+  coverage for this one before moving it, not after; (2) **only then** make macOS consume the shared logger core, and
   only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` — this
   is the module with the worst bug history in the repo.
 
