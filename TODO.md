@@ -502,10 +502,11 @@ Constraints: **paths before moves, moves before content, data before code.**
      JS branches four. `resolve_anchor()` only ever produces the four the
      renderer agrees on, so it is latent, not live — adding the missing branches
      would add dead code.
-     ⚠ `anchor_cascade` in `[positioning]` is read by **no driver**, is labelled
-     "informative", and its own neighbouring comment says AHK adds a step it does
-     not list. An informative constant that contradicts the prose beside it is
-     worse than prose alone.
+     ~~`anchor_cascade` in `[positioning]` is read by no driver and contradicts
+     the prose beside it~~ — **deleted 2026-08-02.** It is prose now, with the
+     AHK-only mouse-cursor step in its right place, and
+     `test-tooltip-positioning-reach.cjs` asserts it does not come back. A
+     constant nothing consumes cannot go stale loudly, so it went stale quietly.
 
 - **Lot 9 — the tests.** Honest ceiling: `meta/` directories alone are **84 956
   lines (44 %)** and each asserts on one driver's source text; the plan must not
@@ -586,7 +587,7 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-02 at pcall-only **203**,
+`unfloored-scan`. It only turns down. Frozen 2026-08-02 at pcall-only **136**,
 unfloored-scan **4**, **the other four at 0**.
 
 The work is burning those floors down. Each occurrence is either a real false
@@ -638,22 +639,34 @@ to filter.
   was created watching an empty set in every test run. When a test says it cannot
   assert something, check whether the harness is what made it impossible.
 
-- **pcall-only (203) is the whole remaining class, and it is now measured.**
-  **135 of the 203 are the ONLY assertion in their case** (68 also check a
-  value); macOS 119, Linux 84, AHK none — the AHK detector is `vacuous-absence`
-  and that is already at zero.
+- **pcall-only: 203 → 136, and the recipe below is what did it.** 135 of the
+  original 203 were the ONLY assertion in their case; macOS 119, Linux 84, AHK
+  none — the AHK detector is `vacuous-absence`, already at zero.
 
   They are one shape: `it("X does not crash", …)` around a `pcall`, so the case
-  certifies survival and nothing else. The fix is the same each time and it is
-  NOT to delete the pcall — it is to assert **what the guard did**. For the
-  `require_state` family (`"start() before init is a safe no-op"`, `"rejects a
-  non-table core_state"`) that means calling a public function afterwards and
-  asserting it still returns the guard's sentinel: a module that swallowed the
-  bad input and initialised anyway passes "did not crash" and fails everything
-  after it.
+  certifies survival and nothing else. The fix is to assert **what the guard
+  did**. For the `require_state` family (`"start() before init is a safe no-op"`,
+  `"rejects a non-table core_state"`) that means calling a public function
+  afterwards and asserting it still returns the guard's sentinel: a module that
+  swallowed the bad input and initialised anyway passes "did not crash" and fails
+  everything after it.
   ⚠ Where the call is expected NOT to raise, drop the pcall entirely: a raise
-  then fails the case with the real error instead of a boolean, which is strictly
-  more informative. Reserve `pcall` for cases whose subject IS the raising.
+  then fails the case with the real error instead of a boolean. Reserve `pcall`
+  for cases whose subject IS the raising — `test_utf8_offset_pcall.lua` is the
+  genuine one, and its helper's docstring already says so.
+
+  **Three findings from the first 67, worth having before the next batch.** A
+  SQLite writer with no database must REFUSE, and refusal is a return value the
+  caller advances its watermark on — "did not crash" let a writer report success
+  against a closed database, which loses rows silently and for good. A privacy
+  detector answering `nil` satisfied "did not throw" and reads as falsy at the
+  caller, which is the fail-OPEN direction. And a shell-runner completion
+  callback's real invariant is that it RELEASES the GC pin: a task left pinned is
+  never collected and the process holds its pipes for the session. None of the
+  three was visible through the pcall status.
+  ⚠ One conversion introduced `assert_true(X ~= nil or true)` — always true, a
+  tautology created while removing tautologies. Run the detector after every
+  batch, not at the end.
 - ~~**unfloored-scan (24): only a handful are genuine** — the rest already carry a
   floor in a shape the detector does not recognise.~~ — **detector fixed, 24 → 4.**
   Four blind spots closed: a Lua collector `t[#t+1] = v` (the regex required AHK
