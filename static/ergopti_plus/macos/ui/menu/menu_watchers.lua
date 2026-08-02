@@ -49,7 +49,7 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 --- @param get_suppress_until function Returns the epoch timestamp until which events are suppressed.
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
 --- @return userdata|nil The hs.pathwatcher object, or nil on failure.
-function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore, ignored_dirs)
+function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore, ignored_dirs, self_written_files)
 	-- Single debounce/poll timer shared across all pathwatcher callbacks; cancelled
 	-- and restarted on every new event so that a burst of changes produces only
 	-- one reload fired once the burst settles.
@@ -107,6 +107,25 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		ui_restore.defer_reload(on_reload)
 	end
 
+	--- The files the driver rewrites itself, as a set keyed by path. config.toml is
+	--- rewritten on EVERY persisted preference change, so under a layout where the
+	--- config directory sits inside base_dir — the symlink and copy layouts — a
+	--- menu toggle looked exactly like a source edit to this watcher and armed a
+	--- reload. infra/file_watchers is given the same list and has always used it;
+	--- this watcher covers the same tree and was not, which is the whole of the
+	--- asymmetry: the exclusion was applied to one of two watchers on one tree.
+	local self_written = {}
+	for _, p in ipairs(self_written_files or {}) do
+		if type(p) == "string" and p ~= "" then self_written[p] = true end
+	end
+
+	--- True when a changed path is one the driver wrote itself.
+	--- @param file string Absolute path reported by the pathwatcher.
+	--- @return boolean
+	local function is_self_written(file)
+		return self_written[file] == true
+	end
+
 	--- True when a changed path lies inside a directory the driver writes itself.
 	--- @param file string Absolute path reported by the pathwatcher.
 	--- @return boolean
@@ -142,7 +161,12 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 				-- snapshot write reloaded the driver, the reload re-parsed and rewrote
 				-- snapshots, and the cycle repeated. That is the same loop the
 				-- paths.toml exclusion above was added for.
-				and not is_ignored(file) then
+				and not is_ignored(file)
+				-- Files the driver rewrites itself: config.toml on every preference
+				-- toggle, the Karabiner config on every regenerate. Treating those as a
+				-- source change makes the driver reload because the user ticked a menu
+				-- item.
+				and not is_self_written(file) then
 				if not burst_paths[file] then
 					burst_paths[file] = true
 					burst_count = burst_count + 1

@@ -1072,7 +1072,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function() do_reload("watcher") end,
 		function() return _suppress_watcher_until end,
 		ui_restore,
-		{ (hs.configdir or ".") .. "/cache" }
+		{ (hs.configdir or ".") .. "/cache" },
+		-- Resolved from MenuPaths, exactly as infra/file_watchers resolves the same
+		-- two, so the watcher and the writers cannot disagree about where they are.
+		-- Both files are rewritten by the driver itself — config.toml on every
+		-- persisted preference change, the Karabiner config on every regenerate —
+		-- and this is the second recursive watcher on the same tree. The other one
+		-- has always been given this list; this one was not, so under a layout where
+		-- the config directory sits inside base_dir a menu toggle read as a source
+		-- edit and armed a reload.
+		{
+			MenuPaths.get("ConfigTomlPath"),
+			MenuPaths.get("KarabinerConfigPath"),
+		}
 	)
 
 	M._menu    = myMenu
