@@ -1,4 +1,4 @@
-﻿--- ui/menu/preferences.lua
+﻿--- infra/preferences.lua
 
 --- ==============================================================================
 --- MODULE: Menu Preferences

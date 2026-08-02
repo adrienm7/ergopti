@@ -542,7 +542,7 @@ do
 	end
 end
 
-local Preferences = require("ui.menu.preferences")
+local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(menu_paths.get("ConfigTomlPath"))
 local boot_llm_enabled = hs.settings.get("llm.enabled")

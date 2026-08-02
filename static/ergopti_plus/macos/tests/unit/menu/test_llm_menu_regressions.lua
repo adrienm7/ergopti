@@ -4,7 +4,7 @@
 --- windows/tests/test_llm_menu_regressions.ahk where the platform shares the bug class.
 
 local helpers = require("tests.helpers")
-local prefs   = helpers.load_with_stubs("ui.menu.preferences")
+local prefs   = helpers.load_with_stubs("infra.preferences")
 local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 local function contract_path()
@@ -25,7 +25,7 @@ local function load_contract_entry(id)
 end
 
 local function preferences_source()
-	return helpers.driver_root() .. "ui/menu/preferences.lua"
+	return helpers.driver_root() .. "infra/preferences.lua"
 end
 
 local function init_llm_source()

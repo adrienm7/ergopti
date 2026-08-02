@@ -15,7 +15,7 @@
 ---   set_llm_temperature      -> `t <= GREEDY_TEMP_THRESHOLD`   (prompt_builder:127)
 ---   set_llm_debounce         -> `inactivity_debounce_sec < 0`  (start_inactivity_timer)
 ---
---- Neither ui/menu/preferences.lua nor ui/menu/menu_state.lua coerces, and the
+--- Neither infra/preferences.lua nor ui/menu/menu_state.lua coerces, and the
 --- shared TOML codec falls back to a bare string for anything its two numeric
 --- patterns miss — so an untrusted string genuinely reaches these setters.
 ---

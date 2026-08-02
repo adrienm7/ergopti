@@ -33,8 +33,8 @@ local DELAY    = 0.75
 helpers.describe("preferences: a per-category expansion delay round-trips through disk", function()
 
 	helpers.it("survives save, load and merge", function()
-		package.loaded["ui.menu.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		package.loaded["infra.preferences"] = nil
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 
 		local path = os.tmpname()
 		local state = { delays = { [CATEGORY] = DELAY } }
@@ -56,8 +56,8 @@ helpers.describe("preferences: a per-category expansion delay round-trips throug
 	end)
 
 	helpers.it("does not invent a delay that was never set", function()
-		package.loaded["ui.menu.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		package.loaded["infra.preferences"] = nil
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 
 		local path = os.tmpname()
 		pcall(Prefs.save, path, { delays = {} }, {}, {})

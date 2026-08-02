@@ -176,12 +176,29 @@ Constraints: **paths before moves, moves before content, data before code.**
   `layout_menu` currently describes a Windows-only menu that the macOS drift gate
   pins without macOS implementing it; delete
   `test_menu_hotstrings_layout_drift_gate.lua` **after**, never before;
-  (4) move the 1 812 lines of `macos/ui/menu/` that are not menu layout
-  (`preferences.lua`, `menu_state.lua`, `menu_watchers.lua`,
-  `shortcut_utils.lua`, `menu_paths.lua`) out — ⚠ **the third-driver test yields
-  no destination**: none of the five has a counterpart on Windows or Linux, so
-  picking a target directory is taste rather than evidence. Needs a design call;
-  (5) fold `_shared/modules/llm/menu_layout.json` in — ⚠ **blocked on (2)**: of
+  ~~(4) move the 1 812 lines of `macos/ui/menu/` that are not menu layout out~~ —
+  **decided and measured 2026-08-02, and the premise was wrong for three of the
+  five.** "Not menu layout" is not the same as "not menu". Applying the canonical
+  rule — everything that is not a named feature, a port adapter or OS-unique is a
+  flat file in `infra/` — needs one fact per file: is it used from outside the
+  menu?
+
+  | File | Consumers outside `ui/menu/` | Verdict |
+  | --- | --- | --- |
+  | `preferences.lua` (592 l) | `init.lua`, `ui/onboarding/init.lua` | **moved to `infra/`** |
+  | `menu_paths.lua` (656 l) | 2 in `infra/`, several elsewhere | **split** — see Lot 7 (1) |
+  | `shortcut_utils.lua` (265 l) | none — all 6 are `ui/menu/*` | **stays** |
+  | `menu_state.lua` (349 l) | none — one, `ui/menu/init.lua` | **stays** |
+  | `menu_watchers.lua` (222 l) | none — one, `ui/menu/init.lua` | **stays** |
+
+  A shortcut formatter used only by menu rows is menu code, however little it
+  looks like layout. Moving it would have bought a longer require path and
+  nothing else.
+  The `preferences` move surfaced the purity ratchet's per-tree design working:
+  the modules+infra io/os baseline rose by one and the `ui/` one fell by one, so
+  a relocation cannot launder an OS call in either direction. That hole is
+  documented in the ratchet's own comment as having cost two bumps before each
+  tree got its own frozen pair; (5) fold `_shared/modules/llm/menu_layout.json` in — ⚠ **blocked on (2)**: of
   its five row fields, `builder` and `health_dot` have no v3 counterpart, and
   `builder` is the same need as `provider` above. The file is not a duplication:
   both renderers already read it.
