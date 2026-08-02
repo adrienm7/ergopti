@@ -208,27 +208,29 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(wm._focus_gtk_window) == "function")
     end)
     helpers.it("_create_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._create_gtk_window("test", "<html></html>", nil)
-      end)
-      helpers.assert_true(ok, "_create_gtk_window should not crash when lgi absent")
+      -- Called directly: a raise fails with the real error. The claim is the
+      -- no-op — with no GTK the window must not be registered, or every later
+      -- show/focus call addresses a window that does not exist.
+      wm._create_gtk_window("test", "<html></html>", nil)
+      helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
+        "no GTK means no window, and no window means nothing registered")
     end)
     helpers.it("_destroy_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._destroy_gtk_window("nonexistent")
-      end)
-      helpers.assert_true(ok, "_destroy_gtk_window should not crash when lgi absent")
+      wm._destroy_gtk_window("nonexistent")
+      helpers.assert_true(wm.is_open == nil or wm.is_open("nonexistent") ~= true,
+        "destroying a window that was never created must leave nothing behind")
     end)
     helpers.it("_focus_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._focus_gtk_window("nonexistent")
-      end)
-      helpers.assert_true(ok, "_focus_gtk_window should not crash when lgi absent")
+      wm._focus_gtk_window("nonexistent")
+      helpers.assert_true(wm.is_open == nil or wm.is_open("nonexistent") ~= true,
+        "focusing a window that does not exist must not conjure one")
     end)
     helpers.it("bring_to_front calls _focus_gtk_window", function()
       wm.show("action_picker", "fr")
-      local ok = pcall(function() wm.bring_to_front("action_picker") end)
-      helpers.assert_true(ok, "bring_to_front should not crash")
+      wm.bring_to_front("action_picker")
+      helpers.assert_eq(type(wm.bring_to_front), "function",
+        "bring_to_front must survive being called with no GTK — it is bound to a menu "
+          .. "row the user can click on any desktop")
       wm.hide("action_picker")
     end)
   end)

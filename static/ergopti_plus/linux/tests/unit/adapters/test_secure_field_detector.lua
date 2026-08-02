@@ -296,8 +296,10 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with unparseable gdbus output must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"unparseable gdbus output must resolve to a definite false — leaving whatever "
+				.. "the previous refresh decided is how a stale secure flag outlives its field")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"unparseable gdbus output must leave isSecureField false")
 	end)
@@ -313,8 +315,9 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with nil io.popen must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"same when io.popen itself is unavailable")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"nil io.popen must leave isSecureField false")
 	end)
@@ -332,8 +335,9 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() must catch internal error and not rethrow")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"an internal error must be absorbed into an answer, not swallowed into silence")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"throwing io.popen must leave isSecureField false")
 	end)
