@@ -51,18 +51,21 @@ helpers.describe("window_info adapter", function()
     end)
 
     helpers.it("does not crash when called twice", function()
-      local ok = pcall(function()
-        wi.getFocused()
-        wi.getFocused()
-      end)
-      helpers.assert_true(ok, "double getFocused() does not crash")
+      -- Called directly: a raise fails with the real error. The claim is that two
+      -- reads AGREE — a query that answered differently on the second call would
+      -- make every window-scoped decision depend on how often it was asked.
+      local a = wi.getFocused()
+      local b = wi.getFocused()
+      helpers.assert_eq(type(a), type(b), "two reads must answer the same shape")
     end)
 
     helpers.it("does not crash when called 100 times", function()
-      local ok = pcall(function()
-        for _ = 1, 100 do wi.getFocused() end
-      end)
-      helpers.assert_true(ok, "100x getFocused() does not crash")
+      local first = wi.getFocused()
+      for _ = 1, 100 do
+        helpers.assert_eq(type(wi.getFocused()), type(first),
+          "100 reads must all answer the same shape — this runs on the focus watcher, "
+            .. "so a drift here is a leak that only shows after minutes of use")
+      end
     end)
   end)
 
@@ -91,8 +94,9 @@ helpers.describe("window_info adapter", function()
     end)
 
     helpers.it("does not crash when xdotool is absent", function()
-      local ok = pcall(function() wi.getAll() end)
-      helpers.assert_true(ok, "getAll does not crash")
+      local all = wi.getAll()
+      helpers.assert_eq(type(all), "table",
+        "with no xdotool the answer is an empty list, not nil — the caller iterates it")
     end)
   end)
 
@@ -105,7 +109,9 @@ helpers.describe("window_info adapter", function()
       local ok = pcall(function()
         local focused = wi.getFocused()
         local all = wi.getAll()
-        -- Silently consume both
+        helpers.assert_eq(type(all), "table", "getAll must still answer a list after getFocused")
+        helpers.assert_true(focused == nil or type(focused) == "table",
+          "and getFocused must answer nil or a table, never a half-value")
       end)
       helpers.assert_true(ok, "composed calls do not crash")
     end)
