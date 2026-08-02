@@ -160,9 +160,24 @@ helpers.describe("meta: port-adapter coverage", function()
 			string.format("%d HS adapter(s) missing for port specs", missing_hs))
 	end)
 
-	helpers.it(string.format("every port spec has a Linux adapter (%d specs)", spec_count), function()
-		helpers.assert_true(missing_linux == 0,
-			string.format("%d Linux adapter(s) missing for port specs", missing_linux))
+	-- Deliberately NOT asserted for Linux, and this is the third place the same
+	-- sentence had to be undone. ADR-008 supersedes ADR-001's "adding a new driver
+	-- requires only implementing the twenty port adapters": a port is a contract
+	-- for the drivers that need the capability, not a checklist. Requiring a file
+	-- per spec here is what produced nine Linux adapters with no production caller
+	-- — every one of them satisfying this very assertion while nothing reached it.
+	--
+	-- The count is still computed and printed above, because "which ports does
+	-- Linux not implement?" is a useful thing to be able to read. It is reported,
+	-- not enforced. What IS enforced is the other direction, by
+	-- tools/test/test-adapter-reachability.cjs: an adapter that exists must be
+	-- required by something, held at zero on all three drivers.
+	helpers.it(string.format("Linux port coverage is reported, not mandated (%d specs)", spec_count), function()
+		helpers.assert_true(spec_count > 0,
+			"no *.spec.js files found — the scan is broken and this reports nothing")
+		helpers.assert_true(missing_linux >= 0,
+			"the Linux coverage count must be computed even though it is not enforced — "
+				.. "an unread number stops being maintained")
 	end)
 end)
 
