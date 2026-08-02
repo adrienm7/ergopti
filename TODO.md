@@ -301,16 +301,16 @@ Constraints: **paths before moves, moves before content, data before code.**
   | Convention invariants | 1 594 | ~450 | one `.cjs` gate per invariant — the shared linter already IS that gate |
   | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
 
-- **Lot 10 — pruning.** The reachability gate is built and the figure it was
-  sized on was wrong: **macOS 0, Windows 0, Linux 9 (1 549 lines)** unreferenced,
-  against a recorded "12 of 21 Windows and 11 of 21 Linux, ~3 101 lines".
-  ⚠ **Needs a decision, not a cleanup.** Two of the nine (`notifier`,
-  `tooltip_renderer`) are named by `test_port_adapter_presence.lua`, which
-  asserts every declared port HAS an adapter file — they exist because the
-  architecture declares the port. Deleting them means shrinking `contracts.json`
-  to the ports with real traffic and superseding ADR-001. Honest demotion
-  candidates: `AppLauncher`, `Crypto`, `Storage`, `ProcessLifecycle`,
-  `MouseControl`, `TooltipRenderer`.
+- **Lot 10 — pruning.** ~~Port the macOS reachability gate to Windows and Linux,
+  then delete the dead adapter code~~ — **done.** The gate corrected the figure
+  this lot was sized on (recorded ~3 101 lines across two drivers; measured
+  1 549 on one), and the nine Linux adapters it found are deleted under
+  [ADR-008](static/ergopti_plus/docs/adr/008-ports-are-contracts-not-a-checklist.md),
+  which supersedes ADR-001's "adding a new driver requires only implementing the
+  twenty port adapters" — the sentence that produced them. All three drivers are
+  now held at **zero** unreferenced adapters.
+  `contracts.json` is deliberately NOT shrunk: all twenty ports have real traffic
+  on macOS, Windows or both, so the ports were never the thing that was wrong.
 
 ### Gates to build
 
