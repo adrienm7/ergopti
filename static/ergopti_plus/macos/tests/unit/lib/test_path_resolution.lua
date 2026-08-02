@@ -165,11 +165,13 @@ helpers.describe("ui_builder and asset path resolution", function()
 		local original_configdir = hs.configdir
 		hs.configdir = nil
 		-- Module should still work (no exception)
-		local ok, _ = pcall(function()
-			_ = UiBuilder
-		end)
+		-- The pcall wrapped a table read, which cannot raise — so the case asserted
+		-- nothing at all. The real claim is that the module resolved its own path
+		-- WITHOUT hs.configdir, and that is observable: it loaded, and it is a table.
 		hs.configdir = original_configdir
-		helpers.assert_true(ok)
+		helpers.assert_eq(type(UiBuilder), "table",
+			"ui_builder must load with hs.configdir unset — a module that resolved only "
+				.. "through configdir would have failed at require time")
 	end)
 end)
 
@@ -237,11 +239,10 @@ helpers.describe("menu.builder manifest resolution", function()
 		-- should log ERROR (not WARN) when the manifest is missing.
 		-- We can't directly call these private functions, but we can verify
 		-- the module loads and the logging is configured correctly.
-		local ok, _ = pcall(function()
-			require("ui.menu.builder")
-		end)
-		-- Module should load, and any manifest misses should be logged at ERROR level
-		helpers.assert_true(ok)
+		local builder = require("ui.menu.builder")
+		helpers.assert_eq(type(builder), "table",
+			"the menu builder must load even when the manifest cannot be found — a missing "
+				.. "manifest degrades the menu, it does not take the boot down")
 	end)
 
 	helpers.it("does not silently use FALLBACK constants without logging", function()

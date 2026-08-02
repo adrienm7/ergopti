@@ -136,8 +136,8 @@ helpers.describe("ShellRunner: GC pin release", function()
 		local ok, err = pcall(function()
 			handle = ShellRunner.spawn("/nonexistent/binary", { "-x" }, function() end)
 		end)
-		helpers.assert_true(ok,
-			"spawn() must not raise when hs.task.new returns nil for a non-executable path: " .. tostring(err))
+		helpers.assert_true(ok, "spawn() must not raise when hs.task.new returns nil: " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 
 		helpers.assert_true(ShellRunner._active_tasks[nil] == nil,
 			"a nil task must never be pinned in _active_tasks")
@@ -254,8 +254,8 @@ helpers.describe("ShellRunner: GC pin release", function()
 			"a running task must be pinned in _active_tasks against premature GC")
 
 		-- Normal (non-terminated) completion: pin released, callback forwarded verbatim.
-		local ok = pcall(captured_done, 0, "hi\n", "")
-		helpers.assert_true(ok, "completion callback must not raise on a normal exit")
+		-- Called directly — a raise here should fail with its own error.
+		captured_done(0, "hi\n", "")
 		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
 			"wrapped_on_done must release the GC pin once the subprocess exits")
 		helpers.assert_eq(seen.code, 0)

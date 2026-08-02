@@ -90,8 +90,8 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 			menu = AppPicker.build_menu({}, function() end, "search")
 		end)
 
-		helpers.assert_true(ok,
-			"build_menu must not raise on an app name containing '%': " .. tostring(err))
+		helpers.assert_true(ok, "build_menu must not raise on '%': " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 		helpers.assert_true(type(menu) == "table", "build_menu must return a menu table")
 	end)
 
