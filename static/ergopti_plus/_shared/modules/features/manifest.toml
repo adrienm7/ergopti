@@ -1023,13 +1023,6 @@ type = "boolean"
 description_key = "menu.metrics.encrypt_toggle"
 
 [[features.metrics]]
-id = "filter_private_browsing"
-platforms = ["ahk"]
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.filter_private_browsing"
-
-[[features.metrics]]
 id = "metrics_enabled"
 platforms = ["ahk"]
 default = true
@@ -1056,20 +1049,6 @@ platforms = ["ahk"]
 default = false
 type = "boolean"
 description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
-
-[[features.metrics]]
-id = "metrics_filter_secure_field"
-platforms = ["ahk"]
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_secure_field"
-
-[[features.metrics]]
-id = "metrics_filter_system_auth"
-platforms = ["ahk"]
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_system_auth"
 
 [[features.metrics]]
 id = "metrics_disabled_apps"

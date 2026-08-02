@@ -41,22 +41,57 @@
 ; ===============================
 
 class MetricsFilters {
-		; Privacy filters — all three default ON. They only matter when the
-		; keylogger itself is enabled; KL_AppendLog short-circuits anyway
-		; when off.
+		; Privacy filters and the at-rest encryption opt-in. The values below are
+		; placeholders only: MetricsFiltersApplyManifestDefaults() overwrites all
+		; four from the shared manifest before CS_Load() applies the user's config,
+		; so the effective default has exactly one declaration
+		; (_shared/modules/features/manifest.toml, [[features.metrics]]).
+		;
+		; They used to be the defaults, hardcoded, alongside a SECOND set of
+		; manifest entries declaring the same three toggles AHK-only under
+		; different ids. The driver read neither. Three spellings of one setting is
+		; how the macOS and Windows privacy defaults get to disagree without any
+		; gate noticing — and this is the one setting where disagreeing means
+		; logging keystrokes the user asked not to log.
+		;
+		; They are NOT left unset: this is a privacy fail-closed. If the manifest
+		; ever fails to resolve, filtering stays ON and encryption stays OFF rather
+		; than the reverse.
 		static private_browsing  := true
 		static secure_field      := true   ; Ignorer les champs mot de passe (UIA)
 		static system_auth       := true
-
-		; At-rest encryption of the typed-text columns. Off by default, matching the
-		; shared manifest's metrics.encrypt — unlike the filters above, this one is a
-		; deliberate opt-in, not a privacy default.
 		static encrypt           := false
 
 		; Per-app exclusion list. Keys are process names (e.g. "chrome.exe");
 		; presence of the key means « do not log this app ». Map for O(1)
 		; lookup on the hot path.
 		static disabled_apps := Map()
+}
+
+
+; Seed the four configurable filter flags from the shared manifest. Called by
+; CS_Load() before it applies the user's config, so the order is
+; manifest default -> user override, with no third source in between.
+;
+; A missing manifest entry leaves the placeholder in place and logs an ERROR: a
+; privacy toggle that silently resolves to "whatever was in the class body" is
+; the failure this function exists to make impossible to have unnoticed.
+MetricsFiltersApplyManifestDefaults() {
+		Pairs := Map(
+			"private_browsing", "metrics.private_filter_enabled",
+			"secure_field",     "metrics.secure_filter_enabled",
+			"system_auth",      "metrics.system_auth_filter_enabled",
+			"encrypt",          "metrics.encrypt"
+		)
+		for Prop, Path in Pairs {
+				Entry := ManifestFindEntryByPath(Path)
+				if (Entry == false) {
+						try LoggerError("MetricsFilters",
+							"No manifest entry for '{1}' — keeping the fail-closed placeholder for '{2}'.", Path, Prop)
+						continue
+				}
+				MetricsFilters.%Prop% := (Entry["default"] = true)
+		}
 }
 
 
