@@ -452,10 +452,14 @@ would report that migration, not a defect. It follows Lot 5 (2).
 - `macos/tests/meta/test_menu_hotstrings_layout_drift_gate.lua` (after Lot 5.3)
 - `test_menu_top_level_drift_gate.{lua,ahk}` (once the tail is manifest rows with
   registry-validated ids — **and a Linux twin exists first**)
-- `linux/tests/unit/meta/test_port_adapter_presence.lua` (9 hardcoded names)
-- `windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md` — hand-written
-  inventories, already stale. `docs/TESTING.md` states the right principle: the
-  inventory of checks is the run itself.
+- ~~`linux/tests/unit/meta/test_port_adapter_presence.lua` (9 hardcoded names)~~ —
+  **already rewritten** under ADR-008: it enumerates from the filesystem and
+  asserts every shipped adapter loads, which is the direction that was silent.
+- ~~`windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md`~~ — **deleted.** They
+  claimed "keylogger: 0% covered" against 66 keylogger test files and "ui/: 0%
+  covered (intentional)" against 118, and every roadmap item in the Windows one
+  had shipped. `docs/TESTING.md` states the rule they broke: the inventory of
+  checks is the run itself.
 
 ---
 
