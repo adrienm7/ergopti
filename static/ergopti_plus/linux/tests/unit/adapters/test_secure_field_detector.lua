@@ -86,10 +86,13 @@ helpers.describe("SecureFieldDetector: isSecureApp (Linux)", function()
 	end)
 
 	helpers.it("returns a boolean for every call", function()
-		local ok1 = pcall(function() return adapter.isSecureApp("AnyApp") end)
-		helpers.assert_true(ok1, "isSecureApp must not throw")
-		local ok2 = pcall(function() return adapter.isSecureApp(nil) end)
-		helpers.assert_true(ok2, "isSecureApp(nil) must not throw")
+		-- The case title is the assertion; "did not throw" was not. A detector that
+		-- answered nil would satisfy the old check and then be read as falsy by the
+		-- caller — which is the fail-OPEN direction for a privacy filter.
+		helpers.assert_eq(type(adapter.isSecureApp("AnyApp")), "boolean",
+			"isSecureApp must answer a boolean, not nil")
+		helpers.assert_eq(type(adapter.isSecureApp(nil)), "boolean",
+			"including for a nil appId — the caller does not check before asking")
 	end)
 
 	-- Cleanup
@@ -135,9 +138,10 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads with D-Bus available")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw when D-Bus is available")
+			adapter.refresh()
+			helpers.assert_eq(type(adapter.isSecureField()), "boolean",
+				"with D-Bus available, refresh must leave the detector answering — a mute "
+					.. "detector reports every field as non-secure")
 		end
 	end)
 
@@ -152,9 +156,7 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads without D-Bus")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw when D-Bus is unavailable")
+			adapter.refresh()
 			helpers.assert_eq(adapter.isSecureField(), false,
 				"isSecureField must be false when D-Bus is not available")
 		end
@@ -171,9 +173,7 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads with empty D-Bus address")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw with empty D-Bus address")
+			adapter.refresh()
 			helpers.assert_eq(adapter.isSecureField(), false,
 				"isSecureField must be false with empty D-Bus address")
 		end

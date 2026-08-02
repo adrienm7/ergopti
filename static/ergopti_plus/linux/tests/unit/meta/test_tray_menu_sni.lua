@@ -75,14 +75,20 @@ helpers.describe("tray_menu SNI compliance", function()
       helpers.assert_true(ok, "setMenu with 3-level nesting does not crash")
     end)
 
-    helpers.it("setMenu with nil items is safe", function()
-      local ok = pcall(function() tray.setMenu(nil) end)
-      helpers.assert_true(ok, "setMenu(nil) does not crash")
+    -- Called directly throughout: a raise fails the case with the real error.
+    -- The assertion is that the adapter is still USABLE afterwards — getBackend()
+    -- is its only readable state, and a tray left in a half-built state answers
+    -- nothing while the menu silently stops updating.
+    helpers.it("setMenu with nil items leaves the tray usable", function()
+      tray.setMenu(nil)
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "a refused menu must not tear the backend down")
     end)
 
-    helpers.it("setMenu with empty items is safe", function()
-      local ok = pcall(function() tray.setMenu({}) end)
-      helpers.assert_true(ok, "setMenu({}) does not crash")
+    helpers.it("setMenu with empty items leaves the tray usable", function()
+      tray.setMenu({})
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "an empty menu is a legitimate state, not a teardown")
     end)
   end)
 
@@ -95,8 +101,10 @@ helpers.describe("tray_menu SNI compliance", function()
     helpers.it("pump() before any setMenu does not crash", function()
       -- Ensure a clean state.
       tray.destroy()
-      local ok = pcall(function() tray.pump() end)
-      helpers.assert_true(ok, "pump() before setMenu does not crash")
+      tray.pump()
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "pump runs on the event loop every tick; one that wedged the adapter would "
+          .. "take the whole menu with it")
     end)
 
     helpers.it("pump() after setMenu + destroy does not crash", function()
@@ -104,8 +112,9 @@ helpers.describe("tray_menu SNI compliance", function()
         { title = "Test", fn = function() end },
       })
       tray.destroy()
-      local ok = pcall(function() tray.pump() end)
-      helpers.assert_true(ok, "pump() after destroy does not crash")
+      tray.pump()
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "a pump after destroy must be a no-op, not a resurrection")
     end)
   end)
 
@@ -120,19 +129,21 @@ helpers.describe("tray_menu SNI compliance", function()
         { title = "First", fn = function() end },
       })
       tray.destroy()
-      local ok = pcall(function()
-        tray.setMenu({
-          { title = "Second", fn = function() end },
-        })
-      end)
-      helpers.assert_true(ok, "setMenu after destroy does not crash")
+      tray.setMenu({
+        { title = "Second", fn = function() end },
+      })
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "destroy then setMenu is the reload path — it must rebuild, not stay dead")
       tray.destroy()
     end)
 
-    helpers.it("double destroy() is safe", function()
+    helpers.it("double destroy() leaves the tray restartable", function()
       tray.destroy()
-      local ok = pcall(function() tray.destroy() end)
-      helpers.assert_true(ok, "double destroy does not crash")
+      tray.destroy()
+      tray.setMenu({ { title = "After", fn = function() end } })
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "a second destroy must not poison the restart that follows it")
+      tray.destroy()
     end)
   end)
 
@@ -142,9 +153,10 @@ helpers.describe("tray_menu SNI compliance", function()
 
   helpers.describe("icon and tooltip", function()
 
-    helpers.it("setIcon with empty opts does not crash", function()
-      local ok = pcall(function() tray.setIcon({}) end)
-      helpers.assert_true(ok, "setIcon({}) does not crash")
+    helpers.it("setIcon with empty opts leaves the tray usable", function()
+      tray.setIcon({})
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "an icon call with nothing to set must not tear the backend down")
       tray.destroy()
     end)
 

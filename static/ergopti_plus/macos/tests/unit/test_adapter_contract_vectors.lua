@@ -684,9 +684,11 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 		execute = function(_cmd) return "SHA2-256(stdin)= " .. CANONICAL .. "\n" end,
 	})
 
-	helpers.it("sha256 returns a string and never throws (sha256_returns_string)", function()
-		local ok, out = pcall(function() return adapter.sha256("hello") end)
-		helpers.assert_true(ok, "sha256() must not throw")
+	helpers.it("sha256 returns a string (sha256_returns_string)", function()
+		-- No pcall: a raise fails this case with the real error, which is more use
+		-- than a boolean, and the contract vector says "returns a string" — the
+		-- not-throwing is implied by returning at all.
+		local out = adapter.sha256("hello")
 		helpers.assert_true(type(out) == "string", "sha256() must return a string")
 	end)
 
@@ -701,9 +703,13 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 			"sha256() must return the same digest for the same input")
 	end)
 
-	helpers.it("sha256 handles the empty string without throwing (sha256_empty_string)", function()
-		local ok = pcall(function() return adapter.sha256("") end)
-		helpers.assert_true(ok, "sha256('') must not throw")
+	helpers.it("sha256 of the empty string is still a 64-char digest (sha256_empty_string)", function()
+		-- The empty string is the input most likely to short-circuit a shell-based
+		-- digest into returning "", and "did not throw" cannot tell those apart.
+		local out = adapter.sha256("")
+		helpers.assert_eq(64, #out,
+			"the empty string still has a digest — a short answer here means the adapter "
+				.. "returned the shell's empty output as if it were a hash")
 	end)
 
 	helpers.it("sha256 returns '' when the digest cannot be parsed (error_behavior)", function()
@@ -737,9 +743,11 @@ helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
 		helpers.assert_eq(false, out, "isSecureApp('') must be false")
 	end)
 
-	helpers.it("refresh completes without throwing (refresh_does_not_throw)", function()
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() must not throw")
+	helpers.it("refresh leaves the detector answering (refresh_does_not_throw)", function()
+		adapter.refresh()
+		helpers.assert_eq(type(adapter.isSecureApp("")), "boolean",
+			"refresh rebuilds the secure-app set; one that left the detector mute would "
+				.. "report every field as non-secure, which is the fail-OPEN direction")
 	end)
 end)
 
@@ -863,19 +871,36 @@ helpers.describe("Adapter contract vectors: ProcessLifecycle", function()
 	end)
 
 	helpers.it("start is idempotent (start_is_idempotent)", function()
-		local ok = pcall(function() adapter.start(); adapter.start() end)
+		-- Idempotence is about the SECOND call changing nothing, not about it
+		-- surviving. A second start that armed a second watcher leaves one of them
+		-- unreachable by stop(), and it keeps firing for the rest of the session.
+		adapter.start()
+		adapter.start()
+		local app = adapter.getForegroundApp()
 		adapter.stop()
-		helpers.assert_true(ok, "start() twice must not throw")
+		helpers.assert_eq(type(app), "table",
+			"a doubly-started adapter must still answer through the one live watcher")
 	end)
 
 	helpers.it("stop is idempotent (stop_is_idempotent)", function()
-		local ok = pcall(function() adapter.start(); adapter.stop(); adapter.stop() end)
-		helpers.assert_true(ok, "stop() twice must not throw")
+		adapter.start()
+		adapter.stop()
+		adapter.stop()
+		adapter.start()
+		local app = adapter.getForegroundApp()
+		adapter.stop()
+		helpers.assert_eq(type(app), "table",
+			"a double stop must leave the adapter restartable — the boot path stops "
+				.. "defensively before it starts")
 	end)
 
 	helpers.it("stop before start is safe (stop_before_start_is_safe)", function()
-		local ok = pcall(function() adapter.stop() end)
-		helpers.assert_true(ok, "stop() before start() must not throw")
+		adapter.stop()
+		adapter.start()
+		local app = adapter.getForegroundApp()
+		adapter.stop()
+		helpers.assert_eq(type(app), "table",
+			"a stop that never started must not poison the adapter for the start that follows")
 	end)
 
 	helpers.it("onFocusChange accepts a function (onFocusChange_accepts_function)", function()
