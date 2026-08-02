@@ -48,7 +48,7 @@ local _cancelled   = false -- Set by cancel() to suppress callbacks.
 
 -- JSON encoder: delegates to the shared linux_bridge module (single source of truth).
 local json_encode = nil
-local ok_encode, bridge_mod = pcall(require, "llm.linux_bridge")
+local ok_encode, bridge_mod = pcall(require, "infra.llm_bridge")
 if ok_encode and bridge_mod and bridge_mod.json_encode then
 	json_encode = bridge_mod.json_encode
 else

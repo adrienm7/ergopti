@@ -541,7 +541,7 @@ local function main()
 	-- so all three drivers send the same context window.
 	if prediction_engine then
 		local canonical_ctx = 500  -- defensive fallback
-		local ok_lb, lb = pcall(require, "llm.linux_bridge")
+		local ok_lb, lb = pcall(require, "infra.llm_bridge")
 		if ok_lb and lb and lb.DEFAULT_CONTEXT_LENGTH then
 			canonical_ctx = lb.DEFAULT_CONTEXT_LENGTH
 		end

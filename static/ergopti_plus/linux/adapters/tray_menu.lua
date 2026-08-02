@@ -118,7 +118,7 @@ local TrayProto = nil  -- lazy-loaded
 
 local function _get_tray_proto()
 	if TrayProto then return TrayProto end
-	local ok, mod = pcall(require, "linux.tray_protocol")
+	local ok, mod = pcall(require, "tray.protocol")
 	if ok then TrayProto = mod end
 	return TrayProto
 end

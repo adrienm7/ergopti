@@ -1,9 +1,9 @@
 --- tests/unit/meta/test_llm_linux_bridge.lua
 
 local helpers = require("tests.helpers")
-local LB       = helpers.load_module("llm.linux_bridge")
+local LB       = helpers.load_module("infra.llm_bridge")
 
-helpers.describe("llm.linux_bridge", function()
+helpers.describe("infra.llm_bridge", function()
 
   -- ==========================================================================
   -- 1. resolve_base_url()

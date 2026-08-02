@@ -223,9 +223,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       "keylogger.aggregator_helpers",
       "keycodes.evdev",
       "json",
-      "linux.tray_protocol",
+      "tray.protocol",
       "llm.prompt_builder",
-      "llm.linux_bridge",
+      "infra.llm_bridge",
       "updater.version",
     }
     for _, name in ipairs(shared_mods) do

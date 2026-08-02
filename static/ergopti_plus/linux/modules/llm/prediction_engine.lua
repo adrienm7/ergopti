@@ -33,7 +33,7 @@ local LOG = "modules.llm.prediction_engine"
 -- _shared (mirrored from defaults.json) and max_tokens in prompt_builder, so the
 -- Linux engine never re-types a value that could drift from macOS/Windows.
 local HttpBridge = nil
-local ok_bridge, bridge_mod = pcall(require, "llm.linux_bridge")
+local ok_bridge, bridge_mod = pcall(require, "infra.llm_bridge")
 if ok_bridge then HttpBridge = bridge_mod end
 
 local PromptBuilder = nil

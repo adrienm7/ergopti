@@ -31,7 +31,7 @@ local ok_sel, sel_mod = pcall(require, "llm.profile_selector")
 if ok_sel then Selector = sel_mod end
 
 local HttpBridge = nil
-local ok_bridge, bridge_mod = pcall(require, "llm.linux_bridge")
+local ok_bridge, bridge_mod = pcall(require, "infra.llm_bridge")
 if ok_bridge then HttpBridge = bridge_mod end
 
 
