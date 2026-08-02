@@ -240,8 +240,10 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 
 		local before = close_all.count
 		clock.now = clock.now + 100   -- well past the activation grace window
-		local ok = pcall(captured.cb, fake_activity_event())
-		helpers.assert_true(ok, "watcher callback must not error (regression: 'type' builtin was shadowed)")
+		-- Called directly: the regression this guards (the 'type' builtin shadowed
+		-- inside the callback) raised, and a raise here now fails with that error
+		-- rather than with a boolean. The assertion is the callback's EFFECT.
+		captured.cb(fake_activity_event())
 		helpers.assert_true(close_all.count > before, "auto-deactivation must close the keep-awake banner")
 	end)
 

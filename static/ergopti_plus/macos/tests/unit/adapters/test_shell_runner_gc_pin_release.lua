@@ -116,9 +116,11 @@ helpers.describe("ShellRunner: GC pin release", function()
 		helpers.assert_true(type(captured_done) == "function",
 			"the spawn wrapper must register a completion callback")
 		-- The OS fires the completion callback for the terminated task AFTER _task was nilled.
-		local ok = pcall(captured_done, 15, "", "")  -- 15 = SIGTERM
-		helpers.assert_true(ok,
-			"wrapped_on_done must not raise when _task was already cleared by terminate()")
+		captured_done(15, "", "")  -- 15 = SIGTERM
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
+			"a completion arriving after terminate() must still RELEASE the pin — a task "
+				.. "left pinned is never collected, and the process holds its pipes for the "
+				.. "rest of the session")
 	end)
 
 	-- Regression: hs.task.new() RETURNS nil (it does not raise) when the launch
@@ -142,10 +144,15 @@ helpers.describe("ShellRunner: GC pin release", function()
 
 		-- The handle must still honour its contract so callers need no nil checks.
 		helpers.assert_true(type(handle) == "table", "spawn() must still return a handle")
-		local ok_start = pcall(function() return handle.start() end)
-		helpers.assert_true(ok_start, "handle.start() must be safe to call when no task was created")
-		local ok_term = pcall(function() return handle.terminate() end)
-		helpers.assert_true(ok_term, "handle.terminate() must be safe to call when no task was created")
+		-- Called directly: a raise fails with the real error. What the contract
+		-- promises is that the handle stays USABLE, so callers need no nil checks —
+		-- that is observable as both methods still being there afterwards.
+		handle.start()
+		handle.terminate()
+		helpers.assert_eq(type(handle.start), "function",
+			"handle.start() must survive being called when no task was created")
+		helpers.assert_eq(type(handle.terminate), "function",
+			"and terminate() likewise")
 	end)
 
 	-- Regression (latch release): _safe_start logs a launch failure but never
