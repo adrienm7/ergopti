@@ -328,10 +328,15 @@ Constraints: **paths before moves, moves before content, data before code.**
 
 - **Lot 6 — one action registry.** Remaining: (1) write `chord.{ahk,lua}` and add
   the **21st port, `HotkeyRegistrar`** — none of the 20 has a "bind a chord to a
-  callback" operation, which is why each driver invented its own; (2) replace
-  Windows layers A+B, which bind the same intent to two different physical keys
-  because layer B is registered *before* `modules/keymap/layout.ahk` and
-  therefore resolves against the OS layout instead of Ergopti's; (3) give macOS
+  callback" operation, which is why each driver invented its own;
+  ⚠ **(2) could not be located, re-measured 2026-08-02.** Nothing in the Windows
+  driver is named "layer A" or "layer B", and the ordering the entry blames is
+  already the other way round: `ErgoptiPlus.ahk` includes
+  `modules/keymap/layout.ahk` (l.897) *before* `modules/shortcuts.ahk` (l.898).
+  Either the names come from a vocabulary that no longer exists, or the bug went
+  away with the include order. Whoever remembers what A and B were should rewrite
+  this row or delete it; as written it cannot be acted on;
+  (3) give macOS
   the binding UI it lacks — `M.DEFAULTS` is empty by design, `get_action` /
   `get_slot_label` / `get_assignments` have **0** production callers, and the one
   writer is a reset routine for a feature that cannot be configured
@@ -347,9 +352,45 @@ Constraints: **paths before moves, moves before content, data before code.**
   shared page that needs to be HANDED its data now has one; (6) replace the
   macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the AHK-only `modifier_combos`
   groups with one `chord_bindings` group rendered identically everywhere.
+  ⚠ **(6) re-measured 2026-08-02: it conflates two things and is blocked.** The
+  three groups are not the same shape or the same subject. `modifier_combos` is a
+  manifest group with three declared feature rows (`shortcuts.alt_gr_lalt`,
+  `alt_gr_caps_lock`, `lalt_caps_lock`) — *which modifier pairs activate a
+  layer*. `ctrl_shortcuts` / `cmd_shortcuts` have no manifest rows at all: they
+  are `group_builders` supplied by `macos/ui/menu/menu_shortcuts.lua`, listing
+  *the ctrl/cmd emulation shortcuts*. Merging them is not a rename, it is a
+  decision about whether those two subjects are one; and even if they are, a
+  declarative group cannot absorb a builder until Lot 5's `provider`/`builder`
+  capability exists. It follows Lot 5 (1), not the rest of Lot 6.
 
-- **Lot 7 — the cross-cutting layer.** Remaining: (1) move the macOS config-path
-  SSOT out of `ui/menu/menu_paths.lua` — today `infra/` depends on `ui/menu/`.
+- **Lot 7 — the cross-cutting layer.** ~~(1) move the macOS config-path SSOT out of
+  `ui/menu/menu_paths.lua`~~ — **done 2026-08-02.** `infra/config_paths.lua` holds
+  resolution; `menu_paths.lua` keeps the webview form and delegates; `init.lua`
+  initialises the resolver directly and the editor's reload callback is wired by
+  `ui/menu/init.lua`, the only caller that can act on it. **One writer** of
+  paths.toml where there were two: `set_config_dir` returns whether anything
+  moved, and reloading is the caller's decision — which is the entire difference
+  between the wizard (must not reload, or it restarts mid-flow) and the editor.
+
+  *The coverage came first, and writing it found a lying stub.* `hs.fs.mkdir`
+  returned `true` and created nothing, so production code that verifies its own
+  mkdir with `hs.fs.attributes` — as `ensure_dir` does deliberately, because
+  LuaFileSystem returns nil rather than raising — saw the create succeed and the
+  directory stay missing. **No directory-creation invariant was testable at all.**
+  That is the harness-stubs-the-subject false green, the one class the detector
+  cannot see, and it is why this coverage did not already exist. The stub is
+  honest now and nothing else needed changing for it.
+
+  The purity ratchet moved 5 calls from the `ui/` pair to the modules+infra pair,
+  exactly as the `preferences` relocation did: the driver total is unchanged and
+  neither tree can launder an OS call through the other.
+
+  Remaining: (2) make macOS consume the shared logger core, and only after
+  writing `_shared/tests/corpus/logger/behaviour_vectors.json` — this is the
+  module with the worst bug history in the repo.
+
+  <details><summary>The measurement that planned (1), kept for the next
+  extraction of the same shape</summary>
   **Re-measured 2026-08-02, and it can be staged rather than done in one cut.**
   The file is 656 lines and holds TWO concerns: path resolution (`init`, `get`,
   `get_config_dir`, the paths.toml bootstrap load/save — roughly lines 78-350)
@@ -381,10 +422,8 @@ Constraints: **paths before moves, moves before content, data before code.**
   executes the resolvers for real and stats every answer, so build the equivalent
   coverage for this one before moving it, not after — a macOS phase modelled on
   its §3, stat every `get(key)` plus `get_config_dir()` and
-  `get_default_config_dir()`, HOME set and unset, paths.toml present and absent;
-  (2) **only then** make macOS consume the shared logger core, and
-  only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` — this
-  is the module with the worst bug history in the repo.
+  `get_default_config_dir()`, HOME set and unset, paths.toml present and absent.
+  </details>
 
 - **Lot 8 — the engines.** One matcher, not one engine: the genuinely
   platform-agnostic core is ~350 lines; the other ~14 000 are emission,
