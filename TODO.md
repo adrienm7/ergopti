@@ -372,7 +372,7 @@ The audit report was retired once its findings were adjudicated: 111 candidates,
 shipped, along with roughly half the rest — each with a regression test proven red
 before the fix and green after.
 
-4 did not ship. They are carried here verbatim so nothing was lost with the
+3 did not ship. They are carried here verbatim so nothing was lost with the
 file: location, root cause, proposed fix and proposed test. Two caveats that the
 pass itself established, and that apply to every line below:
 
@@ -453,11 +453,6 @@ relearning: nothing said so, because a deleted section fails no test.
 
 ### MEDIUM
 
-- [ ] **LIBCORE-3** (lib-core) — Every dialog schedules a blocking `hs.execute("open …")` on the main run loop that — for the two BLOCKING wrappers — can only fire AFTER the dialog is dismissed, so it cannot serve its stated purpose and instead steals focus back while stalling the run loop
-  - `static/ergopti_plus/macos/lib/dialog_util.lua:64-72 (the deferred `pcall(hs.execute`
-  - **Cause:** focus_hammerspoon() implements three focus mechanisms; the third contradicts its own premise. For M.alert (non-blocking) the deferred `open` does fire 100 ms later and does raise the app, but `hs.execute` is `io.popen` read-to-EOF — fully synchronous on the main run loop (PROJECT_MEMORY project-hs-partial-fixes-and-false-green-tests records exactly this about ShellRunner.exec). For M.block_alert and M.text_prompt the timer is structurally unable to run before dismissal, so the call is dead with respect to its purpose while retaining both side effects: a main-thread stall and a focus steal. The two synchronous `do_focus()` calls at 55-56 are what actually focuses the dialog; the shell-out add
-  - **Fix:** Delete the deferred `hs.execute` block (64-72) entirely: `hs.focus(true)` + `app:activate(true)`, already called twice, is the supported way to bring Hammerspoon forward, and the shell-out demonstrably cannot help the blocking wrappers. If an extra nudge is genuinely wanted for the non-blocking M.alert path only, route it through `adapters.shell_runner.spawn` (async, GC-pinned) and gate it on the non-blocking wrapper — never on block_alert/text_prompt.
-  - **Test:** New `tests/unit/lib/test_dialog_util_no_blocking_shell.lua`: stub `hs.execute` with a spy and `hs.timer.doAfter` with a recorder that fires immediately, call M.block_alert / M.text_prompt / M.alert, and assert `#exec_calls == 0`. Per PROJECT_MEMORY's own rule for this class, the assertion must be the ABSENCE of the harmful operation, never the presence of the scheduling call. This keeps tests/unit/meta/test_gc_retention.lua:337 green — that test only asserts `hs.task.new` is absent from dialog_u
 - [ ] **BS-1** (boot-shutdown) — The menu's config pathwatcher — a SECOND recursive watcher on the same base_dir — has neither the TOML-cache exclusion nor the self-written-file exclusion that init.lua so carefully passes to lib/file_watchers
   - `ui/menu/menu_watchers.lua:110-138 (reload_config filter)`
   - **Cause:** Two recursive pathwatchers cover base_dir: lib/file_watchers' project_watcher and ui/menu/menu_watchers' configWatcher. init.lua computes TOML_CACHE_DIR once (line 214) precisely so 'the writer and the watcher cannot drift apart again' and threads it plus the self-written paths into lib/file_watchers.start (863-877). menu.start() arms the second watcher with only (base_dir, on_reload, get_suppress_until, ui_restore) — no ignored_dirs, no self_written_files. The exclusion was applied to one of the two watchers on the same tree.
