@@ -302,15 +302,42 @@ end)
 -- ===============================================
 -- ===============================================
 
-helpers.describe("keymap.expander: pause invariant and stress", function()
-	-- ULTIMATE MAX 100% regression: pause must gate every expander entry point (try_repeat, perform_text_replacement, etc.)
-	helpers.it("pause must early-return on all public expander surfaces (project_suspend_pause_invariant)", function()
-		-- Expander is called on every keystroke in hotstring paths; must be completely silent when paused.
-		helpers.assert_true(true, "keymap expander must never expand or mutate buffer under pause")
+helpers.describe("keymap.expander: the pause gate is not here", function()
+	-- The expander runs on the hotstring path of every keystroke, and the pause
+	-- check is the early return at the top of that path. Both cases below used to
+	-- say so with assert_true(true) and a sentence — a design claim written as a
+	-- test, which costs a suite line and deters anyone from writing the real one.
+	helpers.it("the module names no pause or suspend state", function()
+		-- A second check here would mean two modules decide whether an expansion
+		-- fires. They will disagree, and the failure is silent in the worst
+		-- direction: a paused driver that still mutates the buffer expands the
+		-- first thing typed after resume against text the user never saw tracked.
+		local src = helpers.read_driver_source("function M.perform_text_replacement")
+		helpers.assert_true(src ~= nil, "modules/keymap/expander.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"the expander must stay pure — the Feed path early-returns before reaching it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
-	helpers.it("high volume try_repeat + replacement under stress must stay correct", function()
-		-- 150+ rapid calls must not corrupt expected_synthetic or state.
-		helpers.assert_true(true)
+	helpers.it("150 non-matching calls leave the buffer exactly where they found it", function()
+		-- The stress claim is worth keeping; what it needed was to read the state
+		-- back. The buffer and the synthetic-echo counters are what the keystroke
+		-- path reads next, so a call that nudged either while returning false
+		-- would corrupt the following expansion — and the old case, a comment plus
+		-- assert_true(true), would have passed straight through it.
+		local E = helpers.load_with_stubs("modules.keymap.expander")
+		local s = make_state("ab★")
+		E.init(s, make_registry({}, {}), make_llm())
+
+		for i = 1, 150 do
+			helpers.assert_eq(E.try_repeat_feature("x" .. i, false), false,
+				"a char that is not the magic key must never fire the repeat feature")
+		end
+
+		helpers.assert_eq(s.buffer, "ab★", "150 refusals must not have touched the buffer")
+		helpers.assert_eq(s.expected_synthetic_chars, "",
+			"nor armed the synthetic-echo filter — a stale value there makes the driver ignore a "
+				.. "real keystroke it mistakes for its own")
+		helpers.assert_eq(s.expected_synthetic_deletes, 0, "nor queued a backspace nobody asked for")
 	end)
 end)

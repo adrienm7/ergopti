@@ -30,16 +30,42 @@ helpers.describe("llm.parser edge cases", function()
 		helpers.assert_nil(res)
 	end)
 
-	helpers.it("pause must prevent any parser processing that could lead to prediction/tooltip (project_suspend_pause_invariant)", function()
-		-- Parser may be called from prediction path; the engine must gate before calling when paused.
-		helpers.assert_true(true, "llm parser must be pause-safe; no output when paused")
+	-- The parser has no pause state of its own: the engine gates before calling
+	-- it. That claim used to be written as assert_true(true) with a sentence.
+	-- What is checkable is that the coupling is genuinely absent — a pause check
+	-- here would mean two modules decide whether a prediction reaches the
+	-- tooltip, and a parser that returned early on its own reading of the flag
+	-- would drop predictions the engine believed it had accepted.
+	helpers.it("parses without consulting pause state (project_suspend_pause_invariant)", function()
+		local src = helpers.read_driver_source("function M.process_prediction")
+		helpers.assert_true(src ~= nil, "modules/llm/parser.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"the parser must stay pure — the pause gate belongs to the engine that calls it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
-	helpers.it("malformed UTF-8 + high volume edge chunks must not crash or leak PII", function()
-		for i=1,80 do
-			parser.process_prediction("x", "x", string.char(0x80 + (i % 0x40)))
+	helpers.it("malformed UTF-8 in volume returns a well-formed answer, never a raised error", function()
+		-- The loop is worth keeping — it is the only place invalid continuation
+		-- bytes are fed in bulk — but the old version threw every answer away and
+		-- asserted true, so a parser that had started raising, or returning a
+		-- malformed table the tooltip then indexed, would have passed.
+		--
+		-- Deliberately NOT asserted here: that the result is nil. It is not. A
+		-- lone 0x80 byte comes back as a prediction whose to_type is that byte,
+		-- while "<random gibberish>" two cases below comes back nil — the untagged
+		-- body is rejected in one shape and accepted in the other. That asymmetry
+		-- is real and lives in _shared/lua/llm, so pinning either answer here
+		-- would freeze a decision this file is not the place to make.
+		for i = 1, 80 do
+			local ok, res = pcall(parser.process_prediction, "x", "x", string.char(0x80 + (i % 0x40)))
+			helpers.assert_true(ok, "the parser must not raise on an invalid UTF-8 continuation byte")
+			if res ~= nil then
+				helpers.assert_eq(type(res), "table", "a non-nil result must be the documented table")
+				helpers.assert_eq(type(res.to_type), "string",
+					"to_type is typed straight into the buffer — a non-string there is a crash at the "
+						.. "keystroke path, one frame later and far from here")
+			end
 		end
-		helpers.assert_true(true)
 	end)
 
 	helpers.it("returns nil for body without expected tags", function()

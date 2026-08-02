@@ -171,14 +171,32 @@ helpers.describe("rotation — init validation", function()
 		helpers.assert_eq(r.get_offset(), 512)
 	end)
 
-	helpers.it("pause must silence rollover and append in real driver paths (project_suspend_pause_invariant)", function()
-		-- rotation.rollover / append_log must be no-op or gated when script_control.is_paused.
-		helpers.assert_true(true, "keylogger rotation must not write or rollover while paused")
+	-- Rotation owns file offsets and day boundaries, not the decision to record.
+	-- Both claims below used to be assert_true(true) with the sentence attached;
+	-- both are checkable against the module's own source.
+	helpers.it("holds no pause state of its own (project_suspend_pause_invariant)", function()
+		-- The gate is the keystroke path's early return. A second check here would
+		-- mean two modules decide whether a keystroke is recorded, and the one
+		-- that loses silently advances an offset past bytes nobody wrote.
+		local src = helpers.read_driver_source("function M.set_offset")
+		helpers.assert_true(src ~= nil, "modules/keylogger/rotation.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"rotation must not gate on pause — the ingest path early-returns before reaching it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
-	helpers.it("rollover on day boundary must preserve privacy (no PII in offset state)", function()
-		-- Rollover must not leak raw keys into state or logs.
-		helpers.assert_true(true)
+	helpers.it("the offset state it exposes carries no keystroke content", function()
+		-- The privacy claim is narrow and precise: rotation's public state is an
+		-- integer and a date. If a future change parked the pending buffer here
+		-- so a rollover could re-emit it, this module would start holding raw
+		-- keys — in a table that is written to disk on every rotation.
+		local r = helpers.load_with_stubs("modules.keylogger.rotation")
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+		r.set_offset(4096, "2024-06-15")
+		helpers.assert_eq(type(r.get_offset()), "number", "the offset must stay a byte count")
+		helpers.assert_eq(type(r.get_date()), "string", "the date must stay a date")
+		helpers.assert_eq(r.get_date(), "2024-06-15",
+			"and it must be the date that was set, not a value derived from what was typed")
 	end)
 end)
 
@@ -200,7 +218,10 @@ helpers.describe("rotation — set_offset / get_offset / get_date", function()
 			paths = { today_log_path = "/tmp/today.log" },
 			state = {},
 		})
-		helpers.assert_true(true)
+		-- The setup case earns its place by asserting the starting point the cases
+		-- below depend on: they all measure a CHANGE from zero, and read as passing
+		-- if init silently left a stale offset behind.
+		helpers.assert_eq(r.get_offset(), 0, "a fresh init must start at offset zero")
 	end)
 
 	helpers.it("set_offset updates both offset and date", function()
