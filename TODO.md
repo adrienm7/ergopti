@@ -140,21 +140,62 @@ Constraints: **paths before moves, moves before content, data before code.**
   `modules/<feature>/window.*` shape is still wanted, it is now one move of
   three identical trees rather than a reconciliation.
 
-- **Lot 4 — one namespace.** Migrate the **206 of 335 features (61.5 %)** out of
-  the `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry
-  `platforms`. **Approved, config-schema break accepted** — the user deletes
-  `config.toml` and the driver regenerates it, as the v1→v2 cut-over already
-  established. Add `linux` to the platforms of the features Linux really
-  implements and to `KNOWN_PLATFORMS`; extend `test-config-schema.cjs` to the
-  Linux template. Merge the duplicated privacy toggles: the three filters exist
-  **twice** in the shared manifest (`metrics.*_filter_enabled` **and**
-  `ahk.metrics.filter_*`) and the AHK driver reads neither — it hardcodes
-  `:= true`. Extreme case: `ahk.gestures` = 11 features vs `hs.gestures` +
-  `.modes` + `.sensitivities` = 109, for the same feature, with the same i18n key
-  `menu.gestures` on both sides.
-  *Sizing note: adding `linux` to the eight `hotstrings` sections cost one line
-  each and moved no gate. The fear attached to this lot is the 223-table RENAME,
-  not the platform declarations.*
+- **Lot 4 — one namespace.** Migrate the **206 driver-namespaced feature blocks**
+  and **17 driver-namespaced sections** out of the `[ahk.*]` / `[hs.*]` silos to
+  their semantic path with per-entry `platforms`. **Approved, config-schema break
+  accepted** — the user deletes `config.toml` and the driver regenerates it, as
+  the v1→v2 cut-over already established.
+
+  **Measured 2026-08-02, and the two things that made it look like weeks are both
+  false.**
+
+  *There are no id collisions.* Every id under a driver silo is unique against its
+  semantic target, including the three targets that already exist
+  (`features.metrics`, `features.shortcuts`, `features.hotstrings`). The merge is
+  mechanical — no entry needs a judgement about which of two definitions wins.
+
+  *The reader surface is 22 hand-edited occurrences, not 199.* Counted by shape
+  rather than by grepping `"ahk.` / `"hs.`, which returns 445 hits that are mostly
+  Hammerspoon API names (`"hs.timer"`, `"hs.json"`):
+
+  | Where | Count | Nature |
+  | --- | ---: | --- |
+  | `_shared/modules/features/manifest.toml` | 221 | the source being rewritten |
+  | `*/_generated/features_manifest.{lua,ahk}` | 119 | regenerated |
+  | `*/_generated/config_template.toml` | 15 | regenerated |
+  | `menu_manifest.json` | 5 | hand-edited |
+  | the two `config_schema/examples/*.toml` | 15 | hand-edited |
+  | `windows/infra/manifest_reader.ahk` | 2 | hand-edited |
+
+  **No production code addresses a feature by a driver-namespaced path string** —
+  nothing calls `default_for("ahk.…")` or `find_entry_by_path("hs.…")`. Features
+  are reached through the generated manifests and through `config.toml` section
+  headers, both of which follow the source.
+
+  The 15 source paths and their targets:
+  `hs.gestures`(45) `hs.gestures.modes`(32) `hs.gestures.sensitivities`(32)
+  `ahk.shortcuts.keyboard`(15) `ahk.metrics`(13) `ahk.gestures`(11)
+  `ahk.shortcuts.alt_gr_caps_lock`(10) `ahk.shortcuts.alt_gr_lalt`(10)
+  `ahk.shortcuts.lalt_caps_lock`(10) `ahk.layout`(5) `ahk.shortcuts`(5)
+  `ahk.shortcuts.personal`(5) `hs.hotstrings`(5) `ahk.shortcuts.script_control`(4)
+  `ahk.category_enabled`(4).
+
+  ⚠ **It cannot be staged.** The manifest, the generated files, the config
+  templates and the menu manifest describe the same paths, so a half-applied
+  rename leaves the tree in a state worse than either end — the same reason the
+  `lib/`→`infra/` rename had to be atomic across three drivers. Budget one focused
+  pass, and regenerate before running anything: the drift guard compares generated
+  output against HEAD, so an unregenerated tree reads as a failure of the change
+  rather than of the sequence.
+
+  Still to do alongside it: add `linux` to the platforms of the features Linux
+  really implements and to `KNOWN_PLATFORMS`; extend `test-config-schema.cjs` to
+  the Linux template; and merge the duplicated privacy toggles — the three filters
+  exist **twice** in the shared manifest (`metrics.*_filter_enabled` **and**
+  `ahk.metrics.filter_*`) and the AHK driver reads neither, it hardcodes `:= true`.
+  Extreme case for the merge: `ahk.gestures` = 11 features against
+  `hs.gestures` + `.modes` + `.sensitivities` = 109, for the same feature, with the
+  same i18n key `menu.gestures` on both sides.
 
 - **Lot 5 — one menu.** The manifest must gain the capabilities that explain
   every hand-written row: a resolvable `action` id (12), `label.format` + `args`
