@@ -65,6 +65,17 @@ local _chat_endpoint        = nil
 local _endpoints_discovered = false
 local _endpoint_probe_in_flight = false
 
+-- When the last probe cycle ENDED, for the inter-cycle cooldown. A failed cycle
+-- fires its queued callbacks synchronously, each of which is a warmup that
+-- re-tests is_discovered() — still false on the failure path — and calls
+-- discover() again inline. The new cycle then resets BOTH pacing variables, so
+-- the exponential backoff never applied across cycles and the retry landed on
+-- the very next run-loop tick: a curl + HTTP storm on the main thread, happening
+-- exactly when the server is not answering.
+local _last_cycle_finished_at   = nil
+-- The pending deferred re-entry, so a burst of callers arms ONE timer.
+local _cooldown_timer           = nil
+
 -- Inter-probe delay, carried ACROSS discovery cycles. Declared here rather than
 -- inside discover() so a failed cycle's backoff is still in force when the next
 -- caller retries.
@@ -145,6 +156,10 @@ local DISCOVERY_MAX_WAIT_SEC        = Timings.sec("llm", "discovery_max_wait_ms"
                                            -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
+-- Minimum gap between the END of one probe cycle and the START of the next.
+-- Distinct from the backoff above, which paces probes WITHIN a cycle and is reset
+-- every time a cycle begins.
+local DISCOVERY_RETRY_COOLDOWN_SEC  = Timings.sec("llm", "discovery_retry_cooldown_ms")
 
 -- Seeded once the initial value is known; reset to it on a successful discovery.
 _poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
@@ -230,6 +245,16 @@ function M.reset()
 	-- background chat-route probe) so a stale response cannot overwrite the
 	-- routes the NEXT discovery cycle caches (F-MED-8).
 	_discovery_gen = _discovery_gen + 1
+	-- The inter-cycle cooldown goes with it. reset() means the server changed —
+	-- a relaunch, a model switch — so the next probe is about a DIFFERENT server
+	-- and must not be held back by how the previous one failed. Keeping the
+	-- timestamp here would make a model switch wait out a cooldown earned by the
+	-- model the user just left.
+	_last_cycle_finished_at = nil
+	if _cooldown_timer then
+		pcall(function() _cooldown_timer:stop() end)
+		_cooldown_timer = nil
+	end
 end
 
 
@@ -282,6 +307,32 @@ function M.discover(on_done)
 		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
 	end
 	if _endpoint_probe_in_flight then return end
+
+	-- Inter-cycle cooldown. Owned here rather than at the one caller that
+	-- re-enters, because every caller of discover() would otherwise have to
+	-- remember it — and the queued-callback path that caused the storm is not the
+	-- only way in.
+	--
+	-- The cycle is DEFERRED, never dropped: the caller's on_done is already queued
+	-- above, so refusing outright would strand it. Re-entering through
+	-- TimerScheduler keeps the contract and only moves it later.
+	if _last_cycle_finished_at then
+		local waited = TimerScheduler.now() - _last_cycle_finished_at
+		if waited < DISCOVERY_RETRY_COOLDOWN_SEC then
+			if not _cooldown_timer then
+				local remaining = DISCOVERY_RETRY_COOLDOWN_SEC - waited
+				Logger.debug(LOG, "Discovery retry deferred %.2fs by the inter-cycle cooldown.", remaining)
+				_cooldown_timer = TimerScheduler.after(remaining, function()
+					_cooldown_timer = nil
+					-- nil so this re-entry cannot be deferred again by the same window.
+					_last_cycle_finished_at = nil
+					M.discover()
+				end)
+			end
+			return
+		end
+	end
+
 	_endpoint_probe_in_flight = true
 	-- Captured now so every async callback below (including the opportunistic
 	-- background chat probe, which can outlive finish_discovery) can detect a
@@ -301,6 +352,7 @@ function M.discover(on_done)
 		-- reset() + discover() again does not find the timer
 		-- still running and incorrectly skip starting a fresh one.
 		_endpoint_probe_in_flight = false
+		_last_cycle_finished_at   = TimerScheduler.now()
 		if success then
 			_endpoints_discovered = true
 			-- The server answered — that, and only that, justifies probing eagerly
