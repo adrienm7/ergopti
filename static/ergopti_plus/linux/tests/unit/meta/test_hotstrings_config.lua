@@ -59,22 +59,30 @@ helpers.describe("hotstrings_config", function()
   -- ==========================================================================
 
   helpers.describe("init()", function()
-    helpers.it("init with valid engine does not crash", function()
+    -- Called directly, not through pcall: a raise fails the case with the real
+    -- error, which says more than a boolean. What each case asserts instead is
+    -- what init LEFT BEHIND — a config module that swallowed its engine and
+    -- initialised nothing passes "does not crash" and expands nothing at runtime.
+    helpers.it("init with a valid engine leaves the module usable", function()
       local engine = make_engine()
-      local ok = pcall(function() config.init(engine) end)
-      helpers.assert_true(ok, "init(engine) does not crash")
+      config.init(engine)
+      helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
+        "after init the group reader must answer")
     end)
 
-    helpers.it("init with explicit config directory does not crash", function()
+    helpers.it("init with an explicit config directory leaves the module usable", function()
       local engine = make_engine()
-      local ok = pcall(function() config.init(engine, "/tmp") end)
-      helpers.assert_true(ok, "init with config dir does not crash")
+      config.init(engine, "/tmp")
+      helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
+        "an explicit directory must not change whether the module answers")
     end)
 
-    helpers.it("init with nil config dir falls back to XDG", function()
+    helpers.it("init with a nil config dir falls back to XDG and still answers", function()
       local engine = make_engine()
-      local ok = pcall(function() config.init(engine, nil) end)
-      helpers.assert_true(ok, "init with nil dir does not crash")
+      config.init(engine, nil)
+      helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
+        "the XDG fallback is the default path — if it left the module mute, every "
+          .. "install with no explicit directory would silently expand nothing")
     end)
   end)
 
@@ -104,19 +112,23 @@ helpers.describe("hotstrings_config", function()
   -- ==========================================================================
 
   helpers.describe("group management", function()
-    helpers.it("disable_group does not crash", function()
-      local ok = pcall(function() config.disable_group("test_group") end)
-      helpers.assert_true(ok, "disable_group does not crash")
+    helpers.it("disable_group disables the group it names", function()
+      config.disable_group("test_group")
+      helpers.assert_eq(config.is_group_enabled("test_group"), false,
+        "a disable that does not disable is the whole bug this reader exists to catch")
     end)
 
-    helpers.it("enable_group does not crash", function()
-      local ok = pcall(function() config.enable_group("test_group") end)
-      helpers.assert_true(ok, "enable_group does not crash")
+    helpers.it("enable_group enables the group it names", function()
+      config.enable_group("test_group")
+      helpers.assert_eq(config.is_group_enabled("test_group"), true,
+        "and the other direction")
     end)
 
-    helpers.it("toggle_group does not crash", function()
-      local ok = pcall(function() config.toggle_group("test") end)
-      helpers.assert_true(ok, "toggle_group does not crash")
+    helpers.it("toggle_group inverts the state it found", function()
+      local before = config.is_group_enabled("test")
+      config.toggle_group("test")
+      helpers.assert_eq(config.is_group_enabled("test"), not before,
+        "a toggle that lands on the same state is a menu row that does nothing")
     end)
 
     helpers.it("a disable/enable cycle ends where it started", function()
@@ -134,9 +146,11 @@ helpers.describe("hotstrings_config", function()
       if not before then config.disable_group("cycle_test") end
     end)
 
-    helpers.it("disable_group with nil does not crash", function()
-      local ok = pcall(function() config.disable_group(nil) end)
-      helpers.assert_true(ok, "disable_group(nil) does not crash")
+    helpers.it("disable_group(nil) changes nothing", function()
+      config.enable_group("nil_probe")
+      config.disable_group(nil)
+      helpers.assert_eq(config.is_group_enabled("nil_probe"), true,
+        "a nil group name must be refused, not applied to whatever was last touched")
     end)
 
     helpers.it("is_group_enabled returns boolean", function()
@@ -176,9 +190,11 @@ helpers.describe("hotstrings_config", function()
   -- ==========================================================================
 
   helpers.describe("reload()", function()
-    helpers.it("reload does not crash", function()
-      local ok = pcall(function() config.reload() end)
-      helpers.assert_true(ok, "reload does not crash")
+    helpers.it("reload leaves the module answering", function()
+      config.reload()
+      helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
+        "reload runs on every config-file change; one that left the module mute would "
+          .. "stop every expansion until the next restart")
     end)
   end)
 

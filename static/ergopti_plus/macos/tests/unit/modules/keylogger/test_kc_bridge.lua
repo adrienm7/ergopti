@@ -116,14 +116,21 @@ helpers.describe("kc_bridge — pre-init behaviour", function()
 		helpers.assert_eq(kc.is_ke_managed_output_kc(0),  false)
 	end)
 
-	helpers.it("get_stats does not crash before init", function()
-		local ok = pcall(function() kc.get_stats() end)
-		helpers.assert_true(ok)
+	-- Called directly, not through pcall: "it did not raise" is not the claim.
+	-- The claim is that an uninitialised bridge ANSWERS — a guard that returned
+	-- nil here would satisfy the old assertion and crash the caller one line
+	-- later, which is where the diagnostic would have been useless.
+	helpers.it("get_stats answers a table before init", function()
+		local stats = kc.get_stats()
+		helpers.assert_eq(type(stats), "table",
+			"the stats reader must answer a table even before init — its caller indexes it")
 	end)
 
-	helpers.it("stop does not crash before init", function()
-		local ok = pcall(function() kc.stop() end)
-		helpers.assert_true(ok)
+	helpers.it("stop before init leaves the bridge stopped, not half-torn-down", function()
+		kc.stop()
+		helpers.assert_eq(type(kc.get_stats()), "table",
+			"a stop that never started must leave the module usable; the boot path calls "
+				.. "stop() defensively before it calls init()")
 	end)
 end)
 
@@ -137,20 +144,24 @@ end)
 -- ================================================================
 
 helpers.describe("kc_bridge — refresh_managed_set", function()
-	helpers.it("rejects non-table tap_hold_config without crashing", function()
+	-- "Rejects X without crashing" asserted survival. What rejection MEANS here is
+	-- that the suppression set is not built from the bad input: a refresh that
+	-- swallowed nil and left a half-populated set would mark the wrong keycodes
+	-- as driver-managed, and the keylogger would then drop the user's real
+	-- keystrokes as if the driver had synthesised them.
+	helpers.it("a non-table tap_hold_config leaves no keycode marked managed", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		local ok = pcall(function()
-			kc.refresh_managed_set(nil, {})
-		end)
-		helpers.assert_true(ok)
+		kc.refresh_managed_set(nil, {})
+		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
+			"a refused refresh must leave the managed set empty, not partially built")
 	end)
 
-	helpers.it("rejects non-table available_actions without crashing", function()
+	helpers.it("a non-table available_actions leaves no keycode marked managed", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		local ok = pcall(function()
-			kc.refresh_managed_set({}, nil)
-		end)
-		helpers.assert_true(ok)
+		kc.refresh_managed_set({}, nil)
+		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
+			"same on the other argument — half a set is worse than none, because the half "
+				.. "that is there looks authoritative")
 	end)
 
 	helpers.it("marks output keycodes as managed after refresh", function()
@@ -242,31 +253,39 @@ end)
 -- ================================================================
 
 helpers.describe("kc_bridge — M.init()", function()
-	helpers.it("rejects non-table core_state without crashing", function()
+	helpers.it("a non-table core_state leaves the module uninitialised", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		local ok = pcall(function() kc.init(nil, nil, {}, {}) end)
-		helpers.assert_true(ok)
+		kc.init(nil, nil, {}, {})
+		-- Refusal has to be observable, not merely survivable: a module that
+		-- swallowed the bad state and initialised anyway passes "does not crash"
+		-- and then fails at every later call, far from the argument that caused it.
+		kc.start()
+		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
+			"a refused init must leave nothing configured")
 	end)
 
-	helpers.it("accepts valid core_state and does not throw", function()
+	helpers.it("accepts a valid core_state and becomes usable", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		local ok = pcall(function()
-			kc.init(
-				{ some_state = true },
-				nil,  -- no log_manager needed for this surface test
-				{ k = { tap = "none", hold = "none" } },
-				{}
-			)
-		end)
-		helpers.assert_true(ok)
+		kc.init(
+			{ some_state = true },
+			nil,  -- no log_manager needed for this surface test
+			{ k = { tap = "none", hold = "none" } },
+			{}
+		)
+		helpers.assert_eq(type(kc.get_stats()), "table",
+			"a successful init must leave the public surface answering — the positive control "
+				.. "for the two refusal cases above")
 	end)
 
 	helpers.it("ignores duplicate init calls", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
 		local state = { ok = true }
 		kc.init(state, nil, {}, {})
-		local ok = pcall(function() kc.init(state, nil, {}, {}) end)
-		helpers.assert_true(ok)
+		local before = kc.get_stats()
+		kc.init(state, nil, {}, {})
+		helpers.assert_eq(type(kc.get_stats()), type(before),
+			"a second init must be ignored, not re-run — re-running rebuilds the managed set "
+				.. "while the first init's watchers are still armed against the old one")
 	end)
 end)
 
@@ -346,10 +365,15 @@ helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", f
 			"poll timer must be re-armed by start() after stop()")
 	end)
 
-	helpers.it("start() before init is a safe no-op", function()
+	helpers.it("start() before init arms nothing", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
-		local ok = pcall(function() kc.start() end)
-		helpers.assert_true(ok, "M.start() before M.init() must not raise")
+		lc_watcher_running = false
+		lc_timer_running   = false
+		kc.start()
+		helpers.assert_eq(lc_watcher_running, false,
+			"an uninitialised start must not arm the path watcher — it would poll a log path "
+				.. "that has not been resolved yet")
+		helpers.assert_eq(lc_timer_running, false, "nor the poll timer")
 	end)
 end)
 
