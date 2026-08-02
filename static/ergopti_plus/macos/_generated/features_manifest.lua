@@ -38,17 +38,17 @@ M.sections = {
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
-	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.ahk.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.alt_gr_lalt"] = { description_key = "menu.ahk.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.keyboard"] = { description_key = "menu.ahk.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.lalt_caps_lock"] = { description_key = "menu.ahk.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.personal"] = { description_key = "menu.ahk.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.script_control"] = { description_key = "menu.ahk.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
-	["category_enabled"] = { description_key = "menu.ahk.category_enabled", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.alt_gr_lalt"] = { description_key = "menu.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.lalt_caps_lock"] = { description_key = "menu.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
+	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs" }, subsections = { "modes", "sensitivities" } },
-	["gestures.modes"] = { description_key = "menu.hs.gestures.modes", platforms = { "hs" }, subsections = {  } },
-	["gestures.sensitivities"] = { description_key = "menu.hs.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
+	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
+	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
 }
 
 M.features = {
@@ -62,19 +62,19 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hs.hotstrings.expansion_delay", platforms = { "hs" },
+		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "hs" },
 	},
 	{
-		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hs.hotstrings.preview_ai_enabled", platforms = { "hs" },
+		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "hs" },
 	},
 	{
-		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hs.hotstrings.preview_autocorrect_enabled", platforms = { "hs" },
+		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "hs" },
 	},
 	{
-		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hs.hotstrings.preview_colored_tooltips", platforms = { "hs" },
+		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "hs" },
 	},
 	{
-		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hs.hotstrings.preview_star_enabled", platforms = { "hs" },
+		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "hs" },
 	},
 	{
 		path = "hotstrings.autocorrection.accents", id = "accents", section = "hotstrings.autocorrection", default = { enabled = true, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.accents", platforms = { "ahk", "hs", "linux" },
@@ -512,196 +512,196 @@ M.features = {
 		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs" },
 	},
 	{
-		path = "gestures.modes.swipe_2_left", id = "swipe_2_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left", id = "swipe_2_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right", id = "swipe_2_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right", id = "swipe_2_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_up", id = "swipe_2_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_up", id = "swipe_2_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_down", id = "swipe_2_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_down", id = "swipe_2_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_2_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left", id = "swipe_3_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left", id = "swipe_3_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_3_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left", id = "swipe_4_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left", id = "swipe_4_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right", id = "swipe_4_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right", id = "swipe_4_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_up", id = "swipe_4_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_up", id = "swipe_4_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_down", id = "swipe_4_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_down", id = "swipe_4_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_4_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left", id = "swipe_5_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left", id = "swipe_5_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right", id = "swipe_5_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right", id = "swipe_5_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_up", id = "swipe_5_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_up", id = "swipe_5_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_down", id = "swipe_5_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_down", id = "swipe_5_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_down", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.hs.gestures.modes.swipe_5_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_up", platforms = { "hs" }, enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left", id = "swipe_2_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_left", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_left", id = "swipe_2_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right", id = "swipe_2_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_right", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_right", id = "swipe_2_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_up", id = "swipe_2_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_up", id = "swipe_2_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_down", id = "swipe_2_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_down", id = "swipe_2_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_left_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_left_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_right_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_2_right_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left", id = "swipe_3_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_left", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_left", id = "swipe_3_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right", id = "swipe_3_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_right", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_right", id = "swipe_3_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_left_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_left_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_right_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_3_right_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left", id = "swipe_4_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_left", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_left", id = "swipe_4_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right", id = "swipe_4_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_right", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_right", id = "swipe_4_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_up", id = "swipe_4_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_up", id = "swipe_4_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_down", id = "swipe_4_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_down", id = "swipe_4_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_left_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_left_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_right_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_4_right_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left", id = "swipe_5_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_left", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_left", id = "swipe_5_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right", id = "swipe_5_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_right", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_right", id = "swipe_5_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_up", id = "swipe_5_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_up", id = "swipe_5_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_down", id = "swipe_5_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_down", id = "swipe_5_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_left_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_left_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_right_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_down", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.hs.gestures.sensitivities.swipe_5_right_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_up", platforms = { "hs" },
 	},
 }
 
