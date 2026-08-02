@@ -121,6 +121,7 @@ const CHECKS = [
 	{ name: 'magic key single source (declared once in the feature manifest, no driver copy)', cmd: 'node', args: ['tools/test/test-magic-key-single-source.cjs'], repro: 'node tools/test/test-magic-key-single-source.cjs' },
 	{ name: 'tap-hold threshold parity (macOS global sits inside the per-key range)', cmd: 'node', args: ['tools/test/test-tap-hold-threshold-parity.cjs'], repro: 'node tools/test/test-tap-hold-threshold-parity.cjs' },
 	{ name: 'adapter reachability (an adapter nothing requires is a port claimed, not wired)', cmd: 'node', args: ['tools/test/test-adapter-reachability.cjs'], repro: 'node tools/test/test-adapter-reachability.cjs' },
+	{ name: 'hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)', cmd: 'node', args: ['tools/test/test-hotstring-telemetry-is-deferred.cjs'], repro: 'node tools/test/test-hotstring-telemetry-is-deferred.cjs' },
 	{ name: 'feature-state boot smoke (4 fixtures, real include graph, own process)', cmd: 'node', args: ['tools/test/test-feature-state-boot-smoke.cjs'], repro: 'node tools/test/test-feature-state-boot-smoke.cjs' },
 	{ name: 'port contract vector traceability (ratchet: ids linked to the macOS mirror)', cmd: 'node', args: ['tools/test/test-port-vector-traceability.cjs'], repro: 'node tools/test/test-port-vector-traceability.cjs --measure' },
 	{ name: 'lua gsub returns one value (bare return leaks the replacement count)', cmd: 'node', args: ['tools/test/test-lua-gsub-single-return.cjs'], repro: 'node tools/test/test-lua-gsub-single-return.cjs' },

@@ -372,9 +372,19 @@ The audit report was retired once its findings were adjudicated: 111 candidates,
 shipped, along with roughly half the rest — each with a regression test proven red
 before the fix and green after.
 
-16 did not ship. They are carried here verbatim so nothing was lost with the
+15 did not ship. They are carried here verbatim so nothing was lost with the
 file: location, root cause, proposed fix and proposed test. Two caveats that the
 pass itself established, and that apply to every line below:
+
+**Verified against the tree on 2026-08-02.** Fourteen of the original thirty are
+gone: eleven closed earlier that day, three more here after reading the code
+they name. The proportion is the point — the caveat above says one in six turns
+out stale, and in this batch it was closer to one in two. Two cheap signals sort
+them faster than reading all of them: whether the test the finding PROPOSES now
+exists (the repo's rule is a test per fix), and whether a distinctive identifier
+from its **Fix** paragraph appears in the source it names. Neither is a verdict —
+`karabiner-actions-rebuilt-673` scored zero on both and was fully done — but
+together they say which to read first.
 
 **Verified against the tree on 2026-08-02.** Fourteen of the original thirty are
 gone: eleven closed earlier that day, three more here after reading the code
@@ -513,11 +523,6 @@ relearning: nothing said so, because a deleted section fails no test.
   - **Cause:** `_warmup_started_at` and the `warmup_elapsed >= WARMUP_GIVE_UP_SEC` check sit AFTER the `if not ApiMlxDiscovery.is_discovered() then … return end` short-circuit (api_mlx.lua:544-564). That placement is deliberate and pinned (see existing_test_checked) so a slow weight load is not falsely failed — but it means the give-up budget measures post-discovery warmup time ONLY. A permanent discovery failure is on no clock at all, and no other counter bounds it: the launcher's fast path (ui/menu/menu_llm/models_manager_mlx_server.lua:520-541) calls mark_load_failed only when it recognises a Python traceback in the server's stdout, which never happens if the server was never ours or never started.
   - **Fix:** Bound discovery on its own clock. Stamp `_discovery_first_attempt_at` on the first discover() of a (server, model) identity — cleared by reset() — and in api_mlx.warmup's discovery branch, before calling discover(), check that elapsed discovery time against a DISCOVERY_GIVE_UP_SEC budget read from lib.timings; on exceed call `M.mark_load_failed(model_name, true)` once and return. Also clear the budget in reset_endpoints() alongside `_warmup_started_at`. Do NOT fix this by moving the `_warmup_started_at` stamp above the short-circuit: tests/unit/llm/test_api_mlx_warmup_giveup_after_discovery.lua asserts that exact source ordering and such a change would regress it.
   - **Test:** New file tests/unit/llm/test_api_mlx_giveup_when_discovery_never_succeeds.lua. Capture notifications by installing a lib.notifications stub BEFORE the fresh `require("modules.llm.api_mlx")` (the exact technique used by tests/unit/modules/llm/test_api_mlx_load_failure.lua). Stub adapters.timer_scheduler with a controllable `now()`; stub modules.llm.api_mlx_discovery with `is_discovered = function() return false end` and `discover = function(cb) if cb then cb() end end` (a discovery that always fa
-- [ ] **preview-flushes-keylogger-on-hid-thread** (tooltip-engine-divergence) — update_preview performs two synchronous file write+flush pairs inside the keyDown eventtap callback — the exact cost the repo already deleted from the expander for this reason
-  - `modules/keymap/llm_bridge.lua:748-751 and 816-822; modules/keylogger/init.lua:1232-1243`
-  - **Cause:** The suggestion telemetry sits inline in the preview path instead of being deferred. This is a known cost in this codebase: tests/unit/modules/keymap/test_terminator_suggested_telemetry.lua names it explicitly in its own header — "It also cost two synchronous write+flush pairs inside the HID callback" — and the fix there was to delete the expander's duplicate call while blessing "the LEGITIMATE call … in llm_bridge.update_preview". The legitimacy of the call was settled; its placement on the eventtap thread was not. The write target is ~/.config/ergopti_plus/.../today.log, whose latency is not bounded by anything the driver controls (encrypted volume, cloud-synced config directory, a stalled 
-  - **Fix:** Defer both telemetry calls off the tap: wrap them in `TimerScheduler.after(0, …)` with the values captured into locals first (the same one-tick deferral llm_bridge already uses for the render at lines 705-710, and the same shape expander.perform_text_replacement uses for its deferred update_preview at expander.lua:157-168). Because the deferral moves the throw off the eventtap stack where Hammerspoon would eat it, wrap the deferred body in a pcall with a Logger.error, exactly as expander.lua:163-166 does. A stronger variant, if the telemetry rate justifies it: give LogManager a small in-memory append queue flushed on a timer, so no telemetry call site can ever block a callback.
-  - **Test:** tests/unit/modules/keymap/test_preview_telemetry_off_hid_thread.lua — modelled on the existing tests/unit/modules/keymap/test_preview_render_off_hid_thread.lua. Load llm_bridge with stubs; install a keylogger stub whose log_hotstring_suggested records the current "tick" (a counter the TimerScheduler stub increments when it drains doAfter(0) callbacks); call update_preview with a matching buffer and assert the recorded tick is > 0, i.e. the call happened on a later runloop turn, not inside the sy
 - [ ] **UML-6** (ui-menu-llm) — After a reload, the reattached download shows a per-file percentage as the overall progress and never a total or ETA
   - `D:/Documents/GitHub/ergopti/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua:624-643`
   - **Cause:** The reattach path was written as a stripped-down copy of `process_stream` (:346-409) but dropped the two pieces that make the number meaningful: the persistent `_bytes_done`/`_bytes_total` upvalues and the `estimated_bytes_total` lookup from `m.hardware_requirements.mlx.download_gb` in the preset tree. The session JSON carries `repo` and `model`, so the estimate is recoverable — it just is not recomputed.
