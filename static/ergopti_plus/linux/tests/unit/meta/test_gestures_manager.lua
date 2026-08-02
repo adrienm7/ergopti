@@ -259,29 +259,41 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- 7. Process frame (no-op stub)
   -- ==========================================================================
 
-  helpers.it("process_frame does not crash with empty touches", function()
-    local ok = pcall(M.process_frame, {})
-    helpers.assert_true(ok, "process_frame should not crash")
+  helpers.it("process_frame with no touches fires no gesture", function()
+    -- Called directly: a raise fails with the real error. The claim is that an
+    -- empty frame recognises nothing — a frame loop that fired on emptiness would
+    -- trigger an action every tick the user is not touching the trackpad.
+    local before = M.get_last_gesture and M.get_last_gesture() or nil
+    M.process_frame({})
+    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
+      "an empty frame must not recognise a gesture")
   end)
 
-  helpers.it("process_frame does not crash with touch data", function()
-    local ok = pcall(M.process_frame, { { x = 100, y = 200 } })
-    helpers.assert_true(ok, "process_frame should not crash with touch data")
+  helpers.it("process_frame with a single touch fires no gesture", function()
+    local before = M.get_last_gesture and M.get_last_gesture() or nil
+    M.process_frame({ { x = 100, y = 200 } })
+    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
+      "one finger is not a gesture — every slot needs three or more")
   end)
 
   helpers.it("process_frame does nothing when disabled", function()
     M.disable()
-    local ok = pcall(M.process_frame, { { x = 100, y = 200 } })
-    helpers.assert_true(ok)
+    local before = M.get_last_gesture and M.get_last_gesture() or nil
+    M.process_frame({ { x = 100, y = 200 } })
+    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
+      "a disabled manager must not recognise anything — the menu toggle is the only "
+        .. "thing standing between the user and an action they turned off")
   end)
 
   -- ==========================================================================
   -- 8. Init
   -- ==========================================================================
 
-  helpers.it("init with empty opts does not crash", function()
-    local ok = pcall(function() M.init({}) end)
-    helpers.assert_true(ok)
+  helpers.it("init with empty opts leaves gestures disabled", function()
+    M.init({})
+    helpers.assert_eq(M.is_enabled(), false,
+      "no opts means no enable — an init that turned gestures on by default would "
+        .. "start reading the trackpad the user never opted into")
   end)
 
   helpers.it("init with enabled=true starts reading", function()
