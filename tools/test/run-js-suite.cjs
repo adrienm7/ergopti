@@ -140,6 +140,7 @@ const CHECKS = [
 	// particular guards a keyboard-thread crash class and the features README
 	// documents it as a "CI gate".
 	{ name: 'feature read sites resolve against the manifest (UnsetItemError crash class)', cmd: 'node', args: ['tools/test/test-feature-read-sites.js'], repro: 'node tools/test/test-feature-read-sites.js' },
+	{ name: 'manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)', cmd: 'node', args: ['tools/test/test-menu-labels-resolve.cjs'], repro: 'node tools/test/test-menu-labels-resolve.cjs' },
 	{ name: 'config schema (v2 TOML shape)', cmd: 'node', args: ['tools/test/test-config-schema.cjs'], repro: 'node tools/test/test-config-schema.cjs' },
 	{ name: 'metrics heatmap translation coverage', cmd: 'node', args: ['tools/test/test-metrics-heatmap-translation.cjs'], repro: 'node tools/test/test-metrics-heatmap-translation.cjs' },
 	// CI verifies AHK encoding with an inline PowerShell step rather than this
