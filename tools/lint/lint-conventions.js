@@ -681,11 +681,25 @@ for (const dir of luaDirs) {
 // and locally the non-zero count came entirely from the sibling repo, which made
 // the hole invisible. The sibling stays (it is a genuine convenience) but it is
 // never the reason this list is non-empty.
+//
+// The three driver trees are here too, because until 2026-08-02 they were
+// covered by a per-driver test instead — 239 lines of Lua and AHK doing this
+// check over 4 effective files, and none of them over Linux, which had no such
+// test at all. One scan reaches all three.
 const tomlDirs = [
 	join(REPO_ROOT, 'static', 'ergopti_plus', '_shared'),
+	join(REPO_ROOT, 'static', 'ergopti_plus', 'windows'),
+	join(REPO_ROOT, 'static', 'ergopti_plus', 'macos'),
+	join(REPO_ROOT, 'static', 'ergopti_plus', 'linux'),
 	join(REPO_ROOT, '..', 'config', 'ergopti_plus')
 ];
-const tomlAll = tomlDirs.flatMap((d) => walkFiles(d, ['.toml']));
+// paths.toml is written by the driver in a PascalCase convention that predates
+// ADR-003 and is read back by the same writer, so it is not a style choice this
+// linter can act on — the exclusion carries over from the per-driver tests it
+// replaces rather than being invented here.
+const tomlAll = tomlDirs
+	.flatMap((d) => walkFiles(d, ['.toml']))
+	.filter((f) => !/[/\\]paths\.toml$/.test(f));
 
 // Guard against the exact regression above: a stale path makes walkFiles() return
 // [] and the whole TOML check pass vacuously. The shared tree always has TOMLs, so

@@ -47,8 +47,14 @@ function walk(dir, acc = []) {
 }
 
 const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+// `git ls-files` reports the INDEX, so a file deleted on disk but not yet staged
+// is listed and unreadable. Reading it unguarded made this gate die with ENOENT
+// halfway through deleting a superseded test — a crash where a finding belongs,
+// and one that says nothing about the invariant. A file that is gone cannot
+// reference a runner, so skipping it is also the right answer.
 const corpus = tracked
 	.filter((f) => /\.(ahk|cjs|js|mjs|yml|yaml|json|md|ps1|sh|toml)$/i.test(f))
+	.filter((f) => fs.existsSync(path.join(ROOT, f)))
 	.map((f) => ({ file: f, text: fs.readFileSync(path.join(ROOT, f), 'utf8') }));
 
 const runners = walk(TESTS);

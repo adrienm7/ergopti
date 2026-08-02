@@ -34,10 +34,14 @@ This rule applies to:
 - The shared features manifest (`manifest.toml`)
 - Any TOML file generated or consumed by a driver
 
-The invariant is enforced mechanically by the meta-test
-`tests/meta/test_no_pascal_case_in_toml.lua`, which scans all `.toml` files
-reachable from the Hammerspoon driver root and fails if it finds a key that
-starts with an uppercase letter.
+The invariant is enforced mechanically by `tools/lint/lint-conventions.js`,
+which scans every `.toml` file under `_shared/` and under all three driver
+trees, and fails if it finds a key that starts with an uppercase letter. It
+replaced a pair of per-driver meta-tests that between them covered four files
+and left Linux unchecked — the rule is cross-driver, so its gate is too.
+`paths.toml` is excluded: the driver writes it in a PascalCase convention that
+predates this ADR and reads it back itself, so it is not a style choice the
+linter can act on.
 
 ## Consequences
 
@@ -69,6 +73,6 @@ starts with an uppercase letter.
 
 ## Evidence in the codebase
 
-- Enforcement test: `static/ergopti_plus/macos/tests/meta/test_no_pascal_case_in_toml.lua`
+- Enforcement gate: `tools/lint/lint-conventions.js` (check 3, "No PascalCase TOML keys")
 - Source manifest (all snake_case): `static/ergopti_plus/_shared/modules/features/manifest.toml`
 - Migration guide: `static/ergopti_plus/_shared/modules/features/_migration_v1_to_v2.md`
