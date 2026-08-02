@@ -572,7 +572,13 @@ function findUnflooredScans(file, src, ext) {
 		for (const m of block.text.matchAll(/(\w+)\+\+/g)) counters.add(m[1]);
 		let floored = false;
 		for (const c of counters) {
-			const re = new RegExp(`(?:Assert\\w*|assert_\\w+)\\s*\\([^\\n]*\\b${c}\\b`);
+			// `[\s\S]` rather than `[^\n]`: an assertion whose message is long
+			// enough to wrap is written across three lines, and the counter is on
+			// the first while the closing paren is on the third. Refusing to cross
+			// a newline meant the longest, most carefully explained floors were the
+			// ones the detector could not see. Bounded so it cannot run to the end
+			// of the file and call a distant mention a floor.
+			const re = new RegExp(`(?:Assert\\w*|assert_\\w+)\\s*\\([\\s\\S]{0,200}?\\b${c}\\b`);
 			if (re.test(block.text)) {
 				floored = true;
 				break;
@@ -590,13 +596,28 @@ function findUnflooredScans(file, src, ext) {
 		// stops at the inner `]` — the same bracket-nesting trap that made the
 		// AltGr guard match nothing in the first place.
 		for (const m of block.text.matchAll(/^[^\n]*?(\w+)\s*\[.*\]\s*:=/gm)) collectors.add(m[1]);
+		// The Lua half of the same shape. `:=` is AHK; Lua writes `t[k] = v`, and
+		// the idiomatic append is `t[#t + 1] = v`. Only the AHK spelling was
+		// recognised, so every Lua collector in the suite — the majority — was
+		// invisible and its floor could not be found however it was written.
+		// `(?!=)` keeps `t[k] == v` (a comparison) out of the collector set.
+		for (const m of block.text.matchAll(/^[^\n]*?(\w+)\s*\[.*\]\s*=(?!=)/gm)) collectors.add(m[1]);
 		if (!floored) {
 			for (const c of collectors) {
 				// Compared against anything, not only a literal: `Stages.Count ==
 				// Counted` is a floor too — it ties the scan's result to a number
 				// derived elsewhere, so an empty scan fails.
+				//
+				// The second alternative is the comma form. `assert_eq(#rows, 3)`
+				// is exactly as strong a floor as `#rows == 3`, but the size sits
+				// next to a comma rather than an operator, so an operator-only
+				// pattern rated the stricter spelling as no floor at all. Both
+				// argument orders count: `assert_eq(3, #rows)` is the same claim.
+				const size = `(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})`;
 				const re = new RegExp(
-					`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=|==)\\s*\\w`
+					`${size}\\s*(?:>|>=|!=|~=|==)\\s*\\w` +
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${size}\\s*,` +
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*[\\w."']+\\s*,\\s*${size}\\s*[,)]`
 				);
 				if (re.test(src)) {
 					floored = true;
@@ -625,6 +646,26 @@ function findUnflooredScans(file, src, ext) {
 			const CALLER_FLOOR =
 				/(?:Assert\w*|assert_\w+)\s*\([^\n]*(?:(?:\.\s*(?:Length|Count)|#\s*\w+)\s*(?:>|>=|==|~=|!=)\s*\w|\b\w+\s*(?:>|>=)\s*\d)/;
 			if (CALLER_FLOOR.test(src)) floored = true;
+		}
+
+		// The subject of the scan is itself asserted non-nil, and it came from a
+		// locator that returns nil on a miss.
+		//
+		// helpers.read_driver_source(selector) searches the driver tree for a
+		// declaration and returns nil when it finds none. So `assert_true(src ~=
+		// nil)` is not a null check — it is the statement "the selector matched a
+		// real file", which is precisely the vacuity this pattern hunts. Without
+		// this, the most careful shape in the suite (locate by symbol, assert the
+		// locate worked, then scan) was rated as no floor at all, while a bare
+		// `#lines > 0` on an unchecked read was rated as one.
+		if (!floored) {
+			const subject = (rows[idx] || '').match(/\bfor\b[^\n]*?\b(\w+)\s*[:.]\s*(?:gmatch|gfind)\s*\(/);
+			if (subject && /read_driver_source\s*\(|read_file\s*\(/.test(src)) {
+				const nilFloor = new RegExp(
+					`(?:Assert\\w*|assert_\\w+)\\s*\\([\\s\\S]{0,120}?\\b${subject[1]}\\b\\s*(?:~=|!=)\\s*nil`
+				);
+				if (nilFloor.test(src)) floored = true;
+			}
 		}
 		if (floored) continue;
 
