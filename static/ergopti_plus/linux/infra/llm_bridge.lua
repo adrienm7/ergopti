@@ -1,4 +1,4 @@
---- _shared/lua/llm/linux_bridge.lua
+--- infra/llm_bridge.lua
 ---
 --- Pure, driver-agnostic LLM bridge logic for the Linux driver.
 --- Handles context collection, prompt building, response parsing, and

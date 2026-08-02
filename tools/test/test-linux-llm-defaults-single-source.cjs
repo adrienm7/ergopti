@@ -49,7 +49,7 @@ function esc(v) {
 const errors = [];
 
 // ── 1. linux_bridge mirrors must equal the canonical values ───────────────
-const bridge = stripLua(read('_shared/lua/llm/linux_bridge.lua'));
+const bridge = stripLua(read('linux/infra/llm_bridge.lua'));
 const bridgeChecks = [
 	['OLLAMA_DEFAULT_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
 	['DEFAULT_TEMPERATURE', DEFAULTS.llm_temperature, 'defaults.json llm_temperature'],

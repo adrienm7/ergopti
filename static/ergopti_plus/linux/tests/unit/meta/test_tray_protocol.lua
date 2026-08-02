@@ -1,9 +1,9 @@
 --- tests/unit/meta/test_tray_protocol.lua
 
 local helpers = require("tests.helpers")
-local TP      = helpers.load_module("linux.tray_protocol")
+local TP      = helpers.load_module("tray.protocol")
 
-helpers.describe("linux.tray_protocol", function()
+helpers.describe("tray.protocol", function()
 
   -- ==========================================================================
   -- 1. build_menu_item_xml()

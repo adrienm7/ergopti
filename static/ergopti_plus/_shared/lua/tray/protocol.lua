@@ -1,4 +1,4 @@
---- _shared/lua/linux/tray_protocol.lua
+--- _shared/lua/tray/protocol.lua
 ---
 --- Pure, driver-agnostic serialization helpers for the D-Bus StatusNotifierItem
 --- (SNI) protocol and notify-send desktop notifications. All functions produce
