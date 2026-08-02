@@ -500,7 +500,7 @@ Constraints: **paths before moves, moves before content, data before code.**
   | ~~Convention invariants~~ | ~~392~~ | **0** | **done** — `lint-conventions.js --fail-on-violations` |
   | Corpus consumers (16 corpora, 258 vectors) | 7 650 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
   | Port contract vectors (129) | 2 138 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
-  | Port presence/compliance | 1 473 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
+  | Port presence/compliance | 1 493 | ~500 | ⚠ see below — the mechanism as written is a downgrade |
   | e2e harnesses | 1 374 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
 
   **Convention row closed 2026-08-02.** The four
@@ -512,6 +512,19 @@ Constraints: **paths before moves, moves before content, data before code.**
   such gate at all**. Widening the linter to the three driver trees (carrying the
   `paths.toml` exclusion over rather than inventing it) is what made the deletion
   a net gain in coverage instead of a loss.
+
+  ⚠ **The port presence/compliance row, re-measured 2026-08-02: "one JS gate over
+  `contracts.json` × the three `adapters/` trees" would WEAKEN what is there.**
+  All three drivers' compliance tests `require`/load the adapter and inspect the
+  real method table — macOS 141 l, Linux 115 l, Windows 458 l calling the
+  functions through `HasMethod` with zero `FileRead`. A JS gate can only read
+  source text, so it cannot catch an adapter that fails to LOAD, which is the
+  failure these actually catch. Swapping a runtime check for a textual one to
+  save lines is the thing the working rules forbid.
+  What a JS gate genuinely does better is the part that spans trees and is pure
+  filesystem fact: which ports a driver ships an adapter for, and ADR-008's
+  reachability. Split the row that way — the cross-tree half to JS, the loading
+  half stays where the loading happens — or drop it.
 
   Every other row means writing the replacement first.
 
