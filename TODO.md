@@ -521,7 +521,7 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-02 at tautology **45**,
+`unfloored-scan`. It only turns down. Frozen 2026-08-02 at tautology **22**,
 pcall-only **203**, unfloored-scan **4**, the other three at 0.
 
 The work is burning those floors down. Each occurrence is either a real false
@@ -531,9 +531,9 @@ to filter.
 
 **Where the real work is, measured rather than assumed:**
 
-- **tautology (45 → 35): the sole-assertion ones are the real find**, and ten are
-  now done. 32 of the original 45 were the ONLY assertion in their case, so the
-  whole case certified nothing; 15 of those mention "pause".
+- **tautology (45 → 22): the sole-assertion ones are the real find**, and 23 are
+  now done. Of the 22 left, **16 are still the ONLY assertion in their case**, so
+  the whole case certifies nothing.
 
   The pattern in every one fixed so far: the case was a **design claim written as
   a test** — "this module is pure, the pause gate lives higher" — asserted with
@@ -542,6 +542,18 @@ to filter.
   the pause coupling is absent from the module's source, or that the guard is the
   first statement of the keystroke path, and each was proved red by reintroducing
   the coupling.
+
+  Three of them wrapped a **loop whose results were discarded** — 150 iterations
+  over a body reading `-- simulate`, 120 profile resolutions, 80 malformed UTF-8
+  chunks — so the volume the case advertised was measuring nothing. The loop is
+  usually worth keeping; what it needs is to read its answers back.
+
+  ⚠ Two traps, both hit while doing this: `read_driver_source` needs a selector
+  unique to ONE production file (`function M.get_active_profile` is declared by
+  both `modules/llm/init.lua` and `modules/llm/profiles.lua`, so the scan
+  concatenated them and the pause check ran against the wrong module), and
+  `list_shortcuts()` hands back LIVE state, so a stress loop that toggles a
+  shortcut must restore it or a later case in the same file fails.
 
   ⚠ **One of them was blocked by the harness, not by the test.**
   `test_actions_system.lua` said in a comment that it "cannot easily assert the
