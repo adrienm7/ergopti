@@ -589,8 +589,12 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 	helpers.it("valid UTF-8 buffer still runs without error (no regression on happy path)", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = "hello world"
-		local ok = pcall(bridge.update_preview, "hello world")
-		helpers.assert_true(ok, "update_preview must not raise on valid UTF-8")
+		-- The happy-path control for the four malformed cases above. Called directly:
+		-- valid input raising is a plain bug, and it should fail with its own error.
+		bridge.update_preview("hello world")
+		helpers.assert_eq(state.buffer, "hello world",
+			"a valid buffer must survive the read untouched — the malformed cases assert "
+				.. "the same thing, and this is what proves they can tell the difference")
 	end)
 
 end)

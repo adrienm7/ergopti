@@ -958,7 +958,7 @@ _RunClipboardContractVectors() {
 			; read_after_write
 			CB_Write("ergopti_clipboard_test_42")
 			Assert(CB_Read() = "ergopti_clipboard_test_42", "CB_Read must return what CB_Write wrote")
-			; save_returns_string_or_null
+			; save_returns_snapshot_or_null
 			Saved := CB_Save()
 			Assert(Type(Saved) = "String", "CB_Save must return a string")
 			; restore_null_clears

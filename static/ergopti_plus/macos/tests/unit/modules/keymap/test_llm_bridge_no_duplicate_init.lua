@@ -226,8 +226,12 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		-- The bridge was loaded fresh above with _state == nil; the first init
 		-- must not throw and must leave the module operational.
 		local state1, defaults1 = make_state("state1")
-		local ok = pcall(function() bridge.init(state1, defaults1) end)
-		helpers.assert_true(ok, "first M.init() must not throw")
+		-- Called directly: a raise fails with the real error. The claim is that the
+		-- first init leaves the bridge OPERATIONAL, which is what the duplicate-init
+		-- case below is measuring a change against.
+		bridge.init(state1, defaults1)
+		helpers.assert_eq(type(bridge.check_nav_reset), "function",
+			"a successful first init must leave the public surface callable")
 	end)
 
 
@@ -285,11 +289,9 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 
 		-- check_nav_reset uses require_state + reads _state.buffer.
 		-- A nil _state would produce an ERROR; state1's buffer is "" so no crash.
-		local ok = pcall(function() bridge.check_nav_reset() end)
+		bridge.check_nav_reset()
 
 		Logger.set_sink(nil)
-
-		helpers.assert_true(ok, "check_nav_reset() must not throw after duplicate init")
 		helpers.assert_eq(#error_lines, 0,
 			"require_state guard must not fire — _state must still be the first state table")
 

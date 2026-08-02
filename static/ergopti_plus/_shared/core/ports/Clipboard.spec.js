@@ -14,9 +14,9 @@
  *    deliver the expanded string. save() and restore() allow the adapter host
  *    to snapshot the user's clipboard before injection and return it afterwards,
  *    making the operation transparent to the user.
- * 2. Null-safe semantics: read() and save() return null on an empty or non-text
- *    clipboard rather than an empty string, so callers can distinguish "nothing
- *    was there" from "an empty string was there". restore(null) means "clear".
+ * 2. Null-safe semantics: read() and save() return null on an empty clipboard
+ *    rather than an empty string, so callers can distinguish "nothing was there"
+ *    from "an empty string was there". restore(null) means "clear".
  * 3. Boolean return on write/restore: callers can check for failure without
  *    catching exceptions. A false return MUST be logged by the caller.
  * 4. UTF-8 everywhere: the adapter MUST read and write clipboard content as
@@ -53,14 +53,24 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 *
 	 * save() — Snapshot the current clipboard content and return it so the
-	 *   caller can restore it later. Equivalent to read() but signals intent.
-	 *   @returns {string|null} Current clipboard text, or null if the clipboard
-	 *     is empty, contains non-text data, or an error occurred.
+	 *   caller can restore it later. The value is OPAQUE: pass it back to
+	 *   restore() unchanged, never inspect it.
+	 *   @returns {string|object|null} A snapshot restore() accepts, or null if
+	 *     the clipboard is empty or an error occurred.
 	 *   @error_behavior "return_null".
+	 *
+	 *   ⚠ THE TWO ADAPTERS SNAPSHOT DIFFERENT THINGS, deliberately, and this
+	 *   line used to say {string|null} as though they did not. Windows save()
+	 *   is text only and has a separate save_all() for every format; macOS
+	 *   save() returns the readAllData() TABLE, so a non-text clipboard also
+	 *   survives an injection. Calling the result opaque is what makes both
+	 *   honest — a caller that assumed a string would work on Windows and
+	 *   silently corrupt a macOS round-trip. The contract vector asserted only
+	 *   that save() did not throw, which is why this went unnoticed.
 	 *
 	 * restore(saved) — Restore the clipboard to a previously saved value.
 	 *   If saved is null, the clipboard is cleared.
-	 *   @param {string|null} saved  Value previously returned by save(), or null.
+	 *   @param {string|object|null} saved  Value previously returned by save(), or null.
 	 *   @returns {boolean} true on success, false on any error.
 	 *   @error_behavior "return_false".
 	 */
@@ -135,11 +145,14 @@ function contractTestVectors() {
 			]
 		},
 		{
-			id: 'save_returns_string_or_null',
-			description: 'save() returns a string or null, never throws.',
+			id: 'save_returns_snapshot_or_null',
+			description:
+				'save() returns an opaque snapshot restore() accepts, or null. It was ' +
+				'declared string-or-null, which macOS has never satisfied: it returns the ' +
+				'readAllData() table so a non-text clipboard survives an injection.',
 			steps: [
 				{ call: 'save', args: [] },
-				{ assert: 'return_type_one_of', expected: ['string', 'null'] }
+				{ assert: 'return_type_one_of', expected: ['string', 'object', 'null'] }
 			]
 		},
 		{
