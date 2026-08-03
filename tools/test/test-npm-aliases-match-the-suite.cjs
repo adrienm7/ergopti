@@ -20,10 +20,16 @@
  * is an ASSERTION so no gate can go dark again.
  *
  * The reverse — every suite gate having an alias — was never true: 78 of them had
- * none. Turning that into a rule would mean 78 lines of package.json mirroring
- * the suite, which is churn, not safety. It is a RATCHET instead: the count may
- * only fall, so adding a gate with an alias is free and adding one without makes
- * the number worse, deliberately.
+ * none, and it was held as a ratchet on the grounds that writing the 78 lines
+ * would be churn. That reasoning had one flaw: the churn was a one-off and the
+ * cost was recurring. A gate with no alias cannot be run alone, so the first
+ * thing anyone does when it fails is re-run all 141 — which is how a two-second
+ * check turns into a two-minute one, every time, forever.
+ *
+ * The 78 were written on 2026-08-03 and the baseline is now ZERO, which makes
+ * this half an ASSERTION as well. Adding a gate means adding its alias in the
+ * same commit; the name is not a judgement call, it is `test-foo.cjs` →
+ * `test:foo`. A naming decision is precisely what got skipped 78 times.
  *
  * The parses are floored: a regex that stopped matching would report zero and
  * pass over nothing.
@@ -48,9 +54,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/test-properties.cjs' // property + mutation pass, run under --full
 ]);
 
-// Gates the suite runs with no npm alias, measured 2026-08-03. Lower it as
-// aliases are added; never raise it.
-const BASELINE_ALIASLESS = 78;
+// Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last
+// 78 were written — so this is an assertion, not a ratchet, and it must stay at
+// zero. Never raise it to make a change pass: add the alias.
+const BASELINE_ALIASLESS = 0;
 
 const errors = [];
 
@@ -109,17 +116,19 @@ if (dark.length > 0) {
 
 // ==================================================
 // ==================================================
-// ======= 2/ The Aliasless Count Only Falls ========
+// ======= 2/ Every Suite Gate Has An Alias =========
 // ==================================================
 // ==================================================
 
 const aliasless = [...suitePaths].filter((p) => !aliasPaths.has(p));
 if (aliasless.length > BASELINE_ALIASLESS) {
 	errors.push(
-		`gates the suite runs with no npm alias rose to ${aliasless.length} (baseline ${BASELINE_ALIASLESS}). ` +
+		`${aliasless.length} gate(s) the suite runs have no npm alias (allowed: ${BASELINE_ALIASLESS}). ` +
 			'A gate with no alias cannot be run alone, so the first thing anyone does when it fails is ' +
-			're-run the whole suite. Add "test:<name>": "node ./<path>" and lower the baseline.\n' +
-			aliasless.slice(-5).map((p) => `      · ${p}`).join('\n')
+			're-run all ' + suitePaths.size + ' — a two-second check becomes a two-minute one, every ' +
+			'time. The name is mechanical, not a decision: tools/test/test-foo.cjs → "test:foo": ' +
+			'"node ./tools/test/test-foo.cjs".\n' +
+			aliasless.map((p) => `      · ${p} → "test:${path.basename(p, '.cjs').replace(/^test-/, '')}"`).join('\n')
 	);
 }
 
