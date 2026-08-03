@@ -76,6 +76,11 @@ helpers.describe("ManifestMenu.build: dispatch isolates each handler under pcall
 
 		helpers.assert_true(ok_call,
 			"M.build itself must never raise — a throwing handler must be isolated by an internal pcall (F-HIGH-18)")
+		-- Isolation means the OTHER rows still render. A build that contained the
+		-- exception by returning nothing would pass the check above and leave the
+		-- user with an empty menu and no error.
+		helpers.assert_eq(type(built), "table",
+			"and must still return the rows the throwing handler did not own")
 
 		local found_good = false
 		for _, item in ipairs(built or {}) do

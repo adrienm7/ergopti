@@ -82,9 +82,10 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 		local CUSTOM_TRIGGER = "%"
 		local fake_km = make_fake_keymap(CUSTOM_TRIGGER)
 
-		local ok = pcall(DynHot.start, "/tmp/", fake_km, scratch_toml)
+		local ok, err = pcall(DynHot.start, "/tmp/", fake_km, scratch_toml)
 		os.remove(scratch_toml)
-		helpers.assert_true(ok, "dynamic_hotstrings.start must not raise with a fake keymap")
+		helpers.assert_true(ok, "dynamic_hotstrings.start must not raise with a fake keymap: " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 
 		local interceptor = fake_km.get_interceptor()
 		helpers.assert_true(type(interceptor) == "function",

@@ -608,7 +608,12 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local write_ok = pcall(function()
 			L.error("fsfail", "this error write must fail gracefully")
 		end)
+		-- The containment IS the subject: a logger that raised would take down
+		-- whatever was trying to report a problem. It must also stay USABLE, or the
+		-- first filesystem hiccup silences every later line in the session.
 		helpers.assert_true(write_ok, "high-severity log must not propagate FS error to caller")
+		helpers.assert_eq(type(L.error), "function",
+			"and the logger must still be callable afterwards")
 
 		-- Critical: ring buffer and sink must still have received the line
 		local snap = L.ring_buffer_snapshot()

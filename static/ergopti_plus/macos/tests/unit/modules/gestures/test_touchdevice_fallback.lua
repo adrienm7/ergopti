@@ -124,9 +124,19 @@ helpers.describe("gestures startup degraded mode", function()
 	package.loaded["modules.gestures"] = nil
 	local gestures = helpers.load_with_stubs("modules.gestures")
 
-	helpers.it("M.start does not throw when touchdevice cannot be loaded", function()
-		local ok = pcall(gestures.start)
-		helpers.assert_true(ok)
+	helpers.it("M.start degrades without losing the module, when touchdevice cannot load", function()
+		-- Called directly: a raise fails with the real error. And note what is NOT
+		-- asserted — is_enabled(). It reflects the USER's feature flag, not whether a
+		-- device was found, and a start with no hardware must leave that flag alone:
+		-- the user still wants gestures, the trackpad just is not there. What must
+		-- hold is that the module survives usable, so plugging a device in and
+		-- calling start() again works.
+		gestures.start()
+		gestures.stop()
+		gestures.start()
+		helpers.assert_eq(type(gestures.get_all_actions()), "table",
+			"a failed start must leave the slot table readable — the menu renders from it "
+				.. "whether or not a device was found")
 	end)
 
 	helpers.it("M.start logs a warning and no error on missing touchdevice", function()

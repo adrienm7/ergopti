@@ -3,7 +3,7 @@
 
 # Architecture Overview
 
-> Generated on 2026-08-02 from port specs, domain specs, and adapter file listings.
+> Generated on 2026-08-03 from port specs, domain specs, and adapter file listings.
 
 The diagram below shows the three-layer hexagonal architecture:
 **Ports** (shared contracts) → **Adapters** (driver-specific implementations) → **Domain** (pure business logic).

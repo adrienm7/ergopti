@@ -103,8 +103,11 @@ helpers.describe("M-9: rules_engine interceptor respects is_group_enabled=false"
 			getFlags      = function() return { cmd = false, ctrl = false } end,
 			getCharacters = function() return "x" end,  -- not the trigger char
 		}
-		local ok = pcall(interceptor, non_trigger_event, "xy")
-		helpers.assert_true(ok, "interceptor must not error on non-matching input when group is enabled")
+		-- Called directly: this runs on every keystroke, so a raise here is a dead
+		-- keyboard and should fail with its own error rather than a boolean.
+		local consumed = interceptor(non_trigger_event, "xy")
+		helpers.assert_true(consumed == nil or consumed == false,
+			"a non-matching character must not be consumed — swallowing it would delete the\n\t\t\tuser's keystroke")
 	end)
 end)
 

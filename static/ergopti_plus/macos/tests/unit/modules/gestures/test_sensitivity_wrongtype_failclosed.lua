@@ -29,10 +29,12 @@ helpers.describe("gesture sensitivity fails closed to DEFAULT_SENSITIVITY on a w
 		Gestures.set_sensitivity("swipe_2_left", "fast")
 		local s = Gestures.get_sensitivity("swipe_2_left")
 		-- Both crashed on the raw string before the fix.
-		helpers.assert_true(pcall(function() return math.floor(10 / s) end),
-			"engine arithmetic must never divide by a non-number")
-		helpers.assert_true(pcall(function() return string.format("%.1f", s) end),
-			"menu format must never %.1f a non-number")
+		-- Both crashed on the raw string before the fix, so what the fix guarantees
+		-- is the TYPE — and asserting that directly is stronger than asserting two
+		-- operations happened not to raise on it.
+		helpers.assert_eq(type(s), "number",
+			"a wrong-typed sensitivity must fail closed to a number: the engine divides by\n\t\t\tit and the menu formats it with %.1f")
+		helpers.assert_true(s > 0, "and to a usable one — a zero would divide by zero downstream")
 	end)
 
 	helpers.it("a zero or negative sensitivity also fails closed (no divide-by-zero)", function()

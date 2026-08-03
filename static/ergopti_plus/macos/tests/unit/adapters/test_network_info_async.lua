@@ -229,6 +229,11 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 		local ok, result = pcall(function() return NI.isInternetReachable() end)
 		helpers.assert_true(ok, "isInternetReachable() must not throw even if the async adapter fails to spawn: "
 			.. tostring(result))
+		-- And it must ANSWER. A probe that failed to spawn and returned nil reads as
+		-- falsy at the caller, which is the same as "no internet" — so an unlaunchable
+		-- probe would look identical to a genuinely offline machine.
+		helpers.assert_eq(type(result), "boolean",
+			"a failed spawn must still answer a boolean, not nil")
 	end)
 
 end)
