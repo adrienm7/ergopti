@@ -449,8 +449,40 @@ Constraints: **paths before moves, moves before content, data before code.**
   NUMBER meant two different things and the adoption would have silently changed
   every threshold. macOS is on the spec numbering now, and gained the
   `ring_buffer_clear` / `ring_buffer_size` it never had. What remains is the
-  adoption itself: 994 lines down to a thin driver layer over the 287-line core,
-  with the corpus as the equivalence check.
+  adoption itself.
+
+  ⚠ **Attempted 2026-08-03 and reverted; here is what it costs, measured.** The
+  rewiring is small — five edits to declarations, plus one replacing `_log`'s
+  body with a call into the core and moving console/file/errors-only into a sink.
+  It took the file from 994 to 943 lines and left **31 failing tests**, in three
+  families:
+  1. **Ring lifetime.** The ring moves into a DIFFERENT module, so a test that
+     re-requires `infra.logger` no longer gets a fresh buffer: three cases that
+     expected 0 entries saw 200. The fix is a decision about whether the ring is
+     per-driver-instance or per-process, not a patch.
+  2. **Source-scanning tests.** `test_hot_path_costs` asserts the emit path
+     passes its level decision to the writer by matching
+     `_write_to_file(stamp, line, variant.level ~= …)`; the signature became one
+     composed line, so the scan missed. `test_logger_dedup_errors_mirror` names
+     `_flush_dedup_summary`, which no longer exists here — the invariant still
+     holds, in the sink. Both need re-encoding against the new home. Legitimate
+     work, but eight files of it, and never a weakening.
+  3. **The error-notification handler** stopped receiving the module name: it
+     read values `_log` used to compute and the core now computes.
+
+  **Next pass, in this order:** decide the ring's lifetime; re-encode the two
+  source-scanning families; then rewire. The behaviour corpus already covers
+  filtering, the lifecycle-pair rule, dedup and the ring, so the parts most
+  likely to break silently are guarded. What is NOT guarded — and what all 31
+  failures were about — is the driver half: file writing, sub-file fan-out, the
+  errors-only mirror and the print() tee. Coverage for those comes first.
+
+  What landed instead is everything the adoption depends on: the spec numbering,
+  the dedup the core was missing, `ring_buffer_clear` / `ring_buffer_size` /
+  `reset_dedup` / `dedup_suppressed_count` on both sides, and `LEVELS` /
+  `level_of` / `label_of` on the core so a sink can express its own policy in the
+  core's vocabulary instead of keeping a private copy of the numbers — which is
+  exactly how this driver came to use 1/2/3/4 in the first place.
 
   <details><summary>The measurement that planned (1), kept for the next
   extraction of the same shape</summary>

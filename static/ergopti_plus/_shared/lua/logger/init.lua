@@ -163,6 +163,34 @@ function M.get_level()
 	return _min_level
 end
 
+--- The four thresholds, by name. Exposed so a driver can express its own policy
+--- ("flush anything above DEBUG immediately") in the core's vocabulary instead of
+--- keeping a private copy of the numbers — which is exactly how the macOS driver
+--- came to use 1/2/3/4 while everything else used 10/20/30/40.
+M.LEVELS = {
+	DEBUG   = 10,
+	INFO    = 20,
+	WARNING = 30,
+	ERROR   = 40,
+}
+
+--- The severity of one variant.
+--- A driver sink receives the variant name and often needs its level — to decide
+--- whether to flush now, or to mirror the line into an errors-only file. Deriving
+--- it here keeps the variant→level mapping in one place.
+--- @param variant string
+--- @return number|nil
+function M.level_of(variant)
+	return LEVELS[variant]
+end
+
+--- The label a variant renders as, e.g. "warn" → "WARNING".
+--- @param variant string
+--- @return string|nil
+function M.label_of(variant)
+	return LABELS[variant]
+end
+
 --- Installs the output sink. Every accepted, formatted line is passed to fn.
 --- Call with nil to remove the sink (useful in tests).
 --- @param fn function|nil  function(line: string, variant: string) → void
