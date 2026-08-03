@@ -154,8 +154,32 @@ data, and no generator in this repo emits a Lua function.
 
 ## 3. One keylogger aggregation core
 
-**Decided 2026-08-03: do it.** Two ~1 330-line walkers whose function names map
-1:1, one of which says in a comment that it "MIRRORS" the other.
+⚠⚠ **The premise of this section is wrong, and it changes what the work IS.**
+Measured 2026-08-03: **the shared core already exists and macOS is already on it.**
+
+`macos/modules/keylogger/aggregator/core.lua` has 21 public functions. **Thirteen
+are pure delegations** to `_shared/lua/keylogger/aggregator_helpers.lua` (257
+lines) and `_shared/lua/keylogger/utils.lua` — `burst_length_bucket`,
+`char_class`, `pop_utf8`, `get_app_ctx`, `add_ngram_metric`, `push_ngram`,
+`bump_app_day`, `finalize_burst`, `finalize_session`, and the rest. The eight
+that stay local are trivial state accessors (`today`, `get_ngram_ctx`,
+`set_device_id`, `require_init`…), not aggregation logic.
+
+**So there is nothing to extract.** The asymmetry is that the AutoHotkey walker
+re-implements those same twelve functions in AHK, and it cannot `require` a Lua
+module — no adoption is possible in the sense the logger's was.
+
+**What the work actually is:** hold the AutoHotkey re-implementation to the
+existing shared Lua core BY VECTORS, which is exactly the mechanism
+`test-walker-constants-single-source.cjs` already applies to the eight bucket
+edges and caps. The mechanism is proven and in place; what is missing is
+BEHAVIOURAL vectors for the functions, where today there are only value vectors
+for the constants. Filed below as the primitives corpus — that is the whole job,
+not a step toward a bigger one.
+
+**Superseded:** "two ~1 330-line walkers whose function names map 1:1, one of
+which says in a comment that it MIRRORS the other." The comment is true and the
+mapping is real; the conclusion drawn from them was not.
 
 **The constants half is done:** all eight bucket edges and caps are held to
 `_shared/lua/keylogger/aggregator_helpers.lua` by
