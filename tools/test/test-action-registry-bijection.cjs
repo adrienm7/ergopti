@@ -63,6 +63,23 @@ const PLATFORM_FIELD = /^platform\s*=\s*"([^"]+)"/m;
 const errors = [];
 const summary = [];
 
+/**
+ * True when a `platform` field claims a driver.
+ *
+ * The field is "all", one driver key, or a comma-separated list of them. The
+ * list form exists because the field could not previously say "two drivers out
+ * of three": the two window cyclers ship on macOS and Windows and not on Linux,
+ * and both single-value answers were false — "all" declared two rows Linux
+ * cannot perform, "hs" or "ahk" hid half the feature.
+ * @param {string} platform The declared field.
+ * @param {string} driver The driver key to test.
+ * @returns {boolean}
+ */
+function claims(platform, driver) {
+	if (platform === 'all') return true;
+	return String(platform).split(',').map((s) => s.trim()).includes(driver);
+}
+
 if (!fs.existsSync(REGISTRY)) {
 	console.error('\x1b[31m[ERROR] actions.toml is missing.\x1b[0m');
 	process.exit(1);
@@ -118,8 +135,9 @@ for (const drv of DRIVERS) {
 	})(base);
 	const corpus = chunks.join('\n');
 
-	// "all" means every platform; otherwise the row names its one platform.
-	const declared = actions.filter((a) => a.platform === 'all' || a.platform === drv.key);
+	// "all" means every platform; otherwise the row names the drivers it ships
+	// on, as one key or a comma-separated list of them.
+	const declared = actions.filter((a) => claims(a.platform, drv.key));
 
 	if (declared.length < MIN_DECLARED[drv.key]) {
 		errors.push(

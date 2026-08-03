@@ -102,15 +102,15 @@ const KNOWN_DIVERGENCES = {
 		pc: 'alt_tab_monitor',
 		mac: 'alt_tab_windows',
 		reason:
-			'DRIFT, and measured 2026-08-03: two different behaviours, not two names for one. ' +
-			'Windows AltTabMonitor() reads the mouse position, resolves the monitor under the ' +
-			'cursor, and cycles only the windows ON THAT MONITOR. macOS start_alt_tab_windows_hotkey ' +
-			'binds Shift+F17 to focus_previous_window_global — the previously focused window, ' +
-			'unscoped, and itself migrated away from cmd_tab so it switches WINDOWS rather than ' +
-			'apps. Renaming either side would be the wrong fix: calling the macOS action ' +
-			'alt_tab_monitor would claim a display scoping it does not implement. Closing this ' +
-			'means DECIDING whether macOS should scope to the display under the cursor too — a ' +
-			'product question, not a namespace one, and it is open rather than justified'
+			'a difference of DEFAULT, not of capability — settled 2026-08-03. It was drift: Windows ' +
+			'cycled only the windows on the monitor under the cursor and macOS cycled globally, so ' +
+			'the same physical key did two things and neither driver could do the other. Both ' +
+			'behaviours were wanted, so both now ship on both drivers — AltTabAll() on Windows and ' +
+			'Ctrl+F17 -> focus_previous_window_on_screen() on macOS — and each is bindable to a key ' +
+			'or a gesture anywhere. What is left is which one the tab key defaults to, and the two ' +
+			'platforms answer differently on purpose: a Windows desk is typically multi-monitor with ' +
+			'per-screen workspaces, a Mac laptop typically is not. A user who disagrees changes one ' +
+			'setting, which was not true before'
 	},
 	'tab.hold': {
 		pc: 'alt',

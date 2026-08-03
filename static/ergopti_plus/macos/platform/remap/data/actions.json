@@ -371,6 +371,19 @@
 		]
 	},
 	{
+		"id": "alt_tab_monitor",
+		"short_label": "Alt+Tab — Écran courant",
+		"label": "Alt+Tab — Fenêtre précédente sur l'écran sous le curseur",
+		"holdable": false,
+		"category": "Navigation",
+		"karabiner_to": [
+			{
+				"key_code": "f17",
+				"modifiers": ["left_control"]
+			}
+		]
+	},
+	{
 		"id": "cmd_shift_tab",
 		"short_label": "App précédente",
 		"label": "⌘⇧⇥ — App précédente (Cmd+Shift+Tab)",

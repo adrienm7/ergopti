@@ -1011,6 +1011,26 @@ end
 
 register_modifier_chords(load_modifier_chords(_modifier_chords_json))
 
+-- The driver key this build of the catalogue answers to.
+local THIS_PLATFORM = "hs"
+
+--- True when a catalogue `platform` field claims this driver.
+---
+--- The field is "all", one driver key, or a comma-separated list of them. The
+--- list form exists because the field could not previously say "two drivers out
+--- of three": the two window cyclers ship on macOS and Windows and not on
+--- Linux, and both single-value answers were false — "all" put dead rows in the
+--- Linux picker, "hs" or "ahk" hid half the feature.
+--- @param platform string|nil The declared field, or nil for the "all" default.
+--- @return boolean
+local function claims_this_platform(platform)
+	if type(platform) ~= "string" or platform == "" or platform == "all" then return true end
+	for key in platform:gmatch("[^,%s]+") do
+		if key == THIS_PLATFORM then return true end
+	end
+	return false
+end
+
 --- Builds a picker-order list from the shared TOML, keeping only entries
 --- matching the given platform ("hs") plus sentinels ("--", "#…").
 --- The modifier-chord placeholder is expanded from modifier_chords.json.
@@ -1047,8 +1067,7 @@ local function build_sg_names(shared)
 			-- Driver-specific placeholders are ignored deliberately.
 		else
 			local meta = shared.sg_actions[item]
-			local platform = meta and meta.platform or "all"
-			if platform == "all" or platform == "hs" then
+			if claims_this_platform(meta and meta.platform) then
 				out[#out + 1] = item
 			end
 		end
@@ -1062,8 +1081,7 @@ local function build_ax_names(shared)
 	local out = {"none"}
 	for _, item in ipairs(shared.ax_order) do
 		local meta = shared.ax_actions[item]
-		local platform = meta and meta.platform or "all"
-		if platform == "all" or platform == "hs" then
+		if claims_this_platform(meta and meta.platform) then
 			out[#out + 1] = item
 		end
 	end

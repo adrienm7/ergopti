@@ -19,6 +19,7 @@
 
 return {
 	{ id = "alt_tab_apps", key = "f17", mods = { "alt" } },
+	{ id = "alt_tab_monitor", key = "f17", mods = { "ctrl" } },
 	{ id = "alt_tab_windows", key = "f17", mods = { "shift" } },
 	{ id = "arrow_down", key = "down", mods = {  } },
 	{ id = "arrow_left", key = "left", mods = {  } },

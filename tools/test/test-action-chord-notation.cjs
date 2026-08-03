@@ -18,6 +18,15 @@
  * The registry is 58 AutoHotkey chords, 27 Hammerspoon chords and 26 Linux
  * chords, all currently well-formed and held that way by nothing at all.
  *
+ * THE `platform` FIELD IS CHECKED HERE TOO, and for the same reason. It gained a
+ * comma-separated list form on 2026-08-03 ("hs,ahk"), because it could not say
+ * "two drivers out of three" — the two window cyclers ship on macOS and Windows
+ * and not on Linux, so "all" declared rows Linux cannot perform and a single key
+ * hid half the feature. A list is more expressive and also more mistakeable:
+ * "hs, ahk " with a stray space, or "mac", silently drops the action from a
+ * driver's picker with nothing to see. Same failure shape as a wrong modifier
+ * name, same gate.
+ *
  * THREE NOTATIONS, ON PURPOSE:
  * `emit_ahk_key` + `emit_ahk_mods`, `emit_hs_key` + `emit_hs_mods`, and
  * `emit_linux` as a single "ctrl+shift+Tab" string are not an accident of
@@ -46,6 +55,12 @@ const MODIFIERS = new Set(['alt', 'ctrl', 'cmd', 'shift', 'super']);
 // matching would find nothing malformed and pass having validated nothing.
 const MIN_CHORDS = { ahk: 40, hs: 20, linux: 18 };
 
+// The driver keys a `platform` field may name, plus the "all" shorthand.
+const PLATFORM_KEYS = new Set(['hs', 'ahk', 'linux']);
+
+// Floor on the number of platform fields read, for the same reason as MIN_CHORDS.
+const MIN_PLATFORM_FIELDS = 150;
+
 const TABLE_HEADER = /^(\[+)([A-Za-z0-9_.]+)(\]+)\s*$/;
 const STRING_FIELD = (f) => new RegExp(`^${f}\\s*=\\s*"([^"]*)"`, 'm');
 const ARRAY_FIELD = (f) => new RegExp(`^${f}\\s*=\\s*\\[([^\\]]*)\\]`, 'm');
@@ -72,6 +87,7 @@ for (const line of fs.readFileSync(REGISTRY, 'utf8').split(/\r?\n/)) {
 if (current) tables.push(current);
 
 const counts = { ahk: 0, hs: 0, linux: 0 };
+let platformFields = 0;
 
 for (const t of tables) {
 	const body = t.body.join('\n');
@@ -84,6 +100,43 @@ for (const t of tables) {
 		return m ? [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]) : null;
 	};
 	const id = str('id') || t.name;
+
+	// The platform field: "all", one driver key, or a comma-separated list.
+	const platform = str('platform');
+	if (platform !== null) {
+		platformFields++;
+		if (platform === '') {
+			errors.push(`${id}: platform is empty — write "all" if that is what is meant`);
+		} else if (platform !== 'all') {
+			const keys = platform.split(',');
+			for (const raw of keys) {
+				if (raw !== raw.trim()) {
+					errors.push(
+						`${id}: platform "${platform}" has whitespace around "${raw}". Every reader compares ` +
+							'the parts exactly, so the padded one matches no driver and the action vanishes ' +
+							'from that picker with nothing to see.'
+					);
+				}
+				const key = raw.trim();
+				if (!PLATFORM_KEYS.has(key)) {
+					errors.push(
+						`${id}: platform "${platform}" names "${key}", which is not a driver ` +
+							`(${[...PLATFORM_KEYS].join(', ')}, or "all"). No picker will list it, and no gate ` +
+							'other than this one can tell that apart from a deliberate restriction.'
+					);
+				}
+			}
+			if (new Set(keys.map((k) => k.trim())).size !== keys.length) {
+				errors.push(`${id}: platform "${platform}" repeats a driver`);
+			}
+			if (keys.length >= PLATFORM_KEYS.size) {
+				errors.push(
+					`${id}: platform "${platform}" lists every driver — write "all", so that a driver added ` +
+						'later inherits it instead of being silently excluded by a list nobody revisits'
+				);
+			}
+		}
+	}
 
 	// The two paired notations.
 	for (const drv of ['ahk', 'hs']) {
@@ -140,6 +193,13 @@ for (const t of tables) {
 	}
 }
 
+if (platformFields < MIN_PLATFORM_FIELDS) {
+	errors.push(
+		`read only ${platformFields} platform field(s) (floor ${MIN_PLATFORM_FIELDS}) — the registry parse ` +
+			'is broken, and the platform check above validated nothing'
+	);
+}
+
 for (const [drv, min] of Object.entries(MIN_CHORDS)) {
 	if (counts[drv] < min) {
 		errors.push(
@@ -157,5 +217,6 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] every declared chord is well formed (${counts.ahk} AutoHotkey, ${counts.hs} ` +
-		`Hammerspoon, ${counts.linux} Linux).\x1b[0m`
+		`Hammerspoon, ${counts.linux} Linux), and all ${platformFields} platform field(s) name real ` +
+		'drivers.\x1b[0m'
 );

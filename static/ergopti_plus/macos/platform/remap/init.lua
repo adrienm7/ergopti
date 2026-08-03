@@ -33,6 +33,7 @@ local Config      = require("platform.remap.config")
 local Generator   = require("platform.remap.generator")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
 local Watchers    = require("platform.remap.watchers")
+local Registrar   = require("adapters.hotkey_registrar")
 local Timings     = require("infra.timings")
 
 -- Optional: keylogger may not be loaded in all deployments
@@ -730,6 +731,7 @@ function M.init(file_system)
 		hotkey_cycle_windows      = nil,
 		hotkey_alt_tab_windows    = nil,
 		hotkey_alt_tab_apps       = nil,
+		hotkey_alt_tab_monitor    = nil,
 	}
 
 	-- Propagate the tap/hold config to the KE physical-kc bridge so it knows
@@ -777,6 +779,7 @@ function M.init(file_system)
 		_state.hotkey_cycle_windows   = Watchers.start_cycle_windows_hotkey()
 		_state.hotkey_alt_tab_windows = Watchers.start_alt_tab_windows_hotkey()
 		_state.hotkey_alt_tab_apps    = Watchers.start_alt_tab_apps_hotkey()
+		_state.hotkey_alt_tab_monitor = Watchers.start_alt_tab_monitor_hotkey()
 		Logger.debug(LOG, "Window-management hotkeys bound (deferred).")
 	end)
 
@@ -933,16 +936,20 @@ function M.stop()
 		_state.watcher = nil
 	end
 	if _state.hotkey_cycle_windows then
-		pcall(function() _state.hotkey_cycle_windows:disable() end)
+		Registrar.unbind(_state.hotkey_cycle_windows)
 		_state.hotkey_cycle_windows = nil
 	end
 	if _state.hotkey_alt_tab_windows then
-		pcall(function() _state.hotkey_alt_tab_windows:disable() end)
+		Registrar.unbind(_state.hotkey_alt_tab_windows)
 		_state.hotkey_alt_tab_windows = nil
 	end
 	if _state.hotkey_alt_tab_apps then
-		pcall(function() _state.hotkey_alt_tab_apps:disable() end)
+		Registrar.unbind(_state.hotkey_alt_tab_apps)
 		_state.hotkey_alt_tab_apps = nil
+	end
+	if _state.hotkey_alt_tab_monitor then
+		Registrar.unbind(_state.hotkey_alt_tab_monitor)
+		_state.hotkey_alt_tab_monitor = nil
 	end
 	if type(Watchers.stop_alt_tab_apps_tracker) == "function" then
 		Watchers.stop_alt_tab_apps_tracker()
