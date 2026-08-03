@@ -112,6 +112,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.hotkey_registrar",
+		contract = { "bind", "unbind", "setEnabled" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.http_client",
 		contract = { "get", "post" },
 		wired    = true,

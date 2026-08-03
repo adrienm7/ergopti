@@ -464,8 +464,8 @@ reaching the codegen step.
 **Port**
 A formal JavaScript interface contract stored in `_shared/core/ports/` as a
 `*.spec.js` file. Each port defines method signatures, parameter shapes, return
-values, and compliance test vectors. The twenty ports are: `AppLauncher`, `Clipboard`, `Crypto`,
-`FileSystem`, `GraphicsRenderer`, `HttpClient`, `KeyState`, `KeyboardHook`,
+values, and compliance test vectors. The twenty-one ports are: `AppLauncher`, `Clipboard`, `Crypto`,
+`FileSystem`, `GraphicsRenderer`, `HotkeyRegistrar`, `HttpClient`, `KeyState`, `KeyboardHook`,
 `MouseControl`, `NetworkInfo`, `Notifier`, `ProcessLifecycle`,
 `SecureFieldDetector`, `Storage`, `TextSender`, `TimerScheduler`,
 `TooltipRenderer`, `TrayMenu`, `WindowInfo`, `WindowManager`. See ADR-001 and

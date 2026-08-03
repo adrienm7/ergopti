@@ -13,19 +13,22 @@
 ---    labels, icons, and implementations stay in one place.
 --- 2. Configurable Defaults: Current Cmd+ shortcuts that were hard-coded in
 ---    bindings.lua are seeded as defaults; the user can override any slot.
---- 3. hs.hotkey Lifecycle: Hotkeys are created by start(), deleted by stop(),
----    and rebuilt after any assignment change + reload.
+--- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
+---    and rebuilt after any assignment change + reload. The OS call itself lives
+---    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
 --- ==============================================================================
 
 local M = {}
 
 local hs          = hs
+local Chord       = require("chord")
+local Registrar   = require("adapters.hotkey_registrar")
 local Logger      = require("infra.logger")
 local GestActions = require("modules.gestures.actions")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
-local _hotkeys   = {}
+local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
 local _started   = false
 local _settings_prefix = "keyboard_shortcut_"
@@ -48,8 +51,8 @@ local MOD_SYMBOLS = {
 	alt        = "⌥",
 }
 
--- Slot prefix → hs.hotkey modifier list.
--- Stored as an ordered array (longest prefix first) so slot_to_hotkey()
+-- Slot prefix → canonical modifier list.
+-- Stored as an ordered array (longest prefix first) so slot_to_chord()
 -- and slot_label() use ipairs() and never mistake "cmd_shift_x" for "cmd_x"
 -- due to non-deterministic pairs() iteration.
 local SLOT_MODS = {
@@ -60,7 +63,9 @@ local SLOT_MODS = {
 	{ "cmd_",            {"cmd"} },
 }
 
--- Special key suffix → hs.hotkey key name
+-- Special key suffix → canonical key name. The registrar translates these to
+-- whatever the OS calls them; "enter" is spelled "return" here because that is
+-- the name the key has, not because Hammerspoon happens to want it.
 local SPECIAL_KEYS = {
 	space  = "space",
 	enter  = "return",
@@ -83,20 +88,22 @@ M.DEFAULTS = {
 -- ====================================
 -- ====================================
 
---- Resolves a slot id to (mods, key) for hs.hotkey.bind().
---- Returns nil, nil when the slot cannot be mapped to a valid hotkey.
+--- Resolves a slot id to a canonical chord string.
+--- Returns nil when the slot cannot be mapped to a valid chord — a slot whose
+--- prefix matches nothing names no modifiers, and binding its bare suffix would
+--- steal a plain letter key from every application.
 --- @param slot_id string e.g. "cmd_a", "hs_ctrl_0", "hs_option_space".
---- @return table|nil mods, string|nil key
-local function slot_to_hotkey(slot_id)
+--- @return string|nil chord Canonical chord, e.g. "Cmd+A".
+local function slot_to_chord(slot_id)
 	for _, entry in ipairs(SLOT_MODS) do
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
 			local key = SPECIAL_KEYS[suffix] or suffix
-			return mods, key
+			return Chord.format(mods, key)
 		end
 	end
-	return nil, nil
+	return nil
 end
 
 --- Returns a human-readable label for a slot (e.g. "⌘ A", "^ Espace").
@@ -133,29 +140,29 @@ end
 --- @param action_id string
 local function bind_slot(slot_id, action_id)
 	if action_id == "none" then return end
-	local mods, key = slot_to_hotkey(slot_id)
-	if not mods then
-		Logger.debug(LOG, "Slot '%s' has no valid hotkey mapping — skipped.", slot_id)
+	local chord = slot_to_chord(slot_id)
+	if not chord then
+		Logger.debug(LOG, "Slot '%s' has no valid chord mapping — skipped.", slot_id)
 		return
 	end
-	local ok, hk = pcall(hs.hotkey.bind, mods, key, function()
+	local handle = Registrar.bind(chord, function()
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
 		pcall(GestActions.execute_single, action_id, "keyboard__" .. slot_id)
 	end)
-	if ok and hk then
-		_hotkeys[slot_id] = hk
+	if handle then
+		_hotkeys[slot_id] = handle
 		Logger.done(LOG, "Bound %s → %s.", slot_label(slot_id), action_id)
 	else
-		Logger.warn(LOG, "Failed to bind slot '%s' (key: %s).", slot_id, tostring(key))
+		Logger.warn(LOG, "Failed to bind slot '%s' (chord: %s).", slot_id, chord)
 	end
 end
 
 --- Releases the hotkey for a slot if active.
 --- @param slot_id string
 local function unbind_slot(slot_id)
-	local hk = _hotkeys[slot_id]
-	if hk then
-		pcall(function() hk:delete() end)
+	local handle = _hotkeys[slot_id]
+	if handle then
+		Registrar.unbind(handle)
 		_hotkeys[slot_id] = nil
 	end
 end

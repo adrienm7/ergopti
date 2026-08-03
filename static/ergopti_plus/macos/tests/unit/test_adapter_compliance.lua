@@ -73,6 +73,7 @@ local ADAPTERS_UNDER_TEST = {
 	"http_client",
 	"timer_scheduler",
 	"notifier",
+	"hotkey_registrar",
 	"tray_menu",
 	"file_system",
 	"window_info",

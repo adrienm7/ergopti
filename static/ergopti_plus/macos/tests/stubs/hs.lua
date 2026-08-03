@@ -684,7 +684,40 @@ M.spaces = {
 }
 M.openConsole = function() end
 M.focus = function() end
-M.hotkey = { bind = function() return { delete = function() end } end }
+-- A hotkey stub that returned a bare {delete = noop} could not tell a test
+-- whether the binding was ever enabled, disabled, or released — every lifecycle
+-- assertion against it was vacuously true. This one records what it was asked to
+-- do and exposes the live set, so a leaked hotkey is visible to the suite.
+M.hotkey = {
+	_bound = {},
+	bind = function(mods, key, pressed_fn)
+		local entry = {
+			mods = mods, key = key, pressed_fn = pressed_fn,
+			enabled = true, deleted = false,
+		}
+		entry.enable = function(self)
+			local target = self or entry
+			target.enabled = true
+			return target
+		end
+		entry.disable = function(self)
+			local target = self or entry
+			target.enabled = false
+			return target
+		end
+		entry.delete = function(self)
+			local target = self or entry
+			target.deleted = true
+			target.enabled = false
+			for i, held in ipairs(M.hotkey._bound) do
+				if held == target then table.remove(M.hotkey._bound, i); break end
+			end
+			return nil
+		end
+		table.insert(M.hotkey._bound, entry)
+		return entry
+	end,
+}
 M.menubar = { new = function() return {
 	setTitle = function() end, setMenu = function() end,
 	delete = function() end, setIcon = function() end,
