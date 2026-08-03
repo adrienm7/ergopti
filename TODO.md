@@ -194,10 +194,37 @@ Linux only, so this is adoption, not generation. 29 cross-driver vectors
 (`_shared/tests/corpus/hotstrings/vectors.json`) are already replayed by all three
 suites, unit and e2e.
 
-**Blocker, measured:** Windows carries **103 lines** of star-trigger indexing
-under `infra/hotstrings/` against **6** mentions in the whole shared core.
-Adopting it as-is would lose the feature. **Port star-trigger handling into the
-core first**, with vectors, then adopt.
+⚠ **Re-measured 2026-08-03, and both halves of the blocker were understated.**
+
+**The core reaching Linux only is confirmed** — `linux/modules/hotstrings/engine.lua:44`
+is `return require("hotstring_engine")`, and no macOS file references it. 526
+lines, as recorded.
+
+**The star-trigger indexing is not "103 lines".** It is **5 globals and 53
+reference sites across four files** (`hotstring_engine_main.ahk`,
+`hotstring_builder.ahk`, `hotstring_registry.ahk`, `hotstring_match.ahk`), and it
+is a *performance structure with incremental-maintenance invariants*: the maps
+are populated in `HSE_Register` and `HSE_EnableGroup`, **rebuilt** in
+`HSE_DisableGroup`, and reset in `HSE_RegistryClear`. Its own comment records why
+it exists — every star trigger ends in the magic key, so all ~2 100 of them share
+one last-char bucket, and the linear suffix scan it replaced **cost ~21 ms on
+every magic-key press**. Porting the lookup is the easy half; porting the four
+maintenance points without dropping one is the job.
+
+🚩 **And the prerequisite cannot be met as the decision states it.** "Port it into
+the core WITH cross-driver vectors first" assumes the corpus can express a star
+trigger. **It cannot.** `_shared/tests/corpus/hotstrings/vectors.json` has 29
+vectors whose fields are `trigger / replacement / is_word / auto_expand / buffer /
+terminator / expected` — there is **no flag field at all**. The four vectors that
+appear to mention a star use `★` as a *terminator character*, which is the magic
+key, not the `*` flag. Zero vectors cover star-trigger behaviour.
+
+**So the first step is not the port. It is the vector schema:** add the flag
+field, write vectors for what a star trigger does that a normal one does not
+(fire mid-word with no terminator, and the case-sensitivity split the two index
+maps mirror), have all three suites replay them, and only then move the index.
+Adopting the core before that would be a migration with nothing able to prove it
+kept the behaviour — and the behaviour is worth 21 ms per keystroke.
 
 macOS's `would_fire()` is no longer a blocker: it has four consumers (the
 expansion path, the tooltip preview, two LLM-bridge sites) and
