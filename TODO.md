@@ -754,8 +754,15 @@ segments now, and `test-hotpath-segments-declared.cjs` inventories every one wit
 a line saying what hot path it covers — instrumentation is the one kind of code
 whose absence is invisible, because the profile just looks clean.
 
-**One left:** five retroactive boot marks before `BootProfile_Begin`. A different
-mechanism from HotPath — it needs a pre-init mark queue, not a segment.
+~~One left: five retroactive boot marks before `BootProfile_Begin`.~~ — **also
+already built.** `BootProfile_Stamp` is the pre-init queue and `ErgoptiPlus.ahk`
+takes exactly five: bundle extracted, module includes initialised, tray reset +
+onboarding, config parsed, hotstring engine initialised. They record a tick only
+— the logger does not exist yet — and are replayed once it does. The inventory
+gate covers them too, so the span from process creation to `BootProfile_Begin`
+cannot collapse back into one opaque number.
+
+**The instrumentation half of this section is closed.**
 
 **What genuinely cannot be done here: reading the numbers.** Every segment above
 emits only on a real Windows session over real typing. The instrumentation is
