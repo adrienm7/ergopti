@@ -49,7 +49,9 @@ const INVENTORY = {
 	'Tooltip.DequeuePresent': 'the same present from the destack rebuild, so a slow row expiry is not mistaken for a slow render',
 	'Tooltip.LlmPresent': 'presenting an LLM prediction preview',
 	'Tooltip.BorderPixelLoop': 'the per-pixel border draw, the one step that scales with tooltip size',
+	'Gesture.Invoke': 'the single choke point all three dispatchers share (gesture, shortcut slot, tap-hold), so one segment covers every user-triggered action',
 	'Config.TomlWrite': 'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
+	'Updater.Poll': 'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
 	'UIA.SelectionPoll': 'the idle UI-Automation selection poll',
 	'Metrics.FocusRefresh': 'WinGetTitle on the foreground window, up to 20x/s — a Not Responding window makes it wait out the timeout'
 };

@@ -151,13 +151,21 @@ from one walker's cases and replayed against both.
 segments and 5 pre-logger boot stamps, all inventoried by
 `test-hotpath-segments-declared.cjs` with a line saying what each covers.
 
-~~the TOML config write path~~ — **done 2026-08-03**, `Config.TomlWrite`: a save
-is a full read-modify-write plus a canonicalisation pass, run from menu
-callbacks, so a slow one blocks the tray menu while the user watches. It had no
-segment; the cost showed up only as a menu that felt stuck.
+**Three of the four named paths landed 2026-08-03**, taking the driver to 19
+segments:
+- `Config.TomlWrite` — a save is a full read-modify-write plus canonicalisation,
+  run from menu callbacks, so a slow one blocks the tray menu while the user
+  watches. The cost showed up only as a menu that felt stuck.
+- `Updater.Poll` — the async check calls `WaitForResponse(0)` on a COM object
+  every tick, and a COM call that blocks stalls the whole message pump. Both
+  exits are timed: the re-arm exit runs on every tick but the last, so timing
+  only the completion would report the path as fast.
+- `Gesture.Invoke` — the single choke point all three dispatchers share (gesture,
+  shortcut slot, tap-hold), so one segment covers every user-triggered action.
+  The throwing path is timed too: an action that spends a second before failing
+  costs the user exactly as much as one that spends a second succeeding.
 
-Still unmeasured, in value order: the gesture recogniser's per-event path, the
-updater's poll, and the webview bridge round-trip. Each is two `HotPath_Now()`
+**One left:** the webview bridge round-trip. Same shape — two `HotPath_Now()`
 reads plus a floor-gated `HotPath_LogIfSlow`, and an inventory line.
 
 ⚠ **Reading the numbers cannot happen in a headless session** — every segment

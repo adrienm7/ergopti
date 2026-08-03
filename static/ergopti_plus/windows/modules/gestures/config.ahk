@@ -147,6 +147,11 @@ GestureInvokeAction(ActionName, BindingId := "") {
 		global GESTURE_ACTIONS
 		if !GESTURE_ACTIONS.Has(ActionName)
 				return
+		; The single choke point all three dispatchers share (gesture, keyboard-shortcut
+		; slot, tap-hold), so one segment here covers every user-triggered action.
+		; A slow action was previously attributable to nothing: the gesture ended, the
+		; effect arrived late, and the log said nothing about which action it was.
+		_hpGesture := HotPath_Now()
 		Fn := GESTURE_ACTIONS[ActionName].Fn
 		; Containment lives HERE, at the single choke point all three dispatchers share
 		; (gesture, keyboard-shortcut slot, tap-hold). Only GestureDispatch wrapped the
@@ -155,9 +160,16 @@ GestureInvokeAction(ActionName, BindingId := "") {
 		; net. Fail loud in the log, never rethrow (§5.3) — every dispatcher keeps working.
 		try {
 				if (GestureActionParameterSpec(ActionName) != "")
-						return Fn.Call(BindingId)
-				return Fn.Call()
+						Result := Fn.Call(BindingId)
+				else
+						Result := Fn.Call()
+				HotPath_LogIfSlow("Gesture.Invoke", _hpGesture, ActionName)
+				return Result
 		} catch as e {
+				; The throwing path is timed too: an action that spends a second before
+				; failing costs the user exactly as much as one that spends a second
+				; succeeding
+				HotPath_LogIfSlow("Gesture.Invoke", _hpGesture, ActionName . " (threw)")
 				LoggerError("gestures", "Action '{1}' (binding '{2}') threw: {3}.", ActionName, BindingId, e.Message)
 		}
 }
