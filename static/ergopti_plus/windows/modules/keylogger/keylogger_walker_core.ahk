@@ -183,7 +183,13 @@ KLW_BurstLengthBucket(n) {
 				if (n <= b)
 						return String(b)
 		}
-		return "500+"
+		; Derived from the table, never a literal. The shared Lua core builds this
+		; label as tostring(buckets[#buckets]) .. "+", so a hardcoded "500+" here
+		; agrees only while the last edge happens to be 500 — and the constants gate
+		; pins the EDGES, so it would keep passing while the label diverged and every
+		; over-cap burst was filed under two different keys on the two drivers.
+		Edges := KLWConst.BURST_LENGTH_BUCKETS
+		return String(Edges[Edges.Length]) . "+"
 }
 
 ; UTF-8-aware character classifier — mirrors the Lua _char_class.
@@ -215,7 +221,16 @@ KLW_CharClass(c) {
 KLW_PopLast(s) {
 		if (s = "" || StrLen(s) = 0)
 				return ""
-		return SubStr(s, 1, StrLen(s) - 1)
+		; AutoHotkey v2 strings are UTF-16 and StrLen counts CODE UNITS, so a non-BMP
+		; character — an emoji from Win+. — occupies two of them. Dropping one left a
+		; lone high surrogate in the in-progress word buffer: a broken string the
+		; shared Lua core never produces, because utf8.offset(s, -1) there removes a
+		; whole codepoint. Every BMP character behaves identically either way, which
+		; is the only reason this survived unnoticed.
+		Len  := StrLen(s)
+		Last := Ord(SubStr(s, Len, 1))
+		Drop := (Last >= 0xDC00 && Last <= 0xDFFF) ? 2 : 1
+		return SubStr(s, 1, Len - Drop)
 }
 
 ; Get-or-create the per-app walking context.
