@@ -745,17 +745,17 @@ every keystroke had no segment, so the two tap-hold trackers and the whole
 cost. A slow key-down was visible only as latency further along, where it was
 indistinguishable from a slow consumer.
 
-**Still missing, and each is two QPC reads plus a floor-gated log:**
+~~Still missing~~ — **three of the four added 2026-08-03.** `LLM.OnChar` (the
+plan called it `LLM.FeedChar`; nothing was named that — the real name is the
+second consumer of the char event, the one left unattributed when the profiler
+showed slow `OnChar` with no matching slow `HSE.FeedChar`), `KL.Ingest`, and
+`Metrics.FocusRefresh` around the two Win32 calls that actually block. Sixteen
+segments now, and `test-hotpath-segments-declared.cjs` inventories every one with
+a line saying what hot path it covers — instrumentation is the one kind of code
+whose absence is invisible, because the profile just looks clean.
 
-- `LLM.FeedChar` — the prime suspect for the ~600 slow `OnChar` events with no
-  matching slow `HSE.FeedChar`. Note the name may be stale: nothing in the driver
-  is called that today, so the first step is finding what the LLM char path is
-  actually named.
-- the keylogger fan-out and `KL.Ingest`.
-- `Metrics.FocusRefresh` — a `WinGetTitle` on a Not Responding window blocks
-  20×/s with no trace.
-- five retroactive boot marks before `BootProfile_Begin` (a different mechanism
-  from HotPath; needs a pre-init mark queue, not a segment).
+**One left:** five retroactive boot marks before `BootProfile_Begin`. A different
+mechanism from HotPath — it needs a pre-init mark queue, not a segment.
 
 **What genuinely cannot be done here: reading the numbers.** Every segment above
 emits only on a real Windows session over real typing. The instrumentation is

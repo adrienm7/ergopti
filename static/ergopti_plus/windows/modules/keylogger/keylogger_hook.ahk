@@ -213,6 +213,12 @@ KL_Hook_RefreshContext(force := false) {
 				return
 		if !force and (A_TickCount - (KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
 				return
+		; The two Win32 calls below are the ones that block: WinGetTitle sends a
+		; message to the foreground window, and a Not Responding window makes it wait
+		; out the timeout. This refresh runs up to 20x/s and had no trace at all, so
+		; a blocking foreground window was invisible in the profile and showed up
+		; only as unexplained idle cost.
+		_hpFocus := HotPath_Now()
 		NewTitle := ""
 		NewApp := ""
 		try {
@@ -221,6 +227,7 @@ KL_Hook_RefreshContext(force := false) {
 		try {
 				NewApp := WinGetProcessName("A")
 		}
+		HotPath_LogIfSlow("Metrics.FocusRefresh", _hpFocus, NewApp)
 		Now := A_TickCount
 
 		; Snapshot the outgoing app BEFORE any mutation below. The app-switch
@@ -330,6 +337,11 @@ KL_Hook_OnChar(ih, c) {
 		if !Keylogger.initialized
 				return
 
+		; The keylogger ingest closes the per-keystroke budget alongside the hook
+		; fan-out and had no segment. Two QPC reads; the log line is gated by the
+		; profiler floor, so ordinary typing prints nothing.
+		_hpKlIngest := HotPath_Now()
+
 		; An uncaught exception inside an InputHook callback silently disables the
 		; hook permanently. Wrap the entire body so any runtime error is logged and
 		; swallowed — subsequent keystrokes must continue to reach the callback
@@ -383,6 +395,7 @@ KL_Hook_OnChar(ih, c) {
 		} catch as kl_err {
 				try LoggerError("keylogger_hook", "KL_Hook_OnChar unhandled exception — hook kept alive: {1}", kl_err.Message)
 		}
+		HotPath_LogIfSlow("KL.Ingest", _hpKlIngest, "")
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {
