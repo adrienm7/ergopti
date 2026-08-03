@@ -69,6 +69,10 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				repl          = "ok",
 				plain_repl    = "ok",
 				is_word       = false,
+				-- auto: the field try_auto_expand gates on. Absent from these hand-built
+				-- fixtures for as long as nothing read it — which is what let a non-auto
+				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
+				auto          = true,
 				case_conform  = false,
 				final_result  = false,
 			}
@@ -94,6 +98,10 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				repl          = "ok",
 				plain_repl    = "ok",
 				is_word       = false,
+				-- auto: the field try_auto_expand gates on. Absent from these hand-built
+				-- fixtures for as long as nothing read it — which is what let a non-auto
+				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
+				auto          = true,
 				case_conform  = false,
 				final_result  = false,
 			}
@@ -156,6 +164,10 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				repl          = "by the way",
 				plain_repl    = "by the way",
 				is_word       = false,
+				-- auto: the field try_auto_expand gates on. Absent from these hand-built
+				-- fixtures for as long as nothing read it — which is what let a non-auto
+				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
+				auto          = true,
 				case_conform  = false,
 				final_result  = false,
 			}
