@@ -621,6 +621,16 @@ local function _flush_dedup_summary()
 	local stamp = _timestamp()
 	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
 	_push_ring(stamp .. " " .. summary)
+
+	-- The summary must take the SAME sinks as a normal line. It did not reach the
+	-- test sink, which meant no test could observe suppression at all: the count
+	-- was written to console, ring and file and was invisible to every assertion.
+	-- The shared core delivers its summary through the sink, so this was also a
+	-- difference that would have surfaced as a behaviour change on adoption.
+	local sink_variant = _dedup.variant_key == "WARNING" and "warn"
+		or string.lower(_dedup.variant_key or "info")
+	if _test_sink then pcall(_test_sink, stamp .. " " .. summary, sink_variant) end
+
 	_write_to_file(stamp, summary)
 	-- Mirror suppression summary to the errors-only log when the suppressed
 	-- messages were WARNING or ERROR; without this the errors-only file only
@@ -669,7 +679,7 @@ _log = function(variant_key, module_name, msg, ...)
 	-- recurring line is de-bounced rather than permanently silenced — a streak that
 	-- outlives the window re-surfaces. The window matches the AHK driver so both
 	-- drivers dedup identically.
-	local _now = _gettime()
+	local _now = M.clock_fn()
 	if line == _dedup.line and (_now - _dedup.time) < DEDUP_WINDOW_SEC then
 		_dedup.count = _dedup.count + 1
 		return false
@@ -863,6 +873,32 @@ function M.ring_buffer_clear()
 	_ring_buffer = {}
 	_ring_cursor = 0
 end
+
+--- Forgets the current suppression streak without emitting its summary.
+--- Mirrors the shared core, which is what this driver is being migrated onto.
+--- A streak carried across a reload would suppress the first line of the new
+--- session because it matched the last line of the old one — the least useful
+--- moment to lose a line.
+function M.reset_dedup()
+	_dedup.line        = nil
+	_dedup.count       = 0
+	_dedup.variant_key = nil
+	_dedup.time        = 0
+end
+
+--- Reports how many identical lines the open streak has swallowed so far.
+--- Exposed so a test can assert that suppression HAPPENED rather than infer it
+--- from an absence, which is the shape of a vacuous assertion.
+--- @return number
+function M.dedup_suppressed_count()
+	return _dedup.count
+end
+
+--- Clock used to measure the dedup window, in seconds.
+--- Replaceable so a test can drive the five-second window without sleeping for
+--- it: a window measured in seconds cannot otherwise be exercised by a suite
+--- that runs in milliseconds.
+M.clock_fn = _gettime
 
 
 

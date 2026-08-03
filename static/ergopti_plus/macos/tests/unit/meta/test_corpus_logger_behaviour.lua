@@ -325,3 +325,135 @@ helpers.describe("Logger behaviour corpus: this driver's default", function()
 			"the module's starting level must be the corpus's '" .. recorded .. "'")
 	end)
 end)
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 7/ Deduplication =====================
+-- ==============================================
+-- ==============================================
+
+helpers.describe("Logger behaviour corpus: dedup", function()
+	-- The clock is driven by the test, not by the wall: a window measured in
+	-- seconds cannot be exercised by a suite that runs in milliseconds, and
+	-- sleeping for it would add five seconds per case to every CI run.
+	local fake_now = 0
+
+	--- Runs one dedup case and reports what reached the sink.
+	--- @param messages table Array of message bodies to emit, in order.
+	--- @param variant string|nil Variant to emit them with (default "info").
+	--- @return table lines Every line the sink received.
+	local function run(messages, variant)
+		local lines = {}
+		local saved_clock = Logger.clock_fn
+		local saved_level = Logger.current_level
+		Logger.clock_fn = function() return fake_now end
+		Logger.reset_dedup()
+		Logger.ring_buffer_clear()
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line, v) lines[#lines + 1] = { line = line, variant = v } end)
+		for _, body in ipairs(messages) do
+			EMITTERS[variant or "info"]("corpus", body)
+		end
+		Logger.set_sink(nil)
+		Logger.clock_fn = saved_clock
+		Logger.set_level(saved_level)
+		return lines
+	end
+
+	--- True when a line is a suppression summary rather than a real message.
+	local function is_summary(line)
+		return tostring(line):find("identical", 1, true) ~= nil
+	end
+
+	for _, vector in ipairs(CORPUS.dedup.cases) do
+		helpers.it(vector.id, function()
+			local lines = run(vector.emit, vector.variant)
+
+			if vector.expect_delivered then
+				helpers.assert_eq(#lines, vector.expect_delivered,
+					vector.id .. ": " .. tostring(vector.expect_delivered) .. " line(s) must reach the sink")
+			end
+
+			if vector.expect_suppressed then
+				helpers.assert_eq(Logger.dedup_suppressed_count(), vector.expect_suppressed,
+					vector.id .. ": " .. tostring(vector.expect_suppressed) ..
+					" line(s) must have been suppressed — asserting the absence alone would pass " ..
+					"against a logger that dropped them for any other reason")
+			end
+
+			if vector.expect_summary then
+				local summaries = 0
+				for _, entry in ipairs(lines) do
+					if is_summary(entry.line) then
+						summaries = summaries + 1
+						helpers.assert_true(tostring(entry.line):find(tostring(vector.expect_summary_count), 1, true) ~= nil,
+							vector.id .. ": the summary must carry the suppressed count, got " .. tostring(entry.line))
+					end
+				end
+				helpers.assert_eq(summaries, 1, vector.id .. ": closing a streak must emit exactly one summary")
+			end
+
+			if vector.expect_summary_variant then
+				-- Seed a streak at the variant under test, then close it and read
+				-- the summary's variant back.
+				run({ "graine", "graine" }, vector.expect_summary_variant)
+				local closing = {}
+				Logger.set_sink(function(line, v) closing[#closing + 1] = { line = line, variant = v } end)
+				Logger.set_level("DEBUG")
+				EMITTERS[vector.expect_summary_variant]("corpus", "fermeture")
+				Logger.set_sink(nil)
+
+				local found = nil
+				for _, entry in ipairs(closing) do
+					if is_summary(entry.line) then found = entry end
+				end
+				helpers.assert_true(found ~= nil, vector.id .. ": closing the streak must emit a summary")
+				helpers.assert_true(tostring(found.line):find(vector.expect_summary_variant:upper(), 1, true) ~= nil,
+					vector.id .. ": the summary must carry the suppressed variant's label, or a swallowed " ..
+					"error storm never reaches the errors-only log — got " .. tostring(found.line))
+			end
+
+			if vector.expect_ring_entries then
+				helpers.assert_eq(#Logger.ring_buffer_snapshot(), vector.expect_ring_entries,
+					vector.id .. ": the ring feeds crash reports — a thousand copies of one line would " ..
+					"push out everything that explains it")
+			end
+
+			Logger.reset_dedup()
+			Logger.ring_buffer_clear()
+		end)
+	end
+
+	helpers.it("a streak that outlives the window re-surfaces", function()
+		-- De-BOUNCED, not permanently silenced. Without this the first occurrence
+		-- of a recurring line would be the only one ever logged, all session.
+		local lines = {}
+		local saved_clock = Logger.clock_fn
+		local saved_level = Logger.current_level
+		Logger.clock_fn = function() return fake_now end
+		Logger.reset_dedup()
+		Logger.ring_buffer_clear()
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+
+		Logger.info("corpus", "recurrente")
+		Logger.info("corpus", "recurrente")
+		fake_now = fake_now + CORPUS.dedup.window_seconds + 1
+		Logger.info("corpus", "recurrente")
+
+		Logger.set_sink(nil)
+		Logger.clock_fn = saved_clock
+		Logger.set_level(saved_level)
+
+		local real = 0
+		for _, line in ipairs(lines) do
+			if not is_summary(line) then real = real + 1 end
+		end
+		helpers.assert_eq(real, 2, "the line must re-surface once the window has passed")
+		Logger.reset_dedup()
+		Logger.ring_buffer_clear()
+	end)
+end)

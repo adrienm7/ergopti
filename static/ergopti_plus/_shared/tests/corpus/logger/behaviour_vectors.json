@@ -129,6 +129,63 @@
 		]
 	},
 
+	"dedup": {
+		"window_seconds": 5,
+		"_comment": "Both driver loggers suppress a line identical to the previous one inside a 5 s window, then close the streak with a \"N identical lines suppressed\" summary. The shared core did NOT — which meant adopting it would have removed flood suppression from a driver that had it, quietly, and the first anyone would know is a log file full of one line. Keyed on everything AFTER the timestamp: two emissions a second apart differ only there, so keying on the whole line would suppress nothing.",
+		"cases": [
+			{
+				"id": "identical_consecutive_is_suppressed",
+				"description": "The second of two identical lines does not reach the sink.",
+				"emit": ["a", "a"],
+				"expect_delivered": 1,
+				"expect_suppressed": 1
+			},
+			{
+				"id": "different_lines_both_pass",
+				"description": "Suppression is consecutive-only: two different messages are both kept.",
+				"emit": ["a", "b"],
+				"expect_delivered": 2,
+				"expect_suppressed": 0
+			},
+			{
+				"id": "streak_of_five",
+				"description": "One line plus four suppressed. A counter that reset per line would report 1.",
+				"emit": ["a", "a", "a", "a", "a"],
+				"expect_delivered": 1,
+				"expect_suppressed": 4
+			},
+			{
+				"id": "alternating_is_not_a_streak",
+				"description": "a,b,a is three distinct consecutive lines — suppression must not match against anything but the immediately preceding line.",
+				"emit": ["a", "b", "a"],
+				"expect_delivered": 3,
+				"expect_suppressed": 0
+			},
+			{
+				"id": "streak_closes_with_a_summary",
+				"description": "A new line after a streak emits the summary first, so the count is never lost. Delivered: a, the summary, then b.",
+				"emit": ["a", "a", "a", "b"],
+				"expect_delivered": 3,
+				"expect_summary": true,
+				"expect_summary_count": 2
+			},
+			{
+				"id": "summary_carries_the_suppressed_variant",
+				"description": "A swallowed error storm must still be reported at ERROR level, or the errors-only log misses it entirely.",
+				"emit": ["a", "a"],
+				"variant": "error",
+				"then_emit": ["b"],
+				"expect_summary_variant": "error"
+			},
+			{
+				"id": "ring_excludes_suppressed_lines",
+				"description": "The ring buffer feeds crash reports; a thousand copies of one line would push out everything that explains it.",
+				"emit": ["a", "a", "a"],
+				"expect_ring_entries": 1
+			}
+		]
+	},
+
 	"driver_defaults": {
 		"_comment": "The starting threshold is a POLICY, not a behaviour of the filter, so it is recorded per driver rather than asserted to be one value. Each driver's suite asserts its own row; a change to any of them is then a deliberate edit here and not a surprise in production. Spec § 4 states 10, which the shared core follows; the AutoHotkey driver deliberately starts at INFO to keep the log file quiet during normal use, and the macOS driver overrides its module default to DEBUG during boot.",
 		"shared_core": "debug",
