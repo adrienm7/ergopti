@@ -5,10 +5,19 @@
 # (modules/gestures.ahk) au démarrage pour construire la liste ordonnée
 # du picker et valider les noms d'actions.
 #
-# platform : "all" | "hs" | "ahk"
-#   "all" — disponible sur les deux plateformes
-#   "hs"  — macOS / Hammerspoon uniquement
-#   "ahk" — Windows / AutoHotkey uniquement
+# platform : "all" | "hs" | "ahk" | "linux" | une liste séparée par des virgules
+#   "all"     — disponible sur tous les drivers
+#   "hs"      — macOS / Hammerspoon uniquement
+#   "ahk"     — Windows / AutoHotkey uniquement
+#   "linux"   — Linux / kanata uniquement
+#   "hs,ahk"  — exactement ces drivers-là
+#
+# La forme liste a été ajoutée le 2026-08-03 parce que le champ ne savait pas
+# dire « deux drivers sur trois ». Les deux cycleurs de fenêtres existent sur
+# macOS et Windows et pas sur Linux : les déclarer "all" mettait deux lignes
+# mortes dans le picker Linux, et les déclarer "hs" ou "ahk" cachait la moitié
+# du travail. Aucune des deux réponses n'était vraie, donc c'est le champ qui
+# était faux.
 #
 # type : "sg" (action ponctuelle) | "ax" (axe continu)
 #
@@ -755,9 +764,6 @@ platform = "ahk"
 emit_ahk_key = "Delete"
 emit_ahk_mods = ["ctrl"]
 
-[sg_actions.alt_tab_monitor]
-platform = "ahk"
-
 [sg_actions.space]
 platform = "ahk"
 emit_ahk_key = "Space"
@@ -830,9 +836,20 @@ emit_hs_key = "f17"
 emit_hs_mods = ["alt"]
 
 [sg_actions.alt_tab_windows]
-platform = "hs"
+platform = "hs,ahk"
 emit_hs_key = "f17"
 emit_hs_mods = ["shift"]
+
+# Cycle limité à l'écran sous le curseur. Windows le fait depuis toujours
+# (AltTabMonitor), macOS ne cyclait que globalement : la même touche se
+# comportait différemment sur les deux plateformes sans que rien ne l'écrive.
+# Les deux comportements sont voulus, et chacun est maintenant assignable
+# partout. Ctrl+F17 est le quatrième et dernier accord F17 libre — les trois
+# autres portent déjà cycle_windows_in_app, alt_tab_windows et alt_tab_apps.
+[sg_actions.alt_tab_monitor]
+platform = "hs,ahk"
+emit_hs_key = "f17"
+emit_hs_mods = ["ctrl"]
 
 [sg_actions.cycle_windows_in_app]
 platform = "hs"
@@ -996,6 +1013,7 @@ items = [
     "app_window_previous",
     "alt_tab_apps",
     "alt_tab_windows",
+    "alt_tab_monitor",
     "cmd_shift_tab",
     "--",
     "##edition",
@@ -1136,7 +1154,6 @@ items = [
     "caps_word",
     "ctrl_backspace",
     "ctrl_delete",
-    "alt_tab_monitor",
     "space",
     "caps_lock",
     "layer_on",

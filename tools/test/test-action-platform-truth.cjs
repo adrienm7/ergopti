@@ -62,6 +62,19 @@ function declarations() {
 	return out;
 }
 
+/**
+ * True when a `platform` field claims a driver. The field is "all", one driver
+ * key, or a comma-separated list of them — the list form exists because it could
+ * not previously say "two drivers out of three".
+ * @param {string} platform The declared field.
+ * @param {string} driver The driver key to test.
+ * @returns {boolean}
+ */
+function claims(platform, driver) {
+	if (platform === 'all') return true;
+	return String(platform).split(',').map((s) => s.trim()).includes(driver);
+}
+
 const macSrc = fs.readFileSync(MAC_ACTIONS, 'utf8');
 const macSg = new Set([...macSrc.matchAll(/\bsg\(\s*"([\w.]+)"/g)].map((m) => m[1]));
 const macAx = new Set([...macSrc.matchAll(/\bax\(\s*"([\w.]+)"/g)].map((m) => m[1]));
@@ -89,7 +102,7 @@ if (macSg.size < 50) {
 
 for (const d of decls) {
 	const registered = d.kind === 'sg_actions' ? macSg.has(d.id) : macAx.has(d.id);
-	const claimsMac = d.platform === 'all' || d.platform === 'hs';
+	const claimsMac = claims(d.platform, 'hs');
 
 	if (claimsMac && !registered) {
 		errors.push(
@@ -111,7 +124,7 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-const macClaims = decls.filter((d) => d.platform === 'all' || d.platform === 'hs').length;
+const macClaims = decls.filter((d) => claims(d.platform, 'hs')).length;
 console.log(
 	`\x1b[32m[OK] ${decls.length} action declaration(s); the ${macClaims} that claim macOS all have a ` +
 		`handler, and no macOS handler is hidden by its declaration.\x1b[0m`

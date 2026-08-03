@@ -207,6 +207,9 @@ global GESTURE_ACTIONS := Map(
 		"alt_tab_monitor", {
 				Fn: (*) => AltTabMonitor(),
 		},
+		"alt_tab_windows", {
+				Fn: (*) => AltTabAll(),
+		},
 		"caps_lock", {
 				Fn: (*) => ToggleCapsLock(),
 		},
@@ -740,6 +743,22 @@ global GESTURE_AX_NAMES := []
 global GESTURE_ACTION_PARAMETER_SPECS := Map()
 global GestureActionParameters := Map()
 
+; True when a catalogue `platform` field claims this driver.
+;
+; The field is "all", one driver key, or a comma-separated list of them. The
+; list form exists because the field could not previously say "two drivers out
+; of three": the two window cyclers ship on Windows and macOS and not on Linux,
+; and both single-value answers were false — "all" put dead rows in the Linux
+; picker, "ahk" or "hs" hid half the feature.
+_GestureActionClaimsThisPlatform(Platform) {
+		if (Platform = "" || Platform = "all")
+				return true
+		for _, Key in StrSplit(Platform, ",", " `t")
+				if (Key = "ahk")
+						return true
+		return false
+}
+
 ; Populate GESTURE_ACTION_NAMES / GESTURE_AX_NAMES by parsing the shared
 ; cross-platform action registry (actions.toml). These lists are only needed
 ; when the gesture-picker menu is built — which happens in the deferred
@@ -784,7 +803,7 @@ _GestureLoadActionCatalog(*) {
 								if _Toml[_SecKey].Has("parameter")
 										GESTURE_ACTION_PARAMETER_SPECS[_Item] := _Toml[_SecKey]["parameter"]
 								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if (_Plat = "all" || _Plat = "ahk")
+								if _GestureActionClaimsThisPlatform(_Plat)
 										GESTURE_ACTION_NAMES.Push(_Item)
 						} else if GESTURE_ACTIONS.Has(_Item) {
 								; Action exists in registry but not in shared TOML — include it
@@ -799,7 +818,7 @@ _GestureLoadActionCatalog(*) {
 						_SecKey := "ax_actions." . _Item
 						if _Toml.Has(_SecKey) {
 								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if (_Plat = "all" || _Plat = "ahk")
+								if _GestureActionClaimsThisPlatform(_Plat)
 										GESTURE_AX_NAMES.Push(_Item)
 						}
 				}

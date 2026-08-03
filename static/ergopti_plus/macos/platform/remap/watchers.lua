@@ -33,6 +33,8 @@ local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local KeyState       = require("adapters.key_state")
+local MouseControl   = require("adapters.mouse_control")
+local Registrar      = require("adapters.hotkey_registrar")
 local KePaths        = require("platform.remap.ke_paths")
 
 
@@ -43,6 +45,7 @@ local LOG = "karabiner"
 local KEYCODE_F17_NAME = Keycodes.to_name(Keycodes.F17_CYCLE_WINDOWS)
 local MOD_SHIFT = "shift"
 local MOD_ALT = "alt"
+local MOD_CTRL = "ctrl"
 
 local KARABINER_CLI = KePaths.CLI
 
@@ -560,8 +563,16 @@ local function ensure_app_switch_watcher()
 	end
 end
 
---- Focuses the globally previous standard window (MRU-2).
-local function focus_previous_window_global()
+--- Focuses the most recently used standard window, optionally restricted to one
+--- screen.
+---
+--- `screen_id` restricts candidates, or nil for no constraint. The two public
+--- cyclers differ only in that argument: one implementation means a window state
+--- that has to be excluded — minimised, non-standard — is excluded from both,
+--- which is not true of two functions that merely look alike.
+--- @param screen_id number|nil Restrict candidates to windows on this screen.
+--- @return boolean True when a window was focused.
+local function focus_previous_window(screen_id)
 	local wins = hs.window.orderedWindows()
 	if type(wins) ~= "table" or #wins <= 1 then return false end
 
@@ -572,12 +583,42 @@ local function focus_previous_window_global()
 		local wid = w and w:id() or nil
 		if wid and (not focused_id or wid ~= focused_id)
 			and w:isStandard() and not w:isMinimized() then
-			w:focus()
-			return true
+			local on_screen = true
+			if screen_id then
+				local w_screen = w:screen()
+				on_screen = w_screen ~= nil and w_screen:id() == screen_id
+			end
+			if on_screen then
+				w:focus()
+				return true
+			end
 		end
 	end
 
 	return false
+end
+
+--- Focuses the globally previous standard window (MRU-2), any screen.
+local function focus_previous_window_global()
+	return focus_previous_window(nil)
+end
+
+--- Focuses the previous standard window on the display under the cursor.
+--- The Windows driver has cycled per-monitor since it was written; macOS only
+--- cycled globally, so on a multi-screen desk the same gesture behaved
+--- differently on the two platforms with nothing recording the difference. Both
+--- behaviours are wanted — this is the missing half, not a replacement.
+local function focus_previous_window_on_screen()
+	local screen_id = MouseControl.screen_id_under_cursor()
+	if not screen_id then
+		-- The cursor is on no screen — a real state during a display change.
+		-- Falling back to the global cycle would be worse than doing nothing:
+		-- the user asked for THIS screen, and silently focusing a window on
+		-- another one is a switch they then have to undo.
+		Logger.debug(LOG, "Per-screen window cycle: the cursor is on no screen — nothing to cycle.")
+		return false
+	end
+	return focus_previous_window(screen_id)
 end
 
 --- Focuses the previously active application directly (no macOS switcher overlay).
@@ -613,44 +654,59 @@ end
 --- unreliable on AZERTY and other non-US keyboard layouts.
 --- F17 is used here because F13/F14/F15 are reserved as script-control
 --- sentinels and F16 carries the LLM-chain signal in this codebase.
---- @return hs.hotkey The enabled hotkey instance.
+--- Binds one F17 chord through the hotkey adapter.
+---
+--- The four bindings used to call hs.hotkey.new directly. Routing them through
+--- adapters/hotkey_registrar keeps this module free of the Hammerspoon hotkey
+--- API — the same reason keyboard_shortcuts.lua was moved onto it — and gives
+--- all four one place where a chord the OS refuses is reported.
+--- @param chord string Canonical chord, e.g. "Ctrl+F17".
+--- @param label string What the binding is, for the log lines.
+--- @param action function Zero-arity behaviour to run on press.
+--- @return string|nil handle Registrar handle, or nil when the OS refused it.
+local function bind_f17(chord, label, action)
+	Logger.trace(LOG, "Registering %s hotkey (%s)…", label, chord)
+	local handle = Registrar.bind(chord, function()
+		local ok, err = pcall(action)
+		if not ok then
+			Logger.warn(LOG, "%s callback failed: %s", chord, tostring(err))
+		end
+	end)
+	if not handle then
+		Logger.error(LOG, "%s could not be bound — the %s action is unreachable from a key.", chord, label)
+		return nil
+	end
+	Logger.done(LOG, "%s hotkey registered.", label)
+	return handle
+end
+
+--- @return string|nil Registrar handle for the bare F17 binding.
 function M.start_cycle_windows_hotkey()
-	Logger.trace(LOG, "Registering cycle-windows hotkey (F17)…")
-	local hotkey = hs.hotkey.new({}, KEYCODE_F17_NAME, function() pcall(cycle_windows_in_app) end)
-	hotkey:enable()
-	Logger.done(LOG, "Cycle-windows hotkey registered.")
-	return hotkey
+	return bind_f17(KEYCODE_F17_NAME, "cycle-windows", cycle_windows_in_app)
 end
 
 --- Registers Shift+F17 as "global previous window".
---- @return hs.hotkey
+--- @return string|nil Registrar handle.
 function M.start_alt_tab_windows_hotkey()
-	Logger.trace(LOG, "Registering Alt+Tab windows hotkey (Shift+F17)…")
-	local hotkey = hs.hotkey.new({ MOD_SHIFT }, KEYCODE_F17_NAME, function()
-		local ok = pcall(focus_previous_window_global)
-		if not ok then
-			Logger.warn(LOG, "Shift+F17 callback failed while focusing previous window.")
-		end
-	end)
-	hotkey:enable()
-	Logger.done(LOG, "Alt+Tab windows hotkey registered.")
-	return hotkey
+	return bind_f17(MOD_SHIFT .. "+" .. KEYCODE_F17_NAME, "Alt+Tab windows", focus_previous_window_global)
+end
+
+--- Registers Ctrl+F17 as "previous window on the display under the cursor".
+---
+--- The fourth F17 chord, and the last free one in the set the remap layer uses.
+--- Windows has cycled per-monitor since it was written and macOS only globally,
+--- so the same physical key behaved differently on the two platforms with
+--- nothing recording it. Both behaviours are now bindable on both.
+--- @return string|nil Registrar handle.
+function M.start_alt_tab_monitor_hotkey()
+	return bind_f17(MOD_CTRL .. "+" .. KEYCODE_F17_NAME, "per-screen window", focus_previous_window_on_screen)
 end
 
 --- Registers Option+F17 as "direct previous app".
---- @return hs.hotkey
+--- @return string|nil Registrar handle.
 function M.start_alt_tab_apps_hotkey()
 	ensure_app_switch_watcher()
-	Logger.trace(LOG, "Registering Alt+Tab apps hotkey (Option+F17)…")
-	local hotkey = hs.hotkey.new({ MOD_ALT }, KEYCODE_F17_NAME, function()
-		local ok, switched = pcall(focus_previous_app_direct)
-		if not ok or not switched then
-			Logger.warn(LOG, "Option+F17 could not focus previous app.")
-		end
-	end)
-	hotkey:enable()
-	Logger.done(LOG, "Alt+Tab apps hotkey registered.")
-	return hotkey
+	return bind_f17(MOD_ALT .. "+" .. KEYCODE_F17_NAME, "Alt+Tab apps", focus_previous_app_direct)
 end
 
 --- Stops the internal app-switch watcher used by Alt+Tab app-previous.

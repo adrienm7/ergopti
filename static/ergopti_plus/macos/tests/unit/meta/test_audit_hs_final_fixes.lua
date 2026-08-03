@@ -159,15 +159,34 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ===== 6c) karabiner/watchers.lua: F17 hotkey wrapped in pcall
 	-- =======================================================================
 
-	helpers.it("karabiner/watchers.lua F17 cycle-windows hotkey must use pcall wrapper", function()
+	helpers.it("karabiner/watchers.lua F17 hotkeys must use a pcall wrapper", function()
 		local src = read_src("local function read_current_layout_from_hitoolbox") -- platform/remap/watchers.lua
 		assert(src, "platform/remap/watchers.lua must be readable")
-		-- The other hotkeys (Shift+F17, Alt+F17) already wrap their callback in pcall.
-		-- The plain F17 hotkey must match for consistency.
+		-- This started as "the plain F17 hotkey must wrap its callback in pcall
+		-- like Shift+F17 and Alt+F17 already do" — three separately written
+		-- wrappers, and the one that was forgotten is what the audit found. The
+		-- four bindings now share bind_f17, so the wrapper is written once and a
+		-- fourth chord cannot arrive without it. The assertion follows it there,
+		-- and asserts the property that replaced the consistency it was policing.
 		assert(
-			src:find("pcall%(cycle_windows_in_app%)", 1, false),
-			"karabiner/watchers.lua: cycle_windows_in_app hotkey must call pcall(cycle_windows_in_app)"
+			src:find("local function bind_f17", 1, true),
+			"karabiner/watchers.lua: the F17 bindings must go through one bind_f17 helper — three "
+			.. "hand-written pcall wrappers is what let the third one be forgotten"
 		)
+		assert(
+			src:find("local ok, err = pcall%(action%)", 1, false),
+			"karabiner/watchers.lua: bind_f17 must pcall the action — an exception in a hotkey "
+			.. "callback is delivered to the Hammerspoon Console, never to the driver's log"
+		)
+		for _, starter in ipairs({
+			"start_cycle_windows_hotkey", "start_alt_tab_windows_hotkey",
+			"start_alt_tab_apps_hotkey", "start_alt_tab_monitor_hotkey",
+		}) do
+			local body = src:match("function M%." .. starter .. "%(%)(.-)\nend")
+			assert(body and body:find("bind_f17(", 1, true),
+				"karabiner/watchers.lua: " .. starter .. " must delegate to bind_f17 — a binding that "
+				.. "creates its own hotkey is the unguarded sibling this assertion exists to catch")
+		end
 	end)
 
 

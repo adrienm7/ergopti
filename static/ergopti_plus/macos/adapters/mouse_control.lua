@@ -99,4 +99,45 @@ function M.getMonitorBounds(n)
 	return type(result) == "table" and result or empty
 end
 
+--- Returns the id of the screen the cursor currently sits on.
+---
+--- An ID rather than an hs.screen so callers stay free of Hammerspoon types:
+--- comparing `window:screen():id()` against this number is all a per-screen
+--- window cycler needs, and it keeps the OS object inside the adapter.
+---
+--- `hs.mouse.getCurrentScreen()` is the direct answer but is not present in
+--- every Hammerspoon build the driver runs against, so the geometric fallback
+--- reproduces it from the cursor position — the same computation the Windows
+--- twin (GetMonitorFromPoint) performs.
+---
+--- @return number|nil Screen id, or nil when the cursor is on no screen.
+function M.screen_id_under_cursor()
+	local ok, result = pcall(function()
+		if type(hs.mouse.getCurrentScreen) == "function" then
+			local screen = hs.mouse.getCurrentScreen()
+			if screen then return screen:id() end
+		end
+
+		local pos = hs.mouse.absolutePosition()
+		if type(pos) ~= "table" then return nil end
+		local screens = hs.screen.allScreens()
+		if type(screens) ~= "table" then return nil end
+
+		for _, screen in ipairs(screens) do
+			local frame = screen:fullFrame()
+			if type(frame) == "table"
+				and pos.x >= frame.x and pos.x < frame.x + frame.w
+				and pos.y >= frame.y and pos.y < frame.y + frame.h then
+				return screen:id()
+			end
+		end
+		return nil
+	end)
+	if not ok then
+		Logger.error(LOG, "screen_id_under_cursor(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
 return M
