@@ -600,119 +600,27 @@ would report that migration, not a defect. It follows Lot 5 (2).
 
 ## 1. Tests that certify nothing
 
-The highest-leverage cluster, because a false green is worse than a missing
-test: it actively deters anyone from writing the real one.
+**Closed 2026-08-03. All six classes are at zero** and the baseline says so, so
+`find-false-greens.cjs` is now an assertion rather than a ratchet: tautology,
+vacuous-absence, dead-test, pcall-only, corpus-skip and unfloored-scan.
 
-`tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
-classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-03 at pcall-only **62**,
-unfloored-scan **4**, **the other four at 0**.
+The reasoning worth keeping is in [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md);
+what belongs here is only the operating rule, because the gate now defends a
+floor of zero and the next false green is the one someone is about to write:
 
-The work is burning those floors down. Each occurrence is either a real false
-green to fix or a justified shape to document in the test itself —
-`--update-baseline` after saying why. Use `--list` for file:line, `--pattern=<key>`
-to filter.
-
-**Where the real work is, measured rather than assumed:**
-
-- ~~**tautology (45)**~~ — **zero, 2026-08-02.** The whole class is gone. What it
-  taught, in four shapes:
-
-  Most were a **design claim written as a test** — "this module is pure, the pause
-  gate lives higher" — asserted with `assert_true(true)` and that sentence as the
-  message. The claim is true and worth holding; what it needed was to be checked.
-  Each became an assertion that the coupling is absent from the module's source,
-  or that the guard is the first statement of the keystroke path.
-
-  Several wrapped a **loop whose results were discarded** — 150 iterations over a
-  body reading `-- simulate`, 120 profile resolutions, 80 malformed UTF-8 chunks.
-  The loop is usually worth keeping; what it needs is to read its answers back.
-
-  Eight were a **conditional skip** guarding a module that ships with the driver
-  and is stubbed three lines above — `"menu_builder not available"`,
-  `"modules.llm could not load in this environment"`. The skip never fires, so it
-  buys nothing; if it ever did, six cases across three files would pass while the
-  thing they test failed to load.
-
-  One was an **absence helper over a possibly-empty list**, used by a PII test: a
-  capture that stopped recording would turn every "must not leak" case green
-  while inspecting nothing. Floor the input before asserting the absence.
-
-  ⚠ Four traps, all hit while doing this. `read_driver_source` needs a selector
-  unique to ONE production file (`function M.get_active_profile` is declared by
-  both `modules/llm/init.lua` and `modules/llm/profiles.lua`). `list_shortcuts()`
-  hands back LIVE state, so a stress loop that toggles a shortcut must restore it.
-  A substring check for `"paus"` fires on `sqlite_writer`'s `pause_before_ms`
-  COLUMN — a metric it is supposed to record — so match the state spellings
-  (`processing_paused`, `is_paused`, `script_control`, `suspend`). And reaching
-  for `pcall` to fix a tautology just trades it for a pcall-only.
-
-  ⚠ **One was blocked by the harness, not by the test.**
-  `test_actions_system.lua` said in a comment that it "cannot easily assert the
-  exact watch_types without deep introspection of the eventtap stub". The stub
-  was the problem: `hs.eventtap.new` discarded both arguments, and
-  `event.types` carried 5 of the 12 types the driver names. Because keep-awake
-  builds its watch list as a table constructor starting at `ev.scrollWheel`, a
-  missing type left a nil at index 1 and `ipairs` yielded NOTHING — the watcher
-  was created watching an empty set in every test run. When a test says it cannot
-  assert something, check whether the harness is what made it impossible.
-
-- **pcall-only: 203 → 62, and the recipe below is what did it.** 135 of the
-  original 203 were the ONLY assertion in their case; macOS 119, Linux 84, AHK
-  none — the AHK detector is `vacuous-absence`, already at zero.
-
-  They are one shape: `it("X does not crash", …)` around a `pcall`, so the case
-  certifies survival and nothing else. The fix is to assert **what the guard
-  did**. For the `require_state` family (`"start() before init is a safe no-op"`,
-  `"rejects a non-table core_state"`) that means calling a public function
-  afterwards and asserting it still returns the guard's sentinel: a module that
-  swallowed the bad input and initialised anyway passes "did not crash" and fails
-  everything after it.
-  ⚠ Where the call is expected NOT to raise, drop the pcall entirely: a raise
-  then fails the case with the real error instead of a boolean. Reserve `pcall`
-  for cases whose subject IS the raising — `test_utf8_offset_pcall.lua` is the
-  genuine one, and its helper's docstring already says so.
-
-  **What converting 141 of them found — the reason this class is worth the
-  effort.** A SQLite writer with no database must REFUSE, and refusal is a return
-  value the caller advances its watermark on: "did not crash" let a writer report
-  success against a closed database, which loses rows silently and for good. A
-  privacy detector answering `nil` satisfied "did not throw" and reads as falsy at
-  the caller — the fail-OPEN direction. A shell-runner completion callback's real
-  invariant is that it RELEASES the GC pin; a task left pinned is never collected
-  and the process holds its pipes for the session. An HTTP client left "active"
-  after a cancel refuses every later request as a duplicate. None of those was
-  visible through a pcall status.
-
-  **And one of them was a live cross-driver bug.** The Clipboard port declared
-  `save()` as `{string|null}`; macOS has never satisfied it — it returns the
-  `readAllData()` TABLE, so a non-text clipboard survives an injection, which
-  makes its `save()` behave like the Windows adapter's separate `save_all()`. The
-  vector that should have caught it was named `save_returns_string_or_null` and
-  asserted that `save()` did not throw. **The id stated the contract while the
-  body checked something else.** The snapshot is documented as opaque now.
-
-  ⚠ One conversion introduced `assert_true(X ~= nil or true)` — always true, a
-  tautology created while removing tautologies. Run the detector after every
-  batch, not at the end.
-- ~~**unfloored-scan (24): only a handful are genuine** — the rest already carry a
-  floor in a shape the detector does not recognise.~~ — **detector fixed, 24 → 4.**
-  Four blind spots closed: a Lua collector `t[#t+1] = v` (the regex required AHK
-  `:=`), an assertion wrapped across lines (the pattern forbade `\n`),
-  `assert_eq(#x, n)` in either argument order (a comma, not an operator), and a
-  scan whose subject came from `read_driver_source()` and is asserted `~= nil` —
-  which is not a null check but the statement "the selector matched a real file".
-  The four survivors are the honest ones. Two negative probes confirm the
-  recognisers do not over-clear, and a synthetic unfloored scan is still caught.
-
-Two shapes the detector **cannot** see, to hunt by hand:
-
-- a harness that stubs the very function the test claims to verify;
-- a source-grep pinning the current SPELLING of the code, not the invariant.
-  ~~`test_pause_checked_state.lua`~~ — **fixed**: it ANDed two spellings no single
-  line can carry, so the count was structurally 0. Worth knowing as a *shape*: an
-  AND across alternative spellings is a tautology the detector cannot see, and
-  this file had one. Grep the suites for `find(…) and …find(…)` on the same line.
+- **A pcall status is not a result.** Where the call is not expected to raise,
+  delete the pcall — a raise then fails with the real error instead of a boolean.
+  Where the containment IS the subject, capture the second return and assert it:
+  contained and swallowed are the same observation until you look at what came
+  back.
+- **Floor every scan.** A loop whose body asserts per item proves nothing over an
+  empty match. A boolean flag asserted afterwards is a floor too, and a stricter
+  one than a count.
+- **A conditional skip that never fires is worse than no skip**, because the day
+  it does fire it turns a broken module into a green suite.
+- Run the detector **after every batch**. One conversion in this campaign
+  introduced `assert_true(X ~= nil or true)` — a tautology created while
+  removing tautologies.
 
 ---
 

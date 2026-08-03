@@ -58,7 +58,8 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["adapters.text_sender"] = nil
 
-		helpers.assert_true(ok, "predict() must not crash building the prompt; got: " .. tostring(err))
+		helpers.assert_nil(err, "predict() must not crash building the prompt; got: " .. tostring(err))
+		helpers.assert_true(ok, "predict() must not crash building the prompt")
 		helpers.assert_true(chat_called, "predict() should reach ollama.chat after building the prompt")
 	end)
 end)

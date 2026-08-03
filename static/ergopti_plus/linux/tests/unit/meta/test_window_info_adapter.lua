@@ -106,14 +106,14 @@ helpers.describe("window_info adapter", function()
 
   helpers.describe("edge cases", function()
     helpers.it("getFocused and getAll composed do not crash", function()
-      local ok = pcall(function()
-        local focused = wi.getFocused()
-        local all = wi.getAll()
-        helpers.assert_eq(type(all), "table", "getAll must still answer a list after getFocused")
-        helpers.assert_true(focused == nil or type(focused) == "table",
-          "and getFocused must answer nil or a table, never a half-value")
-      end)
-      helpers.assert_true(ok, "composed calls do not crash")
+      -- The pcall was wrapping the ASSERTIONS, so a failing assertion inside it was
+      -- caught and rethrown as a bare "composed calls do not crash" — the diagnostic
+      -- named the wrapper instead of the check that failed. Called directly.
+      local focused = wi.getFocused()
+      local all = wi.getAll()
+      helpers.assert_eq(type(all), "table", "getAll must still answer a list after getFocused")
+      helpers.assert_true(focused == nil or type(focused) == "table",
+        "and getFocused must answer nil or a table, never a half-value")
     end)
   end)
 

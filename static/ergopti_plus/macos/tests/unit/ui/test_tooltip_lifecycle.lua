@@ -86,10 +86,13 @@ helpers.describe("tooltip: hide_stacked called on LLM transitions (E1)", functio
 		local renderer_stub = {
 			hide_stacked = function() error("canvas unavailable") end,
 		}
-		local ok = pcall(function()
-			pcall(renderer_stub.hide_stacked)
-		end)
-		helpers.assert_eq(ok, true)
+		-- A pcall around a pcall could only ever be true, whatever the inner call
+		-- did — the case asserted the outer wrapper, not the renderer. What it means
+		-- to say is that the INNER guard absorbed the throw and reported it.
+		local inner_ok, inner_err = pcall(renderer_stub.hide_stacked)
+		helpers.assert_eq(inner_ok, false, "the stubbed renderer is supposed to throw")
+		helpers.assert_true(tostring(inner_err):find("canvas unavailable", 1, true) ~= nil,
+			"and the caller must receive the reason, not a bare false: " .. tostring(inner_err))
 	end)
 end)
 

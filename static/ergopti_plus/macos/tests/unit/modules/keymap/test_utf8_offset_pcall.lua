@@ -570,8 +570,8 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8_TRUNCATED
 		local ok, err = pcall(bridge.update_preview, BAD_UTF8_TRUNCATED)
-		helpers.assert_true(ok,
-			"update_preview must not raise on truncated lead byte: " .. tostring(err))
+		helpers.assert_nil(err, "update_preview must not raise on a truncated lead byte: " .. tostring(err))
+		helpers.assert_true(ok, "update_preview must not raise on a truncated lead byte")
 		helpers.assert_eq(state.buffer, BAD_UTF8_TRUNCATED, "and must leave the buffer alone")
 	end)
 
@@ -580,8 +580,8 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		local buf = "bonjour" .. BAD_UTF8
 		state.buffer = buf
 		local ok, err = pcall(bridge.update_preview, buf)
-		helpers.assert_true(ok,
-			"update_preview must not raise on valid + bad UTF-8: " .. tostring(err))
+		helpers.assert_nil(err, "update_preview must not raise on valid + bad UTF-8: " .. tostring(err))
+		helpers.assert_true(ok, "update_preview must not raise on valid + bad UTF-8")
 		helpers.assert_eq(state.buffer, buf,
 			"and the valid prefix must not be truncated by the failed read")
 	end)
