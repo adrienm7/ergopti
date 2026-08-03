@@ -13,6 +13,25 @@ to make a change pass, and run the gates that cover what you touched —
 
 **Delete an entry the moment it is done. When this file is empty, delete it.**
 
+> ## What actually blocks this list
+>
+> Measured 2026-08-03, and it is one dependency, not six. **Three of the six
+> sections below are gated by the same thing: user-facing strings in 21 locales
+> that only a human can supply.**
+>
+> - **§1** needs 756 of them (36 actions × 21). The gate is an assertion, and
+>   123 of the 125 existing action labels are genuinely translated.
+> - **§5 `reason_key`** needs ~3 000 (142 restrictions × 21).
+> - **§5 Convention S stubs** need a `REASON_KEY` per unimplemented folder —
+>   the same shape, hitting the same wall, which is why its "blocked on the
+>   reader" note undersells it.
+>
+> Every one of those gates says the same thing in its own words: machine-filling
+> the strings puts unverifiable text in front of users in nineteen languages,
+> which is worse than the silence or the raw identifier it replaces. **This is a
+> translator's queue, not an engineering backlog.** Splitting it out is what makes
+> the remaining three sections — §2, §3, §4 — legible as the code work they are.
+>
 > **Reading the performance numbers is no longer an entry here.** The
 > instrumentation is complete — 20 HotPath segments and 5 pre-logger boot stamps,
 > inventoried by `test-hotpath-segments-declared.cjs`. What was left is not work
