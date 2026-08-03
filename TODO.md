@@ -396,10 +396,21 @@ Constraints: **paths before moves, moves before content, data before code.**
   new structure, not retired;
   (4) merge
   `macos/platform/remap/data/actions.json` (73 actions, hardcoded French, no
-  i18n keys) into the one registry, `holdable` becoming a per-action flag —
-  **18 of the 73 already have `sg_actions.*` keys in all 21 languages, 55 do
-  not**, and the merge must come before the translations or ~1 700 strings get
-  keyed to ids that are about to change; ~~(5) the host→page push for the Linux
+  i18n keys) into the one registry, `holdable` becoming a per-action flag.
+  **Re-measured 2026-08-03 and the overlap is exact:** 18 of the 73 are already
+  ROWS of `actions.toml` and carry `sg_actions.*` in all 21 languages; the other
+  55 are in neither. Zero have a locale key without a registry row, so the two
+  sets line up perfectly and the merge target is precisely those 55 rows.
+  **The duplication those 18 caused is fixed:** the JSON carried a second,
+  hardcoded French label for an action whose translated label already existed, so
+  the remap picker showed French to every user while the gesture picker — listing
+  the same action — showed their own language. `localise_action_labels` in
+  `platform/remap/config.lua` now prefers the registry label and honours the
+  unresolved-key sentinel, so the 55 keep theirs. Regression test proved red
+  before the fix.
+  What remains is the merge itself: 55 rows into `actions.toml`, then the
+  translations — in that order, or ~1 155 strings get keyed to ids that are about
+  to change; ~~(5) the host→page push for the Linux
   `action_picker`~~ — **done.** `webview_manager.eval_js(app, js)` is the channel,
   addressed by app name so a handler never holds a webview past its window's
   life. Worth reusing: it is the only host→page direction on Linux, and any other
