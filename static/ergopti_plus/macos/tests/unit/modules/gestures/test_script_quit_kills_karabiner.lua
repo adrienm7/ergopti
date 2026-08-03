@@ -39,14 +39,15 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		os.exit = function() error("os.exit must not run during the test") end
 		_G.hs.timer.doAfter = function(_delay, _fn) exit_scheduled = true end  -- record, never fire
 
-		local ok = pcall(Actions.execute_single, "script_quit")
+		local ok, err = pcall(Actions.execute_single, "script_quit")
 
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_doAfter
 		package.loaded["platform.remap"] = nil
 
 		helpers.assert_true(ok, "executing script_quit must not raise: " .. tostring(err))
-		helpers.assert_nil(err, "and must report no error")
+		helpers.assert_true(err ~= nil,
+			"and must still answer its caller — execute_single reports whether it dispatched")
 		helpers.assert_eq(killed.count, 1)  -- remap bridge torn down exactly once
 		helpers.assert_true(exit_scheduled, "the quit must still schedule the process exit afterwards")
 	end)
@@ -71,7 +72,7 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		os.exit = function() error("os.exit must not run during the test") end
 		_G.hs.timer.doAfter = function(_delay, _fn) end  -- record-never-fire
 
-		local ok = pcall(Actions.execute_single, "script_quit")
+		local ok, err = pcall(Actions.execute_single, "script_quit")
 
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_doAfter
@@ -79,7 +80,8 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		package.loaded["ui.menu.menu_llm"] = nil
 
 		helpers.assert_true(ok, "executing script_quit must not raise: " .. tostring(err))
-		helpers.assert_nil(err, "and must report no error")
+		helpers.assert_true(err ~= nil,
+			"and must still answer its caller — execute_single reports whether it dispatched")
 		helpers.assert_eq(mlx_stopped, 1, "script_quit must stop the MLX server (os.exit bypasses the shutdown callback)")
 		helpers.assert_eq(helpers_killed, 1, "script_quit must terminate the orphan helper processes")
 		helpers.assert_eq(orphan_killed, 1, "script_quit must reap the detached mlx_lm.server (pgrep/lsof sweep) — F-M7")

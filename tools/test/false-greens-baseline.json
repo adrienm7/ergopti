@@ -2,7 +2,7 @@
 	"tautology": 0,
 	"vacuous-absence": 0,
 	"dead-test": 0,
-	"pcall-only": 50,
+	"pcall-only": 41,
 	"corpus-skip": 0,
 	"unfloored-scan": 4
 }

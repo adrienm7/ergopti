@@ -114,7 +114,8 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 			state.magic_key = key
 			Registry.init(state)
 
-			local ok = pcall(Registry.add, "sig★", "Best regards", {})
+			local ok, add_err = pcall(Registry.add, "sig★", "Best regards", {})
+			helpers.assert_nil(add_err, "and must report none: " .. tostring(add_err))
 			helpers.assert_true(ok,
 				"Registry.add must not raise for magic key '" .. key .. "'")
 		end
