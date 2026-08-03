@@ -164,9 +164,33 @@ seven as class statics, the macOS aggregator all eight, and every value must
 agree. The six AHK constants filled at boot from the timing registry are
 deliberately excluded and gated elsewhere.
 
-**What remains is the walkers themselves.** Write the behaviour corpus first, as
-with the logger: the function-name mapping is 1:1, so the corpus can be derived
-from one walker's cases and replayed against both.
+⚠ **Re-measured 2026-08-03, and both halves of this entry were wrong.**
+
+**The corpus already exists.** `_shared/tests/corpus/keylogger/aggregation_vectors.json`
+holds 13 vectors and is ALREADY replayed by both suites —
+`macos/tests/unit/meta/test_corpus_keylogger_aggregation.lua` (506 lines) and
+`windows/tests/meta/test_corpus_keylogger_aggregation.ahk` (332 lines). "Write the
+behaviour corpus first" is done, exactly as §2's stated prerequisite turned out to
+be already built. What it may need is *extending*, not creating.
+
+**And there is no "1 330-line walker" on either side.** Both are already split
+into four modules that pair by name:
+
+| | macOS | Windows |
+| --- | --- | --- |
+| `core` | 254 | 301 |
+| `events` | 470 | 573 |
+| `sql` | 382 | 287 |
+| facade / state | 68 + 22 | 27 |
+
+So this is not one big migration but **three matched pairs**, and they are not
+equally shareable. `sql` almost certainly is not: the two speak to different
+SQLite bindings. The genuinely shared surface is **`core` + `events`** — roughly
+724 lines against 874.
+
+**Start with `core`.** It is the smallest pair, the corpus already covers its
+territory, and proving the pattern there is what makes `events` a repeat rather
+than a second unknown.
 
 ---
 
