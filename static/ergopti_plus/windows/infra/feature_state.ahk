@@ -102,11 +102,6 @@ global KEYBOARD_SHORTCUT_DEFAULTS := Map(
 		"ctrl_b", "microsoft_bold",
 		"ctrl_shift_v", "paste_plain",
 )
-; AHK send-key codes for each slot — must match GESTURE_ACTIONS Fn lambdas.
-; Slots not listed here are generated dynamically from their suffix.
-global KEYBOARD_SHORTCUT_SEND_CODES := Map(
-		"ctrl_shift_v", "^+v",
-)
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in

@@ -625,6 +625,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; shared cross-driver vectors.
 #Include ../_generated/prompt_builder.ahk
 #Include meta/test_corpus_prompt_builder.ahk
+; Chord notation corpus -- runs the shared _shared/lua/chord/vectors.json against
+; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
+#Include ../infra/chord.ahk
+#Include ../adapters/hotkey_registrar.ahk
+#Include meta/test_chord_notation.ahk
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
 #Include meta/test_corpus_toml_fuzz.ahk

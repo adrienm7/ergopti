@@ -228,6 +228,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
 
+; The chord notation the HotkeyRegistrar adapter parses with, loaded before the
+; adapters block that consumes it
+#Include infra/chord.ahk
+
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
@@ -236,6 +240,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/timer_scheduler.ahk
 #Include adapters/file_system.ahk
 #Include adapters/window_info.ahk
+#Include adapters/hotkey_registrar.ahk
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
@@ -766,18 +771,21 @@ _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 		if (_KbAction == "none")
 				continue
-		_KbSend := _KeyboardSlotSendCode(_KbSlot)
-		if (_KbSend == "") {
-				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — send code not found.", _KbSlot)
+		_KbChord := _KeyboardSlotChord(_KbSlot)
+		if (_KbChord == "") {
+				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", _KbSlot)
 				continue
 		}
-		try {
-				Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
-				_KbBoundCount++
-		} catch as _KbErr {
-				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}': {2}.", _KbSlot, _KbErr.Message)
+		; The registrar owns the OS call and reports refusal by returning "", so the
+		; try/catch that used to wrap Hotkey() here would now only ever catch our own
+		; bugs — which must surface, not be logged as a skipped shortcut
+		_KbHandle := HotkeyRegistrarBind(_KbChord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+		if (_KbHandle == "") {
+				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", _KbSlot, _KbChord)
+				continue
 		}
+		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
+		_KbBoundCount++
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 

@@ -697,26 +697,39 @@ BuildScriptShortcutsMenu() {
 		return SMenu
 }
 
-_KeyboardSlotSendCode(SlotId) {
-		global KEYBOARD_SHORTCUT_SEND_CODES
-		if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId)
-				return KEYBOARD_SHORTCUT_SEND_CODES[SlotId]
+/**
+ * Resolves a keyboard-shortcut slot id to a canonical chord string.
+ *
+ * The slot id is our own vocabulary ("ctrl_shift_v", "win_sc029"); the chord is
+ * the cross-driver one. Everything AutoHotkey-specific — that Ctrl is "^", that
+ * Space is "{Space}" — now lives in the HotkeyRegistrar adapter, which is the
+ * only layer allowed to know it. This function previously emitted a native
+ * AutoHotkey spec directly, which is why the macOS driver had to reimplement the
+ * same slot grammar from scratch.
+ * @param {String} SlotId e.g. "ctrl_shift_v", "win_e", "alt_space".
+ * @returns {String} The canonical chord, or "" when the slot names no modifier.
+ */
+_KeyboardSlotChord(SlotId) {
 		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				ModifierPrefix := "^+"
+				Mods := ["ctrl", "shift"]
 		else if SubStr(SlotId, 1, 4) = "ctrl"
-				ModifierPrefix := "^"
+				Mods := ["ctrl"]
 		else if SubStr(SlotId, 1, 3) = "win"
-				ModifierPrefix := "#"
+				Mods := ["cmd"]
 		else if SubStr(SlotId, 1, 3) = "alt"
-				ModifierPrefix := "!"
+				Mods := ["alt"]
 		else
 				return ""
 		if SubStr(SlotId, 1, 10) = "ctrl_shift"
 				Suffix := SubStr(SlotId, 12)
 		else
 				Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
-		static _SpecialMap := Map("space", "{Space}", "enter", "{Enter}", "period", ".", "comma", ",", "sc029", "SC029")
-		return _SpecialMap.Has(Suffix) ? ModifierPrefix . _SpecialMap[Suffix] : ModifierPrefix . Suffix
+		; Slot-id spellings for keys whose canonical name is a character. The
+		; brace-wrapped AutoHotkey forms that used to live here moved to the adapter
+		static _SlotKeyNames := Map("period", ".", "comma", ",", "enter", "return")
+		Key := _SlotKeyNames.Has(Suffix) ? _SlotKeyNames[Suffix] : Suffix
+		Formatted := ChordFormat(Mods, Key)
+		return Formatted["ok"] ? Formatted["label"] : ""
 }
 
 ReadKeyboardShortcutsConfig() {

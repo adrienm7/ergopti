@@ -1,0 +1,43 @@
+{
+	"schema_version": 1,
+	"description": "Cross-driver chord-notation corpus. Both the shared Lua core (_shared/lua/chord/init.lua) and the AutoHotkey twin (windows/infra/chord.ahk) are run against these vectors by their own suites, which is what makes 'one notation' a fact rather than an intention. A chord that parses differently on two drivers means the same config file produces two different bindings.",
+	"canonicalize": [
+		{ "id": "already_canonical", "input": "Ctrl+Shift+S", "expect": "Ctrl+Shift+S" },
+		{ "id": "lowercase_input", "input": "ctrl+shift+s", "expect": "Ctrl+Shift+S" },
+		{ "id": "uppercase_input", "input": "CTRL+SHIFT+S", "expect": "Ctrl+Shift+S" },
+		{ "id": "modifier_order_normalised", "input": "shift+ctrl+s", "expect": "Ctrl+Shift+S" },
+		{ "id": "full_modifier_order", "input": "fn+shift+alt+ctrl+cmd+k", "expect": "Cmd+Ctrl+Alt+Shift+Fn+K" },
+		{ "id": "alias_command", "input": "command+c", "expect": "Cmd+C" },
+		{ "id": "alias_win", "input": "win+e", "expect": "Cmd+E" },
+		{ "id": "alias_super", "input": "super+e", "expect": "Cmd+E" },
+		{ "id": "alias_meta", "input": "meta+e", "expect": "Cmd+E" },
+		{ "id": "alias_control", "input": "control+t", "expect": "Ctrl+T" },
+		{ "id": "alias_option", "input": "option+t", "expect": "Alt+T" },
+		{ "id": "alias_opt", "input": "opt+t", "expect": "Alt+T" },
+		{ "id": "no_modifier", "input": "f13", "expect": "F13" },
+		{ "id": "named_key_titlecased", "input": "ctrl+space", "expect": "Ctrl+Space" },
+		{ "id": "named_key_uppercase_input", "input": "CMD+RETURN", "expect": "Cmd+Return" },
+		{ "id": "whitespace_tolerated", "input": " ctrl + shift + s ", "expect": "Ctrl+Shift+S" },
+		{ "id": "duplicate_modifier_collapses", "input": "ctrl+ctrl+s", "expect": "Ctrl+S" },
+		{ "id": "alias_duplicate_collapses", "input": "cmd+win+s", "expect": "Cmd+S" },
+		{ "id": "digit_key", "input": "alt+1", "expect": "Alt+1" },
+		{ "id": "punctuation_key", "input": "ctrl+,", "expect": "Ctrl+," }
+	],
+	"rejects": [
+		{ "id": "empty_string", "input": "" },
+		{ "id": "separator_only", "input": "+" },
+		{ "id": "trailing_modifier", "input": "Ctrl+Shift" },
+		{ "id": "bare_modifier", "input": "ctrl" },
+		{ "id": "unknown_modifier", "input": "hyper+s" },
+		{ "id": "unknown_modifier_among_valid", "input": "ctrl+hyper+s" }
+	],
+	"equals": [
+		{ "id": "order_insensitive", "a": "ctrl+shift+s", "b": "Shift+Ctrl+S", "expect": true },
+		{ "id": "alias_insensitive", "a": "win+e", "b": "Cmd+E", "expect": true },
+		{ "id": "case_insensitive_key", "a": "ctrl+S", "b": "CTRL+s", "expect": true },
+		{ "id": "different_key", "a": "ctrl+s", "b": "ctrl+t", "expect": false },
+		{ "id": "different_modifiers", "a": "ctrl+s", "b": "alt+s", "expect": false },
+		{ "id": "extra_modifier", "a": "ctrl+s", "b": "ctrl+shift+s", "expect": false },
+		{ "id": "invalid_is_never_equal", "a": "ctrl+", "b": "ctrl+", "expect": false }
+	]
+}

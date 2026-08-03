@@ -17,6 +17,7 @@ graph TD
         P_Crypto["Crypto"]
         P_FileSystem["FileSystem"]
         P_GraphicsRenderer["GraphicsRenderer"]
+        P_HotkeyRegistrar["HotkeyRegistrar"]
         P_HttpClient["HttpClient"]
         P_KeyState["KeyState"]
         P_KeyboardHook["KeyboardHook"]
@@ -58,6 +59,7 @@ graph TD
         MACOS_event_tap_guard["EventTapGuard.lua"]
         MACOS_file_system["FileSystem.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
+        MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
         MACOS_http_client["HttpClient.lua"]
         MACOS_json_codec["JsonCodec.lua"]
         MACOS_key_state["KeyState.lua"]
@@ -84,6 +86,7 @@ graph TD
         WINDOWS_crypto["Crypto.ahk"]
         WINDOWS_file_system["FileSystem.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
+        WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
         WINDOWS_http_client["HttpClient.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
@@ -129,6 +132,7 @@ graph TD
     P_Crypto -->|implements| MACOS_crypto
     P_FileSystem -->|implements| MACOS_file_system
     P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
+    P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
     P_HttpClient -->|implements| MACOS_http_client
     P_KeyState -->|implements| MACOS_key_state
     P_KeyboardHook -->|implements| MACOS_keyboard_hook
@@ -151,6 +155,7 @@ graph TD
     P_Crypto -->|implements| WINDOWS_crypto
     P_FileSystem -->|implements| WINDOWS_file_system
     P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
+    P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
     P_HttpClient -->|implements| WINDOWS_http_client
     P_KeyState -->|implements| WINDOWS_key_state
     P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
