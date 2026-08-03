@@ -63,6 +63,7 @@
 		"test:keyboard-slot-surface": "node ./tools/test/test-keyboard-slot-surface-is-live.cjs",
 		"test:chord-native-mapping": "node ./tools/test/test-chord-native-mapping-single-source.cjs",
 		"test:tap-hold-namespaces": "node ./tools/test/test-tap-hold-namespace-correspondence.cjs",
+		"test:npm-aliases": "node ./tools/test/test-npm-aliases-match-the-suite.cjs",
 		"test:hotstring-flags": "node ./tools/test/test-hotstring-flag-support-per-driver.cjs",
 		"test:boot-smoke": "node ./tools/test/test-feature-state-boot-smoke.cjs",
 		"test:vector-traceability": "node ./tools/test/test-port-vector-traceability.cjs",
