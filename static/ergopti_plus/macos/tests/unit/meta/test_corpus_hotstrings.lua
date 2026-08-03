@@ -258,6 +258,27 @@ seq_counter             = 0,
 				-- would pin the other driver's number to this one.
 				if v.driver_specific ~= nil then
 					skipped = skipped + 1
+				elseif v.auto_expand ~= true then
+					-- The non-star case, and it must NOT go through would_fire. That is a
+					-- pure buffer-tail predicate: it never reads the flag, so replaying a
+					-- non-star vector through it asserts something the function was never
+					-- deciding. The flag is honoured one level up, in try_auto_expand —
+					-- which is exactly where macOS turned out to have no gate at all, so a
+					-- non-star trigger expanded the moment it was complete and rewrote the
+					-- user's word as they typed it.
+					local state = register_vector(v)
+					local Expander = helpers.load_with_stubs("modules.keymap.expander")
+					local Registry = helpers.load_with_stubs("modules.keymap.registry")
+					Expander.init(state, Registry, {})
+					state.buffer = v.buffer or v.trigger
+					state.start_is_word_boundary = true
+					local fired = false
+					for _, m in ipairs(state.mappings) do
+						if Expander.try_auto_expand(m, 1, false) then fired = true ; break end
+					end
+					helpers.assert_eq((v.expected and v.expected.matched == true), fired,
+						"vector '" .. v.id .. "': the auto path disagrees with the corpus")
+					checked = checked + 1
 				elseif v.auto_expand == true then
 					local state = register_vector(v)
 					-- would_fire consults the expander's OWN state for
