@@ -270,7 +270,16 @@ not the repository. Measured 2026-08-03 on `dev`:
 - **B9 — almost certainly fixed.** `context_window` appears 4 times in the
   Windows AutoHotkey tree; the blocker's own reproduction was `grep -c
   context_window windows/**/*.ahk` → 0.
-- **B10** — not re-checked.
+- **B10 — fixed.** `macos/.../prediction_engine.lua:171` reads
+  `LLM_DEFAULTS.llm_disable_password_fields` — a defaults table, not the
+  hardcoded `true` the blocker described — and `preferences.lua:102` maps
+  `llm_secure_field_filter_enabled` onto a config path, so the shared value is
+  reachable. The blocker stated the exact opposite of what the code now does.
+
+**All six are fixed. The branch question this section opened is closed:** the
+`simplification` work landed on `dev` (`f81c9012a`, fast-forward), and nothing
+was lost. The two audit prompts can be run whenever someone wants them; there is
+no longer a reason to hold them back.
 
 **The lesson is the one this file already carries, at its sharpest.** Recovering
 these took a session; believing them cost a false security alarm raised to the
