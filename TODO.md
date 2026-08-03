@@ -291,17 +291,28 @@ gate correctly, by different mechanisms — which is itself the finding:
   path at all.
 - **macOS** had neither, and that is what `f78deb4` fixed.
 
-⚠ These two were verified by reading their structure, not by driving them. That
-is weaker evidence than the macOS answer, and this file has been burned twice
-this week by exactly that difference. **Treat them as probably-correct, not
-proven.**
+**Both are now proven by driving, not by reading** — the distinction this file has
+been burned by twice:
 
-**What remains for §2:** the cross-driver corpus is still blind to the flag's
-false case — all 29 vectors are `auto_expand = true`. A dispatch-level replay of
-the non-star case on all three drivers would both close that gap and upgrade the
-Windows/Linux answers from read to driven. Do that before porting the star index,
-because a corpus that cannot express the flag cannot verify a migration that
-moves the code holding it.
+- **Windows was already covered.** `test_hotstring_engine_main.ahk` carries *"HSE
+  non-star trigger requires an end char to fire"*, with both halves — the
+  negative AND a positive control. A near-duplicate was written before that was
+  noticed, and deleted rather than kept: a second test of the same invariant is a
+  second thing to maintain and a false sense of new coverage.
+- **Linux gained the replay it lacked.** Two cases in
+  `test_shared_hotstring_engine.lua`, probed red by removing the
+  `mapping.auto_expand == want_auto` guard from the shared core.
+
+So macOS was the only driver both undefended and untested, which is why it was
+the one that was wrong.
+
+**What remains for §2:** the SHARED CORPUS is still blind to the flag's false
+case — all 29 vectors are `auto_expand = true`. Each driver now guards the
+invariant in its own suite, which is what caught this; the corpus is what would
+keep three implementations agreeing about it through a migration. Add non-star
+vectors and a dispatch-level replay for them before porting the star index —
+noting that the macOS replay must go through `try_auto_expand`, not `would_fire`,
+which is a pure buffer-tail predicate and does not decide the flag.
 
 ⚠ **Two wrong measurements in one hour, on this one entry.** First "the corpus has
 no flag field" (it does — `auto_expand` IS `*`). Then "macOS ignores

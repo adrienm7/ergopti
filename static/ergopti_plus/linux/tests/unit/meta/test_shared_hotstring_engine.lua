@@ -67,6 +67,37 @@ helpers.describe("shared hotstring engine — suffix matching", function()
 		helpers.assert_eq("by the way", result.replacement, "replacement")
 	end)
 
+
+	helpers.it("a NON auto_expand trigger does not fire on its own last char", function()
+		-- The `*` flag under its other name. An entry that does not opt in waits for
+		-- a terminator: "ya" must not fire in the middle of "yaourt". macOS did NOT
+		-- honour this until 2026-08-03 — it had no gate at any of its three levels —
+		-- and nothing caught it because all 29 shared corpus vectors carry
+		-- auto_expand = true. This driver gates it at init.lua:361
+		-- (mapping.auto_expand == want_auto); the check was read there, and this
+		-- drives it, which is a different quality of evidence.
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = false, trigger = "ya", replacement = "y a-t-il" } })
+		local result
+		for _, ch in ipairs({"y", "a"}) do
+			result = e:on_char(ch)
+		end
+		helpers.assert_true(result == nil,
+			"a non auto_expand entry fired the moment its own last character was typed — "
+			.. "the AutoHotkey * flag ignored, so the user's word is rewritten as they type it")
+	end)
+
+	helpers.it("the same trigger WITH auto_expand does fire there", function()
+		-- The contrast, so the case above cannot pass through an engine that simply
+		-- never matches anything.
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = true, trigger = "ya", replacement = "y a-t-il" } })
+		local result
+		for _, ch in ipairs({"y", "a"}) do
+			result = e:on_char(ch)
+		end
+		helpers.assert_true(result ~= nil, "the positive control must fire")
+	end)
 	helpers.it("no match when trigger is not at buffer tail", function()
 		local e = engine_mod.new()
 		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
