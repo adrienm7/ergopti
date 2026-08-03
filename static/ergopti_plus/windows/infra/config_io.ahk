@@ -816,25 +816,40 @@ _FormatSlotLabel(SlotId) {
 		return SlotId
 }
 
-InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
-		global KeyboardShortcutAssignments, GESTURE_ACTIONS
-		_Groups := [
-				Map("prefix", "alt_", "label", t("menu.shortcuts.alt_group"), "add_label", t("menu.shortcuts.alt_add")),
-				Map("prefix", "ctrl_", "label", t("menu.shortcuts.ctrl_group"), "add_label", t("menu.shortcuts.ctrl_add")),
-				Map("prefix", "ctrl_shift_", "label", t("menu.shortcuts.ctrl_shift_group"), "add_label", t("menu.shortcuts.ctrl_shift_add")),
-				Map("prefix", "win_", "label", t("menu.shortcuts.win_group"), "add_label", t("menu.shortcuts.win_add")),
-		]
-		GroupMenus := []
-		for GroupInfo in _Groups {
+; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
+; the translated labels: a static initialised with t() would freeze the language
+; at first call, and the menu is rebuilt on a language switch expecting the new one
+global KEYBOARD_SLOT_GROUPS := [
+		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
+		Map("prefix", "ctrl_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
+		Map("prefix", "ctrl_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
+		Map("prefix", "win_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
+]
+
+/**
+ * The list provider for the manifest's "keyboard_slots" entry.
+ *
+ * Returns row DATA, never a Menu: the renderer owns the menu shape, which is
+ * what removed the whole class of bug this used to be. It was a Menu.Insert
+ * splice with no idempotence check, and AHK v2's Insert APPENDS on an existing
+ * label rather than merging, so every updater-driven tray refresh grew the
+ * submenu by five more rows. A provider cannot splice anything.
+ * @returns {Array} Rows of Map("label", …, "items", …) for the renderer.
+ */
+KeyboardSlotRows() {
+		global KeyboardShortcutAssignments, GESTURE_ACTIONS, KEYBOARD_SLOT_GROUPS
+
+		Rows := []
+		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
-				GLabel := GroupInfo["label"]
-				AddLabel := GroupInfo["add_label"]
-				GMenu := Menu()
+				Items := []
 				for Slot, Action in KeyboardShortcutAssignments {
 						if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
 								continue
+						; A slot only belongs to the LONGEST prefix that matches it, or
+						; "ctrl_shift_v" would appear in the Ctrl group as well
 						IsExactPrefix := true
-						for OtherGroup in _Groups {
+						for OtherGroup in KEYBOARD_SLOT_GROUPS {
 								OtherPrefix := OtherGroup["prefix"]
 								if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
 										IsExactPrefix := false
@@ -844,14 +859,16 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
 						if !IsExactPrefix or (Action == "none")
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
-						RegisterMenuItem(GMenu, _FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
+						Items.Push(Map(
+								"label", _FormatSlotLabel(Slot) . " : " . ActionLabel,
+								"action", ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot)
+						))
 				}
-				RegisterMenuItem(GMenu, AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
-				GroupMenus.Push(Map("label", GLabel, "menu", GMenu))
+				Items.Push(Map(
+						"label", t(GroupInfo["add_key"]),
+						"action", ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix)
+				))
+				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
 		}
-		TargetMenu.Insert(InsertBefore)
-		loop GroupMenus.Length {
-				Idx := GroupMenus.Length - A_Index + 1
-				TargetMenu.Insert(InsertBefore, GroupMenus[Idx]["label"], GroupMenus[Idx]["menu"])
-		}
+		return Rows
 }

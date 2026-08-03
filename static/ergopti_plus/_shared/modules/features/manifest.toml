@@ -2836,6 +2836,19 @@ id = "wrap_symbols_menu"
 platforms = ["ahk"]
 
 [[menu.shortcuts_menu]]
+type = "list"
+id = "keyboard_slots"
+# The configurable keyboard-shortcut groups. A "list" rather than a "group"
+# because there are several of them and their contents are the user's own
+# assignments, which no static entry can enumerate; the driver supplies the rows
+# as data and the renderer draws them, so no menu row is built outside it.
+#
+# Both drivers render it from here. The Windows driver used to splice the same
+# groups in with a Menu.Insert sequence that had already duplicated them once
+# per updater refresh; a list entry cannot, because the renderer builds the menu
+# fresh every time.
+
+[[menu.shortcuts_menu]]
 type = "group"
 id = "modifier_combos"
 i18n = "menu.shortcuts.group_modifiers"
@@ -2851,19 +2864,6 @@ platforms = ["hs"]
 type = "group"
 id = "cmd_shortcuts"
 i18n = "menu.shortcuts.submenu_cmd"
-platforms = ["hs"]
-
-[[menu.shortcuts_menu]]
-type = "list"
-id = "keyboard_slots"
-# The configurable keyboard-shortcut groups. A "list" rather than a "group"
-# because there are five of them and their contents are the user's own
-# assignments, which no static entry can enumerate; the driver supplies the rows
-# as data and the renderer draws them, so no menu row is built outside it.
-#
-# macOS-only for now: the Windows driver renders the same five groups from
-# InsertKeyboardShortcutGroups, outside the manifest entirely. Bringing it here
-# is the follow-up, and is what would let the two be compared at all.
 platforms = ["hs"]
 
 [[menu.shortcuts_menu]]

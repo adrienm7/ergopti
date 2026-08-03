@@ -229,6 +229,10 @@
 			]
 		},
 		{
+			"type": "list",
+			"id": "keyboard_slots"
+		},
+		{
 			"type": "group",
 			"id": "modifier_combos",
 			"i18n": "menu.shortcuts.group_modifiers",
@@ -248,13 +252,6 @@
 			"type": "group",
 			"id": "cmd_shortcuts",
 			"i18n": "menu.shortcuts.submenu_cmd",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "list",
-			"id": "keyboard_slots",
 			"platforms": [
 				"hs"
 			]

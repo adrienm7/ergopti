@@ -112,36 +112,39 @@ Test("menu: initMenu() never mutates a SubMenus entry (menu-shortcut-groups-dupl
 
 ; ================================================================
 ; ================================================================
-; ======= 3/ The splice belongs to the construction point =========
+; ======= 3/ There is no splice left to run twice ================
 ; ================================================================
 ; ================================================================
 
-_MSG_SpliceRunsOncePerConstruction() {
-	Body := _DriverFuncBody("InitSubMenus")
-	Assert(Body != "", "InitSubMenus() must exist in the driver source")
-
-	BuildPos  := InStr(Body, 'SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()')
-	SplicePos := InStr(Body, 'InsertKeyboardShortcutGroups(SubMenus["Shortcuts"]')
-	Assert(BuildPos > 0, "InitSubMenus() must build the Shortcuts submenu")
-	Assert(SplicePos > BuildPos,
-		"the keyboard-shortcut groups must be spliced into the Shortcuts submenu right where that "
-		. "submenu is CONSTRUCTED, so the splice runs exactly once per menu object")
-
-	; One definition plus exactly one call site. A second call site anywhere is
-	; either a duplicate splice into the same object or a new menu that needs the
-	; idempotence question answered first.
+_MSG_GroupsComeFromTheManifest() {
+	; The bug was a splice that could run more than once against a persistent Menu
+	; object. The groups now come from a manifest "list" entry, and
+	; MenuRenderer_Build creates a fresh Menu() on every call -- so the duplication
+	; is not merely avoided, it has no place left to happen. This asserts that
+	; structural fact rather than the old "splice exactly once" arrangement, which
+	; would still be one careless call site away from the original bug.
 	Src := _DriverSourceNoComments()
-	Occurrences := 0
-	Pos := 1
-	while (Found := InStr(Src, "InsertKeyboardShortcutGroups(", , Pos)) {
-		Occurrences += 1
-		Pos := Found + 1
-	}
-	Assert(Occurrences == 2,
-		"InsertKeyboardShortcutGroups must appear exactly twice in driver source -- its definition "
-		. "plus the single splice at the Shortcuts submenu construction point. Any further call site "
-		. "re-splices a menu that already carries the groups, and Menu.Insert appends rather than "
-		. "merges -- found " . Occurrences)
+
+	Assert(!InStr(Src, "InsertKeyboardShortcutGroups("),
+		"the InsertKeyboardShortcutGroups splice must stay gone -- reintroducing any Menu.Insert pass "
+		. "over a persistent SubMenus entry brings back the unbounded row growth "
+		. "(menu-shortcut-groups-duplicated-on-updater-rebuild)")
+
+	Body := _DriverFuncBody("_BuildShortcutsSubmenu")
+	Assert(Body != "", "_BuildShortcutsSubmenu() must exist in the driver source")
+	Assert(InStr(Body, '"keyboard_slots"') > 0,
+		"_BuildShortcutsSubmenu must register the keyboard_slots list provider, or the section is "
+		. "skipped with a warning and simply vanishes from the tray")
+	Assert(InStr(Body, "MenuRenderer_Build(") > 0,
+		"_BuildShortcutsSubmenu must build through the manifest renderer")
+
+	; The renderer must keep constructing a fresh Menu per call. If it ever started
+	; caching and mutating one, every guarantee above would be void.
+	RendererBody := _DriverFuncBody("MenuRenderer_Build")
+	Assert(RendererBody != "", "MenuRenderer_Build() must exist in the driver source")
+	Assert(RegExMatch(RendererBody, "Result\s*:=\s*Menu\(\)"),
+		"MenuRenderer_Build must construct a fresh Menu on every call -- a cached menu mutated in "
+		. "place would duplicate rows exactly the way the old splice did")
 }
-Test("menu: the keyboard-shortcut groups are spliced once, at construction (menu-shortcut-groups-duplicated-on-updater-rebuild)",
-	_MSG_SpliceRunsOncePerConstruction)
+Test("menu: the keyboard-shortcut groups come from the manifest, not a splice (menu-shortcut-groups-duplicated-on-updater-rebuild)",
+	_MSG_GroupsComeFromTheManifest)

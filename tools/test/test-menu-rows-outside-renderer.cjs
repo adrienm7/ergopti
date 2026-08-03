@@ -43,8 +43,10 @@ const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 
 // Frozen baselines: rows built OUTSIDE the renderer, per driver, on 2026-08-01.
 // windows 230 total - 8 in renderer, macos 330 - 29, linux 100 - 97.
+// windows lowered 222 → 220 on 2026-08-03: the keyboard-shortcut groups moved
+// onto the manifest "list" type, so the renderer builds them.
 const BASELINE = {
-	windows: 222,
+	windows: 220,
 	macos: 301,
 	linux: 3
 };

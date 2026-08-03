@@ -35,7 +35,16 @@ _BuildShortcutsSubmenu() {
 		"wrap_symbols_menu",          (M, C) => _SC_WrapSymbols(M, C),
 	)
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers)
+	; The keyboard slots are a list, not a group: their rows are the user's own
+	; assignments, so the manifest can name the section but not enumerate it. The
+	; provider returns row DATA and the renderer draws it — which is also what
+	; ended the Menu.Insert splice that used to duplicate the groups on every
+	; updater-driven tray refresh
+	ListProviders := Map(
+		"keyboard_slots",             () => KeyboardSlotRows(),
+	)
+
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).

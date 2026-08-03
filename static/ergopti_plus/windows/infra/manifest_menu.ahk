@@ -115,11 +115,22 @@ _MR_Get(Obj, Key, Default := "") {
 ; ``GroupBuilders`` — Map of group_id → Func to call for ``type:"group"`` entries.
 ;   Each builder receives no arguments and returns a Menu object (or ``false``
 ;   to skip the entry entirely).
+; ``ListProviders`` — Map of list_id → Func to call for ``type:"list"`` entries.
+;   A provider returns DATA, never a Menu: each row is a Map with "label" and
+;   optionally "action", "items", "checked", "disabled" or "separator", and this
+;   renderer turns it into AHK menu items. The asymmetry is the point — a
+;   provider that could return a finished Menu would be building menu items
+;   outside the renderer again, which is what the list type exists to stop. The
+;   macOS renderer takes the same shape, which is what lets a section rendered on
+;   both drivers finally be compared.
 ;
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "") {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "") {
 	if (GroupBuilders == "") {
 		GroupBuilders := Map()
+	}
+	if (ListProviders == "") {
+		ListProviders := Map()
 	}
 
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
@@ -187,6 +198,18 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			_MR_RenderLetterPicker(Result, Item, CategoryName)
 			ItemCount++
 
+		} else if ItemType == "list" {
+			Id := _MR_Get(Item, "id")
+			if (Id != "" and ListProviders is Map and ListProviders.Has(Id)) {
+				Rows := (ListProviders[Id])()
+				Added := _MR_RenderRows(Result, Rows, Id, 1)
+				ItemCount += Added
+			} else {
+				; Same class of drift as the action and dynamic branches: a list
+				; entry with no provider is a whole menu section that vanishes
+				try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+			}
+
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
@@ -212,6 +235,73 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 ; ======= 4/ Per-Type Render Helpers =========
 ; ============================================
 ; ============================================
+
+; How deep a list provider's rows may nest. A provider returning a structure that
+; contains itself would recurse until the stack gave out, taking the whole menu
+; with it; three levels is deeper than any menu the driver draws. Kept equal to
+; the macOS renderer's MAX_LIST_DEPTH so a list that renders on one driver cannot
+; be silently truncated on the other
+global MR_MAX_LIST_DEPTH := 3
+
+; Turn a list provider's row DATA into AHK menu items.
+;
+; This is the only place a provider's rows become menu items, which is the whole
+; reason the two shapes differ: a provider hands over labels, callbacks and
+; nested rows, and knows nothing about Menu, Add or Check. A row missing a label
+; is dropped with a warning rather than added blank — an unlabelled item is one
+; the user cannot identify and cannot report.
+;
+; Returns the number of items added.
+_MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
+	global MR_MAX_LIST_DEPTH
+
+	if (Depth > MR_MAX_LIST_DEPTH) {
+		try LoggerError("MenuRenderer", "List '{1}' nests deeper than {2} level(s) — truncated.", ListId, MR_MAX_LIST_DEPTH)
+		return 0
+	}
+	if (!(Rows is Array)) {
+		try LoggerWarn("MenuRenderer", "List '{1}' produced no row array — skipped.", ListId)
+		return 0
+	}
+
+	Added := 0
+	for Row in Rows {
+		if (!(Row is Map)) {
+			try LoggerWarn("MenuRenderer", "List '{1}' produced a non-row entry — skipped.", ListId)
+			continue
+		}
+		if (Row.Has("separator") and Row["separator"]) {
+			TargetMenu.Add()
+			continue
+		}
+		Label := Row.Has("label") ? Row["label"] : ""
+		if (Label == "") {
+			try LoggerWarn("MenuRenderer", "List '{1}' produced a row with no label — skipped.", ListId)
+			continue
+		}
+
+		if (Row.Has("items") and Row["items"] is Array) {
+			SubMenu := Menu()
+			_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1)
+			TargetMenu.Add(Label, SubMenu)
+		} else if (Row.Has("action") and Row["action"] is Func) {
+			RegisterMenuItem(TargetMenu, Label, Row["action"])
+		} else {
+			; A row with neither a submenu nor an action is a label; AHK needs a
+			; callback regardless, so it gets an inert one and is disabled below
+			RegisterMenuItem(TargetMenu, Label, (*) => "")
+		}
+
+		if (Row.Has("checked") and Row["checked"]) {
+			try TargetMenu.Check(Label)
+		}
+		if ((Row.Has("disabled") and Row["disabled"]) or (!Row.Has("items") and !Row.Has("action"))) {
+			try TargetMenu.Disable(Label)
+		}
+		Added++
+	}
+	return Added
+}
 
 ; Render the category on/off toggle item (always inserted at position 1).
 ; The caller typically calls ``AddCategoryToggleItem`` directly before calling
