@@ -648,12 +648,13 @@ helpers.describe("aggregator — walk_system_event manifest_increment (F-HIGH-26
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "manifest-bad-uuid" })
 
-		local ok = pcall(function()
+		local ok, walk_err = pcall(function()
 			a.walk_system_event({
 				action = "manifest_increment", stat = "not_a_real_column", amount = 1,
 				app = "TestApp", timestamp = "2024-06-01 12:00:00.000",
 			})
 		end)
+		helpers.assert_nil(walk_err, "and must report none: " .. tostring(walk_err))
 		helpers.assert_true(ok, "an unknown stat name must not crash walk_system_event")
 
 		local row = read_app_day_row("2024-06-01", "TestApp")
@@ -732,12 +733,13 @@ helpers.describe("aggregator — walk_system_event focus_first_key (F-MED-27)", 
 			events = { { "a", 100, {} } },
 		})
 
-		local ok = pcall(function()
+		local ok, focus_err = pcall(function()
 			a.walk_system_event({
 				action = "focus_first_key", app = "SharedApp", latency_ms = 300,
 				timestamp = "2024-07-02 09:00:01.000",
 			})
 		end)
+		helpers.assert_nil(focus_err, "and must report none: " .. tostring(focus_err))
 		helpers.assert_true(ok, "focus_first_key must not crash when the ergo row was created by walk_typing first")
 
 		local row = read_ergo_row("2024-07-02", "SharedApp")

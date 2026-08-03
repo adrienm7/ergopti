@@ -204,11 +204,12 @@ helpers.describe("logger — old-log purge is deferred AND spawns no subprocess"
 		Logger.set_sink(function(line) captured[#captured + 1] = line end)
 
 		exec_log = {}
-		local ok = pcall(Logger._purge_old_logs, TEST_LOG_DIR, RETENTION_DAYS)
+		local ok, purge_err = pcall(Logger._purge_old_logs, TEST_LOG_DIR, RETENTION_DAYS)
 
 		Logger.set_sink(nil)
 		hs.fs = saved_fs
 
+		helpers.assert_nil(purge_err, "and must report none: " .. tostring(purge_err))
 		helpers.assert_true(ok, "a missing filesystem port must degrade, not throw")
 		helpers.assert_true(#exec_log == 0, "the degraded path must not fall back to shelling out")
 

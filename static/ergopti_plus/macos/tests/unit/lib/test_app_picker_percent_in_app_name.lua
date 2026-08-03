@@ -114,8 +114,8 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 			menu = AppPicker.build_menu({}, function() end, "search")
 		end)
 
-		helpers.assert_true(ok,
-			"build_menu must not raise on an app name containing '%1': " .. tostring(err))
+		helpers.assert_nil(err, "build_menu must report no error: " .. tostring(err))
+		helpers.assert_true(ok, "build_menu must not raise on an app name containing '%1'")
 		helpers.assert_true(has_title(menu, "Exclude Save %1 Now"),
 			"a capture-like sequence in the app name must survive as literal text")
 	end)
