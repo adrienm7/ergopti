@@ -13,6 +13,16 @@ to make a change pass, and run the gates that cover what you touched —
 
 **Delete an entry the moment it is done. When this file is empty, delete it.**
 
+> **Reading the performance numbers is no longer an entry here.** The
+> instrumentation is complete — 20 HotPath segments and 5 pre-logger boot stamps,
+> inventoried by `test-hotpath-segments-declared.cjs`. What was left is not work
+> to schedule but an operating procedure: run the Windows driver for a day and
+> read the lines above the 5 ms floor. It lives with the rest of the operating
+> knowledge, in
+> [`project-instrumentation-absence-is-invisible`](docs/PROJECT_MEMORY.md), which
+> also records where to look first. A backlog entry nobody can action at a
+> keyboard is not a backlog entry.
+
 > ⚠ **Re-measure before you start.** Over one long session on 2026-08-03,
 > **eleven** entries in the previous version of this file turned out to be wrong
 > — not stale by a little, but wrong in a way that inverted the work: a
@@ -44,8 +54,20 @@ for. So the work is:
 2. **55 macOS gesture handlers** emitting the corresponding Karabiner action.
    This is the part that makes a swipe able to trigger `layer` hold, `capsword`,
    `cmd_tab` — which is the decision that was taken.
-3. **~1 155 translations** (55 × 21), and only after 1 and 2, or the strings get
-   keyed to ids that are about to change.
+3. **756 translations** (36 × 21) — and this is the BINDING constraint, not a
+   mechanical follow-up. Measured 2026-08-03: `test-action-labels-have-locale-keys.cjs`
+   is an **assertion**, not a ratchet, so a registered row with no key fails in all
+   21 locales at once. And the labels are genuinely translated: **123 of the 125
+   existing ones carry up to 21 distinct values**. (`one_shot_shift` is one of the
+   two that do not — do not generalise from it, as was done once already.) **Zero
+   of the 36 has a key today.**
+
+   So finishing §1 means writing 756 strings in 19 languages nobody here can
+   check — the same objection `test-platform-restrictions-explained.cjs` states
+   for `reason_key`, and the same answer applies: machine-filling them puts
+   unverifiable text in front of users, which is worse than the identifier the
+   picker shows now. **This needs a human translator or a review pass, not an
+   agent.** Steps 1 and 2 can land first; step 3 is what gates the feature.
 
 The picker itself is driven by `sg_order`, not by the row set, so the rows alone
 are invisible in the UI — the handlers are not. Decide whether the 55 also join
@@ -129,27 +151,7 @@ from one walker's cases and replayed against both.
 
 ---
 
-## 4. Read the performance numbers
-
-**The instrumentation is finished** — 20 HotPath segments and 5 pre-logger boot
-stamps, every one inventoried by `test-hotpath-segments-declared.cjs` with a line
-saying what it covers. Nothing named in the old plan is unmeasured any more.
-
-⚠ **What remains cannot be done in a headless session.** Every segment emits only
-above the 5 ms floor, over real typing on Windows. Run the driver a full day,
-then read the lines.
-
-Where to look first, from the last profile: `Tooltip.Present` was the dominant
-offender (~12.9 ms mean) and its five sub-steps each sit BELOW the floor
-individually, which is why the breakdown exists — the parent number never said
-which one moved. `Metrics.FocusRefresh` is the suspect for idle cost:
-`WinGetTitle` sends a message to the foreground window, and a Not Responding one
-makes it wait out the timeout, up to 20x/s. `Updater.Poll` and `Webview.Eval`
-are both COM calls that can stall the message pump.
-
----
-
-## 5. Menu label-tree parity (I3)
+## 4. Menu label-tree parity (I3)
 
 `test-menu-parity.cjs`, the label-tree half: render for the three platforms and
 diff the label trees. **Blocked, deliberately:** the menu manifest carries no
@@ -163,7 +165,7 @@ a declarative group can absorb a driver-supplied builder.
 
 ---
 
-## 6. Smaller and known — but the cheap ones are gone
+## 5. Smaller and known — but the cheap ones are gone
 
 The two genuinely cheap entries were closed on 2026-08-03 (npm aliases, `tab.tap`).
 Everything below is either blocked on a prerequisite or deliberately incremental;
@@ -205,7 +207,7 @@ none of it is a batch job, and the section title used to imply otherwise.
 
 ---
 
-## 7. Audits not yet run
+## 6. Audits not yet run
 
 `docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — check
 `PROJECT_MEMORY.md` before running either; the refactor cycle the latter belongs
