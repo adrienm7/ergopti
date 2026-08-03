@@ -180,10 +180,6 @@ a declarative group can absorb a driver-supplied builder.
 
 ## 7. Smaller, known, and cheap
 
-- **`lifecycle.js` is mirrored by claim, not by gate.**
-  `windows/ui/tooltip/helpers.ahk` names it as the canonical phase list it
-  implements, but nothing checks the AHK's phases against `lifecyclePhases()`.
-  One corpus away from being real.
 - **Convention S stubs (I1).** Every canonical folder exists on every driver;
   where unimplemented it ships an `init` with a `STATUS: not implemented` line and
   a `REASON_KEY`. Blocked on the reader:
