@@ -151,8 +151,12 @@ from one walker's cases and replayed against both.
 segments and 5 pre-logger boot stamps, all inventoried by
 `test-hotpath-segments-declared.cjs` with a line saying what each covers.
 
-Unmeasured paths worth a segment, in value order: the gesture recogniser's
-per-event path, the TOML config write path (a save blocks the menu), the
+~~the TOML config write path~~ — **done 2026-08-03**, `Config.TomlWrite`: a save
+is a full read-modify-write plus a canonicalisation pass, run from menu
+callbacks, so a slow one blocks the tray menu while the user watches. It had no
+segment; the cost showed up only as a menu that felt stuck.
+
+Still unmeasured, in value order: the gesture recogniser's per-event path, the
 updater's poll, and the webview bridge round-trip. Each is two `HotPath_Now()`
 reads plus a floor-gated `HotPath_LogIfSlow`, and an inventory line.
 

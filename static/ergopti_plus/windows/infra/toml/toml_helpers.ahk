@@ -454,6 +454,12 @@ TOML_BatchWrite(Path, Updates) {
 		if (Updates.Length = 0)
 				return true
 
+		; A config save is a full read-modify-write plus a canonicalisation pass, and
+		; it runs from menu callbacks — so a slow one blocks the tray menu while the
+		; user watches. It had no segment at all; the cost showed up only as a menu
+		; that felt stuck. Two QPC reads, gated by the profiler floor.
+		_hpTomlWrite := HotPath_Now()
+
 		Cached := ParseTomlFile(Path)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
@@ -592,6 +598,7 @@ TOML_BatchWrite(Path, Updates) {
 				_ParseTomlCache.Delete(Path)
 
 		TOML_RunStrictCanonicalization(Path)
+		HotPath_LogIfSlow("Config.TomlWrite", _hpTomlWrite, Updates.Length . " update(s)")
 		return true
 }
 
