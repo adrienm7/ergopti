@@ -439,9 +439,18 @@ Constraints: **paths before moves, moves before content, data before code.**
   exactly as the `preferences` relocation did: the driver total is unchanged and
   neither tree can launder an OS call through the other.
 
-  Remaining: (2) make macOS consume the shared logger core, and only after
-  writing `_shared/tests/corpus/logger/behaviour_vectors.json` — this is the
-  module with the worst bug history in the repo.
+  Remaining: (2) make macOS consume the shared logger core. **The corpus
+  prerequisite is done, 2026-08-03.**
+  `_shared/tests/corpus/logger/behaviour_vectors.json` exists and all three
+  suites replay it: severity filtering, the lifecycle-pair rule, and the ring
+  buffer including both boundaries either side of capacity. Writing it found the
+  divergence that made the prerequisite worth insisting on — macOS used levels
+  1/2/3/4 against the spec's, AutoHotkey's and the core's 10/20/30/40, so a level
+  NUMBER meant two different things and the adoption would have silently changed
+  every threshold. macOS is on the spec numbering now, and gained the
+  `ring_buffer_clear` / `ring_buffer_size` it never had. What remains is the
+  adoption itself: 994 lines down to a thin driver layer over the 287-line core,
+  with the corpus as the equivalence check.
 
   <details><summary>The measurement that planned (1), kept for the next
   extraction of the same shape</summary>
