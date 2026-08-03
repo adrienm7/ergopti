@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Descarga interrumpida",
 	"mlx.download_interrupted_body": "El proceso de descarga de %s se detuvo durante la recarga.",
 	"mlx.download_stalled": "Descarga MLX bloqueada",
+	"mlx.download_stalled_giving_up": "Sin progreso durante {1} minutos. Cancelado.",
+	"mlx.download_stalled_near_complete": "Sin progreso durante {1} minutos al 99 %. Probablemente bloqueado.",
 	"mlx.download_subtitle": "Obteniendo pesos desde Hugging Face…",
 	"mlx.download_title": "Descargando modelo MLX",
 	"mlx.hf_connected": "HuggingFace conectado",

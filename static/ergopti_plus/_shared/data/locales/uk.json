@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Завантаження перервано",
 	"mlx.download_interrupted_body": "Процес завантаження %s зупинився під час перезавантаження.",
 	"mlx.download_stalled": "Завантаження MLX заблоковано",
+	"mlx.download_stalled_giving_up": "Немає поступу {1} хвилин. Скасовано.",
+	"mlx.download_stalled_near_complete": "Немає поступу {1} хвилин на 99 %. Імовірно, зависло.",
 	"mlx.download_subtitle": "Отримання ваг з Hugging Face…",
 	"mlx.download_title": "Завантаження моделі MLX",
 	"mlx.hf_connected": "HuggingFace підключено",

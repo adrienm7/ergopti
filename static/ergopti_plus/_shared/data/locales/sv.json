@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Nedladdningen avbruten",
 	"mlx.download_interrupted_body": "Nedladdningsprocessen för %s stoppades under omstart.",
 	"mlx.download_stalled": "MLX-nedladdning fastnad",
+	"mlx.download_stalled_giving_up": "Ingen framgång på {1} minuter. Avbryter.",
+	"mlx.download_stalled_near_complete": "Ingen framgång på {1} minuter vid 99 %. Troligen låst.",
 	"mlx.download_subtitle": "Hämtar vikter från Hugging Face…",
 	"mlx.download_title": "Laddar ned MLX-modell",
 	"mlx.hf_connected": "HuggingFace ansluten",

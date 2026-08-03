@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Загрузка прервана",
 	"mlx.download_interrupted_body": "Процесс загрузки %s остановился во время перезагрузки.",
 	"mlx.download_stalled": "Загрузка MLX заблокирована",
+	"mlx.download_stalled_giving_up": "Нет прогресса {1} минут. Отмена.",
+	"mlx.download_stalled_near_complete": "Нет прогресса {1} минут на 99 %. Вероятно, зависло.",
 	"mlx.download_subtitle": "Получение весов из Hugging Face…",
 	"mlx.download_title": "Загрузка модели MLX",
 	"mlx.hf_connected": "HuggingFace подключён",

@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "다운로드가 중단되었습니다",
 	"mlx.download_interrupted_body": "%s 다운로드 프로세스가 다시 로드하는 동안 중지되었습니다.",
 	"mlx.download_stalled": "MLX 다운로드가 중단되었습니다",
+	"mlx.download_stalled_giving_up": "{1}분 동안 진행이 없습니다. 취소합니다.",
+	"mlx.download_stalled_near_complete": "99 %에서 {1}분 동안 진행이 없습니다. 중단된 것 같습니다.",
 	"mlx.download_subtitle": "Hugging Face에서 가중치 가져오는 중…",
 	"mlx.download_title": "MLX 모델 다운로드 중",
 	"mlx.hf_connected": "HuggingFace에 연결되었습니다",

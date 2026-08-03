@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Nedlasting avbrutt",
 	"mlx.download_interrupted_body": "Nedlastingsprosessen for %s stoppet under ominnlasting.",
 	"mlx.download_stalled": "MLX-nedlasting stoppet",
+	"mlx.download_stalled_giving_up": "Ingen framgang på {1} minutter. Avbryter.",
+	"mlx.download_stalled_near_complete": "Ingen framgang på {1} minutter ved 99 %. Sannsynligvis låst.",
 	"mlx.download_subtitle": "Henter vekter fra Hugging Face…",
 	"mlx.download_title": "Laster ned MLX-modell",
 	"mlx.hf_connected": "HuggingFace tilkoblet",

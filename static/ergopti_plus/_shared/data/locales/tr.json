@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "İndirme kesintiye uğradı",
 	"mlx.download_interrupted_body": "%s indirme işlemi yeniden yükleme sırasında durdu.",
 	"mlx.download_stalled": "MLX indirmesi takıldı",
+	"mlx.download_stalled_giving_up": "{1} dakikadır ilerleme yok. Vazgeçiliyor.",
+	"mlx.download_stalled_near_complete": "99 %’de {1} dakikadır ilerleme yok. Muhtemelen takıldı.",
 	"mlx.download_subtitle": "Hugging Face'den ağırlıklar alınıyor…",
 	"mlx.download_title": "MLX modeli indiriliyor",
 	"mlx.hf_connected": "HuggingFace bağlandı",
