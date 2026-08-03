@@ -133,6 +133,8 @@
 		"test:platform-restrictions-explained": "node ./tools/test/test-platform-restrictions-explained.cjs",
 		"test:action-chord-notation": "node ./tools/test/test-action-chord-notation.cjs",
 		"test:action-registry-bijection": "node ./tools/test/test-action-registry-bijection.cjs",
+		"test:karabiner-namespace-is-merged": "node ./tools/test/test-karabiner-namespace-is-merged.cjs",
+		"test:karabiner-binary-paths-single-source": "node ./tools/test/test-karabiner-binary-paths-single-source.cjs",
 		"test:wpm-chars-per-word-single-source": "node ./tools/test/test-wpm-chars-per-word-single-source.cjs",
 		"test:prompt-builder-constants-parity": "node ./tools/test/test-prompt-builder-constants-parity.cjs",
 		"test:corpus-fields-are-read": "node ./tools/test/test-corpus-fields-are-read.cjs",

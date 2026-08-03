@@ -37,6 +37,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
+local KePaths = require("platform.remap.ke_paths")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -64,11 +65,11 @@ local CACHE_DIR = (os.getenv("HOME") or "") .. "/Library/Caches/Ergopti/karabine
 local KE_APP_PATH      = "/Applications/Karabiner-Elements.app"
 -- v15 and earlier shipped karabiner_grabber; v16 (May 2026) renamed it to
 -- Karabiner-Core-Service. Both live under the same bin/ directory.
-local KE_GRABBER_BIN      = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_grabber"
-local KE_GRABBER_BIN_V16  = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/Karabiner-Core-Service"
+local KE_GRABBER_BIN      = KePaths.GRABBER
+local KE_GRABBER_BIN_V16  = KePaths.GRABBER_V16
 -- karabiner_cli is present in all KE versions (v14-v16+) and never renamed,
 -- making it the most reliable signal that the full PKG stack is installed.
-local KE_CLI_BIN          = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+local KE_CLI_BIN          = KePaths.CLI
 local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 -- macOS deep-links into the relevant System Settings panes. The scheme is

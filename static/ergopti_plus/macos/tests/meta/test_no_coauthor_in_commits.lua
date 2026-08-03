@@ -46,11 +46,29 @@ helpers.describe("meta: no Co-Authored-By trailers in new commits", function()
 		end
 		local body = pipe:read("*a") or "" ; pipe:close()
 		-- This check passes when it finds no trailer, so an empty read is
-		-- indistinguishable from a clean history. Assert git actually returned
-		-- something before concluding anything about what is in it.
-		helpers.assert_true(#body > 0,
-			"git returned no commit text at all — the scan below would report a clean "
+		-- indistinguishable from a clean history — EXCEPT when the range is
+		-- genuinely empty, which is the normal state of the tree for the minutes
+		-- after a push (HEAD == origin/dev). Counting the range separates the two:
+		-- a count of 0 is "nothing new to inspect", an unreadable count is "the
+		-- scan is broken". Conflating them made this test fail on a freshly pushed
+		-- branch, which is the one moment the history is provably reviewed.
+		local commit_count = nil
+		local counter = io.popen(string.format(
+			"git rev-list --count %s 2>nul || git rev-list --count %s 2>/dev/null", range, range))
+		if counter then
+			commit_count = tonumber(counter:read("*l"))
+			counter:close()
+		end
+		helpers.assert_true(commit_count ~= nil,
+			"git could not count the commits in " .. range .. " — the scan below would report a clean "
 			.. "history because it read nothing, not because the history is clean")
+		if commit_count == 0 then
+			print("  (no commit ahead of the upstream ref — nothing to inspect)")
+			return
+		end
+		helpers.assert_true(#body > 0,
+			string.format("git reported %d commit(s) in %s but returned no commit text — the scan "
+				.. "below would report a clean history because it read nothing", commit_count, range))
 		-- Strip lines that merely document or test the rule (meta-references).
 		local cleaned = body
 		for line in body:gmatch("[^\n]+") do

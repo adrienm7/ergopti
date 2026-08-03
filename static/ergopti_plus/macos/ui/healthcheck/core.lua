@@ -137,6 +137,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.modifier_injector",
+		contract = { "arm", "disarm", "is_armed" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.mouse_control",
 		contract = { "setPos", "getPos" },
 		wired    = true,
