@@ -145,34 +145,23 @@ from one walker's cases and replayed against both.
 
 ---
 
-## 5. More hot-path instrumentation
+## 5. Read the performance numbers
 
-**Decided 2026-08-03: keep going.** The named list is closed — 16 HotPath
-segments and 5 pre-logger boot stamps, all inventoried by
-`test-hotpath-segments-declared.cjs` with a line saying what each covers.
+**The instrumentation is finished** — 20 HotPath segments and 5 pre-logger boot
+stamps, every one inventoried by `test-hotpath-segments-declared.cjs` with a line
+saying what it covers. Nothing named in the old plan is unmeasured any more.
 
-**Three of the four named paths landed 2026-08-03**, taking the driver to 19
-segments:
-- `Config.TomlWrite` — a save is a full read-modify-write plus canonicalisation,
-  run from menu callbacks, so a slow one blocks the tray menu while the user
-  watches. The cost showed up only as a menu that felt stuck.
-- `Updater.Poll` — the async check calls `WaitForResponse(0)` on a COM object
-  every tick, and a COM call that blocks stalls the whole message pump. Both
-  exits are timed: the re-arm exit runs on every tick but the last, so timing
-  only the completion would report the path as fast.
-- `Gesture.Invoke` — the single choke point all three dispatchers share (gesture,
-  shortcut slot, tap-hold), so one segment covers every user-triggered action.
-  The throwing path is timed too: an action that spends a second before failing
-  costs the user exactly as much as one that spends a second succeeding.
+⚠ **What remains cannot be done in a headless session.** Every segment emits only
+above the 5 ms floor, over real typing on Windows. Run the driver a full day,
+then read the lines.
 
-**One left:** the webview bridge round-trip. Same shape — two `HotPath_Now()`
-reads plus a floor-gated `HotPath_LogIfSlow`, and an inventory line.
-
-⚠ **Reading the numbers cannot happen in a headless session** — every segment
-emits only over real typing on Windows. Run the driver a full day, then read the
-lines above the 5 ms floor. `Tooltip.Present` was the dominant offender (~12.9 ms
-mean) and its five sub-steps each sit below the floor, which is why the breakdown
-exists. `Metrics.FocusRefresh` is the one to suspect for idle cost.
+Where to look first, from the last profile: `Tooltip.Present` was the dominant
+offender (~12.9 ms mean) and its five sub-steps each sit BELOW the floor
+individually, which is why the breakdown exists — the parent number never said
+which one moved. `Metrics.FocusRefresh` is the suspect for idle cost:
+`WinGetTitle` sends a message to the foreground window, and a Not Responding one
+makes it wait out the timeout, up to 20x/s. `Updater.Poll` and `Webview.Eval`
+are both COM calls that can stall the message pump.
 
 ---
 
