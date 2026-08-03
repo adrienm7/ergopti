@@ -301,11 +301,18 @@ _ActPickWeb_HtmlUrl() {
 
 ; Fire-and-forget script eval. ExecuteScript().await() wedges the thread when
 ; called from inside a WebView2 callback, so never await here.
+; The host-to-page half of the webview bridge. ExecuteScriptAsync is named async
+; but the COM marshalling to the WebView2 process is not free, and this is what
+; pushes the init payload — a picker that opens slowly is almost always this call
+; rather than the page. It had no segment, so the cost sat between "menu clicked"
+; and "picker visible" with nothing measuring it.
 _ActPickWeb_Eval(Js) {
 	global _ActPickWeb_WebView
 	if !IsSet(_ActPickWeb_WebView)
 		return
+	_hpWebEval := HotPath_Now()
 	try _ActPickWeb_WebView.ExecuteScriptAsync(Js)
+	HotPath_LogIfSlow("Webview.Eval", _hpWebEval, StrLen(Js) . " char(s)")
 }
 
 _ActPickWeb_OnResize(GuiObj, MinMax, Width, Height) {
