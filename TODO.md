@@ -179,7 +179,27 @@ in common, 55 missing — 36 tappable, 19 hold-only. The counts above hold.
 
 ---
 
-## 2. macOS + Windows onto the shared matcher core — **NEXT UP**
+## 2. ~~macOS + Windows~~ **macOS** onto the shared matcher core — **NEXT UP**
+
+🚩 **The title is half impossible, measured 2026-08-04.** The shared matcher core
+is **Lua** (`_shared/lua/hotstring_engine/init.lua`). The Windows driver is
+**AutoHotkey and contains no Lua at all** — not one `.lua` file outside its test
+tree, and no Lua runtime anywhere in its boot path. Windows cannot adopt it. Ever,
+short of embedding an interpreter, which nothing in this repository suggests.
+
+So this section is **one driver, not two**: macOS runs Hammerspoon/Lua and *can*
+adopt the core; Windows keeps its own AutoHotkey engine and shares the
+**behavioural contract** instead — which is what the cross-driver corpus is, and
+what was extended on 2026-08-04 to finally cover the `*` flag.
+
+That also reframes the star-index blocker below. Porting Windows' star indexing
+into the Lua core is **for macOS's benefit**, not Windows': Windows already has
+it and keeps it. The question is whether macOS needs it at all before adopting —
+and macOS has no star-trigger index today, so adopting a core WITHOUT one loses
+nothing macOS currently has. **Re-derive the blocker from that before treating the
+21 ms figure as a reason to delay: it is a Windows performance number, measured
+on a Windows structure, and Windows is not the driver migrating.**
+
 
 > **This is the only large approved item still unstarted.** Decision 3 of
 > 2026-08-03 authorised it explicitly: port the star-trigger indexing into the
