@@ -268,8 +268,10 @@ helpers.describe("rotation — rollover", function()
 		-- rollover writes a comment line to data_sql_path; the hs stub intercepts io.
 		-- We use a non-existent path — io.open in append mode will silently fail or
 		-- succeed depending on the OS; either way, rollover must not throw.
-		local ok = pcall(function() r.rollover("/tmp/test_data.sql") end)
-		helpers.assert_true(ok)
+		-- Called directly. A rollover RESETS the offset — that is what it is for, and
+		-- an offset left where it was means the next read replays a whole day.
+		r.rollover("/tmp/test_data.sql")
+		helpers.assert_eq(r.get_offset(), 0, "a rollover must reset the offset to zero")
 
 		-- Offset must be 0 after rollover regardless of io success.
 		helpers.assert_eq(r.get_offset(), 0)

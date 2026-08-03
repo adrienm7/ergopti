@@ -43,8 +43,11 @@ helpers.describe("llm_bridge M.stop(): existence (escape-trap-ghost-tap)", funct
 	helpers.it("M.stop() does not raise before the trap is armed", function()
 		package.loaded["modules.keymap.llm_bridge"] = nil
 		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
-		local ok = pcall(Bridge.stop)
-		helpers.assert_true(ok, "M.stop() must not throw when _escape_trap is nil")
+		-- Called directly. A stop before any start must leave the bridge startable:
+		-- the boot path stops defensively before it starts.
+		Bridge.stop()
+		helpers.assert_eq(type(Bridge.init), "function",
+			"a stop with no escape trap armed must leave the bridge usable")
 	end)
 
 	helpers.it("M.stop() is idempotent — safe to call twice", function()

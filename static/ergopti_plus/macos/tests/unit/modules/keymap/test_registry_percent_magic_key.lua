@@ -56,6 +56,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 
 		local ok, err = pcall(Registry.add, "sig★", "Best regards", {})
 
+		helpers.assert_nil(err, "and must report no error: " .. tostring(err))
 		helpers.assert_true(ok,
 			"Registry.add must not raise when the magic key is '%' — the key is interpolated "
 			.. "into the REPLACEMENT side of gsub, where an unescaped '%' throws and aborts "
