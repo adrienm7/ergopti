@@ -235,8 +235,12 @@ So: add a `primitives` section to
 replay it in BOTH suites — a corpus only one driver reads is a corpus that pins
 nothing. That is the smallest useful unit of work left in this file.
 
-⚠ **And reading the two implementations side by side on 2026-08-03 already found
-two divergences. Neither has a symptom today; both are what the vectors are for.**
+✅ **Two divergences were found this way and are now FIXED** (2026-08-03), each
+with a regression test proved red first, in
+`windows/tests/meta/test_walker_pure_fns_match_shared_core.ahk`. AHK 3701/0.
+They are kept below because they are the worked example of what the remaining
+vectors are for — two real defects, neither with a symptom, both invisible to the
+existing constants gate.
 
 1. **`pop_utf8` vs `KLW_PopLast` disagree on astral characters.** Lua removes the
    last UTF-8 **codepoint** via `utf8.offset(s, -1)`. AutoHotkey does
