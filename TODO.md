@@ -147,16 +147,27 @@ a declarative group can absorb a driver-supplied builder.
 
 ---
 
-## 6. Smaller, known, and cheap
+## 6. Smaller and known — but the cheap ones are gone
+
+The two genuinely cheap entries were closed on 2026-08-03 (npm aliases, `tab.tap`).
+Everything below is either blocked on a prerequisite or deliberately incremental;
+none of it is a batch job, and the section title used to imply otherwise.
 
 - **Convention S stubs (I1).** Every canonical folder exists on every driver;
   where unimplemented it ships an `init` with a `STATUS: not implemented` line and
   a `REASON_KEY`. Blocked on the reader:
   `test-menu-manifest-keys-have-readers.cjs` rejects a manifest field before its
   reader exists, so write the reader first.
-- **`reason_key` for platform restrictions (I2).** 139 of 142 restrictions carry
-  no reason. Lower `test-platform-restrictions-explained.cjs`'s baseline as they
-  are written.
+- **`reason_key` for platform restrictions (I2) — NOT a batch job, and the gate
+  says so.** 139 of 142 restrictions carry no reason. Writing them all means 142
+  locale keys × 21 locales ≈ **3 000 translated strings in 19 languages nobody
+  here can check**, and `test-platform-restrictions-explained.cjs` is explicit
+  that machine-filling them "would put unverifiable text in front of users in
+  every language, which is worse than the silence it replaces". It is frozen as a
+  ratchet on purpose: a NEW restriction must explain itself, and the existing ones
+  get described **as the feature around them is revisited** — one at a time, by
+  someone who knows why that feature is missing. Lower the baseline then. This
+  entry was filed under "cheap"; it is the opposite, deliberately.
 - **Menu rows outside the renderer (I3).** windows 220, macos 301, linux 3. The
   gate names the biggest offenders (`menu_remap.lua` 36,
   `menu_llm/models_selector.lua` 32, `menu_keyboard_layout.lua` 26). Lower it;
