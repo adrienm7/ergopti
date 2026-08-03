@@ -51,6 +51,20 @@ The picker itself is driven by `sg_order`, not by the row set, so the rows alone
 are invisible in the UI — the handlers are not. Decide whether the 55 also join
 `sg_order` (visible in the gesture picker) or stay registry-only.
 
+⚠ **Measured 2026-08-03, and it splits the 55 in two.** Nineteen of them are
+`tappable: false` — hold-only: `layer`, `shift`, `ctrl`, `cmd`, `alt`, `altgr`,
+`fn`, and twelve modifier combinations. **A gesture has no duration**: a swipe
+happens and ends, so "hold Shift" cannot be expressed as one. Applied literally,
+the decision would create nineteen gesture actions that cannot work.
+
+So the shape is:
+- **36 tappable actions** → rows + handlers, straightforward.
+- **19 hold-only actions** → decide one of: (a) rows without handlers, which
+  needs the bijection gate to learn about a `hold_only` flag; (b) handlers with
+  TOGGLE semantics (gesture enters the layer/modifier, a second gesture leaves
+  it), which is the only meaningful reading of "swipe to hold"; or (c) they stay
+  out of the registry and only the 36 merge.
+
 **Watch for:** `one_shot_shift`/`sticky_shift` and `alt_gr`/`altgr` are one
 action under two spellings (see `test-tap-hold-namespace-correspondence.cjs`).
 Reconcile those two pairs BEFORE keying, or two of the 55 get the wrong id.
