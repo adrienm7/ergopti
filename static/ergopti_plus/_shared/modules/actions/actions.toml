@@ -766,6 +766,155 @@ emit_ahk_mods = []
 [sg_actions.caps_lock]
 platform = "ahk"
 
+# --- Actions du remap Karabiner (macOS) ---
+# Les 36 actions « tappables » de macos/platform/remap/data/actions.json qui
+# n'étaient déclarées nulle part ici : le picker de gestes ne pouvait donc pas
+# les proposer, alors que le remap clavier les exécute depuis toujours.
+#
+# Les 19 autres actions du catalogue Karabiner sont volontairement absentes :
+# elles sont « hold-only » (layer, shift, cmd, et douze combinaisons). Un geste
+# n'a pas de durée — un swipe se produit puis se termine — donc « maintenir
+# Shift » ne peut pas s'exprimer comme geste. Les déclarer créerait dix-neuf
+# lignes de picker qui ne peuvent pas fonctionner.
+#
+# Les identifiants sont ceux de Karabiner, jamais renommés : one_shot_shift
+# (AutoHotkey) et sticky_shift (Karabiner) restent deux orthographes que la
+# table SYNONYMS de test-tap-hold-namespace-correspondence.cjs apparie. Les
+# fusionner coûterait un renommage à travers les trois drivers.
+
+[sg_actions.layer_on]
+platform = "hs"
+
+[sg_actions.layer_off]
+platform = "hs"
+
+[sg_actions.capsword]
+platform = "hs"
+
+[sg_actions.save]
+platform = "hs"
+emit_hs_key = "s"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.opt_backspace]
+platform = "hs"
+emit_hs_key = "delete"
+emit_hs_mods = ["alt"]
+
+[sg_actions.opt_delete_fwd]
+platform = "hs"
+emit_hs_key = "forwarddelete"
+emit_hs_mods = ["alt"]
+
+[sg_actions.cmd_backspace]
+platform = "hs"
+emit_hs_key = "delete"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.cmd_delete_fwd]
+platform = "hs"
+emit_hs_key = "forwarddelete"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.cmd_shift_tab]
+platform = "hs"
+emit_hs_key = "tab"
+emit_hs_mods = ["cmd", "shift"]
+
+# Ces trois-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie F17,
+# Shift+F17 et Alt+F17), donc le geste passe par le même chemin que la touche
+# remappée au lieu de réimplémenter le cyclage une deuxième fois.
+[sg_actions.alt_tab_apps]
+platform = "hs"
+emit_hs_key = "f17"
+emit_hs_mods = ["alt"]
+
+[sg_actions.alt_tab_windows]
+platform = "hs"
+emit_hs_key = "f17"
+emit_hs_mods = ["shift"]
+
+[sg_actions.cycle_windows_in_app]
+platform = "hs"
+emit_hs_key = "f17"
+emit_hs_mods = []
+
+[sg_actions.home]
+platform = "hs"
+emit_hs_key = "home"
+emit_hs_mods = []
+
+[sg_actions.end]
+platform = "hs"
+emit_hs_key = "end"
+emit_hs_mods = []
+
+[sg_actions.page_up]
+platform = "hs"
+emit_hs_key = "pageup"
+emit_hs_mods = []
+
+[sg_actions.page_down]
+platform = "hs"
+emit_hs_key = "pagedown"
+emit_hs_mods = []
+
+[sg_actions.spotlight]
+platform = "hs"
+emit_hs_key = "space"
+emit_hs_mods = ["cmd"]
+
+# --- Modificateurs collants (one-shot) ---
+# Karabiner les exprime par `sticky_modifier`, une construction de manipulateur
+# qu'aucune IPC ne peut déclencher de l'extérieur. macOS les réimplémente donc
+# dans modules/gestures/sticky_modifiers.lua : chaque modificateur bascule
+# indépendamment, exactement comme le fait le catalogue Karabiner.
+
+[sg_actions.sticky_shift]
+platform = "hs"
+
+[sg_actions.sticky_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_cmd]
+platform = "hs"
+
+[sg_actions.sticky_option]
+platform = "hs"
+
+[sg_actions.sticky_cmd_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option]
+platform = "hs"
+
+[sg_actions.sticky_cmd_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_option_shift]
+platform = "hs"
+
+[sg_actions.sticky_option_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_ctrl_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_cmd_shift_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_option_shift_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_hyper]
+platform = "hs"
+
 # --- Debug ---
 
 [sg_actions.open_console]
@@ -792,6 +941,41 @@ is_header = true
 
 
 # ==============================================================================
+# Alias : identifiants Karabiner d'actions déjà présentes sous un autre nom
+# ==============================================================================
+#
+# Mesuré le 2026-08-03 en fusionnant les deux espaces de noms : quatre des
+# trente-six actions « manquantes » du catalogue Karabiner ne manquaient pas.
+# Elles produisent EXACTEMENT la frappe d'une action déjà déclarée ici :
+#
+#   return            ≡ enter          (return)
+#   delete_fwd        ≡ delete         (forwarddelete)
+#   cmd_tab           ≡ app_switcher   (cmd+tab)
+#   alt_tab_apps_list ≡ app_switcher   (cmd+tab — Karabiner déclare lui-même
+#                                       deux ids pour un « karabiner_to »
+#                                       identique)
+#
+# Les déclarer comme lignes aurait mis quatre doublons dans le picker de
+# gestes : « ⌦ Suppr. avant » deux fois, à deux endroits, pour la même touche.
+# Un espace de noms qui porte deux noms pour une même chose n'en est pas un.
+#
+# L'alias sert au picker du REMAP, qui est indexé sur les identifiants
+# Karabiner : il résout son libellé vers celui de l'action partagée, si bien
+# que les deux vocabulaires affichent le même texte sans dupliquer une chaîne
+# dans vingt-et-un fichiers de locale.
+#
+# Ce n'est pas un fourre-tout : test-action-aliases-are-real-duplicates.cjs
+# exige que la cible existe, que l'alias ne soit pas lui-même une ligne, et que
+# deux lignes n'émettent jamais la même frappe macOS.
+
+[karabiner_aliases]
+return = "enter"
+delete_fwd = "delete"
+cmd_tab = "app_switcher"
+alt_tab_apps_list = "app_switcher"
+
+
+# ==============================================================================
 # Ordre du picker pour les actions ponctuelles
 # "--" = séparateur visuel
 # "#Titre" = titre de section (non sélectionnable)
@@ -810,6 +994,9 @@ items = [
     "app_switcher",
     "app_previous",
     "app_window_previous",
+    "alt_tab_apps",
+    "alt_tab_windows",
+    "cmd_shift_tab",
     "--",
     "##edition",
     "copy",
@@ -819,6 +1006,11 @@ items = [
     "redo",
     "select_all",
     "find",
+    "save",
+    "opt_backspace",
+    "opt_delete_fwd",
+    "cmd_backspace",
+    "cmd_delete_fwd",
     "--",
     "##keys",
     "enter",
@@ -843,6 +1035,7 @@ items = [
     "win_next",
     "win_app_prev",
     "win_app_next",
+    "cycle_windows_in_app",
     "close_window",
     "fullscreen",
     "snap_left",
@@ -877,6 +1070,10 @@ items = [
     "para_next",
     "doc_start",
     "doc_end",
+    "home",
+    "end",
+    "page_up",
+    "page_down",
     "--",
     "##selection",
     "sel_up",
@@ -913,6 +1110,7 @@ items = [
     "##system",
     "lock_screen",
     "notification_center",
+    "spotlight",
     "--",
     "##system_actions",
     "select_line",
@@ -941,6 +1139,24 @@ items = [
     "alt_tab_monitor",
     "space",
     "caps_lock",
+    "layer_on",
+    "layer_off",
+    "capsword",
+    "sticky_shift",
+    "sticky_ctrl",
+    "sticky_cmd",
+    "sticky_option",
+    "sticky_cmd_shift",
+    "sticky_cmd_option",
+    "sticky_cmd_ctrl",
+    "sticky_option_shift",
+    "sticky_option_ctrl",
+    "sticky_ctrl_shift",
+    "sticky_cmd_option_shift",
+    "sticky_cmd_option_ctrl",
+    "sticky_cmd_shift_ctrl",
+    "sticky_option_shift_ctrl",
+    "sticky_hyper",
     "--",
     "#grp_app",
     "##ui",

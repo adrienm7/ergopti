@@ -17,8 +17,10 @@ local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
+local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
 local Click         = require("modules.gestures.actions_click")
+local Sticky        = require("modules.gestures.sticky_modifiers")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -375,6 +377,112 @@ for _, row in ipairs(emit_rows) do
 end
 
 
+
+
+-- ── The Karabiner catalogue's non-keystroke actions ─────────────────────────
+--
+-- macos/platform/remap/data/actions.json describes 73 actions the REMAP layer can
+-- put on a key. 36 of them are tappable and had no row in the shared catalogue,
+-- so the gesture picker could not offer a single one — the same feature was
+-- reachable from a remapped key and unreachable from a swipe, with nothing
+-- saying why. The 18 that are plain keystrokes come through the generated table
+-- above; these 18 cannot, and each family fails differently:
+--
+--   layer_on / layer_off / capsword  — state that lives INSIDE Karabiner. The
+--       only IPC is `karabiner_cli --set-variable`, so they are writes, not
+--       keystrokes (platform/remap/ke_variables.lua).
+--   the 15 sticky_*                  — `sticky_modifier` is a manipulator
+--       construct with no IPC at all, so macOS implements the behaviour itself
+--       (modules/gestures/sticky_modifiers.lua).
+--
+-- The 19 hold-only actions of the catalogue are deliberately absent: a gesture
+-- has no duration, so "hold Shift" cannot be expressed as one.
+
+-- Karabiner reads these two variables to decide whether the navigation layer is
+-- live; `layer_toggle` is the latched half and `layer_active` the one the
+-- manipulators test, and writing only one leaves the engine half-switched.
+local KE_LAYER_ON_VARIABLES  = { { "layer_toggle", 1 }, { "layer_active", 1 } }
+local KE_LAYER_OFF_VARIABLES = { { "layer_toggle", 0 }, { "layer_active", 0 } }
+local KE_CAPSWORD_VARIABLE   = "capsword"
+local KE_CAPSWORD_ACTIVE     = 1
+
+-- The remap menu stores the sticky auto-cancel delay in milliseconds.
+local MILLISECONDS_PER_SECOND = 1000
+
+--- The Karabiner variable bridge, required lazily so a driver booted without the
+--- remap layer still loads this registry.
+--- @return table|nil
+local function ke_variables()
+	local ok, mod = pcall(require, "platform.remap.ke_variables")
+	if not ok or type(mod) ~= "table" then
+		Logger.error(LOG, "platform.remap.ke_variables could not be required — the gesture is a no-op.")
+		return nil
+	end
+	return mod
+end
+
+--- Reads the user's sticky auto-cancel delay, in seconds.
+--- Returns nil rather than a default: the value is the one set in the remap
+--- menu, and substituting one here would silently override that choice on the
+--- exact boot where the configuration failed to load.
+--- @return number|nil
+local function sticky_timeout_sec()
+	local ok, Remap = pcall(require, "platform.remap")
+	if not ok or type(Remap) ~= "table" or type(Remap.get_sticky_timeout) ~= "function" then
+		Logger.error(LOG, "platform.remap exposes no get_sticky_timeout — sticky gesture is a no-op.")
+		return nil
+	end
+	local ms = Remap.get_sticky_timeout()
+	if type(ms) ~= "number" or ms <= 0 then
+		Logger.error(LOG, "Sticky timeout is '%s' — refusing to arm on a guessed delay.", tostring(ms))
+		return nil
+	end
+	return ms / MILLISECONDS_PER_SECOND
+end
+
+--- Arms a set of one-shot modifiers for the next keystroke.
+--- @param modifiers table Array of hs modifier names.
+local function arm_sticky(modifiers)
+	local secs = sticky_timeout_sec()
+	if not secs then return end
+	Sticky.toggle(modifiers, secs)
+end
+
+sg("layer_on", function()
+	local ke = ke_variables()
+	if ke then ke.set_all(KE_LAYER_ON_VARIABLES) end
+end)
+sg("layer_off", function()
+	local ke = ke_variables()
+	if ke then ke.set_all(KE_LAYER_OFF_VARIABLES) end
+end)
+sg("capsword", function()
+	local ke = ke_variables()
+	if ke then ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE) end
+	-- A keystroke cannot toggle CapsLock: macOS delivers it as a flagsChanged
+	-- event rather than a keyDown/keyUp pair, so keyStroke fails silently. The
+	-- adapter owns the only path that works, and it is the same one
+	-- platform/remap/watchers.lua uses to switch CapsWord back off.
+	KeyState.set_capslock(true)
+end)
+
+sg("sticky_shift",             function() arm_sticky({ "shift" }) end)
+sg("sticky_ctrl",              function() arm_sticky({ "ctrl" }) end)
+sg("sticky_cmd",               function() arm_sticky({ "cmd" }) end)
+sg("sticky_option",            function() arm_sticky({ "alt" }) end)
+sg("sticky_cmd_shift",         function() arm_sticky({ "cmd", "shift" }) end)
+sg("sticky_cmd_option",        function() arm_sticky({ "cmd", "alt" }) end)
+sg("sticky_cmd_ctrl",          function() arm_sticky({ "cmd", "ctrl" }) end)
+sg("sticky_option_shift",      function() arm_sticky({ "alt", "shift" }) end)
+sg("sticky_option_ctrl",       function() arm_sticky({ "alt", "ctrl" }) end)
+sg("sticky_ctrl_shift",        function() arm_sticky({ "ctrl", "shift" }) end)
+sg("sticky_cmd_option_shift",  function() arm_sticky({ "cmd", "alt", "shift" }) end)
+sg("sticky_cmd_option_ctrl",   function() arm_sticky({ "cmd", "alt", "ctrl" }) end)
+sg("sticky_cmd_shift_ctrl",    function() arm_sticky({ "cmd", "shift", "ctrl" }) end)
+sg("sticky_option_shift_ctrl", function() arm_sticky({ "alt", "shift", "ctrl" }) end)
+sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "ctrl" }) end)
+
+
 -- Tabs
 
 -- Windows & Spaces
@@ -691,9 +799,10 @@ local _shared_toml = Paths.shared("modules/actions/actions.toml")
 local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
 
 --- Parses the shared actions.toml using a lightweight line-by-line reader.
---- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
+--- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}},
+--- ax_actions = {name={platform=...}}, karabiner_aliases = {karabiner_id = shared_id} }
 local function load_shared_actions(path)
-	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {} }
+	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {}, karabiner_aliases = {} }
 	local ok, f = pcall(io.open, path, "r")
 	if not ok or not f then
 		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
@@ -763,6 +872,11 @@ local function load_shared_actions(path)
 				if kind and name then
 					result[kind][name][key] = str_val
 				end
+			elseif current_section == "karabiner_aliases" then
+				-- A flat id = "target" table, not an action block: without this
+				-- branch the reader silently drops it and the remap picker shows
+				-- the raw Karabiner identifier for every aliased action.
+				result.karabiner_aliases[key] = str_val
 			end
 		end
 
@@ -773,6 +887,15 @@ local function load_shared_actions(path)
 end
 
 local _shared = load_shared_actions(_shared_toml)
+
+--- Karabiner ids that name an action the catalogue already carries under another
+--- name, as { karabiner_id = shared_id }. The remap picker is indexed on
+--- Karabiner ids, so it resolves a label through this rather than carrying a
+--- second copy of the same translated string in twenty-one locale files.
+--- @return table
+function M.karabiner_aliases()
+	return (_shared and _shared.karabiner_aliases) or {}
+end
 
 local function parameter_key(binding, action)
 	return tostring(binding or "") .. "__" .. tostring(action or "")

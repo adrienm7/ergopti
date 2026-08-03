@@ -100,24 +100,35 @@ local _chord_catalogue = nil
 --- Replaces the hardcoded French label of any action that also exists in the one
 --- action registry with its translated one.
 ---
---- Eighteen of this catalogue is entries are ALSO rows of
---- _shared/modules/actions/actions.toml, and those eighteen already carry an
---- `sg_actions.<id>` label in all twenty-one locales. The French string here was
---- a second declaration of the same label — so the remap picker showed French to
---- every user while the gesture picker, listing the same action, showed their own
---- language. The remaining fifty-five have no registry row yet (that merge is
---- tracked separately) and keep their French label until they do.
+--- This catalogue's entries and the rows of _shared/modules/actions/actions.toml
+--- are now ONE namespace: the 18 that always overlapped, plus the 32 merged on
+--- 2026-08-03, plus 4 that turned out to be Karabiner spellings of an action the
+--- registry already carried (`return`≡`enter`, `delete_fwd`≡`delete`, `cmd_tab`
+--- and `alt_tab_apps_list`≡`app_switcher`) and resolve through the alias table
+--- rather than duplicating a translated string in twenty-one files.
+---
+--- The 19 that remain French are the hold-only ones — `layer`, the bare
+--- modifiers and their combinations. A gesture has no duration, so they have no
+--- registry row by design, not by omission.
 --- @param actions table The decoded action list, mutated in place.
 --- @return number localised How many labels came from the registry.
 local function localise_action_labels(actions)
+	local ok_reg, Registry = pcall(require, "modules.gestures.actions")
+	local aliases = {}
+	if ok_reg and type(Registry) == "table" and type(Registry.karabiner_aliases) == "function" then
+		aliases = Registry.karabiner_aliases() or {}
+	else
+		Logger.warn(LOG, "Action registry unavailable — aliased labels stay in their catalogue language.")
+	end
+
 	local localised = 0
 	for _, action in ipairs(actions) do
 		if type(action) == "table" and type(action.id) == "string" then
-			local key = "sg_actions." .. action.id
+			local key = "sg_actions." .. (aliases[action.id] or action.id)
 			local translated = i18n.get(key)
 			-- i18n.get answers with the KEY when it does not resolve, which is the
-			-- signal that this action has no registry row yet. Writing it through
-			-- would put "sg_actions.cmd_tab" in the menu.
+			-- signal that this action has no registry row and no alias. Writing it
+			-- through would put "sg_actions.hyper" in the menu.
 			if translated and translated ~= key and translated ~= "" then
 				action.label = translated
 				action.short_label = translated

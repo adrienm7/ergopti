@@ -174,4 +174,31 @@ function M.describe_held_modifiers()
 	return ok and result or "(error)"
 end
 
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Lock-key State ===============
+-- =========================================
+-- =========================================
+
+--- Switches the CapsLock lock state (and its LED) on or off.
+---
+--- Not expressible as a keystroke: macOS delivers CapsLock as a `flagsChanged`
+--- event rather than a keyDown/keyUp pair, so `hs.eventtap.keyStroke("capslock")`
+--- fails silently — it posts an event nothing consumes and reports success. The
+--- HID call is the only path that works, which is why it is exposed here rather
+--- than left for each call site to rediscover.
+---
+--- @param enabled boolean True to lock CapsLock on, false to release it.
+--- @return boolean True when Hammerspoon accepted the change.
+function M.set_capslock(enabled)
+	local ok, err = pcall(hs.hid.capslock.set, enabled and true or false)
+	if not ok then
+		Logger.error(LOG, "set_capslock(%s) failed — %s", tostring(enabled), tostring(err))
+	end
+	return ok
+end
+
 return M

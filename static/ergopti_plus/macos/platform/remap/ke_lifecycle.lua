@@ -34,6 +34,7 @@ local text_utils = require("infra.text_utils")
 local Timings = require("infra.timings")
 local Notifications = require("infra.notifications")
 local i18n   = require("infra.i18n")
+local KePaths = require("platform.remap.ke_paths")
 
 local LOG = "karabiner"
 
@@ -240,11 +241,9 @@ end
 -- Headless priming command validated on this setup: start the user-level
 -- Karabiner bridge daemon directly (no Dock icon, no app window, no Space switch).
 -- This process in turn starts session_monitor and notification agents as needed.
-local KE_CONSOLE_USER_SERVER_BIN =
-	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server"
+local KE_CONSOLE_USER_SERVER_BIN = KePaths.CONSOLE_USER_SERVER
 
-local KE_CLI_BIN =
-	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+local KE_CLI_BIN = KePaths.CLI
 
 local KE_PRIME_HEADLESS_CMD =
 	"/usr/bin/nohup " .. text_utils.shell_quote(KE_CONSOLE_USER_SERVER_BIN)

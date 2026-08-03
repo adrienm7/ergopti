@@ -32,6 +32,8 @@ local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local KeyState       = require("adapters.key_state")
+local KePaths        = require("platform.remap.ke_paths")
 
 
 local LOG = "karabiner"
@@ -42,7 +44,7 @@ local KEYCODE_F17_NAME = Keycodes.to_name(Keycodes.F17_CYCLE_WINDOWS)
 local MOD_SHIFT = "shift"
 local MOD_ALT = "alt"
 
-local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+local KARABINER_CLI = KePaths.CLI
 
 -- macOS can emit two input-source change notifications in rapid succession
 -- during a layout switch — debouncing coalesces them into a single rebuild.
@@ -192,8 +194,8 @@ local function deactivate_capsword()
 			-- macOS sometimes re-displays the CapsLock indicator after a single
 			-- LED reset (race with the Karabiner virtual CapsLock state machine).
 			-- A second unconditional set 150 ms later ensures the indicator stays off.
-			pcall(hs.hid.capslock.set, false)
-			hs.timer.doAfter(0.15, function() pcall(hs.hid.capslock.set, false) end)
+			KeyState.set_capslock(false)
+			hs.timer.doAfter(0.15, function() KeyState.set_capslock(false) end)
 			Logger.done(LOG, "CapsWord deactivated via pointer event.")
 		end, {"--set-variable", "capsword", "0"})
 		-- Nil-check: hs.task.new() returns nil when the CLI binary is absent.
@@ -209,10 +211,10 @@ local function deactivate_capsword()
 			end
 		end
 
-		-- hs.eventtap.keyStroke does not work for CapsLock on macOS — CapsLock is
-		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
-		-- silently. hs.hid.capslock.set is the only reliable way to toggle the LED.
-		pcall(hs.hid.capslock.set, false)
+		-- A keystroke does not work for CapsLock on macOS — CapsLock is a
+		-- flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
+		-- silently. The adapter owns the only reliable way to toggle the LED.
+		KeyState.set_capslock(false)
 	end, {"--get-variable", "capsword"})
 	-- Nil means the CLI binary is absent; release the lock immediately so the guard is not permanent.
 	if not task then
