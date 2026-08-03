@@ -67,6 +67,7 @@
 		"test:walker-constants": "node ./tools/test/test-walker-constants-single-source.cjs",
 		"test:port-matrix": "node ./tools/test/test-port-adapter-matrix.cjs",
 		"test:hotpath-segments": "node ./tools/test/test-hotpath-segments-declared.cjs",
+		"test:shared-js-reachable": "node ./tools/test/test-shared-js-is-reachable.cjs",
 		"test:hotstring-flags": "node ./tools/test/test-hotstring-flag-support-per-driver.cjs",
 		"test:boot-smoke": "node ./tools/test/test-feature-state-boot-smoke.cjs",
 		"test:vector-traceability": "node ./tools/test/test-port-vector-traceability.cjs",
