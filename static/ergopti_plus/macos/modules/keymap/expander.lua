@@ -328,6 +328,13 @@ end
 function M.try_auto_expand(m, char_len, is_ignored)
 	if not require_state("try_auto_expand") then return false end
 
+	-- The `*` flag, and the only place it is checked. An entry that does not opt in
+	-- waits for a terminator — "ya" must not fire inside "yaourt". Neither
+	-- would_fire, this function, nor the tail index filtered on it, so a non-auto
+	-- entry expanded the moment its trigger was complete
+	-- (test_auto_expand_flag_gate.lua carries the full account).
+	if not m.auto then return false end
+
 	local trigger = m.trigger
 
 	-- The whole match decision — length, case resolution, word boundary, no-op —
