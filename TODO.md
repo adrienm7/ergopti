@@ -188,9 +188,29 @@ equally shareable. `sql` almost certainly is not: the two speak to different
 SQLite bindings. The genuinely shared surface is **`core` + `events`** — roughly
 724 lines against 874.
 
-**Start with `core`.** It is the smallest pair, the corpus already covers its
-territory, and proving the pattern there is what makes `events` a repeat rather
-than a second unknown.
+**Start with `core`.** It is the smallest pair, and its function map is exact —
+twelve functions, twelve counterparts, measured 2026-08-03:
+
+| macOS `aggregator/core.lua` | Windows `keylogger_walker_core.ahk` |
+| --- | --- |
+| `reset_batch` · `gc` · `bucket_add` | `KLW_ResetBatch` · `KLW_GC` · `KLW_BucketAdd` |
+| `burst_length_bucket` · `char_class` · `pop_utf8` | `KLW_BurstLengthBucket` · `KLW_CharClass` · `KLW_PopLast` |
+| `get_app_ctx` · `add_ngram_metric` · `push_ngram` | `KLW_GetAppCtx` · `KLW_AddNgramMetric` · `KLW_PushNgram` |
+| `bump_app_day` · `finalize_burst` · `finalize_session` | `KLW_BumpAppDay` · `KLW_FinalizeBurst` · `KLW_FinalizeSession` |
+
+⚠ **And there is a measured gap to close FIRST.** Three of those twelve are
+**pure** — `burst_length_bucket(n)`, `char_class(c)`, `pop_utf8(s)` /
+`KLW_PopLast(s)`. Deterministic, stateless, and **not directly pinned by
+anything**: all 13 existing corpus vectors are end-to-end event replays that
+exercise the pipeline, so these three are covered only by implication. A drift in
+one bucket edge or one character class changes every downstream aggregate and
+produces no failure — the exact silence a corpus exists to break.
+
+So: add a `primitives` section to
+`_shared/tests/corpus/keylogger/aggregation_vectors.json` covering those three,
+replay it in BOTH suites (a corpus only one driver reads is a corpus that pins
+nothing), and only then extract. That is the smallest useful unit of work left in
+this file.
 
 ---
 
