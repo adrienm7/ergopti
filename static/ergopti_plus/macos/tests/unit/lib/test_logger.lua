@@ -9,6 +9,27 @@
 
 local helpers = require("tests.helpers")
 
+--- Returns a logger with an EMPTY ring buffer and no open suppression streak.
+---
+--- These used to be obtained by reloading infra.logger, on the reasoning that a
+--- fresh module means fresh module state. That stopped being true when the ring
+--- and the dedup streak moved into the shared core: the core is required under a
+--- BARE name, and tests/run.lua only evicts modules whose name starts with
+--- modules. / adapters. / infra. / ui. — so it survives every reload, and its
+--- state is per PROCESS.
+---
+--- Which is also what the running driver does. Asking for the clean state makes
+--- the isolation visible at the point that depends on it, instead of leaving it
+--- as a side effect of the loader that a reader has no way to see.
+--- @return table The logger module, at DEBUG level, ring and streak cleared.
+local function fresh_logger()
+	local logger = helpers.load_with_stubs("infra.logger")
+	logger.set_level("DEBUG")
+	logger.ring_buffer_clear()
+	logger.reset_dedup()
+	return logger
+end
+
 -- Replace hs.console.printStyledtext with a recording stub before loading.
 local Logger = helpers.load_with_stubs("infra.logger")
 
@@ -103,17 +124,14 @@ end)
 
 helpers.describe("Logger: ring buffer", function()
 	helpers.it("ring_buffer_snapshot returns empty table when no lines emitted", function()
-		-- Fresh logger state — reload to reset internal ring buffer.
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		local snap = FreshLogger.ring_buffer_snapshot()
 		helpers.assert_true(type(snap) == "table", "snapshot must be a table")
 		helpers.assert_eq(#snap, 0)
 	end)
 
 	helpers.it("ring_buffer_snapshot contains emitted lines in order", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		FreshLogger.info("ring_test", "Line A.")
 		FreshLogger.info("ring_test", "Line B.")
 		FreshLogger.info("ring_test", "Line C.")
@@ -125,8 +143,7 @@ helpers.describe("Logger: ring buffer", function()
 	end)
 
 	helpers.it("ring_buffer_snapshot respects the 200-entry cap (circular overwrite)", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		-- Emit 205 lines — the first 5 should be overwritten.
 		for i = 1, 205 do
 			FreshLogger.info("ring_test", "Entry %d.", i)
@@ -141,8 +158,7 @@ helpers.describe("Logger: ring buffer", function()
 	end)
 
 	helpers.it("lines suppressed by dedup are NOT pushed to the ring buffer", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		-- Emit the same line 5 times — dedup should suppress lines 2-5.
 		for _ = 1, 5 do
 			FreshLogger.info("dedup_test", "Repeated line.")
@@ -162,8 +178,7 @@ end)
 
 helpers.describe("Logger: deduplication", function()
 	helpers.it("does not suppress the first occurrence of a repeated line", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		-- First call must always emit.
 		local snap_before = FreshLogger.ring_buffer_snapshot()
 		FreshLogger.info("dedup_test", "Unique line.")
@@ -172,8 +187,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("suppresses consecutive identical lines (count > 1)", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		FreshLogger.info("dedup_test", "Repeated.")
 		local snap_after_first = FreshLogger.ring_buffer_snapshot()
 		-- Second identical call — should be suppressed (no new ring entry yet).
@@ -184,8 +198,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("flushes a dedup summary when a different line breaks the run", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		FreshLogger.info("dedup_test", "AAA.")
 		FreshLogger.info("dedup_test", "AAA.")  -- suppressed
 		FreshLogger.info("dedup_test", "AAA.")  -- suppressed
@@ -205,8 +218,7 @@ helpers.describe("Logger: deduplication", function()
 	end)
 
 	helpers.it("does not suppress lines of different levels even with same text", function()
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
-		FreshLogger.set_level("DEBUG")
+		local FreshLogger = fresh_logger()
 		FreshLogger.info("dedup_test", "Same text.")
 		FreshLogger.warn("dedup_test", "Same text.")
 		local snap = FreshLogger.ring_buffer_snapshot()

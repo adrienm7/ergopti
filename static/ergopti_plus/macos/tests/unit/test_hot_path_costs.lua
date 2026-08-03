@@ -53,14 +53,22 @@ helpers.describe("logger: DEBUG lines do not fsync inside the eventtap", functio
 				.. "the eventtap on every key — the one place where blocking I/O is least "
 				.. "affordable, since a stalled tap is what macOS disables")
 
-		-- The CALL, not the definition: "local function _write_to_file(stamp, line,"
-		-- matches the same prefix and would put the window on the wrong lines.
-		local call_at = code:find("	_write_to_file(stamp, line,", 1, true)
+		-- The CALL, not the definition: "local function _write_to_file(line," shares
+		-- the same prefix and would put the window on the wrong lines.
+		--
+		-- Re-anchored when the driver moved onto the shared logger core: the writer
+		-- used to be handed the timestamp and the body separately and now receives
+		-- one composed line, because the core builds the timestamp INTO it. The
+		-- call also moved from _log into the sink the core delivers to. What is
+		-- being checked has not changed — that the emit path passes a decision
+		-- derived from the LEVEL — and the behaviour behind it is pinned
+		-- independently, by the flush cases in test_logger_file_sinks.lua.
+		local call_at = code:find("	_write_to_file(line,", 1, true)
 		helpers.assert_true(call_at ~= nil,
 			"the emit path must pass the level decision — a writer that can defer but is never "
 				.. "told to changes nothing")
 		local call = code:sub(call_at, call_at + 120)
-		helpers.assert_true(call:find("M.LEVELS.DEBUG", 1, true) ~= nil,
+		helpers.assert_true(call:find("LEVELS.DEBUG", 1, true) ~= nil,
 			"and only the DEBUG class may defer: INFO and above are the lines that matter after "
 				.. "a crash, and they are rare enough to flush every time")
 	end)

@@ -296,37 +296,43 @@ end
 -- ==================================================
 -- ==================================================
 
+-- Each variant RETURNS the formatted line, or nil when the line was filtered by
+-- level or swallowed by the dedup window. A driver that mirrors a line elsewhere
+-- — the macOS logger raises a system notification on every error — has to follow
+-- the log's own decision: firing a toast for a line the log suppressed buries the
+-- user under identical notifications while the log shows a single deduped entry.
+
 --- DEBUG misc — verbose detail, per-keystroke events, setter calls.
 --- @param module_name string  @param msg string  @param ... any
-function M.debug(module_name, msg, ...)   emit("debug",   module_name, msg, ...) end
+function M.debug(module_name, msg, ...)   return emit("debug",   module_name, msg, ...) end
 
 --- DEBUG start — start of a routine internal operation. Pair with M.done().
 --- @param module_name string  @param msg string  @param ... any
-function M.trace(module_name, msg, ...)   emit("trace",   module_name, msg, ...) end
+function M.trace(module_name, msg, ...)   return emit("trace",   module_name, msg, ...) end
 
 --- DEBUG end — successful end of a routine internal operation. Pair with M.trace().
 --- @param module_name string  @param msg string  @param ... any
-function M.done(module_name, msg, ...)    emit("done",    module_name, msg, ...) end
+function M.done(module_name, msg, ...)    return emit("done",    module_name, msg, ...) end
 
 --- INFO misc — general status, config loaded, feature toggled.
 --- @param module_name string  @param msg string  @param ... any
-function M.info(module_name, msg, ...)    emit("info",    module_name, msg, ...) end
+function M.info(module_name, msg, ...)    return emit("info",    module_name, msg, ...) end
 
 --- INFO start — start of a significant action. Pair with M.success().
 --- @param module_name string  @param msg string  @param ... any
-function M.start(module_name, msg, ...)   emit("start",   module_name, msg, ...) end
+function M.start(module_name, msg, ...)   return emit("start",   module_name, msg, ...) end
 
 --- INFO end — successful completion of a significant action. Pair with M.start().
 --- @param module_name string  @param msg string  @param ... any
-function M.success(module_name, msg, ...) emit("success", module_name, msg, ...) end
+function M.success(module_name, msg, ...) return emit("success", module_name, msg, ...) end
 
 --- WARNING — unexpected but recoverable condition; must be investigated.
 --- @param module_name string  @param msg string  @param ... any
-function M.warn(module_name, msg, ...)    emit("warn",    module_name, msg, ...) end
+function M.warn(module_name, msg, ...)    return emit("warn",    module_name, msg, ...) end
 
 --- ERROR — unrecoverable failure; execution should stop or degrade gracefully.
 --- @param module_name string  @param msg string  @param ... any
-function M.error(module_name, msg, ...)   emit("error",   module_name, msg, ...) end
+function M.error(module_name, msg, ...)   return emit("error",   module_name, msg, ...) end
 
 
 

@@ -213,6 +213,24 @@ local function purge_driver_modules()
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
+
+	-- The shared logger core is required under a BARE name ("logger"), so the
+	-- prefix purge above never evicts it: its ring buffer and its five-second
+	-- suppression streak span the whole process. That is correct for the running
+	-- driver and wrong for a suite, because 630 modules run back to back in one
+	-- process — the last line of one file can suppress the identical first line of
+	-- the next, and the result then depends on the walk order, which differs
+	-- between NTFS and APFS. That is exactly the cross-file contamination this
+	-- function exists to remove.
+	--
+	-- Only the carry-over is cleared. The module is NOT evicted: doing that would
+	-- hand every test an isolation the driver never has, which is how a suite comes
+	-- to be green about behaviour that does not exist.
+	local ok_core, core = pcall(require, "logger")
+	if ok_core and type(core) == "table" then
+		pcall(core.reset_dedup)
+		pcall(core.ring_buffer_clear)
+	end
 end
 
 local total_modules = 0

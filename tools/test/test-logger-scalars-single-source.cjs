@@ -89,6 +89,35 @@ function check(file, name, pattern, expected, note) {
 	}
 }
 
+/**
+ * The inverse of check(): asserts a file does NOT hold a scalar, because it
+ * delegates to whoever does.
+ *
+ * A constant that moved out of a driver leaves check() reporting "renamed or
+ * removed, and this gate silently stopped guarding it" — which is correct and
+ * exactly what it should say. Deleting the check to make that go away is what
+ * loses the guarantee: nothing would then object to the constant being pasted
+ * back in a month later, next to a delegating call that quietly stops being the
+ * source. So the assertion is inverted instead of dropped, and it is the stronger
+ * of the two: not "these numbers agree" but "there is only one number".
+ *
+ * @param {string} file Path relative to static/ergopti_plus.
+ * @param {string} name The constant that must not reappear.
+ * @param {RegExp} pattern Global regex matching its declaration.
+ * @param {string} why What holds the value instead.
+ */
+function mustNotDeclare(file, name, pattern, why) {
+	const src = read(file);
+	const found = [...src.matchAll(pattern)];
+	for (const m of found) {
+		const line = src.slice(0, m.index).split('\n').length;
+		errors.push(
+			`${file}:${line}: ${name} is declared here again — ${why}. Two copies of one number ` +
+				'agree until the day one of them is edited, which is the whole reason this gate exists.'
+		);
+	}
+}
+
 // ── retention_days ──────────────────────────────────────────────────────────
 
 check(
@@ -114,16 +143,16 @@ check(
 	registry.logger.ring_buffer_size
 );
 check(
-	'macos/infra/logger.lua',
-	'RING_BUFFER_SIZE',
-	/\bRING_BUFFER_SIZE\s*=\s*(\d+)/g,
-	registry.logger.ring_buffer_size
-);
-check(
 	'_shared/lua/logger/init.lua',
 	'RING_CAPACITY',
 	/\bRING_CAPACITY\s*=\s*(\d+)/g,
 	registry.logger.ring_buffer_size
+);
+mustNotDeclare(
+	'macos/infra/logger.lua',
+	'RING_BUFFER_SIZE',
+	/\bRING_BUFFER_SIZE\s*=\s*\d+/g,
+	'the macOS driver delegates its ring to the shared core'
 );
 
 // ── dedup_window: the same duration, in two units ───────────────────────────
@@ -134,12 +163,11 @@ check(
 	/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/g,
 	registry.logger.dedup_window_ms
 );
-check(
+mustNotDeclare(
 	'macos/infra/logger.lua',
 	'DEDUP_WINDOW_SEC',
-	/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/g,
-	registry.logger.dedup_window_ms / 1000,
-	'macOS holds this in SECONDS — the registry value is milliseconds'
+	/\bDEDUP_WINDOW_SEC\s*=\s*\d+/g,
+	'the macOS driver delegates its suppression window to the shared core'
 );
 
 check(
