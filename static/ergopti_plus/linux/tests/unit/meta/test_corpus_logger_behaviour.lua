@@ -151,6 +151,27 @@ describe("Logger behaviour corpus: numbering", function()
     Logger.set_level(saved)
   end)
 
+  it("exposes its level table and variant mapping, and both match the corpus", function()
+    -- A driver sink is handed a variant name and needs its level — to decide
+    -- whether to flush now, or to mirror the line into an errors-only file.
+    -- Deriving it from the core is what stops a driver keeping a private copy of
+    -- the numbers, which is exactly how macOS came to use 1/2/3/4.
+    for variant, expected in pairs(CORPUS.numbering) do
+      if type(expected) == "number" then
+        assert_eq(Logger.level_of(variant), expected,
+          "level_of('" .. variant .. "') must be the spec's " .. tostring(expected))
+        assert_eq(type(Logger.label_of(variant)), "string",
+          "label_of('" .. variant .. "') must name the label the line renders with")
+      end
+    end
+    for name, expected in pairs(CORPUS.aliases) do
+      if type(expected) == "number" then
+        assert_eq(Logger.LEVELS[name:upper()], expected,
+          "LEVELS." .. name:upper() .. " must be the spec's " .. tostring(expected))
+      end
+    end
+  end)
+
   it("the numbering is what the filtering thresholds are built from", function()
     -- The numbers are only meaningful if a threshold set to one variant's level
     -- admits exactly the variants at or above it. Asserting the table alone would
