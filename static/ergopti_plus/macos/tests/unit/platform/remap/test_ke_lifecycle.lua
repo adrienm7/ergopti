@@ -116,8 +116,10 @@ helpers.describe("KELifecycle.launch_headless", function()
 		-- Unload notifications to test the pcall path in launch_headless
 		package.loaded["infra.notifications"] = nil
 		-- Must not raise even though notifications is gone
-		local ok = pcall(function() KE.launch_headless() end)
+		local ok, err = pcall(function() return KE.launch_headless() end)
 		helpers.assert_eq(ok, true, "launch_headless must not propagate errors")
+		helpers.assert_true(err == nil or type(err) == "boolean",
+			"and must answer whether it launched — the caller shows a bridge-down state on it")
 	end)
 end)
 

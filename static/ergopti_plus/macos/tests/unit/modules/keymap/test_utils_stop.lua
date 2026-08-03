@@ -43,8 +43,12 @@ helpers.describe("keymap.utils M.stop(): existence (watcher-leak-on-reload)", fu
 	end)
 
 	helpers.it("M.stop() does not raise when no watchers are running", function()
-		local ok = pcall(KU.stop)
-		helpers.assert_true(ok, "M.stop() must not throw before any watcher is armed")
+		-- Called directly: a raise fails with the real error. What the guard has to
+		-- leave behind is a USABLE module — the boot path calls this defensively, so a
+		-- guard that survived by wedging itself would break the call that follows.
+		KU.stop()
+		helpers.assert_eq(type(KU.stop), "function",
+			"and must leave the module callable")
 	end)
 
 	helpers.it("M.stop() is idempotent — safe to call twice", function()

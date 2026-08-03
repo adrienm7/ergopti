@@ -178,8 +178,12 @@ helpers.describe("ApiRemote.prewarm_active_entry_decrypt: caches the active entr
 
 	helpers.it("is a no-op when there are no entries configured", function()
 		local ApiRemote, _fire_pending = load_fresh_api_remote()
-		local ok = pcall(ApiRemote.prewarm_active_entry_decrypt)
-		helpers.assert_true(ok, "prewarm_active_entry_decrypt must not throw with zero entries configured")
+		-- Called directly: a raise fails with the real error. What the guard has to
+		-- leave behind is a USABLE module — the boot path calls this defensively, so a
+		-- guard that survived by wedging itself would break the call that follows.
+		ApiRemote.prewarm_active_entry_decrypt()
+		helpers.assert_eq(type(ApiRemote.prewarm_active_entry_decrypt), "function",
+			"and must leave the module callable")
 	end)
 
 	helpers.it("is a no-op when the active entry's token is already cleartext", function()

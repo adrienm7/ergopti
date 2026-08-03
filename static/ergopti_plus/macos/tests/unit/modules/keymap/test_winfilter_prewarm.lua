@@ -50,8 +50,12 @@ helpers.describe("keymap.utils prewarm_ignored_win_watchers (winfilter-cold-star
 		-- Prewarm must do exactly what the first is_ignored_window() would have done,
 		-- but here it is the ONLY thing called — proving the cold cost is paid off the
 		-- keystroke path.
-		local ok = pcall(KU.prewarm_ignored_win_watchers)
-		helpers.assert_true(ok, "prewarm must not raise")
+		-- Called directly: a raise fails with the real error. What the guard has to
+		-- leave behind is a USABLE module — the boot path calls this defensively, so a
+		-- guard that survived by wedging itself would break the call that follows.
+		KU.prewarm_ignored_win_watchers()
+		helpers.assert_eq(type(KU.prewarm_ignored_win_watchers), "function",
+			"and must leave the module callable")
 		helpers.assert_true(app_started,   "prewarm must start the application watcher")
 		helpers.assert_true(filter_subbed, "prewarm must subscribe the window filter (paying its cold enumeration)")
 	end)

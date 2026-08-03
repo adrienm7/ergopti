@@ -34,13 +34,15 @@ end
 
 helpers.describe("State.new: argument validation", function()
 	helpers.it("errors when defaults is not a table", function()
-		local ok = pcall(State.new, "oops", {})
+		local ok, err = pcall(State.new, "oops", {})
 		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err) ~= "", "and must say why: " .. tostring(err))
 	end)
 
 	helpers.it("errors when delays_default is not a table", function()
-		local ok = pcall(State.new, make_defaults(), "oops")
+		local ok, err = pcall(State.new, make_defaults(), "oops")
 		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err) ~= "", "and must say why: " .. tostring(err))
 	end)
 end)
 
