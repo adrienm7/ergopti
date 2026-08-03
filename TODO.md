@@ -226,15 +226,37 @@ coverage of the non-star case** — the entry that waits for a terminator, which
 the core's own comment calls the whole point of the field: *"`ya` must not fire in
 the middle of `yaourt`"*.
 
-**So the first step is still vectors first, but the vectors to write are the ones
-nobody thought were missing:** `auto_expand = false` cases proving a trigger does
-NOT fire mid-word without a terminator. A migration verified only by star vectors
-would keep every star trigger working and could silently make `ya` fire inside
-`yaourt` on two drivers at once — a regression the whole 29-vector corpus is
-blind to today.
+**Then the vectors were tried, and the obstacle moved again.** Four `auto_expand
+= false` vectors were written and replayed. Result, measured rather than
+reasoned:
 
-Only then port the index, then adopt. The behaviour is worth 21 ms per keystroke;
-the non-star behaviour is worth not corrupting the user's words.
+- **The macOS unit replay cannot express the non-star case at all.** It goes
+  through `Expander.would_fire(m, buffer)`, which is a *pure buffer-tail
+  predicate*: it never reads `auto_expand`. The flag is honoured one level up, by
+  WHICH CALL PATH the expander takes — `try_auto_expand` on the trigger's own last
+  character, versus the terminator path. So a vector asserting "this must not
+  fire" fails against a function that was never deciding it.
+- The harness's own bound caught the attempt immediately (`#vectors - skipped
+  == checked`), which is the gate working exactly as designed.
+- One of the four (`non_star_fires_on_terminator`) is not unit-expressible either:
+  `field_semantics` already records that the unit replays do not feed the
+  terminator.
+
+**So the first step is a level down, not a vector up:** the non-star gate needs a
+replay against the expander's DISPATCH (or e2e), because the predicate the corpus
+currently replays through is deliberately blind to the flag. Writing vectors
+before that just moves the blindness into the corpus.
+
+⚠ **Two wrong measurements in one hour, on this one entry.** First "the corpus has
+no flag field" (it does — `auto_expand` IS `*`). Then "macOS ignores
+`auto_expand`, so it is broken" (it does not — `would_fire` is not where the flag
+lives). Both came from reading names instead of the call site. The entry is now
+what it should have been from the start: **the blocker is not the index, and not
+the vectors. It is that the corpus replays through a predicate one level below
+the flag it needs to test.**
+
+Only then port the index, then adopt. The star behaviour is worth 21 ms per
+keystroke; the non-star behaviour is worth not corrupting the user's words.
 
 macOS's `would_fire()` is no longer a blocker: it has four consumers (the
 expansion path, the tooltip preview, two LLM-bridge sites) and
