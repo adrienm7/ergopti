@@ -142,16 +142,46 @@ check(
 	'macOS holds this in SECONDS — the registry value is milliseconds'
 );
 
-// The two must not merely each match the registry; they must denote the same
-// duration. Stated separately because that is the invariant the comments on
-// both sides claim, and the one nothing was checking.
+check(
+	'_shared/lua/logger/init.lua',
+	'DEDUP_WINDOW_SEC',
+	/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/g,
+	registry.logger.dedup_window_ms / 1000,
+	'the shared core holds this in SECONDS — the registry value is milliseconds'
+);
+
+// The three must not merely each match the registry; they must denote the same
+// duration. Stated separately because that is the invariant the comments claim,
+// and the one nothing was checking. The shared core joined them on 2026-08-03:
+// it had no dedup at all, so adopting it would have removed flood suppression
+// from a driver that had it.
 {
 	const ms = Number((read('windows/infra/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]);
 	const sec = Number((read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
+	const coreSec = Number((read('_shared/lua/logger/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
 	if (Number.isFinite(ms) && Number.isFinite(sec) && ms !== sec * 1000) {
 		errors.push(
 			`the two dedup windows are different durations: AHK ${ms} ms vs HS ${sec} s (= ${sec * 1000} ms). ` +
 				'Both files claim in a comment to mirror the other.'
+		);
+	}
+	if (Number.isFinite(sec) && Number.isFinite(coreSec) && sec !== coreSec) {
+		errors.push(
+			`the macOS driver and the shared core disagree on the dedup window: ${sec} s vs ${coreSec} s. ` +
+				'The core is what macOS is being migrated onto, so a difference here IS the migration failing.'
+		);
+	}
+}
+
+// And the cross-driver corpus must record the same window, or the vectors that
+// exercise suppression would be measuring a duration no driver uses.
+{
+	const corpus = JSON.parse(read('_shared/tests/corpus/logger/behaviour_vectors.json'));
+	const windowSec = corpus.dedup && corpus.dedup.window_seconds;
+	if (windowSec !== registry.logger.dedup_window_ms / 1000) {
+		errors.push(
+			`the logger behaviour corpus records a ${windowSec} s dedup window, the registry says ` +
+				`${registry.logger.dedup_window_ms / 1000} s. The vectors would exercise a duration nothing uses.`
 		);
 	}
 }

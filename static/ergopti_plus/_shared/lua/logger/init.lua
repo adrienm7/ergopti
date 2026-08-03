@@ -62,6 +62,18 @@ local LABELS = {
 --- Minimum severity level. Lines below this threshold are discarded.
 local _min_level = 10
 
+--- How long an identical line stays suppressed, in seconds.
+--- Five seconds, matching both driver loggers byte for byte: a line that recurs
+--- is de-BOUNCED, not permanently silenced, so a streak outliving the window
+--- re-surfaces instead of vanishing from the log for the rest of the session.
+local DEDUP_WINDOW_SEC = 5
+
+--- The suppression state: the last accepted line, when it was accepted, how many
+--- identical ones have been swallowed since, and which variant they were.
+--- A streak is closed by a "N identical lines suppressed" summary carrying the
+--- SAME variant, so a suppressed error storm is still reported as an error.
+local _dedup = { line = nil, time = 0, count = 0, variant = nil }
+
 --- Optional sink function called with every accepted formatted line.
 --- Signature: function(line: string, variant: string) → void
 local _sink = nil
@@ -113,6 +125,17 @@ end
 --- Signature: function() → string in "YYYY-MM-DD HH:MM:SS:mmm" format.
 M.timestamp_fn = M.default_timestamp
 
+--- Monotonic-ish seconds provider, used only to measure the dedup window.
+--- os.time() has one-second resolution, which is coarse but never runs backwards
+--- within a session; a driver with a better clock replaces this.
+--- @return number
+function M.default_clock()
+	return os.time()
+end
+
+--- Clock provider for the dedup window. Replace with a higher-resolution one.
+M.clock_fn = M.default_clock
+
 
 
 
@@ -156,12 +179,46 @@ end
 -- =====================================================
 -- =====================================================
 
---- Formats a log line per spec § 3 and pushes it to the ring buffer and sink.
+--- Pushes one finished line to the ring buffer and the sink.
+--- Suppressed duplicates never reach here, which is what keeps the ring — the
+--- buffer a crash report is built from — free of a thousand copies of one line.
+--- @param line string The complete formatted line.
+--- @param variant string The variant that produced it.
+local function deliver(line, variant)
+	local slot = (_ring_head % RING_CAPACITY) + 1
+	_ring[slot] = line
+	_ring_head  = _ring_head + 1
+	if _ring_size < RING_CAPACITY then _ring_size = _ring_size + 1 end
+
+	if _sink then
+		local ok = pcall(_sink, line, variant)
+		-- Sink errors are deliberately swallowed — a broken sink must never
+		-- prevent the calling code from completing its own work
+		if not ok then end
+	end
+end
+
+--- Closes an open suppression streak with a summary line, if one is open.
+--- The summary takes the same path as a normal line and carries the suppressed
+--- variant, so a swallowed error storm is still reported at ERROR level.
+local function flush_dedup_summary()
+	if _dedup.count == 0 then return end
+	local variant = _dedup.variant or "info"
+	local label   = LABELS[variant] or variant:upper()
+	local word    = _dedup.count == 1 and "line" or "lines"
+	local summary = string.format("%s [%s] [logger] \u{2191} %d identical %s suppressed",
+		M.timestamp_fn(), label, _dedup.count, word)
+	_dedup.count   = 0
+	_dedup.variant = nil
+	deliver(summary, variant)
+end
+
+--- Formats a log line per spec § 3, deduplicates it, and delivers it.
 --- @param variant string  One of: debug/trace/done/info/start/success/warn/error
---- @param module  string  Caller-supplied tag (e.g. "menu_llm")
---- @param msg     string  Format string (Lua string.format syntax)
---- @param ...            Variadic arguments for msg
---- @return string|nil    The formatted line, or nil if filtered out
+--- @param module_name string  Caller-supplied tag (e.g. "menu_llm")
+--- @param msg string  Format string (Lua string.format syntax)
+--- @param ... any  Variadic arguments for msg
+--- @return string|nil  The formatted line, or nil when filtered or suppressed
 local function emit(variant, module_name, msg, ...)
 	local level = LEVELS[variant]
 	if not level or level < _min_level then return nil end
@@ -179,20 +236,25 @@ local function emit(variant, module_name, msg, ...)
 	local ts    = M.timestamp_fn()
 	local line  = string.format("%s [%s] [%s] %s", ts, label, tostring(module_name), body)
 
-	-- Push to ring buffer (circular, O(1))
-	local slot = (_ring_head % RING_CAPACITY) + 1
-	_ring[slot] = line
-	_ring_head  = _ring_head + 1
-	if _ring_size < RING_CAPACITY then _ring_size = _ring_size + 1 end
+	-- Deduplication is keyed on everything AFTER the timestamp: two emissions of
+	-- one message a second apart differ only in their timestamp, so keying on the
+	-- whole line would suppress nothing at all.
+	local body_key = string.format("[%s] [%s] %s", label, tostring(module_name), body)
+	local now = M.clock_fn()
 
-	-- Forward to sink (driver-specific output)
-	if _sink then
-		local ok = pcall(_sink, line, variant)
-		-- Sink errors are deliberately swallowed — a broken sink must never
-		-- prevent the calling code from completing its own work
-		if not ok then end
+
+	if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
+		_dedup.count   = _dedup.count + 1
+		_dedup.variant = variant
+		return nil
 	end
 
+	flush_dedup_summary()
+	_dedup.line    = body_key
+	_dedup.time    = now
+	_dedup.variant = nil
+
+	deliver(line, variant)
 	return line
 end
 
@@ -275,6 +337,25 @@ function M.ring_buffer_clear()
 	_ring      = {}
 	_ring_head = 0
 	_ring_size = 0
+end
+
+--- Forgets the current suppression streak without emitting its summary.
+--- For tests and for a driver reload: a streak carried across a reload would
+--- suppress the first line of the new session because it matched the last line
+--- of the old one, which is the least useful moment to lose a line.
+function M.reset_dedup()
+	_dedup.line    = nil
+	_dedup.time    = 0
+	_dedup.count   = 0
+	_dedup.variant = nil
+end
+
+--- Reports how many identical lines the open streak has swallowed so far.
+--- Exposed so a test can assert suppression happened rather than infer it from
+--- an absence, which is the shape of a vacuous assertion.
+--- @return number
+function M.dedup_suppressed_count()
+	return _dedup.count
 end
 
 --- Returns the number of entries currently in the ring buffer.

@@ -93,6 +93,32 @@ _LogCorpus_EmitNumbered(N) {
 	_LoggerRefreshFastFlags()
 }
 
+; Emits one variant with an explicit body, for the dedup probes which need to
+; control the exact text rather than have it salted unique.
+_LogCorpus_EmitBody(Variant, Body) {
+	switch Variant {
+		case "debug":   LoggerDebug("corpus", Body)
+		case "trace":   LoggerTrace("corpus", Body)
+		case "done":    LoggerDone("corpus", Body)
+		case "info":    LoggerInfo("corpus", Body)
+		case "start":   LoggerStart("corpus", Body)
+		case "success": LoggerSuccess("corpus", Body)
+		case "warn":    LoggerWarn("corpus", Body)
+		case "error":   LoggerError("corpus", Body)
+		default:        throw Error("unknown variant in corpus: " . Variant)
+	}
+}
+
+; Forgets the current suppression streak without emitting its summary, so one
+; case cannot leave a streak open across into the next.
+_LogCorpus_ResetDedup() {
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL, _LastErrTime
+	_LOGGER_DEDUP_KEY := ""
+	_LOGGER_DEDUP_COUNT := 0
+	_LOGGER_DEDUP_LEVEL := ""
+	_LastErrTime := 0
+}
+
 ; Reads back the emission index a ring entry carries, or -1 when it carries none.
 _LogCorpus_IndexOf(Line) {
 	if RegExMatch(Line, "ligne (\d+)", &M)
@@ -265,6 +291,128 @@ _LogCorpus_RunAll() {
 		LOGGER_RING_CURSOR := 0
 	}
 	Test("logger corpus ring: capacity matches the corpus", _LogCorpus_Capacity)
+
+
+
+	; ======================================
+	; ======================================
+	; ======= 6/ Deduplication =============
+	; ======================================
+	; ======================================
+
+	_LogCorpus_MakeDedupCase(Vector) {
+		_Run() {
+			global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
+			global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LastErrTime
+
+			Saved := LOGGER_MIN_LEVEL
+			_LogCorpus_SetLevel("DEBUG")
+			_LogCorpus_ResetDedup()
+			LOGGER_RING_BUFFER := []
+			LOGGER_RING_CURSOR := 0
+
+			Lines := []
+			LoggerSetTestSink((L) => Lines.Push(L))
+			Variant := Vector.Has("variant") ? Vector["variant"] : "info"
+			for _, Body in Vector["emit"] {
+				_LogCorpus_EmitBody(Variant, Body)
+			}
+			LoggerClearTestSink()
+
+			if Vector.Has("expect_delivered") {
+				AssertEqual(Lines.Length, Vector["expect_delivered"],
+					Vector["id"] . ": " . Vector["expect_delivered"] . " line(s) must reach the sink")
+			}
+			if Vector.Has("expect_suppressed") {
+				AssertEqual(_LOGGER_DEDUP_COUNT, Vector["expect_suppressed"],
+					Vector["id"] . ": " . Vector["expect_suppressed"] . " line(s) must have been suppressed "
+					. "-- asserting the absence alone would pass against a logger that dropped them for "
+					. "any other reason")
+			}
+			if (Vector.Has("expect_summary") and Vector["expect_summary"]) {
+				Summaries := 0
+				for _, L in Lines {
+					if InStr(L, "identical") {
+						Summaries += 1
+						AssertTrue(InStr(L, Vector["expect_summary_count"] . " identical") > 0,
+							Vector["id"] . ": the summary must carry the suppressed count, got " . L)
+					}
+				}
+				AssertEqual(Summaries, 1, Vector["id"] . ": closing a streak must emit exactly one summary")
+			}
+			if Vector.Has("expect_summary_variant") {
+				; Seed a streak at the variant under test, then close it and read the
+				; summary's label back
+				_LogCorpus_ResetDedup()
+				Wanted := Vector["expect_summary_variant"]
+				_LogCorpus_EmitBody(Wanted, "graine")
+				_LogCorpus_EmitBody(Wanted, "graine")
+				Closing := []
+				LoggerSetTestSink((L) => Closing.Push(L))
+				_LogCorpus_EmitBody(Wanted, "fermeture")
+				LoggerClearTestSink()
+				Found := ""
+				for _, L in Closing {
+					if InStr(L, "identical")
+						Found := L
+				}
+				AssertTrue(Found != "", Vector["id"] . ": closing the streak must emit a summary")
+				AssertTrue(InStr(Found, "[" . StrUpper(Wanted) . "]") > 0,
+					Vector["id"] . ": the summary must carry the suppressed variant's label, or a "
+					. "swallowed error storm never reaches the errors-only log -- got " . Found)
+			}
+			if Vector.Has("expect_ring_entries") {
+				AssertEqual(LoggerRingBufferSnapshot().Length, Vector["expect_ring_entries"],
+					Vector["id"] . ": the ring feeds crash reports -- a thousand copies of one line "
+					. "would push out everything that explains it")
+			}
+
+			_LogCorpus_ResetDedup()
+			LOGGER_RING_BUFFER := []
+			LOGGER_RING_CURSOR := 0
+			LOGGER_MIN_LEVEL := Saved
+			_LoggerRefreshFastFlags()
+		}
+		return _Run
+	}
+	for _, Vector in Data["dedup"]["cases"] {
+		Test("logger corpus dedup: " . Vector["id"], _LogCorpus_MakeDedupCase(Vector))
+	}
+
+	_LogCorpus_DedupWindowExpires() {
+		global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LastErrTime
+		; De-BOUNCED, not permanently silenced. Without this the first occurrence of
+		; a recurring line would be the only one ever logged, for the whole session.
+		; The window is walked by moving the streak's start backwards rather than by
+		; sleeping five seconds, which would add five seconds to every CI run.
+		Saved := LOGGER_MIN_LEVEL
+		_LogCorpus_SetLevel("DEBUG")
+		_LogCorpus_ResetDedup()
+		LOGGER_RING_BUFFER := []
+		LOGGER_RING_CURSOR := 0
+
+		Lines := []
+		LoggerSetTestSink((L) => Lines.Push(L))
+		_LogCorpus_EmitBody("info", "recurrente")
+		_LogCorpus_EmitBody("info", "recurrente")
+		_LastErrTime := _LastErrTime - (Data["dedup"]["window_seconds"] * 1000) - 1000
+		_LogCorpus_EmitBody("info", "recurrente")
+		LoggerClearTestSink()
+
+		Real := 0
+		for _, L in Lines {
+			if !InStr(L, "identical")
+				Real += 1
+		}
+		AssertEqual(Real, 2, "the line must re-surface once the window has passed")
+
+		_LogCorpus_ResetDedup()
+		LOGGER_RING_BUFFER := []
+		LOGGER_RING_CURSOR := 0
+		LOGGER_MIN_LEVEL := Saved
+		_LoggerRefreshFastFlags()
+	}
+	Test("logger corpus dedup: a streak that outlives the window re-surfaces", _LogCorpus_DedupWindowExpires)
 
 
 	_LogCorpus_Default() {

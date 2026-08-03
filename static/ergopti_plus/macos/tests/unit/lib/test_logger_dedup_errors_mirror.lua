@@ -19,7 +19,15 @@ helpers.assert_true(src ~= nil, "infra/logger.lua source must be locatable")
 -- Locate _flush_dedup_summary body.
 local fn_pos = src:find("local function _flush_dedup_summary()", 1, true)
 helpers.assert_true(fn_pos ~= nil, "logger.lua must define _flush_dedup_summary (lib-logger-perf-002)")
-local fn_body = src:sub(fn_pos, fn_pos + 1200)
+
+-- Bounded by the function's own closing `end`, not by a character count. It used
+-- to slice a fixed 1200 characters, so adding a few lines to the top of the
+-- function pushed the level check out of the window and failed an invariant that
+-- was still perfectly satisfied — a test that measures its own slice size rather
+-- than the code.
+local fn_end = src:find("\nend\n", fn_pos, true)
+helpers.assert_true(fn_end ~= nil, "_flush_dedup_summary must have a closing end (lib-logger-perf-002)")
+local fn_body = src:sub(fn_pos, fn_end)
 
 -- Test 1: the function must check variant.level >= M.LEVELS.WARNING.
 local has_level_check = fn_body:find("variant.level >= M.LEVELS.WARNING", 1, true) ~= nil
