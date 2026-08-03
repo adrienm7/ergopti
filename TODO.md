@@ -233,9 +233,27 @@ none of it is a batch job, and the section title used to imply otherwise.
 
 ## 5. Audits not yet run
 
-`docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — check
-`PROJECT_MEMORY.md` before running either; the refactor cycle the latter belongs
-to was declared complete.
+`docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — both files still exist.
+
+⚠ **Measured 2026-08-03: the reason given for not running `refactor.md` no longer
+checks out.** The entry said "the refactor cycle it belongs to was declared
+complete", pointing at
+[`project-simplification-branch-2026-07-30`](docs/PROJECT_MEMORY.md). That entry
+describes the `simplification` branch as **unmerged, with 6 of 12 blockers
+delivered** — not complete — and it directs the reader to "`TODO.md` §0", a
+section that no longer exists.
+
+And the branch itself is **gone**: no local branch, no worktree (only
+`hs-audit-2` remains). So the memory entry documents a branch nobody can inspect,
+against a plan section nobody can read, and this entry cites it as authority for
+skipping an audit.
+
+**Resolve the branch question before running either prompt.** Either the six
+remaining blockers (B3, B4, B5, B6 and the rest) landed on `dev` under other
+commits — in which case the memory entry should say so and be closed — or they
+were dropped with the branch, in which case they are lost work that belongs back
+in this file. Nobody can tell from the repository as it stands, and running an
+audit on top of that ambiguity would produce findings nobody can act on.
 
 `audit_mise_en_commun_et_simplification.md` **was run on 2026-08-03** — report at
 [`docs/audits/2026-08-03-mise-en-commun-et-simplification.md`](docs/audits/2026-08-03-mise-en-commun-et-simplification.md).
