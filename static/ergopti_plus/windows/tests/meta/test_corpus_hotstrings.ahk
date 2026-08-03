@@ -178,6 +178,16 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		if Buf = "" {
 			continue
 		}
+		; A non-star trigger legitimately fails to match a buffer that DOES end
+		; with it: without the "*" flag it waits for a terminator, so "ya" must not
+		; fire inside "yaourt". The rule below assumed otherwise, and the
+		; assumption held only because every vector in the corpus was a star
+		; trigger — all 29 of them, until 2026-08-04. That is the same blind spot
+		; that let macOS ship with no gate on the flag at all; the corpus harness
+		; had it too, one layer up.
+		if (Vec.Has("auto_expand") && !Vec["auto_expand"]) {
+			continue
+		}
 		BufTail := SubStr(Buf, -TLen)
 		; Use !== (case-sensitive) so "btw" and "BTW" are treated as distinct
 		AssertTrue(BufTail !== Trigger,

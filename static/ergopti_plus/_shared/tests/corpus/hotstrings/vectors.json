@@ -6,9 +6,10 @@
 		"backspace_count": "LOGICAL count: how many codepoints of already-typed text the expansion replaces (trigger length, plus 1 when terminator_consumed is true). It is NOT the number of backspace keystrokes a driver emits. macOS keeps the longest common prefix shared by trigger and replacement, so for 'btw' -> 'by the way' it emits 2 backspaces and types 'y the way' where Windows and Linux emit 3 and type the whole replacement; 6 of the 13 matched vectors below differ this way. All three drivers replace the same codepoints, which is what this field asserts and what makes it portable. A driver conforms by replacing that many codepoints, however few keystrokes it takes to do it.",
 		"is_case_sensitive": "Registration shape, NOT comparison: true registers the trigger literally (no lower/Title/UPPER family). Matching still folds case unless is_case_sensitive_strict is also set. The name is inherited from the TOML schema and is the opposite of what it suggests.",
 		"is_case_sensitive_strict": "Comparison: true means only the casing written in the TOML matches. This is the flag the domain spec calls is_case_sensitive.",
-		"driver_specific": "Present when the vector's expected outcome depends on a constant that is deliberately per-driver. A driver whose constant differs must SKIP the vector rather than assert it, and say which constant. Absent means the vector is a cross-driver contract."
+		"driver_specific": "Present when the vector's expected outcome depends on a constant that is deliberately per-driver. A driver whose constant differs must SKIP the vector rather than assert it, and say which constant. Absent means the vector is a cross-driver contract.",
+		"auto_expand": "The AutoHotkey \"*\" flag under another name. true fires the moment the trigger's own last character is typed; false waits for a terminator, so \"ya\" does not fire inside \"yaourt\". Named here because reading it as a convenience toggle is what hid, for the corpus's whole life, that every vector in it was a star trigger and none covered the false case — the case macOS was getting wrong. A replay must drive the DISPATCH for this field: on macOS that is try_auto_expand, not would_fire, which is a pure buffer-tail predicate and does not decide it."
 	},
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"vectors": [
 		{
 			"id": "simple_expansion",
@@ -445,6 +446,32 @@
 			"terminator": " ",
 			"expected": {
 				"matched": false
+			}
+		},
+		{
+			"id": "non_star_waits_for_terminator",
+			"description": "A trigger WITHOUT auto_expand must not fire when its own last character is typed. This is the case the shared engine comment calls the whole point of the field — \"ya\" inside \"yaourt\" — and until 2026-08-04 no vector covered it: all 29 carried auto_expand = true. macOS had no gate at any level and expanded on the spot, rewriting the word as the user typed it; Linux and Windows gated it by two unrelated mechanisms. Three implementations, one invariant, nothing shared holding them to it.",
+			"trigger": "ya",
+			"replacement": "y a-t-il",
+			"is_word": false,
+			"auto_expand": false,
+			"buffer": "ya",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "star_fires_where_non_star_waits",
+			"description": "The contrast. Same trigger, same buffer — only auto_expand differs, and the outcome flips. Without it the vector above passes on any driver that never matches anything, which is the shape a corpus takes when it stops testing and starts agreeing with itself.",
+			"trigger": "ya",
+			"replacement": "y a-t-il",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "ya",
+			"expected": {
+				"matched": true,
+				"replacement": "y a-t-il",
+				"backspace_count": 2
 			}
 		}
 	],
