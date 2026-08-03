@@ -100,10 +100,67 @@ for (const [name, where] of declared) {
 	}
 }
 
+
+
+
+
+// ==================================================
+// ==================================================
+// ======= 2/ Pre-Logger Boot Stamps ================
+// ==================================================
+// ==================================================
+
+// The five stamps taken BEFORE BootProfile_Begin, when the logger does not exist
+// yet: they record a tick only, and are replayed as log lines once it does.
+// Without them the whole span from process creation to BootProfile_Begin is one
+// opaque "script parse + load: ~N ms" with no attribution inside it.
+const BOOT_STAMPS = [
+	'Bundle extracted',
+	'Module includes initialised',
+	'Tray reset + onboarding',
+	'Config parsed (TOML + i18n)',
+	'Hotstring engine initialised'
+];
+
+const entry = fs.readFileSync(path.join(WIN, 'ErgoptiPlus.ahk'), 'utf8');
+const stamped = [...entry.matchAll(/BootProfile_Stamp\(\s*"([^"]+)"/g)].map((m) => m[1]);
+
+if (stamped.length === 0) {
+	errors.push(
+		'parsed 0 BootProfile_Stamp call(s) from ErgoptiPlus.ahk — the parser drifted, and the boot ' +
+			'stamp check below would pass over nothing'
+	);
+}
+for (const name of BOOT_STAMPS) {
+	if (!stamped.includes(name)) {
+		errors.push(
+			`the pre-logger boot stamp "${name}" is gone. Without it the span from process creation to ` +
+				'BootProfile_Begin collapses back into one opaque number with no attribution inside it.'
+		);
+	}
+}
+for (const name of stamped) {
+	if (!BOOT_STAMPS.includes(name)) {
+		errors.push(`ErgoptiPlus.ahk takes a boot stamp "${name}" that is not in the inventory — add it`);
+	}
+}
+
+
+
+
+// ==================================================
+// ==================================================
+// ======= 3/ Report ================================
+// ==================================================
+// ==================================================
+
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the HotPath segment inventory and the driver disagree:\x1b[0m');
+	console.error('\x1b[31m[FAIL] the instrumentation inventory and the driver disagree:\x1b[0m');
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] all ${declared.size} HotPath segment(s) are declared, and every declared one is emitted.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] ${declared.size} HotPath segment(s) and ${stamped.length} pre-logger boot stamp(s), ` +
+		'all declared, all emitted.\x1b[0m'
+);
