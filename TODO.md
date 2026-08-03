@@ -201,17 +201,23 @@ expansion that never fires.
 `codegen-terminators.cjs` is **not** a usable model: its Lua output is 44 lines of
 data, and no generator in this repo emits a Lua function.
 
-## 3. Menu label-tree parity (I3)
+## 3. Menu label-tree parity (I3) — half done 2026-08-03
 
-`test-menu-parity.cjs`, the label-tree half: render for the three platforms and
-diff the label trees. **Blocked, deliberately:** the menu manifest carries no
-`linux` platform value anywhere — 27 rows are `[ahk]`, 19 `[hs]`, 2 both — so
-Linux "sees" 76 rows only because an unrestricted row defaults to every platform,
-while `menu_builder.lua` builds its rows by hand. Diffing the three trees today
-would report that migration, not a defect.
+**The shape half is done** (`35b603d`). The manifest now has a Linux dimension,
+and giving it one immediately surfaced three rows nobody could see: `kanata`
+(built by Linux since it was written, absent from the manifest — so the manifest
+described a driver with no remap menu at all), `updates` (built, absent,
+genuinely Linux-only) and `apps` (built, while the manifest said
+`platforms = ["hs"]`). `test-menu-top-level-parity.cjs` holds both directions.
 
-Follows the menu-capability work: the manifest needs `provider`/`builder` before
-a declarative group can absorb a driver-supplied builder.
+⚠ **The entry named `test-menu-parity.cjs` as the gate to extend. No such file
+has ever existed, in any commit.**
+
+**What remains is the label half, and its real cost is now measured:** Linux
+reads no manifest at all — not one `menu_manifest` reference outside a comment.
+Diffing translated label trees needs a Linux renderer, and the reference
+implementation (`macos/infra/manifest_menu.lua`) is 561 lines. That is the job,
+and it is a port, not a diff.
 
 ---
 
@@ -223,11 +229,37 @@ none of it is a batch job, and the section title used to imply otherwise.
 
 - **Convention S stubs (I1).** Every canonical folder exists on every driver;
   where unimplemented it ships an `init` with a `STATUS: not implemented` line and
-  a `REASON_KEY`. Blocked on the reader:
-  `test-menu-manifest-keys-have-readers.cjs` rejects a manifest field before its
-  reader exists, so write the reader first.
-- **`reason_key` for platform restrictions (I2) — NOT a batch job, and the gate
-  says so.** 139 of 142 restrictions carry no reason. Writing them all means 142
+  a `REASON_KEY`. ⚠ **The stated blocker is wrong — measured 2026-08-03.**
+  `test-menu-manifest-keys-have-readers.cjs` reads
+  `_shared/modules/menu/menu_manifest.json` and nothing else (line 51). It has
+  never looked at the feature manifest, so it would not reject a `REASON_KEY`
+  there and it is not what blocks this. The real dependency is the same as the
+  entry below: something has to display the reason.
+- **`reason_key` for platform restrictions (I2).**
+  **Maintainer's decision, 2026-08-03: write the consumer FIRST**, then fill the
+  reasons as the ratchet comes down. ⚠ **Measured the same day, and the consumer
+  is three steps, not one:**
+  1. `reason_key` has **zero readers anywhere in the repo** — a grep over
+     `static/` and `tools/` finds it only inside
+     `test-platform-restrictions-explained.cjs` itself. Without a consumer the
+     ~3 000 strings would be dead configuration, which is why the question was
+     put to the maintainer before writing any of them.
+  2. `tools/build/build-features-manifest.js` does not even **emit** it. The
+     generated `features_manifest.{lua,ahk}` carry `platforms` (246 entries) and
+     no `reason_key`, so no driver could read one today even if it wanted to.
+     `description_key` is the cautionary precedent: it IS emitted, and its own
+     generated header records that no macOS module reads it.
+  3. Only then a display. The natural home is the healthcheck report (already
+     reachable at Menu → Debug → Healthcheck, already structured as `safe_collect`
+     collectors), not a menu row — showing absent features as disabled rows would
+     change every menu on every platform, which nobody asked for.
+
+  So the order is: emit → read → display → **write one real reason end to end and
+  lower the baseline by one**, which is what proves the chain before 141 more
+  strings are written on top of it.
+
+  The frozen count and its rationale below still hold. 139 of 142 restrictions
+  carry no reason. Writing them all means 142
   locale keys × 21 locales ≈ **3 000 translated strings in 19 languages nobody
   here can check**, and `test-platform-restrictions-explained.cjs` is explicit
   that machine-filling them "would put unverifiable text in front of users in
