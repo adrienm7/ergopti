@@ -290,7 +290,14 @@ class HookDispatcher {
 	}
 
 	; Bound to IH.OnKeyDown — receives (ih, vk, sc) from AHK.
+	;
+	; The first stage of every keystroke, and it had no segment at all: the two
+	; tap-hold trackers and the whole EVT_KB_DOWN fan-out ran inside the hook
+	; callback with nothing attributing their cost. A slow key-down was visible
+	; only as latency further along, where it was indistinguishable from a slow
+	; consumer. Two QPC reads; the log line is gated by the profiler floor.
 	static _OnKeyDown(ih, vk, sc) {
+		_hpKeyDown := HotPath_Now()
 		try TapHoldTrackKeyDownByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackKeyDownByScancode", _thTrackErr)
@@ -298,10 +305,12 @@ class HookDispatcher {
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
+		HotPath_LogIfSlow("Hook.KeyDown", _hpKeyDown, "vk" . vk . " sc" . sc)
 	}
 
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
+		_hpKeyUp := HotPath_Now()
 		try TapHoldTrackKeyUpByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackKeyUpByScancode", _thTrackErr)
@@ -312,6 +321,7 @@ class HookDispatcher {
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
+		HotPath_LogIfSlow("Hook.KeyUp", _hpKeyUp, "vk" . vk . " sc" . sc)
 	}
 
 

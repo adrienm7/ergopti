@@ -728,25 +728,38 @@ floor of zero and the next false green is the one someone is about to write:
 
 ## 2. Performance — instrumentation first
 
-What is left is mostly **unmeasured**, and silence reads as "optimal".
+⚠ **Re-measured 2026-08-03: most of this section had already been built, and its
+stated prerequisite was done.** The text below gated everything behind
+sub-segmenting `_TooltipPresentStack` — which exists, with five marks (`clamp`,
+`prepare`, `corners`, `border`, `reveal`) covering its whole body, and a comment
+in the source saying why. So did the Tooltip render counter, the
+`_TooltipResolvePosition` exit counters, `RemapEmit` and `UIA.SelectionPoll`. The
+driver declares **12 HotPath segments**: `HSE.Dispatch`, `HSE.FeedChar`,
+`Hook.KeyDown`, `Hook.KeyUp`, `OnChar`, `RemapEmit`, `Tooltip.BorderPixelLoop`,
+`Tooltip.Build`, `Tooltip.DequeuePresent`, `Tooltip.LlmPresent`,
+`Tooltip.Present`, `Tooltip.ResolvePos`, `UIA.SelectionPoll`.
 
-**Prerequisite before any further tooltip work:** sub-segment
-`_TooltipPresentStack` (`windows/ui/tooltip/helpers.ahk`). Since the UIA fix,
-`Tooltip.Present` is the dominant offender (102 of 194 slow lines on the first
-post-fix day, ~12.9 ms mean) and has **no surviving lever** — every candidate was
-rejected in verification or forbidden by PROJECT_MEMORY. It aggregates six
-sub-steps with no attribution, so anything proposed before this exists is
-speculation.
+`Hook.KeyDown` and `Hook.KeyUp` were added on 2026-08-03 — the first stage of
+every keystroke had no segment, so the two tap-hold trackers and the whole
+`EVT_KB_DOWN` fan-out ran inside the hook callback with nothing attributing their
+cost. A slow key-down was visible only as latency further along, where it was
+indistinguishable from a slow consumer.
 
-Then, in value order: `LLM.FeedChar` (prime suspect for the ~600 slow `OnChar`
-events with no matching slow `HSE.FeedChar`); `RemapEmit`, the first stage of
-every keystroke, with no segment at all; the keylogger fan-out and
-`Hook.KeyDown`, which close the per-keystroke budget; exit counters for
-`_TooltipResolvePosition` plus a total render counter, without which the
-slow-render ratio is incalculable; five retroactive boot marks before
-`BootProfile_Begin`; and for idle, `UIA.SelectionPoll`, `Metrics.FocusRefresh`
-(a `WinGetTitle` on a Not Responding window blocks 20×/s with no trace) and
-`KL.Ingest`.
+**Still missing, and each is two QPC reads plus a floor-gated log:**
+
+- `LLM.FeedChar` — the prime suspect for the ~600 slow `OnChar` events with no
+  matching slow `HSE.FeedChar`. Note the name may be stale: nothing in the driver
+  is called that today, so the first step is finding what the LLM char path is
+  actually named.
+- the keylogger fan-out and `KL.Ingest`.
+- `Metrics.FocusRefresh` — a `WinGetTitle` on a Not Responding window blocks
+  20×/s with no trace.
+- five retroactive boot marks before `BootProfile_Begin` (a different mechanism
+  from HotPath; needs a pre-init mark queue, not a segment).
+
+**What genuinely cannot be done here: reading the numbers.** Every segment above
+emits only on a real Windows session over real typing. The instrumentation is
+code; the conclusions are not, and nothing in this repo can produce them.
 
 ---
 
