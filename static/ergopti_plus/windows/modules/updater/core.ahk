@@ -555,10 +555,16 @@ _Updater_FetchLatestJsonAsync(Channel, OnJson) {
 ; A throw means the request errored (DNS / connect / timeout) — treated as a
 ; failure that yields OnJson(""). UPDATER_ASYNC_MAX_POLLS is a belt-and-suspenders
 ; cap so a wedged request can never leave a poll timer running forever.
+; The async update check polls on a timer, and each tick calls
+; WaitForResponse(0) on a COM object. A COM call that blocks stalls the whole
+; message pump — the same failure mode the Ollama busy-loop fix addressed — and
+; this path had no segment, so a stall here was invisible and looked like general
+; sluggishness. Two QPC reads; the log line is gated by the profiler floor.
 _Updater_PollAsync(id) {
 	global _UpdaterAsyncRequests, UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
 	if !_UpdaterAsyncRequests.Has(id)
 		return
+	_hpUpdaterPoll := HotPath_Now()
 	rec := _UpdaterAsyncRequests[id]
 	http := rec["http"]
 	ready := false
@@ -576,6 +582,10 @@ _Updater_PollAsync(id) {
 			try LoggerWarn("Updater", "Async check exceeded its poll budget — aborting.")
 		} else {
 			SetTimer(() => _Updater_PollAsync(id), -UPDATER_ASYNC_POLL_MS)
+			; The re-arm exit is the one that runs on EVERY tick but the last, so
+			; leaving it unmeasured would attribute the poll cost to the single
+			; completion tick and report the path as fast
+			HotPath_LogIfSlow("Updater.Poll", _hpUpdaterPoll, "re-armed")
 			return
 		}
 	}
@@ -598,6 +608,7 @@ _Updater_PollAsync(id) {
 	catch as OnJsonErr {
 		try LoggerError("Updater", "OnJson callback threw while completing an async background check: {1}.", OnJsonErr.Message)
 	}
+	HotPath_LogIfSlow("Updater.Poll", _hpUpdaterPoll, failed ? "failed" : "completed")
 }
 
 ; Abandons every in-flight async update check. Called when background checks are
