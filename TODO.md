@@ -248,6 +248,40 @@ And the branch itself is **gone**: no local branch, no worktree (only
 against a plan section nobody can read, and this entry cites it as authority for
 skipping an audit.
 
+🚩 **AND THEN VERIFIED: FIVE OR SIX OF THE SIX ARE ALREADY FIXED. Do not act on
+the table below without re-checking each row.**
+
+The `PROJECT_MEMORY` entry is dated **2026-07-30** and describes a branch state,
+not the repository. Measured 2026-08-03 on `dev`:
+
+- **B3 — fixed.** `test-kanata-defalias-parity.cjs` passes 17/17 and names the
+  four aliases the blocker said were dangling: *"hand-maintained composites
+  survive the replacement (rollc, rollx, deadtrema, copy, paste)"*.
+- **B5 — fixed.** `linux/.../sqlite_writer.lua` now passes the SQL on **stdin**
+  via `SqliteCommand.build`, and the surviving comment is in the PAST tense:
+  *"Staging it in /tmp is what turned this module into a keystroke leak."* The
+  leak is what the comment documents, not what the code does.
+- **B4 — almost certainly fixed.** 75 references to `secure_field` /
+  `private_window` in the Linux tree, against a blocker that said there were
+  none.
+- **B6 — almost certainly fixed.** 12 references to `text_cipher` /
+  `text_crypto` on macOS, plus `_shared/lua/keylogger/text_crypto.lua`, against a
+  blocker that said ten empty stubs.
+- **B9 — almost certainly fixed.** `context_window` appears 4 times in the
+  Windows AutoHotkey tree; the blocker's own reproduction was `grep -c
+  context_window windows/**/*.ahk` → 0.
+- **B10** — not re-checked.
+
+**The lesson is the one this file already carries, at its sharpest.** Recovering
+these took a session; believing them cost a false security alarm raised to the
+maintainer minutes later. A recovered record is still a record with a date on it,
+and four days was enough. **Re-measure a recovered entry exactly as hard as a
+stale one — recovery is not verification.**
+
+The table stays below because B10 is unverified and because the traps are worth
+reading before touching those areas. It is a historical record now, not a work
+order.
+
 ✅ **RECOVERED 2026-08-03 — and they were never lost, only unreachable.**
 
 The reflog holds 81c9012a merge simplification: Fast-forward and
