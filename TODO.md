@@ -71,59 +71,7 @@ Reconcile those two pairs BEFORE keying, or two of the 55 get the wrong id.
 
 ---
 
-## 2. macOS onto the shared logger core
-
-**Decided 2026-08-03: do it.** Everything it depends on is in place — the spec
-numbering, the dedup the core was missing, `ring_buffer_clear` /
-`ring_buffer_size` / `reset_dedup` / `dedup_suppressed_count` on both sides,
-`LEVELS` / `level_of` / `label_of` so a sink can express its policy in the core's
-vocabulary, and `_shared/tests/corpus/logger/behaviour_vectors.json` replayed by
-all three suites (filtering, the lifecycle-pair rule, dedup, the ring).
-
-**Attempted and reverted; here is the exact cost.** The rewiring is small — five
-edits to declarations plus one replacing `_log`'s body with a call into the core
-and moving console/file/errors-only into a sink. 994 → 943 lines, and **31
-failing tests in three families**:
-
-1. ~~**Ring lifetime.**~~ **Settled 2026-08-03, and it was never a choice.** The
-   core is reached as `require("logger")` — a BARE module name, because
-   `_shared/lua` is spliced onto `package.path`. `tests/run.lua` evicts modules
-   between files by prefix (`^modules%.`, `^adapters%.`, `^infra%.`, `^ui%.`), so
-   a bare name is never evicted and **core state is per process**. The three
-   "expected 0, saw 200" failures are that, exactly. A test needing a clean ring
-   calls `ring_buffer_clear()`; needing a clean streak, `reset_dedup()`. Adding
-   `"^logger$"` to the purge list would "fix" it and be wrong — it would grant the
-   tests an isolation the running driver never has. See
-   [`project-the-macos-logger-ring-is-per-process`](docs/PROJECT_MEMORY.md).
-2. **Source-scanning tests.** `test_hot_path_costs` matches
-   `_write_to_file(stamp, line, variant.level ~= …)`; the signature becomes one
-   composed line. `test_logger_dedup_errors_mirror` names `_flush_dedup_summary`,
-   which moves into the sink. Both need re-encoding against the new home —
-   legitimate, but eight files of careful work, and never a weakening.
-3. **The error-notification handler** loses the module name: it reads values
-   `_log` used to compute and the core now computes.
-
-~~**What has no corpus:** the driver half.~~ **Written 2026-08-03.**
-`macos/tests/unit/lib/test_logger_file_sinks.lua` states that half as behaviour
-in 14 cases — canonical line format, the eight variants under their own labels,
-level filtering before the sink, the errors-only mirror (and its exclusions), the
-mirrored line being byte-identical to the unified one, topical routing in both
-directions, the level-aware flush policy and its safety valve, the suppression
-summary's exact count and its mirror, and the print() tee. Seven of eight
-one-fact probes went red; the eighth is documented as a doubly-guarded hazard.
-
-**So only families 2 and 3 remain.** The design that follows from the ring
-decision: keep `M.current_level` as the single filter (six tests and the
-log-level submenu ASSIGN it directly, so a second threshold in the core would
-filter differently from the one the menu shows) and leave the core's own
-threshold at its floor; shim `Core.clock_fn`/`Core.timestamp_fn` back through the
-driver's fields so a test setting `Logger.clock_fn` still drives the window; and
-let the core's `deliver()` hand the summary to the driver sink, which deletes
-`_flush_dedup_summary`'s four duplicated sink writes outright.
-
----
-
-## 3. macOS + Windows onto the shared matcher core
+## 2. macOS + Windows onto the shared matcher core
 
 **Decided 2026-08-03: do it.** A 526-line shared core already exists and reaches
 Linux only, so this is adoption, not generation. 29 cross-driver vectors
@@ -147,7 +95,7 @@ data, and no generator in this repo emits a Lua function.
 
 ---
 
-## 4. One keylogger aggregation core
+## 3. One keylogger aggregation core
 
 **Decided 2026-08-03: do it.** Two ~1 330-line walkers whose function names map
 1:1, one of which says in a comment that it "MIRRORS" the other.
@@ -165,7 +113,7 @@ from one walker's cases and replayed against both.
 
 ---
 
-## 5. Read the performance numbers
+## 4. Read the performance numbers
 
 **The instrumentation is finished** — 20 HotPath segments and 5 pre-logger boot
 stamps, every one inventoried by `test-hotpath-segments-declared.cjs` with a line
@@ -185,7 +133,7 @@ are both COM calls that can stall the message pump.
 
 ---
 
-## 6. Menu label-tree parity (I3)
+## 5. Menu label-tree parity (I3)
 
 `test-menu-parity.cjs`, the label-tree half: render for the three platforms and
 diff the label trees. **Blocked, deliberately:** the menu manifest carries no
@@ -199,7 +147,7 @@ a declarative group can absorb a driver-supplied builder.
 
 ---
 
-## 7. Smaller, known, and cheap
+## 6. Smaller, known, and cheap
 
 - **Convention S stubs (I1).** Every canonical folder exists on every driver;
   where unimplemented it ships an `init` with a `STATUS: not implemented` line and
@@ -230,7 +178,7 @@ a declarative group can absorb a driver-supplied builder.
 
 ---
 
-## 8. Audits not yet run
+## 7. Audits not yet run
 
 `docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — check
 `PROJECT_MEMORY.md` before running either; the refactor cycle the latter belongs

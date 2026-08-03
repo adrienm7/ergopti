@@ -27,6 +27,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-instrumentation-absence-is-invisible](#project-instrumentation-absence-is-invisible) — A missing profiler segment produces a clean-looking profile, so the 20 segments and 5 boot stamps are inventoried
 - [project-a-green-probe-can-mean-redundant-guards](#project-a-green-probe-can-mean-redundant-guards) — A falsifiability probe that stays green can mean the hazard is guarded twice, not that the assertion is vacuous
 - [project-the-macos-logger-ring-is-per-process](#project-the-macos-logger-ring-is-per-process) — The shared Lua core is required under a bare name, so the test runner never evicts it and its state spans every test file
+- [project-adopting-a-singleton-core-has-three-costs](#project-adopting-a-singleton-core-has-three-costs) — Moving a driver onto a shared process-singleton core costs single-slot hooks, cross-file state carry-over, and newly-visible log lines
 - [project-audit-ahk-2026-07-30-pass](#project-audit-ahk-2026-07-30-pass) — Sixth adversarial AHK pass: 14 findings all fixed; the refuted list, the coverage gaps, and the two measurements worth keeping
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
@@ -3419,3 +3420,74 @@ moment that state moves into the core. This is exactly the shape of the three
   make the tests pass by giving them an isolation the running driver never has.
 
 Related: [[project-plan-entries-go-stale-faster-than-code]].
+
+
+
+
+### project-adopting-a-singleton-core-has-three-costs
+
+_Moving a driver onto a shared process-singleton core costs three things nobody predicts: single-slot hooks, cross-file state carry-over, and newly-visible log lines_
+
+<sub>slug: `project_adopting_a_singleton_core_has_three_costs`</sub>
+
+The macOS driver moved onto `_shared/lua/logger` on 2026-08-03 (1054 → 877 lines,
+four duplicated algorithms deleted: line format, eight variants, 200-entry ring,
+five-second dedup window). The rewiring itself was small. Everything that went
+wrong came from one fact — **the core is a process singleton and the driver
+wrapper is not** — and it went wrong in three distinct ways.
+
+**1. Single-slot hooks, multiple wrapper instances.** The core holds ONE sink,
+ONE clock and ONE timestamp provider. `infra.logger` can be instantiated more
+than once inside a single test file: the file takes its own handle through
+`load_with_stubs`, and the module under test pulls another when it loads.
+Whichever ran last owns all three slots — so a test would install a sink on one
+instance and watch every line be delivered through the other, reaching the file
+and the console exactly as it should and reaching the assertion never. Symptom:
+*"expected 3 lines, got 0"*, on a driver that is logging perfectly.
+
+Fix: `M.claim_core_hooks()`, called at load AND from `M.set_sink()`. Installing a
+sink is a caller saying "drive the logger through me", so it is the right moment
+to take ownership. It is exposed on `M` rather than kept `local` because
+`M.set_sink` is defined earlier in the file, and a table field resolves at CALL
+time where a `local` declared further down is not captured at all — see
+[[project-lua-closure-before-local-nil-global]].
+
+Claim the clock as a **closure over `M`**, never by value: `Core.clock_fn =
+function() return M.clock_fn() end`. Assigning `Core.clock_fn = M.clock_fn`
+captures it once at load, and every later replacement is ignored — which silently
+disables the only way a five-second window can be exercised by a suite running in
+milliseconds.
+
+**2. Shared state makes the suite order-dependent.** The dedup streak is per
+process, so the last line of one test file can suppress the identical first line
+of the next, and the result then depends on the walk order — which differs
+between NTFS and APFS. `tests/run.lua`'s `purge_driver_modules()` now clears the
+core's streak and ring between FILES. It deliberately does NOT add `^logger$` to
+`PURGE_PREFIXES`: evicting the module would hand every test an isolation the
+running driver never has, which is how a suite comes to be green about behaviour
+that does not exist.
+
+**3. Previously-invisible log lines become visible, and old counts encode the
+blindness.** `test_expander_no_duplicate_init` asserted "first init emits no
+WARN". After adoption it saw one — a real
+`[keymap.terminator_replay] M.init() called more than once`, emitted through a
+DIFFERENT logger instance and therefore invisible to the sink before. The count
+had not regressed; it had stopped lying. The fix is to scope the assertion to the
+module under test's own tag, which is what it always meant.
+
+**How to apply:**
+
+- Before adopting a shared core, ask what it holds ONE of. Every such slot is a
+  place where two wrapper instances fight, and the loser fails silently.
+- A test count that changes after adoption is evidence about the OLD test, not
+  automatically about the new code. Read the line before assuming a regression.
+- Pin the driver half as BEHAVIOUR first. Source-scanning guards all go red on a
+  move that changes nothing, and the only available reading of a red test is "you
+  broke it". See [[project-source-scanning-guards-must-strip-comments]].
+- When a constant moves out of a driver, a single-source gate will report that it
+  "silently stopped guarding it". Do not delete the check — **invert** it, into
+  "this file must not declare it again". That is the stronger assertion: not
+  "these numbers agree" but "there is only one number".
+
+Related: [[project-the-macos-logger-ring-is-per-process]],
+[[project-a-green-probe-can-mean-redundant-guards]].

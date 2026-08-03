@@ -20,6 +20,11 @@
 
 local helpers = require("tests.helpers")
 
+-- The module tag keymap/expander.lua logs under. Every driver instance now shares
+-- one logger core, so a sink sees warnings from every module at once — these
+-- cases are about the expander's own duplicate-init guard and say so.
+local EXPANDER_LOG_TAG = "keymap.expander"
+
 -- Force a fresh Logger so the sink installed below does not inherit state from
 -- other suites that may have run before this file in the same process.
 package.loaded["infra.logger"] = nil
@@ -163,12 +168,22 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		local llm2      = make_llm()
 
 		-- Collect every WARNING line emitted during the two init() calls.
+		-- Scoped to the expander's OWN tag, which is what these cases have always
+		-- meant. It used to count every WARNING reaching the sink, and that only
+		-- worked because the sink could not see most of them: each infra.logger
+		-- instance ran its own pipeline, so a warning emitted through a different
+		-- instance — keymap.terminator_replay's own duplicate-init guard, fired by
+		-- an earlier case in this same file — never arrived. Now every driver
+		-- instance funnels through the one shared core and they all do. Counting
+		-- "any WARNING from anywhere" would make this test fail whenever an
+		-- unrelated module warns, which is not the invariant it is guarding.
 		local warn_lines = {}
 		L.set_sink(function(line, variant)
-			if variant == "warn" then
+			if variant == "warn" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
 				warn_lines[#warn_lines + 1] = line
 			end
 		end)
+		local function warn_dump() return table.concat(warn_lines, " || ") end
 
 		expander.init(state1, registry1, llm1)   -- legitimate — no WARN expected
 		expander.init(state2, registry2, llm2)   -- duplicate — must emit one WARN
@@ -176,7 +191,8 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		L.set_sink(nil)
 
 		helpers.assert_eq(#warn_lines, 1,
-			"expected exactly one WARN from the duplicate init() call, got " .. tostring(#warn_lines))
+			"expected exactly one WARN from the duplicate init() call, got "
+			.. tostring(#warn_lines) .. ": " .. warn_dump())
 
 		-- Confirm the message text matches the guard wording in the source.
 		local line = warn_lines[1] or ""
@@ -196,19 +212,30 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		local registry1 = make_registry()
 		local llm1      = make_llm()
 
+		-- Scoped to the expander's OWN tag, which is what these cases have always
+		-- meant. It used to count every WARNING reaching the sink, and that only
+		-- worked because the sink could not see most of them: each infra.logger
+		-- instance ran its own pipeline, so a warning emitted through a different
+		-- instance — keymap.terminator_replay's own duplicate-init guard, fired by
+		-- an earlier case in this same file — never arrived. Now every driver
+		-- instance funnels through the one shared core and they all do. Counting
+		-- "any WARNING from anywhere" would make this test fail whenever an
+		-- unrelated module warns, which is not the invariant it is guarding.
 		local warn_lines = {}
 		L.set_sink(function(line, variant)
-			if variant == "warn" then
+			if variant == "warn" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
 				warn_lines[#warn_lines + 1] = line
 			end
 		end)
+		local function warn_dump() return table.concat(warn_lines, " || ") end
 
 		expander.init(state1, registry1, llm1)
 
 		L.set_sink(nil)
 
 		helpers.assert_eq(#warn_lines, 0,
-			"first init() must not emit any WARN — got " .. tostring(#warn_lines))
+			"first init() must not emit any WARN — got "
+			.. tostring(#warn_lines) .. ": " .. warn_dump())
 
 		-- Module must be functional: try_expand must not crash and must bind buffer.
 		state1.buffer = ""

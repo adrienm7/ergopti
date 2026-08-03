@@ -7,6 +7,16 @@
 --- Provides consistent formatting, level filtering, colored console output, and
 --- a unified rotating file sink so every subsystem's output lands in one place.
 ---
+--- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
+--- _shared/lua/logger owns the canonical line format, the eight variants, the
+--- 200-entry ring and the five-second dedup window — items 4, 5 and 8 below. This
+--- file owns everything that touches the filesystem or the console: the unified
+--- daily log, its purge, the errors-only mirror, the topical fan-out, the
+--- level-aware flush policy and the print() tee. The split is not cosmetic: the
+--- core's half is replayed against a cross-driver corpus so all three drivers are
+--- held to ONE implementation of those rules, and this half is pinned as
+--- behaviour by tests/unit/lib/test_logger_file_sinks.lua.
+---
 --- FEATURES & RATIONALE:
 --- 1. Level Filtering: Avoids console noise in production while preserving full
 ---    detail in development — just lower the level once and all modules comply.
@@ -84,6 +94,27 @@ local PURGE_NOON_HOUR = 12
 -- no grammar to get wrong and no "file unavailable" branch to diverge in.
 local SUB_LOG_NAMES = require("_generated.logger_sub_files")
 
+-- The platform-neutral core, shared with the Linux daemon and mirrored by the
+-- AutoHotkey driver. It owns the four algorithms this file used to carry its own
+-- copy of: the canonical line format, the eight variants, the 200-entry ring, and
+-- the five-second dedup window. Each copy carried a comment claiming to match the
+-- other drivers byte for byte — and a claim is not a mechanism. The corpus at
+-- _shared/tests/corpus/logger/behaviour_vectors.json is the mechanism, and it can
+-- only hold ONE implementation to those rules.
+--
+-- Everything the core deliberately has no opinion about stays here: the unified
+-- daily file, the errors-only mirror, the topical fan-out, the level-aware flush
+-- policy, and the print() tee. That half is pinned by
+-- tests/unit/lib/test_logger_file_sinks.lua as BEHAVIOUR rather than as source
+-- text, which is what made this migration provable instead of merely plausible.
+--
+-- LIFETIME: the core is required under a BARE name, so tests/run.lua's
+-- between-file purge (prefixes ^modules%. ^adapters%. ^infra%. ^ui%.) never
+-- evicts it. Its ring and its dedup streak are therefore per PROCESS — which is
+-- also true of the running driver. A test that needs either one clean asks for
+-- it: ring_buffer_clear() / reset_dedup().
+local Core = require("logger")
+
 
 
 
@@ -98,26 +129,23 @@ local SUB_LOG_NAMES = require("_generated.logger_sub_files")
 
 
 
-
 -- ====================================
 -- ====================================
 -- ======= 1/ Level Definitions =======
 -- ====================================
 -- ====================================
 
---- Numeric severity levels used for filtering.
---- The spacing is spec § 4's, shared with the AutoHotkey driver's LOGGER_SEVERITY
---- and the shared Lua core. It used to be 1/2/3/4 here, which meant a level
---- NUMBER meant two different things depending on which driver read it — and
---- made the shared core impossible to adopt without silently changing what every
---- threshold filtered. The gaps also leave room for a level between two existing
---- ones without renumbering anything.
-M.LEVELS = {
-	DEBUG   = 10,
-	INFO    = 20,
-	WARNING = 30,
-	ERROR   = 40,
-}
+--- Numeric severity levels used for filtering, read from the core rather than
+--- re-declared here.
+---
+--- The spacing is spec § 4's, shared with the AutoHotkey driver's
+--- LOGGER_SEVERITY. It used to be 1/2/3/4 in this file, which meant a level
+--- NUMBER meant two different things depending on which driver read it, and made
+--- the core impossible to adopt without silently changing what every threshold
+--- filtered. Two tables of the same four numbers is exactly how that happened, so
+--- there is now one table. The gaps still leave room for a level between two
+--- existing ones without renumbering anything.
+M.LEVELS = Core.LEVELS
 
 -- Full variant table: each entry drives its label, color, and severity level.
 --
@@ -128,19 +156,33 @@ M.LEVELS = {
 --   DEBUG axis (level 10): TRACE → start of a routine internal op  |  DONE → end
 --   INFO  axis (level 20): START → start of a significant action   |  SUCCESS → end
 --
-local VARIANTS = {
+-- This driver's public vocabulary is UPPERCASE — every call site, M.LEVELS, and
+-- the log-level submenu use it; the core's is lowercase. One table maps between
+-- them, and it is the only place the two spellings meet.
+local CORE_VARIANT = {
 	-- ── Debug axis ──────────────────────────────────────────────────────────
-	DEBUG   = { level = M.LEVELS.DEBUG,   label = "DEBUG"   },
-	TRACE   = { level = M.LEVELS.DEBUG,   label = "TRACE"   },
-	DONE    = { level = M.LEVELS.DEBUG,   label = "DONE"    },
+	DEBUG   = "debug",
+	TRACE   = "trace",
+	DONE    = "done",
 	-- ── Info axis ───────────────────────────────────────────────────────────
-	INFO    = { level = M.LEVELS.INFO,    label = "INFO"    },
-	START   = { level = M.LEVELS.INFO,    label = "START"   },
-	SUCCESS = { level = M.LEVELS.INFO,    label = "SUCCESS" },
+	INFO    = "info",
+	START   = "start",
+	SUCCESS = "success",
 	-- ── Warning / Error ─────────────────────────────────────────────────────
-	WARNING = { level = M.LEVELS.WARNING, label = "WARNING" },
-	ERROR   = { level = M.LEVELS.ERROR,   label = "ERROR"   },
+	WARNING = "warn",
+	ERROR   = "error",
 }
+
+-- Derived from the core, never re-declared. A variant's label and severity are
+-- the core's answer; a second table here would be a second answer, and the two
+-- would agree right up until one of them was edited.
+local VARIANTS = {}
+for upper_key, core_name in pairs(CORE_VARIANT) do
+	VARIANTS[upper_key] = {
+		level = Core.level_of(core_name),
+		label = Core.label_of(core_name),
+	}
+end
 
 --- Current active level — only messages at or above this level are emitted.
 M.current_level = M.LEVELS.WARNING
@@ -191,10 +233,14 @@ local _sub_file_date  = {}
 -- with the other sink state and ABOVE every closure that touches it.
 local _sub_handles    = {}
 
--- Forward declaration — implementation is in Section 3.2. Declared here for the
--- same reason as the handles above: init_log_path() and _purge_old_logs() are
--- defined before it and must reach the real dispatcher, not a nil global.
+-- Forward declarations — implementations are in Section 3.2. Declared here for
+-- the same reason as the handles above: init_log_path(), _purge_old_logs() and
+-- M.set_sink() are defined before them and must reach the real functions, not a
+-- nil global. A `local` declared textually BELOW a closure that names it is not
+-- captured by that closure at all; it silently binds the global instead, and the
+-- surrounding pcall then swallows the "attempt to call a nil value" that follows.
 local _log
+local _driver_sink
 
 --- Configures the log file path under <config_dir>/hammerspoon/logs/ with
 --- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
@@ -370,6 +416,11 @@ end
 --- @param fn function|nil One-arity function receiving the line string, or nil to clear.
 function M.set_sink(fn)
 	_test_sink = (type(fn) == "function") and fn or nil
+
+	-- Installing a sink is a test saying "drive the logger through me", so it is
+	-- also the moment this instance takes ownership of the core's single set of
+	-- hooks. See claim_core_hooks() for why that is not automatic.
+	M.claim_core_hooks()
 end
 
 --- Sets the active log level. Messages below this threshold are silently dropped.
@@ -399,24 +450,14 @@ end
 -- ===================================
 -- ===================================
 
--- Window during which a repeated identical line is suppressed. Named rather than
--- inlined because the AHK driver holds the same duration in MILLISECONDS, and two
--- bare literals in two units, each with a comment claiming to match the other,
--- are indistinguishable from two literals that have drifted apart.
--- Single source: _shared/modules/timings/constants.toml [logger] dedup_window_ms.
-local DEDUP_WINDOW_SEC = 5
-
--- Deduplication state: suppresses consecutive identical log lines to prevent spam.
--- `time` stamps the start of the current streak so a recurring line re-surfaces
--- after the window instead of being silenced forever (matches the AHK driver).
-local _dedup = { line = nil, count = 0, variant_key = nil, time = 0 }
-
--- Forward declaration — implementation is in Section 5 (ring buffer).
--- Must be declared here so _log() captures the variable by reference.
-local _push_ring
+-- The five-second suppression window, the streak state and the ring buffer are
+-- all the core's now. What stood here was a second implementation of each, kept
+-- in step with the AutoHotkey driver by a comment saying so — and the window in
+-- particular was a bare literal in SECONDS facing a bare literal in MILLISECONDS,
+-- which is indistinguishable from two literals that have already drifted apart.
 
 -- Runtime error-capture state (installed by Section 7). Forward-declared here so
--- _log() and _flush_dedup_summary() route their console writes through
+-- _driver_sink() routes every console write through
 -- _console_out(), which the print() tee uses to tell the Logger's own output
 -- (already written to the file) apart from foreign prints (Hammerspoon error
 -- tracebacks, stray print()s) that must be captured into the file too.
@@ -434,6 +475,7 @@ local function _console_out(line)
 	pcall(p, line)
 	_emitting = false
 end
+
 
 
 
@@ -486,11 +528,6 @@ local function _ensure_log_file()
 	return _file_handle
 end
 
---- Appends a fully-formatted line to the main log and any matching sub-files.
---- All writes are line-flushed so `tail -f` sees output in real time and an
---- unexpected HS crash does not lose buffered entries. Failures are silent.
---- @param stamp string Pre-built timestamp string.
---- @param line string The line to write (without timestamp).
 --- Returns the io.open mode for a topical sub-file: "a" when it already carries
 --- today's lines, "w" when it must be reset for a new day. Decided once per
 --- sub-file per calendar date, then cached in _sub_file_date.
@@ -544,11 +581,12 @@ local FLUSH_EVERY_N_DEBUG = 40
 --- buffer and are flushed by the next important line or once
 --- FLUSH_EVERY_N_DEBUG of them have accumulated, so only a bounded tail of
 --- verbose tracing is ever at risk.
---- @param stamp string Formatted timestamp.
---- @param line string The already-composed log line.
+--- @param line string The complete formatted line, timestamp included. The core
+---   composes the timestamp INTO the line, so this no longer takes the two
+---   halves separately and cannot put them back together in the wrong order.
 --- @param immediate boolean|nil False to defer the flush; anything else flushes now.
-local function _write_to_file(stamp, line, immediate)
-	local full = stamp .. " " .. line .. "\n"
+local function _write_to_file(line, immediate)
+	local full = line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
 		pcall(function()
@@ -606,37 +644,42 @@ end
 
 
 
+
 -- =================================
 -- ===== 3.2) Dedup & Dispatch =====
 -- =================================
 
---- Emits a count summary using the same variant as the suppressed messages, then resets.
-local function _flush_dedup_summary()
-	if _dedup.count == 0 then return end
-	local variant = VARIANTS[_dedup.variant_key] or VARIANTS["INFO"]
-	local word    = _dedup.count == 1 and "line" or "lines"
-	local summary = string.format("[%s] [logger] \u{2191} %d identical %s suppressed",
-		variant.label, _dedup.count, word)
-	_console_out(summary)
-	local stamp = _timestamp()
-	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
-	_push_ring(stamp .. " " .. summary)
+--- The sink the core delivers every accepted line to.
+---
+--- This is the whole driver half in one function, and the core calls it for
+--- suppression summaries on exactly the same terms as for ordinary lines. That
+--- deletes a duplicate that used to matter: _flush_dedup_summary wrote the
+--- summary to the console, the ring, the file and the errors mirror itself, in
+--- its own copy of this logic — and it had already drifted once, silently
+--- skipping the test sink, so no assertion could observe suppression at all.
+--- @param line string The complete formatted line, timestamp included.
+--- @param variant string The core's lowercase variant name ("info", "warn", …).
+_driver_sink = function(line, variant)
+	local level = Core.level_of(variant) or Core.LEVELS.INFO
 
-	-- The summary must take the SAME sinks as a normal line. It did not reach the
-	-- test sink, which meant no test could observe suppression at all: the count
-	-- was written to console, ring and file and was invisible to every assertion.
-	-- The shared core delivers its summary through the sink, so this was also a
-	-- difference that would have surfaced as a behaviour change on adoption.
-	local sink_variant = _dedup.variant_key == "WARNING" and "warn"
-		or string.lower(_dedup.variant_key or "info")
-	if _test_sink then pcall(_test_sink, stamp .. " " .. summary, sink_variant) end
+	-- Routed through _console_out so the print() tee (Section 7) does not
+	-- re-capture the Logger's own lines — they are persisted below already.
+	_console_out(line)
 
-	_write_to_file(stamp, summary)
-	-- Mirror suppression summary to the errors-only log when the suppressed
-	-- messages were WARNING or ERROR; without this the errors-only file only
-	-- shows the first occurrence and silently omits the repeat count.
-	if variant.level >= M.LEVELS.WARNING then
-		local err_full = stamp .. " " .. summary .. "\n"
+	-- Forward to the test sink when registered (never in production builds).
+	if _test_sink then pcall(_test_sink, line, variant) end
+
+	-- Only the DEBUG-class variants defer their flush; see _write_to_file. Those
+	-- are the ones emitted per keystroke, and also the ones whose loss in a crash
+	-- costs least.
+	_write_to_file(line, level ~= Core.LEVELS.DEBUG)
+
+	-- Dedicated errors-only log (WARNING + ERROR). Separate open/close per write
+	-- (like the sub-files) so a crash never leaks a handle. This file stays small
+	-- and is the recommended first place to look when something goes wrong,
+	-- without drowning in the full daily unified log.
+	if level >= Core.LEVELS.WARNING then
+		local err_full = line .. "\n"
 		pcall(function()
 			local f = io.open(M.ERRORS_LOG_FILE, "a")
 			if f then
@@ -645,90 +688,58 @@ local function _flush_dedup_summary()
 			end
 		end)
 	end
-	_dedup.count       = 0
-	_dedup.line        = nil
-	_dedup.variant_key = nil
 end
 
---- Internal dispatcher — formats and outputs one log entry.
---- @param variant_key string Key into VARIANTS.
+--- Points the core's three single-slot hooks at THIS module instance.
+---
+--- The core is a process singleton and holds exactly one sink, one clock and one
+--- timestamp provider, while infra.logger can be instantiated more than once in a
+--- single test file — the file takes its own handle, and the module under test
+--- pulls another when it loads. Whichever instance ran last owns all three slots,
+--- so an instance that does not claim them would install a sink nobody calls and
+--- a clock nobody reads: every line would still reach the file and the console
+--- exactly as it should, and reach the assertion never.
+---
+--- The clock is claimed as a CLOSURE over M rather than by value, so replacing
+--- Logger.clock_fn afterwards still takes effect — which is the only way a
+--- five-second window can be exercised by a suite that runs in milliseconds.
+--- Exposed on M rather than kept local so M.set_sink() — which is defined
+--- earlier in the file — can reach it. A table field resolves at CALL time; a
+--- local declared further down would not be captured at all.
+function M.claim_core_hooks()
+	Core.set_sink(_driver_sink)
+	Core.timestamp_fn = _timestamp
+	Core.clock_fn     = function() return M.clock_fn() end
+end
+
+M.claim_core_hooks()
+
+-- The core's own severity threshold stays at its floor, permanently. This driver
+-- filters in _log against M.current_level, and that field is a public contract:
+-- the log-level submenu and several tests ASSIGN it directly rather than calling
+-- M.set_level. A second threshold inside the core that such an assignment could
+-- not reach would filter differently from the one the menu displays — so there is
+-- exactly one filter, and it is the one that was already there.
+Core.set_level(Core.LEVELS.DEBUG)
+
+--- Internal dispatcher — filters by level, then hands the line to the core.
+--- @param variant_key string Key into VARIANTS (this driver's UPPERCASE spelling).
 --- @param module_name string Short identifier of the calling module.
 --- @param msg string Message or printf-style format string.
 --- @param ... any Optional arguments for string.format.
---- @return boolean emitted True when the line was actually written to the sinks;
----   false when it was filtered by level or suppressed by the dedup window. Callers
----   that mirror a line elsewhere (M.error → notification handler) must follow this
----   decision so a deduped line does not produce a side effect the log itself suppressed.
+--- @return boolean emitted True when the line actually reached the sinks; false
+---   when it was filtered by level or suppressed by the dedup window. Callers that
+---   mirror a line elsewhere (M.error → notification handler) must follow this
+---   decision, so a deduped line does not produce a side effect the log suppressed.
 _log = function(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
 	if not variant or variant.level < M.current_level then return false end
 
-	local ok, base = pcall(tostring, msg)
-	local text = ok and base or "???"
-	if select("#", ...) > 0 then
-		local ok_f, formatted = pcall(string.format, text, ...)
-		text = ok_f and formatted or (text .. " [format error]")
-	end
-
-	-- Canonical line format (no indent) shared with the AHK driver, the shared
-	-- logger core, and the Linux daemon: "[LEVEL] [module] body". The timestamp
-	-- prefix is added by the console/file sinks below.
-	local line = string.format("[%s] [%s] %s", variant.label, tostring(module_name), text)
-
-	-- Deduplication: suppress repeated identical lines within a 5 s window so a
-	-- recurring line is de-bounced rather than permanently silenced — a streak that
-	-- outlives the window re-surfaces. The window matches the AHK driver so both
-	-- drivers dedup identically.
-	local _now = M.clock_fn()
-	if line == _dedup.line and (_now - _dedup.time) < DEDUP_WINDOW_SEC then
-		_dedup.count = _dedup.count + 1
-		return false
-	end
-	_flush_dedup_summary()
-	_dedup.line        = line
-	_dedup.variant_key = variant_key
-	_dedup.time        = _now
-
-	local stamp = _timestamp()
-
-	-- Console output: plain print (colors removed — hs.styledtext/console no longer a dependency).
-	-- Routed through _console_out so the print() tee (Section 7) does not re-capture
-	-- the Logger's own lines — they are already persisted by _write_to_file below.
-	local console_line = stamp .. " " .. line
-	_console_out(console_line)
-
-	-- Push to the in-memory ring buffer so ring_buffer_snapshot() is always
-	-- current without requiring a file read.
-	_push_ring(console_line)
-
-	-- Forward to the test sink when registered (never in production builds).
-	-- Map "WARNING" to "warn" to match the lowercase short-name convention used
-	-- by the shared logger, so test assertions like `if variant == "warn"` work.
-	local sink_variant = variant_key == "WARNING" and "warn" or string.lower(variant_key)
-	if _test_sink then pcall(_test_sink, console_line, sink_variant) end
-
-	-- Only the DEBUG-class variants defer their flush; see _write_to_file. These
-	-- are the ones emitted per keystroke, and they are also the ones whose loss
-	-- in a crash costs least.
-	_write_to_file(stamp, line, variant.level ~= M.LEVELS.DEBUG)
-
-	-- Dedicated errors-only log (WARNING + ERROR). Separate open/close per
-	-- write (like sub-files) so a crash never leaks a handle. This file stays
-	-- small and is the recommended first place to look when something goes
-	-- wrong without drowning in the full daily unified log.
-	if variant.level >= M.LEVELS.WARNING then
-		local err_full = stamp .. " " .. line .. "\n"
-		pcall(function()
-			local f = io.open(M.ERRORS_LOG_FILE, "a")
-			if f then
-				f:write(err_full)
-				f:close()
-			end
-		end)
-	end
-
-	return true
+	local core_fn = Core[CORE_VARIANT[variant_key]]
+	if not core_fn then return false end
+	return core_fn(module_name, msg, ...) ~= nil
 end
+
 
 
 
@@ -810,94 +821,52 @@ end
 
 
 
--- ====================================
---- ====================================
--- ======= 5/ In-memory Ring Buffer ===
---- ====================================
--- ====================================
 
--- Fixed-capacity circular array — 200 entries matching the AHK driver and the
--- shared SPEC §5. Each slot stores the complete formatted line (post-substitution,
--- with timestamp). On overflow the oldest slot is silently overwritten (O(1)).
-local RING_BUFFER_SIZE = 200
-local _ring_buffer     = {}
-local _ring_cursor     = 0
+-- ======================================
+-- ======================================
+-- ======= 5/ Ring Buffer & Dedup =======
+-- ======================================
+-- ======================================
 
---- Appends a fully-formatted line to the in-memory ring buffer.
---- Called from _log() after every emitted line so the buffer always mirrors
---- the most recent RING_BUFFER_SIZE entries of the main log file.
---- @param line string The complete formatted log line (timestamp + level + tag + body).
-_push_ring = function(line)
-	if #_ring_buffer < RING_BUFFER_SIZE then
-		_ring_buffer[#_ring_buffer + 1] = line
-		_ring_cursor = #_ring_buffer
-	else
-		_ring_cursor = (_ring_cursor % RING_BUFFER_SIZE) + 1
-		_ring_buffer[_ring_cursor] = line
-	end
-end
+-- Every function below delegates to the core. The ring used to be a second
+-- 200-entry circular array with its own wrap arithmetic, sitting beside the
+-- core's — two implementations of an off-by-one nobody wants to debug twice, and
+-- the suppression streak was the same story.
+--
+-- Both are per PROCESS rather than per require; see the note on `Core` at the top
+-- of this file. A test that needs a clean ring or a clean streak asks for one
+-- here, rather than getting one as a side effect of a module reload.
 
 --- Returns a snapshot of the ring buffer in chronological order (oldest first).
---- The most recent entry is last. Useful for a "Dump recent logs" menu entry
---- without requiring a file read.
+--- The most recent entry is last. Lets a "Dump recent logs" menu entry or a crash
+--- report be built without reading the file back.
 --- @return table Flat list of formatted log line strings.
-function M.ring_buffer_snapshot()
-	if #_ring_buffer == 0 then return {} end
-	local snapshot = {}
-	if #_ring_buffer < RING_BUFFER_SIZE then
-		-- Buffer not yet full — entries are already in chronological order.
-		for i = 1, #_ring_buffer do
-			snapshot[#snapshot + 1] = _ring_buffer[i]
-		end
-		return snapshot
-	end
-	-- Buffer is full and wrapped — read from cursor+1 (oldest) to cursor (newest).
-	for i = 1, RING_BUFFER_SIZE do
-		local idx = (_ring_cursor + i - 1) % RING_BUFFER_SIZE + 1
-		snapshot[#snapshot + 1] = _ring_buffer[idx]
-	end
-	return snapshot
-end
+function M.ring_buffer_snapshot() return Core.ring_buffer_snapshot() end
 
 --- Returns how many entries the ring buffer currently holds.
 --- @return number
-function M.ring_buffer_size()
-	return #_ring_buffer
-end
+function M.ring_buffer_size() return Core.ring_buffer_size() end
 
 --- Empties the ring buffer.
---- Resets the cursor as well as the contents: leaving the cursor where it was
---- would make the next snapshot after a wrap read from a slot that no longer
---- corresponds to the oldest entry, so the buffer would come back shuffled.
-function M.ring_buffer_clear()
-	_ring_buffer = {}
-	_ring_cursor = 0
-end
+function M.ring_buffer_clear() Core.ring_buffer_clear() end
 
 --- Forgets the current suppression streak without emitting its summary.
---- Mirrors the shared core, which is what this driver is being migrated onto.
 --- A streak carried across a reload would suppress the first line of the new
---- session because it matched the last line of the old one — the least useful
---- moment to lose a line.
-function M.reset_dedup()
-	_dedup.line        = nil
-	_dedup.count       = 0
-	_dedup.variant_key = nil
-	_dedup.time        = 0
-end
+--- session because it matched the last line of the old one, which is the least
+--- useful moment to lose a line.
+function M.reset_dedup() Core.reset_dedup() end
 
 --- Reports how many identical lines the open streak has swallowed so far.
 --- Exposed so a test can assert that suppression HAPPENED rather than infer it
 --- from an absence, which is the shape of a vacuous assertion.
 --- @return number
-function M.dedup_suppressed_count()
-	return _dedup.count
-end
+function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 
 --- Clock used to measure the dedup window, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
---- it: a window measured in seconds cannot otherwise be exercised by a suite
---- that runs in milliseconds.
+--- it: a window measured in seconds cannot otherwise be exercised by a suite that
+--- runs in milliseconds. The core reads this field through a closure installed in
+--- Section 3.2, so replacing it here still takes effect.
 M.clock_fn = _gettime
 
 
@@ -940,6 +909,7 @@ function M.build(module_name, label, fn, ctx)
 	end
 	return result
 end
+
 
 
 
@@ -1020,7 +990,7 @@ function M.install_runtime_error_capture()
 			local stamp = _timestamp()
 			for subline in (msg .. "\n"):gmatch("(.-)\n") do
 				if subline ~= "" then
-					pcall(_write_to_file, stamp, "[CONSOLE] [console] " .. subline)
+					pcall(_write_to_file, stamp .. " [CONSOLE] [console] " .. subline)
 				end
 			end
 		end
