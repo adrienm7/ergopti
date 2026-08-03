@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Pobieranie przerwane",
 	"mlx.download_interrupted_body": "Proces pobierania %s zatrzymał się podczas przeładowania.",
 	"mlx.download_stalled": "Pobieranie MLX zablokowane",
+	"mlx.download_stalled_giving_up": "Brak postępu od {1} minut. Przerwano.",
+	"mlx.download_stalled_near_complete": "Brak postępu od {1} minut przy 99 %. Prawdopodobnie zablokowane.",
 	"mlx.download_subtitle": "Pobieranie wag z Hugging Face…",
 	"mlx.download_title": "Pobieranie modelu MLX",
 	"mlx.hf_connected": "HuggingFace połączony",

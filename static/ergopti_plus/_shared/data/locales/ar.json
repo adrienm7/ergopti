@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "تم مقاطعة التنزيل",
 	"mlx.download_interrupted_body": "توقفت عملية تنزيل %s أثناء إعادة التحميل.",
 	"mlx.download_stalled": "توقف تنزيل MLX",
+	"mlx.download_stalled_giving_up": "لم يُرصد أي تقدم منذ {1} دقائق. تم التخلي.",
+	"mlx.download_stalled_near_complete": "لم يُرصد أي تقدم منذ {1} دقيقة عند 99 ٪. من المرجح أنه متوقف.",
 	"mlx.download_subtitle": "جارٍ جلب الأوزان من Hugging Face…",
 	"mlx.download_title": "جارٍ تنزيل نموذج MLX",
 	"mlx.hf_connected": "تم الاتصال بـ HuggingFace",

@@ -1294,6 +1294,8 @@
 	"mlx.download_interrupted": "Download interrupted",
 	"mlx.download_interrupted_body": "The download process for %s stopped during reload.",
 	"mlx.download_stalled": "MLX download stalled",
+	"mlx.download_stalled_giving_up": "No progress for {1} minutes. Giving up.",
+	"mlx.download_stalled_near_complete": "No progress for {1} minutes at 99 %. Probably stalled.",
 	"mlx.download_subtitle": "Fetching weights from Hugging Face…",
 	"mlx.download_title": "Downloading MLX model",
 	"mlx.hf_connected": "HuggingFace connected",

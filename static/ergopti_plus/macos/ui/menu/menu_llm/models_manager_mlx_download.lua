@@ -351,9 +351,16 @@ function M.install(ctx)
 					local stall_seconds = os.difftime(os.time(), last_progress_time)
 					local stall_limit = (_current_pct >= 99) and 120 or 300
 					if stall_seconds >= stall_limit then
-						local reason = (_current_pct >= 99)
-							and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
-							or "Aucun progrès détecté depuis 5 minutes. Abandon."
+						-- The notification title already went through i18n; the body did not, so
+						-- twenty of the twenty-one locales showed a French sentence under a
+						-- translated heading. The minute count is the stall limit itself, so
+						-- the two variants differ only in the number and in whether the
+						-- download had already reached 99 %.
+						local reason = i18n.format(
+							(_current_pct >= 99) and "mlx.download_stalled_near_complete"
+								or "mlx.download_stalled_giving_up",
+							math.floor(stall_limit / 60)
+						)
 						pcall(notifications.notify, i18n.get("mlx.download_stalled"), reason, "warning")
 						if download_window then pcall(download_window.complete, false, target_model) end
 						-- Pass silent=true: notifications and window state already handled above

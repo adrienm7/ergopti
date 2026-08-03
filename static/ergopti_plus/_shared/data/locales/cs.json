@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Stahování přerušeno",
 	"mlx.download_interrupted_body": "Proces stahování %s se zastavil během opětovného načítání.",
 	"mlx.download_stalled": "Stahování MLX zablokováno",
+	"mlx.download_stalled_giving_up": "Žádný pokrok po dobu {1} minut. Přerušeno.",
+	"mlx.download_stalled_near_complete": "Žádný pokrok po dobu {1} minut na 99 %. Pravděpodobně zaseknuté.",
 	"mlx.download_subtitle": "Načítání vah z Hugging Face…",
 	"mlx.download_title": "Stahování modelu MLX",
 	"mlx.hf_connected": "HuggingFace připojen",

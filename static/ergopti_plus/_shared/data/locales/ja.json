@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "ダウンロードが中断されました",
 	"mlx.download_interrupted_body": "%s のダウンロードプロセスがリロード中に停止しました。",
 	"mlx.download_stalled": "MLXダウンロードが停止しています",
+	"mlx.download_stalled_giving_up": "{1} 分間進捗がありません。中止します。",
+	"mlx.download_stalled_near_complete": "99 % で {1} 分間進捗がありません。停止している可能性があります。",
 	"mlx.download_subtitle": "Hugging Faceから重みを取得中…",
 	"mlx.download_title": "MLXモデルをダウンロード中",
 	"mlx.hf_connected": "HuggingFaceに接続しました",

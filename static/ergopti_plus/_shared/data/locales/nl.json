@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Download onderbroken",
 	"mlx.download_interrupted_body": "Het downloadproces voor %s is gestopt tijdens het herladen.",
 	"mlx.download_stalled": "MLX-download geblokkeerd",
+	"mlx.download_stalled_giving_up": "Geen voortgang gedurende {1} minuten. Afgebroken.",
+	"mlx.download_stalled_near_complete": "Geen voortgang gedurende {1} minuten op 99 %. Waarschijnlijk vastgelopen.",
 	"mlx.download_subtitle": "Gewichten ophalen van Hugging Face…",
 	"mlx.download_title": "MLX-model downloaden",
 	"mlx.hf_connected": "HuggingFace verbonden",

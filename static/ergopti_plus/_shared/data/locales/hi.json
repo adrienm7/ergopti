@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "डाउनलोड बाधित",
 	"mlx.download_interrupted_body": "%s के लिए डाउनलोड प्रक्रिया पुनः लोड के दौरान रुक गई।",
 	"mlx.download_stalled": "MLX डाउनलोड अटका",
+	"mlx.download_stalled_giving_up": "{1} मिनट से कोई प्रगति नहीं। छोड़ा जा रहा है।",
+	"mlx.download_stalled_near_complete": "99 % पर {1} मिनट से कोई प्रगति नहीं। संभवतः अटका हुआ है।",
 	"mlx.download_subtitle": "Hugging Face से वेट प्राप्त किए जा रहे हैं…",
 	"mlx.download_title": "MLX मॉडल डाउनलोड हो रहा है",
 	"mlx.hf_connected": "HuggingFace से जुड़ा हुआ",

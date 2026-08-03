@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "下载已中断",
 	"mlx.download_interrupted_body": "%s 的下载进程在重新加载时停止。",
 	"mlx.download_stalled": "MLX 下载已卡住",
+	"mlx.download_stalled_giving_up": "{1} 分钟无进展。已放弃。",
+	"mlx.download_stalled_near_complete": "在 99 % 处 {1} 分钟无进展。可能已停滞。",
 	"mlx.download_subtitle": "正在从 Hugging Face 获取权重…",
 	"mlx.download_title": "正在下载 MLX 模型",
 	"mlx.hf_connected": "HuggingFace 已连接",

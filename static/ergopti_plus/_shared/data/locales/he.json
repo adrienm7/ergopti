@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "ההורדה הופרעה",
 	"mlx.download_interrupted_body": "תהליך ההורדה של %s נעצר במהלך טעינה מחדש.",
 	"mlx.download_stalled": "הורדת MLX תקועה",
+	"mlx.download_stalled_giving_up": "אין התקדמות במשך {1} דקות. מוותר.",
+	"mlx.download_stalled_near_complete": "אין התקדמות במשך {1} דקות ב-99%. ככל הנראה תקוע.",
 	"mlx.download_subtitle": "מביא משקלים מ-Hugging Face…",
 	"mlx.download_title": "מוריד מודל MLX",
 	"mlx.hf_connected": "HuggingFace מחובר",

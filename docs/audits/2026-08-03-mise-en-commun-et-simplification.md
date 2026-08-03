@@ -31,7 +31,7 @@ correct entries that already exist.
 | # | Opportunity | Value | Risk | New? |
 | --- | --- | --- | --- | --- |
 | 1 | **Three gates ran nowhere** — port compliance, priority parity, manifest parity: alias present, suite entry absent | high | none | ✅ new |
-| 2 | 11 literal French UI strings in two `ui/` files bypass i18n; they are invisible in 20 of 21 locales | small, user-visible | low | ✅ new |
+| 2 | A stalled-download notification had a translated title and a hardcoded French body — fixed, 2 keys × 21 locales | small, user-visible | none | ✅ new |
 | 3 | `_generated/` is **not** reducible — every one of the 21 artefacts has a runtime reader and a generator wired into the drift guard | closes a question | none | ✅ new |
 | 4 | 33 production files over 900 lines (35 873 lines) — the split candidates are known and mostly listed in `TODO.md` | large | medium | partly |
 | 5 | The remaining cross-driver duplication is the four items already in `TODO.md` Lot 8 | large | high | no |
@@ -112,31 +112,41 @@ with hardcoded French labels and no i18n keys, of which 18 already have
 and the merge must precede the translations, or ~1 155 strings get keyed to ids
 that are about to change.
 
-### 1.5 i18n — **finding**
+### 1.5 i18n — **one real string pair, and a lesson about the scan**
 
-**Constat.** Key parity across the 21 catalogues is enforced, but a small number
-of UI strings never reach the catalogue at all.
+**Constat.** Key parity across the 21 catalogues is enforced and holds. A
+mechanical scan suggested 156 untranslated UI strings; reading them, **two** were.
 
-**Preuve.** Scanning production `.ahk`/`.lua` for a double-quoted literal
-containing an accented character, on a line that does not route through
-`i18n`/`t()`/a logger: **156 hits in 32 files**, of which all but 11 are
-legitimately French *data* — hotstring corpora
-(`windows/modules/hotstrings/hotstrings_distances.ahk`, 31) and layout character
-tables (`windows/modules/keymap/layout.ahk`, 25). The genuine findings are the
-two under `ui/`:
+**Preuve, and the correction.** Scanning production `.ahk`/`.lua` for a
+double-quoted literal containing an accented character, on a line that does not
+route through `i18n`/`t()`/a logger, returns **156 hits in 32 files**. Opening
+them shows the heuristic cannot tell UI text from four other things:
 
-- `macos/ui/menu/menu_llm/models_manager_mlx_download.lua` — 7 strings
-- `windows/ui/onboarding/steps_keyboard.ahk` — 4 strings
+| What it actually is | Example | Count |
+| --- | --- | --- |
+| French hotstring corpora | `windows/modules/hotstrings/hotstrings_distances.ahk` | 31 |
+| Layout character tables | `windows/modules/keymap/layout.ahk` | 25 |
+| Content of a *generated shell script* | `f:write("echo 'Démarrage…'")` | 3 |
+| Matching an external tool's French output | `out:find("Terminé !")` | 2 |
+| A key character, not a word | `return "ù"` | 4 |
 
-**Proposition.** Add 11 keys to the shared catalogue and read them through
-`i18n.get()`/`t()`. The onboarding one matters most: it is the first screen a new
-user sees, and it is French for a Japanese or Arabic user today.
+The genuine finding is one notification in
+`macos/ui/menu/menu_llm/models_manager_mlx_download.lua`: its **title** went
+through `i18n.get("mlx.download_stalled")` and its **body** was a hardcoded
+French sentence, so twenty of the twenty-one locales showed French prose under a
+translated heading — on a failure screen, where a user least wants to guess.
 
-**Gain.** 11 strings × 21 locales become translatable; two files stop being
-exceptions to the rule.
+**Proposition — done.** Two keys, `mlx.download_stalled_near_complete` and
+`mlx.download_stalled_giving_up`, in all 21 catalogues, read through
+`i18n.format` because they carry the stall limit as `{1}`. The catalogue gate
+confirms 2345 keys × 21 with no blanks.
 
-**Risque.** Low. **Effort.** One commit. **Vérif.** Re-run the scan (the script
-is in this report's commit message) and `npm run test:i18n-*`.
+**Piste écartée.** Turning this scan into a gate. It has a 98 % false-positive
+rate against a codebase whose *data* is legitimately French, and a gate that
+cries wolf 154 times out of 156 is one people learn to skip. The lesson is the
+one `TODO.md` states in its own header: a finding is a lead, not a work order.
+
+**Vérif.** `npm run test:locale-*`, and the macOS suite.
 
 ---
 

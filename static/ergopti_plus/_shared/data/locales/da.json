@@ -1277,6 +1277,8 @@
 	"mlx.download_interrupted": "Download afbrudt",
 	"mlx.download_interrupted_body": "Downloadprocessen for %s stoppede under genindlæsning.",
 	"mlx.download_stalled": "MLX-download gik i stå",
+	"mlx.download_stalled_giving_up": "Ingen fremgang i {1} minutter. Afbrudt.",
+	"mlx.download_stalled_near_complete": "Ingen fremgang i {1} minutter ved 99 %. Sandsynligvis gået i stå.",
 	"mlx.download_subtitle": "Henter vægte fra Hugging Face…",
 	"mlx.download_title": "Downloader MLX-model",
 	"mlx.hf_connected": "HuggingFace forbundet",
