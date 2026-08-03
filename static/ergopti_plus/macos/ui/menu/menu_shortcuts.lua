@@ -22,6 +22,7 @@ local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
+local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ManifestReader = require("infra.manifest_reader")
 local LOG           = "menu_shortcuts"
 
@@ -658,7 +659,16 @@ function M.build(ctx)
 		cmd_shortcuts  = build_cmd_shortcuts,
 	}
 
-	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, ctx)
+	-- The keyboard slots are a list, not a group: their rows are the user's own
+	-- assignments, so the manifest can name the section but not enumerate it. The
+	-- provider returns row DATA and the renderer draws it.
+	local list_providers = {
+		keyboard_slots = function(_ctx)
+			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
+		end,
+	}
+
+	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, ctx, list_providers)
 
 	-- Prepend the top-level feature items before the manifest section
 	for i, it in ipairs(top_items) do

@@ -29,6 +29,11 @@ local LOG    = "manifest_menu"
 -- Module-level manifest cache — invalidated by M.invalidate_cache().
 local _cache = nil
 
+-- How deep a list provider's rows may nest. A provider returning a table that
+-- contains itself would recurse until the stack gave out, taking the whole menu
+-- with it; three levels is deeper than any menu the driver draws.
+local MAX_LIST_DEPTH = 3
+
 
 
 
@@ -146,6 +151,49 @@ local function call_isolated(manifest_key, item_id, fn, ...)
 	return true, result
 end
 
+--- Turns a list provider's row DATA into hs.menubar item tables.
+---
+--- This is the only place a provider's rows become menu rows, which is the whole
+--- reason the two shapes differ: a provider hands over labels, callbacks and
+--- nested rows, and knows nothing about `title`, `fn` or `menu`. A row missing a
+--- label is dropped with a warning rather than rendered blank — an untitled row
+--- is a row the user cannot identify and cannot report.
+--- @param rows table Array of { label, action?, items?, checked?, disabled?, separator? }.
+--- @param list_id string The provider's id, for the warning.
+--- @param depth number|nil Current nesting depth, guarded against a cyclic table.
+--- @return table Array of hs.menubar item tables.
+local function render_rows(rows, list_id, depth)
+	depth = depth or 1
+	local out = {}
+	-- A provider that returned a table containing itself would recurse until the
+	-- stack gave out, taking the menu with it. Three levels is deeper than any
+	-- menu in the driver.
+	if depth > MAX_LIST_DEPTH then
+		Logger.error(LOG, "List '%s' nests deeper than %d level(s) — truncated.", tostring(list_id), MAX_LIST_DEPTH)
+		return out
+	end
+
+	for _, row in ipairs(rows) do
+		if type(row) ~= "table" then
+			Logger.warn(LOG, "List '%s' produced a %s where a row was expected — skipped.", tostring(list_id), type(row))
+		elseif row.separator then
+			out[#out + 1] = { title = "-" }
+		elseif type(row.label) ~= "string" or row.label == "" then
+			Logger.warn(LOG, "List '%s' produced a row with no label — skipped.", tostring(list_id))
+		else
+			local entry = { title = row.label, disabled = row.disabled or nil }
+			if row.checked ~= nil then entry.checked = row.checked and true or false end
+			if type(row.items) == "table" then
+				entry.menu = render_rows(row.items, list_id, depth + 1)
+			elseif type(row.action) == "function" then
+				entry.fn = row.action
+			end
+			out[#out + 1] = entry
+		end
+	end
+	return out
+end
+
 --- Build an hs.menubar items table from a manifest menu definition array.
 ---
 --- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
@@ -154,6 +202,12 @@ end
 ---   Each handler receives ``(items_list, ctx)`` and appends its items in place.
 --- ``group_builders``    — optional table of group_id → function(ctx) → table|nil for
 ---   ``type:"group"`` entries. Returns a table ``{title, menu}`` or nil to skip.
+--- ``list_providers``    — optional table of list_id → function(ctx) → rows for
+---   ``type:"list"`` entries. A provider returns DATA, never menu rows: each row
+---   is ``{label, action?, items?, checked?, disabled?, separator?}`` and this
+---   renderer turns it into the hs.menubar shape. The asymmetry is the point — a
+---   provider that could return a finished row would be building menu rows
+---   outside the renderer again, which is what the list type exists to stop.
 --- ``ctx``               — the menu context table passed through to dynamic handlers.
 ---
 --- Returns the populated items list (array of hs.menubar item tables).
@@ -162,9 +216,11 @@ end
 --- @param dynamic_handlers table
 --- @param group_builders table|nil
 --- @param ctx table
+--- @param list_providers table|nil
 --- @return table
-function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
+function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx, list_providers)
 	group_builders = group_builders or {}
+	list_providers = list_providers or {}
 	local menu_def = get_menu_def(manifest_key)
 	local result      = {}
 	local item_count  = 0     -- real items added so far
@@ -239,6 +295,26 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 				local sub_disabled = built.disabled or nil
 				table.insert(result, { title = label, menu = sub_menu, disabled = sub_disabled })
 				item_count = item_count + 1
+			end
+
+		elseif t == "list" then
+			local list_id = type(item.id) == "string" and item.id or ""
+			if list_id == "" or type(list_providers[list_id]) ~= "function" then
+				-- Same class of bug as the "action" and "dynamic" branches: an entry
+				-- whose provider is missing either belongs on this platform (and the
+				-- caller's list_providers table has a hole) or needs a `platforms`
+				-- restriction. Silence here is a menu section that vanishes.
+				Logger.warn(LOG, "No 'list' provider registered for id '%s' in '%s' — item skipped.",
+					tostring(list_id), manifest_key)
+				goto continue
+			end
+			local ok_list, rows = call_isolated(manifest_key, list_id, list_providers[list_id], ctx)
+			if ok_list and type(rows) == "table" and #rows > 0 then
+				flush_sep()
+				for _, row in ipairs(render_rows(rows)) do
+					table.insert(result, row)
+					item_count = item_count + 1
+				end
 			end
 
 		elseif t == "dynamic" then

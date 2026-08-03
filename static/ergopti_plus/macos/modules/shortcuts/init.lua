@@ -73,6 +73,9 @@ M.set_keyboard_action      = KeyboardShortcuts.set_action
 M.get_keyboard_action      = KeyboardShortcuts.get_action
 M.get_keyboard_slot_label  = KeyboardShortcuts.get_slot_label
 M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
+M.get_keyboard_slot_groups = function() return KeyboardShortcuts.SLOT_GROUPS end
+M.available_keyboard_slots = KeyboardShortcuts.available_slots
+M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
 
 --- Starts the user-facing shortcut layer: the static Bindings AND the
 --- configurable keyboard shortcuts. Symmetric with stop() and resume_bindings()

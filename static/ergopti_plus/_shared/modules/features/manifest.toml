@@ -2854,6 +2854,19 @@ i18n = "menu.shortcuts.submenu_cmd"
 platforms = ["hs"]
 
 [[menu.shortcuts_menu]]
+type = "list"
+id = "keyboard_slots"
+# The configurable keyboard-shortcut groups. A "list" rather than a "group"
+# because there are five of them and their contents are the user's own
+# assignments, which no static entry can enumerate; the driver supplies the rows
+# as data and the renderer draws them, so no menu row is built outside it.
+#
+# macOS-only for now: the Windows driver renders the same five groups from
+# InsertKeyboardShortcutGroups, outside the manifest entirely. Bringing it here
+# is the follow-up, and is what would let the two be compared at all.
+platforms = ["hs"]
+
+[[menu.shortcuts_menu]]
 type = "dynamic"
 id = "script_control_shortcuts"
 
