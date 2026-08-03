@@ -126,13 +126,21 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 // value it is supposed to constrain makes the comparison `x <= x` — a check that
 // passes for every possible input, which is the precise definition of the false
 // green this repo already ratchets against elsewhere.
-const BASELINE_SHARED = 23;
+//   25/47 (53.2 %) — measured 2026-08-04, and the ratchet had been carrying two
+//                    paths of slack since 2026-08-01. Slack in a ratchet is not
+//                    harmless: it is exactly enough room for a regression to
+//                    land and pass, and the gate would report OK while the
+//                    programme went backwards. Tightened to the measurement.
+//                    The union shrank 49 → 47 over the same period, which is the
+//                    healthy direction: fewer unshared directories, not more
+//                    shared ones bolted onto a growing tree.
+const BASELINE_SHARED = 25;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
 // the programme drifting sideways — adding structure to one driver while the
 // shared count stands still.
-const BASELINE_UNION = 49;
+const BASELINE_UNION = 47;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
