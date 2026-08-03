@@ -408,9 +408,17 @@ Constraints: **paths before moves, moves before content, data before code.**
   `platform/remap/config.lua` now prefers the registry label and honours the
   unresolved-key sentinel, so the 55 keep theirs. Regression test proved red
   before the fix.
-  What remains is the merge itself: 55 rows into `actions.toml`, then the
-  translations — in that order, or ~1 155 strings get keyed to ids that are about
-  to change; ~~(5) the host→page push for the Linux
+  **What remains is a product decision, not a refactor — measured 2026-08-03.**
+  `test-action-registry-bijection.cjs` reports `hs 0/0` declared-with-no-handler
+  over 126 `sg_actions` rows: a declared row REQUIRES a handler on every platform
+  it is declared for. So adding the 55 rows means adding 55 macOS gesture
+  handlers, which makes every remap action also a GESTURE action — a swipe would
+  become able to trigger `layer` hold, `capsword`, `cmd_tab`. Whether those two
+  namespaces should be one is the question, and it is the maintainer's to answer;
+  the picker itself is driven by `sg_order`, not by the row set, so the rows
+  alone would be invisible but the handlers would not be.
+  Once answered: rows, then handlers, then the ~1 155 translations — in that
+  order, or the strings get keyed to ids that are about to change; ~~(5) the host→page push for the Linux
   `action_picker`~~ — **done.** `webview_manager.eval_js(app, js)` is the channel,
   addressed by app name so a handler never holds a webview past its window's
   life. Worth reusing: it is the only host→page direction on Linux, and any other
