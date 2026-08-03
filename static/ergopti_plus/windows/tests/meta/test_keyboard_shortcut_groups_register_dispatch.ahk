@@ -3,23 +3,28 @@
 ; ==============================================================================
 ; MODULE: Keyboard-Shortcut Groups RegisterMenuItem Dispatch Meta Test
 ; DESCRIPTION:
-; Regression guard for HIGH-04: raw GMenu.Add drops menu clicks.
+; Regression guard for HIGH-04: raw Menu.Add drops menu clicks.
 ;
-; InsertKeyboardShortcutGroups built the keyboard-shortcut group submenus with
-; raw GMenu.Add(Label, Callback) for the per-slot picker and the add-slot item.
-; AHK 2.0's WM_COMMAND -> menu-callback dispatch silently drops roughly one
-; click in three. infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry
-; path, but ONLY for items registered via RegisterMenuItem(MenuObj, Label, Cb).
+; The keyboard-shortcut group submenus were built with raw GMenu.Add(Label,
+; Callback) for the per-slot picker and the add-slot item. AHK 2.0's WM_COMMAND
+; -> menu-callback dispatch silently drops roughly one click in three.
+; infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
+; for items registered via RegisterMenuItem(MenuObj, Label, Cb).
 ;
 ; Since these items used raw .Add, they were never in the retry path and ~30-50%
 ; of clicks on a slot picker or the add-slot entry silently did nothing.
 ;
-; The fix swaps both raw GMenu.Add calls for RegisterMenuItem(GMenu, ...),
-; keeping the lambda closures identical. The parent TargetMenu.Insert calls stay
-; raw — those are the sanctioned exceptions. This test asserts RegisterMenuItem
-; is used and no raw GMenu.Add wires the slot/add-slot pickers.
+; WHERE THE ROOT CAUSE LIVES NOW: those rows moved onto the manifest "list" type,
+; so the wiring happens once, in _MR_RenderRows, for every list on every menu.
+; That makes the guard stronger rather than weaker -- it now covers every current
+; and future list section, not just the four keyboard groups -- and it moves with
+; the code instead of pinning a function that no longer exists.
 ;
-; SCOPE: source introspection of ErgoptiPlus.ahk.
+; The parent Menu.Add(Label, SubMenu) call stays raw: a submenu parent carries no
+; callback, so it was never in the dispatch path and never dropped a click. That
+; was the sanctioned exception before this moved, and it still is.
+;
+; SCOPE: source introspection of the driver tree.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -29,34 +34,46 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
+; ======= 1/ The renderer wires every row ==========
 ; ==================================================
 ; ==================================================
 
-_KSGRD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KSGRD_RowsUseRegisterMenuItem() {
+	Body := _DriverFuncBody("_MR_RenderRows")
+	Assert(Body != "", "_MR_RenderRows must exist in the driver source -- the list renderer is where "
+		. "every list row is now wired, and a scan over an empty body would pass forever")
+
+	Assert(InStr(Body, "RegisterMenuItem(TargetMenu") > 0,
+		"_MR_RenderRows must wire actionable rows via RegisterMenuItem(TargetMenu, ...) so they land "
+		. "in the WM_COMMAND retry path (HIGH-04)")
+
+	; The only sanctioned raw Add in the renderer is the submenu parent, which
+	; carries no callback. A raw Add that passes a callback is the original bug.
+	Assert(!RegExMatch(Body, "TargetMenu\.Add\(\s*Label\s*,\s*Row\["),
+		"_MR_RenderRows must NOT use raw TargetMenu.Add for a row callback -- use RegisterMenuItem (HIGH-04)")
 }
+Test("meta keyboard-shortcut-groups: list rows are wired via RegisterMenuItem (HIGH-04)", _KSGRD_RowsUseRegisterMenuItem)
 
 
 
 
 ; ==================================================
 ; ==================================================
-; ======= 2/ Guard assertion =======================
+; ======= 2/ The provider builds no menu ===========
 ; ==================================================
 ; ==================================================
 
-_KSGRD_GroupsUseRegisterMenuItem() {
-	Body := _DriverFuncBody("InsertKeyboardShortcutGroups")
-	Assert(Body != "", "InsertKeyboardShortcutGroups must exist in ErgoptiPlus.ahk")
+_KSGRD_ProviderReturnsData() {
+	; The provider must hand over DATA. One that built a Menu itself would be
+	; wiring rows outside the renderer again, which is how the raw-Add bug got in.
+	Body := _DriverFuncBody("KeyboardSlotRows")
+	Assert(Body != "", "KeyboardSlotRows must exist in the driver source")
 
-	Assert(InStr(Body, "RegisterMenuItem(GMenu") > 0,
-		"InsertKeyboardShortcutGroups must register group items via RegisterMenuItem(GMenu, ...) (HIGH-04)")
-	Assert(!RegExMatch(Body, "GMenu\.Add\([^)]*ShowKeyboardShortcutPicker"),
-		"InsertKeyboardShortcutGroups must NOT use raw GMenu.Add for the slot picker — use RegisterMenuItem (HIGH-04)")
-	Assert(!RegExMatch(Body, "GMenu\.Add\([^)]*ShowKeyboardSlotPicker"),
-		"InsertKeyboardShortcutGroups must NOT use raw GMenu.Add for the add-slot item — use RegisterMenuItem (HIGH-04)")
+	Assert(!InStr(Body, "Menu()"),
+		"KeyboardSlotRows must return row data, never build a Menu -- the renderer owns the menu shape")
+	Assert(!InStr(Body, "RegisterMenuItem("),
+		"KeyboardSlotRows must not register menu items itself")
+	Assert(InStr(Body, '"label"') > 0,
+		"KeyboardSlotRows must produce labelled rows")
 }
-Test("meta keyboard-shortcut-groups: InsertKeyboardShortcutGroups uses RegisterMenuItem (HIGH-04)", _KSGRD_GroupsUseRegisterMenuItem)
+Test("meta keyboard-shortcut-groups: the slot provider returns data, not a menu", _KSGRD_ProviderReturnsData)

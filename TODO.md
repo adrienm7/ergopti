@@ -381,11 +381,18 @@ Constraints: **paths before moves, moves before content, data before code.**
   Either the names come from a vocabulary that no longer exists, or the bug went
   away with the include order. Whoever remembers what A and B were should rewrite
   this row or delete it; as written it cannot be acted on;
-  (3) give macOS
-  the binding UI it lacks — `M.DEFAULTS` is empty by design, `get_action` /
-  `get_slot_label` / `get_assignments` have **0** production callers, and the one
-  writer is a reset routine for a feature that cannot be configured
-  (`test-keyboard-slot-surface-is-dead.cjs` holds the measurement); (4) merge
+  ~~(3) give macOS the binding UI it lacks~~ — **done 2026-08-03.** Five modifier
+  groups in the Shortcuts menu, wired to the shared webview picker twice (which
+  chord, then what it does), over the same 40-key catalogue the gesture actions
+  and the Windows driver already read. The renderer gained a `list` item type so
+  this could land without regressing I3: the manifest names the section, the
+  driver hands over row DATA, and the renderer alone turns it into menu rows —
+  rows built outside the renderer stayed at 301. The dead-surface gate was
+  replaced by `test-keyboard-slot-surface-is-live.cjs`, which asserts the
+  opposite invariant. **Follow-up:** the Windows driver renders the same five
+  groups from `InsertKeyboardShortcutGroups`, outside the manifest entirely.
+  Bringing it onto the `list` type is what would let the two be compared at all;
+  (4) merge
   `macos/platform/remap/data/actions.json` (73 actions, hardcoded French, no
   i18n keys) into the one registry, `holdable` becoming a per-action flag —
   **18 of the 73 already have `sg_actions.*` keys in all 21 languages, 55 do

@@ -767,6 +767,52 @@ _LLM_EngineIsBusy_Idle() {
 }
 Test("LLM_Engine_IsBusy: false when idle", _LLM_EngineIsBusy_Idle)
 
+; Regression: a debounce timer that outlives the engine map must be a no-op.
+;
+; The timer is armed with SetTimer and fires from AHK's timer thread, long after
+; the call site returned. Several cases in this very file replace _LLM_Engine
+; with a one-key Map, and a stray timer landing in that window read
+; _LLM_Engine["enabled"] on a map that no longer had the key -- "Item has no
+; value", raised from a timer thread where no caller can catch it, so it took the
+; whole process down rather than one prediction. It surfaced as an intermittent
+; FATAL STARTUP ERROR that moved around the suite depending on timing.
+;
+; The state a stale timer was armed for is gone; dropping the prediction is the
+; only correct outcome, and it must be a return, never a raise.
+_LLM_EngineFire_SurvivesTornDownEngine() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+
+	_LLM_Engine := Map("timer_active", true)   ; the shape a mid-test case leaves behind
+	Threw := false
+	try {
+		LLM_Engine_FirePrediction("bonjour le")
+	} catch {
+		Threw := true
+	}
+	_LLM_Engine := Saved
+	AssertFalse(Threw,
+		"a debounce timer firing against a torn-down engine must drop the prediction, not raise from "
+		. "a timer thread where nothing can catch it")
+}
+Test("LLM_Engine_FirePrediction: a stale timer against a torn-down engine is a no-op", _LLM_EngineFire_SurvivesTornDownEngine)
+
+_LLM_EngineFire_SurvivesNonMapEngine() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+
+	_LLM_Engine := ""                          ; the shape a teardown leaves behind
+	Threw := false
+	try {
+		LLM_Engine_FirePrediction("bonjour le")
+	} catch {
+		Threw := true
+	}
+	_LLM_Engine := Saved
+	AssertFalse(Threw, "an engine that is not a Map at all must also be survivable")
+}
+Test("LLM_Engine_FirePrediction: a stale timer against a non-Map engine is a no-op", _LLM_EngineFire_SurvivesNonMapEngine)
+
 
 ; Regression: the loading spinner must NOT replace a prediction already on screen.
 ; macOS parity (prediction_engine.lua:590) — replacing a shown prediction with the

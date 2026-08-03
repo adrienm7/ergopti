@@ -50,6 +50,18 @@ _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
  */
 LLM_Engine_FirePrediction(buffer) {
 	global _LLM_Engine
+
+	; A debounce timer outlives whatever armed it: it is scheduled with SetTimer
+	; and fires from AHK's timer thread, long after the call site returned. If the
+	; engine map has been replaced or torn down in the meantime, every read below
+	; raises "Item has no value" from a timer thread — which no caller can catch,
+	; so it kills the process rather than one prediction. Reading through .Has()
+	; makes a stale timer a no-op, which is the only correct outcome: the state it
+	; was armed for is gone.
+	if (!(_LLM_Engine is Map) || !_LLM_Engine.Has("enabled")) {
+		try LoggerWarn("LLM", "A debounce timer fired against a torn-down engine — prediction dropped.")
+		return
+	}
 	_LLM_Engine["timer_active"] := false
 
 	; A debounce timer armed just before the user paused must not fire an HTTP
