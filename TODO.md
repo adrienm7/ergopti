@@ -262,14 +262,28 @@ be SETTLED before anything is written.** What was verified:
   `:808`) — so the flag reaches registration, and where it changes behaviour after
   that is the open question.
 
-**The question, stated so it can be falsified rather than assumed:** does a macOS
-mapping registered with `auto_expand = false` fire on its own last character?
-Answer it by DRIVING the code — register one, feed the characters, observe —
-never by reading further. This entry has already produced two confident wrong
-answers from reading (see the warning above), and a third would be the same
-mistake in a new place. If it does fire, that is a real defect and it predates
-any migration; if it does not, the gate is somewhere neither read found, and that
-place is what the corpus must replay through.
+✅ **ANSWERED BY DRIVING THE CODE, and it was a real defect** — fixed in
+`f78deb4`. A macOS mapping registered with `auto_expand = false` **did** fire on
+its own last character. `"ya"` expanded inside `"yaourt"` as the user typed it.
+
+The gate existed at none of the three levels: `would_fire` is a pure buffer-tail
+predicate, `try_auto_expand` read the field nowhere, and the tail index is built
+from every mapping with no filter. `try_auto_expand` now refuses a mapping whose
+`auto` flag is false, with a regression test that drives the path rather than
+reading it, and a positive control so a harness that never fires cannot report
+the flag as honoured.
+
+**The defect predates the migration entirely**, which is why finding it here
+matters: adopting the shared core would have inherited the behaviour in either
+direction and made it read as a migration regression instead of a five-line fix.
+
+**What this leaves for §2, and it is now concrete:** the cross-driver corpus is
+still blind to the flag's false case — all 29 vectors are `auto_expand = true`.
+Windows and Linux were **not** checked for the same defect. So the next step is a
+replay of the non-star case at the DISPATCH level (`try_auto_expand`, not
+`would_fire`) on all three drivers, which both closes the corpus gap and answers
+whether the other two drivers share the bug. Only then port the star index and
+adopt the core.
 
 ⚠ **Two wrong measurements in one hour, on this one entry.** First "the corpus has
 no flag field" (it does — `auto_expand` IS `*`). Then "macOS ignores
