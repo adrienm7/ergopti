@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Canonical modifier-key actions shared by the Windows, macOS and Linux drivers. Labels are deliberately language-neutral and must be rendered verbatim.",
+  "description": "Canonical modifier-key actions shared by the Windows, macOS and Linux drivers. Labels are deliberately language-neutral and must be rendered verbatim. \"chord_key\" is the key name the shared chord notation uses (_shared/lua/chord and its AutoHotkey twin); it is present only where it differs from the id, and its absence means the id IS the chord key. The per-platform *_key fields are what each OS calls that same key, and tools/test/test-chord-native-mapping-single-source.cjs holds the drivers to them.",
   "keys": [
     { "id": "a", "label": "A" },
     { "id": "b", "label": "B" },
@@ -41,6 +41,7 @@
     {
       "id": "space",
       "label": "Space",
+      "chord_key": "space",
       "windows_key": "{Space}",
       "macos_key": "space",
       "linux_key": "space",
@@ -49,6 +50,7 @@
     {
       "id": "enter",
       "label": "Enter",
+      "chord_key": "return",
       "windows_key": "{Enter}",
       "macos_key": "return",
       "linux_key": "Return",
@@ -57,6 +59,7 @@
     {
       "id": "period",
       "label": ".",
+      "chord_key": ".",
       "windows_key": ".",
       "macos_key": ".",
       "linux_key": ".",
@@ -65,6 +68,7 @@
     {
       "id": "comma",
       "label": ",",
+      "chord_key": ",",
       "windows_key": ",",
       "macos_key": ",",
       "linux_key": ",",

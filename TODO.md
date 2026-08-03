@@ -48,7 +48,7 @@ is a wish.**
 | **I1** | One tree. The same folder names under `modules/` on the three drivers; a feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs` ratchets it: **25/47 directories = 53.2 %**, and now **14/25 canonical features on all three** — the list is machine-readable at last. Still to do: the Convention S stubs, blocked on the `REASON_KEY` reader. |
 | **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. A feature missing on a platform carries a translated `reason_key`. | Namespace half **done** — the ratchet is now an assertion of zero. The `reason_key` half is at 0 of 142 written. |
 | **I3** | One menu. The manifest describes what the user sees; the renderer how this OS draws a row; the driver supplies only named actions, state getters and list providers. | `action_id` ↔ handler bijection done. The label-tree diff is not built — see §0.6. |
-| **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done. The `HotkeyRegistrar` port and the Karabiner catalogue remain; two of Lot 6's rows turned out not to be actionable as written. |
+| **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`. | Bijection and chord-notation gates done, and the `HotkeyRegistrar` port now carries one chord notation across both drivers. The Karabiner catalogue remains; two of Lot 6's rows turned out not to be actionable as written. |
 | **I5** | One implementation per behaviour. Pure logic in `_shared/lua/`; macOS and Linux `require` it; AHK gets generated **data** or a ported twin **pinned by a shared vector corpus**. | Per-behaviour corpora exist for hotstrings, tooltip, logger, ports. The matcher codegen (Lot 8.3) is the open one. |
 
 **The platform seam, in one sentence:** OS-uniqueness may live in exactly two
@@ -363,9 +363,17 @@ Constraints: **paths before moves, moves before content, data before code.**
   Windows (17.6×)** — and Windows is 41 lines *because the manifest does the
   work*.
 
-- **Lot 6 — one action registry.** Remaining: (1) write `chord.{ahk,lua}` and add
-  the **21st port, `HotkeyRegistrar`** — none of the 20 has a "bind a chord to a
-  callback" operation, which is why each driver invented its own;
+- **Lot 6 — one action registry.** ~~(1) write `chord.{ahk,lua}` and add the
+  **21st port, `HotkeyRegistrar`**~~ — **done 2026-08-03.** `_shared/lua/chord`
+  (macOS + Linux) and `windows/infra/chord.ahk` are pinned to one corpus,
+  `_shared/lua/chord/vectors.json`, run by both suites. Both drivers' configurable
+  shortcut slots now resolve through it. The two Windows `Hotkey()` calls that
+  depend on `InputLevel` were deliberately left out: the port has no notion of
+  AutoHotkey event routing and inventing one would have been a plausible-sounding
+  abstraction that is wrong. Two finds along the way — the `hs.hotkey` stub
+  returned `{delete = noop}`, making every lifecycle assertion against it
+  vacuously true, and `KEYBOARD_SHORTCUT_SEND_CODES` held one override the
+  generic path already produced.
   ⚠ **(2) could not be located, re-measured 2026-08-02.** Nothing in the Windows
   driver is named "layer A" or "layer B", and the ordering the entry blames is
   already the other way round: `ErgoptiPlus.ahk` includes
