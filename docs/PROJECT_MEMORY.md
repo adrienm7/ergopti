@@ -3368,9 +3368,18 @@ assertion real.
   arrangement. It stays because losing it costs nothing and the cross-instance
   case is real in the suite — but it is documented as redundant, not as load
   bearing.
+- **A probe that goes red on the wrong case is also a result.** In the same
+  sweep, a mutation that corrupted a log line's suppression count to `0` failed
+  to turn the assertion checking that count red. The assertion searched a log
+  line for the bare digit `"3"` — and the line carries a timestamp, so the date
+  `2026-08-03` supplied one. **Never assert a numeric value as a bare substring
+  of a line that carries a timestamp**; match it in context (`"3 identical"`).
+  An assertion a calendar can satisfy will pass for eleven days a year and hide
+  a defect for the other three hundred and fifty.
 
 Related: [[project-instrumentation-absence-is-invisible]],
-[[project-gate-scripts-must-be-wired]].
+[[project-gate-scripts-must-be-wired]],
+[[project-source-scan-loops-need-a-floor]].
 
 
 
