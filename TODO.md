@@ -85,10 +85,16 @@ edits to declarations plus one replacing `_log`'s body with a call into the core
 and moving console/file/errors-only into a sink. 994 → 943 lines, and **31
 failing tests in three families**:
 
-1. **Ring lifetime.** The ring moves into a different module, so a test that
-   re-requires `infra.logger` no longer gets a fresh buffer: three cases that
-   expected 0 entries saw 200. **Decide first** whether the ring is
-   per-driver-instance or per-process; the rest follows.
+1. ~~**Ring lifetime.**~~ **Settled 2026-08-03, and it was never a choice.** The
+   core is reached as `require("logger")` — a BARE module name, because
+   `_shared/lua` is spliced onto `package.path`. `tests/run.lua` evicts modules
+   between files by prefix (`^modules%.`, `^adapters%.`, `^infra%.`, `^ui%.`), so
+   a bare name is never evicted and **core state is per process**. The three
+   "expected 0, saw 200" failures are that, exactly. A test needing a clean ring
+   calls `ring_buffer_clear()`; needing a clean streak, `reset_dedup()`. Adding
+   `"^logger$"` to the purge list would "fix" it and be wrong — it would grant the
+   tests an isolation the running driver never has. See
+   [`project-the-macos-logger-ring-is-per-process`](docs/PROJECT_MEMORY.md).
 2. **Source-scanning tests.** `test_hot_path_costs` matches
    `_write_to_file(stamp, line, variant.level ~= …)`; the signature becomes one
    composed line. `test_logger_dedup_errors_mirror` names `_flush_dedup_summary`,
@@ -97,9 +103,23 @@ failing tests in three families**:
 3. **The error-notification handler** loses the module name: it reads values
    `_log` used to compute and the core now computes.
 
-**What has no corpus, and is what all 31 failures were about:** the driver half —
-file writing, sub-file fan-out, the errors-only mirror, the print() tee. Write
-that coverage first.
+~~**What has no corpus:** the driver half.~~ **Written 2026-08-03.**
+`macos/tests/unit/lib/test_logger_file_sinks.lua` states that half as behaviour
+in 14 cases — canonical line format, the eight variants under their own labels,
+level filtering before the sink, the errors-only mirror (and its exclusions), the
+mirrored line being byte-identical to the unified one, topical routing in both
+directions, the level-aware flush policy and its safety valve, the suppression
+summary's exact count and its mirror, and the print() tee. Seven of eight
+one-fact probes went red; the eighth is documented as a doubly-guarded hazard.
+
+**So only families 2 and 3 remain.** The design that follows from the ring
+decision: keep `M.current_level` as the single filter (six tests and the
+log-level submenu ASSIGN it directly, so a second threshold in the core would
+filter differently from the one the menu shows) and leave the core's own
+threshold at its floor; shim `Core.clock_fn`/`Core.timestamp_fn` back through the
+driver's fields so a test setting `Logger.clock_fn` still drives the window; and
+let the core's `deliver()` hand the summary to the driver sink, which deletes
+`_flush_dedup_summary`'s four duplicated sink writes outright.
 
 ---
 
@@ -193,8 +213,6 @@ a declarative group can absorb a driver-supplied builder.
   gate names the biggest offenders (`menu_remap.lua` 36,
   `menu_llm/models_selector.lua` 32, `menu_keyboard_layout.lua` 26). Lower it;
   never raise it.
-- **npm aliases** — 78 of 136 suite gates have none, ratcheted at 78 by
-  `test-npm-aliases-match-the-suite.cjs`. Adding one is free.
 - **`tab.tap` drift.** `alt_tab_monitor` on Windows and Linux, `alt_tab_windows`
   on macOS, with nothing recorded about why. The only genuine drift of the five
   tap-hold divergences.
