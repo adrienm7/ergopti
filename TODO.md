@@ -605,7 +605,7 @@ test: it actively deters anyone from writing the real one.
 
 `tools/test/find-false-greens.cjs` runs inside `npm run test:js` and ratchets six
 classes — tautology, vacuous-absence, dead-test, pcall-only, `corpus-skip` and
-`unfloored-scan`. It only turns down. Frozen 2026-08-03 at pcall-only **86**,
+`unfloored-scan`. It only turns down. Frozen 2026-08-03 at pcall-only **62**,
 unfloored-scan **4**, **the other four at 0**.
 
 The work is burning those floors down. Each occurrence is either a real false
