@@ -248,12 +248,30 @@ And the branch itself is **gone**: no local branch, no worktree (only
 against a plan section nobody can read, and this entry cites it as authority for
 skipping an audit.
 
-**Resolve the branch question before running either prompt.** Either the six
-remaining blockers (B3, B4, B5, B6 and the rest) landed on `dev` under other
-commits — in which case the memory entry should say so and be closed — or they
-were dropped with the branch, in which case they are lost work that belongs back
-in this file. Nobody can tell from the repository as it stands, and running an
-audit on top of that ambiguity would produce findings nobody can act on.
+✅ **RECOVERED 2026-08-03 — and they were never lost, only unreachable.**
+
+The reflog holds 81c9012a merge simplification: Fast-forward and
+97ca0ec1 docs: fold the simplification plan into TODO.md. The branch WAS
+merged; the six surviving blockers were folded into a TODO.md section that a
+later rewrite of this file dropped. git show 297ca0ec1:TODO.md still has them,
+and they are restored below verbatim. **Two are plaintext data leaks.**
+
+| # | Blocker | Note before starting |
+| --- | --- | --- |
+| **B5** | Linux writes every typed character, in plaintext, into a world-readable `/tmp` file on every keylogger flush (`linux/modules/keylogger/sqlite_writer.lua:96-112`, `:127-139`) | the temp name comes from `tmpnam(3)` then is mutated, so it is not the reserved file — a symlink/TOCTOU target. Stop shelling SQL through a file; the `sqlite3` CLI reads a script on stdin |
+| **B4** | Linux keylogger is always on, in plaintext, with no off switch, no private-browsing and no system-auth filter | ⚠ **do NOT simply wire `adapters/secure_field_detector.lua`** — `modules/keylogger/keylogger.lua:90-98` documents that its exact `WM_CLASS` match on a shorter list would *narrow* coverage and leak `gpg`/`ssh-agent`/`polkit`/`sudo`, and a test guard locks "coverage must never narrow". The fix is **additive** |
+| **B3** | The generated kanata config is unloadable: the generator emits 7 of the 12 aliases the template defines, leaving `@copy`, `@paste`, `@rollx`, `@deadtrema` dangling | `test:kanata-defalias-parity` never runs the generator against the template — extend it first, then fix the generator. The generator's own docstring also warns `ralt` needs hand-merging, which `manager.lua` does not do |
+| **B6** | The macOS "Chiffrement" menu item is a complete no-op (ten empty stubs) and `docs/security/keylogger_privacy.md:93` tells users to enable it for at-rest privacy | the `type(...) == "function"` guard is always true because the stub exists, so the flow raises inside the stub's own `pcall`, the progress canvas is never deleted and no dialog appears. Decide: implement, or delete the feature **and** the doc sentence together |
+| **B9** | `llm_context_length` has no effect on the Windows automatic path — the `context_window_chars` fix was never ported into the AHK generator (`grep -c context_window windows/**/*.ahk` → 0) | add a corpus vector that sets `context_window_chars`: none of the 12 existing vectors does, which is why the corpus cannot catch it |
+| **B10** | Opposite secure-field defaults for LLM predictions: macOS hardcodes `true` (contradicting `defaults.json`, and both keys are absent from `_SHARED_SCALAR_KEYS` so the shared value is unreachable); Windows sends context from password fields | security posture — pick the default deliberately, then make both drivers read it from `defaults.json` |
+
+Recovery route, for the next time a plan section vanishes: git reflog --all\nfinds the merge, git log --all --oneline -- <file> finds the versions, and
+git show <sha>:<file> reads one. Searching git log --grep for the identifiers
+finds nothing, because they only ever appeared in a file body — which is what made
+this look like lost work rather than buried work.
+
+Do that before running either prompt. An audit that reports findings while six
+known defects sit unrecorded is an audit measuring the wrong thing.
 
 `audit_mise_en_commun_et_simplification.md` **was run on 2026-08-03** — report at
 [`docs/audits/2026-08-03-mise-en-commun-et-simplification.md`](docs/audits/2026-08-03-mise-en-commun-et-simplification.md).
