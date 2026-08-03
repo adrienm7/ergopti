@@ -231,10 +231,31 @@ one bucket edge or one character class changes every downstream aggregate and
 produces no failure — the exact silence a corpus exists to break.
 
 So: add a `primitives` section to
-`_shared/tests/corpus/keylogger/aggregation_vectors.json` covering those three,
-replay it in BOTH suites (a corpus only one driver reads is a corpus that pins
-nothing), and only then extract. That is the smallest useful unit of work left in
-this file.
+`_shared/tests/corpus/keylogger/aggregation_vectors.json` covering those three and
+replay it in BOTH suites — a corpus only one driver reads is a corpus that pins
+nothing. That is the smallest useful unit of work left in this file.
+
+⚠ **And reading the two implementations side by side on 2026-08-03 already found
+two divergences. Neither has a symptom today; both are what the vectors are for.**
+
+1. **`pop_utf8` vs `KLW_PopLast` disagree on astral characters.** Lua removes the
+   last UTF-8 **codepoint** via `utf8.offset(s, -1)`. AutoHotkey does
+   `SubStr(s, 1, StrLen(s) - 1)` — and AHK v2 counts UTF-16 code units, so for
+   anything outside the BMP (emoji) it removes **half a surrogate pair** and
+   leaves a broken string in the word buffer. They agree for every BMP character,
+   which is why nothing has ever failed.
+
+2. **The bucket overflow labels can silently drift apart.** Lua returns
+   `tostring(buckets[#buckets]) .. "+"` — derived from the table. AutoHotkey
+   returns the **literal `"500+"`**. They agree only for as long as the last
+   bucket edge is 500. `test-walker-constants-single-source.cjs` pins the edges
+   themselves, so it would not notice: the constants would still match while the
+   overflow LABEL diverged, and every over-cap burst would be filed under two
+   different keys on the two drivers.
+
+Both are one vector each. Write those two first — they are the cases that
+already differ, which makes them the cheapest possible proof that the corpus
+does something.
 
 ---
 
