@@ -79,7 +79,31 @@ to make a change pass, and run the gates that cover what you touched —
 
 ---
 
-## 1. One action namespace — remap actions become gesture actions
+## ~~1. One action namespace~~ — DONE 2026-08-03
+
+Landed in `213c9d6`. The merge was not the shape this section described, and the
+correction is worth keeping because it is the same lesson as the others:
+
+- **32** of the "55 missing" were genuinely missing and became rows.
+- **4** were not missing at all — `return`≡`enter`, `delete_fwd`≡`delete`,
+  `cmd_tab` and `alt_tab_apps_list`≡`app_switcher`. Declaring them would have put
+  four duplicate entries in the picker: the same label twice, for the same
+  keystroke. They became a `[karabiner_aliases]` table instead.
+- **19** hold-only ones stay out, as decided.
+- **The 756 translations were 63.** Twelve labels compose from a string the same
+  locale file already carries, fifteen are the sticky family (left untranslated,
+  matching what this catalogue already does for `OneShotShift` and `CapsWord` in
+  all 21 files), and nine are chords or key names printed on the keyboard. Three
+  terms remain that a native speaker should read: "direct", "all apps",
+  "Cycle windows (same app)".
+
+The gate that found the four duplicates — no two rows may emit the same macOS
+keystroke — is `test-karabiner-namespace-is-merged.cjs`, and it also holds the
+tappable/hold-only split so a new Karabiner action cannot become a
+remap-only feature again.
+
+<details>
+<summary>The original analysis, kept because its measurements were the useful part</summary>
 
 **Decided 2026-08-03: yes, one namespace.**
 
@@ -151,6 +175,8 @@ table does not already give.
 **Measured overlap, 2026-08-03:** 73 Karabiner actions, 126 `sg_actions` rows, 18
 in common, 55 missing — 36 tappable, 19 hold-only. The counts above hold.
 
+</details>
+
 ---
 
 ## 2. macOS + Windows onto the shared matcher core
@@ -214,16 +240,14 @@ none of it is a batch job, and the section title used to imply otherwise.
   gate names the biggest offenders (`menu_remap.lua` 36,
   `menu_llm/models_selector.lua` 32, `menu_keyboard_layout.lua` 26). Lower it;
   never raise it.
-- **`tab.tap` drift — measured 2026-08-03, and it is a product question.**
-  Windows `AltTabMonitor()` reads the mouse position, resolves the monitor under
-  the cursor, and cycles only the windows **on that monitor**. macOS
-  `start_alt_tab_windows_hotkey` binds Shift+F17 to `focus_previous_window_global`
-  — the previously focused window, unscoped (itself migrated away from `cmd_tab`
-  so it switches windows rather than apps). Two behaviours, not two names, so
-  renaming either side would be the wrong fix. What remains is a decision: should
-  macOS scope to the display under the cursor as well? The full finding is in
-  `test-tap-hold-namespace-correspondence.cjs`, which no longer says "nothing
-  recorded why".
+- ~~**`tab.tap` drift**~~ — **DONE 2026-08-03**, in `f5a861c`. The maintainer's
+  answer was "implement both", so both behaviours now ship on both drivers:
+  `AltTabAll()` on Windows, a Ctrl+F17 per-screen cycler on macOS. What is left
+  is which one the tab key defaults to, and the two platforms answer differently
+  on purpose. **The finding worth keeping is that the `platform` field was the
+  real blocker**: it accepted only "all" / "hs" / "ahk", so it could not say "two
+  drivers out of three" — "all" declared two rows Linux cannot perform, and a
+  single key hid half the work. It now takes a comma-separated list.
 - **Gates to retire, after their migration only:**
   `macos/tests/meta/test_menu_hotstrings_layout_drift_gate.lua`, and
   `test_menu_top_level_drift_gate.{lua,ahk}` (once the tail is manifest rows with
