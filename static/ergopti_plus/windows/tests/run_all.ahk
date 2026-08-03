@@ -630,6 +630,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../infra/chord.ahk
 #Include ../adapters/hotkey_registrar.ahk
 #Include meta/test_chord_notation.ahk
+; Logger behaviour corpus -- severity filtering and the ring buffer, from the
+; same shared file the macOS and Linux suites replay.
+#Include meta/test_corpus_logger_behaviour.ahk
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
 #Include meta/test_corpus_toml_fuzz.ahk

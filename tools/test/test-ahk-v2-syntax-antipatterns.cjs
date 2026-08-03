@@ -70,6 +70,18 @@ const errors = [];
 // matched.
 const BLOCK_ARROW = /=>\s*\{\s*(\w+\s*[(.]|\w+\s*:=)/g;
 
+// Words AHK v2 refuses as identifiers. The list is deliberately the control-flow
+// keywords rather than every reserved name: those are the ones that read as
+// perfectly ordinary variable names ("Case", "Loop", "Until", "Catch") and so are
+// the ones actually reached for. "Case" cost a full debugging session — a test
+// file using it as a loop variable blocked the entire suite at load, silently.
+const RESERVED_LOWER = new Set(
+	[
+		'Case', 'Loop', 'Until', 'Catch', 'Finally', 'Switch', 'Break', 'Continue',
+		'Return', 'Throw', 'Goto', 'Global', 'Static', 'Local'
+	].map((w) => w.toLowerCase())
+);
+
 for (const file of files) {
 	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
 	const src = fs.readFileSync(file, 'utf8');
@@ -102,6 +114,43 @@ for (const file of files) {
 				`${rel}:${i + 1}: unbraced one-line \`try\` as an if-body followed by \`else\` on ` +
 					`line ${j + 1} — AHK v2's \`try\` has its own \`else\` clause, so this aborts the ` +
 					'whole script with `Unexpected "Else"`. Brace the if/else bodies.'
+			);
+		}
+	});
+
+	// A reserved word used as a variable, parameter or loop variable. AHK v2
+	// rejects it at LOAD time — which means a modal error dialog, which in a
+	// headless run is a process that blocks forever at ~0% CPU with no output at
+	// all. That is far worse than a failing test: the suite does not fail, it
+	// stops existing, and the run looks like a slow machine.
+	codeLines.forEach((line, i) => {
+		// String literals are blanked first: half this repo's test names contain
+		// the word "case", and matching inside them would report 20 findings on a
+		// tree that loads perfectly — a gate nobody could act on.
+		const stripped = line.replace(/\s+;.*$/, '').replace(/"(?:[^"`]|`.)*"/g, '""');
+
+		// A function's PARAMETER list is the position AHK actually rejects.
+		const decl = stripped.match(/^\s*(\w+)\s*\(([^)]*)\)\s*\{?\s*$/);
+		if (decl) {
+			for (const param of decl[2].split(',')) {
+				const name = param.trim().replace(/^&/, '').split(/[\s:=*]/)[0];
+				if (RESERVED_LOWER.has(name.toLowerCase())) {
+					errors.push(
+						`${rel}:${i + 1}: "${name}" is an AHK v2 reserved word used as a parameter of ` +
+							`${decl[1]}() — this fails at LOAD time with a modal dialog, so a headless run ` +
+							'blocks forever at ~0% CPU with no output instead of reporting a failure. ' +
+							'Rename the parameter.'
+					);
+				}
+			}
+		}
+
+		// And as an assignment target, which AHK rejects the same way.
+		const assign = stripped.match(/(?:^|[\s(,])(\w+)\s*:=/);
+		if (assign && RESERVED_LOWER.has(assign[1].toLowerCase())) {
+			errors.push(
+				`${rel}:${i + 1}: "${assign[1]}" is an AHK v2 reserved word used as an assignment ` +
+					'target — this fails at LOAD time with a modal dialog. Rename the variable.'
 			);
 		}
 	});

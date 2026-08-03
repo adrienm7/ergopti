@@ -22,21 +22,25 @@ local function mkdir_p(path)
 end
 
 helpers.describe("Logger: levels", function()
+	-- The spec's numbering, shared with the AutoHotkey driver's LOGGER_SEVERITY
+	-- and the shared Lua core. It was 1/2/3/4 here until 2026-08-03, so a level
+	-- NUMBER meant two different things depending on which driver read it; the
+	-- cross-driver corpus now asserts the same four values from one file.
 	helpers.it("exposes the 4 numeric levels", function()
-		helpers.assert_eq(Logger.LEVELS.DEBUG, 1)
-		helpers.assert_eq(Logger.LEVELS.INFO, 2)
-		helpers.assert_eq(Logger.LEVELS.WARNING, 3)
-		helpers.assert_eq(Logger.LEVELS.ERROR, 4)
+		helpers.assert_eq(Logger.LEVELS.DEBUG, 10)
+		helpers.assert_eq(Logger.LEVELS.INFO, 20)
+		helpers.assert_eq(Logger.LEVELS.WARNING, 30)
+		helpers.assert_eq(Logger.LEVELS.ERROR, 40)
 	end)
 
 	helpers.it("set_level accepts numeric level", function()
 		Logger.set_level(Logger.LEVELS.DEBUG)
-		helpers.assert_eq(Logger.current_level, 1)
+		helpers.assert_eq(Logger.current_level, 10)
 	end)
 
 	helpers.it("set_level accepts string level", function()
 		Logger.set_level("INFO")
-		helpers.assert_eq(Logger.current_level, 2)
+		helpers.assert_eq(Logger.current_level, 20)
 	end)
 
 	helpers.it("set_level falls back to WARNING on unknown name", function()
