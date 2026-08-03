@@ -122,11 +122,19 @@ helpers.describe("_shared/lua/tap_hold/kanata_generator.lua", function()
 		local output = gen.generate(keys, { one_shot_shift_timeout_ms = 2000 })
 
 		local allowed = { copy = true, paste = true }
+		-- Floored: a generator that emitted no @refs at all — an empty template, a
+		-- silent write failure — would satisfy every per-ref check below by having
+		-- nothing to check.
+		local seen_refs = 0
 		for ref in output:gmatch("@([%w_]+)") do
+			seen_refs = seen_refs + 1
 			helpers.assert_true(allowed[ref] == true,
 				"generated block references @" .. ref ..
 				", which nothing defines — add it to the template's composites block")
 		end
+		helpers.assert_true(seen_refs > 0,
+			"the generated block must reference at least one composite — none at all means "
+				.. "the generator produced nothing, not that everything was valid")
 	end)
 
 	helpers.it("output is deterministic (stable iteration order)", function()

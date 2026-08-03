@@ -236,13 +236,14 @@ helpers.describe("ergopti_hotstrings CLI", function()
 
     helpers.it("no arguments does not corrupt output", function()
       -- Without a device, the daemon will fail — but it should not crash.
-      local ok = pcall(function()
+      local ok, launch_err = pcall(function()
         local pipe = io.popen(lua_bin() .. " " .. daemon_path() .. " 2>&1", "r")
         if pipe then
           local _ = pipe:read("*a")
           pipe:close()
         end
       end)
+      helpers.assert_nil(launch_err, "and must report none: " .. tostring(launch_err))
       helpers.assert_true(ok, "no-args launch does not crash test harness")
     end)
   end)

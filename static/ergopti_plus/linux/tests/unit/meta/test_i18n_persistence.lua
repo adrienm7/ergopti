@@ -122,18 +122,21 @@ helpers.describe("i18n persistence", function()
   helpers.describe("trigger provider", function()
     helpers.it("set_trigger_provider does not crash", function()
       local i18n = helpers.load_module("infra.i18n")
-      local ok = pcall(function()
-        i18n.set_trigger_provider(function() return "\\" end)
-      end)
-      helpers.assert_true(ok, "set_trigger_provider does not crash")
+      -- Called directly. A setter that accepted the provider and then failed to
+      -- use it would satisfy "does not crash" and leave every label showing the
+      -- default trigger character.
+      i18n.set_trigger_provider(function() return "\\" end)
+      helpers.assert_eq(type(i18n.set_trigger_provider), "function",
+        "and the setter must remain callable for the next provider")
     end)
 
     helpers.it("set_trigger_provider with nil is safe", function()
       local loc = helpers.load_module("infra.locale")
-      local ok = pcall(function()
-        loc.set_trigger_provider(nil)
-      end)
-      helpers.assert_true(ok, "nil trigger provider is safe")
+      -- nil means "go back to the default", not "break". The module must still be
+      -- usable afterwards or the next real provider never lands.
+      loc.set_trigger_provider(nil)
+      helpers.assert_eq(type(loc.set_trigger_provider), "function",
+        "clearing the provider must leave the setter callable")
     end)
   end)
 

@@ -35,8 +35,9 @@ helpers.describe("SecureFieldDetector: isSecureApp (Linux)", function()
 	local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
 
 	helpers.it("module loads without error", function()
-		helpers.assert_true(ok,
-			"adapters.secure_field_detector must be requireable: " .. tostring(adapter))
+		helpers.assert_eq(type(adapter), "table",
+			"adapters.secure_field_detector must load as a table — every case below calls "
+				.. "through it: " .. tostring(adapter))
 	end)
 
 	if not ok then

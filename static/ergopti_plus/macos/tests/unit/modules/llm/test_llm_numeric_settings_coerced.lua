@@ -291,8 +291,8 @@ helpers.describe("prediction_engine — numeric settings survive a string from c
 		PE.stop_timer()
 		PE.set_llm_enabled(false)
 
-		helpers.assert_true(ok,
-			"a string llm_debounce must be coerced by the setter — start_inactivity_timer compares it against 0: " .. tostring(err))
+		helpers.assert_nil(err, "start_inactivity_timer compares the debounce against 0: " .. tostring(err))
+		helpers.assert_true(ok, "a string llm_debounce must be coerced by the setter")
 	end)
 
 	helpers.it("set_llm_num_predictions floors and clamps to at least one prediction", function()

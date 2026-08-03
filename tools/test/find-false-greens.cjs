@@ -602,6 +602,21 @@ function findUnflooredScans(file, src, ext) {
 		// invisible and its floor could not be found however it was written.
 		// `(?!=)` keeps `t[k] == v` (a comparison) out of the collector set.
 		for (const m of block.text.matchAll(/^[^\n]*?(\w+)\s*\[.*\]\s*=(?!=)/gm)) collectors.add(m[1]);
+		// A boolean FLAG is a collector too, and the fifth blind spot of this
+		// detector. A positive control — "feed the scanner a sample containing the
+		// forbidden shape and prove it fires" — accumulates into `flagged = true`
+		// rather than into a list, and its floor is `assert_true(flagged)`. That is
+		// a stronger floor than a count, not a weaker one: it ties the loop to the
+		// exact shape it is supposed to find. Only assignments of a literal
+		// true/false count, so `x = compute()` inside a loop is not mistaken for
+		// one.
+		// The trailing `end`/`}` matters: the idiomatic spelling is a one-line
+		// guarded set — `if cond then flagged = true end` — so anchoring at the end
+		// of the line found nothing at all, which is how this class stayed invisible
+		// through four earlier widenings of exactly this recogniser.
+		for (const m of block.text.matchAll(/\b(\w+)\s*=\s*(?:true|false)\s*(?:end\b|\}|$)/gm)) {
+			collectors.add(m[1]);
+		}
 		if (!floored) {
 			for (const c of collectors) {
 				// Compared against anything, not only a literal: `Stages.Count ==
@@ -617,7 +632,12 @@ function findUnflooredScans(file, src, ext) {
 				const re = new RegExp(
 					`${size}\\s*(?:>|>=|!=|~=|==)\\s*\\w` +
 						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${size}\\s*,` +
-						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*[\\w."']+\\s*,\\s*${size}\\s*[,)]`
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*[\\w."']+\\s*,\\s*${size}\\s*[,)]` +
+						// A boolean flag has no size to compare. Asserting it directly IS
+						// the floor, and a stricter one than any count: it ties the loop to
+						// the exact shape it was supposed to find, so an empty scan leaves
+						// the flag false and the assertion fails.
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${c}\\s*[,)]`
 				);
 				if (re.test(src)) {
 					floored = true;

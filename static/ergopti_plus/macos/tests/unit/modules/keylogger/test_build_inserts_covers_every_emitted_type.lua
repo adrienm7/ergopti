@@ -336,6 +336,14 @@ helpers.describe("keylogger/sqlite_writer: no emitted row violates a schema CHEC
 					local columns = {}
 					for column in column_blob:gmatch("[%w_]+") do columns[#columns + 1] = column end
 					local values = split_sql_values(value_blob)
+					-- Floored: the per-column CHECK assertions live inside a loop over
+					-- the parsed column list, so one that parsed to nothing would skip every
+					-- one of them and report a clean run over an INSERT nobody inspected.
+					helpers.assert_true(#columns > 0,
+						"no columns parsed out of: " .. tostring(column_blob))
+					helpers.assert_eq(#values, #columns,
+						"column and value counts must match, or the index pairing below is comparing "
+							.. "the wrong pairs: " .. tostring(column_blob))
 
 					for index, column in ipairs(columns) do
 						local allowed = per_column[column]

@@ -90,14 +90,14 @@ helpers.describe("hotstring corpus — integrity", function()
 			if v.expected and v.expected.matched == true then
 				local bc = v.expected.backspace_count
 				if bc ~= nil then
-					-- Compute codepoint length of trigger (handles ASCII and multi-byte)
-					local trigger_codepoints = 0
-					for _ in v.trigger:gmatch("[\0-\127\194-\244][\128-\191]*") do
-						trigger_codepoints = trigger_codepoints + 1
-					end
-					-- Wait — the simple pattern above is imprecise. Use utf8.len for correctness.
+					-- Codepoint length of the trigger. A hand-rolled UTF-8 scan used to run
+					-- here first and was then overwritten by utf8.len two lines down — its own
+					-- comment said "the simple pattern above is imprecise", so it had been dead
+					-- since the day it was written.
 					local ok_len, tlen = pcall(utf8.len, v.trigger)
-					if ok_len and tlen then trigger_codepoints = tlen end
+					helpers.assert_true(ok_len and tlen ~= nil,
+						"corpus trigger must be valid UTF-8: " .. tostring(v.trigger))
+					local trigger_codepoints = tlen
 					local consumed_bonus = (v.terminator_consumed == true) and 1 or 0
 					local expected_bc    = trigger_codepoints + consumed_bonus
 					helpers.assert_eq(bc, expected_bc,

@@ -1091,13 +1091,12 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 	end)
 
 	helpers.it("destroy/show/hide/drawBitmap on a zero handle are no-ops (zero_is_noop)", function()
-		local ok = pcall(function()
-			adapter.destroyWindow(0)
-			adapter.show(0)
-			adapter.hide(0)
-			adapter.drawBitmap(0, function() end)
-		end)
-		helpers.assert_true(ok, "zero-handle calls must be no-ops without throwing")
+		-- Called directly: a raise fails with the real error, which names which of
+		-- the four calls broke.
+		adapter.destroyWindow(0)
+		adapter.show(0)
+		adapter.hide(0)
+		adapter.drawBitmap(0, function() end)
 		helpers.assert_eq(type(adapter.createWindow), "function",
 			"and must leave the adapter usable — a zero handle is what every caller has "
 				.. "before its first createWindow")
@@ -1113,12 +1112,9 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 
 	helpers.it("show then hide then destroy do not throw (show/hide/destroy lifecycle)", function()
 		local h = adapter.createWindow({ x = 0, y = 0, w = 64, h = 64 })
-		local ok = pcall(function()
-			adapter.show(h)
-			adapter.hide(h)
-			adapter.destroyWindow(h)
-		end)
-		helpers.assert_true(ok, "show/hide/destroy lifecycle must not throw")
+		adapter.show(h)
+		adapter.hide(h)
+		adapter.destroyWindow(h)
 		helpers.assert_eq(type(adapter.createWindow), "function",
 			"and a destroyed window must leave the adapter able to create another")
 	end)
