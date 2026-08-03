@@ -277,13 +277,31 @@ the flag as honoured.
 matters: adopting the shared core would have inherited the behaviour in either
 direction and made it read as a migration regression instead of a five-line fix.
 
-**What this leaves for §2, and it is now concrete:** the cross-driver corpus is
-still blind to the flag's false case — all 29 vectors are `auto_expand = true`.
-Windows and Linux were **not** checked for the same defect. So the next step is a
-replay of the non-star case at the DISPATCH level (`try_auto_expand`, not
-`would_fire`) on all three drivers, which both closes the corpus gap and answers
-whether the other two drivers share the bug. Only then port the star index and
-adopt the core.
+**The other two drivers were then checked, and macOS was the odd one out.** Both
+gate correctly, by different mechanisms — which is itself the finding:
+
+- **Linux** (the shared core) gates explicitly:
+  `if mapping.auto_expand == want_auto and body_len >= tlen`
+  (`_shared/lua/hotstring_engine/init.lua:361`), with `want_auto` separating
+  Path A (fires on the trigger's own last char) from Path B (waits for a
+  terminator).
+- **Windows** gates structurally: star and non-star triggers live in **separate
+  indexes** — `HSE_StarByTriggerCI/CS` against `HSE_EndByTriggerCI/CS` — so a
+  non-star trigger is only ever probed on a terminator. It cannot reach the auto
+  path at all.
+- **macOS** had neither, and that is what `f78deb4` fixed.
+
+⚠ These two were verified by reading their structure, not by driving them. That
+is weaker evidence than the macOS answer, and this file has been burned twice
+this week by exactly that difference. **Treat them as probably-correct, not
+proven.**
+
+**What remains for §2:** the cross-driver corpus is still blind to the flag's
+false case — all 29 vectors are `auto_expand = true`. A dispatch-level replay of
+the non-star case on all three drivers would both close that gap and upgrade the
+Windows/Linux answers from read to driven. Do that before porting the star index,
+because a corpus that cannot express the flag cannot verify a migration that
+moves the code holding it.
 
 ⚠ **Two wrong measurements in one hour, on this one entry.** First "the corpus has
 no flag field" (it does — `auto_expand` IS `*`). Then "macOS ignores
