@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initialisation du moteur IA (MLX)",
 	"mlx.init_subtitle": "Initialisation IA en cours, veuillez patienter…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "Windows uniquement : compense les dispositions personnalisées (KbdEdit/MSKLC) qui réassignent AltGr à une autre touche virtuelle — une notion de pilote clavier Windows sans équivalent ailleurs.",
 	"metrics_apps.chart_time_series": "Temps",
 	"metrics_apps.edit_category_hint": "Modifier la catégorie"
 }

@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "仅限 Windows：用于补偿将 AltGr 重新映射到其他虚拟键的自定义布局（KbdEdit/MSKLC）——这是 Windows 键盘驱动程序特有的概念，其他系统没有对应物。",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别"
 }

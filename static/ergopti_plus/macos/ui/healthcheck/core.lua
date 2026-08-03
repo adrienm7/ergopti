@@ -330,6 +330,7 @@ function M.run()
 		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
 		logs             = safe_collect("logs_info",           H.collect_logs_info),
 		config           = safe_collect("config_summary",      H.collect_config_summary),
+		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
@@ -630,6 +631,20 @@ function M.format_plain(snapshot)
 	if s.hotstrings then
 		local hs = s.hotstrings
 		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
+	end
+
+	-- Platform coverage: the only place a user can ask why a feature they read
+	-- about is not in their menu. The SILENT count is reported next to the
+	-- explained one on purpose — a list of only the explained absences would look
+	-- complete while hiding the ones that matter most.
+	if s.coverage then
+		local cv = s.coverage
+		table.insert(lines, "")
+		table.insert(lines, string.format("Unavailable here : %d feature(s) — %d explained, %d with no reason recorded",
+			cv.total or 0, cv.explained or 0, cv.silent or 0))
+		for _, entry in ipairs(cv.entries or {}) do
+			table.insert(lines, string.format("  · %s (only %s) — %s", entry.path, entry.only, entry.reason))
+		end
 	end
 
 	local ok_list      = s.ports_validated  or {}

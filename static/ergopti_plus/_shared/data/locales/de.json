@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "Nur Windows: gleicht benutzerdefinierte Layouts (KbdEdit/MSKLC) aus, die AltGr auf eine andere virtuelle Taste legen — ein Begriff des Windows-Tastaturtreibers ohne Entsprechung anderswo.",
 	"metrics_apps.chart_time_series": "Zeit",
 	"metrics_apps.edit_category_hint": "Kategorie ändern"
 }
