@@ -56,11 +56,21 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
 
-// Frozen on 2026-08-02: 87 features + 45 menu rows + 10 sections restricted to
-// one platform with no reason_key. 127 restrictions that a parent section
-// already makes are excluded by construction — see the header for why this is
-// 142 rather than the 76 measured under the driver silos.
-const BASELINE = 142;
+// Frozen on 2026-08-02 at 142: 87 features + 45 menu rows + 10 sections
+// restricted to one platform with no reason_key. 127 restrictions that a parent
+// section already makes are excluded by construction — see the header for why
+// this is 142 rather than the 76 measured under the driver silos.
+//
+// 2026-08-03: 142 → 139. Three came off together, and it is the first time this
+// number has moved at all, because until that day it could not: `reason_key` had
+// no reader anywhere in the repo, and the generator did not even emit it — each
+// driver's generated manifest carries only the features it HAS, so a driver
+// could not enumerate its own absences, let alone explain one. Writing reasons
+// into that would have been writing configuration nothing could ever read.
+// The chain now exists (generator → manifest_reader.coverage_gaps() →
+// healthcheck), and `script.alt_gr_is_kana_remap` is the first one written
+// through it end to end.
+const BASELINE = 139;
 
 // Floor: the manifest holds 500 tables, so a low parse means the scan broke and
 // the ratchet would pass having measured nothing.

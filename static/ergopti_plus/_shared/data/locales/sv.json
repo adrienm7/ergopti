@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "Endast Windows: kompenserar för anpassade layouter (KbdEdit/MSKLC) som mappar om AltGr till en annan virtuell tangent — ett begrepp i Windows tangentbordsdrivrutin utan motsvarighet någon annanstans.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori"
 }

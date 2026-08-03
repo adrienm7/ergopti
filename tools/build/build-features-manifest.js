@@ -198,7 +198,42 @@ function validate(features) {
 		if (!/^[a-z][a-z0-9_]*$/.test(f.id)) {
 			throw new Error(`feature ${f.path} has invalid id "${f.id}" (must match ^[a-z][a-z0-9_]*$)`);
 		}
+		// A reason with nothing to explain is the shape a copied block takes: the
+		// key gets carried along, the restriction does not, and the coverage
+		// report then has an entry it can never show. Refuse it at build time
+		// rather than let it sit in the manifest looking like documentation.
+		if (f.reason_key && f.platforms && f.platforms.length === PLATFORMS.length) {
+			throw new Error(
+				`feature ${f.path} declares reason_key but is available on every platform — ` +
+					'there is no absence to explain'
+			);
+		}
 	}
+}
+
+// The features a given driver does NOT get, with whatever explains each one.
+//
+// This has to be emitted explicitly, because each driver's generated manifest
+// carries only the features it HAS: a feature restricted to "ahk" simply does
+// not appear in features_manifest.lua, so nothing on macOS could enumerate what
+// it is missing, let alone say why. That is the gap that made `reason_key` a
+// field with no possible reader — the data it describes was never shipped to the
+// driver that would display it.
+function unavailableFor(features, platform) {
+	return features
+		.filter((f) => !f.platforms.includes(platform))
+		.map((f) => ({
+			path: f.path,
+			section: f.section,
+			reason_key: f.reason_key || '',
+			platforms: f.platforms
+		}));
+	// No description_key here on purpose. The coverage report shows the path and
+	// the reason; carrying the label too would emit a field nothing reads — the
+	// exact shape description_key already has in the features array, where its own
+	// generated header records that no macOS module consumes it. It also made
+	// these rows indistinguishable from feature rows to the label-resolution
+	// parser, which counted 104 absences as menu labels that fail to translate.
 }
 
 // ========================================
@@ -274,6 +309,15 @@ function renderAhkManifest(manifest, sections, features) {
 		return `        ${ahkLiteral(entry)}`;
 	});
 	lines.push(featLines.join(',\n'));
+	lines.push('    ],');
+
+	// What this driver does NOT have. See unavailableFor(): the features array
+	// above is filtered to this platform, so without this table the driver has no
+	// way to know a feature exists at all, and `reason_key` would stay a field
+	// nothing could ever read.
+	lines.push('    "unavailable", [');
+	const unavailLines = unavailableFor(features, 'ahk').map((u) => `        ${ahkLiteral(u)}`);
+	lines.push(unavailLines.join(',\n'));
 	lines.push('    ]');
 	lines.push(')');
 	lines.push('');
@@ -370,6 +414,22 @@ function renderLuaManifest(manifest, sections, features, platform) {
 		// entry's opening "{" on its own line so the regex manifest parsers
 		// (parseLuaFeatures, depth-based) still walk each block correctly.
 		const fields = Object.entries(entry)
+			.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
+			.join(', ');
+		lines.push('\t{');
+		lines.push(`\t\t${fields},`);
+		lines.push('\t},');
+	}
+	lines.push('}');
+	lines.push('');
+
+	// What this driver does NOT have. See unavailableFor(): M.features above is
+	// filtered to this platform, so without this table the driver cannot know a
+	// feature exists at all, and `reason_key` would stay a field nothing could
+	// ever read.
+	lines.push('M.unavailable = {');
+	for (const u of unavailableFor(features, platform)) {
+		const fields = Object.entries(u)
 			.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
 			.join(', ');
 		lines.push('\t{');

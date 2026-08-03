@@ -273,4 +273,751 @@ M.features = {
 	},
 }
 
+M.unavailable = {
+	{
+		path = "script.locale", section = "script", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "script.log_level", section = "script", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
+	},
+	{
+		path = "hotstrings.repeat_key_enabled", section = "hotstrings", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "hotstrings.expansion_delay", section = "hotstrings", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "hotstrings.preview_ai_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "hotstrings.preview_autocorrect_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "hotstrings.preview_colored_tooltips", section = "hotstrings", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "hotstrings.preview_star_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "llm.enabled", section = "llm", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "llm.display.pred_indent", section = "llm.display", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.display.show_info_bar", section = "llm.display", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.display.streaming", section = "llm.display", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.display.streaming_multi", section = "llm.display", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.context_length", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.min_words", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.max_words", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.temperature", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.auto_raise_temp", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.reset_on_nav", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.generation.sequential_mode", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.models.selected", section = "llm.models", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.models.ollama", section = "llm.models", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.models.mlx", section = "llm.models", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "llm.profiles.active", section = "llm.profiles", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.profiles.num_predictions", section = "llm.profiles", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.profiles.auto_profile_for_model", section = "llm.profiles", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.debounce_ms", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.instant_on_word_end", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.after_hotstring", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "llm.trigger.secure_filter_enabled", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.url_bar_filter_enabled", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.trigger.shortcut", section = "llm.trigger", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "llm.navigation.val_modifiers", section = "llm.navigation", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "metrics.metrics_enabled", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.metrics_shortcut_typing", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.metrics_shortcut_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.metrics_disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.wpm_widget_visible", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.wpm_widget_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.enabled", section = "shortcuts", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "shortcuts.chatgpt_url", section = "shortcuts", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.gpt", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.search", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.take_note", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.microsoft_bold", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.title_case", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.uppercase", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.paste_without_formatting", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.select_line", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.spotlight_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.surround_with_parentheses", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.move", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.screen", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.screen_instant", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.win_caps_lock", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.a_grave.letter", section = "shortcuts.a_grave", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_acute.enabled", section = "shortcuts.e_acute", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_acute.letter", section = "shortcuts.e_acute", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_circ.enabled", section = "shortcuts.e_circ", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_circ.letter", section = "shortcuts.e_circ", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_grave.enabled", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.backspace", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.caps_lock", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.caps_word", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.ctrl_backspace", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.ctrl_delete", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.delete", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.enter", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.escape", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.one_shot_shift", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_caps_lock.tab", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.backspace", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.caps_lock", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.caps_word", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.ctrl_backspace", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.ctrl_delete", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.delete", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.enter", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.escape", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.one_shot_shift", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.alt_gr_lalt.tab", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.backspace", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.caps_lock", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.caps_word", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.ctrl_backspace", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.ctrl_delete", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.delete", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.enter", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.escape", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.one_shot_shift", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.lalt_caps_lock.tab", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.personal.mouse_drag_window", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.personal.mouse_tab_switching", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.personal.professional_environment", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_backspace", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_delete", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_enter", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_escape", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.ctrl_b", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.ctrl_shift_v", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_a", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_d", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_g", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_h", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_m", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_n", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_o", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_s", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_sc029", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_t", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_u", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_w", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_x", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "gestures.enabled", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_3_down", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_3_left", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_3_right", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_3_up", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_4_down", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_4_left", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_4_right", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.swipe_4_up", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.tap_3", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.tap_4", section = "gestures", reason_key = "", platforms = { "ahk", "hs" },
+	},
+	{
+		path = "gestures.space_wrap", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_left", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_left", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_right", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_right", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_left_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_left_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_right_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_right_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_2_diag", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_left_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_left_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_right_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_right_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_diag", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_3_horiz", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_left_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_left_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_right_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_right_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_diag", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_4_horiz", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_left_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_left_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_right_down", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_right_up", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_diag", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.swipe_5_horiz", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.tap_2", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.tap_5", section = "gestures", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_left", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_right", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_left_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_left_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_right_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_2_right_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_left", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_right", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_left_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_left_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_right_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_3_right_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_left", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_right", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_left_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_left_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_right_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_right_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_left", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_right", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_left_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_left_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_right_down", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_right_up", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_left", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_right", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_left_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_left_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_right_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_2_right_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_left", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_right", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_left_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_left_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_right_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_right_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_left", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_right", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_left_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_left_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_right_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_right_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_left", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_right", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_left_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_left_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_right_down", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_right_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.direct_access_digits", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.ergopti_plus", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "category_enabled.hotstrings", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "category_enabled.layout", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "category_enabled.shortcuts", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "category_enabled.tap_holds", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+}
+
 return M

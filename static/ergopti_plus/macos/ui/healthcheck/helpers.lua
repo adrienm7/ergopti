@@ -32,6 +32,7 @@ local H = {}
 local hs       = hs
 local Logger   = require("infra.logger")
 local text_utils = require("infra.text_utils")
+local i18n     = require("infra.i18n")
 local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
@@ -380,6 +381,46 @@ function H.collect_config_summary()
 	end
 	Logger.debug(LOG, "Config summary: cfgdir='%s' files=%d.", cfgdir, #sum.config_files)
 	return sum
+end
+
+--- Collects what this platform does NOT have, and how much of it is explained.
+---
+--- This is the only place a user can ask why a menu row they read about is not
+--- in their menu. Until 2026-08-03 there was no such place: `reason_key` existed
+--- in the schema, was policed by a ratchet, and was read by nothing — and the
+--- driver could not even enumerate its own absences, because the generated
+--- manifest ships only the features the platform HAS.
+---
+--- The silent count is deliberately reported next to the explained one. A report
+--- that listed only the explained absences would look complete while saying
+--- nothing about the ones that matter most.
+--- @return table { total, explained, silent, entries } where entries carry a reason.
+function H.collect_platform_coverage()
+	local ok_reader, Manifest = pcall(require, "infra.manifest_reader")
+	if not ok_reader or type(Manifest.coverage_gaps) ~= "function" then
+		Logger.warn(LOG, "manifest_reader exposes no coverage_gaps — platform coverage unavailable.")
+		return nil
+	end
+
+	local explained, silent = Manifest.coverage_gaps()
+	local entries = {}
+	for _, gap in ipairs(explained) do
+		entries[#entries + 1] = {
+			path   = gap.path,
+			reason = i18n.get(gap.reason_key),
+			only   = table.concat(gap.platforms or {}, ", "),
+		}
+	end
+	table.sort(entries, function(a, b) return a.path < b.path end)
+
+	Logger.debug(LOG, "Platform coverage: %d unavailable, %d explained, %d silent.",
+		#explained + #silent, #explained, #silent)
+	return {
+		total     = #explained + #silent,
+		explained = #explained,
+		silent    = #silent,
+		entries   = entries,
+	}
 end
 
 

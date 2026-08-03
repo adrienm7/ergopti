@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "Alleen Windows: compenseert aangepaste indelingen (KbdEdit/MSKLC) die AltGr aan een andere virtuele toets toewijzen — een begrip uit het Windows-toetsenbordstuurprogramma zonder tegenhanger elders.",
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken"
 }

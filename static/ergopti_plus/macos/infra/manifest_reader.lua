@@ -113,4 +113,48 @@ function M.default_for(path)
 	return entry.default
 end
 
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 2/ Platform Coverage =============
+-- ==========================================
+-- ==========================================
+
+--- Every feature this driver does NOT have, with whatever explains each one.
+---
+--- `M.features` above is the list of features macOS HAS: the generator filters
+--- it per platform, so a feature restricted to Windows simply does not appear
+--- there. That is why the absences are shipped as their own table — without it
+--- the driver cannot know a feature exists at all, and `reason_key` was a field
+--- no code anywhere could read.
+---
+--- @return table Array of { path, section, description_key, reason_key, platforms }.
+function M.unavailable()
+	return _manifest.unavailable or {}
+end
+
+--- Splits the absences into the ones that say why and the ones that do not.
+---
+--- The unexplained half is the point: it is what the user meets as a menu with
+--- a row missing and nothing anywhere saying whether that is deliberate,
+--- unimplemented, or impossible. Reporting the two counts side by side is what
+--- turns `test-platform-restrictions-explained.cjs`'s frozen number into
+--- something a person can see rather than a figure in a test log.
+---
+--- @return table explained Absences carrying a reason_key.
+--- @return table silent Absences carrying none.
+function M.coverage_gaps()
+	local explained, silent = {}, {}
+	for _, entry in ipairs(M.unavailable()) do
+		if type(entry.reason_key) == "string" and entry.reason_key ~= "" then
+			explained[#explained + 1] = entry
+		else
+			silent[#silent + 1] = entry
+		end
+	end
+	return explained, silent
+end
+
 return M

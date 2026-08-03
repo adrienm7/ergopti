@@ -265,6 +265,12 @@ type = "enum"
 enum_values = ["auto", true, false]
 description_key = "menu.script.alt_gr_is_kana_remap"
 platforms = ["ahk"]
+# Première raison écrite (2026-08-03), et elle sert de modèle : elle dit ce que
+# la plateforme ne peut pas faire, pas ce qui n'a pas été codé. Le réglage
+# compense les dispositions Windows personnalisées (KbdEdit/MSKLC) qui
+# réassignent AltGr à une autre touche virtuelle — une notion de pilote clavier
+# Windows (HKL, MapVirtualKeyExW, VK_RMENU) sans équivalent ailleurs.
+reason_key = "platform_reason.alt_gr_is_kana_remap"
 
 
 

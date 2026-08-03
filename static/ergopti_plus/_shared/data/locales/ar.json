@@ -2374,6 +2374,7 @@
 	"mlx.init_title": "Initializing the AI engine (MLX)",
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
+	"platform_reason.alt_gr_is_kana_remap": "ويندوز فقط: يعوّض تخطيطات لوحة المفاتيح المخصّصة (KbdEdit/MSKLC) التي تعيد تعيين AltGr إلى مفتاح افتراضي آخر — وهو مفهوم خاص ببرنامج تشغيل لوحة المفاتيح في ويندوز.",
 	"metrics_apps.chart_time_series": "الوقت",
 	"metrics_apps.edit_category_hint": "تعديل الفئة"
 }

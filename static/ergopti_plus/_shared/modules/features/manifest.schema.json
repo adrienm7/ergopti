@@ -97,6 +97,10 @@
 					"description": "Required when type = \"enum\"."
 				},
 				"description_key": { "type": "string" },
+				"reason_key": {
+					"type": "string",
+					"description": "Locale key explaining WHY this feature is unavailable on the platforms its \"platforms\" list excludes. Read by the platform-coverage report (Menu → Debug → Healthcheck), which is the only place a user can ask why a row is missing. Meaningless without a platforms restriction, and the generator refuses one that has none."
+				},
 				"platforms": {
 					"type": "array",
 					"items": { "enum": ["ahk", "hs", "linux"] },
