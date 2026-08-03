@@ -139,10 +139,16 @@ _LLM_Bridge_UnregisterDispatcherFallback() {
 	}
 }
 
+; One of the two consumers of every character event, and the one with no segment:
+; the profiler showed ~600 slow OnChar events with no matching slow HSE.FeedChar,
+; which left this path as the only unattributed candidate. Two QPC reads, and the
+; line is gated by the profiler floor so ordinary typing logs nothing.
 _LLM_Bridge_OnDispatcherChar(ih, ch) {
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
 		return
+	_hpLlmChar := HotPath_Now()
 	LLM_Bridge_OnChar(ch)
+	HotPath_LogIfSlow("LLM.OnChar", _hpLlmChar, "")
 }
 
 _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
