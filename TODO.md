@@ -389,9 +389,11 @@ Constraints: **paths before moves, moves before content, data before code.**
   driver hands over row DATA, and the renderer alone turns it into menu rows —
   rows built outside the renderer stayed at 301. The dead-surface gate was
   replaced by `test-keyboard-slot-surface-is-live.cjs`, which asserts the
-  opposite invariant. **Follow-up:** the Windows driver renders the same five
-  groups from `InsertKeyboardShortcutGroups`, outside the manifest entirely.
-  Bringing it onto the `list` type is what would let the two be compared at all;
+  opposite invariant. The Windows follow-up landed the same day: its
+  `InsertKeyboardShortcutGroups` splice is gone, both drivers read the section
+  from one manifest entry, and Windows rows built outside the renderer went
+  222 → 220. Both of that splice's regression tests were re-encoded against the
+  new structure, not retired;
   (4) merge
   `macos/platform/remap/data/actions.json` (73 actions, hardcoded French, no
   i18n keys) into the one registry, `holdable` becoming a per-action flag —

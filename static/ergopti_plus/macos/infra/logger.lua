@@ -106,31 +106,40 @@ local SUB_LOG_NAMES = require("_generated.logger_sub_files")
 -- ====================================
 
 --- Numeric severity levels used for filtering.
+--- The spacing is spec § 4's, shared with the AutoHotkey driver's LOGGER_SEVERITY
+--- and the shared Lua core. It used to be 1/2/3/4 here, which meant a level
+--- NUMBER meant two different things depending on which driver read it — and
+--- made the shared core impossible to adopt without silently changing what every
+--- threshold filtered. The gaps also leave room for a level between two existing
+--- ones without renumbering anything.
 M.LEVELS = {
-	DEBUG   = 1,
-	INFO    = 2,
-	WARNING = 3,
-	ERROR   = 4,
+	DEBUG   = 10,
+	INFO    = 20,
+	WARNING = 30,
+	ERROR   = 40,
 }
 
 -- Full variant table: each entry drives its label, color, and severity level.
 --
--- Two lifecycle axes:
---   DEBUG axis (level 1): TRACE → start of a routine internal op  |  DONE → end
---   INFO  axis (level 2): START → start of a significant action   |  SUCCESS → end
+-- Two lifecycle axes. Each axis shares ONE level so a threshold can never emit
+-- half a pair: a TRACE with no DONE, or a START with no SUCCESS, is how a silent
+-- failure looks in the log, and splitting an axis would manufacture one on every
+-- run.
+--   DEBUG axis (level 10): TRACE → start of a routine internal op  |  DONE → end
+--   INFO  axis (level 20): START → start of a significant action   |  SUCCESS → end
 --
 local VARIANTS = {
 	-- ── Debug axis ──────────────────────────────────────────────────────────
-	DEBUG   = { level = 1, label = "DEBUG"   },
-	TRACE   = { level = 1, label = "TRACE"   },
-	DONE    = { level = 1, label = "DONE"    },
+	DEBUG   = { level = M.LEVELS.DEBUG,   label = "DEBUG"   },
+	TRACE   = { level = M.LEVELS.DEBUG,   label = "TRACE"   },
+	DONE    = { level = M.LEVELS.DEBUG,   label = "DONE"    },
 	-- ── Info axis ───────────────────────────────────────────────────────────
-	INFO    = { level = 2, label = "INFO"    },
-	START   = { level = 2, label = "START"   },
-	SUCCESS = { level = 2, label = "SUCCESS" },
+	INFO    = { level = M.LEVELS.INFO,    label = "INFO"    },
+	START   = { level = M.LEVELS.INFO,    label = "START"   },
+	SUCCESS = { level = M.LEVELS.INFO,    label = "SUCCESS" },
 	-- ── Warning / Error ─────────────────────────────────────────────────────
-	WARNING = { level = 3, label = "WARNING" },
-	ERROR   = { level = 4, label = "ERROR"   },
+	WARNING = { level = M.LEVELS.WARNING, label = "WARNING" },
+	ERROR   = { level = M.LEVELS.ERROR,   label = "ERROR"   },
 }
 
 --- Current active level — only messages at or above this level are emitted.
@@ -838,6 +847,21 @@ function M.ring_buffer_snapshot()
 		snapshot[#snapshot + 1] = _ring_buffer[idx]
 	end
 	return snapshot
+end
+
+--- Returns how many entries the ring buffer currently holds.
+--- @return number
+function M.ring_buffer_size()
+	return #_ring_buffer
+end
+
+--- Empties the ring buffer.
+--- Resets the cursor as well as the contents: leaving the cursor where it was
+--- would make the next snapshot after a wrap read from a slot that no longer
+--- corresponds to the oldest entry, so the buffer would come back shuffled.
+function M.ring_buffer_clear()
+	_ring_buffer = {}
+	_ring_cursor = 0
 end
 
 
