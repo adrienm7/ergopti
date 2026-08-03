@@ -30,6 +30,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
+local i18n   = require("infra.i18n")
 
 local Defaults = require("platform.remap.defaults")
 
@@ -95,6 +96,38 @@ end
 -- layout change — re-reading and re-decoding the JSON to rebuild the same 673
 -- action tables. Declared above the function that reads it.
 local _chord_catalogue = nil
+
+--- Replaces the hardcoded French label of any action that also exists in the one
+--- action registry with its translated one.
+---
+--- Eighteen of this catalogue is entries are ALSO rows of
+--- _shared/modules/actions/actions.toml, and those eighteen already carry an
+--- `sg_actions.<id>` label in all twenty-one locales. The French string here was
+--- a second declaration of the same label — so the remap picker showed French to
+--- every user while the gesture picker, listing the same action, showed their own
+--- language. The remaining fifty-five have no registry row yet (that merge is
+--- tracked separately) and keep their French label until they do.
+--- @param actions table The decoded action list, mutated in place.
+--- @return number localised How many labels came from the registry.
+local function localise_action_labels(actions)
+	local localised = 0
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and type(action.id) == "string" then
+			local key = "sg_actions." .. action.id
+			local translated = i18n.get(key)
+			-- i18n.get answers with the KEY when it does not resolve, which is the
+			-- signal that this action has no registry row yet. Writing it through
+			-- would put "sg_actions.cmd_tab" in the menu.
+			if translated and translated ~= key and translated ~= "" then
+				action.label = translated
+				action.short_label = translated
+				localised = localised + 1
+			end
+		end
+	end
+	Logger.debug(LOG, "Localised %d of %d action label(s) from the shared registry.", localised, #actions)
+	return localised
+end
 
 local function append_shared_modifier_chords(actions)
 	local catalogue_path = Paths.shared("modules/actions/modifier_chords.json")
@@ -208,6 +241,7 @@ function M.load_available_actions(actions_file)
 		Logger.error(LOG, "Cannot load actions — module will be non-functional.")
 		return nil
 	end
+	localise_action_labels(list)
 	append_shared_modifier_chords(list)
 	M.resolve_layout_actions(list)
 
