@@ -626,7 +626,7 @@ Constraints: **paths before moves, moves before content, data before code.**
   | ~~Convention invariants~~ | ~~392~~ | **0** | **done** — `lint-conventions.js --fail-on-violations` |
   | Corpus consumers (16 corpora, 258 vectors) | 7 650 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
   | Port contract vectors (129) | 2 138 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
-  | Port presence/compliance | 1 493 | ~500 | ⚠ see below — the mechanism as written is a downgrade |
+  | ~~Port presence (cross-tree)~~ | — | **0** | **done** — `test-port-adapter-matrix.cjs`; the compliance/loading half stays in the drivers, deliberately |
   | e2e harnesses | 1 374 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
 
   **Convention row closed 2026-08-02.** The four
@@ -651,6 +651,20 @@ Constraints: **paths before moves, moves before content, data before code.**
   filesystem fact: which ports a driver ships an adapter for, and ADR-008's
   reachability. Split the row that way — the cross-tree half to JS, the loading
   half stays where the loading happens — or drop it.
+
+  ~~Split the row that way.~~ — **the cross-tree half is done, 2026-08-03.**
+  `test-port-adapter-matrix.cjs` freezes the matrix: 21 ports, Windows and macOS
+  ship all 21, Linux 11, 11 on all three, none absent everywhere. **The loading
+  half was not touched and must not be** — the drivers' own compliance tests keep
+  doing what only they can. What the new gate adds is the thing no per-driver test
+  can see: a port present on two drivers vanishing from the third, which from
+  inside one tree is not an event at all. Every one of Linux's ten absences now
+  carries a reason — nine of them "deleted under ADR-008, zero production
+  callers", which is the finding that ADR exists to record — so a deliberate
+  absence and a dropped one no longer look identical. Falsified three ways: an
+  adapter dropped, an absence filled while its note stayed, and a note naming a
+  port that no longer exists. **This row is closed; it saved no lines and was not
+  meant to.**
 
   Every other row means writing the replacement first.
 
