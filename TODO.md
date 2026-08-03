@@ -15,14 +15,14 @@ to make a change pass, and run the gates that cover what you touched —
 
 > ## What actually blocks this list
 >
-> Measured 2026-08-03, and it is one dependency, not six. **Three of the six
+> Measured 2026-08-03, and it is one dependency, not several. **Three of the five
 > sections below are gated by the same thing: user-facing strings in 21 locales
 > that only a human can supply.**
 >
 > - **§1** needs 756 of them (36 actions × 21). The gate is an assertion, and
 >   123 of the 125 existing action labels are genuinely translated.
-> - **§5 `reason_key`** needs ~3 000 (142 restrictions × 21).
-> - **§5 Convention S stubs** need a `REASON_KEY` per unimplemented folder —
+> - **§4 `reason_key`** needs ~3 000 (142 restrictions × 21).
+> - **§4 Convention S stubs** need a `REASON_KEY` per unimplemented folder —
 >   the same shape, hitting the same wall, which is why its "blocked on the
 >   reader" note undersells it.
 >
@@ -30,7 +30,8 @@ to make a change pass, and run the gates that cover what you touched —
 > the strings puts unverifiable text in front of users in nineteen languages,
 > which is worse than the silence or the raw identifier it replaces. **This is a
 > translator's queue, not an engineering backlog.** Splitting it out is what makes
-> the remaining three sections — §2, §3, §4 — legible as the code work they are.
+> the remaining code sections — §2 the matcher core and §3 the menu label trees —
+> legible as the code work they are.
 >
 > **Reading the performance numbers is no longer an entry here.** The
 > instrumentation is complete — 20 HotPath segments and 5 pre-logger boot stamps,
@@ -150,120 +151,7 @@ expansion that never fires.
 `codegen-terminators.cjs` is **not** a usable model: its Lua output is 44 lines of
 data, and no generator in this repo emits a Lua function.
 
----
-
-## 3. One keylogger aggregation core
-
-⚠⚠ **The premise of this section is wrong, and it changes what the work IS.**
-Measured 2026-08-03: **the shared core already exists and macOS is already on it.**
-
-`macos/modules/keylogger/aggregator/core.lua` has 21 public functions. **Thirteen
-are pure delegations** to `_shared/lua/keylogger/aggregator_helpers.lua` (257
-lines) and `_shared/lua/keylogger/utils.lua` — `burst_length_bucket`,
-`char_class`, `pop_utf8`, `get_app_ctx`, `add_ngram_metric`, `push_ngram`,
-`bump_app_day`, `finalize_burst`, `finalize_session`, and the rest. The eight
-that stay local are trivial state accessors (`today`, `get_ngram_ctx`,
-`set_device_id`, `require_init`…), not aggregation logic.
-
-**So there is nothing to extract.** The asymmetry is that the AutoHotkey walker
-re-implements those same twelve functions in AHK, and it cannot `require` a Lua
-module — no adoption is possible in the sense the logger's was.
-
-**What the work actually is:** hold the AutoHotkey re-implementation to the
-existing shared Lua core BY VECTORS, which is exactly the mechanism
-`test-walker-constants-single-source.cjs` already applies to the eight bucket
-edges and caps. The mechanism is proven and in place; what is missing is
-BEHAVIOURAL vectors for the functions, where today there are only value vectors
-for the constants. Filed below as the primitives corpus — that is the whole job,
-not a step toward a bigger one.
-
-**Superseded:** "two ~1 330-line walkers whose function names map 1:1, one of
-which says in a comment that it MIRRORS the other." The comment is true and the
-mapping is real; the conclusion drawn from them was not.
-
-**The constants half is done:** all eight bucket edges and caps are held to
-`_shared/lua/keylogger/aggregator_helpers.lua` by
-`test-walker-constants-single-source.cjs` — the AutoHotkey walker re-declares
-seven as class statics, the macOS aggregator all eight, and every value must
-agree. The six AHK constants filled at boot from the timing registry are
-deliberately excluded and gated elsewhere.
-
-⚠ **Re-measured 2026-08-03, and both halves of this entry were wrong.**
-
-**The corpus already exists.** `_shared/tests/corpus/keylogger/aggregation_vectors.json`
-holds 13 vectors and is ALREADY replayed by both suites —
-`macos/tests/unit/meta/test_corpus_keylogger_aggregation.lua` (506 lines) and
-`windows/tests/meta/test_corpus_keylogger_aggregation.ahk` (332 lines). "Write the
-behaviour corpus first" is done, exactly as §2's stated prerequisite turned out to
-be already built. What it may need is *extending*, not creating.
-
-**And there is no "1 330-line walker" on either side.** Both are already split
-into four modules that pair by name:
-
-| | macOS | Windows |
-| --- | --- | --- |
-| `core` | 254 | 301 |
-| `events` | 470 | 573 |
-| `sql` | 382 | 287 |
-| facade / state | 68 + 22 | 27 |
-
-So this is not one big migration but **three matched pairs**, and they are not
-equally shareable. `sql` almost certainly is not: the two speak to different
-SQLite bindings. The genuinely shared surface is **`core` + `events`** — roughly
-724 lines against 874.
-
-**Start with `core`.** It is the smallest pair, and its function map is exact —
-twelve functions, twelve counterparts, measured 2026-08-03:
-
-| macOS `aggregator/core.lua` | Windows `keylogger_walker_core.ahk` |
-| --- | --- |
-| `reset_batch` · `gc` · `bucket_add` | `KLW_ResetBatch` · `KLW_GC` · `KLW_BucketAdd` |
-| `burst_length_bucket` · `char_class` · `pop_utf8` | `KLW_BurstLengthBucket` · `KLW_CharClass` · `KLW_PopLast` |
-| `get_app_ctx` · `add_ngram_metric` · `push_ngram` | `KLW_GetAppCtx` · `KLW_AddNgramMetric` · `KLW_PushNgram` |
-| `bump_app_day` · `finalize_burst` · `finalize_session` | `KLW_BumpAppDay` · `KLW_FinalizeBurst` · `KLW_FinalizeSession` |
-
-⚠ **And there is a measured gap to close FIRST.** Three of those twelve are
-**pure** — `burst_length_bucket(n)`, `char_class(c)`, `pop_utf8(s)` /
-`KLW_PopLast(s)`. Deterministic, stateless, and **not directly pinned by
-anything**: all 13 existing corpus vectors are end-to-end event replays that
-exercise the pipeline, so these three are covered only by implication. A drift in
-one bucket edge or one character class changes every downstream aggregate and
-produces no failure — the exact silence a corpus exists to break.
-
-So: add a `primitives` section to
-`_shared/tests/corpus/keylogger/aggregation_vectors.json` covering those three and
-replay it in BOTH suites — a corpus only one driver reads is a corpus that pins
-nothing. That is the smallest useful unit of work left in this file.
-
-✅ **Two divergences were found this way and are now FIXED** (2026-08-03), each
-with a regression test proved red first, in
-`windows/tests/meta/test_walker_pure_fns_match_shared_core.ahk`. AHK 3701/0.
-They are kept below because they are the worked example of what the remaining
-vectors are for — two real defects, neither with a symptom, both invisible to the
-existing constants gate.
-
-1. **`pop_utf8` vs `KLW_PopLast` disagree on astral characters.** Lua removes the
-   last UTF-8 **codepoint** via `utf8.offset(s, -1)`. AutoHotkey does
-   `SubStr(s, 1, StrLen(s) - 1)` — and AHK v2 counts UTF-16 code units, so for
-   anything outside the BMP (emoji) it removes **half a surrogate pair** and
-   leaves a broken string in the word buffer. They agree for every BMP character,
-   which is why nothing has ever failed.
-
-2. **The bucket overflow labels can silently drift apart.** Lua returns
-   `tostring(buckets[#buckets]) .. "+"` — derived from the table. AutoHotkey
-   returns the **literal `"500+"`**. They agree only for as long as the last
-   bucket edge is 500. `test-walker-constants-single-source.cjs` pins the edges
-   themselves, so it would not notice: the constants would still match while the
-   overflow LABEL diverged, and every over-cap burst would be filed under two
-   different keys on the two drivers.
-
-Both are one vector each. Write those two first — they are the cases that
-already differ, which makes them the cheapest possible proof that the corpus
-does something.
-
----
-
-## 4. Menu label-tree parity (I3)
+## 3. Menu label-tree parity (I3)
 
 `test-menu-parity.cjs`, the label-tree half: render for the three platforms and
 diff the label trees. **Blocked, deliberately:** the menu manifest carries no
@@ -277,7 +165,7 @@ a declarative group can absorb a driver-supplied builder.
 
 ---
 
-## 5. Smaller and known — but the cheap ones are gone
+## 4. Smaller and known — but the cheap ones are gone
 
 The two genuinely cheap entries were closed on 2026-08-03 (npm aliases, `tab.tap`).
 Everything below is either blocked on a prerequisite or deliberately incremental;
@@ -319,7 +207,7 @@ none of it is a batch job, and the section title used to imply otherwise.
 
 ---
 
-## 6. Audits not yet run
+## 5. Audits not yet run
 
 `docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — check
 `PROJECT_MEMORY.md` before running either; the refactor cycle the latter belongs

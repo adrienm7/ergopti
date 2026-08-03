@@ -373,3 +373,46 @@ _KlgAggCorpus_RunVector(Vec) {
 }
 
 _KlgAggCorpus_RegisterAll()
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 9/ Pure Text Primitives ===============
+; ===============================================
+; ===============================================
+
+; The vectors above replay whole event batches, which covers the pure text
+; primitives only by implication — and an implication is exactly what let
+; KLW_PopLast drop half a surrogate pair for years without one failing test.
+; These two replay the shared corpus straight through the functions.
+
+_KlgAggCorpus_CharClassVectors() {
+	Data := _KlgAggCorpus_LoadCorpus()
+	Cases := Data["primitives"]["char_class"]
+	Assert(Cases.Length > 0, "the corpus must carry char_class vectors — an empty section asserts nothing")
+	for _, Vector in Cases {
+		AssertEqual(Vector["expect"], KLW_CharClass(Vector["input"]),
+			"KLW_CharClass must agree with the shared core on " . Chr(34) . Vector["input"] . Chr(34)
+			. ". This is the classifier every typing metric is bucketed by, and it is a hand-port: "
+			. "a drift changes every downstream aggregate and reports nothing")
+	}
+}
+
+_KlgAggCorpus_PopLastVectors() {
+	Data := _KlgAggCorpus_LoadCorpus()
+	Cases := Data["primitives"]["pop_utf8"]
+	Assert(Cases.Length > 0, "the corpus must carry pop_utf8 vectors")
+	for _, Vector in Cases {
+		AssertEqual(Vector["expect"], KLW_PopLast(Vector["input"]),
+			"KLW_PopLast must remove one whole CODEPOINT, as the shared core does. AutoHotkey "
+			. "counts UTF-16 code units, so the astral vector is the one that already diverged: "
+			. "dropping a single unit leaves half a surrogate pair in the word buffer")
+	}
+}
+
+Test("keylogger corpus: char_class matches the shared core on every vector (walker-shared-core-parity)",
+	_KlgAggCorpus_CharClassVectors)
+Test("keylogger corpus: pop_utf8 removes a whole codepoint on every vector (walker-shared-core-parity)",
+	_KlgAggCorpus_PopLastVectors)
