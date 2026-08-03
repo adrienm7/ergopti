@@ -727,7 +727,17 @@ slow-render ratio is incalculable; five retroactive boot marks before
 Prompts live in [`docs/prompts/`](docs/prompts/) — work from the prompt, not from
 a summary.
 
-**`audit_mise_en_commun_et_simplification.md` has never been run.** It covers
+~~**`audit_mise_en_commun_et_simplification.md` has never been run.**~~ — **run
+2026-08-03**, report at
+[`docs/audits/2026-08-03-mise-en-commun-et-simplification.md`](docs/audits/2026-08-03-mise-en-commun-et-simplification.md).
+Its sharpest finding is fixed already: three gates existed, passed, had an npm
+alias and were run by NOTHING — including `test-port-compliance.cjs`, the
+freshness gate for the whole port layer. They are in the suite now (140 → 144
+checks) and `test-npm-aliases-match-the-suite.cjs` asserts no alias can name a
+gate the suite skips. It also closes the prompt’s central question: `_generated/`
+is **not** reducible — all 21 artefacts (200.3 KB) have a runtime reader, a
+generator and drift-guard coverage. What it leaves open is what `TODO.md`
+already holds, plus 11 hardcoded French UI strings in two `ui/` files. It covers
 pushing everything non-platform-specific into `_shared/` and reducing mass: are
 the `_generated/` trees still earning their committed size, can `_shared/` be
 flattened, god-files, orphan tooling. One correction to apply when running it: it
