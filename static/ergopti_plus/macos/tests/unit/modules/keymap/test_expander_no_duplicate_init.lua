@@ -212,8 +212,9 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 
 		-- Module must be functional: try_expand must not crash and must bind buffer.
 		state1.buffer = ""
-		local ok = pcall(expander.try_expand, "a", false)
-		helpers.assert_true(ok, "try_expand must not throw after a clean single init()")
+		-- Called directly: this is the happy path after one clean init, so a raise
+		-- is a plain bug and should fail with its own error.
+		expander.try_expand("a", false)
 		helpers.assert_eq(state1.buffer, "a",
 			"buffer must be updated by try_expand after a successful init()")
 	end)

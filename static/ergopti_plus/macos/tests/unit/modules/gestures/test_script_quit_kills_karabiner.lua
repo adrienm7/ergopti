@@ -45,8 +45,9 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		_G.hs.timer.doAfter = saved_doAfter
 		package.loaded["platform.remap"] = nil
 
-		helpers.assert_true(ok, "executing script_quit must not raise")
-		helpers.assert_eq(killed.count, 1)  -- Karabiner torn down exactly once
+		helpers.assert_true(ok, "executing script_quit must not raise: " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
+		helpers.assert_eq(killed.count, 1)  -- remap bridge torn down exactly once
 		helpers.assert_true(exit_scheduled, "the quit must still schedule the process exit afterwards")
 	end)
 
@@ -77,7 +78,8 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		package.loaded["platform.remap"] = nil
 		package.loaded["ui.menu.menu_llm"] = nil
 
-		helpers.assert_true(ok, "executing script_quit must not raise")
+		helpers.assert_true(ok, "executing script_quit must not raise: " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 		helpers.assert_eq(mlx_stopped, 1, "script_quit must stop the MLX server (os.exit bypasses the shutdown callback)")
 		helpers.assert_eq(helpers_killed, 1, "script_quit must terminate the orphan helper processes")
 		helpers.assert_eq(orphan_killed, 1, "script_quit must reap the detached mlx_lm.server (pgrep/lsof sweep) — F-M7")
