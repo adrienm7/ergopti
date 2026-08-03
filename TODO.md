@@ -537,8 +537,24 @@ Constraints: **paths before moves, moves before content, data before code.**
      The threshold half is closed: macOS was 1000 ms against 200–350 ms, now 250,
      held by `test-tap-hold-threshold-parity.cjs`. What remains is that macOS has
      ONE global where the others have one value per key; the generator already
-     supports the per-manipulator override, so it is wiring, blocked on the id
-     vocabularies above.
+     supports the per-manipulator override, so it is wiring.
+     ⚠ **The id-vocabulary measurement above was wrong, re-measured 2026-08-03.**
+     The correspondence is by PHYSICAL POSITION, not by name: a Mac bottom row
+     carries fn/control/option/command where a PC carries ctrl/win/alt. Read that
+     way `left_alt`↔`left_command` match exactly (backspace/backspace, nav
+     layer/layer) and `left_ctrl`↔`fn` match on tap (paste/paste); read as
+     `left_ctrl`↔`left_control` and `left_alt`↔`left_option`, nothing matches at
+     all. `right_ctrl` DOES have a counterpart — `right_option` — and its drift\n     is one action under two spellings (`one_shot_shift`/`sticky_shift`), as is
+     `alt_gr`/`altgr`. `test-tap-hold-namespace-correspondence.cjs` now holds the
+     whole mapping: 7 paired keys, 3 synonym pairs, 7 macOS-only keys, and **5
+     recorded divergences of which exactly ONE is genuine drift** — `tab.tap`,
+     `alt_tab_monitor` vs `alt_tab_windows`, with nothing recorded about why. The
+     other four are the cmdorctrl distinction (twice), one layer named at two
+     levels of indirection, and a Mac fn key with no PC equivalent. The gate
+     fails if a pair silently starts agreeing, so the exception list can only
+     shrink. What is still blocked is the RENAME itself: the ids are read at boot
+     by three loaders and the synonym pairs must be reconciled in
+     `macos/platform/remap/data/actions.json` first, which is Lot 6 (4).
   5. **Tooltip**: wire the 1 483 lines of shared JS as an ORACLE (vector
      generator + conformance harness), not as runtime.
      ⚠ Known latent divergence, deliberately left: the macOS renderer branches
