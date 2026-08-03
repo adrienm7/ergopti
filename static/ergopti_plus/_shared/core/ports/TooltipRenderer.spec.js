@@ -6,8 +6,11 @@
  * DESCRIPTION:
  * Contract for the OS-level floating overlay port. Every driver adapter that
  * displays the Ergopti+ tooltip MUST satisfy this interface. The port accepts
- * the draw_calls[] IR produced by the shared tooltip layout engine
- * (_shared/modules/tooltip/draw_calls.js) and translates it to native drawing calls.
+ * the draw_calls[] IR and translates it to native drawing calls. The IR is the
+ * payload SHAPE this contract passes; the composer that once built it
+ * (_shared/modules/tooltip/draw_calls.js, 433 lines) was deleted on 2026-08-03
+ * because no driver ever implemented it — Windows and macOS both render natively,
+ * and the drivers build the payload themselves.
  *
  * FEATURES & RATIONALE:
  * 1. IR-driven rendering: the adapter receives a draw_calls[] array and maps

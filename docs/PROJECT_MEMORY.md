@@ -23,6 +23,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
 - [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
 - [project-generated-trees-are-not-reducible](#project-generated-trees-are-not-reducible) — The `_generated/` trees were audited 2026-08-03: 21 artefacts, 200.3 KB, zero orphans — do not re-open the question
+- [project-plan-entries-go-stale-faster-than-code](#project-plan-entries-go-stale-faster-than-code) — Eleven TODO measurements were wrong in one session; re-measure before starting and write the correction back
+- [project-instrumentation-absence-is-invisible](#project-instrumentation-absence-is-invisible) — A missing profiler segment produces a clean-looking profile, so the 16 segments and 5 boot stamps are inventoried
 - [project-audit-ahk-2026-07-30-pass](#project-audit-ahk-2026-07-30-pass) — Sixth adversarial AHK pass: 14 findings all fixed; the refuted list, the coverage gaps, and the two measurements worth keeping
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
@@ -575,6 +577,86 @@ contradicting tests. Loop-until-dry was NOT reached — one discovery wave ran.
 Related: [[project_ahk_invariant_incomplete_application]],
 [[project_gate_scripts_must_be_wired]], [[feedback_ahk_ui_syntax_validation]],
 [[errors_only_log_sink]], [[project_audit_ahk_2026_07_21_adversarial]].
+
+### project-plan-entries-go-stale-faster-than-code
+
+_Eleven TODO measurements were wrong in one session — re-measure before starting, and write the correction back_
+
+<sub>slug: `project_plan_entries_go_stale_faster_than_code`</sub>
+
+`TODO.md` warned that "roughly one entry in six turns out to be stale". Measured
+over one long session on 2026-08-03, it was closer to **one in two**, and the
+errors were not small — they inverted the work.
+
+**What was wrong, and how:**
+
+| Entry said | Actually |
+| --- | --- |
+| §2 perf: "mostly unmeasured", gated behind sub-segmenting `_TooltipPresentStack` | That prerequisite was **done**, with five marks. So were the render counter, the resolve-exit counters, `RemapEmit`, `UIA.SelectionPoll`, and the five pre-logger boot stamps |
+| Lot 8.5: "wire the 1 483 lines of shared JS as an oracle" | Six modules, five already runtime-mirrored **and** oracles. One (`draw_calls.js`) was neither |
+| Lot 8.4: tap-hold vocabularies pair by NAME; `right_ctrl` has no macOS counterpart | They pair by **physical position**. `right_ctrl` ↔ `right_option` exists, and its "drift" was one action under two spellings. Of five divergences, exactly one is real |
+| Lot 6(4): 18 of 73 remap actions have locale keys | True, and **zero** have a key without a registry row — the sets line up exactly, which the entry did not say |
+| Lot 6(2), 6(6) | Named things that do not exist, or conflated two subjects |
+| Lot 9 port row: "one JS gate saves ~1 000 lines" | Would have swapped a runtime check for a textual one. Only the cross-tree half was a gain |
+| Lot 7(2): adoption blocked on writing a corpus | Also blocked on something unrecorded: **the shared core had no dedup at all**, so adopting it would have silently removed flood suppression from a driver that had it |
+
+**How to apply:**
+
+- **Re-measure every entry before starting it.** Half the value of this session
+  was measurements that turned an "N-day refactor" into "already done" or into "a
+  product decision, not a refactor".
+- **Write the correction back into the entry**, with the number. A stale entry
+  costs the next person the same investigation; a corrected one costs nothing.
+- **An entry's cost estimate is the least reliable part of it.** Lot 6(4)'s
+  "55 rows" is 55 rows *plus 55 handlers*, because the bijection gate requires a
+  handler on every platform a row is declared for — which changes it from a data
+  edit into a product decision about whether a swipe may trigger `layer` hold.
+
+Related: [[project-gate-scripts-must-be-wired]],
+[[project-generated-trees-are-not-reducible]].
+
+
+
+
+### project-instrumentation-absence-is-invisible
+
+_A missing test fails; a missing profiler segment produces a clean-looking profile — so the segments are inventoried, not trusted_
+
+<sub>slug: `project_instrumentation_absence_is_invisible`</sub>
+
+Instrumentation is the one kind of code whose absence produces no symptom. A
+deleted assertion turns a suite red. A deleted `HotPath_LogIfSlow` turns a hot
+path silent, and silence reads as "fast".
+
+`tools/test/test-hotpath-segments-declared.cjs` inventories all of it: **16
+HotPath segments and 5 pre-logger boot stamps**, each with a line saying what hot
+path it covers. A deleted segment fails with the reason it was added.
+
+**What each covers**, keystroke path first: `Hook.KeyDown` / `Hook.KeyUp` (the
+first stage of every keystroke — two tap-hold trackers plus the whole
+`EVT_KB_DOWN` fan-out, inside the hook callback), `RemapEmit`, `OnChar`,
+`HSE.FeedChar`, `HSE.Dispatch`, `LLM.OnChar`, `KL.Ingest`; then render:
+`Tooltip.Build`, `Tooltip.ResolvePos`, `Tooltip.Present` (sub-attributed by
+`HotPath_BreakdownMark` into clamp / prepare / corners / border / reveal),
+`Tooltip.DequeuePresent`, `Tooltip.LlmPresent`, `Tooltip.BorderPixelLoop`; then
+idle: `UIA.SelectionPoll`, `Metrics.FocusRefresh`.
+
+**How to read the profile:** every segment logs only above the 5 ms floor, so an
+ordinary keystroke prints nothing. `Tooltip.Present` was the dominant offender
+(~12.9 ms mean) and its five sub-steps all sit BELOW the floor individually —
+which is why the breakdown exists: the parent's number never said which moved.
+`Metrics.FocusRefresh` is the one to suspect for idle cost: `WinGetTitle` sends a
+message to the foreground window and a Not Responding window makes it wait out
+the timeout, up to 20×/s.
+
+**How to apply:**
+
+- Adding a hot path means adding its segment AND its inventory line.
+- Never delete a segment to "clean up" — it is the only evidence that path is
+  fast.
+
+
+
 
 ### project-generated-trees-are-not-reducible
 

@@ -16,10 +16,11 @@
  * shared logic in the tree — and nothing anywhere depends on it being correct.
  * That is the most expensive kind of dead code, because it reads as the answer.
  *
- * Measured 2026-08-03: ONE module is in that state — `draw_calls.js`, 433 lines,
- * a draw-call IR that no driver implements because Windows and macOS both render
- * natively. It is declared below with that reason rather than deleted, because
- * "adopt the IR or drop it" is a design decision, not a cleanup.
+ * Measured 2026-08-03: one module was in that state — `draw_calls.js`, 433 lines,
+ * a draw-call IR that no driver ever implemented because Windows and macOS both
+ * render natively. The maintainer chose to drop it rather than adopt it, so the
+ * baseline is ZERO: every shared JS module is now runtime-mirrored or an oracle,
+ * and the next one that is neither has to be declared here deliberately.
  *
  * `lifecycle.js` looked like a second case and is not: windows/ui/tooltip/
  * helpers.ahk names it as the canonical phase list it implements, which is this
@@ -45,11 +46,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 
 // Shared JS that is currently neither runtime-mirrored nor an oracle, with why.
 // This list may only shrink: adopt the module, give it vectors, or delete it.
-const DECLARED_UNREACHABLE = {
-	'tooltip/draw_calls.js':
-		'defines a draw-call IR that no driver implements — Windows and macOS both render natively. ' +
-		'Named only by TooltipRenderer.spec.js prose. Adopting the IR or dropping it is a design decision',
-};
+const DECLARED_UNREACHABLE = {};
 
 const errors = [];
 
@@ -135,7 +132,7 @@ for (const rel of Object.keys(DECLARED_UNREACHABLE)) {
 	}
 }
 
-const BASELINE_UNREACHABLE = 1;
+const BASELINE_UNREACHABLE = 0;
 if (unreachable.length > BASELINE_UNREACHABLE) {
 	errors.push(
 		`unreachable shared JS modules rose to ${unreachable.length} (baseline ${BASELINE_UNREACHABLE}): ` +
