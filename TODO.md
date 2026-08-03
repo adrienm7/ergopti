@@ -247,6 +247,30 @@ replay against the expander's DISPATCH (or e2e), because the predicate the corpu
 currently replays through is deliberately blind to the flag. Writing vectors
 before that just moves the blindness into the corpus.
 
+🔎 **And the dispatch level was then read too, which raises a question that must
+be SETTLED before anything is written.** What was verified:
+
+- `expander.lua` has two paths — `try_auto_expand` (fires on the trigger's own
+  last character, every keystroke) and `try_terminator_expand` (fires when a
+  terminator arrives).
+- Both iterate the SAME bucket, `registry.mappings_for_tail(tail)`, which returns
+  every mapping for that last codepoint regardless of the flag.
+- `grep '\.auto\b' expander.lua` returns **nothing**. The expander never reads it.
+- `mappings_by_star_tail_char` is NOT this flag: it indexes `star_base` for the
+  LLM preview's magic-key path.
+- The registry does read `is_auto` (`registry.lua:561`, used at `:697`, `:724`,
+  `:808`) — so the flag reaches registration, and where it changes behaviour after
+  that is the open question.
+
+**The question, stated so it can be falsified rather than assumed:** does a macOS
+mapping registered with `auto_expand = false` fire on its own last character?
+Answer it by DRIVING the code — register one, feed the characters, observe —
+never by reading further. This entry has already produced two confident wrong
+answers from reading (see the warning above), and a third would be the same
+mistake in a new place. If it does fire, that is a real defect and it predates
+any migration; if it does not, the gate is somewhere neither read found, and that
+place is what the corpus must replay through.
+
 ⚠ **Two wrong measurements in one hour, on this one entry.** First "the corpus has
 no flag field" (it does — `auto_expand` IS `*`). Then "macOS ignores
 `auto_expand`, so it is broken" (it does not — `would_fire` is not where the flag
