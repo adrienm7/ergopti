@@ -43,7 +43,6 @@ static/ergopti_plus/_shared/
 │  ├── constants.toml               # Single source of truth for all visual constants (colors, fonts, layout, timing)
 │  ├── tint.js                      # Pure HSL tint-mixing algorithm + cross-driver test vectors
 │  ├── layout.js                    # Pure position resolution + canvas geometry + test vectors
-│  └── draw_calls.js                # draw_calls[] IR type definitions and composer functions
 ├── ports/
 │  ├── SPEC.md                      # Hexagonal architecture step 1: 7 OS-facing port contracts
 │  ├── KeyboardHook.spec.js         # Keyboard event subscription contract + test vectors

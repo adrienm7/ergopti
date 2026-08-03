@@ -21,7 +21,7 @@
  * have. That is what this guard exists to prevent recurring.
  *
  * WHY "RECORDED AS SPEC-ONLY" IS AN ALLOWED ANSWER:
- * Three of them genuinely are. `draw_calls.js`, `lifecycle.js` and `tint.js`
+ * Two of them genuinely are. `lifecycle.js` and `tint.js`
  * describe behaviour the Lua and AutoHotkey drivers implement by hand; nothing
  * executes them, and nothing can — the drivers cannot load JS. Being read only
  * by humans is a legitimate role for a specification. Being read by nobody
@@ -41,9 +41,6 @@ const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 // Modules that no tool loads, on purpose. Each needs a reason, because the
 // alternative reading — "nothing can load it and nobody noticed" — is the bug.
 const SPEC_ONLY = {
-	'modules/tooltip/draw_calls.js':
-		'Describes the draw-call sequence the Lua and AHK renderers implement by hand. ' +
-		'No tool executes it and no driver can (they cannot load JS).',
 	'modules/tooltip/lifecycle.js':
 		'Describes the show/hide/replace lifecycle each driver implements natively.',
 	'modules/tooltip/tint.js':
