@@ -612,8 +612,27 @@ Constraints: **paths before moves, moves before content, data before code.**
      shrink. What is still blocked is the RENAME itself: the ids are read at boot
      by three loaders and the synonym pairs must be reconciled in
      `macos/platform/remap/data/actions.json` first, which is Lot 6 (4).
-  5. **Tooltip**: wire the 1 483 lines of shared JS as an ORACLE (vector
-     generator + conformance harness), not as runtime.
+  5. **Tooltip**: ~~wire the 1 483 lines of shared JS as an ORACLE (vector
+     generator + conformance harness), not as runtime.~~
+     ⚠ **Re-measured 2026-08-03: most of this was already built, and the number
+     was wrong.** `_shared/modules/tooltip/` is six modules, not 1 483 lines of
+     one thing. `dequeue.js` and `layout.js` are BOTH runtime-mirrored and
+     oracles — `dequeue_vectors.json` and `layout_vectors.json` are replayed by
+     all three driver suites plus `test-tooltip-corpus-parity.cjs`. `tint.js` and
+     the others are reachable too.
+     **Exactly one module is neither: `draw_calls.js`, 433 lines.** It defines a
+     draw-call IR that no driver implements — Windows and macOS both render
+     natively — and is named only by `TooltipRenderer.spec.js` prose. That is the
+     most expensive kind of dead code: it loads, it passes the loadable gate, it
+     reads as the answer in the tree, and nothing depends on it being correct.
+     `test-shared-js-is-reachable.cjs` freezes it at one with that reason, and
+     the count may only fall. **Adopting the IR or dropping it is a design
+     decision, not a cleanup** — which is why the gate records it rather than
+     deleting 433 lines on its own authority.
+     **Smaller follow-up found on the way:** `lifecycle.js` IS mirrored —
+     `windows/ui/tooltip/helpers.ahk` names it as the canonical phase list it
+     implements — but nothing checks the AHK's phases against
+     `lifecyclePhases()`. The mirror is a claim, not a gate.
      ⚠ Known latent divergence, deliberately left: the macOS renderer branches
      two ways (`caret`, and everything else as a window anchor) where the shared
      JS branches four. `resolve_anchor()` only ever produces the four the
