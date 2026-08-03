@@ -100,12 +100,25 @@
 			]
 		},
 		{
+			"id": "kanata",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
 			"id": "gestures"
 		},
 		{
 			"id": "apps",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
+			]
+		},
+		{
+			"id": "updates",
+			"platforms": [
+				"linux"
 			]
 		},
 		{

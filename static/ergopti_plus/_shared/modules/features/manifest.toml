@@ -2728,12 +2728,26 @@ platforms = ["ahk", "hs"]
 id = "karabiner"
 platforms = ["hs"]
 
+# Le pendant Linux de Karabiner. Absent du manifeste jusqu'au 2026-08-03 alors
+# que menu_builder.lua le construit depuis toujours : le manifeste ne portait
+# aucune valeur "linux", donc rien ne pouvait constater le manque.
+[[menu.top_level]]
+id = "kanata"
+platforms = ["linux"]
+
 [[menu.top_level]]
 id = "gestures"
 
+# Mesuré le 2026-08-03 : Linux construit bien un sous-menu Apps
+# (_build_apps dans menu_builder.lua), la restriction "hs" était fausse.
 [[menu.top_level]]
 id = "apps"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
+
+# Linux uniquement : les deux autres drivers n'ont aucun menu de mise à jour.
+[[menu.top_level]]
+id = "updates"
+platforms = ["linux"]
 
 [[menu.top_level]]
 id = "---"

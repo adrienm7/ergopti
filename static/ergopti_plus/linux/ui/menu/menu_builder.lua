@@ -552,7 +552,11 @@ local function _build_apps(ctx)
 			end,
 		},
 		{ title = "-" },
-		{ title = "Ouvrir le dossier de config", fn = function()
+		-- Was a hardcoded French string, so every non-French user read one French
+		-- row in an otherwise translated menu. Found on 2026-08-03 while giving
+		-- the manifest its Linux dimension; the key already existed and is the
+		-- one the other two drivers use for the same row.
+		{ title = i18n_safe("menu.global.config_folder"), fn = function()
 			if ctx.on_open_config then ctx.on_open_config() end
 		end },
 	}}
