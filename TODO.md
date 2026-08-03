@@ -211,20 +211,30 @@ one last-char bucket, and the linear suffix scan it replaced **cost ~21 ms on
 every magic-key press**. Porting the lookup is the easy half; porting the four
 maintenance points without dropping one is the job.
 
-🚩 **And the prerequisite cannot be met as the decision states it.** "Port it into
-the core WITH cross-driver vectors first" assumes the corpus can express a star
-trigger. **It cannot.** `_shared/tests/corpus/hotstrings/vectors.json` has 29
-vectors whose fields are `trigger / replacement / is_word / auto_expand / buffer /
-terminator / expected` — there is **no flag field at all**. The four vectors that
-appear to mention a star use `★` as a *terminator character*, which is the magic
-key, not the `*` flag. Zero vectors cover star-trigger behaviour.
+🚩 **The corpus gap is real but it is the OPPOSITE of what it first looked like —
+and getting that wrong once, on this very entry, is worth recording.**
 
-**So the first step is not the port. It is the vector schema:** add the flag
-field, write vectors for what a star trigger does that a normal one does not
-(fire mid-word with no terminator, and the case-sensitivity split the two index
-maps mirror), have all three suites replay them, and only then move the index.
-Adopting the core before that would be a migration with nothing able to prove it
-kept the behaviour — and the behaviour is worth 21 ms per keystroke.
+A first pass concluded "the corpus has no flag field, so it cannot express a star
+trigger". That was wrong, and wrong by reasoning from field NAMES instead of
+reading the loader. **`auto_expand` IS the `*` flag.** The shared core says so in
+so many words at `_shared/lua/hotstring_engine/init.lua:219` — *"the AutoHotkey
+loader emits the `*` flag only when the TOML says auto_expand = true"*.
+
+Measured properly: **all 29 vectors carry `auto_expand = true`, and not one
+carries `false`.** So the corpus covers star triggers exclusively, and has **zero
+coverage of the non-star case** — the entry that waits for a terminator, which
+the core's own comment calls the whole point of the field: *"`ya` must not fire in
+the middle of `yaourt`"*.
+
+**So the first step is still vectors first, but the vectors to write are the ones
+nobody thought were missing:** `auto_expand = false` cases proving a trigger does
+NOT fire mid-word without a terminator. A migration verified only by star vectors
+would keep every star trigger working and could silently make `ya` fire inside
+`yaourt` on two drivers at once — a regression the whole 29-vector corpus is
+blind to today.
+
+Only then port the index, then adopt. The behaviour is worth 21 ms per keystroke;
+the non-star behaviour is worth not corrupting the user's words.
 
 macOS's `would_fire()` is no longer a blocker: it has four consumers (the
 expansion path, the tooltip preview, two LLM-bridge sites) and
