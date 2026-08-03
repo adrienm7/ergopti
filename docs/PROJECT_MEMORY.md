@@ -24,7 +24,9 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
 - [project-generated-trees-are-not-reducible](#project-generated-trees-are-not-reducible) — The `_generated/` trees were audited 2026-08-03: 21 artefacts, 200.3 KB, zero orphans — do not re-open the question
 - [project-plan-entries-go-stale-faster-than-code](#project-plan-entries-go-stale-faster-than-code) — Eleven TODO measurements were wrong in one session; re-measure before starting and write the correction back
-- [project-instrumentation-absence-is-invisible](#project-instrumentation-absence-is-invisible) — A missing profiler segment produces a clean-looking profile, so the 16 segments and 5 boot stamps are inventoried
+- [project-instrumentation-absence-is-invisible](#project-instrumentation-absence-is-invisible) — A missing profiler segment produces a clean-looking profile, so the 20 segments and 5 boot stamps are inventoried
+- [project-a-green-probe-can-mean-redundant-guards](#project-a-green-probe-can-mean-redundant-guards) — A falsifiability probe that stays green can mean the hazard is guarded twice, not that the assertion is vacuous
+- [project-the-macos-logger-ring-is-per-process](#project-the-macos-logger-ring-is-per-process) — The shared Lua core is required under a bare name, so the test runner never evicts it and its state spans every test file
 - [project-audit-ahk-2026-07-30-pass](#project-audit-ahk-2026-07-30-pass) — Sixth adversarial AHK pass: 14 findings all fixed; the refuted list, the coverage gaps, and the two measurements worth keeping
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
@@ -628,7 +630,7 @@ Instrumentation is the one kind of code whose absence produces no symptom. A
 deleted assertion turns a suite red. A deleted `HotPath_LogIfSlow` turns a hot
 path silent, and silence reads as "fast".
 
-`tools/test/test-hotpath-segments-declared.cjs` inventories all of it: **16
+`tools/test/test-hotpath-segments-declared.cjs` inventories all of it: **20
 HotPath segments and 5 pre-logger boot stamps**, each with a line saying what hot
 path it covers. A deleted segment fails with the reason it was added.
 
@@ -639,6 +641,15 @@ first stage of every keystroke — two tap-hold trackers plus the whole
 `Tooltip.Build`, `Tooltip.ResolvePos`, `Tooltip.Present` (sub-attributed by
 `HotPath_BreakdownMark` into clamp / prepare / corners / border / reveal),
 `Tooltip.DequeuePresent`, `Tooltip.LlmPresent`, `Tooltip.BorderPixelLoop`; then
+the user-triggered and COM paths: `Gesture.Invoke` (the single choke point all
+three dispatchers share, so one segment covers every action a gesture, a shortcut
+slot or a tap-hold can fire — and it times the throwing exit too, because an
+action that takes a second to fail costs exactly what one that takes a second to
+succeed does), `Config.TomlWrite` (a full read-modify-write run from a menu
+callback, so a slow save shows up as a frozen tray menu), `Updater.Poll`
+(`WaitForResponse(0)` on a COM object every tick — and BOTH exits are timed,
+since the re-arming one runs on every tick but the last), `Webview.Eval`
+(`ExecuteScriptAsync` is async in name only; the COM marshalling is not); then
 idle: `UIA.SelectionPoll`, `Metrics.FocusRefresh`.
 
 **How to read the profile:** every segment logs only above the 5 ms floor, so an
@@ -3314,3 +3325,88 @@ Evidence in `docs/PROJECT_MEMORY.md`.
   25 ms of margin. Dropping the 75 ms puts the render back under the gate and
   silently disables the position cache. The relationship is pinned by
   `tests/meta/test_tooltip_debounce_is_load_bearing.ahk`.
+
+
+
+
+### project-a-green-probe-can-mean-redundant-guards
+
+_A falsifiability probe that stays green does not always mean the assertion is vacuous — it can mean the hazard is guarded twice_
+
+<sub>slug: `project_a_green_probe_can_mean_redundant_guards`</sub>
+
+Every new gate in this repo is perturbed one fact at a time to prove it can fail.
+The usual reading of a probe that stays GREEN is "the assertion is vacuous —
+rewrite it". That reading is wrong often enough to be worth naming.
+
+**Measured 2026-08-03 on the macOS logger.** The assertion was "the Logger's own
+console line appears exactly once in the file — the print() tee must not
+re-capture what the file sink already wrote". The probe deleted the `_emitting`
+guard from the tee. It stayed green.
+
+The assertion was fine. The hazard is guarded **twice**:
+
+1. `_console_out()` calls `_orig_print` — the function captured *before* the tee
+   was installed — so the tee is never entered for a Logger line at all.
+2. The tee separately early-returns on `_emitting`.
+
+Either guard alone is sufficient, so no single-fact mutation can produce a double
+write. Removing **both** does, and that two-fact probe is what proves the
+assertion real.
+
+**How to apply:**
+
+- When a probe comes back green, ask "is there a SECOND thing preventing this?"
+  before rewriting the assertion. Deleting a good assertion because a probe could
+  not falsify it is how coverage is lost while the sweep reports success.
+- Then run the two-fact probe. An assertion nothing can falsify is worthless; an
+  assertion only a two-fact perturbation falsifies is guarding something real and
+  should say so in a comment, so the next reader does not "simplify" one of the
+  two guards away.
+- The corollary: `_emitting` is dead in the single-instance production path and
+  alive only when two module instances each install a tee, which is a *test*
+  arrangement. It stays because losing it costs nothing and the cross-instance
+  case is real in the suite — but it is documented as redundant, not as load
+  bearing.
+
+Related: [[project-instrumentation-absence-is-invisible]],
+[[project-gate-scripts-must-be-wired]].
+
+
+
+
+### project-the-macos-logger-ring-is-per-process
+
+_The shared Lua core is required under a BARE name, so the test runner's namespace purge never evicts it_
+
+<sub>slug: `project_the_macos_logger_ring_is_per_process`</sub>
+
+`macos/tests/run.lua` cold-starts every test FILE by evicting driver modules from
+`package.loaded` between files. The eviction list is a prefix match:
+
+```lua
+local PURGE_PREFIXES = { "^modules%.", "^adapters%.", "^infra%.", "^ui%." }
+```
+
+The shared Lua core is reached as `require("logger")` — `_shared/lua` is spliced
+onto `package.path` in `init.lua`, so the module name is **bare**. It matches no
+prefix and is therefore never evicted.
+
+**The consequence, which is not a choice:** any state the shared core holds —
+the 200-entry ring, the dedup streak, the minimum level — is **per process**, and
+survives every test file. A suite that got a fresh ring for free from
+`load_with_stubs` wiping `package.loaded["infra.logger"]` stops getting one the
+moment that state moves into the core. This is exactly the shape of the three
+"expected 0 entries, saw 200" failures the first adoption attempt produced.
+
+**How to apply:**
+
+- A test that needs a clean ring must call `Logger.ring_buffer_clear()` — and one
+  that needs a clean dedup streak `Logger.reset_dedup()` — in its own setup.
+  Relying on module reload is relying on a loader side effect, and it is invisible
+  at the point where it matters.
+- The same applies to any future `_shared/lua` module holding state. Adding
+  `"^logger$"` to `PURGE_PREFIXES` would "fix" it and would be wrong: it would
+  make the tests pass by giving them an isolation the running driver never has.
+
+Related: [[project-plan-entries-go-stale-faster-than-code]].
