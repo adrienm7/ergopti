@@ -545,6 +545,18 @@ Constraints: **paths before moves, moves before content, data before code.**
      is documented as the single source of truth used by the tooltip preview as
      well — replacing it risks the exact divergence its docstring says was
      already fixed once.
+     **Both confirmed 2026-08-03, and the second is now a test.** 103 lines under
+     `windows/infra/hotstrings/` mention the star trigger against 6 in the whole
+     526-line shared core, so adopting it on Windows as-is would lose the
+     feature. And `would_fire` has FOUR consumers — the expansion path, the
+     tooltip preview and two LLM-bridge sites — held together by nothing but two
+     docstrings saying they must stay in one place. A docstring cannot fail:
+     `test_would_fire_single_source.lua` now asserts every consumer reaches the
+     predicate, and that the predicate refuses a buffer whose TAIL is not the
+     trigger, which is the case a length-only reimplementation gets wrong and
+     exactly how a preview comes to show an expansion that never fires. Falsified
+     both ways. **An invariant that blocks a refactor should be a test, not a
+     comment** — the adoption can now be attempted against something that fails.
   2. **LLM**: fold the prompt-builder constants into one JSON.
      **Re-measured 2026-08-02, and the priority is lower than it reads.** Of the
      three declarations one is GENERATED (`windows/_generated/prompt_builder.ahk`),
