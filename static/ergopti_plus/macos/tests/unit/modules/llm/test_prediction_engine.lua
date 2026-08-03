@@ -400,8 +400,9 @@ helpers.describe("prediction_engine — timer safety", function()
 	end)
 
 	helpers.it("start_timer with override does not throw (regression for timer replacement)", function()
-		local ok = pcall(function() PE.start_timer(10.0) end)
-		helpers.assert_true(ok)
+		-- Called directly: a raise fails with the real error.
+		PE.start_timer(10.0)
+		helpers.assert_eq(type(PE.start_timer), "function", "and must leave the engine callable")
 	end)
 
 	helpers.it("start_timer_word_end does not throw", function()

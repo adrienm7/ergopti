@@ -104,6 +104,7 @@ helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", fun
 		helpers.load_with_stubs("infra.logger")
 		local ok_shim, ShimPB = pcall(require, "modules.llm.prompt_builder")
 		helpers.assert_true(ok_shim, "modules.llm.prompt_builder shim must be loadable")
+		helpers.assert_eq(type(ShimPB), "table", "and must be a table — the cases below index it")
 
 		local result, skip, _sig = ShimPB.build(LONG_BUFFER, {
 			max_words            = 0,

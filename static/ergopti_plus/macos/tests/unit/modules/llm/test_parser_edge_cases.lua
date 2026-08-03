@@ -95,7 +95,9 @@ helpers.describe("llm.parser edge cases", function()
 
 	helpers.it("survives non-string buffer arguments", function()
 		local body = "TAIL_CORRECTED: a\nNEXT_WORDS: b\n"
-		local ok = pcall(parser.process_prediction, nil, nil, body)
+		local ok, res = pcall(parser.process_prediction, nil, nil, body)
 		helpers.assert_true(ok, "parser must not crash on nil buffer")
+		helpers.assert_true(res == nil or type(res) == "table",
+			"and must answer nil or the documented table, never a half-value")
 	end)
 end)

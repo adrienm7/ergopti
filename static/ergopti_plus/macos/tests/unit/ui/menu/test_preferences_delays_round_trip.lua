@@ -39,8 +39,10 @@ helpers.describe("preferences: a per-category expansion delay round-trips throug
 		local path = os.tmpname()
 		local state = { delays = { [CATEGORY] = DELAY } }
 
-		local ok_save = pcall(Prefs.save, path, state, {}, {})
+		local ok_save, save_err = pcall(Prefs.save, path, state, {}, {})
 		helpers.assert_true(ok_save, "save must not throw on a minimal state")
+		helpers.assert_true(save_err == nil or type(save_err) == "boolean",
+			"and must answer whether it wrote — the caller has no other way to know")
 
 		local saved = select(2, pcall(Prefs.load, path))
 		helpers.assert_type(saved, "table", "load must return the parsed preferences table")

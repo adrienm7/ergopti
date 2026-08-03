@@ -58,8 +58,12 @@ helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)
 	helpers.it("stop() is safe to call repeatedly when already stopped", function()
 		local Menubar = (load_menubar())
 		-- No start() yet: stop() must early-return without error.
-		local ok = pcall(function() Menubar.stop(); Menubar.stop() end)
-		helpers.assert_true(ok, "repeated stop() on an idle menubar must not raise")
+		-- Called directly. A second stop must leave the widget restartable: the menu
+		-- toggle stops before it starts.
+		Menubar.stop()
+		Menubar.stop()
+		helpers.assert_eq(type(Menubar.start), "function",
+			"a double stop must leave the menubar startable")
 	end)
 end)
 

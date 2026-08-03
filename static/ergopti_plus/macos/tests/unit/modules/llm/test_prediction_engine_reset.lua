@@ -240,8 +240,12 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 
 	helpers.it("reset() is safe to call when chain was never armed", function()
 		PE.init(core_state)
-		local ok = pcall(function() PE.reset() end)
-		helpers.assert_true(ok, "reset() must not throw when no chain was ever armed")
+		-- Called directly: a raise fails with the real error. What the guard has to
+		-- leave behind is a USABLE module — the boot path calls this defensively, so a
+		-- guard that survived by wedging itself would break the call that follows.
+		PE.reset()
+		helpers.assert_eq(type(PE.reset), "function",
+			"and must leave the module callable")
 		helpers.assert_eq(PE.is_chain_pending(), false)
 	end)
 
