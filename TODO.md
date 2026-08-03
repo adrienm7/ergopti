@@ -552,8 +552,22 @@ Constraints: **paths before moves, moves before content, data before code.**
      being touched; not worth a dedicated risky pass.
   3. **Metrics**: shared aggregation core — two ~1 330-line walkers whose
      function names map 1:1, one of which says in a comment that it "MIRRORS" the
-     other; eight constants declared three times where the shared copy exists
-     only to be shadowed.
+     other. ~~Eight constants declared three times where the shared copy exists
+     only to be shadowed.~~ — **the constants half is done, 2026-08-03.**
+     `test-walker-constants-single-source.cjs` holds all eight: the shared
+     helpers own them, the AutoHotkey walker re-declares 7 as class statics and
+     the macOS aggregator all 8, and every value must agree. Scalars compare as
+     numbers, bucket arrays element by element. They agreed already, so this
+     freezes a correct state rather than fixing a wrong one — a bucket edge
+     changed in the shared file would previously have reached macOS and left
+     Windows aggregating against the old edges, producing two histograms nobody
+     can compare and no failure anywhere. Falsified five ways (a scalar drifting,
+     a bucket edge drifting, the shared value drifting, and both parsers
+     breaking). The six AHK constants filled at boot from the timing registry are
+     deliberately excluded — asserting `0 == the registry value` would be
+     asserting the placeholder, and `test-keylogger-timings-single-source.cjs`
+     already holds that path.
+     What remains is the expensive half: the two walkers themselves.
   4. **Remap**: a shared tap-hold IR + three emitters (`emit_kanata` /
      `emit_karabiner` / `emit_ahk`) — today only a kanata emitter parked in
      `_shared/`. And `_shared/tap_hold/defaults.toml` must become **one**
