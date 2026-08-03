@@ -213,9 +213,16 @@ a declarative group can absorb a driver-supplied builder.
   gate names the biggest offenders (`menu_remap.lua` 36,
   `menu_llm/models_selector.lua` 32, `menu_keyboard_layout.lua` 26). Lower it;
   never raise it.
-- **`tab.tap` drift.** `alt_tab_monitor` on Windows and Linux, `alt_tab_windows`
-  on macOS, with nothing recorded about why. The only genuine drift of the five
-  tap-hold divergences.
+- **`tab.tap` drift — measured 2026-08-03, and it is a product question.**
+  Windows `AltTabMonitor()` reads the mouse position, resolves the monitor under
+  the cursor, and cycles only the windows **on that monitor**. macOS
+  `start_alt_tab_windows_hotkey` binds Shift+F17 to `focus_previous_window_global`
+  — the previously focused window, unscoped (itself migrated away from `cmd_tab`
+  so it switches windows rather than apps). Two behaviours, not two names, so
+  renaming either side would be the wrong fix. What remains is a decision: should
+  macOS scope to the display under the cursor as well? The full finding is in
+  `test-tap-hold-namespace-correspondence.cjs`, which no longer says "nothing
+  recorded why".
 - **Gates to retire, after their migration only:**
   `macos/tests/meta/test_menu_hotstrings_layout_drift_gate.lua`, and
   `test_menu_top_level_drift_gate.{lua,ahk}` (once the tail is manifest rows with

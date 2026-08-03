@@ -86,7 +86,16 @@ const KNOWN_DIVERGENCES = {
 	'tab.tap': {
 		pc: 'alt_tab_monitor',
 		mac: 'alt_tab_windows',
-		reason: 'DRIFT — two different actions, not two names for one. Nothing recorded why they differ'
+		reason:
+			'DRIFT, and measured 2026-08-03: two different behaviours, not two names for one. ' +
+			'Windows AltTabMonitor() reads the mouse position, resolves the monitor under the ' +
+			'cursor, and cycles only the windows ON THAT MONITOR. macOS start_alt_tab_windows_hotkey ' +
+			'binds Shift+F17 to focus_previous_window_global — the previously focused window, ' +
+			'unscoped, and itself migrated away from cmd_tab so it switches WINDOWS rather than ' +
+			'apps. Renaming either side would be the wrong fix: calling the macOS action ' +
+			'alt_tab_monitor would claim a display scoping it does not implement. Closing this ' +
+			'means DECIDING whether macOS should scope to the display under the cursor too — a ' +
+			'product question, not a namespace one, and it is open rather than justified'
 	},
 	'tab.hold': {
 		pc: 'alt',
