@@ -179,7 +179,15 @@ in common, 55 missing — 36 tappable, 19 hold-only. The counts above hold.
 
 ---
 
-## 2. macOS + Windows onto the shared matcher core
+## 2. macOS + Windows onto the shared matcher core — **NEXT UP**
+
+> **This is the only large approved item still unstarted.** Decision 3 of
+> 2026-08-03 authorised it explicitly: port the star-trigger indexing into the
+> core **with cross-driver vectors first**, then adopt — same method as the
+> logger (behavioural contract, migration, falsifiability probes). Nothing about
+> it has been re-measured since; do that first, because eleven of the entries in
+> this file were wrong when checked and about half inverted the work.
+
 
 **Decided 2026-08-03: do it.** A 526-line shared core already exists and reaches
 Linux only, so this is adoption, not generation. 29 cross-driver vectors
@@ -235,10 +243,22 @@ none of it is a batch job, and the section title used to imply otherwise.
   never looked at the feature manifest, so it would not reject a `REASON_KEY`
   there and it is not what blocks this. The real dependency is the same as the
   entry below: something has to display the reason.
-- **`reason_key` for platform restrictions (I2).**
-  **Maintainer's decision, 2026-08-03: write the consumer FIRST**, then fill the
-  reasons as the ratchet comes down. ⚠ **Measured the same day, and the consumer
-  is three steps, not one:**
+- ~~**`reason_key` for platform restrictions (I2)**~~ — **consumer DONE
+  2026-08-03** (`4f25003`). The chain exists and carries a real value: the
+  generator emits an `unavailable` table per driver (104 macOS / 107 Windows /
+  248 Linux), `manifest_reader.coverage_gaps()` splits it, and the healthcheck
+  report shows the explained absences **and the count of silent ones**. The
+  ratchet moved for the first time since it was frozen: **142 → 139**.
+
+  What remains is incremental and deliberately so: describe a restriction **as
+  the feature around it is revisited**, by someone who knows why it is missing,
+  and lower the baseline each time. `script.alt_gr_is_kana_remap` is the model —
+  it states what the PLATFORM cannot do (a Windows keyboard-driver concept with
+  no counterpart elsewhere), not what has not been coded.
+
+  <details><summary>The measurement that made this order the right one</summary>
+
+  The consumer was three steps, not one:
   1. `reason_key` has **zero readers anywhere in the repo** — a grep over
      `static/` and `tools/` finds it only inside
      `test-platform-restrictions-explained.cjs` itself. Without a consumer the
@@ -254,11 +274,13 @@ none of it is a batch job, and the section title used to imply otherwise.
      collectors), not a menu row — showing absent features as disabled rows would
      change every menu on every platform, which nobody asked for.
 
-  So the order is: emit → read → display → **write one real reason end to end and
-  lower the baseline by one**, which is what proves the chain before 141 more
-  strings are written on top of it.
+  So the order was: emit → read → display → **write one real reason end to end
+  and lower the baseline by one**, which is what proved the chain before 138 more
+  strings get written on top of it. All four steps landed.
 
-  The frozen count and its rationale below still hold. 139 of 142 restrictions
+  </details>
+
+  The frozen count and its rationale still hold. 139 restrictions
   carry no reason. Writing them all means 142
   locale keys × 21 locales ≈ **3 000 translated strings in 19 languages nobody
   here can check**, and `test-platform-restrictions-explained.cjs` is explicit
