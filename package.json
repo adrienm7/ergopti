@@ -60,7 +60,7 @@
 		"test:tree-parity": "node ./tools/test/test-driver-tree-parity.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
-		"test:keyboard-slot-surface": "node ./tools/test/test-keyboard-slot-surface-is-dead.cjs",
+		"test:keyboard-slot-surface": "node ./tools/test/test-keyboard-slot-surface-is-live.cjs",
 		"test:chord-native-mapping": "node ./tools/test/test-chord-native-mapping-single-source.cjs",
 		"test:hotstring-flags": "node ./tools/test/test-hotstring-flag-support-per-driver.cjs",
 		"test:boot-smoke": "node ./tools/test/test-feature-state-boot-smoke.cjs",

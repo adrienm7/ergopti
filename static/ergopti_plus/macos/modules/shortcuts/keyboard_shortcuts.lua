@@ -23,6 +23,8 @@ local M = {}
 local hs          = hs
 local Chord       = require("chord")
 local Registrar   = require("adapters.hotkey_registrar")
+local FileSystem  = require("adapters.file_system")
+local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
 local GestActions = require("modules.gestures.actions")
 
@@ -73,6 +75,24 @@ local SPECIAL_KEYS = {
 	comma  = ",",
 }
 
+-- The groups the menu offers, in display order, each with the i18n keys for its
+-- submenu title and its "add a binding" row. The prefixes are the SLOT_MODS
+-- prefixes: a group whose prefix is not in SLOT_MODS would render rows that
+-- resolve to no chord, which is why test_keyboard_slot_groups.lua ties the two
+-- together rather than trusting them to stay in step.
+M.SLOT_GROUPS = {
+	{ prefix = "hs_option_",     group_key = "menu.shortcuts.alt_group",       add_key = "menu.shortcuts.alt_add" },
+	{ prefix = "hs_ctrl_",       group_key = "menu.shortcuts.ctrl_group",      add_key = "menu.shortcuts.ctrl_add" },
+	{ prefix = "hs_ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
+	{ prefix = "cmd_",           group_key = "menu.shortcuts.cmd_group",       add_key = "menu.shortcuts.cmd_add" },
+	{ prefix = "cmd_shift_",     group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
+}
+
+-- Path to the shared key catalogue. The slot space is prefix × key, and the keys
+-- are the same 40 the gesture actions and the Windows driver already use — a
+-- private list here would be a fourth answer to "which keys exist".
+local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
+
 -- Default assignments (mirrors common macOS conventions + current bindings.lua shortcuts)
 M.DEFAULTS = {
 	-- No hard defaults on a fresh install: all slots start at "none".
@@ -87,6 +107,40 @@ M.DEFAULTS = {
 -- ======= 2/ Slot Resolution =========
 -- ====================================
 -- ====================================
+
+-- The catalogue, decoded once. Nil until the first read; false once a read has
+-- failed, so a missing file is reported once rather than on every menu rebuild.
+local _catalogue = nil
+
+--- Reads the shared key catalogue.
+--- @return table|nil keys The ordered key entries, or nil when unavailable.
+local function catalogue_keys()
+	if _catalogue == false then return nil end
+	if _catalogue == nil then
+		local raw = FileSystem.read(KEY_CATALOGUE_PATH)
+		local ok, decoded = pcall(hs.json.decode, raw or "")
+		if not raw or not ok or type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
+			-- No local fallback list: an unsynchronised private copy of the key
+			-- space is exactly what the shared catalogue exists to prevent, so an
+			-- unreadable catalogue means an empty picker, not a made-up one.
+			Logger.error(LOG, "Shared key catalogue unreadable at %s — no slots can be offered.", tostring(KEY_CATALOGUE_PATH))
+			_catalogue = false
+			return nil
+		end
+		_catalogue = decoded
+	end
+	return _catalogue.keys
+end
+
+--- Key id → display label, from the catalogue.
+--- @return table
+local function key_labels()
+	local labels = {}
+	for _, entry in ipairs(catalogue_keys() or {}) do
+		labels[entry.id] = entry.label or entry.id
+	end
+	return labels
+end
 
 --- Resolves a slot id to a canonical chord string.
 --- Returns nil when the slot cannot be mapped to a valid chord — a slot whose
@@ -114,7 +168,7 @@ local function slot_label(slot_id)
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
-			local key_display = suffix:sub(1,1):upper() .. suffix:sub(2)
+			local key_display = key_labels()[suffix] or (suffix:sub(1, 1):upper() .. suffix:sub(2))
 			local mod_str = ""
 			for _, m in ipairs(mods) do
 				mod_str = mod_str .. (MOD_SYMBOLS[m] or m) .. " "
@@ -195,6 +249,46 @@ end
 --- @return string
 function M.get_slot_label(slot_id)
 	return slot_label(slot_id)
+end
+
+--- Lists every slot a group can offer, in catalogue order.
+--- Each entry is { id, label } ready for the picker. An unknown prefix yields an
+--- empty list rather than the whole key space, so a typo in a group definition
+--- shows as a group with nothing in it instead of five identical groups.
+--- @param prefix string One of M.SLOT_GROUPS' prefixes.
+--- @return table
+function M.available_slots(prefix)
+	local known = false
+	for _, entry in ipairs(SLOT_MODS) do
+		if entry[1] == prefix then known = true; break end
+	end
+	if not known then
+		Logger.error(LOG, "available_slots(): '%s' is not a slot prefix.", tostring(prefix))
+		return {}
+	end
+
+	local out = {}
+	for _, key in ipairs(catalogue_keys() or {}) do
+		out[#out + 1] = { id = prefix .. key.id, label = key.label or key.id }
+	end
+	return out
+end
+
+--- Lists the slots of a group that currently hold an action, in catalogue order.
+--- Iterating the catalogue rather than the assignment table is what makes the
+--- menu order stable: pairs() over _actions would reshuffle the rows on every
+--- rebuild, and a menu whose items move between two openings is unusable.
+--- @param prefix string
+--- @return table Array of { id, label, action } for assigned slots only.
+function M.assigned_slots(prefix)
+	local out = {}
+	for _, slot in ipairs(M.available_slots(prefix)) do
+		local action = _actions[slot.id]
+		if action and action ~= "none" then
+			out[#out + 1] = { id = slot.id, label = slot.label, action = action }
+		end
+	end
+	return out
 end
 
 --- Configures the action for a slot and hot-rebinds without a full reload.
