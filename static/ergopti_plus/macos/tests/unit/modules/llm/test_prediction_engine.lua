@@ -317,7 +317,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 		local mx = hs.settings.get("llm_max_words")
 		helpers.assert_eq(type(mx), "number")
 		-- Exactly the comparison that crashed on the raw string.
-		helpers.assert_true(pcall(function() return mx > 0 end))
+		-- The comparison crashed pre-fix on a string. Asserting the TYPE is what the
+		-- fix guarantees, and it is stronger than "this one comparison did not raise".
+		helpers.assert_eq(type(mx), "number", "a coerced max must be a number, not a string")
 
 		PE.set_llm_min_words("seven")
 		helpers.assert_eq(type(hs.settings.get("llm_min_words")), "number")

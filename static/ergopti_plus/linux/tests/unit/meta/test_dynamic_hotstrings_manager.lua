@@ -96,8 +96,11 @@ helpers.describe("dynamic hotstrings manager", function()
     end)
 
     helpers.it("on_trigger with nil buffer is safe", function()
-      local ok = pcall(function() dh.on_trigger(nil, "\\") end)
-      helpers.assert_true(ok, "nil buffer does not crash")
+      -- Called directly: this runs on every keystroke, so a raise is a dead
+      -- keyboard and should fail with its own error.
+      local out = dh.on_trigger(nil, "\\")
+      helpers.assert_true(out == nil or type(out) == "string" or type(out) == "boolean",
+        "a nil buffer must answer nil or a documented value, never a half-value")
     end)
   end)
 

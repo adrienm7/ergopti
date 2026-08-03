@@ -243,11 +243,12 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		Logger.set_sink(function(line) captured_lines[#captured_lines + 1] = line end)
 
 		local state2, defaults2 = make_state("state2")
-		local ok = pcall(function() bridge.init(state2, defaults2) end)
+		local ok, init_err = pcall(function() bridge.init(state2, defaults2) end)
 
 		-- Restore sink immediately so subsequent tests are unaffected.
 		Logger.set_sink(nil)
 
+		helpers.assert_nil(init_err, "and must report none: " .. tostring(init_err))
 		helpers.assert_true(ok, "second M.init() must not throw")
 
 		-- Verify that at least one captured line mentions the duplicate-call warning.

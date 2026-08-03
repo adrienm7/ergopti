@@ -228,8 +228,10 @@ helpers.describe("keylogger", function()
     helpers.it("flush with configured log_dir does not crash", function()
       keylogger.init({ log_dir = os.getenv("TEMP") or "/tmp" })
       keylogger.on_keydown("f", 1234, "flush-test")
-      local ok = pcall(function() keylogger.flush() end)
-      helpers.assert_true(ok)
+      -- Called directly. flush answers what it wrote, and the caller advances on it.
+      local flushed = keylogger.flush()
+      helpers.assert_true(flushed == nil or type(flushed) == "boolean" or type(flushed) == "number",
+        "flush must answer something the caller can act on")
     end)
 
     helpers.it("flushes one canonical raw batch and never replays it", function()

@@ -161,8 +161,9 @@ helpers.describe("tray_menu SNI compliance", function()
     end)
 
     helpers.it("setTooltip with a string does not crash", function()
-      local ok = pcall(function() tray.setTooltip("Ergopti — test") end)
-      helpers.assert_true(ok, "setTooltip(...) does not crash")
+      tray.setTooltip("Ergopti — test")
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "a tooltip must not tear the backend down")
       tray.destroy()
     end)
   end)
@@ -192,8 +193,9 @@ helpers.describe("tray_menu SNI compliance", function()
         verbose  = false,
         on_quit  = function() end,
       })
-      local ok = pcall(function() tray.setMenu(items) end)
-      helpers.assert_true(ok, "menu_builder output accepted by setMenu")
+      tray.setMenu(items)
+      helpers.assert_eq(type(tray.getBackend()), "string",
+        "the menu builder's real output must be accepted, not silently rejected")
       tray.destroy()
     end)
 

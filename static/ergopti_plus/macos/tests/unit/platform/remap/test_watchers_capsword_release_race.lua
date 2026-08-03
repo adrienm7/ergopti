@@ -271,7 +271,12 @@ helpers.describe("watchers.capsword release race: explicit start-failure path (F
 
 		trigger_pointer_event(clock, captured)
 		trigger_pointer_event(clock, captured)
-		local ok = pcall(captured.cb, {})
+		local ok, cb_err = pcall(captured.cb, {})
+		-- The callback ANSWERS whether it consumed the event; that second return is
+		-- the answer, not an error. An eventtap callback returning nil is read by
+		-- Hammerspoon as "do not consume", so the type is the invariant.
+		helpers.assert_true(type(cb_err) == "boolean" or cb_err == nil,
+			"and must answer whether it consumed the event")
 		helpers.assert_true(ok,
 			"repeated pointer events must never raise even when hs.task.new consistently returns nil "
 			.. "(the lock must be released synchronously every time, not just once)")

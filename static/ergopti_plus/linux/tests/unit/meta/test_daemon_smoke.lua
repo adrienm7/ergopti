@@ -202,7 +202,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     for _, name in ipairs(adapters) do
       helpers.it(name .. " loads", function()
         local ok, mod = pcall(require, name)
-        helpers.assert_true(ok, name .. " module loads")
+        helpers.assert_true(ok, name .. " module loads: " .. tostring(mod))
+        helpers.assert_eq(type(mod), "table", name .. " must load as a table")
       end)
     end
   end)
@@ -229,7 +230,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     for _, name in ipairs(shared_mods) do
       helpers.it("require('" .. name .. "') loads", function()
         local ok, mod = pcall(require, name)
-        helpers.assert_true(ok, name .. " module loads")
+        helpers.assert_true(ok, name .. " module loads: " .. tostring(mod))
+        helpers.assert_eq(type(mod), "table", name .. " must load as a table")
       end)
     end
   end)
