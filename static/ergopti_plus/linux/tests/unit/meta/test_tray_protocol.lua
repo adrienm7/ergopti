@@ -220,8 +220,12 @@ helpers.describe("tray.protocol", function()
 
     helpers.it("normalizes separators in candidate paths", function()
       -- Just verify it doesn't crash with backslash paths
-      local ok = pcall(TP.resolve_tray_icon, "C:\\nonexistent")
-      helpers.assert_true(ok, "does not crash on Windows paths")
+      -- Called directly. The resolver must ANSWER for a path it cannot use: the
+      -- caller passes the result straight to the tray, and nil there is a missing
+      -- icon with no diagnostic.
+      local icon = TP.resolve_tray_icon("C:\\nonexistent")
+      helpers.assert_true(icon == nil or type(icon) == "string",
+        "an unusable path must resolve to nil or a string, never a half-value")
     end)
   end)
 

@@ -118,7 +118,12 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		helpers.assert_true(type(captured.cb) == "function",
 			"start_gesture_watcher must register an eventtap callback")
 
-		local ok_cb = pcall(captured.cb, dummy_event)
+		local ok_cb, cb_err = pcall(captured.cb, dummy_event)
+		-- The callback ANSWERS whether it consumed the event; that second return is
+		-- the answer, not an error. An eventtap callback returning nil is read by
+		-- Hammerspoon as "do not consume", so the type is the invariant.
+		helpers.assert_true(type(cb_err) == "boolean" or cb_err == nil,
+			"and must answer whether it consumed the event")
 		helpers.assert_true(ok_cb,
 			"the eventtap callback must not raise even when deactivate_capsword's hs.task.new throws (F-HIGH-7)")
 	end)

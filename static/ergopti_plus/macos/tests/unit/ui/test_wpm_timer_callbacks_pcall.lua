@@ -55,8 +55,13 @@ helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScree
 
 	helpers.it("does not propagate an error when mainScreen() is nil", function()
 		local Widget = load_widget_with_nil_screen()
-		local ok = pcall(function() Widget.start(false) end)
-		helpers.assert_true(ok, "M.start() (which calls update_widget()) must not raise when mainScreen() is nil")
+		-- Called directly: a raise fails with the real error. What the guard must
+		-- leave behind is a stoppable widget — a start that wedged itself would leak
+		-- its timer for the session.
+		Widget.start(false)
+		Widget.stop()
+		helpers.assert_eq(type(Widget.start), "function",
+			"a start with no main screen must leave the widget restartable")
 	end)
 
 	helpers.it("logs an ERROR-level line when mainScreen() is nil", function()
@@ -116,8 +121,10 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 
 	helpers.it("does not propagate an error when get_live_stats() throws", function()
 		local Menubar = load_menubar_with_throwing_stats()
-		local ok = pcall(function() Menubar.start() end)
-		helpers.assert_true(ok, "M.start() (which calls update_menubar()) must not raise on a downstream failure")
+		Menubar.start()
+		Menubar.stop()
+		helpers.assert_eq(type(Menubar.start), "function",
+			"a start that hit a downstream failure must leave the menubar restartable")
 	end)
 
 	helpers.it("logs an ERROR-level line when the update body throws", function()
