@@ -22,6 +22,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
 - [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
+- [project-generated-trees-are-not-reducible](#project-generated-trees-are-not-reducible) — The `_generated/` trees were audited 2026-08-03: 21 artefacts, 200.3 KB, zero orphans — do not re-open the question
 - [project-audit-ahk-2026-07-30-pass](#project-audit-ahk-2026-07-30-pass) — Sixth adversarial AHK pass: 14 findings all fixed; the refuted list, the coverage gaps, and the two measurements worth keeping
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
@@ -575,6 +576,44 @@ Related: [[project_ahk_invariant_incomplete_application]],
 [[project_gate_scripts_must_be_wired]], [[feedback_ahk_ui_syntax_validation]],
 [[errors_only_log_sink]], [[project_audit_ahk_2026_07_21_adversarial]].
 
+### project-generated-trees-are-not-reducible
+
+_The `_generated/` trees were audited on 2026-08-03: 21 artefacts, 200.3 KB, zero orphans. Do not re-open the question_
+
+<sub>slug: `project_generated_trees_are_not_reducible`</sub>
+
+"Are the `_generated/` folders still earning their committed size?" is a natural
+question and it has now been answered with a full scan, so the next person does
+not have to redo it.
+
+**Measured:** all 21 committed artefacts across `windows/`, `macos/` and
+`linux/_generated/` total **200.3 KB**. Every single one has at least one runtime
+reader outside `_generated/`, at least one generator under `tools/`, and
+drift-guard coverage (`build-domain.cjs` compares the working tree against the
+index). **There are no orphans and nothing to delete.**
+
+**67 % of the mass is three files** — `macos/_generated/features_manifest.lua`
+(54.9 KB), `windows/_generated/features_manifest.ahk` (54.8 KB),
+`linux/_generated/features_manifest.lua` (24 KB).
+
+**How to apply:**
+
+- Do not propose replacing the feature manifests with a runtime TOML read. It
+  puts a ~130 KB parse back on every driver's boot path to save 134 KB of
+  committed text, which is exactly the trade ADR-002 decided against. Net
+  negative, and it has now been re-proposed and re-rejected twice.
+- If you add a `_generated/` artefact, it needs the same three things as the
+  others: a runtime reader, a generator in the registry, and drift-guard
+  coverage. Two out of three is a file that rots silently.
+- To re-run the scan: for each file under a driver's `_generated/`, search that
+  driver's tree and `tools/` for its basename. A file whose only hits are inside
+  `_generated/` is an orphan.
+
+Related: [[project-gate-scripts-must-be-wired]].
+
+
+
+
 ### project-gate-scripts-must-be-wired
 
 _A `tools/test/` gate script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"_
@@ -604,6 +643,26 @@ fail, a test that never runs.
 - Do not trust a README or `docs/TESTING.md` claim that something "is a CI gate" — grep
   `run-js-suite.cjs` and `.github/workflows/*.yml` for the script name. Documentation drifts; the
   invocation list is the truth.
+
+**Update 2026-08-03 — it recurred, and it is an assertion now.** The advice above
+was right and was not enough: an instruction nobody can check is a habit, and
+habits lapse. Running the mise-en-commun audit found **three more** dark gates —
+`test-port-compliance.cjs`, `test-priority-parity.cjs`, `test-manifest-parity.cjs`
+— each appearing exactly once outside its own file, on its `package.json` line.
+Port compliance is the freshness gate for the whole port layer: it re-projects
+`contracts.json` from the 21 spec files and checks every AutoHotkey `ADAPTER_*`
+map against it. All three passed, which is precisely why nobody noticed.
+
+`tools/test/test-npm-aliases-match-the-suite.cjs` now asserts the direction that
+matters: **no npm alias may name a gate the suite does not run.** The reverse was
+measured and deliberately left as a ratchet — 78 of the 136 suite gates have no
+alias, so requiring one would mean 78 lines of `package.json` mirroring the
+suite. Adding a gate with an alias is free; adding one without makes the number
+worse on purpose.
+
+The rule to apply is unchanged and now enforced: **write the gate, add it to
+`run-js-suite.cjs`, and give it an npm alias.** If you only do two of the three,
+the gate tells you which one you skipped.
 - The durable guard is a meta-check that enumerates `tools/test/test-*` and asserts each is either in
   `run-js-suite.cjs` or in an explicit allow-list whose entries name the CI step that runs them —
   and that check must be wired into `run-js-suite.cjs` itself so it cannot become its own victim.

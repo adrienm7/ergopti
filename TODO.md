@@ -744,5 +744,11 @@ flattened, god-files, orphan tooling. One correction to apply when running it: i
 says to confront your conclusions against `docs/REFACTOR_PLAN.md`, which no
 longer exists — `PROJECT_MEMORY.md` is now the only canonical memory.
 
+Its two durable conclusions are in `PROJECT_MEMORY.md`:
+`project-generated-trees-are-not-reducible` (so the question is not re-opened) and
+an update to `project-gate-scripts-must-be-wired` recording that the dark-gate
+problem RECURRED — the advice there was right and was not enough, because an
+instruction nobody can check is a habit, and habits lapse. It is an assertion now.
+
 `perf_hs.md` and `refactor.md` — check PROJECT_MEMORY before running; the
 refactor cycle the latter belongs to was declared complete.
