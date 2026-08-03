@@ -13,11 +13,35 @@ to make a change pass, and run the gates that cover what you touched —
 
 **Delete an entry the moment it is done. When this file is empty, delete it.**
 
-> ## What actually blocks this list
+> ## ✅ Four decisions taken by the maintainer on 2026-08-03
+>
+> These override the analysis below wherever they disagree. Do not re-ask.
+>
+> 1. **Translations: fill them all, machine translation included.** The objection
+>    below — that unreviewed strings in nineteen languages are worse than the raw
+>    identifier — was put to the maintainer explicitly, with the count, and the
+>    answer was to write them anyway. The labels are short, standard UI terms
+>    (Save, Home, Page Up, Spotlight). **Risk accepted knowingly: text not read by
+>    a native speaker will ship.** This unblocks §1 and the `reason_key` half of
+>    §4. Prefer wording that already appears elsewhere in the same locale file
+>    over inventing a new phrasing.
+> 2. **§1 — the 19 hold-only actions stay OUT.** Only the 36 tappable ones join
+>    the registry. A gesture has no duration, so `layer`/`shift`/`cmd` hold cannot
+>    be expressed as one; they remain Karabiner-only. No `hold_only` flag, no
+>    toggle semantics.
+> 3. **§2 — port the star-trigger indexing.** Go ahead: the 103 lines move into
+>    the shared core WITH cross-driver vectors first, then adopt. Same method as
+>    the logger — behavioural contract, migration, falsifiability probes.
+> 4. **This file stays until it is empty**, then it is deleted, exactly as the
+>    line above prescribes. Reducing it section by section is the intended
+>    behaviour, not a deferral.
+>
+> ## What blocked this list before those decisions
 >
 > Measured 2026-08-03, and it is one dependency, not several. **Three of the five
 > sections below are gated by the same thing: user-facing strings in 21 locales
-> that only a human can supply.**
+> that only a human can supply.** Decision 1 removes that gate by accepting the
+> risk; the measurements are kept because they say what the risk IS.
 >
 > - **§1** needs 756 of them (36 actions × 21). The gate is an assertion, and
 >   123 of the 125 existing action labels are genuinely translated.
