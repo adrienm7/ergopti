@@ -65,9 +65,25 @@ So the shape is:
   it), which is the only meaningful reading of "swipe to hold"; or (c) they stay
   out of the registry and only the 36 merge.
 
-**Watch for:** `one_shot_shift`/`sticky_shift` and `alt_gr`/`altgr` are one
-action under two spellings (see `test-tap-hold-namespace-correspondence.cjs`).
-Reconcile those two pairs BEFORE keying, or two of the 55 get the wrong id.
+⚠ **The "reconcile the two spellings first" instruction was wrong — measured
+2026-08-03.** `one_shot_shift`/`sticky_shift` and `alt_gr`/`altgr` are indeed one
+action under two spellings, and they are **already reconciled**: the `SYNONYMS`
+table in `test-tap-hold-namespace-correspondence.cjs` pairs them and a gate holds
+the pairing. What was wrong is the cost. That table called itself "a rename, no
+behaviour change"; `one_shot_shift` is in fact a key in the shared timing registry
+(`[tap_hold] one_shot_shift_timeout_ms`), the FILENAME of an AutoHotkey module,
+a global constant, three `shortcuts.*` paths in the feature manifest with matching
+config-template rows, a `tap_action` in the Linux kanata defaults, and a locale
+key in all 21 locales — **roughly eighty sites across three drivers**.
+
+So do NOT rename. Key the new rows on the **Karabiner ids** (`sticky_shift`,
+`altgr`), leave the AutoHotkey vocabulary alone, and let the `SYNONYMS` table
+remain what ties them. Two vocabularies pairing by meaning under a gate cost one
+table; collapsing them costs a rename through every driver and buys nothing the
+table does not already give.
+
+**Measured overlap, 2026-08-03:** 73 Karabiner actions, 126 `sg_actions` rows, 18
+in common, 55 missing — 36 tappable, 19 hold-only. The counts above hold.
 
 ---
 

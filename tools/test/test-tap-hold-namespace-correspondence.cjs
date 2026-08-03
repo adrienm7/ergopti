@@ -62,10 +62,25 @@ const CORRESPONDENCE = [
 	{ pc: 'tab', mac: 'tab' }
 ];
 
-// Action ids that name the SAME behaviour under two spellings. These are the
-// cheapest half of the unification — a rename, no behaviour change — and listing
-// them here is what makes the genuine divergences below visible as the short
-// list they actually are.
+// Action ids that name the SAME behaviour under two spellings. Listing them here
+// is what makes the genuine divergences below visible as the short list they
+// actually are.
+//
+// This table used to describe itself as "the cheapest half of the unification —
+// a rename, no behaviour change". Measured on 2026-08-03, that is false for
+// `one_shot_shift`, and expensively so: the id is not merely a registry row
+// name. It is a key in the shared timing registry
+// (`[tap_hold] one_shot_shift_timeout_ms`), the FILENAME of an AutoHotkey module
+// (platform/remap/one_shot_shift.ahk), a global constant
+// (ONE_SHOT_SHIFT_TIMEOUT_SEC), three `shortcuts.*.one_shot_shift` paths in the
+// feature manifest with matching rows in the config templates, a `tap_action` in
+// the Linux kanata defaults, and a locale key in all 21 locales — roughly eighty
+// sites across three drivers.
+//
+// So this table IS the reconciliation, and it should stay one. Two vocabularies
+// that pair by MEANING and are held to each other by a gate cost one table; the
+// same two collapsed into one spelling cost a rename through every driver, and
+// buy nothing the table does not already give.
 const SYNONYMS = {
 	enter: 'return',
 	one_shot_shift: 'sticky_shift',
