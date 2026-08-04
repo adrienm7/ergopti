@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "الحساسية — تمرير بأربعة أصابع ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "الحساسية — تمرير بأربعة أصابع ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "الحساسية — تمرير بأربعة أصابع ↑",
+	"menu.gestures.reading_on": "قراءة libinput: مفعّلة",
+	"menu.gestures.reading_off": "قراءة libinput: معطّلة",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 مسح الكل (نقر/ضغط واختصارات)",
 	"menu.karabiner.combo_arrow": "مزيج → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows فقط: كل ما سيعرضه هذا الصف هو نفسه خاص بنظام Windows، لذا فإنه على macOS وLinux يعرض قائمة فارغة.",
 	"platform_reason.no_magic_key_editor_on_linux": "ليس على Linux: يغيّر هذا الصف المفتاح السحري. يعرض macOS وWindows مربع حوار لذلك؛ أما مشغّل Linux فيقرأ المفتاح من الإعدادات ولا يتيح تغييره من القائمة.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "ليس على Linux: يفتح هذا الصف ملف الاختصارات الشخصية. لدى macOS وWindows ملف كهذا؛ أما مشغّل Linux فاختصاراته مفاتيح تبديل وتحويلات للنص المحدد، دون أي ملف على القرص لتحريره.",
+	"platform_reason.libinput_reader_is_linux_only": "قراءة libinput — على لينكس فقط",
 	"metrics_apps.chart_time_series": "الوقت",
 	"metrics_apps.edit_category_hint": "تعديل الفئة"
 }

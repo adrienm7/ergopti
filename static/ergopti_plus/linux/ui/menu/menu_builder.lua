@@ -1058,40 +1058,33 @@ local function _build_gestures(ctx)
 	end
 
 	local enabled = ge.is_enabled()
-	local items = {}
 
-	-- Keyed by the manifest's own row ids rather than appended anonymously. The
-	-- ids are what the action↔handler bijection gate matches on, and an anonymous
-	-- row is a row the manifest can declare and no gate can find — which is how
-	-- gestures came to be declared for two drivers while Linux built a third menu
-	-- nobody had compared. It is also the shape ManifestMenu.build consumes, so
-	-- this is the half of the migration that does not need the renderer.
+	-- Keyed by the manifest's own row ids. Each handler appends to the table the
+	-- renderer HANDS IT, never to one closed over from here: the renderer builds
+	-- its own result and passes it in, so a handler writing to an outer table
+	-- would emit its rows into a menu the renderer never returns — every gesture
+	-- row silently missing, with nothing failing.
 	local gesture_rows = {
-		["gestures_toggle"] = function()
-			items[#items + 1] = {
-				title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
-				fn = function() ge.toggle() end,
-			}
-		end,
-		["restore_defaults"] = function()
-			items[#items + 1] = {
+		["restore_defaults"] = function(out)
+			out[#out + 1] = {
 				title = i18n_safe("menu.gestures.restore_defaults"),
 				fn = function() ge.reset_defaults() end,
 			}
 		end,
-		["disable_all"] = function()
-			items[#items + 1] = {
+		["disable_all"] = function(out)
+			out[#out + 1] = {
 				title = i18n_safe("menu.gestures.disable_all"),
 				fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
 			}
 		end,
 	}
 
-	gesture_rows["gestures_toggle"]()
-	items[#items + 1] = { title = "-" }
-	gesture_rows["restore_defaults"]()
-	gesture_rows["disable_all"]()
-	items[#items + 1] = { title = "-" }
+	-- The master toggle, built here because the renderer skips `toggle` rows by
+	-- contract: a category gate is driver state, not manifest data.
+	local master_toggle = {
+		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
+		fn = function() ge.toggle() end,
+	}
 
 	local function prompt_parameter(slot, action, spec, prior)
 		if type(ctx.prompt_action_parameter) == "function" then
@@ -1132,7 +1125,7 @@ local function _build_gestures(ctx)
 	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
 	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
 	-- count, so grouping would mean parsing the names apart only to regroup them.
-	gesture_rows["gesture_slots_linux"] = function()
+	gesture_rows["gesture_slots_linux"] = function(out)
 		-- Every known slot is configurable here. A partial quick list made
 		-- parameterized actions unreachable for the omitted gesture bindings.
 		local slots = {}
@@ -1150,30 +1143,36 @@ local function _build_gestures(ctx)
 					fn = function() assign_action(slot, option) end,
 				}
 			end
-			items[#items + 1] = {
+			out[#out + 1] = {
 				title = gesture_slot_label(slot) .. " → " .. label,
 				menu = choices,
 			}
 		end
 	end
 
-	gesture_rows["gesture_slots_linux"]()
+	-- Declared in the manifest since 2026-08-04. Linux reads gestures from
+	-- libinput, which macOS gets from the OS and Windows does not have at all, so
+	-- the reader is startable here and has no counterpart elsewhere. Its label was
+	-- a hardcoded French string, which every non-French user read in French — and
+	-- being in no manifest, no gate could see either that or the row itself.
+	gesture_rows["gesture_reading_linux"] = function(out)
+		out[#out + 1] = {
+			title = i18n_safe(ge.is_reading() and "menu.gestures.reading_on" or "menu.gestures.reading_off"),
+			fn    = function()
+				if ge.is_reading() then ge.stop_reading() else ge.start_reading() end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
 
-	items[#items + 1] = { title = "-" }
+	-- The master toggle stays with the caller: the renderer skips `toggle` rows by
+	-- contract, because the category gate is driver state rather than manifest
+	-- data. Everything below it is the manifest's, in the manifest's order.
+	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, ctx)
+	local menu = { master_toggle }
+	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
-	-- Reading state.
-	items[#items + 1] = {
-		title = "Lecture libinput: " .. (ge.is_reading() and "active" or "inactive"),
-		fn = function()
-			if ge.is_reading() then
-				ge.stop_reading()
-			else
-				ge.start_reading()
-			end
-		end,
-	}
-
-	return { title = i18n_safe("menu.gestures.title"), menu = items }
+	return { title = i18n_safe("menu.gestures.title"), menu = menu }
 end
 
 --- Builds the apps submenu (per-app configs via webview).

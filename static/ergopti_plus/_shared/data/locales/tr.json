@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Hassasiyet — 5 parmak kaydırma ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Hassasiyet — 5 parmak kaydırma ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Hassasiyet — 5 parmak kaydırma ↑",
+	"menu.gestures.reading_on": "libinput okuma: açık",
+	"menu.gestures.reading_off": "libinput okuma: kapalı",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Tümünü temizle (dokunma/basılı tutma ve kısayollar)",
 	"menu.karabiner.combo_arrow": "Kombo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Yalnızca Windows: bu satırın listeleyeceği her şey zaten yalnızca Windows’a özgüdür, bu yüzden macOS ve Linux’ta boş bir liste çizer.",
 	"platform_reason.no_magic_key_editor_on_linux": "Linux’ta yok: bu satır sihirli tuşu değiştirir. macOS ve Windows bunun için bir iletişim kutusu açar; Linux sürücüsü tuşu yalnızca yapılandırmadan okur ve menüden değiştirme imkânı sunmaz.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux’ta yok: bu satır kişisel kısayol dosyasını açar. macOS ve Windows’ta böyle bir dosya vardır; Linux sürücüsünün kısayolları ise anahtarlar ve seçim dönüşümleridir, düzenlenecek bir dosya yoktur.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput okuma — yalnızca Linux",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle"
 }

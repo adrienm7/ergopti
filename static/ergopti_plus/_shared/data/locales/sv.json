@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Känslighet — 5-fingersväng ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Känslighet — 5-fingersväng ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Känslighet — 5-fingersväng ↑",
+	"menu.gestures.reading_on": "libinput-läsning: på",
+	"menu.gestures.reading_off": "libinput-läsning: av",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Rensa allt (tapp/håll och genvägar)",
 	"menu.karabiner.combo_arrow": "Combo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Endast Windows: allt den här raden skulle lista är i sig Windows-exklusivt, så på macOS och Linux visas en tom lista.",
 	"platform_reason.no_magic_key_editor_on_linux": "Inte på Linux: raden ändrar magitangenten. macOS och Windows öppnar en dialogruta för det; Linux-drivrutinen läser bara tangenten ur konfigurationen och kan inte ändra den från menyn.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Inte på Linux: raden öppnar filen med personliga genvägar. macOS och Windows har var sin; Linux-drivrutinens genvägar är växlar och markeringsomvandlingar, utan någon fil att redigera.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput-läsning — endast på Linux",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori"
 }

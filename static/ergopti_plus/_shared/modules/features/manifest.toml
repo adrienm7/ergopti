@@ -3357,6 +3357,21 @@ type = "dynamic"
 id = "gesture_slots_linux"
 platforms = ["linux"]
 
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["linux"]
+
+# Linux reads gestures from libinput, which macOS gets from the OS and Windows
+# does not have at all — so the reader is startable and stoppable here and the row
+# has no counterpart elsewhere. It was drawn with a hardcoded French label until
+# 2026-08-04, which every non-French user read in French, and it was in no
+# manifest, so no gate could see either fact.
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_reading_linux"
+platforms = ["linux"]
+reason_key = "platform_reason.libinput_reader_is_linux_only"
+
 [[menu.tap_holds_menu]]
 type = "toggle"
 i18n_on = "menu.tapholds.on"

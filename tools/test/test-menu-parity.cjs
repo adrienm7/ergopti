@@ -442,7 +442,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // still hand-built. Windows is excluded: its AHK loader exposes one function per
 // key (MenuManifest_LoadDebugMenu and friends) instead of taking the key as an
 // argument, so the same count would mean something different there.
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 3 };
+const RENDERED_THROUGH_SHARED = { hs: 4, linux: 4 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "灵敏度 — 四指右下滑 ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "灵敏度 — 四指右上滑 ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "灵敏度 — 四指上滑 ↑",
+	"menu.gestures.reading_on": "libinput 读取：开",
+	"menu.gestures.reading_off": "libinput 读取：关",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 清空所有（tap/hold 和快捷键）",
 	"menu.karabiner.combo_arrow": "组合 → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "仅限 Windows：此行将列出的内容本身都仅限 Windows，因此在 macOS 和 Linux 上只会显示空列表。",
 	"platform_reason.no_magic_key_editor_on_linux": "不适用于 Linux：此行用于更改魔法键。macOS 和 Windows 会为此打开对话框；Linux 驱动只从配置中读取该键，无法从菜单更改。",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "不适用于 Linux：此行用于打开个人快捷键文件。macOS 和 Windows 各有一个；Linux 驱动的快捷键是开关和选区转换，磁盘上没有可编辑的文件。",
+	"platform_reason.libinput_reader_is_linux_only": "libinput 读取 — 仅限 Linux",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别"
 }

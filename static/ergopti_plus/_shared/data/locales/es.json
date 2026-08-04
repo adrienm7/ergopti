@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Sensibilidad — Deslizar 5 dedos ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Sensibilidad — Deslizar 5 dedos ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Sensibilidad — Deslizar 5 dedos ↑",
+	"menu.gestures.reading_on": "Lectura de libinput: activada",
+	"menu.gestures.reading_off": "Lectura de libinput: desactivada",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Vaciar todo (tap/hold y accesos directos)",
 	"menu.karabiner.combo_arrow": "Combo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Solo Windows: todo lo que enumeraría esta fila es a su vez exclusivo de Windows, por lo que en macOS y Linux muestra una lista vacía.",
 	"platform_reason.no_magic_key_editor_on_linux": "No en Linux: esta fila cambia la tecla mágica. macOS y Windows abren un diálogo para ello; el controlador de Linux solo lee la tecla de la configuración y no permite cambiarla desde el menú.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "No en Linux: esta fila abre el archivo de atajos personales. macOS y Windows tienen uno; los atajos del controlador de Linux son interruptores y transformaciones de la selección, sin ningún archivo que editar.",
+	"platform_reason.libinput_reader_is_linux_only": "Lectura de libinput — solo en Linux",
 	"metrics_apps.chart_time_series": "Tiempo",
 	"metrics_apps.edit_category_hint": "Editar categoría"
 }

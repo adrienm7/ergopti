@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "感度 — 5本指スワイプ ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "感度 — 5本指スワイプ ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "感度 — 5本指スワイプ ↑",
+	"menu.gestures.reading_on": "libinput 読み取り：オン",
+	"menu.gestures.reading_off": "libinput 読み取り：オフ",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 すべてクリア（タップ/ホールドとショートカット）",
 	"menu.karabiner.combo_arrow": "コンボ → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows のみ：この行が一覧表示する対象はいずれも Windows 専用のため、macOS と Linux では空のリストになります。",
 	"platform_reason.no_magic_key_editor_on_linux": "Linux では利用不可：この行はマジックキーを変更します。macOS と Windows はそのためのダイアログを開きますが、Linux ドライバーは設定からキーを読むだけで、メニューから変更する手段はありません。",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux では利用不可：この行は個人用ショートカットのファイルを開きます。macOS と Windows にはそのファイルがありますが、Linux ドライバーのショートカットはトグルと選択テキストの変換で、編集すべきファイルは存在しません。",
+	"platform_reason.libinput_reader_is_linux_only": "libinput 読み取り — Linux のみ",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集"
 }

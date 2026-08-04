@@ -890,6 +890,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Sensibilité  — Swipe 5 doigts ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Sensibilité  — Swipe 5 doigts ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Sensibilité  — Swipe 5 doigts ↑",
+	"menu.gestures.reading_on": "Lecture libinput : active",
+	"menu.gestures.reading_off": "Lecture libinput : inactive",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Tout vider (tap/hold et raccourcis)",
 	"menu.karabiner.combo_arrow": "Combo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide.",
 	"platform_reason.no_magic_key_editor_on_linux": "Pas sous Linux : cette ligne change la touche magique. macOS et Windows ouvrent chacun une boîte de dialogue pour cela ; le pilote Linux se contente de lire la touche depuis la configuration et n'offre aucun moyen de la changer depuis le menu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Pas sous Linux : cette ligne ouvre le fichier de raccourcis personnels. macOS et Windows en ont un ; les raccourcis du pilote Linux sont des bascules et des transformations de la sélection, sans aucun fichier à éditer.",
+	"platform_reason.libinput_reader_is_linux_only": "Lecture libinput — propre à Linux",
 	"metrics_apps.chart_time_series": "Temps",
 	"metrics_apps.edit_category_hint": "Modifier la catégorie"
 }

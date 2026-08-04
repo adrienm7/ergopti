@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Følsomhet — 5-finger-sveip ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Følsomhet — 5-finger-sveip ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Følsomhet — 5-finger-sveip ↑",
+	"menu.gestures.reading_on": "libinput-lesing: på",
+	"menu.gestures.reading_off": "libinput-lesing: av",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Fjern alt (tapp/hold og snarveier)",
 	"menu.karabiner.combo_arrow": "Kombo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Kun Windows: alt denne raden ville vist er selv Windows-eksklusivt, så på macOS og Linux viser den en tom liste.",
 	"platform_reason.no_magic_key_editor_on_linux": "Ikke på Linux: denne raden endrer magitasten. macOS og Windows åpner en dialog for det; Linux-driveren leser bare tasten fra konfigurasjonen og kan ikke endre den fra menyen.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: denne raden åpner filen med personlige snarveier. macOS og Windows har en slik fil; Linux-driverens snarveier er brytere og markeringstransformasjoner, uten noen fil å redigere.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput-lesing — kun på Linux",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori"
 }

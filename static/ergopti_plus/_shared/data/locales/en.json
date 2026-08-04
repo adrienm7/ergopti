@@ -890,6 +890,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Sensitivity — 5-finger swipe ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Sensitivity — 5-finger swipe ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Sensitivity — 5-finger swipe ↑",
+	"menu.gestures.reading_on": "libinput reading: on",
+	"menu.gestures.reading_off": "libinput reading: off",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Clear all (tap/hold and shortcuts)",
 	"menu.karabiner.combo_arrow": "Combo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
 	"platform_reason.no_magic_key_editor_on_linux": "Not on Linux: this row changes the magic key. macOS and Windows each open a dialog for it; the Linux driver only reads the key from configuration and offers no way to change it from the menu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Not on Linux: this row opens the personal shortcuts file. macOS and Windows each have one; the Linux driver's shortcuts are toggles and selection transforms, with nothing on disk to edit.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput reading — Linux only",
 	"metrics_apps.chart_time_series": "Time",
 	"metrics_apps.edit_category_hint": "Edit category"
 }
