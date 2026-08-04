@@ -36,6 +36,7 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
+        LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
@@ -117,6 +118,7 @@ graph TD
     end
 
     %% Port implementations: Linux (Lua)
+    P_Clipboard -->|implements| LINUX_clipboard
     P_Crypto -->|implements| LINUX_crypto
     P_FileSystem -->|implements| LINUX_file_system
     P_HttpClient -->|implements| LINUX_http_client

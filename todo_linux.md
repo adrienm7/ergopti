@@ -560,17 +560,50 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
   logout-X11 → login-Wayland soit une propriété du driver et non du gestionnaire
   de services. Expose aussi l'identité du compositeur : « Wayland » ne dit pas
   comment poser la question.
-- [ ] **M2.2** **Résolution de disposition** : `xkbcli dump-keymap-{wayland,x11}`
+- [x] **M2.2** **Résolution de disposition** : `xkbcli dump-keymap-{wayland,x11}`
   → table cache `char → (keycode, groupe, niveau, mods)`, rafraîchie sur signal
   de changement. Fallbacks `setxkbmap -query` / `gsettings` / override TOML.
   Jamais de table US codée en dur.
   *Test :* [MATÉRIEL] une disposition azerty et une bépo produisent le bon
   keycode pour `é`, `ç`, `à`. CI : mapping depuis un keymap XKB fixture.
-- [ ] **M2.3** **Fallback presse-papiers** pour texte non-typable (accents hors
+  → Trois couches séparables, chacune testable sans serveur d'affichage :
+  `infra/xkb_keymap.lua` (texte → keysym/keycode/niveau, offset XKB→evdev de 8
+  appliqué **une** fois), `infra/keysym.lua` (nom de keysym → caractère : FFI
+  libxkbcommon si présente, sinon le bloc Latin-1 de `keysymdef.h` + les
+  écritures Unicode — ce n'est **pas** une table de disposition, elle est
+  identique sur toutes les machines), et `adapters/keyboard_layout.lua` (la
+  jointure, le cache, et le refus de deviner).
+  → **Fallbacks du plan écartés, avec raison** : `setxkbmap -query` ne rend que
+  le *nom* de la disposition, pas le mapping ; `gsettings` de même. Le repli
+  X11 est `xkbcomp -xkb "$DISPLAY" -`, qui rend le vrai keymap et existe partout
+  où il y a un serveur X. Sous Wayland il n'y a aucun repli : le keymap d'un
+  compositeur n'est pas lisible de l'extérieur. Sans keymap, `resolve()` rend
+  `nil` pour tout et l'expansion passe par le presse-papiers — retomber sur une
+  table US intégrée est exactement le défaut remplacé : il n'échoue pas, il tape
+  les mauvais caractères. Override par `--keymap <fichier>`.
+  → Tests pilotés par un dump **AZERTY**, délibérément : sur US, « a » est le
+  keycode 30 que la disposition ait été lue ou non, donc une table codée en dur,
+  un parse silencieusement vide et l'implémentation correcte sont
+  indiscernables.
+- [x] **M2.3** **Fallback presse-papiers** pour texte non-typable (accents hors
   niveau ≤3, emoji, texte long) : `wl-copy`/`wl-paste` (kill-timeout) sur
   Wayland, `xclip`/`xsel` sur X11, save→set→delay→paste(Shift+Insert Wayland)→
   restore. Router les remplacements accentués par là (leçon espanso).
   *Test :* [MATÉRIEL] `NT’ ➜ N’T` et une phrase accentuée s'insèrent correctement.
+  → **La prémisse du §3.5 est désormais fausse** et c'est le point important : le
+  presse-papiers devait être le chemin *courant* parce qu'on ne savait pas taper
+  les accents. Avec M2.2 on sait — é, ç, «, € et tout ce que la disposition de
+  l'utilisateur produit sortent en vraies frappes. Le presse-papiers ne porte
+  plus que ce qu'**aucune touche** ne peut produire (emoji, CJK). Meilleure
+  chose à rendre rare : coller est visible, court après les gestionnaires de
+  presse-papiers, et détruit ce que l'utilisateur avait copié si on ne le
+  restaure pas. Ctrl+V et non Shift+Insert : c'est ce que lie chaque toolkit.
+  → **ydotool est sorti du chemin de frappe**, comme le veut la décision §6.1 :
+  il n'a jamais été un repli pour le cas qui en atteint un (il suppose US, donc
+  un caractère que la disposition ne sait pas taper est exactement celui qu'il
+  rate) et il ne peut pas tourner sous le grab. Le seam shell de l'injecteur est
+  supprimé avec lui ; la pause inter-phase passe par `nanosleep` en FFI plutôt
+  que par un `fork` de `/bin/sleep` par expansion.
 - [ ] **M2.4** Kit de sûreté d'espanso, porté : fenêtre de discard (ignorer notre
   propre écho), attente de relâche des modificateurs avant injection, comptage de
   backspace en **codepoints Unicode**, undo (backspace après expansion restaure

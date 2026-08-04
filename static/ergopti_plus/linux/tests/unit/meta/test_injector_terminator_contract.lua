@@ -10,17 +10,18 @@
 ---
 --- 1. TERMINATOR ORDERING. On macOS the driver consumes the physical terminator
 ---    and replays it after the replacement, and getting that order wrong sent
----    Enter before the autocorrection had landed. Linux must NOT copy the replay:
----    the keyboard hook runs in OBSERVE mode (no EVIOCGRAB), so the physical
----    terminator already reached the application on its own. Re-injecting it
----    would DOUBLE it — a second newline, a second space. inject() therefore
----    takes a backspace count and a replacement, and nothing else.
+---    Enter before the autocorrection had landed. Linux must NOT copy the replay,
+---    and the reason has changed while the conclusion has not. It used to be that
+---    the hook observed without grabbing, so the terminator reached the
+---    application on its own. The hook now GRABS — but it re-emits every consumed
+---    event through its own uinput device BEFORE dispatching it, so by the time a
+---    match fires the terminator has already landed exactly once. Re-injecting it
+---    would still DOUBLE it. inject() therefore takes a backspace count and a
+---    replacement, and nothing else.
 ---
----    The flip side is honest and recorded here rather than hidden: because the
----    terminator is never held, Linux has the same Enter-before-expansion
----    exposure macOS had, and it cannot be closed without intercept mode plus
----    lossless raw-event pass-through (see keyboard_hook.get_mode()). This test
----    pins the CURRENT contract; it does not claim the exposure is fixed.
+---    The exposure this used to record is closed by that ordering rather than
+---    argued away: anything typed during the erase-and-type window stays in the
+---    kernel buffer and is read AFTER, because the daemon owns the stream.
 ---
 --- 2. THE ERASE MUST SETTLE BEFORE THE TEXT. The two-phase injection exists
 ---    because a replacement arriving before the deletes have been processed
@@ -82,16 +83,23 @@ helpers.describe("linux injector: the terminator is the application's, not ours"
 			"the injector must never synthesise Tab, for the same reason")
 	end)
 
-	helpers.it("the hook still reports the mode this contract depends on", function()
+	helpers.it("the daemon owns the output stream, which is what makes the above safe", function()
 		local hook = helpers.load_module("adapters.keyboard_hook")
 		helpers.assert_type(hook.get_mode, "function",
-			"get_mode() is how a caller learns whether the daemon owns the output stream. "
-				.. "Everything above is only correct while it answers 'observe'; if this driver "
-				.. "ever grabs the device, the terminator becomes ours to replay and this whole "
-				.. "contract must be revisited deliberately, not by accident")
-		helpers.assert_eq(hook.get_mode(), "observe",
-			"the default is observe mode — flipping it silently would leave the physical "
-				.. "terminator unhandled by anyone")
+			"get_mode() is how a caller learns whether the daemon owns the output stream")
+
+		-- Asserted on the DAEMON, not on a freshly loaded hook. A hook that has
+		-- never been started reports "observe" because nothing has set the flag
+		-- yet, so asking it here would answer a question about module
+		-- initialisation while appearing to answer one about the driver.
+		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
+		local fh = assert(io.open(path, "r"))
+		local daemon = fh:read("*a")
+		fh:close()
+		helpers.assert_true(daemon:find("grab%s*=%s*true") ~= nil,
+			"the grab is what puts the re-emitted terminator in front of the match "
+				.. "instead of racing it; a default of false would leave the physical "
+				.. "terminator interleaving with the replacement again")
 	end)
 
 end)
@@ -118,20 +126,28 @@ helpers.describe("linux injector: erase and text must not collide", function()
 				.. "the trigger survives in front of its own replacement")
 	end)
 
-	helpers.it("the erase is issued in one ydotool call, not one call per backspace", function()
+	helpers.it("the erase spawns no process at all", function()
 		local src = injector_source()
-		helpers.assert_true(src:find("table.concat(parts", 1, true) ~= nil,
-			"all backspace down/up pairs go out in a single ydotool invocation. One process "
-				.. "spawn per backspace leaves gaps a physical keystroke can land in")
+		-- The concern the old form of this check expressed — "one process spawn per
+		-- backspace leaves gaps a physical keystroke can land in" — is now answered
+		-- by there being no spawn: backspaces are written straight to the uinput
+		-- device. Asserted as an absence, because a reintroduced subprocess would
+		-- otherwise pass every behavioural test while restoring the gap.
+		helpers.assert_true(src:find("ydotool key", 1, true) == nil,
+			"the erase phase must not shell out; it writes to the driver's own uinput device")
+		helpers.assert_true(src:find("io.popen", 1, true) == nil,
+			"and it must not open a pipe either — under a grab, a gap in the erase is "
+				.. "a window a physical keystroke lands in")
 	end)
 
-	helpers.it("the key delay is non-zero because zero drops keystrokes", function()
+	helpers.it("no key delay is needed, because nothing is being rate-limited", function()
 		local src = injector_source()
-		local value = src:match("local YDOTOOL_KEY_DELAY_MS%s*=%s*(%d+)")
-		helpers.assert_not_nil(value, "YDOTOOL_KEY_DELAY_MS must exist")
-		helpers.assert_true(tonumber(value) > 0,
-			"0 is fastest but measurably lossy in some applications. A dropped backspace is "
-				.. "exactly how an expansion prints on top of its own trigger")
+		-- ydotool needed a per-key delay because 0 dropped keystrokes through its
+		-- socket. Writing struct input_event to /dev/uinput is a syscall the kernel
+		-- either accepts or reports; there is nothing to pace, and a delay here
+		-- would be latency the user sees for no reason.
+		helpers.assert_true(src:find("YDOTOOL_KEY_DELAY_MS", 1, true) == nil,
+			"a per-key delay constant must not come back with the subprocess it paced")
 	end)
 
 	helpers.it("the two phases are ordered erase-then-type inside inject()", function()
