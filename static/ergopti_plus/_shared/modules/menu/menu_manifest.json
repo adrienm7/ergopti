@@ -678,12 +678,7 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "magic_key_config",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.no_magic_key_editor_on_linux"
+			"id": "magic_key_config"
 		},
 		{
 			"type": "dynamic",
