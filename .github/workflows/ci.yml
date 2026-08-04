@@ -766,6 +766,89 @@ jobs:
         timeout-minutes: 6
 
   # ─────────────────────────────────────────────────
+  # 4.1b) Linux install, per distribution family
+  # ─────────────────────────────────────────────────
+  # install.sh has to work on package managers this project's author does not
+  # run. Until 2026-08-05 that was a checklist line asking a person to find five
+  # machines, which is the kind of check that gets done once. Containers make it
+  # deterministic and repeatable: each image is the real package manager, the real
+  # shell and the real filesystem layout.
+  #
+  # --no-deps is used deliberately. Installing every runtime dependency in five
+  # containers would test the distributions' package archives, which are not ours
+  # and go down; what is ours is whether the script RUNS to completion, detects
+  # the package manager, and lays the driver out where the daemon expects it. A
+  # dependency archive outage must not read as a broken installer.
+  install-linux-distros:
+    name: 'Linux · install (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    needs: [test-linux]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:stable-slim
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
+          - distro: fedora
+            image: fedora:latest
+            prep: dnf install -y bash coreutils findutils grep sed
+          - distro: arch
+            image: archlinux:latest
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
+          - distro: alpine
+            image: alpine:latest
+            prep: apk add --no-cache bash coreutils findutils grep sed
+          - distro: opensuse
+            image: opensuse/tumbleweed:latest
+            prep: zypper --non-interactive install bash coreutils findutils grep sed
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Prepare the container
+        run: ${{ matrix.prep }}
+
+      - uses: actions/checkout@v4
+
+      - name: Install with no root and no network dependencies
+        working-directory: static/ergopti_plus/linux
+        # No sudo and no systemd inside a container, which is also the immutable
+        # -distribution case: everything must land under $HOME and the script must
+        # not abort when it cannot write /usr or reach systemctl.
+        run: |
+          export HOME=/tmp/ergopti-home
+          mkdir -p "$HOME"
+          bash install.sh --no-deps
+
+      - name: The installed tree is the one the daemon expects
+        run: |
+          export HOME=/tmp/ergopti-home
+          FAIL=0
+          # The wrapper is what a user types. Without it nothing else matters.
+          if [ ! -x "$HOME/.local/bin/ergopti-hotstrings" ]; then
+            echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
+            FAIL=1
+          fi
+          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
+          # resolves _shared as ../_shared from the driver root and probes it, so a
+          # layout that nests them differently boots to "shared tree not found".
+          for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
+                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
+            if [ ! -f "$path" ]; then
+              echo "::error::missing $path"
+              FAIL=1
+            fi
+          done
+          # A hotstring pack, because an install with no hotstrings is an install
+          # that runs and does nothing.
+          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
+            echo "::error::no hotstring packs were installed"
+            FAIL=1
+          fi
+          exit $FAIL
+        timeout-minutes: 5
+
+  # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
   # ─────────────────────────────────────────────────
   # This job runs on ubuntu-latest against the pure-Lua hotstring engine — no
