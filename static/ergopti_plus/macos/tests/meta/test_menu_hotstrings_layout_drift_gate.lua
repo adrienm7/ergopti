@@ -61,15 +61,16 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"dynamic:hotstring_personal",
 	"---",
 	"section_header:menu.extensions.header",
-	-- `dynamic:hotstring_extensions` was here until 2026-08-04. It lists the
-	-- bundled extension packs found by scanning a Windows extensions directory
-	-- for TOML files; neither Lua driver ships one — their hotstrings come from
-	-- _shared/modules/hotstrings — so the row could only ever have drawn the
-	-- "empty" placeholder here. Restricted to ["ahk"] with a reason.
-	--
-	-- The section header above it is deliberately kept: it is not
-	-- platform-restricted, and removing it is a separate decision about whether an
-	-- empty section should show its title.
+	-- The extensions row. A first pass on 2026-08-04 removed it from this list on
+	-- the manifest's word that it "scans a Windows extensions directory" and that
+	-- neither Lua driver ships one. Both halves were false: the directory is
+	-- static/ergopti_plus/extensions, part of this repository and shipped to all
+	-- three drivers, and macOS has scanned it all along — hotstring_counter.lua
+	-- walks ext_root for manifest.toml + hotstrings/*.toml and builder.lua renders
+	-- the section under this very header. The row was restricted out of a menu that
+	-- was already drawing it. Linux gained the same scan through
+	-- _shared/lua/hotstrings/extensions.lua; the manifest now says all three.
+	"dynamic:hotstring_extensions",
 }
 
 -- Canonical hs-filtered signatures for layout_menu, in manifest order.

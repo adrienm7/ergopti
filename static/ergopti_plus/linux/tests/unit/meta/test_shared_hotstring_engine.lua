@@ -396,6 +396,25 @@ helpers.describe("shared hotstring engine — final_result governs chaining", fu
 			"the chained trigger must NOT fire when the first expansion is final")
 	end)
 
+	helpers.it("a second trigger that EXTENDS the first replacement erases all of it", function()
+		-- ab → abcd, then abcde → abcdefgh. Distinct from the sig/JDx case above:
+		-- there the second trigger was a fresh word, here it CONTAINS the whole
+		-- first replacement, so the second expansion has to erase five characters —
+		-- four of which the user never typed, they came out of the first expansion.
+		-- A buffer holding only what was physically pressed would compute a
+		-- backspace count of 1 and leave "abcd" glued in front of "abcdefgh".
+		local last, e = _fr_drive({
+			{ trigger = "ab",    replacement = "abcd",     auto_expand = true, final_result = false },
+			{ trigger = "abcde", replacement = "abcdefgh", auto_expand = true, final_result = false },
+		}, "abe")
+		helpers.assert_true(last ~= nil and last.replacement == "abcdefgh",
+			"the extended trigger must complete off the first expansion's output")
+		helpers.assert_eq(5, last.backspace_count,
+			"all five characters of 'abcde' must be erased, not just the one that was typed")
+		helpers.assert_eq("abcdefgh", e:current_buffer(),
+			"and the buffer must hold the second replacement alone, not both concatenated")
+	end)
+
 	helpers.it("apply_expansion never re-enters matching", function()
 		-- A replacement containing its own trigger would loop if apply_expansion
 		-- re-ran the matcher. Chaining is deferred to the next real keystroke

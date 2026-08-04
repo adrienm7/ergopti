@@ -386,7 +386,15 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, custom_item)
 		end
 
-		-- 4. Extensions hotstrings section (counts already included in grand_total via HotCounter)
+		-- 4. The manifest's `hotstring_extensions` row (counts already included in
+		-- grand_total via HotCounter). Named here because the id is what the
+		-- action↔handler bijection gate matches on, and this section was built
+		-- anonymously — so the manifest could restrict the row to Windows on the
+		-- grounds that "neither Lua driver ships an extensions directory" while
+		-- hotstring_counter.lua was walking exactly that directory and this block
+		-- was rendering the result. A row nothing names is a row nothing can check.
+		local manifest_row = "hotstring_extensions"
+		Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
 		if #counts.ext_details > 0 then
 			table.insert(hotstrings_menu, { title = "-" })
 			local ext_base   = i18n.get("menu.extensions.header")

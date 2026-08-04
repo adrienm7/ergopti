@@ -638,6 +638,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Aucune extension installée",
 	"menu.extensions.header": "Extensions",
+	"menu.extensions.none_installed": "Aucune extension installée",
 	"menu.gestures.action_disabled": "∅ Désactivé",
 	"menu.gestures.action_prefix": "Action : ",
 	"menu.common.enabled": "Activé",

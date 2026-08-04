@@ -25,6 +25,7 @@ local Logger = require("logger.shim")
 local Loader = require("modules.hotstrings.loader")
 local Storage = require("adapters.storage")
 local DelayResolver = require("hotstrings.delay_resolver")
+local Extensions = require("hotstrings.extensions")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 
@@ -418,6 +419,39 @@ end
 -- =========================================
 -- =========================================
 
+--- The extension packs installed on this machine, as loader entries.
+---
+--- Separate from the bundled/user merge below because extensions answer a
+--- different question: those two settle "which copy of a category do we load",
+--- this one is "what did the user install on top". Returned in the shape
+--- load_catalogue understands directly, so no caller has to know the namespacing
+--- rule that keeps a third party's `rolls.toml` from displacing the bundled one.
+--- @return table Array of { path, category, extension }.
+function M.extension_packs()
+	if type(Paths.extension_roots) ~= "function" then return {} end
+
+	local found = Extensions.scan(Paths.extension_roots(), {
+		list_dirs  = Loader.list_subdirs,
+		list_files = Loader.find_toml_files,
+		read_file  = Loader.read_file,
+	})
+
+	local entries = {}
+	for _, extension in ipairs(found) do
+		for _, pack in ipairs(extension.toml_files) do
+			entries[#entries + 1] = {
+				path      = pack.path,
+				category  = Extensions.category_key(extension.id, pack.stem),
+				extension = { id = extension.id, name = extension.name },
+			}
+		end
+	end
+	if #entries > 0 then
+		Logger.info(LOG, "Extensions: %d pack(s) from %d extension(s).", #entries, #found)
+	end
+	return entries
+end
+
 --- The TOML files to load: the bundled packs, overlaid with the user's.
 ---
 --- Merged rather than exclusive. Choosing ONE directory meant that creating a
@@ -457,6 +491,15 @@ local function resolve_paths()
 
 	local paths = {}
 	for _, stem in ipairs(order) do paths[#paths + 1] = by_stem[stem] end
+
+	-- Extension packs come last and are NOT keyed by stem: they carry their own
+	-- namespaced category key so a third party shipping `rolls.toml` cannot
+	-- replace the bundled category of that name. Appended rather than merged for
+	-- the same reason — an extension adds categories, it never substitutes one.
+	for _, entry in ipairs(M.extension_packs()) do
+		paths[#paths + 1] = entry
+	end
+
 	return paths
 end
 

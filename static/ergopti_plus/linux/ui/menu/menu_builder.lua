@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Extensions = require("hotstrings.extensions")
 local LOG = "ui.menu.menu_builder"
 
 -- Single source of the driver version.
@@ -165,6 +166,28 @@ local function _manifest_hotstring_rows(ctx, config)
 			if type(current) == "string" and current ~= "" then locale = current end
 		end
 		return description[locale] or description.en or id
+	end
+
+	--- The display name of an installed extension.
+	---
+	--- The loader stapled the extension's manifest name onto every category it
+	--- produced, so the name is read back from any one of its packs rather than by
+	--- rescanning the disk from the menu — a menu build must not do file I/O, and
+	--- the tray rebuilds this on every toggle.
+	--- @param extension_id string The id parsed out of a namespaced category key.
+	--- @return string
+	local function extension_label(extension_id)
+		for _, name in ipairs(groups) do
+			local id = Extensions.parse_category_key(name)
+			if id == extension_id then
+				local category = type(config.get_category) == "function" and config.get_category(name) or nil
+				local extension = category and category.extension or nil
+				if type(extension) == "table" and type(extension.name) == "string" and extension.name ~= "" then
+					return extension.name
+				end
+			end
+		end
+		return extension_id
 	end
 
 	--- One category, as a submenu rather than a single toggle.
@@ -406,7 +429,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_personal"] = function(items)
 			local added = 0
 			for _, name in ipairs(groups) do
-				if not classified[name] then
+				-- Extension packs are unclassified too, but they are not personal
+				-- files: they belong to the extension that shipped them and get their
+				-- own section below. Without this test they appeared here, under a
+				-- heading that told the user they had written them.
+				if not classified[name] and not Extensions.parse_category_key(name) then
 					items[#items + 1] = group_row(name)
 					added = added + 1
 				end
@@ -415,6 +442,69 @@ local function _manifest_hotstring_rows(ctx, config)
 				items[#items + 1] = {
 					title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true,
 				}
+			end
+		end,
+		["hotstring_extensions"] = function(items)
+			-- One submenu per installed extension, holding its packs. Grouped by
+			-- extension rather than listed flat because an extension is the unit the
+			-- user installed and the unit they will want to turn off; its individual
+			-- packs are an implementation detail of how its author organised them.
+			local by_extension, order = {}, {}
+			for _, name in ipairs(groups) do
+				local extension_id = Extensions.parse_category_key(name)
+				if extension_id then
+					if not by_extension[extension_id] then
+						by_extension[extension_id] = {}
+						order[#order + 1] = extension_id
+					end
+					local list = by_extension[extension_id]
+					list[#list + 1] = name
+				end
+			end
+
+			if #order == 0 then
+				items[#items + 1] = {
+					title    = i18n_safe("menu.extensions.none_installed"),
+					fn       = function() end,
+					disabled = true,
+				}
+				return
+			end
+
+			for _, extension_id in ipairs(order) do
+				local packs = by_extension[extension_id]
+				local sub = {}
+
+				-- Turning the extension off means turning off every pack it brought.
+				-- Offered first because it is the action the extension as a unit
+				-- affords; the per-pack rows below are for the user who wants half.
+				sub[#sub + 1] = {
+					title = i18n_safe("menu.hotstrings.check_all"),
+					fn    = function()
+						for _, name in ipairs(packs) do
+							if config.is_group_enabled and not config.is_group_enabled(name)
+								and config.toggle_group then config.toggle_group(name) end
+						end
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+				sub[#sub + 1] = {
+					title = i18n_safe("menu.hotstrings.uncheck_all"),
+					fn    = function()
+						for _, name in ipairs(packs) do
+							if config.is_group_enabled and config.is_group_enabled(name)
+								and config.toggle_group then config.toggle_group(name) end
+						end
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+				sub[#sub + 1] = { title = "-" }
+
+				for _, name in ipairs(packs) do
+					sub[#sub + 1] = group_row(name)
+				end
+
+				items[#items + 1] = { title = extension_label(extension_id), menu = sub }
 			end
 		end,
 	}
@@ -894,22 +984,37 @@ local function _build_gestures(ctx)
 	local enabled = ge.is_enabled()
 	local items = {}
 
-	-- Master toggle.
-	items[#items + 1] = {
-		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
-		fn = function()
-			ge.toggle()
+	-- Keyed by the manifest's own row ids rather than appended anonymously. The
+	-- ids are what the action↔handler bijection gate matches on, and an anonymous
+	-- row is a row the manifest can declare and no gate can find — which is how
+	-- gestures came to be declared for two drivers while Linux built a third menu
+	-- nobody had compared. It is also the shape ManifestMenu.build consumes, so
+	-- this is the half of the migration that does not need the renderer.
+	local gesture_rows = {
+		["gestures_toggle"] = function()
+			items[#items + 1] = {
+				title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
+				fn = function() ge.toggle() end,
+			}
+		end,
+		["restore_defaults"] = function()
+			items[#items + 1] = {
+				title = i18n_safe("menu.gestures.restore_defaults"),
+				fn = function() ge.reset_defaults() end,
+			}
+		end,
+		["disable_all"] = function()
+			items[#items + 1] = {
+				title = i18n_safe("menu.gestures.disable_all"),
+				fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
+			}
 		end,
 	}
+
+	gesture_rows["gestures_toggle"]()
 	items[#items + 1] = { title = "-" }
-	items[#items + 1] = {
-		title = i18n_safe("menu.gestures.restore_defaults"),
-		fn = function() ge.reset_defaults() end,
-	}
-	items[#items + 1] = {
-		title = i18n_safe("menu.gestures.disable_all"),
-		fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
-	}
+	gesture_rows["restore_defaults"]()
+	gesture_rows["disable_all"]()
 	items[#items + 1] = { title = "-" }
 
 	local function prompt_parameter(slot, action, spec, prior)
@@ -947,27 +1052,36 @@ local function _build_gestures(ctx)
 		ge.set_action(slot, action)
 	end
 
-	-- Every known slot is configurable here. A partial quick list made
-	-- parameterized actions unreachable for the omitted gesture bindings.
-	local slots = {}
-	for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
-	table.sort(slots)
-	for _, slot in ipairs(slots) do
-		local action = ge.get_action(slot) or "none"
-		local label = ge.get_action_display_label and ge.get_action_display_label(slot) or ge.get_action_label(action)
-		local choices = {}
-		for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
-			local selected = option == action
-			choices[#choices + 1] = {
-				title = ge.get_action_label(option) .. (selected and " ✓" or ""),
-				fn = function() assign_action(slot, option) end,
+	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
+	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
+	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
+	-- count, so grouping would mean parsing the names apart only to regroup them.
+	gesture_rows["gesture_slots_linux"] = function()
+		-- Every known slot is configurable here. A partial quick list made
+		-- parameterized actions unreachable for the omitted gesture bindings.
+		local slots = {}
+		for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
+		table.sort(slots)
+		for _, slot in ipairs(slots) do
+			local action = ge.get_action(slot) or "none"
+			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
+				or ge.get_action_label(action)
+			local choices = {}
+			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
+				local selected = option == action
+				choices[#choices + 1] = {
+					title = ge.get_action_label(option) .. (selected and " ✓" or ""),
+					fn = function() assign_action(slot, option) end,
+				}
+			end
+			items[#items + 1] = {
+				title = gesture_slot_label(slot) .. " → " .. label,
+				menu = choices,
 			}
 		end
-		items[#items + 1] = {
-			title = gesture_slot_label(slot) .. " → " .. label,
-			menu = choices,
-		}
 	end
+
+	gesture_rows["gesture_slots_linux"]()
 
 	items[#items + 1] = { title = "-" }
 

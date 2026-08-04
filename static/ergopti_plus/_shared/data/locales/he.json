@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "לא מותקנת הרחבה",
 	"menu.extensions.header": "הרחבות",
+	"menu.extensions.none_installed": "לא הותקנה הרחבה",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "פעולה: ",
 	"menu.common.enabled": "מופעל",

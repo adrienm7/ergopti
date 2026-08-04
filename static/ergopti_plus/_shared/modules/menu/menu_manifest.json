@@ -89,8 +89,7 @@
 		{
 			"id": "tap_holds",
 			"platforms": [
-				"ahk",
-				"hs"
+				"ahk"
 			]
 		},
 		{
@@ -661,11 +660,7 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "hotstring_extensions",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"id": "hotstring_extensions"
 		}
 	],
 	"hotstrings_params_group": [
@@ -705,7 +700,8 @@
 			"i18n_off": "menu.gestures.off",
 			"category": "Gestures",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			]
 		},
 		{
@@ -730,7 +726,8 @@
 			"i18n": "menu.gestures.disable_all",
 			"platforms": [
 				"hs",
-				"ahk"
+				"ahk",
+				"linux"
 			]
 		},
 		{
@@ -739,7 +736,8 @@
 			"i18n": "menu.gestures.restore_defaults",
 			"platforms": [
 				"hs",
-				"ahk"
+				"ahk",
+				"linux"
 			]
 		},
 		{
@@ -809,6 +807,13 @@
 			"id": "gesture_slots_ahk",
 			"platforms": [
 				"ahk"
+			]
+		},
+		{
+			"type": "dynamic",
+			"id": "gesture_slots_linux",
+			"platforms": [
+				"linux"
 			]
 		}
 	],

@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Yüklü uzantı yok",
 	"menu.extensions.header": "Uzantılar",
+	"menu.extensions.none_installed": "Yüklü uzantı yok",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Eylem: ",
 	"menu.common.enabled": "Etkin",
