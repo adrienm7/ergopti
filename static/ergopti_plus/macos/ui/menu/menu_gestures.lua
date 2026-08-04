@@ -367,13 +367,13 @@ function M.build(ctx)
 	end
 
 	local dyn_handlers = {
-		disable_all      = dyn_disable_all,
-		restore_defaults = dyn_restore_defaults,
-		circular_spaces  = dyn_circular_spaces,
-		gesture_slots_2  = dyn_slots_group(2),
-		gesture_slots_3  = dyn_slots_group(3),
-		gesture_slots_4  = dyn_slots_group(4),
-		gesture_slots_5  = dyn_slots_group(5),
+		["disable_all"]      = dyn_disable_all,
+		["restore_defaults"] = dyn_restore_defaults,
+		["circular_spaces"]  = dyn_circular_spaces,
+		["gesture_slots_2"]  = dyn_slots_group(2),
+		["gesture_slots_3"]  = dyn_slots_group(3),
+		["gesture_slots_4"]  = dyn_slots_group(4),
+		["gesture_slots_5"]  = dyn_slots_group(5),
 	}
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, ctx)

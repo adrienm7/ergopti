@@ -2377,6 +2377,8 @@
 	"platform_reason.alt_gr_is_kana_remap": "Nur Windows: gleicht benutzerdefinierte Layouts (KbdEdit/MSKLC) aus, die AltGr auf eine andere virtuelle Taste legen — ein Begriff des Windows-Tastaturtreibers ohne Entsprechung anderswo.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Nur macOS: MLX ist Apples lokales Inferenz-Framework für Apple Silicon; für Windows oder Linux gibt es keine Version davon.",
 	"platform_reason.lists_windows_only_settings": "Nur Windows: alles, was diese Zeile auflisten würde, ist selbst Windows-exklusiv — auf macOS und Linux bliebe die Liste leer.",
+	"platform_reason.no_magic_key_editor_on_linux": "Nicht unter Linux: diese Zeile ändert die Magic-Taste. macOS und Windows zeigen dafür einen Dialog; der Linux-Treiber liest die Taste nur aus der Konfiguration und kann sie im Menü nicht ändern.",
+	"platform_reason.no_personal_shortcuts_file_on_linux": "Nicht unter Linux: diese Zeile öffnet die Datei mit persönlichen Kürzeln. macOS und Windows haben eine solche Datei; die Kürzel des Linux-Treibers sind Schalter und Auswahl-Umwandlungen, ohne Datei zum Bearbeiten.",
 	"metrics_apps.chart_time_series": "Zeit",
 	"metrics_apps.edit_category_hint": "Kategorie ändern"
 }

@@ -61,7 +61,15 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"dynamic:hotstring_personal",
 	"---",
 	"section_header:menu.extensions.header",
-	"dynamic:hotstring_extensions",
+	-- `dynamic:hotstring_extensions` was here until 2026-08-04. It lists the
+	-- bundled extension packs found by scanning a Windows extensions directory
+	-- for TOML files; neither Lua driver ships one — their hotstrings come from
+	-- _shared/modules/hotstrings — so the row could only ever have drawn the
+	-- "empty" placeholder here. Restricted to ["ahk"] with a reason.
+	--
+	-- The section header above it is deliberately kept: it is not
+	-- platform-restricted, and removing it is a separate decision about whether an
+	-- empty section should show its title.
 }
 
 -- Canonical hs-filtered signatures for layout_menu, in manifest order.

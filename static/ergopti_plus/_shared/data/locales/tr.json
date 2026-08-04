@@ -2377,6 +2377,8 @@
 	"platform_reason.alt_gr_is_kana_remap": "Yalnızca Windows: AltGr’yi başka bir sanal tuşa yeniden atayan özel düzenleri (KbdEdit/MSKLC) telafi eder — başka hiçbir yerde karşılığı olmayan bir Windows klavye sürücüsü kavramı.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Yalnızca macOS: MLX, Apple'ın Apple Silicon için yerel çıkarım çerçevesidir ve Windows veya Linux için bir sürümü yoktur.",
 	"platform_reason.lists_windows_only_settings": "Yalnızca Windows: bu satırın listeleyeceği her şey zaten yalnızca Windows’a özgüdür, bu yüzden macOS ve Linux’ta boş bir liste çizer.",
+	"platform_reason.no_magic_key_editor_on_linux": "Linux’ta yok: bu satır sihirli tuşu değiştirir. macOS ve Windows bunun için bir iletişim kutusu açar; Linux sürücüsü tuşu yalnızca yapılandırmadan okur ve menüden değiştirme imkânı sunmaz.",
+	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux’ta yok: bu satır kişisel kısayol dosyasını açar. macOS ve Windows’ta böyle bir dosya vardır; Linux sürücüsünün kısayolları ise anahtarlar ve seçim dönüşümleridir, düzenlenecek bir dosya yoktur.",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle"
 }

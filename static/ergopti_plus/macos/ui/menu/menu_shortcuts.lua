@@ -649,9 +649,9 @@ function M.build(ctx)
 	-- =============================================
 
 	local dyn_handlers = {
-		script_control_shortcuts = dyn_script_control,
-		extensions_shortcuts    = dyn_extensions_shortcuts,
-		edit_shortcuts          = dyn_edit_shortcuts,
+		["script_control_shortcuts"] = dyn_script_control,
+		["extensions_shortcuts"]    = dyn_extensions_shortcuts,
+		["edit_shortcuts"]          = dyn_edit_shortcuts,
 	}
 
 	local group_builders = {

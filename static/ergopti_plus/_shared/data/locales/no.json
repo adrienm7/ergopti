@@ -2377,6 +2377,8 @@
 	"platform_reason.alt_gr_is_kana_remap": "Kun Windows: kompenserer for egendefinerte oppsett (KbdEdit/MSKLC) som tilordner AltGr til en annen virtuell tast — et Windows-tastaturdriverbegrep uten motstykke andre steder.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Kun macOS: MLX er Apples lokale inferensrammeverk for Apple Silicon, og det finnes ingen versjon for Windows eller Linux.",
 	"platform_reason.lists_windows_only_settings": "Kun Windows: alt denne raden ville vist er selv Windows-eksklusivt, så på macOS og Linux viser den en tom liste.",
+	"platform_reason.no_magic_key_editor_on_linux": "Ikke på Linux: denne raden endrer magitasten. macOS og Windows åpner en dialog for det; Linux-driveren leser bare tasten fra konfigurasjonen og kan ikke endre den fra menyen.",
+	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: denne raden åpner filen med personlige snarveier. macOS og Windows har en slik fil; Linux-driverens snarveier er brytere og markeringstransformasjoner, uten noen fil å redigere.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori"
 }
