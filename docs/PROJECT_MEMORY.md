@@ -123,6 +123,10 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-source-scanning-guards-must-strip-comments](#project-source-scanning-guards-must-strip-comments) — Tout garde qui cherche du texte dans du code source doit retirer les commentaires d'abord : commenter la ligne gardee laisse le texte cherche intact, et le garde reste vert. Piege rencontre deux fois en une session, sur des tests neufs
 - [project-simplification-branch-2026-07-30](#project-simplification-branch-2026-07-30) — Etat de la branche `simplification` : ce qui est livre, ce qui reste, et les trois affirmations d'audit qui se sont revelees fausses a la verification
 
+- [project-linux-grab-is-a-contract-not-a-flag](#project-linux-grab-is-a-contract-not-a-flag) — EVIOCGRAB on Linux is only survivable with an open uinput channel, in that order; the kernel releases the grab on process death, so the danger is not the crash but the fork-per-key fallback
+- [project-git-stash-in-this-checkout-pops-a-stranger](#project-git-stash-in-this-checkout-pops-a-stranger) — `git stash push` can fail with "could not write index" and the reflex `git stash pop` then merges someone else's parked stash into your tree; never reach for stash here to get a clean tree
+- [project-drift-guard-needs-a-clean-tree](#project-drift-guard-needs-a-clean-tree) — `test-drift-guard-covers-every-output.cjs` fails whenever a generated file is modified-but-uncommitted, by design, and takes over two minutes
+
 ## Working conventions & feedback
 
 ### project-hs-suite-order-contamination
@@ -3574,3 +3578,68 @@ module under test's own tag, which is what it always meant.
 
 Related: [[project-the-macos-logger-ring-is-per-process]],
 [[project-a-green-probe-can-mean-redundant-guards]].
+
+
+
+
+
+### project-linux-grab-is-a-contract-not-a-flag
+
+_EVIOCGRAB is only survivable with an open uinput channel, opened first; the kernel releases the grab on process death, so the hazard is not the crash — it is the fallback that made grabbing unaffordable_
+
+<sub>slug: `project_linux_grab_is_a_contract_not_a_flag`</sub>
+
+Under `EVIOCGRAB` the daemon is the ONLY remaining path to the application: every physical event it consumes has to be put back, in arrival order, or the keyboard is dead. Three properties follow, and each one was violated at some point by code that looked correct:
+
+- **Order.** The uinput channel opens BEFORE the grab and closes AFTER the ungrab. Opening after the grab leaves a window in which the daemon owns the keyboard and can only give keys back one `fork` at a time; closing before the ungrab destroys the device while there may still be keys to put through it.
+- **No fallback.** `emit_key` had a `ydotool key` fallback, which is a subprocess per physical keystroke on the input path — the measured reason the grab was impossible in the first place. Degrading into it on the machines where uinput is unavailable reintroduces the defect exactly where it hurts. It refuses and says so, and the daemon exits at boot with a French message naming the fix.
+- **Autorepeat is a character.** The application sees exactly what is re-emitted, repeats included. A buffer that ignores evdev value 2 believes the user typed `a` while the screen says `aaaa`, and then erases the wrong number of characters on the next expansion. It is NOT a physical press: the keystroke metrics count keys pressed, and a held key is one press.
+
+**Why:** the grab was enabled by default on the strength of a comment stating that re-emission no longer forked. `open_fast_channel()` had no caller outside its own test, so the justification was true of the code that existed and false of the code that ran.
+
+**How to apply:**
+
+- There is no ungrab-on-panic handler and there must not be one. `EVIOCGRAB` is bound to the open descriptor and the kernel drops it when the process dies, however it dies. A handler would only pretend to add safety.
+- Never write the `struct input_event` layout down. `infra/input_event.lua` owns it in both directions and derives the offsets from `ffi.sizeof`. The old constants (24 bytes, type at offset 17) are the 64-bit shape and only that: a 32-bit userspace has an 8-byte timeval, so every field lands elsewhere and the driver reads plausible garbage rather than failing.
+- The two daemons are coordinated by NAME. `linux/infra/device_names.lua` is the single source; the remap config excludes our uinput device by exact string, and `device_finder` asks for the remap output device before it ranks anything else. `is_likely_keyboard` matched our own `Ergopti Virtual Keyboard` into the PREFERRED tier, so the daemon read its own injections back.
+
+Related: [[project-a-second-vocabulary-fails-silently]], [[feedback-regression-tests]].
+
+
+
+
+### project-git-stash-in-this-checkout-pops-a-stranger
+
+_`git stash push` can fail with "could not write index", and the reflex `git stash pop` then merges another session's parked stash into your working tree_
+
+<sub>slug: `project_git_stash_in_this_checkout_pops_a_stranger`</sub>
+
+Observed 2026-08-04. `git stash push -u -m "wip"` failed with `error: could not write index`; the paired `git stash pop` in the same command chain then ran anyway and applied **`stash@{0}`, which belonged to an earlier session**, producing 17 `UU` conflicts across a driver tree the current work had never touched. Nothing was lost — a conflicted `pop` does not drop the stash — but the working tree looked as if the current change had exploded.
+
+**Why:** this checkout carries long-lived stashes from other sessions (see [[feedback-stash-drop-by-index-trap]]), and `pop` with no argument takes the top of a shared stack that is not yours.
+
+**How to apply:**
+
+- Do not use `git stash` here to obtain a clean tree for a gate. Commit the work first — commits are free and local, and the release-branch rule already forbids pushing.
+- If a `stash push` ever reports a failure, **stop**. Do not run `pop`. Check `git stash list` first and confirm what is on top.
+- Recovery from an accidental pop is per-path, not global: `git reset -q -- <path>` then `git checkout -- <path>` restores the tracked files, and any file the stash ADDED remains untracked and must be removed by hand after confirming with `git show stash@{0}:<path>` that the stash still holds it.
+
+
+
+
+### project-drift-guard-needs-a-clean-tree
+
+_`test-drift-guard-covers-every-output.cjs` fails whenever a generated file is modified-but-uncommitted — by design — and takes over two minutes_
+
+<sub>slug: `project_drift_guard_needs_a_clean_tree`</sub>
+
+The gate's own contract is "detects a change to every generator output **and never eats an uncommitted edit**". To prove the second half it must refuse to run over a dirty generated file, so an uncommitted `static/ergopti_plus/docs/architecture.md` — which is exactly what `npm run gen:diagram` produces — makes `npm run test:js` report a failure that has nothing to do with the change under test.
+
+**Why:** adding any adapter or port changes `architecture.md`, so this fires on most structural work, and the failure message reads like a real drift.
+
+**How to apply:**
+
+- Run `npm run gen` after any change to adapters, ports, the features manifest or the menu manifest, and **commit the regenerated outputs in the same commit**.
+- Re-run the drift guard only on a clean tree. It takes >120 s, so it will be moved to the background by the harness; start it deliberately rather than inside a chain.
+
+Related: [[project-gate-scripts-must-be-wired]], [[feedback-local-gate-mirrors-ci]].

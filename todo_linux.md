@@ -547,11 +547,19 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
 
 ### M2 — Injection correcte multilingue + détection serveur partagée
 
-- [ ] **M2.1** Une **lib de détection X11/Wayland partagée** (`XDG_SESSION_TYPE`/
+- [x] **M2.1** Une **lib de détection X11/Wayland partagée** (`XDG_SESSION_TYPE`/
   `WAYLAND_DISPLAY`), consommée par layout, `window_info`, `clipboard`,
   `text_sender`. Le cœur hotstrings, lui, n'a **aucune** branche (evdev/uinput).
   *Test :* la lib retourne `wayland`/`x11` selon l'env ; single-source (un seul
   point de détection).
+  → `infra/display_server.lua`. L'ordre est tout le contenu : `WAYLAND_DISPLAY`
+  bat `DISPLAY` (XWayland exporte `DISPLAY` aussi — le tester d'abord classe
+  **tous** les bureaux modernes en X11), et une socket bat `XDG_SESSION_TYPE`
+  (plusieurs gestionnaires de session écrivent `tty` pour une session graphique
+  parfaitement valide). Cache + `refresh()` explicite, pour que la bascule
+  logout-X11 → login-Wayland soit une propriété du driver et non du gestionnaire
+  de services. Expose aussi l'identité du compositeur : « Wayland » ne dit pas
+  comment poser la question.
 - [ ] **M2.2** **Résolution de disposition** : `xkbcli dump-keymap-{wayland,x11}`
   → table cache `char → (keycode, groupe, niveau, mods)`, rafraîchie sur signal
   de changement. Fallbacks `setxkbmap -query` / `gsettings` / override TOML.
@@ -568,12 +576,26 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
   backspace en **codepoints Unicode**, undo (backspace après expansion restaure
   le trigger), invalidation sur clic souris.
   *Test :* comptage backspace correct sur remplacement multi-octets ; undo.
-- [ ] **M2.5** `window_info` : vraie voie Wayland (`swaymsg`/`hyprctl` wlroots,
+- [x] **M2.5** `window_info` : vraie voie Wayland (`swaymsg`/`hyprctl` wlroots,
   introspection GNOME / portail fenêtre active pour Mutter) au lieu de
   xdotool-only, sinon `app_id=""` casse la suppression mot-de-passe. **Documenter
   que l'app-id n'est pas universel sous Wayland** (leçon espanso : les règles
   par-app réintroduisent la fragmentation). Router via `shell_runner`.
   *Test :* détection app_id mockée par serveur.
+  → `swaymsg`/`hyprctl`/`niri msg` implémentés. **Pas** d'introspection GNOME :
+  Shell.Eval a été retiré en 41 et il n'existe aucune voie non privilégiée ;
+  KDE, COSMIC et Weston n'exposent rien d'équivalent. Ces sessions obtiennent une
+  ligne de log nommant le compositeur et une identité vide — énoncée plutôt que
+  déboguée. XWayland n'est **délibérément pas** un repli : il ne répond que pour
+  les clients X11, donc les règles marcheraient sur la moitié d'un bureau, ce qui
+  se lit comme « instable » et non comme « non supporté ».
+  → **Portée doublée par rapport au plan** : `process_lifecycle` portait une
+  **seconde** implémentation xdotool indépendante, et c'était *elle* qui
+  alimentait le cache d'application du chemin de frappe — corriger `window_info`
+  seul n'aurait rien changé pour l'utilisateur. Elle délègue désormais, et son
+  signal de changement est passé de l'ID de fenêtre au **titre** : un navigateur
+  qui bascule en navigation privée garde son process et sa fenêtre, et c'est
+  exactement la transition que la suppression mot-de-passe existe pour voir.
 
 ### M3 — Fondation du menu partagé + transport tray
 
