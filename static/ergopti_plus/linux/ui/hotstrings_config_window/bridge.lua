@@ -13,6 +13,14 @@ M.bridge_name = "hotstrings_config_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.hotstrings_config"
 
+-- The collision-priority range the settings window offers. Mirrored from the
+-- window's own `v >= 0 && v <= 100` guard, and re-checked here rather than
+-- trusted: the page is the least trusted input the daemon has, and a priority
+-- outside the tier range silently reorders every hotstring source against every
+-- other with nothing on screen to say so.
+local PRIORITY_MIN = 0
+local PRIORITY_MAX = 100
+
 -- Lazy-loaded writer for hotstring TOML persistence.
 local _writer = nil
 local function _get_writer()
@@ -147,13 +155,6 @@ function M.on_message(payload, state)
 
 	local action = payload.action
 
-	if action == "toggle_group" and payload.group then
-		if state.config and type(state.config.toggle_group) == "function" then
-			state.config.toggle_group(payload.group)
-		end
-		return _build_initial_payload(state)
-	end
-
 	-- The shared settings window speaks eleven actions; this bridge answered four
 	-- of them, so every delay, colour and preview control in it was inert on this
 	-- driver. They are not new controls — the window already draws them, and a
@@ -205,6 +206,54 @@ function M.on_message(payload, state)
 		return _build_initial_payload(state)
 	end
 
+	-- Collision priority. The window validates 0-100 before sending, and this
+	-- re-validates rather than trusting it: the page is the least trusted input the
+	-- daemon has, and a priority outside the tier range silently reorders every
+	-- source against every other.
+	if action == "set_priority" and payload.category then
+		local value = tonumber(payload.priority)
+		if not value or value < PRIORITY_MIN or value > PRIORITY_MAX then
+			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
+				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
+			return _build_initial_payload(state)
+		end
+		set_override(state, payload.category, section_of(payload), "priority", value)
+		return _build_initial_payload(state)
+	end
+
+	if action == "clear_priority" and payload.category then
+		set_override(state, payload.category, section_of(payload), "priority", nil)
+		return _build_initial_payload(state)
+	end
+
+	if action == "set_all_grey" then
+		-- Every category's own colour set to the neutral shade, and every per-section
+		-- colour override wiped so the neutral actually cascades down. Clearing the
+		-- sections is the half that matters: leaving them would repaint the headings
+		-- and leave the rows underneath in their old colours, which looks like the
+		-- button half-worked.
+		--
+		-- Delays are deliberately untouched — the button is about colour, and a user
+		-- who wants their timing back has no way to ask for it here.
+		local config = state and state.config
+		if type(config) == "table" and type(config.get_categories) == "function"
+			and type(config.get_neutral_color) == "function" then
+			-- No `or "#……"` here. The colour comes from the shared defaults, which
+			-- the config module loads fail-fast; substituting a literal would repaint
+			-- the user's categories a shade nothing else in the product uses.
+			local neutral = config.get_neutral_color()
+			for id, category in pairs(config.get_categories()) do
+				set_override(state, id, nil, "color", neutral)
+				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
+					set_override(state, id, section, "color", nil)
+				end
+			end
+		else
+			Logger.error(LOG, "'set_all_grey' needs get_categories and get_neutral_color — nothing changed.")
+		end
+		return _build_initial_payload(state)
+	end
+
 	if action == "reset_all" then
 		if state.config and type(state.config.reset_defaults) == "function" then
 			state.config.reset_defaults()
@@ -218,74 +267,15 @@ function M.on_message(payload, state)
 		return _build_initial_payload(state)
 	end
 
-	if action == "reload" then
-		if state.config and type(state.config.reload) == "function" then
-			state.config.reload()
+	if action == "close" then
+		-- The window's own close button. Answered so the host can tear the webview
+		-- down; a window whose X does nothing is one the user force-quits, and on a
+		-- webview host that can leave the process running with no visible window.
+		Logger.info(LOG, "Hotstrings settings window closed.")
+		if type(state) == "table" and type(state.close_webview) == "function" then
+			pcall(state.close_webview, "hotstrings_config")
 		end
-		return _build_initial_payload(state)
-	end
-
-	if action == "add_hotstring" and payload.trigger and payload.replacement then
-		local group = payload.group or "default"
-		Logger.info(LOG, "Add hotstring: %s → %s (group=%s)",
-			payload.trigger, payload.replacement, group)
-
-		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config.get_config_dir() or nil
-		local added = false
-		if config_dir then
-			local entry = {
-				trigger           = payload.trigger,
-				output            = payload.replacement,
-				is_word           = payload.is_word ~= false,
-				auto_expand       = payload.auto_expand == true,
-				is_case_sensitive = payload.is_case_sensitive == true,
-				final_result      = payload.final_result == true,
-			}
-			local ok, err = _persist_group(config_dir, group, function(entries)
-				-- Upsert by trigger so editing an existing hotstring never
-				-- appends a duplicate.
-				for i, e in ipairs(entries) do
-					if e.trigger == entry.trigger then entries[i] = entry return end
-				end
-				entries[#entries + 1] = entry
-			end)
-			added = ok == true
-			if added then
-				Logger.success(LOG, "Hotstring persisted: %s → %s", payload.trigger, payload.replacement)
-			else
-				Logger.error(LOG, "Failed to persist hotstring: %s", tostring(err))
-			end
-		else
-			Logger.warn(LOG, "Add hotstring: no config directory — nothing persisted.")
-		end
-		return { added = added }
-	end
-
-	if action == "delete_hotstring" and payload.trigger then
-		local group = payload.group or "default"
-		Logger.info(LOG, "Delete hotstring: %s (group=%s)", payload.trigger, group)
-
-		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config.get_config_dir() or nil
-		local deleted = false
-		if config_dir then
-			local ok, err = _persist_group(config_dir, group, function(entries)
-				-- Drop only the matching trigger; every sibling entry survives.
-				for i = #entries, 1, -1 do
-					if entries[i].trigger == payload.trigger then table.remove(entries, i) end
-				end
-			end)
-			deleted = ok == true
-			if deleted then
-				Logger.success(LOG, "Hotstring deleted: %s", payload.trigger)
-			else
-				Logger.error(LOG, "Failed to delete hotstring: %s", tostring(err))
-			end
-		else
-			Logger.warn(LOG, "Delete hotstring: no config directory — nothing persisted.")
-		end
-		return { deleted = deleted }
+		return nil
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))
