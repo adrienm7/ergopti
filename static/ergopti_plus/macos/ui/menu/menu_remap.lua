@@ -216,29 +216,21 @@ local function _load_left_hand_from_catalog()
 		left_command  = true,
 		spacebar      = true,
 	}
-	-- Reuse manifest_menu's cached root to avoid a duplicate JSON parse (MG-3).
+	-- The one reader of menu_manifest.json (infra/manifest_menu, cached).
+	--
+	-- This used to fall back to opening and decoding the file right here, "in case
+	-- manifest_menu is not loaded yet". require is synchronous in Lua: if the module
+	-- resolves, its accessor works, and if it does not resolve then a second copy of
+	-- the same io.open would not help either. What the guard actually did was keep a
+	-- third reader of this file alive on a path nothing could reach — which is how
+	-- the driver came to have three of them.
 	local ok_mm, mm = pcall(require, "infra.manifest_menu")
-	local data = nil
-	if ok_mm and mm and type(mm.get_root) == "function" then
-		data = mm.get_root()
+	if not ok_mm or type(mm) ~= "table" or type(mm.get_root) ~= "function" then
+		Logger.error(LOG, "infra.manifest_menu unavailable — left-hand catalogue uses the built-in set.")
+		return fallback
 	end
-	if type(data) ~= "table" then
-		-- Fallback: direct read (manifest_menu may not be loaded yet).
-		local Paths = require("infra.paths")
-
-
-
-
-
-		local path = Paths.shared("modules/menu/menu_manifest.json") or ""
-		local ok_r, fh = pcall(io.open, path, "r")
-		if not ok_r or not fh then return fallback end
-		local content = fh:read("*a")
-		fh:close()
-		local ok_j
-		ok_j, data = pcall(hs.json.decode, content)
-		if not ok_j or type(data) ~= "table" then return fallback end
-	end
+	local data = mm.get_root()
+	if type(data) ~= "table" then return fallback end
 	local catalog = data.tap_hold_keys_catalog
 	if type(catalog) ~= "table" then return fallback end
 	local result = {}

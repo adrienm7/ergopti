@@ -54,6 +54,7 @@
 		"test:i18n-cascade": "node ./tools/test/test-webview-i18n-cascade.cjs",
 		"test:drift-guard-coverage": "node ./tools/test/test-drift-guard-covers-every-output.cjs",
 		"test:corpus-backspace-semantics": "node ./tools/test/test-corpus-backspace-count-semantics.cjs",
+		"test:menu-manifest-single-reader": "node ./tools/test/test-menu-manifest-single-reader.cjs",
 		"test:is-word-flag-is-honoured-identically": "node ./tools/test/test-is-word-flag-is-honoured-identically.cjs",
 		"test:logger-scalars": "node ./tools/test/test-logger-scalars-single-source.cjs",
 		"test:locale-names": "node ./tools/test/test-locale-names-single-source.cjs",
