@@ -1,6 +1,13 @@
 --- _shared/lua/toml_codec/codec.lua
 
+
 --- ==============================================================================
+
+-- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
+-- unless the build enabled 5.2 compatibility, which the one CI and the Linux
+-- daemon run does not. Resolved once here rather than at each call site, and
+-- table-first so a 5.4 interpreter keeps using the modern spelling.
+local table_unpack = table.unpack or unpack
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
@@ -547,7 +554,7 @@ function M.decode(content)
 				if aot_path == "" then return nil end
 				-- Array-of-tables: append a new table to the array; no duplicate check
 				local segments = split_section_path(aot_path)
-				local parent = nav(root, { table.unpack(segments, 1, #segments - 1) })
+				local parent = nav(root, { table_unpack(segments, 1, #segments - 1) })
 				local last = segments[#segments]
 				if type(parent[last]) ~= "table" then parent[last] = {} end
 				local arr = parent[last]

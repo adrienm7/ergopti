@@ -1,6 +1,13 @@
 --- tests/unit/lib/test_logger_contract.lua
 
+
 --- ==============================================================================
+
+-- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
+-- unless the build enabled 5.2 compatibility, which the one CI and the Linux
+-- daemon run does not. Resolved once here rather than at each call site, and
+-- table-first so a 5.4 interpreter keeps using the modern spelling.
+local table_unpack = table.unpack or unpack
 --- TEST: Logger Contract — shared cross-driver vectors (Linux)
 --- DESCRIPTION:
 --- Replays _shared/modules/logger/test_vectors.json through the shared logger
@@ -134,7 +141,7 @@ describe("Logger contract: shared cross-driver vectors", function()
 				if Logger.set_level then Logger.set_level("debug") end
 
 				local args = vec.args or {}
-				emit(vec.module, msg, table.unpack(args))
+				emit(vec.module, msg, table_unpack(args))
 
 				Logger.set_sink(nil)
 				Logger.timestamp_fn = original_timestamp
