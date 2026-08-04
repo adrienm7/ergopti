@@ -147,20 +147,28 @@ fi
 # ----------------------------------------------------------------------
 # 7. systemd user service
 # ----------------------------------------------------------------------
-cat > "$INSTALL_ROOT/usr/lib/systemd/user/ergopti.service" << 'SERVICE_EOF'
+cat > "$INSTALL_ROOT/usr/lib/systemd/user/ergopti-hotstrings.service" << 'SERVICE_EOF'
 [Unit]
 Description=Ergopti — ergonomic keyboard optimizer
 Documentation=https://github.com/adrienm7/ergopti
+# PartOf, not just After: without it the daemon outlives the session it belongs
+# to, and logging back in under the other display server finds a daemon that
+# probed the old one at startup.
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/ergopti --tray
 Restart=on-failure
 RestartSec=5
+# No Environment=DISPLAY: the daemon probes the session at runtime, and a pinned
+# :0 is wrong on a second seat and under Wayland.
 
 [Install]
-WantedBy=default.target
+# graphical-session, not default: the daemon needs a session to read input from
+# and a tray to draw into, and default.target starts it on a TTY login too.
+WantedBy=graphical-session.target
 SERVICE_EOF
 
 # ----------------------------------------------------------------------
@@ -178,8 +186,6 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 
 Requires:       luajit >= 2.1
-Requires:       ydotool
-Requires:       xdotool
 Requires:       xclip
 Requires:       libnotify
 Requires:       curl
@@ -208,7 +214,7 @@ cp -r %{_builddir}/ergopti-%{version}/* %{buildroot}/
 /usr/bin/ergopti
 /usr/share/applications/ergopti.desktop
 /usr/share/icons/hicolor/128x128/apps/ergopti.png
-/usr/lib/systemd/user/ergopti.service
+/usr/lib/systemd/user/ergopti-hotstrings.service
 %config(noreplace) /etc/ergopti/config.toml
 
 %post
@@ -217,16 +223,16 @@ for uid in \$(awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1}' /etc/passwd); do
   homedir=\$(eval echo ~"\$uid")
   if [ -d "\$homedir" ]; then
     su - "\$uid" -c "systemctl --user daemon-reload" 2>/dev/null || true
-    su - "\$uid" -c "systemctl --user enable ergopti.service" 2>/dev/null || true
+    su - "\$uid" -c "systemctl --user enable ergopti-hotstrings.service" 2>/dev/null || true
   fi
 done
-echo "ergopti: user service enabled. Start with: systemctl --user start ergopti.service"
+echo "ergopti: user service enabled. Start with: systemctl --user start ergopti-hotstrings.service"
 
 %preun
 # Stop and disable before removal
 for uid in \$(awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1}' /etc/passwd); do
-  su - "\$uid" -c "systemctl --user stop ergopti.service" 2>/dev/null || true
-  su - "\$uid" -c "systemctl --user disable ergopti.service" 2>/dev/null || true
+  su - "\$uid" -c "systemctl --user stop ergopti-hotstrings.service" 2>/dev/null || true
+  su - "\$uid" -c "systemctl --user disable ergopti-hotstrings.service" 2>/dev/null || true
 done
 
 %changelog

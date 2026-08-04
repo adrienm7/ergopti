@@ -37,7 +37,7 @@ const RUNTIME_ROOT = '/usr/lib/ergopti'; // driver root inside the package
 const BUNDLE_ENTRY = '/usr/lib/ergopti/ergopti_hotstrings.lua'; // what the wrapper execs
 const SHARED_LUA_EXPR = '$DRIVER_ROOT/_shared/lua'; // LUA_PATH shared root, relative to the driver root
 const WRAPPER_BIN = 'usr/bin/ergopti'; // generated launcher path (repo-relative to the package DESTDIR)
-const SERVICE_UNIT = 'usr/lib/systemd/user/ergopti.service'; // systemd user unit path
+const SERVICE_UNIT = 'usr/lib/systemd/user/ergopti-hotstrings.service'; // systemd user unit path
 const SERVICE_EXEC = 'ExecStart=/usr/bin/ergopti'; // the unit must boot via the wrapper
 
 // Pre-reorg prefix that must never reappear in a packager (mirror of the macOS guard).
@@ -180,6 +180,145 @@ if (!installSrc.includes(`install -m 0644 "${'${KANATA_SRC}'}" "${KANATA_USER_CO
 	errors.push(
 		`${INSTALL_SH}: must seed ${KANATA_USER_CONFIG} with a copy of the template ` +
 		'(install -m 0644), so the unit it enables has a loadable config before the daemon first runs.'
+	);
+}
+
+// ─── 7. There is ONE unit, and every copy of it agrees ──────────────────────
+//
+// ROOT CAUSE ENCODED: six unit definitions lived in five files and disagreed on
+// three things at once — the unit's NAME (ergopti.service vs
+// ergopti-hotstrings.service), its ExecStart (/usr/bin vs ~/.local/bin) and its
+// WantedBy (default.target vs graphical-session.target). A user who installed
+// the .deb and then ran install.sh ended up with TWO enabled units, both
+// grabbing the keyboard, and neither knew about the other.
+//
+// The three properties below are the ones that decide whether "log out of X11,
+// log back in under Wayland, touch nothing" works:
+//   - one name, so two installers cannot both enable a daemon;
+//   - PartOf=graphical-session.target, so the daemon stops with the session it
+//     probed rather than outliving it;
+//   - no Environment=DISPLAY, because a pinned :0 is wrong on a second seat and
+//     under Wayland, and silently right often enough that only the users who
+//     switch ever see the bug.
+
+const CANONICAL_UNIT_NAME = 'ergopti-hotstrings.service';
+
+let unitBlocksSeen = 0;
+
+for (const rel of UNIT_SOURCES) {
+	const full = path.join(ROOT, rel);
+	if (!fs.existsSync(full)) continue;
+	const src = fs.readFileSync(full, 'utf8');
+
+	// Any other .service filename is a second unit by definition.
+	for (const m of src.matchAll(/([A-Za-z0-9_.-]+)\.service\b/g)) {
+		const name = m[1] + '.service';
+		if (name !== CANONICAL_UNIT_NAME && name !== 'kanata.service') {
+			errors.push(
+				`${rel}: names "${name}" — there is one unit, ${CANONICAL_UNIT_NAME}. ` +
+				`A second name means two installers can each enable a daemon, and both grab the keyboard.`
+			);
+		}
+	}
+
+	// Every [Install] section must want the graphical session.
+	for (const m of src.matchAll(/^WantedBy=(.+)$/gm)) {
+		unitBlocksSeen++;
+		if (m[1].trim() !== 'graphical-session.target') {
+			errors.push(
+				`${rel}: "WantedBy=${m[1].trim()}" — the daemon needs a session to read input from ` +
+				`and a tray to draw into; default.target starts it on a TTY login too.`
+			);
+		}
+	}
+
+	// A DISPLAY pinned in a unit overrides the runtime probe.
+	for (const line of src.split('\n')) {
+		if (/^Environment=DISPLAY/.test(line.trim())) {
+			errors.push(
+				`${rel}: "${line.trim()}" — the daemon probes the display server at runtime ` +
+				`(infra/display_server.lua). A pinned value is wrong on a second seat, wrong ` +
+				`under Wayland, and breaks the X11-to-Wayland switch this unit exists to survive.`
+			);
+		}
+	}
+}
+
+if (unitBlocksSeen === 0) {
+	errors.push(
+		'no [Install] section found in any packaging file — the selector is stale, not the tree. ' +
+		'A scan that silently finds nothing is the failure mode this check exists to avoid.'
+	);
+}
+
+// Every ergopti unit must stop with its session.
+for (const rel of UNIT_SOURCES) {
+	const full = path.join(ROOT, rel);
+	if (!fs.existsSync(full)) continue;
+	const src = fs.readFileSync(full, 'utf8');
+	const daemonUnits = (src.match(/ExecStart=\S*(?:ergopti-hotstrings|\/ergopti)\b/g) || []).length;
+	const partOf = (src.match(/^PartOf=graphical-session\.target$/gm) || []).length;
+	if (daemonUnits > 0 && partOf < daemonUnits) {
+		errors.push(
+			`${rel}: ${daemonUnits} daemon unit(s) but ${partOf} PartOf=graphical-session.target — ` +
+			`without it the daemon outlives the session it probed at startup.`
+		);
+	}
+}
+
+// ─── 8. The PKGBUILD ships a driver, not an empty package ───────────────────
+//
+// ROOT CAUSE ENCODED: the PKGBUILD's five copy lines read build/linux/*.lua,
+// build/linux/modules, /adapters, /ui and /vendor — while the builder puts the
+// driver under build/linux/LINUX/. Every one of those lines ended
+// `2>/dev/null || true`, so makepkg SUCCEEDED and produced a package containing
+// the shared Lua tree, a wrapper with no LUA_PATH, a .desktop file and a systemd
+// unit, and no driver at all. Nothing caught it: the PACKAGERS list above covers
+// only the two .sh packagers, and test-packaging-paths-exist.cjs filters
+// tools/build to `.sh`, which a file named PKGBUILD is not.
+//
+// The two halves are independent and both fatal: a package with no driver, and
+// a wrapper that cannot resolve `require("logger.shim")` because LUA_PATH was
+// never set.
+
+const PKGBUILD = 'tools/build/PKGBUILD';
+const pkgbuildSrc = read(PKGBUILD);
+
+// Silent-failure suffixes on a copy that stages the package payload.
+for (const line of pkgbuildSrc.split('\n')) {
+	const isCopy = /^\s*(cp|install)\s/.test(line);
+	if (isCopy && /2>\/dev\/null\s*\|\|\s*true/.test(line)) {
+		errors.push(
+			`${PKGBUILD}: "${line.trim()}" — a staging copy that swallows its own failure ` +
+			`makes makepkg succeed with an empty package. Let it fail.`
+		);
+	}
+}
+
+// The driver tree, from where the builder actually puts it.
+if (!/cp -r build\/linux\/linux\/\.\s/.test(pkgbuildSrc)) {
+	errors.push(
+		`${PKGBUILD}: must copy the driver from build/linux/linux/ — the builder nests it ` +
+		`one level deeper than build/linux/, and copying the wrong path ships no driver.`
+	);
+}
+
+// The shared tree, whole. _shared/lua alone is not enough: the keycode tables,
+// the hotstring packs, the locales and the resolver defaults live in
+// _shared/data and _shared/modules, and the resolver fails fast without them.
+if (!/cp -r build\/linux\/_shared\/\.\s/.test(pkgbuildSrc)) {
+	errors.push(
+		`${PKGBUILD}: must copy the whole _shared tree — _shared/lua alone omits the ` +
+		`keycode tables, the hotstring packs, the locales and defaults.toml, and the ` +
+		`daemon fails fast on the last of those.`
+	);
+}
+
+// The wrapper needs LUA_PATH or the daemon dies on its first require.
+if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
+	errors.push(
+		`${PKGBUILD}: the wrapper must export LUA_PATH — without it the daemon cannot ` +
+		`resolve a single require and exits before it logs anything useful.`
 	);
 }
 
