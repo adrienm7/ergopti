@@ -287,6 +287,11 @@
 		{
 			"type": "action",
 			"id": "edit_shortcuts",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.no_personal_shortcuts_file_on_linux",
 			"i18n": "menu.global.edit_shortcuts"
 		},
 		{
@@ -656,7 +661,11 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "hotstring_extensions"
+			"id": "hotstring_extensions",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		}
 	],
 	"hotstrings_params_group": [
@@ -674,7 +683,12 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "magic_key_config"
+			"id": "magic_key_config",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.no_magic_key_editor_on_linux"
 		},
 		{
 			"type": "dynamic",

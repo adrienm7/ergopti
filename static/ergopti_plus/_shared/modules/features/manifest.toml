@@ -2917,6 +2917,13 @@ platforms = ["ahk"]
 [[menu.shortcuts_menu]]
 type = "action"
 id = "edit_shortcuts"
+# "Open the personal shortcuts file." macOS has one — infra/personal_shortcuts.lua,
+# resolved through config_paths PersonalShortcutsLuaPath — and Windows has
+# personal_shortcuts.ahk. Linux has no personal shortcuts file at all: its
+# shortcuts module is toggles and selection transforms, with nothing on disk
+# for the user to edit.
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.no_personal_shortcuts_file_on_linux"
 i18n = "menu.global.edit_shortcuts"
 
 [[menu.shortcuts_menu]]
@@ -3197,6 +3204,12 @@ i18n = "menu.extensions.header"
 [[menu.hotstrings_menu]]
 type = "dynamic"
 id = "hotstring_extensions"
+# Lists the bundled extension packs found by scanning a Windows extensions
+# directory for TOML files (_HS_PreScanExtensions). Neither Lua driver ships
+# such a directory — their hotstrings come from _shared/modules/hotstrings —
+# so the row could only ever have drawn the "empty" placeholder.
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.hotstrings_params_group]]
 type = "dynamic"
@@ -3213,6 +3226,13 @@ type = "---"
 [[menu.hotstrings_params_group]]
 type = "dynamic"
 id = "magic_key_config"
+# Not on Linux. macOS DOES have a magic-key editor — menu_hotstrings_management
+# prompts for the character and writes state.trigger_char — it simply builds the
+# row without ever naming this id, which is why a first pass read the driver as
+# lacking the feature and nearly restricted a working row out of its menu.
+# Linux has no way to change the key from its menu at all.
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.no_magic_key_editor_on_linux"
 
 [[menu.hotstrings_params_group]]
 type = "dynamic"

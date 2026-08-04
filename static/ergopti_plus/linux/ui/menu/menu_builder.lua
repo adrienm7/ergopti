@@ -110,10 +110,175 @@ local function _build_layouts(ctx)
 	}
 end
 
---- Builds the hotstrings submenu.
+--- Renders the rows of the hotstrings submenu that the manifest describes.
+---
+--- Defined BEFORE its caller: a `local function` is not hoisted
+--- (project-lua-closure-before-local-nil-global).
+---
+--- THE GROUP CLASSIFICATION COMES FROM THE MANIFEST, and it spells the group ids
+--- with underscores (`distances_reduction`) while the shared hotstring index
+--- spells them without (`distancesreduction`). macOS reconciles the two by
+--- comparing both forms; this does the same rather than inventing a third
+--- answer. One vocabulary would be better and neither driver owns that decision.
+--- @param ctx table Menu context; ctx.webview opens the settings window.
+--- @param config table The hotstrings config module.
+--- @return table Menu rows, empty when the renderer could not be bound.
+local function _manifest_hotstring_rows(ctx, config)
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the hotstrings submenu loses its declared rows.")
+		return {}
+	end
+
+	local root    = ManifestMenu.get_root() or {}
+	local classes = type(root.hotstring_groups) == "table" and root.hotstring_groups or {}
+	local groups  = type(config.get_groups) == "function" and (config.get_groups() or {}) or {}
+
+	--- The group ids of one manifest class, in both spellings.
+	--- @param class string "standard", "dynamic" or "ergopti".
+	--- @return table Set of accepted ids.
+	local function members_of(class)
+		local set = {}
+		for _, id in ipairs(classes[class] or {}) do
+			set[id] = true
+			local flattened = id:gsub("_", "")
+			if flattened ~= id then set[flattened] = true end
+		end
+		return set
+	end
+
+	--- One toggle row for a hotstring group.
+	--- @param name string Group name as the config module reports it.
+	--- @return table
+	local function group_row(name)
+		local on = config.is_group_enabled and config.is_group_enabled(name)
+		return {
+			title = name .. (on and " ✓" or ""),
+			fn    = function()
+				if config.toggle_group then config.toggle_group(name) end
+			end,
+		}
+	end
+
+	--- Appends every loaded group belonging to `class`.
+	--- @param items table
+	--- @param class string
+	local function append_class(items, class)
+		local want  = members_of(class)
+		local added = 0
+		for _, name in ipairs(groups) do
+			if want[name] then
+				items[#items + 1] = group_row(name)
+				added = added + 1
+			end
+		end
+		if added == 0 then
+			items[#items + 1] = {
+				title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true,
+			}
+		end
+	end
+
+	-- "Personal" is defined by exclusion: whatever the user loaded that the
+	-- manifest does not classify. Listing it any other way would need a second
+	-- classification to keep in step with the first.
+	local classified = {}
+	for _, class in ipairs({ "standard", "dynamic", "ergopti" }) do
+		for id in pairs(members_of(class)) do classified[id] = true end
+	end
+
+	--- Flips every loaded group to `on`.
+	--- @param on boolean
+	--- @return function
+	local function set_all(on)
+		return function()
+			for _, name in ipairs(groups) do
+				local is_on = config.is_group_enabled and config.is_group_enabled(name)
+				if is_on ~= on and config.toggle_group then config.toggle_group(name) end
+			end
+		end
+	end
+
+	local ok_term, Terminators = pcall(require, "keymap.terminators")
+	if not ok_term then Terminators = nil end
+
+	local params_handlers = {
+		["word_expanders"] = function(items)
+			if not Terminators then
+				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
+				return
+			end
+			local sub = {}
+			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+				if def.type == "separator" then
+					sub[#sub + 1] = { title = "-" }
+				elseif def.key then
+					local key = def.key
+					sub[#sub + 1] = {
+						title = (def.label or key) .. (Terminators.is_terminator_enabled(key) and " ✓" or ""),
+						fn    = function()
+							Terminators.set_terminator_enabled(key, not Terminators.is_terminator_enabled(key))
+						end,
+					}
+				end
+			end
+			items[#items + 1] = { title = i18n_safe("menu.hotstrings.word_expanders"), menu = sub }
+		end,
+		["delays_colors"] = function(items)
+			-- One row, not the Windows submenu: that one also carries per-category
+			-- delay prompts, and this driver has no per-category delays to prompt
+			-- for. What it does have is the settings window, which is what the row
+			-- is for.
+			items[#items + 1] = {
+				title = i18n_safe("menu.hotstrings.delays_colors"),
+				fn    = function()
+					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
+						return
+					end
+					ctx.webview.show("hotstrings_config")
+				end,
+			}
+		end,
+	}
+
+	local handlers = {
+		["hotstring_bulk_actions"] = function(items)
+			items[#items + 1] = { title = i18n_safe("menu.hotstrings.enable_all"),  fn = set_all(true) }
+			items[#items + 1] = { title = i18n_safe("menu.hotstrings.disable_all"), fn = set_all(false) }
+		end,
+		["hotstring_categories_standard"] = function(items) append_class(items, "standard") end,
+		["hotstring_categories_dynamic"]  = function(items) append_class(items, "dynamic") end,
+		["hotstring_categories_ergopti"]  = function(items) append_class(items, "ergopti") end,
+		["hotstring_personal"] = function(items)
+			local added = 0
+			for _, name in ipairs(groups) do
+				if not classified[name] then
+					items[#items + 1] = group_row(name)
+					added = added + 1
+				end
+			end
+			if added == 0 then
+				items[#items + 1] = {
+					title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true,
+				}
+			end
+		end,
+	}
+
+	local group_builders = {
+		["hotstrings_params"] = function(c)
+			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams", params_handlers, nil, c)
+		end,
+	}
+
+	return ManifestMenu.build("hotstrings_menu", "Hotstrings", handlers, group_builders, ctx)
+end
+
+--- Builds the hotstrings submenu: the manifest's rows, then this driver's own.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
 local function _build_hotstrings(ctx)
 	local config = ctx.config
-	local items = {}
 
 	if type(config) ~= "table" then
 		return { title = i18n_safe("menu.hotstrings.title"), menu = {
@@ -121,26 +286,11 @@ local function _build_hotstrings(ctx)
 		}}
 	end
 
-	local groups = {}
-	if type(config.get_groups) == "function" then
-		groups = config.get_groups() or {}
-	end
+	local items = _manifest_hotstring_rows(ctx, config)
 
-	if #groups == 0 then
-		items[#items + 1] = { title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true }
-	else
-		for _, group in ipairs(groups) do
-			local gname = group
-			local is_enabled = config.is_group_enabled and config.is_group_enabled(gname)
-			items[#items + 1] = {
-				title = gname .. (is_enabled and " ✓" or ""),
-				fn = function()
-					if config.toggle_group then config.toggle_group(gname) end
-				end,
-			}
-		end
-	end
-
+	-- Not a manifest row on any driver: reloading the catalogue from disk is this
+	-- driver's own affordance, because it is the only one whose hotstrings can
+	-- change under it without a restart.
 	items[#items + 1] = { title = "-" }
 	items[#items + 1] = {
 		title = "Recharger les hotstrings",

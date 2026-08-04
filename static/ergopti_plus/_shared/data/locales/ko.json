@@ -2377,6 +2377,8 @@
 	"platform_reason.alt_gr_is_kana_remap": "Windows 전용: AltGr을 다른 가상 키에 재할당하는 사용자 지정 레이아웃(KbdEdit/MSKLC)을 보정합니다. Windows 키보드 드라이버 고유의 개념으로 다른 곳에는 대응물이 없습니다.",
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS 전용: MLX는 Apple Silicon용 Apple 온디바이스 추론 프레임워크이며 Windows나 Linux용 빌드는 없습니다.",
 	"platform_reason.lists_windows_only_settings": "Windows 전용: 이 행이 나열할 항목은 모두 Windows 전용이므로 macOS와 Linux에서는 빈 목록이 됩니다.",
+	"platform_reason.no_magic_key_editor_on_linux": "Linux 제외: 이 행은 매직 키를 변경합니다. macOS와 Windows는 이를 위한 대화상자를 엽니다. Linux 드라이버는 설정에서 키를 읽기만 하고 메뉴에서 바꿀 방법이 없습니다.",
+	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집"
 }

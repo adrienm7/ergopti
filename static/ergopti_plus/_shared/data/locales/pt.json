@@ -2377,6 +2377,8 @@
 	"platform_reason.alt_gr_is_kana_remap": "Apenas Windows: compensa layouts personalizados (KbdEdit/MSKLC) que reatribuem o AltGr a outra tecla virtual — um conceito do driver de teclado do Windows sem equivalente noutros sistemas.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Apenas macOS: o MLX é a framework de inferência local da Apple para Apple Silicon e não existe qualquer versão para Windows ou Linux.",
 	"platform_reason.lists_windows_only_settings": "Apenas Windows: tudo o que esta linha listaria é, por sua vez, exclusivo do Windows, pelo que em macOS e Linux mostra uma lista vazia.",
+	"platform_reason.no_magic_key_editor_on_linux": "Não em Linux: esta linha altera a tecla mágica. macOS e Windows abrem uma caixa de diálogo para isso; o controlador Linux apenas lê a tecla da configuração e não permite alterá-la a partir do menu.",
+	"platform_reason.no_personal_shortcuts_file_on_linux": "Não em Linux: esta linha abre o ficheiro de atalhos pessoais. macOS e Windows têm um; os atalhos do controlador Linux são interruptores e transformações da seleção, sem qualquer ficheiro para editar.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Editar categoria"
 }

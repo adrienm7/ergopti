@@ -74,7 +74,35 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // exists on Linux, where ui/wpm is absent and the keylogger exposes no
 // disabled-apps setter. A row declared for a driver that cannot draw it is not a
 // gap in the driver; it is the manifest making a promise on the driver's behalf.
-const BASELINE = { ahk: 0, hs: 16, linux: 10 };
+const BASELINE = { ahk: 0, hs: 5, linux: 0 };
+
+// WHY LINUX IS ZERO AND macOS IS NOT, AND WHAT THE FIVE ARE.
+// Linux reached zero by wiring every row: its metrics and hotstrings submenus
+// render from the manifest, and the rows it could never draw were restricted
+// away with reasons. macOS wired its hotstrings-parameters group the same way
+// and stopped at five, for a reason worth writing down rather than re-deriving:
+//
+//   hotstring_bulk_actions, hotstring_categories_{standard,dynamic,ergopti}
+//     macOS assembles this submenu in a DIFFERENT SHAPE from the manifest. Its
+//     section headers carry live counts (menu.hotstrings.header_common_count,
+//     formatted with a total) where a manifest section_header is a static key,
+//     and it merges the standard and dynamic categories into one non-Ergopti
+//     block. Making the three ids true means reshaping the menu the user sees —
+//     three categories with plain headers — or teaching section_header to carry
+//     a count. Either is a product decision, not a wiring job.
+//
+//   active_layouts
+//     Built by hand in menu_keyboard_layout.lua, which does not go through the
+//     renderer at all. One handler once that submenu is routed.
+//
+// A CAUTION FROM THE SAME PASS. An unresolved id does NOT mean the driver lacks
+// the feature. Seven macOS rows counted here were handled all along — their
+// dispatch tables used bare Lua keys, which this scan cannot see because it
+// looks for a quoted string. Quoting them changed nothing but the count. Worse,
+// magic_key_config was read as "no Lua driver can edit the magic key" and nearly
+// restricted out of the macOS menu it has always been in: the row is built
+// inline in menu_hotstrings_management, id unnamed. Check the driver before
+// concluding anything from a number here.
 
 // Floors: a driver whose scan collapses would report zero unresolved rows and
 // pass while having read nothing.
