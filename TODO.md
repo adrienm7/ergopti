@@ -179,7 +179,46 @@ in common, 55 missing — 36 tappable, 19 hold-only. The counts above hold.
 
 ---
 
-## 2. ~~macOS + Windows~~ **macOS** onto the shared matcher core — **NEXT UP**
+## 2. ~~macOS + Windows~~ **macOS** onto the shared matcher core
+
+> ### État au 2026-08-04 — les obstacles techniques sont levés, il reste UNE décision
+>
+> Trois blocages structurels ont été trouvés et **deux sont supprimés** :
+>
+> 1. ~~**Le matcher était prisonnier du tampon.**~~ La recherche vivait dans une
+>    closure sur le tampon de l'instance, ce qui rendait le matcher inséparable de
+>    la *propriété* des caractères — la vraie raison, jamais écrite, du blocage.
+>    `M.best_match_at(buf_cps, buckets, body_len, want_auto)` prend maintenant son
+>    tampon en argument (`9ac191c6a`).
+> 2. ~~**Les deux drivers ne posent pas la même question.**~~ Linux demande
+>    « laquelle déclenche ? », macOS « celle-ci déclenche-t-elle ? » —
+>    `would_fire` a quatre appelants tenus au même prédicat.
+>    `M.mapping_fires(mapping, buf_cps, body_len)` répond à la seconde
+>    (`dbb12f351`).
+> 3. 🚩 **Les représentations de tampon sont incompatibles sur le chemin de
+>    frappe.** macOS tient son tampon en **chaîne d'octets** et découpe avec
+>    `buffer:sub(-trigger_bytes)` — un décalage d'octets O(1). Le cœur tient un
+>    **tableau de codepoints** et découpe avec `table.concat(buf_cps, …)`.
+>    Appeler le prédicat partagé depuis macOS imposerait de convertir la chaîne en
+>    tableau **à chaque frappe** : O(longueur du tampon) allocations sur le chemin
+>    exact où l'audit perf du même jour rappelle que dépasser le délai fait
+>    **désactiver le tap par macOS** — pas perdre une frappe, arrêter le driver.
+>
+> **La décision qui reste, et c'est une décision produit, pas un obstacle :**
+>
+> - **(a)** macOS passe son tampon en tableau de codepoints. Touche tous ses
+>   lecteurs — keylogger, aperçu LLM, infobulle, contrôle de script — et toute
+>   l'arithmétique d'offsets d'octets de `expander.lua`.
+> - **(b)** le cœur gagne une entrée « chaîne d'octets », c'est-à-dire une seconde
+>   représentation à maintenir.
+>
+> **Ce qui est acquis quoi qu'il arrive :** les deux matchers sont *prouvés
+> équivalents* sur les 32 vecteurs du corpus
+> (`test_shared_core_agrees_with_macos.lua`), et la campagne a livré **deux vrais
+> défauts du chemin de frappe** que personne ne cherchait — `auto_expand` ignoré
+> sur macOS (`f78deb448`) et le no-op non gardé sur le cœur et sur AutoHotkey
+> (`7d434a8`).
+
 
 🚩 **The title is half impossible, measured 2026-08-04.** The shared matcher core
 is **Lua** (`_shared/lua/hotstring_engine/init.lua`). The Windows driver is
