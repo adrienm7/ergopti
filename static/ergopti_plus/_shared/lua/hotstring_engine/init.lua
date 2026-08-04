@@ -140,6 +140,72 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Decides whether ONE mapping fires against the buffer tail ending at
+--- `body_len`, and with what text.
+---
+--- Split out of best_match_at because the two questions are genuinely
+--- different and each driver asks its own. The Linux path asks "WHICH mapping
+--- fires?" and loops. macOS asks "would THIS mapping fire?" — `would_fire` has
+--- four callers (the expansion path, the tooltip preview, two LLM-bridge sites)
+--- and a gate that holds every one of them to the same predicate, because a
+--- length-only reimplementation is how a preview comes to promise an expansion
+--- that never fires.
+---
+--- Neither driver could reuse the other while this logic lived inside a loop
+--- body. It is the last piece of the matcher that was shaped by its caller
+--- rather than by the question it answers.
+---
+--- @param mapping table A loaded mapping (match_mode, trigger, tlen, …).
+--- @param buf_cps table Array of UTF-8 codepoint strings.
+--- @param body_len number Index the candidate trigger must end at.
+--- @return string|nil eff Effective replacement, or nil when it does not fire.
+--- @return string|nil typed The buffer tail that matched, for the caller's arithmetic.
+function M.mapping_fires(mapping, buf_cps, body_len)
+	if type(mapping) ~= "table" or type(buf_cps) ~= "table" then return nil end
+	local tlen = mapping.tlen
+	if type(tlen) ~= "number" or type(body_len) ~= "number" or body_len < tlen then return nil end
+
+	-- Suffix check (case-aware), against the body rather than the whole buffer
+	-- so the terminator is excluded on the end-char path.
+	local buf_tail = table.concat(buf_cps, "", body_len - tlen + 1, body_len)
+
+	-- The effective replacement, which is the mapping's own EXCEPT in conform
+	-- mode where it takes the casing that was typed. nil means this mapping does
+	-- not fire: conform_replacement rejects a casing that is neither lower, Title
+	-- nor UPPER, because no variant would have been registered for it.
+	local eff
+	local mode = mapping.match_mode
+	if mode == "exact" then
+		if buf_tail == mapping.trigger then eff = mapping.replacement end
+	elseif mode == "fold" then
+		if text_utils.trig_lower(buf_tail) == mapping.trigger_folded then
+			eff = mapping.replacement
+		end
+	else
+		if text_utils.trig_lower(buf_tail) == mapping.trigger then
+			eff = text_utils.conform_replacement(mapping.replacement, buf_tail, mapping.trigger)
+		end
+	end
+
+	-- No-op guard. A mapping whose effective replacement equals what was typed
+	-- has nothing to inject, and reporting it as a match is not harmless: the
+	-- caller consumes the triggering keystroke to make room for an expansion that
+	-- then writes the same characters back. macOS shipped without this guard once
+	-- and the character vanished from the screen — the dropped-char bug its own
+	-- try_auto_expand comment names. This core had none at all; the divergence was
+	-- invisible because no corpus vector covered a no-op until 2026-08-04.
+	if eff == buf_tail then eff = nil end
+	if not eff then return nil end
+
+	-- Word-boundary check: the character preceding the trigger must not be a
+	-- word character (or the trigger fills the whole body).
+	if mapping.is_word and body_len > tlen and is_word_char(buf_cps[body_len - tlen]) then
+		return nil
+	end
+
+	return eff, buf_tail
+end
+
 --- Finds the best mapping ending at `body_len`, among those selected by
 --- `want_auto`.
 ---
@@ -148,13 +214,7 @@ end
 --- buffer. That made the matcher inseparable from buffer OWNERSHIP, which is the
 --- single reason macOS could not adopt this core: its buffer belongs to the
 --- keymap core state and is read by the keylogger, the LLM preview, the tooltip
---- and script control. "Adopting the core" would have meant surrendering all of
---- that, so the section stalled — not on the matching logic, which agrees with
---- the cross-driver corpus on every vector, but on who holds the characters.
----
---- Taking the buffer as an argument costs nothing here — `on_char` passes its own
---- and behaves identically — and turns adoption into a call rather than a
---- migration.
+--- and script control.
 ---
 --- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).
 --- @param buckets table Tail-char buckets, longest-trigger-first within each.
@@ -168,52 +228,13 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto)
 	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
 	if not bucket then return nil end
 
+	-- The bucket is sorted longest-first, so the first survivor is the longest
+	-- for this path. The per-mapping decision itself is M.mapping_fires, which
+	-- macOS calls directly — this loop is only the "which one" half.
 	for _, mapping in ipairs(bucket) do
-		local tlen = mapping.tlen
-		if mapping.auto_expand == want_auto and body_len >= tlen then
-			-- Suffix check (case-aware), against the body rather than the
-			-- whole buffer so the terminator is excluded on the end-char path.
-			local buf_tail = table.concat(buf_cps, "", body_len - tlen + 1, body_len)
-			-- The effective replacement, which is the mapping's own EXCEPT in
-			-- conform mode where it takes the casing that was typed. nil means
-			-- this mapping does not fire: conform_replacement rejects a casing
-			-- that is neither lower, Title nor UPPER, because no variant would
-			-- have been registered for it.
-			local eff
-			local mode = mapping.match_mode
-			if mode == "exact" then
-				if buf_tail == mapping.trigger then eff = mapping.replacement end
-			elseif mode == "fold" then
-				if text_utils.trig_lower(buf_tail) == mapping.trigger_folded then
-					eff = mapping.replacement
-				end
-			else
-				if text_utils.trig_lower(buf_tail) == mapping.trigger then
-					eff = text_utils.conform_replacement(mapping.replacement, buf_tail, mapping.trigger)
-				end
-			end
-
-			-- No-op guard. A mapping whose effective replacement equals what was
-			-- typed has nothing to inject, and reporting it as a match is not
-			-- harmless: the caller consumes the triggering keystroke to make room
-			-- for an expansion that then writes the same characters back. macOS
-			-- shipped without this guard once and the character vanished from the
-			-- screen — the dropped-char bug its own try_auto_expand comment names.
-			-- This core had no guard at all; the divergence was invisible because
-			-- no corpus vector covered a no-op until 2026-08-04.
-			if eff == buf_tail then eff = nil end
-
-			if eff then
-				-- Word-boundary check: the character preceding the trigger must
-				-- not be a word character (or the trigger fills the whole body).
-				local boundary_ok = true
-				if mapping.is_word and body_len > tlen then
-					if is_word_char(buf_cps[body_len - tlen]) then boundary_ok = false end
-				end
-				-- The bucket is sorted longest-first, so the first survivor is
-				-- the longest for this path.
-				if boundary_ok then return mapping, tlen, eff end
-			end
+		if mapping.auto_expand == want_auto then
+			local eff = M.mapping_fires(mapping, buf_cps, body_len)
+			if eff then return mapping, mapping.tlen, eff end
 		end
 	end
 	return nil
