@@ -37,6 +37,7 @@ const CHECKS = [
 	{ name: 'lint banner-marker safety (no hardcoded-prefix corruption of "--"-marker Lua banners)', cmd: 'node', args: ['tools/test/test-lint-banner-marker-safety.cjs'], repro: 'node tools/test/test-lint-banner-marker-safety.cjs' },
 	{ name: 'LLM legacy_ids + BASIC_PROMPT single source', cmd: 'node', args: ['tools/test/test-llm-legacy-basic-prompt-single-source.cjs'], repro: 'node tools/test/test-llm-legacy-basic-prompt-single-source.cjs' },
 	{ name: 'locale display order single source (locale_order.json ↔ macOS + Windows + Linux + site)', cmd: 'node', args: ['tools/test/test-locale-order-single-source.cjs'], repro: 'node tools/test/test-locale-order-single-source.cjs' },
+	{ name: 'no generator stamps the current date into its output (drift must mean drift)', cmd: 'node', args: ['tools/test/test-generated-output-is-time-independent.cjs'], repro: 'node tools/test/test-generated-output-is-time-independent.cjs' },
 	{ name: 'architecture diagram (ports resolve + architecture.md in sync)', cmd: 'node', args: ['tools/test/test-architecture-diagram.cjs'], repro: 'node tools/test/test-architecture-diagram.cjs' },
 	{ name: 'dev-tool paths (private-AHK workflow points at live paths)', cmd: 'node', args: ['tools/test/test-dev-tool-paths.cjs'], repro: 'node tools/test/test-dev-tool-paths.cjs' },
 	{ name: 'fast repeating timers are inventoried (no silent poller)', cmd: 'node', args: ['tools/test/test-fast-timer-inventory.cjs'], repro: 'node tools/test/test-fast-timer-inventory.cjs' },
