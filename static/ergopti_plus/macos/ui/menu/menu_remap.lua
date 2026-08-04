@@ -820,12 +820,15 @@ end
 
 --- Builds the complete Karabiner menu item with its submenu.
 ---
---- **Menu skeleton order mirrors _shared/modules/menu/menu_manifest.json
---- karabiner_menu (MENU-3).** The imperative build below follows the same
---- sequence: status → gui → start → stop → (warnings) → --- → clear/restore/
---- copy → --- → delays/symmetric/sticky → --- → tap_hold keys → --- →
---- shortcuts. Platform-specific closures (KE probes, AppleScript dialogs,
---- picker trees) remain here as the glue layer.
+--- **There is no manifest key for this menu.** This docstring used to say the
+--- order mirrors `karabiner_menu` in menu_manifest.json; no such key exists, in
+--- that file or in the manifest.toml it is generated from, and none ever has.
+--- The sequence below — status → gui → start → stop → (warnings) → --- →
+--- clear/restore/copy → --- → delays/symmetric/sticky → --- → tap_hold keys →
+--- --- → shortcuts — is this file's own, and nothing holds it to anything.
+--- Corrected because the reference read as "already migrated" to the next person
+--- to open the file, which is the opposite of true: these 36 row sites are the
+--- single largest block still built outside the renderer on this driver.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
 function M.build(ctx)

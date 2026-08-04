@@ -311,7 +311,15 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx, 
 			local ok_list, rows = call_isolated(manifest_key, list_id, list_providers[list_id], ctx)
 			if ok_list and type(rows) == "table" and #rows > 0 then
 				flush_sep()
-				for _, row in ipairs(render_rows(rows)) do
+				-- list_id is passed on purpose: every warning and the depth-truncation
+				-- ERROR inside render_rows names it, and this top-level call was the one
+				-- caller omitting it — so the single diagnostic that identifies a
+				-- truncated list said "List 'nil'". Windows has always passed it
+				-- (manifest_menu.ahk, _MR_RenderRows(Result, Rows, Id, 1)). It matters
+				-- more than it looks: two of the biggest menus nest at exactly
+				-- MAX_LIST_DEPTH, so the first list to grow a level gets truncated and
+				-- the log could not say which one.
+				for _, row in ipairs(render_rows(rows, list_id, 1)) do
 					table.insert(result, row)
 					item_count = item_count + 1
 				end

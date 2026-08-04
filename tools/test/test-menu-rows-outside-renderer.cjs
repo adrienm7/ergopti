@@ -41,10 +41,34 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 
+const MEASURE = process.argv.includes('--measure');
+
 // Frozen baselines: rows built OUTSIDE the renderer, per driver, on 2026-08-01.
-// windows 230 total - 8 in renderer, macos 330 - 29, linux 100 - 97.
+// Re-measured 2026-08-04 with --measure: windows 232 total - 12 in the renderer,
+// macos 331 - 30, linux 99 - 96. Every one of the three had drifted from the
+// frozen header; run --measure rather than trusting this line.
 // windows lowered 222 → 220 on 2026-08-03: the keyboard-shortcut groups moved
 // onto the manifest "list" type, so the renderer builds them.
+//
+// ── WHAT LOWERS THIS NUMBER, because getting it wrong costs a large refactor ──
+//
+// Routing a menu through ManifestMenu.build does NOT lower it. Three macOS menus
+// already call it — menu_gestures, menu_metrics, menu_shortcuts — and all three
+// are still counted here, 16, 16 and 26 rows respectively. The reason is the
+// `dynamic` item type: the manifest names a handler and the handler appends its
+// rows IN THE DRIVER FILE, so the manifest describes the SLOT and the driver
+// still builds the row. That is the whole distinction this ratchet measures.
+//
+// A row leaves this count only when the RENDERER materialises it: as a static
+// `action` / `section_header` / `---` / `group` entry, or as a `list` row, where
+// the provider returns `label = …` data and manifest_menu.lua turns it into the
+// menu item. Converting a hand-built block to a `dynamic` handler moves nothing
+// and is easy to mistake for progress — the 2026-08-03 windows drop came from a
+// `list` migration, which is the only kind that has ever moved this number.
+//
+// Corollary worth knowing before reading a fall as a win: the macOS predicate
+// keys on the field name `title =`, and provider rows use `label =`. So the
+// number measures who owns the hs.menubar shape, not how many rows a user sees.
 const BASELINE = {
 	windows: 220,
 	macos: 301,
@@ -157,6 +181,17 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 	}
 
 	summary.push(`${driver} ${outside}/${BASELINE[driver]}`);
+
+	// --measure prints what the frozen header can only assert. The header's own
+	// totals had drifted (it said "linux 100 - 97" against a measured 99 - 96)
+	// because nothing could re-derive them, which is how a comment stops being
+	// evidence and becomes folklore.
+	if (MEASURE) {
+		console.log(`${driver}: ${total} row site(s), ${inRenderer} in the renderer, ${outside} outside`);
+		for (const [file, n] of [...offenders].sort((a, b) => b[1] - a[1]).slice(0, 8)) {
+			console.log(`    ${String(n).padStart(3)}  ${file}`);
+		}
+	}
 
 	if (outside > BASELINE[driver]) {
 		const worst = [...offenders].sort((a, b) => b[1] - a[1]).slice(0, 5);
