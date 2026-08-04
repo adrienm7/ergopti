@@ -715,6 +715,56 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
         timeout-minutes: 3
 
+      # "Needs a display server" sounded like "needs a desktop", and it does not.
+      # Xvfb is a real X server and sway --backend headless is a real Wayland
+      # compositor; both simply draw to nothing. Everything the driver does with a
+      # display server EXCEPT putting pixels on a screen is therefore checkable
+      # here — including the two things that actually broke: which server it thinks
+      # it is on, and whether it can read the keymap from it.
+      #
+      # Both run in ONE step, same binary, no configuration in between, which is
+      # the machine-checkable half of C2: log out of X11, log into Wayland, change
+      # nothing.
+      - name: Detect and read the keymap on a real X11 and a real Wayland
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+
+          echo "--- X11 (Xvfb) ---"
+          xvfb-run -a luajit tests/hardware/run_display_server.lua
+
+          echo "--- Wayland (sway, headless) ---"
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/xdg-$(id -u)}"
+          mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+          # A compositor with no config and no outputs. WLR_BACKENDS=headless is
+          # what lets it start without a seat or a GPU on a CI runner.
+          WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway --config /dev/null &
+          SWAY_PID=$!
+          # Poll for the socket rather than sleeping a fixed time: a loaded runner
+          # takes longer, and a fixed sleep turns that into a flake.
+          WAYLAND_SOCK=""
+          for _ in $(seq 1 40); do
+            WAYLAND_SOCK=$(ls "$XDG_RUNTIME_DIR" 2>/dev/null | grep -m1 '^wayland-[0-9]*$' || true)
+            [ -n "$WAYLAND_SOCK" ] && break
+            sleep 0.25
+          done
+          if [ -z "$WAYLAND_SOCK" ]; then
+            echo "::warning::no Wayland socket appeared — the compositor could not start on this runner"
+            kill "$SWAY_PID" 2>/dev/null || true
+            exit 0
+          fi
+          # DISPLAY is deliberately left set: a real Wayland session runs XWayland
+          # and sets it too, and that is exactly the case a detector reading DISPLAY
+          # first gets wrong on every Wayland desktop.
+          set +e
+          WAYLAND_DISPLAY="$WAYLAND_SOCK" DISPLAY=:99 luajit tests/hardware/run_display_server.lua
+          STATUS=$?
+          set -e
+          kill "$SWAY_PID" 2>/dev/null || true
+          exit $STATUS
+        timeout-minutes: 6
+
   # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
   # ─────────────────────────────────────────────────
