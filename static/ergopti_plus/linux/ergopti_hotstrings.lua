@@ -660,6 +660,42 @@ local function main()
 		Logger.debug(LOG, "Pointer click — buffer reset.")
 	end
 
+	-- 8.7b) Restore the word-delimiter choices.
+	--
+	-- The shared catalogue keeps them in memory only, so every delimiter the user
+	-- switched off came back on at the next start — and the feature exists
+	-- precisely so a user can say "expand on ★ and nothing else". A setting that
+	-- forgets itself is worse than one that is missing.
+	local TERMINATORS_KEY = "hotstrings.disabled_terminators"
+	local function persist_terminators()
+		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return end
+		local off = {}
+		for _, def in ipairs(terminators_mod.get_terminator_defs() or {}) do
+			if def.key and not terminators_mod.is_terminator_enabled(def.key) then
+				off[#off + 1] = def.key
+			end
+		end
+		table.sort(off)
+		local ok_storage, Storage = pcall(require, "adapters.storage")
+		if ok_storage then Storage.set(TERMINATORS_KEY, table.concat(off, ",")) end
+	end
+
+	local function restore_terminators()
+		if not terminators_mod or type(terminators_mod.set_terminator_enabled) ~= "function" then return end
+		local ok_storage, Storage = pcall(require, "adapters.storage")
+		if not ok_storage then return end
+		local raw = Storage.get(TERMINATORS_KEY, "")
+		if type(raw) ~= "string" or raw == "" then return end
+		local count = 0
+		for key in raw:gmatch("[^,]+") do
+			terminators_mod.set_terminator_enabled(key, false)
+			count = count + 1
+		end
+		Logger.info(LOG, "Restored %d disabled word delimiter(s).", count)
+	end
+
+	restore_terminators()
+
 	-- 8.8) Start the keyboard hook adapter, in INTERCEPT mode by default.
 	--
 	-- Observe mode does not grab the device, so every physical keystroke reaches
@@ -771,6 +807,23 @@ local function main()
 			-- offers it because a pack is a file people edit, and finding it by
 			-- hand means knowing whether it came from the bundle or the user's own
 			-- directory — which is exactly what the loader already resolved.
+			-- Called by any menu row whose change the menu itself must reflect.
+			-- Persisting here rather than in the shared catalogue keeps that module
+			-- free of a storage dependency it has no other reason to carry.
+			on_menu_changed = function()
+				persist_terminators()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			-- Adding a delimiter needs a text field, and this driver's only text
+			-- field is the settings window. Opening it is honest; a native prompt
+			-- would mean a second dialog toolkit for one input.
+			on_add_delimiter = function()
+				if type(webview_manager) == "table" and type(webview_manager.show) == "function" then
+					webview_manager.show("hotstrings_config")
+				else
+					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
+				end
+			end,
 			on_open_file = function(path)
 				if type(path) ~= "string" or path == "" then return end
 				Logger.info(LOG, "Opening hotstring file: %s", path)

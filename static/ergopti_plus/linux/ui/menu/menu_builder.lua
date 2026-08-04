@@ -300,20 +300,81 @@ local function _manifest_hotstring_rows(ctx, config)
 				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
 				return
 			end
+
+			--- Every delimiter key currently known, custom ones included.
+			--- @return table Array of key strings.
+			local function all_keys()
+				local keys = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key then keys[#keys + 1] = def.key end
+				end
+				return keys
+			end
+
+			--- Sets every delimiter at once.
+			--- @param on boolean
+			--- @return function
+			local function set_all(on)
+				return function()
+					for _, key in ipairs(all_keys()) do
+						Terminators.set_terminator_enabled(key, on)
+					end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end
+			end
+
 			local sub = {}
+
+			-- The bulk rows first. A user turning delimiters off does it wholesale —
+			-- the point of the feature is "expand only on the key I chose" — and
+			-- clicking through twenty rows to get there is not an interface.
+			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.check_all"),   fn = set_all(true) }
+			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.uncheck_all"), fn = set_all(false) }
+			sub[#sub + 1] = { title = "-" }
+
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.type == "separator" then
 					sub[#sub + 1] = { title = "-" }
 				elseif def.key then
 					local key = def.key
+					local label = def.label or key
+					-- A consumed delimiter is swallowed by the expansion; an unconsumed
+					-- one is typed after it. The difference is visible only in the
+					-- output, so the row has to say which it is — a space that vanishes
+					-- and a space that stays look like a bug either way round.
+					local first_char = type(def.chars) == "table" and def.chars[1] or nil
+					if first_char and Terminators.terminator_is_consumed
+						and Terminators.terminator_is_consumed(first_char) then
+						label = label .. " " .. i18n_safe("menu.hotstrings.consumed_suffix")
+					end
 					sub[#sub + 1] = {
-						title = (def.label or key) .. (Terminators.is_terminator_enabled(key) and " ✓" or ""),
-						fn    = function()
+						title   = label,
+						checked = Terminators.is_terminator_enabled(key) and true or false,
+						fn      = function()
 							Terminators.set_terminator_enabled(key, not Terminators.is_terminator_enabled(key))
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
 					}
+					if def.custom then
+						sub[#sub + 1] = {
+							title = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
+							fn    = function()
+								Terminators.remove_custom_terminator(key)
+								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							end,
+						}
+					end
 				end
 			end
+
+			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.hotstrings.add_delimiter"),
+				fn    = function()
+					if type(ctx.on_add_delimiter) == "function" then ctx.on_add_delimiter() end
+				end,
+			}
+
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.word_expanders"), menu = sub }
 		end,
 		["delays_colors"] = function(items)
