@@ -14,21 +14,29 @@ helpers.describe("tray.protocol", function()
       helpers.assert_eq(TP.build_menu_item_xml(nil, 1), "")
     end)
 
+    -- ONE NODE VOCABULARY, AND THESE CASES USED TO BE THE ONLY THING WRITING THE
+    -- OTHER ONE. They fed `separator = true`, `enabled` and `items`; no driver
+    -- ever produced a single one of those keys. The menu builders write
+    -- hs.menubar-shaped nodes — a row titled "-", `disabled`, `menu` — so this
+    -- serialiser and its tests agreed with each other and with nothing else, and
+    -- the SNI backend silently dropped every submenu it was handed. Rewritten to
+    -- the spelling the callers use, with the abandoned one pinned as dead below.
+
     helpers.it("generates separator item", function()
-      local xml = TP.build_menu_item_xml({ separator = true }, 5)
+      local xml = TP.build_menu_item_xml({ title = "-" }, 5)
       helpers.assert_true(xml:find('id="5"'), "has id")
       helpers.assert_true(xml:find("separator"), "has separator type")
     end)
 
-    helpers.it("generates standard item with title and enabled", function()
-      local xml = TP.build_menu_item_xml({ title = "Options", enabled = true }, 1)
+    helpers.it("generates standard item with title, enabled by default", function()
+      local xml = TP.build_menu_item_xml({ title = "Options" }, 1)
       helpers.assert_true(xml:find("Options"), "has title")
       helpers.assert_true(xml:find("standard"), "has standard type")
       helpers.assert_true(xml:find('value="true"'), "enabled = true")
     end)
 
     helpers.it("generates disabled item", function()
-      local xml = TP.build_menu_item_xml({ title = "Greyed", enabled = false }, 1)
+      local xml = TP.build_menu_item_xml({ title = "Greyed", disabled = true }, 1)
       helpers.assert_true(xml:find('value="false"'), "enabled = false")
     end)
 
@@ -38,11 +46,26 @@ helpers.describe("tray.protocol", function()
       helpers.assert_true(xml:find("toggle-state", 1, true), "has toggle-state")
     end)
 
+    helpers.it("reads exactly one spelling — the abandoned keys do nothing", function()
+      -- Not pedantry: a half-revert that restores `items` alongside `menu` is how
+      -- two vocabularies came back the first time, and the failure mode is silent.
+      -- These assertions make the second spelling visible the moment it returns.
+      local sep = TP.build_menu_item_xml({ title = "x", separator = true }, 1)
+      helpers.assert_true(sep:find("separator") == nil,
+        "`separator = true` is not the separator spelling — a row titled \"-\" is")
+      local sub = TP.build_menu_item_xml({ title = "P", items = { { title = "C" } } }, 1)
+      helpers.assert_true(sub:find("C", 1, true) == nil,
+        "`items` is not the submenu spelling — `menu` is")
+      local off = TP.build_menu_item_xml({ title = "P", enabled = false }, 1)
+      helpers.assert_true(off:find('value="true"') ~= nil,
+        "`enabled` is not the availability spelling — `disabled` is")
+    end)
+
     helpers.it("generates item with sub-items (recursive)", function()
       local xml = TP.build_menu_item_xml({
         title = "Parent",
-        items = {
-          { title = "Child A", enabled = true },
+        menu = {
+          { title = "Child A" },
           { title = "Child B", checked = true },
         },
       }, 1)
@@ -88,8 +111,8 @@ helpers.describe("tray.protocol", function()
     helpers.it("generates XML for multiple items", function()
       local xml = TP.build_dbus_menu_xml({
         { title = "Enable All", checked = true },
-        { separator = true },
-        { title = "Quit", enabled = true },
+        { title = "-" },
+        { title = "Quit" },
       })
       helpers.assert_true(xml:find("Enable All"), "has first item")
       helpers.assert_true(xml:find("separator"), "has separator")

@@ -161,7 +161,11 @@ local function _sni_rebuild_menu_xml()
 		_sni_register_callbacks(item)
 	end
 
-	-- Serialise the items array into dbusmenu XML.
+	-- Serialise the items array into dbusmenu XML. The serialiser reads the same
+	-- node vocabulary _sni_register_callbacks walks just above — `menu` for
+	-- children, `disabled`, a row titled "-" for a separator — so the two walks
+	-- see the same tree and their id * 1000 + i numbering agrees. It did not
+	-- until 2026-08-04, and every submenu was dropped on the way to D-Bus.
 	local xml = tp.build_dbus_menu_xml(_sni_items)
 
 	-- Write to a temp file so gdbus can reference it by path.
