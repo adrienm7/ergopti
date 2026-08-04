@@ -27,6 +27,11 @@
 local M = {}
 
 local Logger = require("logger.shim")
+-- The focused-window question belongs to one adapter. This file used to answer
+-- it a second time, with its own xdotool calls, and it was the copy that fed the
+-- keystroke path — so teaching WindowInfo about Wayland would have changed
+-- nothing a user experiences.
+local WindowInfo = require("adapters.window_info")
 
 local LOG = "adapters.process_lifecycle"
 
@@ -48,7 +53,7 @@ local _focus_callbacks  = {}
 local _launch_callbacks = {}
 local _quit_callbacks   = {}
 local _running          = false
-local _last_window_id   = nil
+local _last_focus_key   = nil
 local _last_processes   = {}   -- set: process_name -> true
 
 -- Timer handles (LuaJIT/luaposix compatible; we use a simple background thread
@@ -65,38 +70,37 @@ local _process_thread = nil
 -- =========================================
 -- =========================================
 
---- Returns the currently focused window ID via xdotool, or nil.
-local function _get_active_window_id()
-	local fh = io.popen("xdotool getactivewindow 2>/dev/null", "r")
-	if not fh then return nil end
-	local out = fh:read("*a")
-	fh:close()
-	return tonumber(out:match("%d+"))
+-- Joins the application identity and the window title into one comparable key.
+-- A control character rather than a printable one: a window title may legally
+-- contain any punctuation, and a separator that can occur in the data makes two
+-- different focus states compare equal.
+local FOCUS_KEY_SEPARATOR = "\1"
+
+--- Returns { appId, windowTitle } for the focused window, both "" when unknown.
+---
+--- Delegates rather than asking X11 itself. This file used to carry a second,
+--- independent xdotool implementation — and it was the one that fed the
+--- keystroke path's application cache, so the WindowInfo adapter could have been
+--- made to speak every Wayland compositor without changing anything a user sees.
+--- One question, one answer, wherever the answer has to come from.
+--- @return string appId, string windowTitle
+local function _focused_identity()
+	local ok, info = pcall(WindowInfo.getFocused)
+	if not ok or type(info) ~= "table" then return "", "" end
+	return info.appId or "", info.windowTitle or ""
 end
 
---- Returns { appId, windowTitle } for a window ID, or empty strings.
-local function _get_window_info(wid)
-	if not wid then return "", "" end
-	local fh_name = io.popen(
-		string.format("xdotool getwindowname %d 2>/dev/null", wid), "r")
-	local title = ""
-	if fh_name then
-		title = fh_name:read("*a") or ""
-		fh_name:close()
-		title = title:match("^%s*(.-)%s*$")
-	end
-	-- xprop WM_CLASS gives the app name
-	local fh_cls = io.popen(
-		string.format("xprop -id %d WM_CLASS 2>/dev/null", wid), "r")
-	local app_name = ""
-	if fh_cls then
-		local cls_out = fh_cls:read("*a") or ""
-		fh_cls:close()
-		-- WM_CLASS = "instance", "ClassName"
-		app_name = cls_out:match('"([^"]+)",%s*"[^"]+"%s*$') or
-		           cls_out:match('"([^"]+)"') or ""
-	end
-	return app_name, title
+--- A value that changes exactly when the focused window's identity changes.
+---
+--- Includes the TITLE, not just the application. A browser switching to a
+--- private window keeps its process and its window, and that transition is the
+--- one the password-suppression feature exists to notice — keying on the window
+--- id, as this did, made it structurally invisible.
+--- @param app_id string
+--- @param title string
+--- @return string
+local function _focus_key(app_id, title)
+	return app_id .. FOCUS_KEY_SEPARATOR .. title
 end
 
 --- Returns a set (name -> true) of currently running process names via ps.
@@ -158,9 +162,7 @@ end
 function M.getForegroundApp()
 	local empty = { appId = "", windowTitle = "" }
 	local ok, result = pcall(function()
-		local wid = _get_active_window_id()
-		if not wid then return empty end
-		local app_name, title = _get_window_info(wid)
+		local app_name, title = _focused_identity()
 		return { appId = app_name, windowTitle = title }
 	end)
 	if not ok then
@@ -175,7 +177,7 @@ end
 function M.start()
 	if _running then return end
 	_running = true
-	_last_window_id = _get_active_window_id()
+	_last_focus_key = _focus_key(_focused_identity())
 	_last_processes = _snapshot_processes()
 
 	-- Focus polling loop: runs as a background coroutine ticked by the caller.
@@ -195,7 +197,7 @@ end
 function M.stop()
 	if not _running then return end
 	_running = false
-	_last_window_id = nil
+	_last_focus_key = nil
 	_last_processes = {}
 	Logger.debug(LOG, "stop(): polling adapters stopped.")
 end
@@ -210,10 +212,10 @@ function M.tick(tick_count)
 
 	-- Focus-change check (every tick)
 	local ok_f = pcall(function()
-		local wid = _get_active_window_id()
-		if wid ~= _last_window_id then
-			_last_window_id = wid
-			local app_name, title = _get_window_info(wid)
+		local app_name, title = _focused_identity()
+		local key = _focus_key(app_name, title)
+		if key ~= _last_focus_key then
+			_last_focus_key = key
 			for _, cb in ipairs(_focus_callbacks) do
 				pcall(cb, app_name, title)
 			end
