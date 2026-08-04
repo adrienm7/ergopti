@@ -3,11 +3,12 @@
 --- ==============================================================================
 --- MODULE: Ergopti Hotstrings Daemon (Linux)
 --- DESCRIPTION:
---- Entry point for the Linux hotstring daemon. Reads keyboard events from an
---- evdev device via the keyboard_hook adapter (libinput/evtest subprocess),
---- matches the rolling typing buffer against loaded hotstring definitions,
---- and replays expansions via ydotool (uinput). Runs a pump-based event loop
---- that also services the tray_menu signal-file callbacks.
+--- Entry point for the Linux hotstring daemon. Reads keyboard events straight
+--- from an evdev device through the keyboard_hook adapter, which holds
+--- EVIOCGRAB and re-emits every event through its own uinput device; matches the
+--- rolling typing buffer against loaded hotstring definitions; and types
+--- expansions as keystrokes resolved against the session's real XKB layout. Runs
+--- a pump-based event loop that also services the tray_menu callbacks.
 ---
 --- USAGE:
 ---   luajit ergopti_hotstrings.lua [OPTIONS]
@@ -17,18 +18,22 @@
 ---                       ~/.config/ergopti/hotstrings/ if that directory exists.
 ---   --device  <path>   Evdev device to listen on (e.g. /dev/input/event3).
 ---                       When omitted, device_finder auto-selects the keyboard.
----   --layout  <name>   Keyboard layout for keycode mapping: "qwerty" or
----                       "azerty". Default: auto-detect from $XKBLAYOUT env var.
+---   --layout  <name>   INPUT layout for keycode-to-character mapping: "qwerty"
+---                       or "azerty". Default: auto-detect from $XKBLAYOUT.
+---   --keymap  <path>   OUTPUT layout override: a keymap dump to type against,
+---                       for a session whose keymap cannot be probed. Normally
+---                       unnecessary — the layout is read from the server.
 ---   --tray             Enable the tray icon (requires yad).
 ---   --dry-run          Log matches without injecting any keystrokes.
 ---   --verbose          Enable debug-level logging.
 ---   --help             Print usage and exit.
 ---
 --- FEATURES & RATIONALE:
---- 1. Pump-based event loop: keyboard_hook.pump() reads from the evdev subprocess
----    pipe in batches of 50 lines; tray_menu.pump() reads the signal file for
----    menu callbacks. Both are called on each iteration so tray menu interactions
----    are serviced even when the user is typing rapidly.
+--- 1. Pump-based event loop: keyboard_hook.pump() drains whatever the grabbed
+---    device has ready, without blocking; tray_menu.pump() services menu
+---    callbacks. Both run on each iteration, so the tray and every timer advance
+---    whether or not anyone is typing — which was not true while capture went
+---    through a blocking pipe read.
 --- 2. Modular architecture: each concern (loading, matching, injection, input,
 ---    metrics, tray) lives in its own adapter/module so individual pieces can
 ---    be unit-tested or swapped without touching this file.
@@ -97,6 +102,7 @@ local LOG = "ergopti_hotstrings"
 local engine_mod        = require("modules.hotstrings.engine")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
+local keyboard_layout   = require("adapters.keyboard_layout")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
@@ -224,6 +230,7 @@ local function parse_args()
 		elseif a == "--config"  and arg[i+1]  then i = i + 1; opts.config = arg[i]
 		elseif a == "--device"  and arg[i+1]  then i = i + 1; opts.device = arg[i]
 		elseif a == "--layout"  and arg[i+1]  then i = i + 1; opts.layout = arg[i]
+		elseif a == "--keymap"  and arg[i+1]  then i = i + 1; opts.keymap = arg[i]
 		else
 			Logger.warn(LOG, "Unknown argument '%s' — ignored.", tostring(a))
 		end
@@ -632,6 +639,16 @@ local function main()
 		print("Le daemon a besoin d'y écrire pour rendre les touches qu'il intercepte.")
 		print("Corrigez les permissions (bash install.sh --setup-perms) ou lancez avec --no-grab.")
 		os.exit(1)
+	end
+
+	-- Resolve the OUTPUT layout before the first expansion can fire. This is the
+	-- inverse of the capture layout and a different question entirely: capture
+	-- turns a keycode into the character the user typed, injection turns a
+	-- character into the keycode that produces it under THEIR layout. Without it
+	-- every accented replacement is typed as whatever the US layout would put on
+	-- that key, which is the defect ydotool has never been able to fix.
+	if not keyboard_layout.refresh(opts.keymap) then
+		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 
 	keyboard_hook.start({
