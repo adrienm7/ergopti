@@ -689,6 +689,32 @@ jobs:
           sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
         timeout-minutes: 2
 
+      # The property the whole Linux milestone is named after: keystrokes arriving
+      # DURING an expansion come out after it, in order. It was verified by reading
+      # only — a recorded backend can assert the order our code intends and is
+      # structurally incapable of asserting that the kernel agrees, and a grab in
+      # particular is invisible to a mock (ioctl returning 0 to a recorder says
+      # nothing about whether the desktop still sees the device).
+      - name: Hold the grab under an interleaved burst
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
+        timeout-minutes: 2
+
+      # No display server needed: `xkbcli compile-keymap --layout fr` produces the
+      # same text a live session dumps. The session decides WHICH layout is active
+      # and has nothing to do with what a layout contains — so "can the driver read
+      # a real French keymap" is checkable here, and only "is é right on YOUR
+      # keyboard" needs a person. Every layout test before this one parsed a keymap
+      # this repository wrote, which tests the parser against its author's
+      # assumptions.
+      - name: Resolve real system keymaps
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends libxkbcommon-tools xkb-data
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
+        timeout-minutes: 3
+
   # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
   # ─────────────────────────────────────────────────

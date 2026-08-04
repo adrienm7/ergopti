@@ -1263,13 +1263,40 @@ déclarée.
 > machine Linux avec un serveur d'affichage, un panneau et une vraie disposition
 > clavier ; ce checkout est sous Windows. Les cocher serait mentir.
 >
-> Ce qui *était* livrable d'ici l'est : **`tests/hardware/validate.sh`** répond à
-> tout ce qu'une machine peut répondre — permissions, groupes, `/dev/uinput`,
-> serveur d'affichage, dump de keymap et son compte de touches, outils de
-> presse-papiers, nombre d'unités systemd installées, présence d'un hôte
-> StatusNotifierItem — puis pose une à une les douze questions qui demandent
-> vraiment des yeux, et écrit **un seul rapport** couvrant les deux moitiés.
-> Vérifié : il échoue proprement hors Linux au lieu de faire semblant.
+> Ce qui *était* livrable d'ici l'est, et il y en avait plus que « une checklist
+> en prose ». Deux de ces sept points avaient un **cœur mécanisable qui n'avait
+> jamais été écrit** :
+>
+> - **`tests/hardware/run_grab_race.lua`** — la propriété qui donne son nom au
+>   jalon (`"abcd"` → `"acd"`, §4 de HARDWARE.md) n'était vérifiée **que par
+>   lecture**. Un backend enregistré peut affirmer l'ordre que notre code
+>   *entend*, et il est structurellement incapable d'affirmer que le noyau est
+>   d'accord ; un grab en particulier est invisible pour un mock — un `ioctl` qui
+>   retourne 0 à un enregistreur ne dit rien de si le bureau voit encore le
+>   périphérique. Ce harnais crée un vrai clavier, prend le grab, écrit une rafale
+>   **entrelacée** (effacements synthétiques + frappes utilisateur au milieu) et
+>   vérifie qu'elle revient entière et dans l'ordre.
+> - **`tests/hardware/run_layout_resolution.lua`** — chaque test unitaire de
+>   `keyboard_layout` analysait une keymap **que ce dépôt a écrite**, c'est-à-dire
+>   testait l'analyseur contre les hypothèses de son auteur. Celui-ci compile les
+>   vraies dispositions système (`fr`, `es`, `us`, `de`) et vérifie que chacune
+>   tape ses propres accents **et refuse ceux des autres, en entier**. Et il ne
+>   demande **aucun serveur d'affichage** : `xkbcli compile-keymap` produit le
+>   même texte qu'un dump de session — la session décide *quelle* disposition est
+>   active, pas ce qu'une disposition contient. C'est ce qui le rend exécutable en
+>   CI, et c'est le cas « pack espagnol sur clavier français » vérifié pour de bon.
+>
+> Les deux sont câblés dans le job `test-linux` existant **en étapes, pas en jobs**
+> (les minutes GitHub Actions sont à 95 %), et appelés par `validate.sh`.
+>
+> **`tests/hardware/validate.sh`** répond en plus à tout ce qu'une machine peut
+> répondre — permissions, groupes, `/dev/uinput`, serveur d'affichage, dump de
+> keymap et son compte de touches, outils de presse-papiers, nombre d'unités
+> systemd installées, présence d'un hôte StatusNotifierItem — puis pose une à une
+> les questions qui demandent vraiment des yeux, et écrit **un seul rapport**
+> couvrant les deux moitiés. Vérifié : les trois harnais sortent en **2**
+> (« cette machine ne peut pas héberger ce test ») hors Linux, distinct d'un
+> échec — sinon un runner mal configuré se lirait comme un driver cassé.
 >
 > Le reste est une liste que personne ne rejoue, donc qui cesse d'être vraie sans
 > que personne le remarque — c'est précisément pourquoi la moitié mécanisable est
