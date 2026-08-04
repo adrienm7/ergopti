@@ -258,7 +258,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "hotstrings.preview_autocorrect_enabled", "section", "hotstrings", "reason_key", "", "platforms", ["hs"]),
         Map("path", "hotstrings.preview_colored_tooltips", "section", "hotstrings", "reason_key", "", "platforms", ["hs"]),
         Map("path", "hotstrings.preview_star_enabled", "section", "hotstrings", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "llm.models.mlx", "section", "llm.models", "reason_key", "", "platforms", ["hs"]),
+        Map("path", "llm.models.mlx", "section", "llm.models", "reason_key", "platform_reason.llm_mlx_is_apple_silicon", "platforms", ["hs"]),
         Map("path", "llm.trigger.shortcut", "section", "llm.trigger", "reason_key", "", "platforms", ["hs"]),
         Map("path", "llm.navigation.arrow_nav_enabled", "section", "llm.navigation", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.enabled", "section", "shortcuts", "reason_key", "", "platforms", ["hs"]),

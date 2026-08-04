@@ -32,6 +32,15 @@
  * 2. Ordering divergences are declared with a reason. Linux is not required to
  *    match the manifest's ORDER — a tray menu has its own conventions — but a
  *    divergence has to be written down rather than discovered.
+ * 3. macOS and Windows handle exactly the tail rows the manifest declares for
+ *    them. Added 2026-08-04, because "those two render from the manifest" was
+ *    true and misleading: they iterate it and dispatch each id through a
+ *    hardcoded if/elseif chain, so the manifest supplies the ORDER and the driver
+ *    supplies every ROW. An id added to the manifest and not to a chain renders
+ *    nothing; an id removed leaves a dead branch. Their own drift gates compare
+ *    the manifest against a hand-typed list and cannot see either. Linux — the
+ *    driver with no manifest renderer at all — was the only one whose real
+ *    builder was ever read.
  *
  * WHAT IT DELIBERATELY DOES NOT DO:
  * render the three menus and diff their translated labels. That needs Linux to
@@ -206,7 +215,126 @@ if (declaredOrder !== builtOrder && !KNOWN_ORDER_DIVERGENCES.linux) {
 
 // ==================================================
 // ==================================================
-// ======= 4/ Report ================================
+// ======= 4/ And so must the other two =============
+// ==================================================
+// ==================================================
+
+// WHY THIS EXISTS, AND WHY IT WAS THE HOLE NOBODY SAW.
+// macOS and Windows both "render from the manifest", which is true and hid the
+// gap: they iterate the manifest's tail and dispatch each id through a hardcoded
+// if/elseif chain. The rows are NOT generic — the manifest supplies the order,
+// the driver supplies every row. So an id added to the manifest and not to a
+// chain renders nothing, and an id removed from the manifest leaves a dead
+// branch, and until 2026-08-04 neither was checked anywhere.
+//
+// Both drivers do have a drift gate — macos/tests/meta/ and windows/tests/meta/
+// test_menu_top_level_drift_gate.{lua,ahk} — but each compares the manifest
+// against a HAND-TYPED list of ids. That alarms on manifest edits and says
+// nothing about the drivers. Linux, the driver with no manifest renderer at all,
+// was the only one whose real builder was read (section 2 above). Generalising
+// that read to the other two is smaller than writing two more drift gates, and
+// it is what eventually makes the two hand-typed lists redundant.
+//
+// Order is deliberately NOT compared here. Both chains iterate the manifest and
+// dispatch, so the ORDER a user sees is the manifest's whatever order the
+// branches happen to be written in. Only membership can be wrong.
+
+const DRIVER_TAIL_CHAINS = {
+	hs: {
+		file: path.join(SP, 'macos', 'ui', 'menu', 'builder.lua'),
+		label: 'macos/ui/menu/builder.lua',
+		// The tail loop. Its nested submenu chains compare `gid` and `did`, so a
+		// word-boundary match on `id` selects the top level and only the top level.
+		start: 'for _, entry in ipairs(load_top_level_tail()) do',
+		end: '\n\tend\n',
+		id: /\bid == "([^"]+)"/g
+	},
+	ahk: {
+		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_init.ahk'),
+		label: 'windows/ui/menu/menu_init.ahk',
+		start: '_MI_AppendTail() {',
+		end: '\n}',
+		id: /\bId == "([^"]+)"/g
+	}
+};
+
+// Floor. A regex that stops matching would report the driver as building nothing
+// and then complain that the manifest declares everything — loud, but for the
+// wrong reason, and the fix would be to the wrong file.
+const MIN_TAIL_IDS = 8;
+
+// The tail is the manifest's own boundary between feature menus and system-wide
+// actions: both drivers slice top_level from `global_actions` onward, and Linux
+// builds the same rows through its own functions.
+const TAIL_ANCHOR = 'global_actions';
+
+/**
+ * The tail ids the manifest declares for one driver.
+ * @param {string} driver "hs" or "ahk".
+ * @returns {string[]}
+ */
+function tailProjectionFor(driver) {
+	const rows = topLevel || [];
+	const at = rows.findIndex((row) => row && row.id === TAIL_ANCHOR);
+	if (at < 0) return [];
+	return rows
+		.slice(at)
+		.filter((row) => !row.platforms || row.platforms.includes(driver))
+		.map((row) => row.id)
+		.filter((id) => id !== SEPARATOR);
+}
+
+for (const [driver, spec] of Object.entries(DRIVER_TAIL_CHAINS)) {
+	const src = fs.readFileSync(spec.file, 'utf8');
+	const from = src.indexOf(spec.start);
+	if (from < 0) {
+		errors.push(
+			`${spec.label}: could not find "${spec.start}" — the dispatch chain moved or was renamed, ` +
+				'and this comparison reads nothing. Repoint it; do not delete it.'
+		);
+		continue;
+	}
+	const rest = src.slice(from);
+	const to = rest.indexOf(spec.end);
+	const block = to > 0 ? rest.slice(0, to) : rest;
+	const built = [...block.matchAll(spec.id)].map((m) => m[1]).filter((id) => id !== SEPARATOR);
+
+	if (built.length < MIN_TAIL_IDS) {
+		errors.push(
+			`${spec.label}: read only ${built.length} tail id(s) (floor ${MIN_TAIL_IDS}) — the scan is ` +
+				'broken, so the comparison below would report the manifest as wholly unimplemented'
+		);
+		continue;
+	}
+
+	const declared = new Set(tailProjectionFor(driver));
+	const handled = new Set(built);
+
+	const unhandled = [...declared].filter((id) => !handled.has(id));
+	if (unhandled.length > 0) {
+		errors.push(
+			`the manifest declares ${unhandled.length} tail row(s) for ${driver} that ${spec.label} has no ` +
+				`branch for: ${unhandled.join(', ')}. The loop will reach the id and fall through, so the ` +
+				'row is in the manifest, counted by every gate, and invisible in the menu.'
+		);
+	}
+
+	const orphaned = [...handled].filter((id) => !declared.has(id));
+	if (orphaned.length > 0) {
+		errors.push(
+			`${spec.label} has ${orphaned.length} branch(es) for tail row(s) the manifest does not declare ` +
+				`for ${driver}: ${orphaned.join(', ')}. Either the manifest dropped the row and this is dead ` +
+				'code, or a platform restriction excludes it and the branch is unreachable.'
+		);
+	}
+}
+
+
+
+
+// ==================================================
+// ==================================================
+// ======= 5/ Report ================================
 // ==================================================
 // ==================================================
 
@@ -218,8 +346,9 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] top-level menu shape agrees: manifest projects ${projections.ahk.length} row(s) for ` +
-		`Windows, ${projections.hs.length} for macOS, ${projections.linux.length} for Linux, and ` +
-		`menu_builder.lua builds exactly those ${linuxBuilt.length}.\x1b[0m`
+		`Windows, ${projections.hs.length} for macOS, ${projections.linux.length} for Linux; ` +
+		`menu_builder.lua builds exactly those ${linuxBuilt.length}, and both dispatch chains handle ` +
+		'exactly the tail rows their driver is declared for.\x1b[0m'
 );
 for (const [driver, why] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {
 	console.log(`     · ${driver} order: ${why}`);

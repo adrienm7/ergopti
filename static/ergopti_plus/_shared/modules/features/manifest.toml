@@ -898,6 +898,13 @@ default = "Qwen3.5-2B"
 type = "string"
 description_key = "menu.llm.models.mlx"
 platforms = ["hs"]
+# Deuxième raison écrite (2026-08-04), même forme que la première : elle dit ce
+# que la plateforme ne peut pas faire. MLX est le moteur d'inférence local
+# d'Apple, bâti sur Metal et la mémoire unifiée d'Apple Silicon ; il n'en existe
+# pas de version Windows ni Linux, donc la restriction ne dépend d'aucun travail
+# à faire ici. C'est le critère : une raison ne s'écrit que quand elle reste
+# vraie même si tout le reste était codé.
+reason_key = "platform_reason.llm_mlx_is_apple_silicon"
 
 
 
