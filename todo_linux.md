@@ -1141,6 +1141,15 @@ déclarée.
 
 ## 10. Validation sur matériel réel (aucune n'est couverte par le CI)
 
+> **Procédure écrite** : `static/ergopti_plus/linux/HARDWARE.md` — chaque point
+> ci-dessous y a sa commande et la réponse attendue, dans un ordre où un échec
+> précoce rend les suivants ininterprétables. Une chose *est* désormais couverte
+> par le CI : `tests/hardware/run_uinput_roundtrip.lua` crée un vrai clavier
+> virtuel, le grab, écrit et relit — ce qui épingle les numéros d'ioctl, la
+> disposition du struct et les bits de capacité. Il tourne sans écran, donc il ne
+> dit rien d'un serveur d'affichage, d'un compositeur, d'un panneau ni d'une
+> disposition clavier.
+
   → `test-linux-package-layout` étendu (unité unique, PartOf, pas de DISPLAY,
   PKGBUILD, assets de release), `test-kanata-defalias-parity` étendu (coordination
   des périphériques), `test-tooltip-positioning-reach` mis à jour (Linux lit
