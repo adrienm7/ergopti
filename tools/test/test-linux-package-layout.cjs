@@ -322,6 +322,42 @@ if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
 	);
 }
 
+// ─── 9. The release publishes something installable ────────────────────────
+//
+// ROOT CAUSE ENCODED: the Linux release uploaded install.sh, the wrapper, and
+// ONE Lua file — ergopti_hotstrings.lua. Not the driver tree, not _shared. A
+// user who downloaded the release got an installer, no driver, and no way to
+// discover that until it failed. The asset list looked plausible because every
+// path in it existed.
+//
+// The archive must carry the driver AND the shared tree, and must preserve
+// their relative layout: the daemon resolves _shared as a SIBLING of the driver
+// root, so an archive that flattens them installs a tree the daemon cannot
+// navigate.
+
+const WORKFLOW = '.github/workflows/ci.yml';
+const workflowSrc = read(WORKFLOW);
+
+// Tolerant of a shell line continuation: the archive command may be written on
+// one line or split across two, and the members are what matter either way.
+const tarLine = workflowSrc.match(/tar -czf[\s\S]{0,200}?-C build\/linux ([^\n]*)/);
+if (!tarLine) {
+	errors.push(
+		`${WORKFLOW}: the Linux release must archive the driver bundle. Publishing ` +
+		`individual files shipped an installer with no driver behind it.`
+	);
+} else {
+	const members = tarLine[1].trim().split(/\s+/);
+	for (const required of ['linux', '_shared', 'bin', 'install.sh']) {
+		if (!members.includes(required)) {
+			errors.push(
+				`${WORKFLOW}: the release archive omits "${required}" — ` +
+				`without it the downloaded release cannot install or cannot start.`
+			);
+		}
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);

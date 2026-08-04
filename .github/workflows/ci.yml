@@ -1277,6 +1277,20 @@ jobs:
           (cd static/ergopti/linux && zip -r "../../../build/linux/xkb/Ergopti_xkb.zip" "$dir_name")
           echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
+      # A tarball, because the release used to publish install.sh, one wrapper
+      # and ONE Lua file — so a user who downloaded it had an installer, no
+      # driver and no shared tree, and could not install anything. The daemon
+      # resolves _shared as a SIBLING of the driver, so the archive preserves
+      # that layout rather than flattening it.
+      - name: Package the installable bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf build/linux/ergopti-plus-linux.tar.gz               -C build/linux linux _shared bin install.sh kanata.kbd
+          echo "Bundle contents:"
+          tar -tzf build/linux/ergopti-plus-linux.tar.gz | head -20
+          echo "... $(tar -tzf build/linux/ergopti-plus-linux.tar.gz | wc -l) entries"
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -1284,10 +1298,7 @@ jobs:
           retention-days: 1
           path: |
             build/linux/xkb/Ergopti_xkb.zip
-            build/linux/kanata.kbd
-            build/linux/install.sh
-            build/linux/bin/ergopti-hotstrings
-            build/linux/linux/ergopti_hotstrings.lua
+            build/linux/ergopti-plus-linux.tar.gz
 
   # ============================================================
   # ============================================================
