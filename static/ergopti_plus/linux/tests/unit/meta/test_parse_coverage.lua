@@ -40,6 +40,13 @@ local helpers = require("tests.helpers")
 --- - vendor/  third-party source, kept verbatim; not ours to fix.
 local EXCLUDED = { "/tests/", "/vendor/" }
 
+--- Test trees the runner never loads, so the "compiles itself by running"
+--- exemption above does not apply to them. tests/hardware/ runs only in the CI
+--- job that needs a real kernel, which means a syntax error there is invisible
+--- to every developer and to every other job — the exact shape of failure this
+--- gate exists to remove.
+local UNLOADED_TEST_TREES = { "/tests/hardware/" }
+
 --- Lower bound on the production file count. Measured at 72 when this landed;
 --- set below that so ordinary growth or a small refactor does not trip it, but
 --- far enough above zero that a walk returning nothing fails loudly.
@@ -68,6 +75,12 @@ local function production_files()
 	local function keep(path)
 		local normalised = path:gsub("\\", "/")
 		if not normalised:match("%.lua$") then return end
+		for _, kept in ipairs(UNLOADED_TEST_TREES) do
+			if normalised:find(kept, 1, true) then
+				files[#files + 1] = normalised
+				return
+			end
+		end
 		for _, skip in ipairs(EXCLUDED) do
 			if normalised:find(skip, 1, true) then return end
 		end
@@ -120,6 +133,19 @@ helpers.describe("linux: every production Lua file compiles", function()
 		helpers.assert_true(#files >= MIN_FILES,
 			string.format("expected at least %d production .lua file(s), found %d — a walk that finds nothing reports zero parse errors and reads as a pass",
 				MIN_FILES, #files))
+	end)
+
+	helpers.it("the hardware harness is part of the scan", function()
+		-- It is the one Lua file in this driver that no developer and no other CI
+		-- job ever loads: it needs a real /dev/uinput. Without this, a typo in it
+		-- surfaces as a red job on a branch nobody expected to touch the kernel.
+		local found = false
+		for _, path in ipairs(files) do
+			if path:find("/tests/hardware/", 1, true) then found = true break end
+		end
+		helpers.assert_true(found,
+			"tests/hardware/ must be compiled by this gate — the suite runner does not "
+				.. "discover it, so nothing else ever parses it")
 	end)
 
 	helpers.it("the entry point is part of the scan", function()

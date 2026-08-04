@@ -685,35 +685,86 @@ jobs:
         timeout-minutes: 5
 
   # ─────────────────────────────────────────────────
-  # 4.3) Gate: Linux driver fully green
+  # 4.3) Linux uinput ⇄ evdev round trip (REAL kernel)
+  # ─────────────────────────────────────────────────
+  # The only job in this workflow that touches a real kernel input path. Every
+  # other test of the two FFI adapters runs against a recorded syscall backend,
+  # which is the right shape for asserting order and sequence and structurally
+  # incapable of asserting the one thing left: that the kernel accepts what we
+  # send it. Four values decide that and none is observable from a mock — the
+  # ioctl request numbers, the struct size, the field offsets, and the capability
+  # bits registered before UI_DEV_CREATE. Get any of them wrong and every unit
+  # test still passes while a real machine gets nothing at all.
+  uinput-linux:
+    name: 'Linux · uinput round trip (real kernel)'
+    runs-on: ubuntu-latest
+    needs: [test-linux]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
+
+      # Separated from the harness on purpose: "this runner image has no uinput"
+      # and "our ioctl numbers are wrong" are different findings, and a harness
+      # that reported them the same way would let the first one hide the second.
+      - name: Load the uinput module
+        run: |
+          sudo modprobe uinput
+          if [ ! -e /dev/uinput ]; then
+              echo "::error::/dev/uinput is absent after modprobe — the runner image cannot host this test."
+              echo "This is an ENVIRONMENT failure, not a driver failure. Check whether the"
+              echo "ubuntu-latest image still ships the uinput module before touching the driver."
+              exit 1
+          fi
+          ls -l /dev/uinput
+
+      - name: Round-trip real events through the kernel
+        working-directory: static/ergopti_plus/linux
+        # Root because /dev/uinput is root-owned until the udev rule that
+        # install.sh --setup-perms writes is in place. `sudo env` rather than
+        # `sudo -E` so the path is set explicitly and does not depend on which
+        # variables the runner's sudoers happens to preserve.
+        run: |
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" \
+              luajit tests/hardware/run_uinput_roundtrip.lua
+        timeout-minutes: 3
+
+  # ─────────────────────────────────────────────────
+  # 4.4) Gate: Linux driver fully green
   # ─────────────────────────────────────────────────
   linux-ok:
     name: 'Linux · ✅ all green'
     runs-on: ubuntu-latest
-    needs: [test-linux, e2e-linux]
+    needs: [test-linux, e2e-linux, uinput-linux]
     if: always()
 
     steps:
       - name: Assert all Linux jobs passed
         run: |
           failed=0
-          for job_result in "${{ needs.test-linux.result }}" "${{ needs.e2e-linux.result }}"; do
+          for job_result in "${{ needs.test-linux.result }}" "${{ needs.e2e-linux.result }}" "${{ needs.uinput-linux.result }}"; do
               if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
                   failed=1
               fi
           done
           if [[ $failed -eq 1 ]]; then
               echo "Linux driver: one or more jobs failed."
-              echo "  test-linux : ${{ needs.test-linux.result }}"
-              echo "  e2e-linux  : ${{ needs.e2e-linux.result }}"
+              echo "  test-linux   : ${{ needs.test-linux.result }}"
+              echo "  e2e-linux    : ${{ needs.e2e-linux.result }}"
+              echo "  uinput-linux : ${{ needs.uinput-linux.result }}"
               exit 1
           fi
           echo "Linux driver: all jobs passed (or skipped)."
-          echo "  test-linux : ${{ needs.test-linux.result }}"
-          echo "  e2e-linux  : ${{ needs.e2e-linux.result }}"
+          echo "  test-linux   : ${{ needs.test-linux.result }}"
+          echo "  e2e-linux    : ${{ needs.e2e-linux.result }}"
+          echo "  uinput-linux : ${{ needs.uinput-linux.result }}"
 
   # ─────────────────────────────────────────────────
-  # 4.4) Validate .deb package structure
+  # 4.5) Validate .deb package structure
   # ─────────────────────────────────────────────────
   build-deb:
     name: 'Linux · .deb structure'
@@ -735,7 +786,7 @@ jobs:
         run: bash tools/build/build-linux-deb.sh --skip-deb
 
   # ─────────────────────────────────────────────────
-  # 4.5) Validate .rpm package structure
+  # 4.6) Validate .rpm package structure
   # ─────────────────────────────────────────────────
   build-rpm:
     name: 'Linux · .rpm structure'
