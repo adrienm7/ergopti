@@ -455,91 +455,24 @@ none of it is a batch job, and the section title used to imply otherwise.
 
 ---
 
-## 5. Audits not yet run
+## ~~5. Audits~~ — DONE 2026-08-04
 
-`docs/prompts/perf_hs.md` and `docs/prompts/refactor.md` — both files still exist.
+Les deux prompts ont été exécutés (`cda3025`).
 
-⚠ **Measured 2026-08-03: the reason given for not running `refactor.md` no longer
-checks out.** The entry said "the refactor cycle it belongs to was declared
-complete", pointing at
-[`project-simplification-branch-2026-07-30`](docs/PROJECT_MEMORY.md). That entry
-describes the `simplification` branch as **unmerged, with 6 of 12 blockers
-delivered** — not complete — and it directs the reader to "`TODO.md` §0", a
-section that no longer exists.
+- **`docs/prompts/refactor.md`** → le guide demandé, sous `docs/`. **Deux de ses
+  trois douleurs chiffrées avaient changé de sens** : les six gros fichiers qu'il
+  nomme ont fondu ou disparu (cinq sur six ; seul `macos/modules/keylogger/init.lua`
+  a grossi, 1 583 → 1 674), et la fragilité des tests a doublé — ~206/411 fichiers
+  scannant la source → **755/841**, dont 576 sur `_DriverFuncBody`. Les deux sont
+  le même fait : découper un fichier crée de nouveaux tests « la fonction X vit
+  dans le fichier Y » pour verrouiller le découpage.
+- **`docs/prompts/perf_hs.md`** → `docs/audits/2026-08-04-perf-hammerspoon.md`.
+  Deux findings corrigés dans le même commit : le primer de gestes portait une
+  **copie écrite à la main** de la récupération de tap, dont le `pcall` avalait un
+  réarmement échoué ; et **rien ne comptait** les désactivations. Le compteur
+  existe maintenant, par cause et par tap, visible dans le rapport de santé.
 
-And the branch itself is **gone**: no local branch, no worktree (only
-`hs-audit-2` remains). So the memory entry documents a branch nobody can inspect,
-against a plan section nobody can read, and this entry cites it as authority for
-skipping an audit.
-
-🚩 **AND THEN VERIFIED: FIVE OR SIX OF THE SIX ARE ALREADY FIXED. Do not act on
-the table below without re-checking each row.**
-
-The `PROJECT_MEMORY` entry is dated **2026-07-30** and describes a branch state,
-not the repository. Measured 2026-08-03 on `dev`:
-
-- **B3 — fixed.** `test-kanata-defalias-parity.cjs` passes 17/17 and names the
-  four aliases the blocker said were dangling: *"hand-maintained composites
-  survive the replacement (rollc, rollx, deadtrema, copy, paste)"*.
-- **B5 — fixed.** `linux/.../sqlite_writer.lua` now passes the SQL on **stdin**
-  via `SqliteCommand.build`, and the surviving comment is in the PAST tense:
-  *"Staging it in /tmp is what turned this module into a keystroke leak."* The
-  leak is what the comment documents, not what the code does.
-- **B4 — almost certainly fixed.** 75 references to `secure_field` /
-  `private_window` in the Linux tree, against a blocker that said there were
-  none.
-- **B6 — almost certainly fixed.** 12 references to `text_cipher` /
-  `text_crypto` on macOS, plus `_shared/lua/keylogger/text_crypto.lua`, against a
-  blocker that said ten empty stubs.
-- **B9 — almost certainly fixed.** `context_window` appears 4 times in the
-  Windows AutoHotkey tree; the blocker's own reproduction was `grep -c
-  context_window windows/**/*.ahk` → 0.
-- **B10 — fixed.** `macos/.../prediction_engine.lua:171` reads
-  `LLM_DEFAULTS.llm_disable_password_fields` — a defaults table, not the
-  hardcoded `true` the blocker described — and `preferences.lua:102` maps
-  `llm_secure_field_filter_enabled` onto a config path, so the shared value is
-  reachable. The blocker stated the exact opposite of what the code now does.
-
-**All six are fixed. The branch question this section opened is closed:** the
-`simplification` work landed on `dev` (`f81c9012a`, fast-forward), and nothing
-was lost. The two audit prompts can be run whenever someone wants them; there is
-no longer a reason to hold them back.
-
-**The lesson is the one this file already carries, at its sharpest.** Recovering
-these took a session; believing them cost a false security alarm raised to the
-maintainer minutes later. A recovered record is still a record with a date on it,
-and four days was enough. **Re-measure a recovered entry exactly as hard as a
-stale one — recovery is not verification.**
-
-The table stays below because B10 is unverified and because the traps are worth
-reading before touching those areas. It is a historical record now, not a work
-order.
-
-✅ **RECOVERED 2026-08-03 — and they were never lost, only unreachable.**
-
-The reflog holds 81c9012a merge simplification: Fast-forward and
-97ca0ec1 docs: fold the simplification plan into TODO.md. The branch WAS
-merged; the six surviving blockers were folded into a TODO.md section that a
-later rewrite of this file dropped. git show 297ca0ec1:TODO.md still has them,
-and they are restored below verbatim. **Two are plaintext data leaks.**
-
-| # | Blocker | Note before starting |
-| --- | --- | --- |
-| **B5** | Linux writes every typed character, in plaintext, into a world-readable `/tmp` file on every keylogger flush (`linux/modules/keylogger/sqlite_writer.lua:96-112`, `:127-139`) | the temp name comes from `tmpnam(3)` then is mutated, so it is not the reserved file — a symlink/TOCTOU target. Stop shelling SQL through a file; the `sqlite3` CLI reads a script on stdin |
-| **B4** | Linux keylogger is always on, in plaintext, with no off switch, no private-browsing and no system-auth filter | ⚠ **do NOT simply wire `adapters/secure_field_detector.lua`** — `modules/keylogger/keylogger.lua:90-98` documents that its exact `WM_CLASS` match on a shorter list would *narrow* coverage and leak `gpg`/`ssh-agent`/`polkit`/`sudo`, and a test guard locks "coverage must never narrow". The fix is **additive** |
-| **B3** | The generated kanata config is unloadable: the generator emits 7 of the 12 aliases the template defines, leaving `@copy`, `@paste`, `@rollx`, `@deadtrema` dangling | `test:kanata-defalias-parity` never runs the generator against the template — extend it first, then fix the generator. The generator's own docstring also warns `ralt` needs hand-merging, which `manager.lua` does not do |
-| **B6** | The macOS "Chiffrement" menu item is a complete no-op (ten empty stubs) and `docs/security/keylogger_privacy.md:93` tells users to enable it for at-rest privacy | the `type(...) == "function"` guard is always true because the stub exists, so the flow raises inside the stub's own `pcall`, the progress canvas is never deleted and no dialog appears. Decide: implement, or delete the feature **and** the doc sentence together |
-| **B9** | `llm_context_length` has no effect on the Windows automatic path — the `context_window_chars` fix was never ported into the AHK generator (`grep -c context_window windows/**/*.ahk` → 0) | add a corpus vector that sets `context_window_chars`: none of the 12 existing vectors does, which is why the corpus cannot catch it |
-| **B10** | Opposite secure-field defaults for LLM predictions: macOS hardcodes `true` (contradicting `defaults.json`, and both keys are absent from `_SHARED_SCALAR_KEYS` so the shared value is unreachable); Windows sends context from password fields | security posture — pick the default deliberately, then make both drivers read it from `defaults.json` |
-
-Recovery route, for the next time a plan section vanishes: git reflog --all\nfinds the merge, git log --all --oneline -- <file> finds the versions, and
-git show <sha>:<file> reads one. Searching git log --grep for the identifiers
-finds nothing, because they only ever appeared in a file body — which is what made
-this look like lost work rather than buried work.
-
-Do that before running either prompt. An audit that reports findings while six
-known defects sit unrecorded is an audit measuring the wrong thing.
-
-`audit_mise_en_commun_et_simplification.md` **was run on 2026-08-03** — report at
-[`docs/audits/2026-08-03-mise-en-commun-et-simplification.md`](docs/audits/2026-08-03-mise-en-commun-et-simplification.md).
-Its findings are either fixed or folded into the sections above.
+L'audit perf ne rapporte aucun finding « code lent » : le driver ne tourne pas
+sur un poste Windows, donc la latence médiane et de queue n'y est pas mesurable.
+L'instrumentation existe déjà (20 segments HotPath) ; ce qui manque est une
+journée d'usage réel, pas du code.
