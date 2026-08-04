@@ -64,6 +64,11 @@ local DEV_INPUT_DIR = "/dev/input/"
 -- A device has EV_KEY if (ev_mask & 0x2) ~= 0.
 local EV_KEY_BIT = 0x2
 
+-- EV_REL (relative axes: a mouse) and EV_ABS (absolute: a touchpad or tablet).
+-- A pointer is a device with buttons AND one of these; a keyboard has neither.
+local EV_REL_BIT = 0x4
+local EV_ABS_BIT = 0x8
+
 
 -- =========================================
 -- =========================================
@@ -237,6 +242,67 @@ function M.select(devices)
 	if preferred then return preferred, "named_keyboard" end
 	if fallback  then return fallback,  "any_key_device" end
 	return nil, nil
+end
+
+--- True when a bit of the EV capability mask is set.
+--- LuaJIT has no native `&` (that is Lua 5.3+), so the test is arithmetic.
+--- @param mask integer
+--- @param bit integer
+--- @return boolean
+local function has_bit(mask, bit)
+	return math.floor(mask / bit) % 2 == 1
+end
+
+--- Chooses the pointer to watch, if there is one.
+---
+--- The daemon does not grab this device and never will: a pointer it consumed
+--- would be a desktop with no working mouse. It watches it for one fact — a
+--- button press — because a click moves the caret, and every character buffered
+--- before it belongs to a different position, often in a different line. Without
+--- this, clicking into the middle of a word and typing expands against a buffer
+--- describing text that is now somewhere else.
+--- @param devices table Array of descriptors from parse_devices().
+--- @return string|nil path
+function M.select_pointer(devices)
+	local named, fallback = nil, nil
+
+	for _, dev in ipairs(devices) do
+		-- Buttons AND an axis. A keyboard has EV_KEY and neither axis; a volume
+		-- rocker has EV_KEY alone; only a pointer has both.
+		if has_bit(dev.ev_mask, EV_KEY_BIT)
+			and (has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT))
+			and not is_synthetic(dev)
+		then
+			local path = event_path(dev)
+			if path then
+				local lower = dev.name:lower()
+				if lower:find("mouse") or lower:find("touchpad") or lower:find("trackpoint") then
+					if not named then named = path end
+				elseif not fallback then
+					fallback = path
+				end
+			end
+		end
+	end
+
+	return named or fallback
+end
+
+--- Finds the pointer device to watch, or nil when this machine has none.
+--- @return string|nil
+function M.find_pointer()
+	local ok, devices = pcall(read_proc_devices)
+	if not ok then return nil end
+	local path = M.select_pointer(devices)
+	if path then
+		Logger.info(LOG, "Watching pointer device: %s.", path)
+	else
+		-- Not an error. A headless machine or a laptop with the touchpad disabled
+		-- has none, and the only consequence is that a click cannot invalidate the
+		-- buffer — which is the behaviour this driver had all along.
+		Logger.info(LOG, "No pointer device found — a click will not reset the buffer.")
+	end
+	return path
 end
 
 --- Finds the device path the daemon should read.

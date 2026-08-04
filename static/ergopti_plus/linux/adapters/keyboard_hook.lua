@@ -94,9 +94,15 @@ local _emit_raw = nil
 local EVDEV_TYPE_KEY = InputEvent.EV_KEY
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
+-- Split by ROLE, not by key: shift and AltGr select a level of the layout and
+-- therefore produce characters; ctrl, alt and meta start a shortcut and
+-- therefore produce none. Treating AltGr as Alt is how a French keyboard loses
+-- é, € and « — or how Alt+Tab ends up in the typing buffer.
 local _shift_held = false
 local _ctrl_held  = false
 local _alt_held   = false
+local _altgr_held = false
+local _meta_held  = false
 
 -- How many periodic ticks pass between device checks. The daemon ticks four
 -- times a second and the check re-reads /proc/bus/input/devices, so every tick
@@ -110,6 +116,13 @@ local _ticks_since_check = 0
 -- Set once when no device at all can be found, so the log says it once rather
 -- than every two seconds for as long as the keyboard stays unplugged.
 local _reported_missing = false
+
+-- Called when a pointer button is pressed, if the caller asked for it.
+local _on_click = nil
+
+-- evdev button codes start at BTN_MISC. Everything at or above it on a pointer
+-- is a button; everything below is a keyboard key, and a pointer reports none.
+local BTN_FIRST = 0x100
 
 
 
@@ -167,8 +180,20 @@ local function _track_modifier(code, pressed)
 		_ctrl_held = pressed
 	elseif modifier == "alt" then
 		_alt_held = pressed
+	elseif modifier == "altgr" then
+		_altgr_held = pressed
+	elseif modifier == "meta" then
+		_meta_held = pressed
 	end
 	return true
+end
+
+--- True while a modifier that starts a SHORTCUT is held.
+--- Deliberately excludes shift and AltGr, which select a layout level and
+--- produce text.
+--- @return boolean
+local function _shortcut_modifier_held()
+	return _ctrl_held or _alt_held or _meta_held
 end
 
 --- Handles one decoded event: re-emits it when we own the stream, then turns it
@@ -215,6 +240,16 @@ local function _dispatch_event(ev)
 	local control = EvdevCodes.CONTROL_NAME_OF[ev.code]
 	if control then
 		if _on_key then pcall(_on_key, control) end
+		return
+	end
+
+	-- Ctrl+S is not the letter S. The layout still resolves a character for the
+	-- key, so without this the buffer filled up with every shortcut the user
+	-- pressed and expansions fired against text nobody typed. Reported as a
+	-- control event so the caller drops the buffer: the caret has almost
+	-- certainly moved, and what came before it no longer describes the line.
+	if _shortcut_modifier_held() then
+		if _on_key then pcall(_on_key, "shortcut") end
 		return
 	end
 
@@ -265,6 +300,41 @@ function M.pump()
 		return
 	end
 	EvdevReader.drain(_dispatch_event)
+
+	-- The pointer, if one was found. Never grabbed — a consumed pointer is a
+	-- desktop with no working mouse — and read for one fact only: a button press
+	-- moves the caret, so every character buffered before it describes text that
+	-- is now somewhere else. Drained after the keyboard so a click and the
+	-- keystroke that follows it stay in the order the user made them.
+	if _on_click and EvdevReader.is_open(EvdevReader.POINTER) then
+		EvdevReader.drain(function(ev)
+			if ev.type == EVDEV_TYPE_KEY
+				and ev.code >= BTN_FIRST
+				and ev.value == InputEvent.VALUE_DOWN
+			then
+				pcall(_on_click, ev.code)
+			end
+		end, EvdevReader.POINTER)
+	end
+end
+
+--- The layout-level modifiers the user is physically holding right now.
+---
+--- Injection asks before it starts, and neutralises what it finds. Under a grab
+--- the application has already seen the press we re-emitted, so it believes the
+--- modifier is down; an injected "e" would arrive as "E", or as "€" under AltGr.
+--- Releasing them for the duration and pressing them back afterwards is
+--- deterministic, where waiting for the user to let go is not: the release event
+--- is sitting in the kernel buffer that the injection is currently blocking.
+---
+--- Shortcut modifiers are absent on purpose — an expansion cannot fire while one
+--- is held, because the character never reaches the engine.
+--- @return table Array of "shift" / "altgr", in press order.
+function M.held_text_modifiers()
+	local held = {}
+	if _shift_held then held[#held + 1] = "shift" end
+	if _altgr_held then held[#held + 1] = "altgr" end
+	return held
 end
 
 --- Resolves the device the daemon should be reading right now.
@@ -380,6 +450,9 @@ end
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
 ---                                  intercept is true, ignored otherwise.
+---              onClick   function  Called with (button_code) when a pointer button is
+---                                  pressed. Supplying it opens a second, NEVER
+---                                  grabbed, read-only descriptor on the pointer.
 ---              device    string    Override /dev/input/eventN path.
 function M.start(opts)
 	if _running then
@@ -391,6 +464,7 @@ function M.start(opts)
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
+	if type(options.onClick) == "function" then _on_click = options.onClick end
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
 	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
@@ -434,6 +508,18 @@ function M.start(opts)
 		return
 	end
 
+	-- The pointer is opened last and its failure is not fatal: a machine with no
+	-- pointer, or one whose node this user cannot read, still expands hotstrings.
+	-- It simply cannot notice a click, which is the behaviour this driver had for
+	-- its whole life until now.
+	if _on_click then
+		local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+		local pointer = ok_df and type(df.find_pointer) == "function" and df.find_pointer() or nil
+		if pointer and EvdevReader.is_available(pointer) then
+			EvdevReader.open(pointer, EvdevReader.POINTER)
+		end
+	end
+
 	_ticks_since_check = 0
 	_reported_missing = false
 	_running = true
@@ -444,6 +530,7 @@ end
 --- Stops the keyboard hook. Safe to call when not running.
 function M.stop()
 	if not _running then return end
+	EvdevReader.close(EvdevReader.POINTER)
 	EvdevReader.close()
 	_device  = nil
 	_running = false
@@ -521,6 +608,7 @@ function M._test_drive(events, callbacks, intercept)
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
 	_shift_held, _ctrl_held, _alt_held = false, false, false
+	_altgr_held, _meta_held = false, false
 
 	EvdevReader.open("/dev/input/test")
 	_running = true

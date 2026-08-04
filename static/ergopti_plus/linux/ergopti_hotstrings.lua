@@ -404,6 +404,13 @@ local function main()
 	-- global that stays nil, silently disabling password-app suppression.
 	local _cached_app_id = nil
 
+	-- The expansion that just fired, kept only until the next keystroke. A
+	-- Backspace pressed immediately after an expansion means "that is not what I
+	-- wanted": the trigger comes back instead of the user having to delete the
+	-- replacement by hand and retype it. Cleared by anything else, because an
+	-- undo two words later would resurrect text from nowhere.
+	local _undoable = nil
+
 	-- 8.5) Define the character callback.
 	local function on_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
@@ -414,6 +421,11 @@ local function main()
 			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
+
+		-- Any keystroke that is not the immediate Backspace ends the undo window.
+		-- Kept this narrow deliberately: an undo that survived a word of typing
+		-- would insert a trigger in a place the user had moved on from.
+		_undoable = nil
 
 		-- CapsWord: process BEFORE the engine so the capitalized character
 		-- enters the buffer correctly (not as a duplicate after the original).
@@ -471,6 +483,11 @@ local function main()
 					now_ms, result.group, result.backspace_count)
 				injector._begin_injection()
 				injector.inject(result.backspace_count, result.replacement)
+				-- Armed AFTER the injection, so a failed one leaves nothing to undo.
+				_undoable = {
+					trigger     = result.trigger,
+					replacement = result.replacement,
+				}
 				-- Drain any physical characters that arrived during
 				-- injection and replay them through the engine so they
 				-- are re-injected in arrival order.
@@ -588,6 +605,29 @@ local function main()
 
 	-- 8.7) Define the control-key callback.
 	local function on_control(key_name)
+		-- Undo: a Backspace immediately after an expansion puts the trigger back.
+		--
+		-- The arithmetic is off by one on purpose. Under a grab the Backspace was
+		-- re-emitted to the application BEFORE this callback ran, so it has already
+		-- removed one character of the replacement; the erase here has to cover
+		-- what is left. Counted in codepoints, not bytes: "N'T" is three
+		-- characters and four bytes, and erasing four would eat the character
+		-- before it.
+		if key_name == "backspace" and _undoable and not opts.dry_run then
+			local remaining = 0
+			for _ in _undoable.replacement:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+				remaining = remaining + 1
+			end
+			if remaining >= 1 then
+				Logger.info(LOG, "Undo: restoring trigger '%s'.", _undoable.trigger)
+				injector.inject(remaining - 1, _undoable.trigger)
+				engine:reset()
+				_undoable = nil
+				return
+			end
+		end
+		_undoable = nil
+
 		engine:reset()
 		-- Cancel any in-flight LLM prediction on Backspace or Escape.
 		if key_name == "backspace" or key_name == "escape" then
@@ -596,6 +636,18 @@ local function main()
 			end
 		end
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
+	end
+
+	-- 8.7b) A pointer click moves the caret.
+	--
+	-- Every character in the buffer describes text at a position the user has
+	-- just left, so an expansion after a click would fire against a line that is
+	-- no longer under the cursor — and erase characters belonging to whatever is
+	-- there now. The pointer is watched, never grabbed.
+	local function on_click()
+		_undoable = nil
+		engine:reset()
+		Logger.debug(LOG, "Pointer click — buffer reset.")
 	end
 
 	-- 8.8) Start the keyboard hook adapter, in INTERCEPT mode by default.
@@ -657,6 +709,7 @@ local function main()
 		intercept  = opts.grab,
 		onChar  = on_char,
 		onKey   = on_control,
+		onClick = on_click,
 		onPhysical = on_physical,
 		onEmitRaw  = injector.emit_key,
 	})
