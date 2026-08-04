@@ -21,12 +21,18 @@
 --- ui/menu/menu_keyboard_layout.lua still need updating — turning a
 --- previously silent desync into a loud one.
 ---
---- NOTE: layout_menu's pinned shape does NOT imply macOS renders every one of
---- those entries — menu_keyboard_layout.lua only implements the
---- active_layouts id today (the on/off toggle, layout_features_base/altgr,
---- and the hotstrings.magic_key.replace feature path have no macOS
---- counterpart yet). That gap is a known, separate limitation; this gate
---- only prevents it from growing silently.
+--- NOTE: layout_menu's pinned shape does NOT imply macOS renders those entries
+--- FROM THE MANIFEST. It does not read layout_menu at all — menu_keyboard_layout
+--- builds the whole submenu imperatively, and this gate pins the manifest's shape
+--- so the two cannot drift further apart while that is true.
+---
+--- CORRECTED 2026-08-04: this note used to say the on/off toggle,
+--- layout_features_base/altgr and the hotstrings.magic_key.replace feature path
+--- "have no macOS counterpart yet". The replace row does have one, and has for
+--- some time — menu_keyboard_layout.lua builds it with its own checked and
+--- disabled state. A stale note in a drift gate is worse than no note: it is the
+--- paragraph the next person scopes the migration from, and it under-reports what
+--- macOS already draws by hand.
 ---
 --- The AHK half reads both keys generically via MenuRenderer_Build in
 --- infra/manifest_menu.ahk (see ui/menu/menu_hotstrings.ahk,
