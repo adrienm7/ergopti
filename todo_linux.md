@@ -703,12 +703,36 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
   l'arbre neutre en SNI/dbusmenu. Supprime `menu_builder.lua` (889 l codées à la
   main). Consomme `menu_manifest.json` (le renderer AHK accepte déjà `"linux"`).
   *Test :* le host produit le même arbre de labels que macOS pour `hotstrings_menu`.
-- [ ] **M3.4** **Étendre le manifeste** aux 14 capacités du Lot 5 (`checked_when`,
+- [x] **M3.4** **Étendre le manifeste** aux 14 capacités du Lot 5 (`checked_when`,
   `action` résoluble, `label.format`+`args`, `provider` pour listes dynamiques,
   `count`/`count_policy`, `radio_group`, `visible_when`, `reason_key`…) pour que
   les rangées codées en dur (sous-menus catégorie, toggles section, compteurs)
   deviennent des données. Ajouter le token `linux` à `KNOWN_PLATFORMS`.
   *Test :* « toute clé-tableau du manifeste a un lecteur » ; schéma manifeste v-next.
+  → **Mesuré avant d'écrire quoi que ce soit**, parce que « ajouter 14 capacités »
+  est la description d'un schéma, pas d'un besoin. État réel :
+  - `linux` dans `KNOWN_PLATFORMS` : **déjà là** (`test-menu-manifest.cjs:40`).
+  - `checked_when` / `disabled_when` : **déjà lus** par le renderer partagé
+    (`resolve_checked_when` / `resolve_disabled_when`). Le vrai défaut n'était pas
+    l'absence de capacité mais que **macOS ne définissait aucun getter** pour les
+    trois `checked_when` de `metrics_menu` — corrigé avec M3.6.
+  - `provider` pour listes dynamiques : **déjà là**, c'est le type `list` +
+    `list_providers`.
+  - `reason_key` : déclaré sur 5 rangées, **lu par personne**. Le renderer jetait
+    la rangée avec sa restriction, donc cinq explications traduites en 21 langues
+    n'ont jamais atteint un seul utilisateur. C'est la capacité qui manquait
+    vraiment, et elle est faite : une rangée absente d'ici mais porteuse d'une
+    raison se rend **présente et grisée**, avec la raison (convention S). Une
+    restriction *sans* raison reste cachée — une rangée grisée qui n'explique rien
+    est pire qu'absente, elle occupe le menu et ne répond à aucune question.
+  - `label.format`+`args`, `count`/`count_policy`, `radio_group` : **non ajoutés,
+    délibérément.** Aucune rangée du manifeste ne les emploie. Ce dépôt a une gate
+    « toute clé-tableau a un lecteur » et une autre contre les tests qui ne peuvent
+    pas échouer ; ajouter du schéma sans consommateur, c'est exactement ce qu'elles
+    punissent. Les comptes et les libellés composés que le plan visait sont
+    produits par des `list` providers, qui existent déjà et dont le contenu dépend
+    de ce que l'utilisateur a installé — donc ils ne peuvent pas être des données
+    du manifeste.
 - [x] **M3.5** **Loader corrigé** : grouper par **stem de fichier** (aligné sur
   `_index.toml categories_order` / `hotstring_category_keys`), garder les chemins
   absolus, exposer `[_meta].description` (21 locales) + `sections_order` + identité
