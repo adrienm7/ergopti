@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Empfindlichkeit — 5-Finger-Wisch ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Empfindlichkeit — 5-Finger-Wisch ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Empfindlichkeit — 5-Finger-Wisch ↑",
+	"menu.gestures.reading_on": "libinput-Lesen: ein",
+	"menu.gestures.reading_off": "libinput-Lesen: aus",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Alles leeren (Tap/Hold und Shortcuts)",
 	"menu.karabiner.combo_arrow": "Kombo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Nur Windows: alles, was diese Zeile auflisten würde, ist selbst Windows-exklusiv — auf macOS und Linux bliebe die Liste leer.",
 	"platform_reason.no_magic_key_editor_on_linux": "Nicht unter Linux: diese Zeile ändert die Magic-Taste. macOS und Windows zeigen dafür einen Dialog; der Linux-Treiber liest die Taste nur aus der Konfiguration und kann sie im Menü nicht ändern.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nicht unter Linux: diese Zeile öffnet die Datei mit persönlichen Kürzeln. macOS und Windows haben eine solche Datei; die Kürzel des Linux-Treibers sind Schalter und Auswahl-Umwandlungen, ohne Datei zum Bearbeiten.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput-Lesen — nur unter Linux",
 	"metrics_apps.chart_time_series": "Zeit",
 	"metrics_apps.edit_category_hint": "Kategorie ändern"
 }

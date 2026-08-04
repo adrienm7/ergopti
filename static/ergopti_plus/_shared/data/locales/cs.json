@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "Citlivost — Přejetí 5 prsty ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "Citlivost — Přejetí 5 prsty ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "Citlivost — Přejetí 5 prsty ↑",
+	"menu.gestures.reading_on": "Čtení libinput: zapnuto",
+	"menu.gestures.reading_off": "Čtení libinput: vypnuto",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 Vymazat vše (klepnutí/přidržení a zkratky)",
 	"menu.karabiner.combo_arrow": "Kombo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Pouze Windows: vše, co by tento řádek vypsal, je samo o sobě jen pro Windows, takže na macOS a Linuxu by zobrazil prázdný seznam.",
 	"platform_reason.no_magic_key_editor_on_linux": "Ne na Linuxu: tento řádek mění magickou klávesu. macOS i Windows k tomu nabízejí dialog; linuxový ovladač klávesu z konfigurace jen čte a z nabídky ji změnit nelze.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ne na Linuxu: tento řádek otevírá soubor osobních zkratek. macOS a Windows takový soubor mají; zkratky linuxového ovladače jsou přepínače a transformace výběru, bez souboru na disku, který by šlo upravit.",
+	"platform_reason.libinput_reader_is_linux_only": "Čtení libinput — pouze v Linuxu",
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii"
 }

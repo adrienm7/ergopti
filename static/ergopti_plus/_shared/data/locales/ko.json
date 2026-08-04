@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "감도 — 5손가락 스와이프 ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "감도 — 5손가락 스와이프 ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "감도 — 5손가락 스와이프 ↑",
+	"menu.gestures.reading_on": "libinput 읽기: 켜짐",
+	"menu.gestures.reading_off": "libinput 읽기: 꺼짐",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 모두 지우기 (탭/홀드 및 단축키)",
 	"menu.karabiner.combo_arrow": "콤보 → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows 전용: 이 행이 나열할 항목은 모두 Windows 전용이므로 macOS와 Linux에서는 빈 목록이 됩니다.",
 	"platform_reason.no_magic_key_editor_on_linux": "Linux 제외: 이 행은 매직 키를 변경합니다. macOS와 Windows는 이를 위한 대화상자를 엽니다. Linux 드라이버는 설정에서 키를 읽기만 하고 메뉴에서 바꿀 방법이 없습니다.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
+	"platform_reason.libinput_reader_is_linux_only": "libinput 읽기 — Linux 전용",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집"
 }

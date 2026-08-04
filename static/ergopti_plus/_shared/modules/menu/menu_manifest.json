@@ -810,6 +810,20 @@
 			"platforms": [
 				"linux"
 			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
+			"type": "dynamic",
+			"id": "gesture_reading_linux",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.libinput_reader_is_linux_only"
 		}
 	],
 	"tap_holds_menu": [

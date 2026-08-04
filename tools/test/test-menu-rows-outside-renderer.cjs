@@ -69,10 +69,14 @@ const MEASURE = process.argv.includes('--measure');
 // Corollary worth knowing before reading a fall as a win: the macOS predicate
 // keys on the field name `title =`, and provider rows use `label =`. So the
 // number measures who owns the hs.menubar shape, not how many rows a user sees.
+// linux lowered 3 → 2 on 2026-08-04: the gestures submenu moved onto
+// ManifestMenu.build, so the rows the daemon used to append by hand — including
+// an undeclared libinput row with a hardcoded French label — are dispatched from
+// the manifest. The two that remain are in ergopti_hotstrings.lua.
 const BASELINE = {
 	windows: 220,
 	macos: 301,
-	linux: 3
+	linux: 2
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

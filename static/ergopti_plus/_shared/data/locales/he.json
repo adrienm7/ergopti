@@ -895,6 +895,8 @@
 	"menu.gestures.sensitivities.swipe_5_right_down": "רגישות — החלקה ב-5 אצבעות ↘",
 	"menu.gestures.sensitivities.swipe_5_right_up": "רגישות — החלקה ב-5 אצבעות ↗",
 	"menu.gestures.sensitivities.swipe_5_up": "רגישות — החלקה ב-5 אצבעות ↑",
+	"menu.gestures.reading_on": "קריאת libinput: פעילה",
+	"menu.gestures.reading_off": "קריאת libinput: כבויה",
 	"menu.kanata.title": "🎹 Kanata",
 	"menu.karabiner.clear_all": "🧹 נקה הכל (tap/hold וקיצורים)",
 	"menu.karabiner.combo_arrow": "Combo → %s",
@@ -2386,6 +2388,7 @@
 	"platform_reason.lists_windows_only_settings": "Windows בלבד: כל מה שהשורה הזו הייתה מציגה הוא עצמו ייחודי ל-Windows, ולכן ב-macOS וב-Linux היא מציגה רשימה ריקה.",
 	"platform_reason.no_magic_key_editor_on_linux": "לא ב-Linux: השורה משנה את מקש הקסם. ב-macOS וב-Windows נפתחת לכך תיבת דו-שיח; מנהל ההתקן של Linux רק קורא את המקש מההגדרות ואינו מאפשר לשנותו מהתפריט.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
+	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה"
 }
