@@ -10,6 +10,22 @@ a keyboard layout or a real user's session. That is what this file is for.
 
 Work top to bottom: a failure early on makes the later results meaningless.
 
+**Run the checklist rather than reading it:**
+
+```bash
+bash static/ergopti_plus/linux/tests/hardware/validate.sh
+```
+
+It answers everything a machine can answer — permissions, groups, `/dev/uinput`,
+display server, keymap dump and its key count, clipboard tools, how many systemd
+units are installed, whether anything is hosting a StatusNotifierItem — then
+prompts for the dozen checks that genuinely need eyes, and writes one report
+covering both halves. `--auto-only` skips the prompts, for a log.
+
+A checklist nobody re-runs stops being true without anyone noticing, which is why
+the machine-checkable part is a script. The sections below remain the reference
+for what each answer means and what to do when it is wrong.
+
 ---
 
 ## 0. Before anything
