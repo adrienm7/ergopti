@@ -124,14 +124,14 @@ helpers.describe("modules/keymap/utils.lua: paste path uses paste counter, not e
 	end)
 
 	helpers.it("expander.lua calls take_paste_ops after emit_action", function()
-		local src = read_source("local function word_boundary_blocks") -- modules/keymap/expander.lua
+		local src = read_source("function M.try_terminator_expand") -- modules/keymap/expander.lua
 		helpers.assert_true(
 			src:find("take_paste_ops", 1, true) ~= nil,
 			"expander.lua must call km_utils.take_paste_ops() to consume the paste counter")
 	end)
 
 	helpers.it("expander.lua updates expected_synthetic_pastes from paste ops", function()
-		local src = read_source("local function word_boundary_blocks") -- modules/keymap/expander.lua
+		local src = read_source("function M.try_terminator_expand") -- modules/keymap/expander.lua
 		helpers.assert_true(
 			src:find("expected_synthetic_pastes", 1, true) ~= nil,
 			"expander.lua must update _state.expected_synthetic_pastes when paste ops > 0")

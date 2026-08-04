@@ -21,6 +21,10 @@ local M = {}
 local hs = hs
 
 local text_utils = require("infra.text_utils")
+-- The shared matcher core. Only M.decide is used: the firing DECISION is shared,
+-- the buffer traversal is not — macOS slices a byte string, the core an array of
+-- codepoints, and neither has to convert for the other.
+local HotstringCore = require("infra.hotstring_engine")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local CoreStateM = require("modules.keymap.state")
@@ -189,48 +193,29 @@ end
 -- ===================================
 -- ===================================
 
---- Returns true when an is_word mapping should be REJECTED because the
---- character immediately before the trigger's start position is a letter
---- (or "@", which marks personal-info triggers). Centralised here so auto
---- and terminator expansion apply the exact same word-boundary policy.
+--- Extracts the one codepoint sitting immediately before a candidate trigger —
+--- the only piece of left-hand context the word-boundary rule consults.
 ---
---- When the trigger starts at byte index 1 of the buffer, the buffer holds
---- no observable left-hand context. The decision is then delegated to
---- `_state.start_is_word_boundary`: true means the buffer's start is known
---- to abut a word terminator (fresh launch, post-expansion, post-Cmd+A,
---- post-word-timeout) and the match is allowed; false means the cursor
---- moved into territory we never observed (BS past the buffer's start,
---- nav keys, mouse click, Ctrl/Cmd combos other than select-all, paste,
---- undo, etc.) and the match is rejected. This is the Hammerspoon mirror
---- of the AHK HSEv2 word-boundary contract.
+--- The rule itself is NOT here any more. It moved into the shared matcher core
+--- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
+--- own version and no two of them ever agreed at once. What stays here is the
+--- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
+--- buffer, which is an O(1) offset rather than the array index the core uses.
 ---
 --- @param buffer string The current rolling buffer.
---- @param trigger string The trigger whose match is being considered.
---- @param trigger_start_byte number 1-based byte index where the trigger
----   starts inside `buffer`. Must be >= 1.
---- @param start_is_word_boundary boolean Whether the buffer's start
----   abuts a known word terminator.
---- @return boolean True when the word boundary blocks the match.
-local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_is_word_boundary)
-	-- Triggers that start with a separator carry their own boundary and skip this
-	-- check: whitespace, nbsp (U+00A0), nnbsp (U+202F), and the comma-layer ";".
-	-- Including ";" guarantees the comma→J expansion (";e" → "Je") fires in every
-	-- context, never word-boundary-gated — the mirror of the AHK "*?C" in-word flag.
-	if trigger:match("^[ \194\160\226\128\175;]") then return false end
-	if trigger_start_byte <= 1 then
-		return not start_is_word_boundary
-	end
-	local before             = buffer:sub(1, trigger_start_byte - 1)
+--- @param trigger_start_byte number 1-based byte index where the trigger starts
+---   inside `buffer`. Must be >= 1.
+--- @return string|nil The preceding codepoint; nil when the trigger starts the
+---   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
+---   string when a character is there but could not be decoded, which the core
+---   treats as "does not open a word" exactly as this function always has.
+local function prev_char_before(buffer, trigger_start_byte)
+	if trigger_start_byte <= 1 then return nil end
+	local before            = buffer:sub(1, trigger_start_byte - 1)
 	local ok_utf8, prev_off = pcall(utf8.offset, before, -1)
 	-- Treat malformed UTF-8 the same as an absent left-hand char: no block
 	if not ok_utf8 then prev_off = nil end
-	local prev_char = prev_off and before:sub(prev_off) or ""
-	-- Shared with the Linux engine so the two cannot disagree about which
-	-- characters open a word. The previous local rule — is_letter_char plus "@" —
-	-- let "_" and every non-ASCII codepoint open one here and nowhere else, so a
-	-- word-boundary trigger typed straight after the magic key fired on macOS and
-	-- was blocked on Windows and Linux.
-	return text_utils.is_hotstring_word_char(prev_char)
+	return prev_off and before:sub(prev_off) or ""
 end
 
 --- Chooses the right emitter for a mapping's replacement: plain_text uses
@@ -277,51 +262,48 @@ end
 --- match while the engine consulted start_is_word_boundary and refused it.
 ---
 --- Returns the EFFECTIVE plain replacement for this firing: conformed to the typed
---- casing for a case_conform entry, the stored replacement otherwise. nil means
+--- casing for a "conform" entry, the stored replacement otherwise. nil means
 --- the mapping does not fire, for any reason.
+---
+--- THE DECISION ITSELF IS NO LONGER HERE. It is `HotstringCore.decide`, shared
+--- with the Linux engine, and this function is now the macOS half of that split:
+--- it does the two slices a BYTE-string buffer makes cheap — the trigger-length
+--- tail and the codepoint in front of it — and hands them over. Nothing converts
+--- and nothing is duplicated, which is what the adoption was blocked on.
 --- @param m table The mapping entry.
 --- @param buffer string The buffer to evaluate against, as the engine will see it.
 --- @return string|nil eff_plain The plain replacement, or nil when it will not fire.
 --- @return string|nil typed The matched trigger text as typed, or nil.
 --- @return string|nil eff_repl The raw replacement (may carry {Token} directives).
+--- @return boolean is_noop True when it matched but replaces the text with itself.
 function M.would_fire(m, buffer)
 	if type(buffer) ~= "string" or type(m) ~= "table" then return nil end
 
-	local trigger = m.trigger
-	local tb      = m.trigger_bytes
+	local tb = m.trigger_bytes
 	if not tb or #buffer < tb then return nil end
 	local typed = buffer:sub(-tb)
 
-	local eff_repl, eff_plain
-	if m.case_conform then
-		if text_utils.trig_lower(typed) ~= trigger then return nil end
-		local conformed = text_utils.conform_replacement(m.plain_repl, typed, trigger)
-		-- nil means the typed case was mixed (not a clean lower/Title/UPPER), for
-		-- which no variant was ever registered: the hotstring must NOT fire.
-		if conformed == nil then return nil end
-		eff_repl, eff_plain = conformed, conformed
-	elseif m.case_fold then
-		-- Literal registration, folding comparison: any casing fires and the
-		-- replacement is emitted exactly as registered. Conforming it here would
-		-- turn "ADN" into "Adn" for a user who capitalised the trigger.
-		if text_utils.trig_lower(typed) ~= m.trigger_folded then return nil end
-		eff_repl, eff_plain = m.repl, m.plain_repl
-	else
-		if typed ~= trigger then return nil end
-		eff_repl, eff_plain = m.repl, m.plain_repl
-	end
-
-	local tstart_byte = #buffer - tb + 1
-	if m.is_word and word_boundary_blocks(buffer, trigger, tstart_byte, _state and _state.start_is_word_boundary) then
-		return nil
-	end
+	local eff_plain, is_noop = HotstringCore.decide(
+		m,
+		m.plain_repl,
+		typed,
+		prev_char_before(buffer, #buffer - tb + 1),
+		_state and _state.start_is_word_boundary
+	)
 
 	-- A replacement identical to what was typed is a no-op: the engine passes the
 	-- keystroke through rather than expanding, so the preview must not offer it.
 	-- Reported as a distinct outcome because the engine still has cleanup to do
 	-- for it, while the preview treats it exactly like "no match".
-	if eff_plain == typed then return nil, typed, nil, true end
+	if not eff_plain then
+		if is_noop then return nil, typed, nil, true end
+		return nil
+	end
 
+	-- The raw replacement, which may carry {Token} directives — EXCEPT in conform
+	-- mode, where the effective text was re-cased and is plain by construction.
+	-- Emitting the stored raw one there would undo the conformance.
+	local eff_repl = (m.match_mode == "conform") and eff_plain or m.repl
 	return eff_plain, typed, eff_repl, false
 end
 
@@ -470,40 +452,34 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	local effective_chars_bytes = chars_bytes + extra_bs_bytes
 	if #buf < tb + effective_chars_bytes then return false end
 	local buf_start   = #buf - effective_chars_bytes - tb + 1
-	-- The trigger exactly as it sits on screen. Kept, rather than compared and
-	-- discarded, because a case_fold entry's registered trigger is the LOWERCASE
-	-- canonical while the screen may hold any casing — and the common-prefix
-	-- optimisation below decides how many characters to erase from the screen.
-	local typed_trigger = buf:sub(buf_start, buf_start + tb - 1)
-	if m.case_fold then
-		-- Non-auto entries reach this path, and 592 of the shared ones are
-		-- case_fold: `"adn" = { output = "ADN", auto_expand = false }` fires on a
-		-- terminator, so folding only in try_auto_expand would have left the
-		-- majority of them still matching exactly.
-		if text_utils.trig_lower(typed_trigger) ~= m.trigger_folded then return false end
-	elseif typed_trigger ~= trigger then
-		return false
-	end
+
+	-- The whole match decision, taken on the BODY: the buffer with the terminator
+	-- — and any nbsp French typography inserted before it — cut off, so the tail
+	-- M.would_fire compares against is the trigger itself.
+	--
+	-- This path used to carry its own copy of that decision, and the copy was not
+	-- a copy: it handled "fold" and "exact" and had no "conform" branch at all, so
+	-- a conform entry typed with a capital ("Btw" then a space) compared unequal to
+	-- its lowercase canonical and simply never expanded on the terminator path.
+	-- Slicing the body and reusing the one predicate is what removes that class of
+	-- divergence instead of patching this instance of it.
+	local body = buf:sub(1, buf_start + tb - 1)
+	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(m, body)
+
 	-- Precomputed trigger length; avoids a hot-path utf8.len call.
 	local trig_len    = m.tlen
 
-	-- Word-boundary check (shared helper — same policy as try_auto_expand).
-	if m.is_word and word_boundary_blocks(buf, trigger, buf_start, _state.start_is_word_boundary) then
-		return false
-	end
-
 	local consume_term = _registry.terminator_is_consumed(chars)
 
-	-- No-op guard: when the replacement equals the trigger, signal
-	-- pass-through so the terminating character is NOT consumed. It must
-	-- stay on screen — returning true would suppress it with nothing
-	-- injected (the dropped-terminator-chars bug).
-	-- Compared against what is on screen rather than against the registered
-	-- canonical: for a case_fold entry those differ, and "adn" -> "ADN" is a real
-	-- expansion when the user typed "adn" but a no-op when they typed "ADN".
-	if m.plain_repl == typed_trigger then
-		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+	if not eff_plain then
+		-- No-op guard: when the replacement equals what is on screen, signal
+		-- pass-through so the terminating character is NOT consumed. It must stay
+		-- on screen — returning true would suppress it with nothing injected (the
+		-- dropped-terminator-chars bug).
+		if is_noop then
+			if m.final_result then _state.suppress_rescan() end
+			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+		end
 		return false
 	end
 
@@ -519,19 +495,20 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	-- inside the HID callback.
 
 	local function do_expansion()
-		-- Use the precomputed plain_repl; tokens_from_repl() is only called below
-		-- when we actually need to emit tokens (replacements with {Token} directives)
-		local repl_text        = m.plain_repl
+		-- The EFFECTIVE replacement, which in conform mode carries the casing the
+		-- user typed. tokens_from_repl() is only called below when we actually need
+		-- to emit tokens (replacements with {Token} directives).
+		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
 		-- Filled in by the emit closure and consumed AFTER perform_text_replacement
 		-- has armed the echo bookkeeping the replay gate reads.
 		local replay_spec      = nil
 
-		if repl_text == m.repl then
+		if repl_text == eff_repl then
 			-- Simple text: keep common prefix to reduce backspaces. Compared against
 			-- the trigger AS TYPED, not the registered canonical, so the characters
-			-- left on screen are the ones actually there — they differ for a
-			-- case_fold entry, and keeping a "matching" prefix that is cased
+			-- left on screen are the ones actually there — they differ for a "fold"
+			-- entry, and keeping a "matching" prefix that is cased
 			-- differently would leave the user's capital in front of the expansion.
 			local common = text_utils.get_common_prefix_utf8(typed_trigger, repl_text)
 			deletes = trig_len - common
@@ -619,9 +596,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
 			if keylogger and type(keylogger.log_hotstring) == "function" then
-				pcall(keylogger.log_hotstring, trigger, m.plain_repl)
+				pcall(keylogger.log_hotstring, trigger, repl_text)
 			end
-			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
+			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", typed_trigger, repl_text)
 		end
 	end
 

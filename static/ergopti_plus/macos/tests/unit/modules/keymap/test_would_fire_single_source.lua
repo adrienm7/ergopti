@@ -57,6 +57,37 @@ helpers.describe("would_fire: one rule for every consumer", function()
 				"because it did not")
 		end
 	end)
+
+	helpers.it("and the predicate itself defers to the CROSS-DRIVER rule", function()
+		-- The layer above this one. would_fire being macOS's single source stopped
+		-- the preview disagreeing with the engine; it did nothing about macOS
+		-- disagreeing with Windows and Linux, which it did — on the word boundary,
+		-- in two separate ways, for as long as each driver owned its own copy.
+		-- would_fire now slices (its byte-string buffer's business) and hands the two
+		-- resulting strings to HotstringCore.decide, which the Linux engine calls too.
+		local src = helpers.read_driver_source("function M.would_fire")
+		helpers.assert_true(src ~= nil, "the expander source must be readable")
+		helpers.assert_true(src:find("HotstringCore.decide(", 1, true) ~= nil,
+			"would_fire must call HotstringCore.decide. Re-deriving the case resolution, the "
+			.. "word boundary or the no-op guard here rebuilds the divergence: three engines "
+			.. "answering 'does this fire?' three ways is what shipped a hotstring that "
+			.. "expanded on one driver and was refused on the other two")
+	end)
+
+	helpers.it("and it does not keep a private copy of the rules it delegated", function()
+		local src = helpers.read_driver_source("function M.would_fire")
+		if not src then return end
+		-- The window is would_fire's own body. A rule reappearing anywhere else in
+		-- the expander is a different question; a rule reappearing HERE means the
+		-- delegation was undone in place, which is the regression this names.
+		local at = src:find("function M.would_fire", 1, true)
+		local body = src:sub(at, at + 1400)
+		for _, forbidden in ipairs({ "conform_replacement", "trigger_folded", "is_hotstring_word_char" }) do
+			helpers.assert_true(body:find(forbidden, 1, true) == nil,
+				"would_fire must not reach for '" .. forbidden .. "' itself — that is a rule it "
+				.. "hands to the shared predicate, and holding both is how the two drift apart")
+		end
+	end)
 end)
 
 
@@ -81,7 +112,7 @@ helpers.describe("would_fire: the predicate matches what fires", function()
 			trigger_bytes = #trigger,
 			plain_repl    = replacement,
 			replacement   = replacement,
-			case_conform  = false,
+			match_mode    = "exact",
 		}
 	end
 

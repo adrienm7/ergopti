@@ -73,7 +73,7 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				-- fixtures for as long as nothing read it — which is what let a non-auto
 				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
 				auto          = true,
-				case_conform  = false,
+				match_mode    = "exact",
 				final_result  = false,
 			}
 			local reg = make_registry({ ["k"] = { m } })
@@ -102,7 +102,7 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				-- fixtures for as long as nothing read it — which is what let a non-auto
 				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
 				auto          = true,
-				case_conform  = false,
+				match_mode    = "exact",
 				final_result  = false,
 			}
 			local reg = make_registry({ ["k"] = { m } })
@@ -168,7 +168,7 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 				-- fixtures for as long as nothing read it — which is what let a non-auto
 				-- entry expand mid-word (test_auto_expand_flag_gate.lua).
 				auto          = true,
-				case_conform  = false,
+				match_mode    = "exact",
 				final_result  = false,
 			}
 			local reg = make_registry({ ["w"] = { m } })

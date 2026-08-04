@@ -50,7 +50,7 @@ helpers.describe("preview: a no-op mapping is treated exactly like no match", fu
 
 		local m = {
 			trigger = "ok", trigger_bytes = 2, tlen = 2,
-			repl = "ok", plain_repl = "ok", is_word = false, case_conform = false,
+			repl = "ok", plain_repl = "ok", is_word = false, match_mode = "exact",
 		}
 		local plain, typed, _repl, is_noop = E.would_fire(m, "ok")
 
