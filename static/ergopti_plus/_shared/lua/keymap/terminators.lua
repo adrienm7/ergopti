@@ -1,6 +1,15 @@
 --- _shared/lua/keymap/terminators.lua
 
 --- ==============================================================================
+
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and this module was reading one: the daemon and the unit runner both install
+-- the compat shim before loading anything, so it worked from those two entry
+-- points and crashed from the E2E runner, which is a third. A shared module
+-- cannot depend on its caller having installed a global — the shim exports the
+-- same functions directly, so ask for them.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
 --- MODULE: Keymap Terminators (Shared)
 --- DESCRIPTION:
 --- Owns the terminator catalogue (definitions, enable/disable state, custom

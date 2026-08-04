@@ -3,6 +3,14 @@
 
 --- ==============================================================================
 
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and a shared module cannot depend on its caller having installed the compat
+-- shim — it does not know its callers. terminators.lua crashed from the E2E
+-- runner for exactly that reason while working from the daemon and the unit
+-- runner, both of which install one.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
+
 -- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
 -- unless the build enabled 5.2 compatibility, which the one CI and the Linux
 -- daemon run does not. Resolved once here rather than at each call site, and
@@ -47,8 +55,8 @@ function M.utf8_chars(s)
 	if type(s) ~= "string" then return chars end
 
 	pcall(function()
-		for _, c in utf8.codes(s) do
-			table.insert(chars, utf8.char(c))
+		for _, c in utf8_lib.codes(s) do
+			table.insert(chars, utf8_lib.char(c))
 		end
 	end)
 
@@ -68,8 +76,8 @@ function M.get_common_prefix_utf8(s1, s2)
 	-- pcall the whole walk so malformed UTF-8 cannot surface as an error;
 	-- worst case we stop early and report whatever prefix was already agreed.
 	local ok, count = pcall(function()
-		local iter1, inv1, ctrl1 = utf8.codes(s1)
-		local iter2, inv2, ctrl2 = utf8.codes(s2)
+		local iter1, inv1, ctrl1 = utf8_lib.codes(s1)
+		local iter2, inv2, ctrl2 = utf8_lib.codes(s2)
 		local matched = 0
 		while true do
 			local p1, c1 = iter1(inv1, ctrl1)
@@ -159,7 +167,7 @@ function M.contains_high_unicode(s)
 
 	local found = false
 	pcall(function()
-		for _, c in utf8.codes(s) do
+		for _, c in utf8_lib.codes(s) do
 			if c > 0xFFFF then
 				found = true
 				break
