@@ -28,6 +28,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
+local MagicKey = require("modules.hotstrings.magic_key")
 local LOG = "ui.menu.menu_builder"
 
 -- Single source of the driver version.
@@ -57,6 +58,45 @@ end
 
 local function shell_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+end
+
+--- Asks the user for a line of text.
+---
+--- Declared here, above every closure that calls it: a `local` declared after a
+--- closure that uses it is captured as a nil GLOBAL, and the call fails at click
+--- time rather than at load time — which is the shape of three bugs already fixed
+--- in this driver.
+--- @param title string Window title.
+--- @param prompt string The question.
+--- @param initial string|nil Pre-filled value.
+--- @return string|nil The entered text, or nil when the dialog was cancelled.
+local function prompt_text(title, prompt, initial)
+	local command = "zenity --entry --title=" .. shell_quote(title)
+		.. " --text=" .. shell_quote(prompt)
+		.. " --entry-text=" .. shell_quote(initial or "") .. " 2>/dev/null"
+	local pipe = io.popen(command, "r")
+	if not pipe then
+		Logger.error(LOG, "Zenity is unavailable: cannot prompt for '%s'.", tostring(title))
+		return nil
+	end
+	local value = pipe:read("*a") or ""
+	-- A non-zero exit is Cancel or the window being closed. Distinguished from an
+	-- empty entry, which exits zero: the first must change nothing, the second is
+	-- a value the caller gets to refuse with its own message.
+	local ok = pipe:close()
+	if not ok then return nil end
+	return (value:gsub("[\r\n]+$", ""))
+end
+
+--- Shows a message the user must acknowledge.
+--- @param message string Already-localised text.
+local function show_error(message)
+	local command = "zenity --error --text=" .. shell_quote(message) .. " 2>/dev/null"
+	if not os.execute(command) then
+		-- Zenity absent: the refusal still has to reach someone, and a silent
+		-- rejection reads as a menu row that does nothing when clicked.
+		Logger.error(LOG, "%s", tostring(message))
+	end
 end
 
 local function gesture_slot_label(slot)
@@ -399,6 +439,42 @@ local function _manifest_hotstring_rows(ctx, config)
 			}
 
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.word_expanders"), menu = sub }
+		end,
+		["magic_key_config"] = function(items)
+			-- The row the manifest restricted to Windows and macOS until 2026-08-04,
+			-- with a translated reason saying Linux had no way to change the key. That
+			-- was true and is the reason it is written here rather than the reason to
+			-- keep the row hidden: a declared gap closes by writing the feature.
+			local current = MagicKey.get()
+			items[#items + 1] = {
+				title = i18n_safe("menu.hotstrings.magic_key") .. " : " .. current,
+				fn    = function()
+					local chosen = prompt_text(
+						i18n_safe("dialog.magic_key.title"),
+						i18n_safe("dialog.magic_key.prompt"),
+						current)
+					-- nil is a cancelled dialog, which must change nothing. An empty
+					-- string is a user who cleared the box and pressed OK, and that is
+					-- refused by validate() with its own message rather than silently
+					-- treated as a cancel.
+					if chosen == nil then return end
+					local ok, reason = MagicKey.set(chosen)
+					if not ok then
+						show_error(i18n_safe(reason or "dialog.magic_key.error_empty"))
+						return
+					end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+			if MagicKey.is_customised() then
+				items[#items + 1] = {
+					title = "    " .. i18n_safe("menu.hotstrings.magic_key_reset"),
+					fn    = function()
+						MagicKey.reset()
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			end
 		end,
 		["delays_colors"] = function(items)
 			-- One row, not the Windows submenu: that one also carries per-category

@@ -3247,16 +3247,16 @@ i18n = "menu.hotstrings.delays_colors"
 [[menu.hotstrings_params_group]]
 type = "---"
 
+# Unrestricted since 2026-08-04. The "Linux has no way to change the key from its
+# menu at all" was accurate — every Linux reader called
+# ManifestReader.default_for, which is the shipped DEFAULT and never a user's
+# choice — and a declared gap closes by writing the feature, not by widening the
+# declaration over an absence. modules/hotstrings/magic_key.lua now owns the
+# value: one reader, one writer, validated (exactly one codepoint, and not a
+# character common in prose) and persisted.
 [[menu.hotstrings_params_group]]
 type = "dynamic"
 id = "magic_key_config"
-# Not on Linux. macOS DOES have a magic-key editor — menu_hotstrings_management
-# prompts for the character and writes state.trigger_char — it simply builds the
-# row without ever naming this id, which is why a first pass read the driver as
-# lacking the feature and nearly restricted a working row out of its menu.
-# Linux has no way to change the key from its menu at all.
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.no_magic_key_editor_on_linux"
 
 [[menu.hotstrings_params_group]]
 type = "dynamic"

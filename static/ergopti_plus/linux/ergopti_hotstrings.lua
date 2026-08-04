@@ -103,6 +103,7 @@ local engine_mod        = require("modules.hotstrings.engine")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
+local MagicKey          = require("modules.hotstrings.magic_key")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -619,8 +620,10 @@ local function main()
 		-- all say "★" — so the @-tag expansions were the only feature in the
 		-- product listening for a different key, and the personal-info editor told
 		-- the user so.
+		-- Through MagicKey, not the manifest default: the default is what ships,
+		-- and reading it here would ignore a key the user chose from the menu.
 		dyn_hotstrings.init({
-			trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
+			trigger_char = MagicKey.get(),
 		})
 		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
 			dyn_hotstrings.get_rules_count())
@@ -940,8 +943,10 @@ local function main()
 		-- every localised label that mentions it, so a driver that answered "\"
 		-- here printed the wrong key in 21 languages while the engine listened for
 		-- ★ — a menu that documented a keystroke nothing responded to.
+		-- Read on every substitution rather than captured once, so changing the key
+		-- from the menu relabels the 21 locales without a restart.
 		i18n_mod.set_trigger_provider(function()
-			return ManifestReader.default_for("hotstrings.trigger_char")
+			return MagicKey.get()
 		end)
 	end
 
