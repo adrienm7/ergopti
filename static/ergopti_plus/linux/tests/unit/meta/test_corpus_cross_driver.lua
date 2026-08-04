@@ -416,11 +416,11 @@ end)
 
 
 
--- ============================================
--- ============================================
--- ======= 9/ Corpus 8 — Tooltip (SKIP) =======
--- ============================================
--- ============================================
+-- ================================================
+-- ================================================
+-- ======= 9/ Corpus 8 — Tooltip (replayed) =======
+-- ================================================
+-- ================================================
 
 describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 	local layout_path  = corpus_root .. "/tooltip/layout_vectors.json"
@@ -441,15 +441,44 @@ describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in tooltip layout corpus")
 	end)
 
-	-- The canonical layout + dequeue math lives in _shared/modules/tooltip/
-	-- (layout.js, dequeue.js) and is pinned by the macOS Lua clone plus the AHK
-	-- consumer. Linux renders through WebKit2GTK with no Lua port of that math,
-	-- which is the reason for the skip — so that is what is asserted.
-	it("SKIP [CONF-LINUX-TOOLTIP-LAYOUT] is still justified — Linux has no Lua tooltip layout port", function()
-		local ok = pcall(require, "modules.tooltip.layout")
-		assert_true(not ok,
-			"a Lua tooltip layout module now loads on Linux — replay the layout corpus against it instead of skipping it")
+	-- The skip that used to sit here asserted that `require("modules.tooltip.layout")`
+	-- FAILS, on the grounds that Linux had no Lua port of the layout maths. It
+	-- does now — in _shared/lua/tooltip/layout.lua, shared with macOS — so the
+	-- corpus is replayed against it instead. The vectors are the output of
+	-- _shared/modules/tooltip/layout.js, which is the reference every driver has
+	-- to agree with.
+	--
+	-- Driven with the geometry from the shared constants rather than with
+	-- literals: the vectors were generated against those numbers, so a test
+	-- carrying its own copy would pass while the driver drew somewhere else.
+	local ok_layout, Layout = pcall(require, "tooltip.layout")
+	local ok_style, Style = pcall(function()
+		return require("ui.tooltip.config").load()
 	end)
+
+	it("the shared layout module and the style canon both load", function()
+		assert_true(ok_layout, "tooltip.layout must be requirable: " .. tostring(Layout))
+		assert_true(ok_style, "the tooltip style canon must load: " .. tostring(Style))
+	end)
+
+	if ok_layout and ok_style and data and data.vectors then
+		local opts = {
+			caret_offset_x  = Style.positioning.caret_offset_x,
+			caret_offset_y  = Style.positioning.caret_offset_y,
+			window_offset_y = Style.positioning.window_offset_y,
+			screen_margin   = Style.layout.screen_margin,
+		}
+
+		for _, vector in ipairs(data.vectors) do
+			it("layout vector " .. tostring(vector.id) .. " lands where the reference says", function()
+				local got = Layout.compute_position(vector.anchor, vector.canvasSize, vector.screenFrame, opts)
+				assert_eq(got.x, vector.expected.x,
+					"x for " .. tostring(vector.id) .. " — " .. tostring(vector.description))
+				assert_eq(got.y, vector.expected.y,
+					"y for " .. tostring(vector.id) .. " — " .. tostring(vector.description))
+			end)
+		end
+	end
 end)
 
 
