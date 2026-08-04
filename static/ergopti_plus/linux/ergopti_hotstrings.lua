@@ -864,6 +864,12 @@ local function main()
 	-- at-rest migration.
 	local on_periodic = function()
 		tick_count = tick_count + 1
+		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
+		-- has no business on the keystroke path. A keyboard unplugged and plugged
+		-- back in gets a new eventN node, and restarting the remap daemon
+		-- recreates the device this one prefers — neither announces itself on the
+		-- descriptor already held.
+		pcall(keyboard_hook.check_device)
 		if process_lifecycle then
 			pcall(process_lifecycle.tick, tick_count)
 		end

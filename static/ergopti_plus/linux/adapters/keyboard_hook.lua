@@ -98,6 +98,19 @@ local _shift_held = false
 local _ctrl_held  = false
 local _alt_held   = false
 
+-- How many periodic ticks pass between device checks. The daemon ticks four
+-- times a second and the check re-reads /proc/bus/input/devices, so every tick
+-- would be four small file reads per second for an event that happens when a
+-- keyboard is unplugged or the remap daemon restarts — twice a day at most.
+local DEVICE_CHECK_TICKS = 8
+
+-- Ticks since the last device check.
+local _ticks_since_check = 0
+
+-- Set once when no device at all can be found, so the log says it once rather
+-- than every two seconds for as long as the keyboard stays unplugged.
+local _reported_missing = false
+
 
 
 
@@ -254,6 +267,78 @@ function M.pump()
 	EvdevReader.drain(_dispatch_event)
 end
 
+--- Resolves the device the daemon should be reading right now.
+--- @return string|nil path
+local function _best_device()
+	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	if not ok_df or type(df.find_keyboard) ~= "function" then return nil end
+	local ok_find, path = pcall(df.find_keyboard)
+	return ok_find and path or nil
+end
+
+--- Opens and, when asked, grabs a device, replacing whatever is open.
+--- @param path string Device path.
+--- @return boolean True when the hook is reading that device.
+local function _acquire(path)
+	EvdevReader.close()
+	if not EvdevReader.open(path) then return false end
+	if _intercept and not EvdevReader.grab() then
+		-- Running ungrabbed after asking for a grab means the daemon re-emits
+		-- every key while the desktop also receives the physical one — everything
+		-- typed twice, which is worse than not reading at all.
+		EvdevReader.close()
+		return false
+	end
+	_device = path
+	return true
+end
+
+--- Re-checks which device should be read, and switches when it has changed.
+---
+--- Two events make this necessary, and neither announces itself on the
+--- descriptor we already hold. A keyboard unplugged and plugged back in gets a
+--- NEW /dev/input/eventN node, so the old descriptor stays open forever and
+--- delivers nothing. And the remap daemon restarting destroys and recreates its
+--- output device — which is the device this daemon prefers, because it carries
+--- post-remap keycodes. Without this, a `systemctl --user restart` of the remap
+--- daemon silently downgraded us to reading the physical keyboard, i.e. to
+--- resolving characters the user never typed.
+---
+--- Called from the daemon's periodic callback, not the idle one: it re-reads
+--- /proc/bus/input/devices, which has no business on the keystroke path.
+function M.check_device()
+	if not _running then return end
+
+	_ticks_since_check = _ticks_since_check + 1
+	if _ticks_since_check < DEVICE_CHECK_TICKS then return end
+	_ticks_since_check = 0
+
+	local best = _best_device()
+	if not best then
+		if not _reported_missing then
+			Logger.warn(LOG, "No input device to read — keeping %s open until one appears.",
+				tostring(_device))
+			_reported_missing = true
+		end
+		return
+	end
+	_reported_missing = false
+
+	if best == _device and EvdevReader.is_open() then return end
+
+	Logger.start(LOG, "Input device changed (%s → %s) — re-acquiring…",
+		tostring(_device), best)
+	if _acquire(best) then
+		Logger.success(LOG, "Re-acquired %s (intercept=%s).", best, tostring(_intercept))
+	else
+		-- Deliberately not a silent retry loop: the next tick tries again, and
+		-- saying so each time is how a permission problem on a newly created node
+		-- becomes visible instead of looking like a dead daemon.
+		Logger.error(LOG, "Could not re-acquire %s — will retry.", best)
+		_running = EvdevReader.is_open()
+	end
+end
+
 
 
 
@@ -320,14 +405,12 @@ function M.start(opts)
 	end
 
 	-- Resolve the device path.
+	local target = nil
 	if type(options.device) == "string" and options.device ~= "" then
-		_device = options.device
+		target = options.device
 	else
-		local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
-		if ok_df and df.find_keyboard then
-			_device = df.find_keyboard()
-		end
-		if not _device then
+		target = _best_device()
+		if not target then
 			Logger.error(LOG, "start(): no keyboard device found (set --device or check /proc/bus/input/devices).")
 			return
 		end
@@ -336,32 +419,23 @@ function M.start(opts)
 	-- Fail loudly and specifically. "No hotstrings happen" used to be the symptom
 	-- of a missing binary, a masked keycode and an unreadable node alike; the
 	-- reason a user can act on is the group membership, so say that.
-	local available, why = EvdevReader.is_available(_device)
+	local available, why = EvdevReader.is_available(target)
 	if not available then
-		Logger.error(LOG, "start(): cannot read %s — %s.", _device, tostring(why))
-		_device = nil
+		Logger.error(LOG, "start(): cannot read %s — %s.", target, tostring(why))
 		return
 	end
 
 	-- Refresh the foreground context before starting.
 	_read_context()
 
-	if not EvdevReader.open(_device) then
-		Logger.error(LOG, "start(): failed to open %s.", _device)
+	if not _acquire(target) then
+		Logger.error(LOG, "start(): failed to open or grab %s.", target)
 		_device = nil
 		return
 	end
 
-	if _intercept and not EvdevReader.grab() then
-		-- A failed grab in intercept mode is not something to continue past: the
-		-- daemon would re-emit every key it read while the desktop also received
-		-- the physical one, so the user would see everything typed twice.
-		Logger.error(LOG, "start(): could not grab %s — refusing to run doubled.", _device)
-		EvdevReader.close()
-		_device = nil
-		return
-	end
-
+	_ticks_since_check = 0
+	_reported_missing = false
 	_running = true
 	Logger.success(LOG, "Keyboard hook started (device=%s layout=%s intercept=%s).",
 		_device, _layout, tostring(_intercept))
@@ -415,6 +489,10 @@ end
 --- produced nothing at all.
 --- @param events table Array of { type, code, value } tables, in arrival order.
 --- @param callbacks table { onChar?, onKey?, onPhysical?, onEmitRaw? }.
+-- Exposed so the watchdog test can advance exactly as many ticks as the check
+-- needs, instead of hardcoding a number that silently stops matching.
+M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
+
 --- @param intercept boolean Whether to run the pass-through branch.
 --- @return integer Number of events drained.
 function M._test_drive(events, callbacks, intercept)
