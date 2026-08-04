@@ -108,6 +108,25 @@ local function _build_initial_payload(state)
 	}
 end
 
+--- Applies one override through the config module, if this driver has one.
+---
+--- Guarded rather than assumed: the harness supplies a config table with only
+--- the functions a given case needs, and a bridge that called an absent one
+--- would fail the test for the wrong reason.
+--- @param state table Daemon state.
+--- @param category string
+--- @param section string|nil
+--- @param field string
+--- @param value any
+local function set_override(state, category, section, field, value)
+	if not state.config or type(state.config.set_override) ~= "function" then
+		Logger.warn(LOG, "set_override unavailable — '%s' for '%s' was not applied.",
+			tostring(field), tostring(category))
+		return
+	end
+	state.config.set_override(category, section, field, value)
+end
+
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
@@ -131,6 +150,70 @@ function M.on_message(payload, state)
 	if action == "toggle_group" and payload.group then
 		if state.config and type(state.config.toggle_group) == "function" then
 			state.config.toggle_group(payload.group)
+		end
+		return _build_initial_payload(state)
+	end
+
+	-- The shared settings window speaks eleven actions; this bridge answered four
+	-- of them, so every delay, colour and preview control in it was inert on this
+	-- driver. They are not new controls — the window already draws them, and a
+	-- user clicking one got silence.
+	--
+	-- The empty string is the window's spelling of "the category itself", not a
+	-- section named "": it sends section: '' for a category-level edit, and
+	-- passing that through would create an override under a section nothing has.
+	--- @param payload table
+	--- @return string|nil
+	local function section_of(payload)
+		local section = payload.section
+		if type(section) ~= "string" or section == "" then return nil end
+		return section
+	end
+
+	if action == "set_delay" and payload.category then
+		set_override(state, payload.category, section_of(payload), "delay", tonumber(payload.value))
+		return _build_initial_payload(state)
+	end
+
+	if action == "clear_delay" and payload.category then
+		set_override(state, payload.category, section_of(payload), "delay", nil)
+		return _build_initial_payload(state)
+	end
+
+	if action == "set_color" and payload.category then
+		set_override(state, payload.category, section_of(payload), "color", payload.value)
+		return _build_initial_payload(state)
+	end
+
+	if action == "clear_color" and payload.category then
+		set_override(state, payload.category, section_of(payload), "color", nil)
+		return _build_initial_payload(state)
+	end
+
+	if action == "set_tooltip" and payload.category then
+		-- Coerced rather than passed through: the window sends a JSON boolean,
+		-- and a string "false" is truthy in Lua — which would turn the preview on
+		-- for a user who had just turned it off.
+		local value = payload.value
+		if type(value) == "string" then value = (value == "true") end
+		set_override(state, payload.category, section_of(payload), "show_tooltip", value and true or false)
+		return _build_initial_payload(state)
+	end
+
+	if action == "clear_tooltip" and payload.category then
+		set_override(state, payload.category, section_of(payload), "show_tooltip", nil)
+		return _build_initial_payload(state)
+	end
+
+	if action == "reset_all" then
+		if state.config and type(state.config.reset_defaults) == "function" then
+			state.config.reset_defaults()
+		end
+		if state.config and type(state.config.get_categories) == "function"
+			and type(state.config.clear_override) == "function" then
+			for id in pairs(state.config.get_categories()) do
+				state.config.clear_override(id, nil)
+			end
 		end
 		return _build_initial_payload(state)
 	end
