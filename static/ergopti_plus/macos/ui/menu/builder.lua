@@ -18,42 +18,35 @@ local text_utils = require("infra.text_utils")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
+-- The single reader of menu_manifest.json. See load_manifest below for why this
+-- module no longer has one of its own.
+local ManifestMenu = require("infra.manifest_menu")
 local HotCounter  = require("ui.menu.hotstring_counter")
 local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
 
 
--- Single parsed representation of menu_manifest.json for the session.
--- Both load_ergopti_groups() and load_debug_menu() share this cache so the
--- file is read and parsed only once, no matter how many menu rebuilds occur.
--- Never invalidated on toggle (the manifest is a static asset that never
--- changes at runtime); only a full hs.reload() resets this module.
-local _manifest_cache          = nil
 local _ergopti_groups_cache    = nil
 local _debug_menu_cache        = nil
 local _top_level_tail_cache    = nil
 local _global_actions_cache    = nil
 
---- Loads and caches menu_manifest.json once per session.
+--- Returns the parsed menu_manifest.json root.
+---
+--- ONE READER, NOT THREE. This used to be a second open/read/hs.json.decode with
+--- a second session cache, byte-for-byte the shape of infra/manifest_menu's own
+--- get_manifest_root() down to the two error messages — and menu_remap carried a
+--- third. Three copies of a file read is three places for a path change to land
+--- in one of, and it cost a duplicate decode of an 11.9 KB file on the boot path,
+--- which is precisely the cost the Windows driver's manifest loader records
+--- having removed on its side.
+---
+--- infra/manifest_menu owns it because it is infra and because it already
+--- exposed get_root(); this module is a UI builder. There is no require cycle:
+--- manifest_menu pulls in logger, paths and i18n only.
 --- @return table|nil Parsed manifest data, or nil on failure.
 local function load_manifest()
-	if _manifest_cache then return _manifest_cache end
-	local manifest_path = Paths.shared("modules/menu/menu_manifest.json") or ""
-	local ok_r, fh = pcall(io.open, manifest_path, "r")
-	if not ok_r or not fh then
-		Logger.error(LOG, "Cannot open menu_manifest.json at '%s'.", manifest_path)
-		return nil
-	end
-	local content = fh:read("*a")
-	fh:close()
-	local ok_j, data = pcall(hs.json.decode, content)
-	if not ok_j or type(data) ~= "table" then
-		Logger.error(LOG, "Failed to parse menu_manifest.json.")
-		return nil
-	end
-	_manifest_cache = data
-	Logger.debug(LOG, "menu_manifest.json loaded and cached.")
-	return data
+	return ManifestMenu.get_root()
 end
 
 --- Loads hotstring group classification from the shared menu_manifest.json.
