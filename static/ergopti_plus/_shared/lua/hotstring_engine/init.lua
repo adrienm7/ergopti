@@ -193,6 +193,16 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto)
 				end
 			end
 
+			-- No-op guard. A mapping whose effective replacement equals what was
+			-- typed has nothing to inject, and reporting it as a match is not
+			-- harmless: the caller consumes the triggering keystroke to make room
+			-- for an expansion that then writes the same characters back. macOS
+			-- shipped without this guard once and the character vanished from the
+			-- screen — the dropped-char bug its own try_auto_expand comment names.
+			-- This core had no guard at all; the divergence was invisible because
+			-- no corpus vector covered a no-op until 2026-08-04.
+			if eff == buf_tail then eff = nil end
+
 			if eff then
 				-- Word-boundary check: the character preceding the trigger must
 				-- not be a word character (or the trigger fills the whole body).

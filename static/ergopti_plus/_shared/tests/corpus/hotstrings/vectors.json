@@ -473,6 +473,18 @@
 				"replacement": "y a-t-il",
 				"backspace_count": 2
 			}
+		},
+		{
+			"id": "noop_expansion_does_not_fire",
+			"description": "A mapping whose replacement equals what was typed must NOT fire. macOS guards this at expander.lua would_fire (\"if eff_plain == typed then …\") because it once shipped without it: the expansion consumed the triggering keystroke while injecting nothing, so the character vanished from the screen — the dropped-char bug named in try_auto_expand own comment. The shared core has no such guard, and this vector is what tells us whether that matters.",
+			"trigger": "ok",
+			"replacement": "ok",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "ok",
+			"expected": {
+				"matched": false
+			}
 		}
 	],
 	"collision_vectors": [
