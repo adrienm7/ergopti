@@ -5,17 +5,20 @@
 --- DESCRIPTION:
 --- OS-facing module responsible for replaying hotstring expansions into the
 --- currently focused application on Linux. Given a backspace count and a
---- replacement string, it erases the typed trigger then inserts the replacement
---- text via ydotool (uinput), which works on both X11 and Wayland sessions.
+--- replacement string, it erases the typed trigger then delivers the
+--- replacement — as keystrokes resolved against the session's own XKB layout,
+--- or through the clipboard for the rare character no key can produce.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Two-phase injection: first emits N Backspace keystrokes to erase the
----    trigger (plus the terminator when consumed), then types the replacement.
---- 2. ydotool dependency: ydotool communicates with the ydotoold daemon via a
----    Unix socket, providing uinput-level injection that works on Wayland where
----    xdotool cannot send events to other windows.
---- 3. Defensive pcall: every os.execute call is wrapped so an injection failure
----    never propagates to the engine or crashes the daemon.
+---    trigger (plus the terminator when consumed), then delivers the replacement.
+--- 2. One output channel. Everything goes through the driver's own uinput
+---    device, the same one the keyboard hook re-emits through, so an injection
+---    obeys the same grab and the same ordering as the keystrokes around it.
+---    ydotool is gone: it assumes a US layout, needs a daemon, and forks per
+---    event, which is what made the grab unaffordable in the first place.
+--- 3. Defensive pcall: an injection failure never propagates to the engine or
+---    crashes the daemon.
 --- 4. Delay between phases: a small inter-phase delay lets the target application
 ---    process the backspaces before the replacement text arrives, preventing
 ---    character interleaving in fast editors.
@@ -33,6 +36,7 @@ local M = {}
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
+local Clipboard = require("adapters.clipboard")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -48,18 +52,9 @@ if not ok_luv then luv = nil end
 -- =========================================
 -- =========================================
 
--- Kernel keycode for Backspace (KEY_BACKSPACE = 14 in input-event-codes.h).
--- ydotool key format: <keycode>:<value> where value 1=down, 0=up.
-local YDOTOOL_BACKSPACE_DOWN = "14:1"
-local YDOTOOL_BACKSPACE_UP   = "14:0"
-
 -- Milliseconds to pause between the backspace phase and the type phase.
 -- Allows slow applications to process the deletes before new characters arrive.
 local INTER_PHASE_DELAY_MS = 20
-
--- ydotool --key-delay: milliseconds between synthesised key events.
--- 0 is fastest but can cause drops in some applications; 12 ms is reliable.
-local YDOTOOL_KEY_DELAY_MS = 12
 
 -- evdev EV_KEY event values (linux/input-event-codes.h): a key report carries
 -- 0 on release, 1 on press and 2 for a kernel-generated autorepeat.
@@ -81,28 +76,69 @@ local MODIFIER_CODES = {
 -- =========================================
 -- =========================================
 
---- The non-forking uinput channel, when one has been opened. nil means emit_key
---- falls back to one `ydotool key` subprocess per event — correct, but far too
---- expensive to run under a keyboard grab.
+--- The driver's uinput channel, once opened. It is the ONLY output path: nil
+--- means the daemon cannot put a key back, cannot erase a trigger and cannot
+--- type a replacement, which is why the daemon refuses to grab without it.
 local _uinput = nil
 
---- Test seam: when set, shell_run delegates to this function instead of os.execute.
---- The function receives the raw shell command string and must return a boolean.
---- Set via M._set_runner(fn); reset via M._reset_runner().
-local _test_runner = nil
+--- The FFI nanosleep binding, or false when this runtime has no FFI. Probed once.
+local _nanosleep = nil
 
---- Runs a shell command, discarding stdout and stderr.
---- Returns true on exit code 0, false otherwise.
---- @param cmd string Shell command string.
---- @return boolean
-local function shell_run(cmd)
-	if _test_runner then
-		return _test_runner(cmd)
+--- Binds nanosleep(2) through FFI.
+---
+--- The reason this exists rather than only the luv path: luv is not installed in
+--- CI and is optional on a user's machine, so the fallback below is what actually
+--- ran everywhere — and it forks /bin/sleep on the injection path, once per
+--- expansion. LuaJIT is a hard requirement of this driver, so FFI is not.
+--- @return function|nil sleep(seconds)
+local function nanosleep()
+	if _nanosleep ~= nil then return _nanosleep or nil end
+	_nanosleep = false
+
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if not ok_ffi or type(ffi) ~= "table" then return nil end
+	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
+		struct timespec { long tv_sec; long tv_nsec; };
+		int nanosleep(const struct timespec *req, struct timespec *rem);
+	]])
+	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then return nil end
+
+	local req = ffi.new("struct timespec[1]")
+	_nanosleep = function(seconds)
+		req[0].tv_sec = math.floor(seconds)
+		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
+		ffi.C.nanosleep(req, nil)
 	end
-	local ok, result = pcall(function()
-		return os.execute(cmd .. " 2>/dev/null")
-	end)
-	return ok and (result == true or result == 0)
+	return _nanosleep
+end
+
+--- Sleeps for the given number of milliseconds without forking or spinning.
+---
+--- Never busy-waits on the standard CPU clock: on Linux it reports process CPU
+--- time, so spinning on it would burn a full core for the delay rather than
+--- yield it.
+--- @param ms integer Milliseconds to sleep.
+local function sleep_ms(ms)
+	if ms <= 0 then return end
+	local nap = nanosleep()
+	if nap then
+		nap(ms / 1000)
+		return
+	end
+	if luv and type(luv.sleep) == "function" then
+		luv.sleep(ms)
+		return
+	end
+	-- Last resort, and the only spawn left anywhere on this path: a runtime with
+	-- neither FFI nor luv, which is the developer's plain Lua and not the daemon.
+	-- Fractional seconds are GNU coreutils syntax.
+	pcall(os.execute, string.format("sleep %.3f", ms / 1000))
+end
+
+--- Test seam: forces the nanosleep probe to a known state.
+--- @param value function|false|nil
+function M._set_nanosleep_for_test(value)
+	_nanosleep = value
 end
 
 --- Emits count Backspace keystrokes.
@@ -123,19 +159,10 @@ local function send_backspaces(count)
 		return
 	end
 
-	-- Build a space-separated list of down/up pairs for a single ydotool call.
-	-- This is faster than count separate process spawns.
-	local parts = {}
-	for _ = 1, count do
-		parts[#parts + 1] = YDOTOOL_BACKSPACE_DOWN
-		parts[#parts + 1] = YDOTOOL_BACKSPACE_UP
-	end
-	local key_sequence = table.concat(parts, " ")
-	local cmd = string.format("ydotool key %s", key_sequence)
-	local success = shell_run(cmd)
-	if not success then
-		Logger.warn(LOG, "send_backspaces(%d): ydotool key returned non-zero.", count)
-	end
+	-- No fallback, for the same reason emit_key has none: the daemon refuses to
+	-- grab without this channel, so a closed one here means an injection that
+	-- should never have been attempted.
+	Logger.error(LOG, "send_backspaces(%d): no uinput channel — the trigger cannot be erased.", count)
 end
 
 --- Types a string as keystrokes, under the layout the session actually has.
@@ -176,53 +203,34 @@ local function send_text_native(text)
 	return true
 end
 
---- Injects a text string via ydotool type.
---- The replacement is passed as a single argument after -- to prevent any
---- leading hyphens in the text from being parsed as flags.
+--- Delivers a replacement.
 ---
---- NOTE: --clearmodifiers used to be passed here. It is xdotool vocabulary, not
---- ydotool's, so ydotool rejected the whole invocation — and because the erase
---- phase runs FIRST, every successful match deleted the user's trigger and then
---- typed nothing. A silent data loss on the happy path, logged as one WARN.
---- @param text string The replacement text to type.
-local function send_text_ydotool(text)
-	-- Escape single quotes for safe shell embedding.
-	local safe = text:gsub("'", "'\\''")
-	local cmd  = string.format(
-		"ydotool type --key-delay=%d -- '%s'",
-		YDOTOOL_KEY_DELAY_MS,
-		safe
-	)
-	local success = shell_run(cmd)
-	if not success then
-		Logger.warn(LOG, "send_text(): ydotool type returned non-zero for text '%s'.", text)
-	end
-end
-
---- Types a replacement, preferring the layout-aware path.
+--- Keystrokes first, clipboard second, and nothing third. ydotool used to be the
+--- third and was never a fallback for the case that reaches one: it assumes a US
+--- layout, so a character the layout cannot type is exactly the character
+--- ydotool gets wrong. It also cannot run under the grab, because `ydotool type`
+--- needs a daemon this driver no longer talks to.
+---
+--- The clipboard is deliberately the rare path now. Before the layout was
+--- resolved it would have carried every accented replacement; it now carries
+--- only what no key on the user's keyboard can produce. That is a better thing
+--- to be rare, because pasting is visible, races clipboard managers, and
+--- destroys what the user had copied unless it is put back.
 --- @param text string
 local function send_text(text)
 	if send_text_native(text) then return end
-	send_text_ydotool(text)
-end
 
---- Sleeps for the given number of milliseconds without forking or spinning.
---- Prefers luv.sleep (libuv uv_sleep, a nanosleep that yields the core) so the
---- single-threaded input path pays no /bin/sleep fork per injection. Falls back
---- to a forked sleep only when luv is unavailable — that still yields the CPU.
---- Never busy-waits on the standard CPU clock: on Linux it reports process CPU
---- time, so spinning on it would burn a full core for the delay, not yield.
---- @param ms integer Milliseconds to sleep.
-local function sleep_ms(ms)
-	if ms <= 0 then return end
-	if luv and type(luv.sleep) == "function" then
-		luv.sleep(ms)
+	if Clipboard.paste_text(text, _uinput, sleep_ms) then
+		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
 		return
 	end
-	-- Fallback path (luv absent): fork /bin/sleep, which yields the CPU. Fractional
-	-- seconds are GNU coreutils syntax.
-	pcall(os.execute, string.format("sleep %.3f", ms / 1000))
+
+	-- Reached only when the layout cannot type it AND there is no clipboard tool.
+	-- Said loudly: the trigger has already been erased, so the user has lost text
+	-- and deserves to know why rather than to wonder.
+	Logger.error(LOG, "Cannot deliver '%s' — not typable on this layout and no clipboard route.", text)
 end
+
 
 
 -- =========================================
@@ -270,19 +278,7 @@ function M._queue_char(ch)
 	end
 end
 
---- Replaces the low-level shell runner with a custom function (test seam).
---- The function receives the raw shell command and must return a boolean.
---- @param fn function|nil Custom runner; nil to use the default.
-function M._set_runner(fn)
-	_test_runner = fn
-end
-
---- Restores the default (os.execute) shell runner.
-function M._reset_runner()
-	_test_runner = nil
-end
-
---- Re-emits a single raw evdev key event through the ydotool uinput channel.
+--- Re-emits a single raw evdev key event through the uinput channel.
 ---
 --- Only meaningful in the keyboard hook's intercept mode: EVIOCGRAB suppresses
 --- delivery of the grabbed device to the desktop, which makes the daemon the
@@ -324,23 +320,22 @@ end
 --- Opens the non-forking uinput channel, if this system can provide one.
 ---
 --- Called by the daemon before taking a grab. Returns false rather than raising
---- when FFI or /dev/uinput is unavailable, and emit_key() then keeps using
---- ydotool — correct, just one fork per event, which is only affordable while
---- the daemon is NOT grabbing.
+--- when FFI or /dev/uinput is unavailable; the daemon then exits with the reason
+--- instead of grabbing a keyboard it has no way to give back.
 --- @return boolean True when the non-forking channel is live.
 function M.open_fast_channel()
 	local ok_mod, mod = pcall(require, "adapters.uinput_writer")
 	if not ok_mod or type(mod) ~= "table" then
-		Logger.debug(LOG, "uinput_writer unavailable — keeping the ydotool channel.")
+		Logger.error(LOG, "uinput_writer unavailable — there is no way to emit keys.")
 		return false
 	end
 	if not mod.is_available() then
-		Logger.info(LOG, "No uinput channel on this system — keeping the ydotool channel "
-			.. "(one subprocess per event, so the daemon must not take a grab).")
+		Logger.error(LOG, "No uinput channel on this system — /dev/uinput needs the "
+			.. "uinput group and the module loaded (bash install.sh --setup-perms).")
 		return false
 	end
 	if not mod.open() then
-		Logger.warn(LOG, "uinput channel could not be opened — keeping the ydotool channel.")
+		Logger.error(LOG, "uinput channel could not be opened — check /dev/uinput permissions.")
 		return false
 	end
 	_uinput = mod
