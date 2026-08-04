@@ -483,3 +483,76 @@ helpers.describe("shared hotstring engine — typographic ':' and ';'", function
 			"a star trigger ending in ':' must fire on its own last character")
 	end)
 end)
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 6/ The Start-Of-Buffer Word Boundary =============
+-- ==========================================================
+-- ==========================================================
+
+--- The rolling window's cap, mirrored from the engine so the eviction case can
+--- be constructed at all. Not read from the module because it is a local there,
+--- and a wrong value here fails loudly (the eviction simply never happens and
+--- the negative case starts passing for the wrong reason) rather than silently.
+local BUFFER_MAX_CHARS = 256
+
+--- Feeds a string one codepoint at a time and returns the last on_char result.
+--- @param engine table
+--- @param s string ASCII only.
+--- @return table|nil
+local function _feed(engine, s)
+	local r
+	for i = 1, #s do r = engine:on_char(s:sub(i, i)) end
+	return r
+end
+
+helpers.describe("shared hotstring engine — the buffer's own start", function()
+
+	-- WHY THIS EXISTS. `is_word` asks whether a word boundary precedes the trigger.
+	-- When the trigger fills the whole buffer there is nothing to look at, and the
+	-- three drivers answered differently: macOS and AutoHotkey each carry a flag
+	-- saying whether the buffer's start is known to abut a terminator, and this
+	-- engine had no such flag — it skipped the check outright and allowed the match.
+	-- So a trigger occupying the entire buffer fired here and was refused on the
+	-- other two. The flag now exists here as well; these two cases are its halves.
+
+	helpers.it("an is_word trigger filling a FRESH buffer fires", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ { trigger = "the", replacement = "THE", is_word = true,
+			auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true } })
+		helpers.assert_true(_feed(engine, "the") ~= nil,
+			"a fresh buffer starts where the user started typing, which is a boundary")
+	end)
+
+	helpers.it("the same trigger is refused once the rolling window has evicted", function()
+		local engine = engine_mod.new()
+		-- A trigger exactly as long as the window, so that after one eviction the
+		-- trigger fills the buffer and the boundary question has nowhere to look.
+		local trigger = string.rep("a", BUFFER_MAX_CHARS)
+		engine:load_mappings({ { trigger = trigger, replacement = "X", is_word = true,
+			auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true } })
+
+		-- One character more than the window: the first is evicted, so the buffer
+		-- now begins in the middle of text this engine never saw.
+		helpers.assert_true(_feed(engine, string.rep("a", BUFFER_MAX_CHARS + 1)) == nil,
+			"after an eviction the buffer's start is not a boundary — it is wherever the "
+			.. "window happened to cut — so an is_word trigger reaching it must be refused")
+	end)
+
+	helpers.it("reset() restores the boundary, because a reset happens at one", function()
+		local engine = engine_mod.new()
+		local trigger = string.rep("a", BUFFER_MAX_CHARS)
+		engine:load_mappings({ { trigger = trigger, replacement = "X", is_word = true,
+			auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true } })
+
+		_feed(engine, string.rep("a", BUFFER_MAX_CHARS + 1))
+		engine:reset()
+		helpers.assert_true(_feed(engine, trigger) ~= nil,
+			"a reset follows a focus change, an Escape or a final_result expansion, so what "
+			.. "is typed next genuinely starts a word and the trigger must fire again")
+	end)
+
+end)

@@ -183,6 +183,7 @@ helpers.describe("try_terminator_expand: the re-typed terminator lands last", fu
 			repl          = LONG_A .. "{Left}" .. LONG_B,
 			plain_repl    = LONG_A .. LONG_B,
 			is_word       = false,
+			match_mode    = "exact",
 			final_result  = false,
 		}
 		local reg = make_registry({ ["w"] = { m } })
@@ -223,6 +224,7 @@ helpers.describe("try_terminator_expand: the re-typed terminator lands last", fu
 			repl          = LONG_A .. "{Left}",
 			plain_repl    = LONG_A,
 			is_word       = false,
+			match_mode    = "exact",
 			final_result  = false,
 		}
 		local reg = make_registry({ ["w"] = { m } })
@@ -264,6 +266,7 @@ helpers.describe("try_terminator_expand: the re-typed terminator lands last", fu
 			repl          = "by the way",
 			plain_repl    = "by the way",
 			is_word       = false,
+			match_mode    = "exact",
 			final_result  = false,
 		}
 		local reg = make_registry({ ["w"] = { m } })

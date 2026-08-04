@@ -59,6 +59,12 @@ package.path = table.concat({
 	package.path,
 }, ";")
 
+-- The SAME terminator set the driver consults (ergopti_hotstrings.lua:443), so
+-- this harness cannot open the end-char path for a character the driver would
+-- leave alone. Deciding that here by hand is what made a correct engine look
+-- wrong against a correct vector.
+local terminators = require("keymap.terminators")
+
 
 -- ============================================================================
 -- 1. Test Infrastructure
@@ -200,13 +206,21 @@ local function make_vkb(trigger, replacement, opts)
 		-- Return the first non-nil match (the trigger match, not nil from terminator).
 		for i, ch in ipairs(chars) do
 			local is_last = (i == #chars)
-			local term_consumed = is_last and terminator ~= ""
 			-- is_terminator is what OPENS the end-char path; terminator_consumed only
 			-- says whether the character is swallowed. Sending the second without the
 			-- first meant a non-auto trigger could never fire in this harness.
+			--
+			-- ASKED, NOT ASSUMED. This used to read `is_last and terminator ~= ""`,
+			-- which declared whatever character came last to BE a terminator. The
+			-- production driver asks terminators.is_terminator(ch) — so the harness
+			-- opened the end-char path for characters the driver never would, and a
+			-- corpus vector describing "a non-auto trigger followed by an ordinary
+			-- letter does not fire" was replayed as "…followed by a terminator", which
+			-- fires and is supposed to. The vector failed against correct behaviour.
+			local is_term = is_last and terminator ~= "" and terminators.is_terminator(ch)
 			local result = engine:on_char(ch, {
-				is_terminator        = is_last and terminator ~= "",
-				terminator_consumed  = term_consumed,
+				is_terminator        = is_term,
+				terminator_consumed  = is_term,
 			})
 			if result then
 				return result

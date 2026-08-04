@@ -450,12 +450,13 @@
 		},
 		{
 			"id": "non_star_waits_for_terminator",
-			"description": "A trigger WITHOUT auto_expand must not fire when its own last character is typed. This is the case the shared engine comment calls the whole point of the field — \"ya\" inside \"yaourt\" — and until 2026-08-04 no vector covered it: all 29 carried auto_expand = true. macOS had no gate at any level and expanded on the spot, rewriting the word as the user typed it; Linux and Windows gated it by two unrelated mechanisms. Three implementations, one invariant, nothing shared holding them to it.",
+			"description": "A trigger WITHOUT auto_expand must not fire when its own last character is typed. This is the case the shared engine comment calls the whole point of the field — \"ya\" inside \"yaourt\" — and until 2026-08-04 no vector covered it: all 29 carried auto_expand = true. macOS had no gate at any level and expanded on the spot, rewriting the word as the user typed it; Linux and Windows gated it by two unrelated mechanisms. Three implementations, one invariant, nothing shared holding them to it. THE `terminator` HERE IS DELIBERATELY NOT ONE: \"o\" is the next letter of \"yaourt\". The vector first shipped with the field absent, and every e2e runner defaults a missing terminator to a space — so all three typed \"ya\" then SPACE, the non-auto trigger fired exactly as it is supposed to on a terminator, and the vector failed on two drivers while claiming to describe the opposite. Naming the character that actually follows makes the same sentence true at both layers: the unit replays still stop at the trigger's last character, and the e2e runners now finish the word instead of ending it.",
 			"trigger": "ya",
 			"replacement": "y a-t-il",
 			"is_word": false,
 			"auto_expand": false,
 			"buffer": "ya",
+			"terminator": "o",
 			"expected": {
 				"matched": false
 			}
@@ -484,6 +485,38 @@
 			"buffer": "ok",
 			"expected": {
 				"matched": false
+			}
+		},
+		{
+			"id": "word_boundary_applies_to_a_separator_prefixed_trigger",
+			"description": "An is_word trigger whose FIRST character is a space is word-gated like every other one: preceded by a letter, it does not fire. macOS used to exempt these — any trigger whose first BYTE was space, NBSP, NNBSP or ';' skipped the boundary check entirely — while AutoHotkey exempted nothing and the shared core exempted nothing either. Three shipped entries fired on macOS and nowhere else because of it. Measured 2026-08-04: the exemption's stated reason, the comma-layer ';e' -> 'Je', has no carrier at all — ZERO shipped triggers begin with ';'. The exemption was removed and the three entries' is_word flag, which had only ever subtracted behaviour, came off with it.",
+			"trigger": " ->",
+			"replacement": " =>",
+			"is_word": true,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
+			"buffer": "a ->",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "separator_prefixed_trigger_fires_at_a_real_boundary",
+			"description": "The positive control for the vector above. Without it, a driver that refuses every separator-prefixed trigger — the opposite defect — would satisfy the negative case and look correct. Preceded by a full stop, which opens no word, the same mapping fires.",
+			"trigger": " ->",
+			"replacement": " =>",
+			"is_word": true,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
+			"buffer": ". ->",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": " =>",
+				"backspace_count": 3
 			}
 		}
 	],

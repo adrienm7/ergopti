@@ -48,7 +48,7 @@ end
 helpers.describe("keymap/expander.lua: try_repeat_feature arm time", function()
 
 	helpers.it("try_repeat_feature updates last_synthetic_arm_time after arming", function()
-		local src = strip_comments(read_source("local function word_boundary_blocks"))
+		local src = strip_comments(read_source("function M.try_terminator_expand"))
 
 		-- Locate try_repeat_feature function body
 		local fn_start = src:find("function M%.try_repeat_feature")
@@ -62,7 +62,7 @@ helpers.describe("keymap/expander.lua: try_repeat_feature arm time", function()
 	end)
 
 	helpers.it("last_synthetic_arm_time is set AFTER expected_synthetic_chars in try_repeat_feature", function()
-		local src = strip_comments(read_source("local function word_boundary_blocks"))
+		local src = strip_comments(read_source("function M.try_terminator_expand"))
 		local fn_start = src:find("function M%.try_repeat_feature")
 		helpers.assert_true(fn_start ~= nil)
 		local after_fn = src:sub(fn_start)

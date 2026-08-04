@@ -291,7 +291,23 @@ Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches
 _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 	; Validates that strict vectors correctly reflect whether the buffer casing
 	; matches the trigger casing.
+	;
+	; WHAT THIS USED TO ASSERT, AND WHY IT WAS TOO STRONG.
+	; It required `matched == (buffer tail equals trigger, case-sensitively)` in
+	; BOTH directions. The forward direction is sound: a tail that differs in case
+	; can never fire a strict trigger. The reverse is not — casing being satisfied
+	; is one condition among several, and a vector can match on casing and still be
+	; refused by the word boundary or the no-op guard. The check held only because
+	; no strict vector had ever been blocked for a non-casing reason, and the first
+	; one that was made a correct vector look like a corpus error.
+	;
+	; So the reverse direction now demands an EXPLANATION rather than a match: a
+	; strict vector whose casing is satisfied but which expects no match must carry
+	; the rule that refuses it. That is stricter than deleting the direction and
+	; catches the thing the original check was really guarding — a `matched: false`
+	; written by mistake.
 	Corpus := _CorpusHS_Parse()
+	Checked := 0
 	for Vec in Corpus["vectors"] {
 		; STRICT is the flag that makes the comparison exact. is_case_sensitive on its
 		; own selects literal registration and still folds, so gating this check on it
@@ -306,11 +322,32 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
 		; Exact (case-sensitive) match — use == for case-sensitive comparison
-		ActualMatch := (BufTail == Trigger)
-		ExpMatch    := Expected.Has("matched") and Expected["matched"] = true
-		AssertEqual(ExpMatch, ActualMatch,
-			"vector '" . Vec["id"] . "': case-sensitive match flag inconsistency")
+		CasingSatisfied := (BufTail == Trigger)
+		ExpMatch        := Expected.Has("matched") and Expected["matched"] = true
+		Checked++
+
+		if (not CasingSatisfied) {
+			AssertEqual(false, ExpMatch,
+				"vector '" . Vec["id"] . "': the buffer tail does not equal the trigger "
+				. "case-sensitively, so a strict trigger cannot fire whatever else is true")
+			continue
+		}
+
+		if (ExpMatch) {
+			continue
+		}
+
+		IsWord := Vec.Has("is_word") and Vec["is_word"] = true
+		IsNoop := Vec.Has("replacement") and Vec["replacement"] == Trigger
+		AssertTrue(IsWord or IsNoop,
+			"vector '" . Vec["id"] . "': casing is satisfied and it still expects no match, "
+			. "but it declares neither is_word nor a no-op replacement. Nothing else in the "
+			. "matcher can refuse it, so the expectation is unexplained")
 	}
+	; Floor: a filter that selects nothing passes for free.
+	AssertTrue(Checked >= 4,
+		"only " . Checked . " strict vector(s) were inspected — the is_case_sensitive_strict "
+		. "filter is no longer selecting anything and this check means nothing")
 }
 Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consistent", _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag)
 

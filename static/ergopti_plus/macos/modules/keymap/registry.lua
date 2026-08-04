@@ -212,7 +212,7 @@ end
 --- @field tlen                integer UTF-8 codepoint length of `trigger`.
 --- @field trigger_bytes       integer Byte length of `trigger`; replaces repeated `#trigger` calls in the hot path.
 --- @field tail_char           string  Last UTF-8 codepoint of `trigger`; keys into _state.mappings_by_tail_char.
---- @field case_conform        boolean|nil True when this single lowercase entry stands in for the lower/Title/UPPER trio; the expander conforms the replacement's case to the typed trigger at fire time (text_utils.conform_replacement). nil on explicit-variant and case-sensitive entries.
+--- @field match_mode          string  One of "conform" (single lowercase entry standing in for the lower/Title/UPPER trio, replacement re-cased at fire time), "fold" (folded compare, replacement emitted verbatim) or "exact" (only the casing written matches). Same three values, same spelling, as the shared matcher core — the shared firing predicate reads this field.
 --- @field final_result        boolean True when the replacement is a finalized string (skip further substitution passes).
 --- @field has_magic           boolean True when `trigger` ends with the magic key.
 --- @field star_base           string|nil When has_magic, `trigger` minus the trailing magic key; nil otherwise.
@@ -654,16 +654,21 @@ function M.add(trigger, replacement, opts)
 			-- First codepoint, folded like tail_char. Buckets the "is this string a
 			-- PREFIX of some trigger?" question, which the tail index cannot answer.
 			first_char   = text_utils.trig_lower(first_codepoint(t)),
-			-- True when this single entry stands in for the lower/Title/UPPER trio:
-			-- the expander conforms the replacement's case to the typed trigger at
-			-- fire time instead of the registry pre-generating three variants.
-			case_conform = conform or nil,
-			-- Match this entry with case folding but emit the replacement verbatim.
-			-- Distinct from case_conform, which also folds but re-cases the output to
-			-- the typed form: an acronym entry must yield "ADN" whether the user typed
-			-- "adn" or "Adn", so conforming it would be wrong in both directions.
-			case_fold    = fold or nil,
-			-- Precomputed folded trigger, the canonical side of a case_fold compare.
+			-- The three-way match mode, resolved once at registration. It used to be
+			-- two orthogonal booleans (case_conform, case_fold) — a second vocabulary
+			-- for the same three outcomes the shared matcher core already names, and
+			-- the shared firing predicate could read neither.
+			--   "conform" — this single entry stands in for the lower/Title/UPPER
+			--               trio: the expander conforms the replacement's case to the
+			--               typed trigger at fire time instead of the registry
+			--               pre-generating three variants.
+			--   "fold"    — match with case folding but emit the replacement
+			--               verbatim. An acronym entry must yield "ADN" whether the
+			--               user typed "adn" or "Adn", so conforming it would be
+			--               wrong in both directions.
+			--   "exact"   — only the casing written matches.
+			match_mode   = conform and "conform" or (fold and "fold" or "exact"),
+			-- Precomputed folded trigger, the canonical side of a "fold" compare.
 			-- Only the typed text is folded on the hot path.
 			trigger_folded = fold and text_utils.trig_lower(t) or nil,
 			final_result = is_final,

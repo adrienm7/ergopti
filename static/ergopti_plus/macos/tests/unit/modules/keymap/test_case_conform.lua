@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Locks in the case-conform fast path ported from the AHK driver: an auto,
 --- case-insensitive, plain-text trigger WITHOUT a shift-symbol char is registered
---- as ONE lowercase entry (case_conform = true) instead of the lower/Title/UPPER
+--- as ONE lowercase entry (match_mode = "conform") instead of the lower/Title/UPPER
 --- trio, and the expander conforms the replacement's case to the typed trigger at
 --- fire time. Triggers that must keep the explicit-variant path (comma/shift-symbol,
 --- non-auto, case-sensitive, token replacements) are guarded too.
@@ -90,7 +90,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add("ccê", "ccu", { auto_expand = true, is_case_sensitive = false })
 		helpers.assert_eq(#state.mappings, 1, "one conform entry, not lower+Title+UPPER")
 		helpers.assert_eq(state.mappings[1].trigger, "ccê")
-		helpers.assert_eq(state.mappings[1].case_conform, true)
+		helpers.assert_eq(state.mappings[1].match_mode, "conform")
 	end)
 
 	helpers.it("buckets the entry under the Unicode-lowered tail (accented capital matches)", function()
@@ -108,7 +108,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add(",e", "je", { auto_expand = true, is_case_sensitive = false })
 		helpers.assert_true(#state.mappings > 1, "comma trigger keeps explicit variants + aliases")
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "no comma entry may be case_conform")
+			helpers.assert_true(m.match_mode ~= "conform", "no comma entry may be in conform mode")
 		end
 	end)
 
@@ -117,7 +117,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add("teh", "the", { auto_expand = false, is_case_sensitive = false })
 		helpers.assert_true(#state.mappings > 1, "non-auto trigger keeps lower/Title/UPPER")
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "non-auto entries are never case_conform")
+			helpers.assert_true(m.match_mode ~= "conform", "non-auto entries are never in conform mode")
 		end
 	end)
 
@@ -125,14 +125,14 @@ helpers.describe("Registry — case-conform registration shape", function()
 		local state, R = fresh_registry()
 		R.add("API", "api", { auto_expand = true, is_case_sensitive = true })
 		helpers.assert_eq(#state.mappings, 1)
-		helpers.assert_true(not state.mappings[1].case_conform)
+		helpers.assert_true(state.mappings[1].match_mode ~= "conform")
 	end)
 
 	helpers.it("does not conform a token (non-plain) replacement", function()
 		local state, R = fresh_registry()
 		R.add("sig", "Hi{Enter}Me", { auto_expand = true, is_case_sensitive = false })
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "token replacements keep the explicit path")
+			helpers.assert_true(m.match_mode ~= "conform", "token replacements keep the explicit path")
 		end
 	end)
 end)
