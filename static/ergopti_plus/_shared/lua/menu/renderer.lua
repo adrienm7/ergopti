@@ -204,6 +204,44 @@ function M.new(deps)
 		return false
 	end
 
+	--- The greyed stand-in for a row this platform does not have.
+	---
+	--- Returns nil unless the row carries a `reason_key`, which is what makes this
+	--- a declaration rather than a guess: the manifest author wrote down why the
+	--- row is absent here, in a key translated into all 21 locales, and this is the
+	--- only thing that ever shows it to anyone.
+	---
+	--- Declared above the render loop deliberately. A `local` declared textually
+	--- after the closure that calls it is captured as a nil GLOBAL, and the call
+	--- then fails when a user opens the menu rather than when the file loads —
+	--- three bugs of exactly that shape have been fixed in this codebase.
+	--- @param entry table Manifest item entry, already known to be off-platform.
+	--- @return table|nil A disabled menu row, or nil to keep the row hidden.
+	local function render_unavailable(entry)
+		local reason_key = entry.reason_key
+		if type(reason_key) ~= "string" or reason_key == "" then return nil end
+
+		local reason = i18n.get(reason_key)
+		-- A key that does not resolve would put the raw dotted key in the menu,
+		-- which reads as a crash. Hiding the row is the better failure: the user
+		-- loses an explanation they were never getting before this existed.
+		if type(reason) ~= "string" or reason == "" or reason == reason_key then
+			Logger.warn(LOG, "reason_key '%s' has no translation — row hidden rather than shown raw.",
+				reason_key)
+			return nil
+		end
+
+		local label = type(entry.i18n) == "string" and i18n.get(entry.i18n) or nil
+		if type(label) ~= "string" or label == "" or label == entry.i18n then
+			-- Most restricted rows are `dynamic` and carry no label of their own —
+			-- their title is built by a handler this platform does not have. The
+			-- reason then IS the row, which is the honest rendering: there is nothing
+			-- else true to say about it here.
+			return { title = reason, disabled = true, fn = function() end }
+		end
+		return { title = label .. " — " .. reason, disabled = true, fn = function() end }
+	end
+
 
 
 
@@ -321,6 +359,23 @@ function M.new(deps)
 
 		for _, item in ipairs(menu_def) do
 			if not is_for_platform(item) then
+				-- A row excluded from this platform that carries a translated
+				-- explanation is rendered PRESENT and greyed, showing the reason,
+				-- rather than dropped. Convention S: the difference between "not
+				-- implemented here" and "removed" is exactly what a user of the
+				-- other driver needs, and until 2026-08-04 five rows carried that
+				-- explanation in 21 languages while every driver silently dropped
+				-- them — the reason existed and nobody could ever read it.
+				--
+				-- Only rows with a reason survive the filter. A restriction with no
+				-- explanation stays hidden, because a greyed row saying nothing is
+				-- worse than an absent one: it occupies the menu and answers nothing.
+				local explained = render_unavailable(item)
+				if explained then
+					flush_sep()
+					table.insert(result, explained)
+					item_count = item_count + 1
+				end
 				goto continue
 			end
 
