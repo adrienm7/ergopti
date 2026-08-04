@@ -196,6 +196,43 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 			"ergopti_hotstrings.lua must pass onEmitRaw to keyboard_hook.start")
 	end)
 
+	helpers.it("the daemon opens the non-forking channel, and opens it before grabbing", function()
+		-- The grab was enabled on the strength of a comment claiming re-emission no
+		-- longer forks. It did fork: open_fast_channel() had no caller outside its
+		-- own test, so `_uinput` was always nil and emit_key fell through to
+		-- `ydotool key` — one subprocess per physical keystroke, under a grab that
+		-- was already on by default. The justification for the default was true of
+		-- the code that existed and false of the code that ran.
+		--
+		-- Order is the assertion, not presence. Between taking the grab and opening
+		-- the channel the daemon owns the keyboard and can only hand keys back one
+		-- fork at a time, which is precisely the state the grab was held back for.
+		local src = daemon_source()
+		local open_at  = src:find("injector%.open_fast_channel%(%)")
+		local start_at = src:find("keyboard_hook%.start%(")
+		helpers.assert_true(open_at ~= nil,
+			"the daemon must call injector.open_fast_channel() — without it the FFI "
+				.. "uinput writer is unreachable and every re-emit is a subprocess")
+		helpers.assert_true(start_at ~= nil, "and it must still start the keyboard hook")
+		helpers.assert_true(open_at < start_at,
+			"open_fast_channel() must come BEFORE keyboard_hook.start(): opening after "
+				.. "the grab leaves a window in which the daemon owns the keyboard and "
+				.. "forks once per key to give it back")
+	end)
+
+	helpers.it("the daemon closes the channel on both exit paths", function()
+		-- UI_DEV_DESTROY never ran either: close_fast_channel() had no caller. A
+		-- daemon killed with SIGTERM left its uinput device behind, and the next
+		-- start enumerated two of them.
+		local src = daemon_source()
+		local closes = 0
+		for _ in src:gmatch("injector%.close_fast_channel%(%)") do closes = closes + 1 end
+		helpers.assert_true(closes >= 2,
+			"close_fast_channel() must run on the signal path AND on the normal exit "
+				.. "path; a daemon that only tidies up when asked politely leaks the "
+				.. "device on every SIGTERM, and found " .. closes .. " call site(s)")
+	end)
+
 	helpers.it("the daemon grabs the device by default", function()
 		-- THE regression this whole item exists for. Observe mode lets physical
 		-- keystrokes reach the application while an expansion is being typed, so

@@ -330,6 +330,9 @@ local function install_signal_handlers()
 			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 		keylogger.flush()
 		keyboard_hook.stop()
+		-- After the hook, never before: closing the channel destroys the uinput
+		-- device, and the hook's ungrab may still have keys to put back through it.
+		injector.close_fast_channel()
 		if tray_menu then tray_menu.destroy() end
 	end
 
@@ -598,10 +601,13 @@ local function main()
 	-- injector's queue (_begin/_queue/_end_injection) only does anything once the
 	-- daemon OWNS the output stream, which is what the grab buys.
 	--
-	-- What made this affordable: emit_key no longer forks a `ydotool key` process
-	-- per physical event — adapters/uinput_writer.lua writes struct input_event
-	-- straight to /dev/uinput through LuaJIT FFI. A fork per keystroke is what a
-	-- grab could not have paid for.
+	-- What makes this affordable: the channel opened immediately below. Under a
+	-- grab the daemon is the only remaining path to the application, so every
+	-- physical event it consumes has to be put back — and the fallback does that
+	-- by forking `ydotool key` ONCE PER EVENT, on the input path. Writing struct
+	-- input_event straight to /dev/uinput is what a grab can pay for; a fork per
+	-- keystroke is not, which is why the open is a precondition of the start
+	-- below and not an optimisation applied later.
 	--
 	-- The two daemons are coordinated through names, not luck: the generated
 	-- remap config excludes our uinput device by exact name, and device_finder
@@ -611,6 +617,14 @@ local function main()
 	-- STILL UNVERIFIED ON HARDWARE. `--no-grab` restores the old behaviour without
 	-- a rebuild, which is why that flag exists — but observe mode is a
 	-- known-corrupting default, so it is the escape hatch and not the norm.
+	-- Open the non-forking re-emit channel BEFORE the grab, never after. The
+	-- ordering is the whole point: between a grab and an open channel the daemon
+	-- owns the keyboard and can only give keys back one fork at a time, which is
+	-- the state the grab was held back for in the first place.
+	if not injector.open_fast_channel() then
+		Logger.warn(LOG, "No uinput channel — every re-emitted key costs a subprocess.")
+	end
+
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,
@@ -869,6 +883,7 @@ local function main()
 	})
 
 	-- 8.14) Clean exit.
+	injector.close_fast_channel()
 	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end
 	if tray_menu then tray_menu.destroy() end
