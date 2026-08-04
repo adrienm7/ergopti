@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Наблюдатель окон",
 	"menu.extensions.empty": "Расширения не установлены",
 	"menu.extensions.header": "Расширения",
+	"menu.extensions.none_installed": "Расширения не установлены",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Действие: ",
 	"menu.common.enabled": "Включено",

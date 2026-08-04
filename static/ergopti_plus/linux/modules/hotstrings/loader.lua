@@ -140,12 +140,19 @@ function M.load_catalogue(paths)
 	local mappings = {}
 	local categories = {}
 
-	for _, path in ipairs(paths) do
+	for _, source in ipairs(paths) do
+		-- A source is a path, or a table carrying a path and the category key it
+		-- must occupy. Extension packs need the second form: two extensions may
+		-- each ship `rolls.toml`, and keying those by stem would silently make one
+		-- replace the other — and replace the bundled category of that name too.
+		local path = type(source) == "table" and source.path or source
+		local forced_group = type(source) == "table" and source.category or nil
+		local extension = type(source) == "table" and source.extension or nil
 		local ok, data = pcall(Reader.parse, path)
 		if not ok then
 			Logger.warn(LOG, "load(): error in '%s' — %s", tostring(path), tostring(data))
 		else
-			local group = category_of(path)
+			local group = forced_group or category_of(path)
 			local meta = type(data.meta) == "table" and data.meta or {}
 
 			-- File-level priority override, the third rung of the cascade.
@@ -160,6 +167,10 @@ function M.load_catalogue(paths)
 				delay          = tonumber(meta.delay),
 				show_tooltip   = meta.show_tooltip,
 				color          = meta.color,
+				-- Set only for a pack that came from an extension. The menu groups
+				-- those under their own heading and labels them with the extension's
+				-- name, which a bare file stem like "demo-phrases" cannot convey.
+				extension      = extension,
 				sections_order = {},
 				sections       = {},
 				count          = 0,
@@ -259,6 +270,42 @@ function M.find_toml_files(dir)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
 	return result
+end
+
+--- Lists the immediate subdirectories of a directory.
+---
+--- Extensions are one directory each, so discovery is a listing at depth 1 —
+--- `-maxdepth 1 -mindepth 1` rather than a recursive walk, which would descend
+--- into every `hotstrings/` and `shortcuts/` folder and report those as
+--- extensions too.
+--- @param dir string Absolute path.
+--- @return table Array of absolute directory paths.
+function M.list_subdirs(dir)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	local result = {}
+	local out = Shell.exec(string.format(
+		"find %s -mindepth 1 -maxdepth 1 -type d 2>/dev/null", Shell.quote(dir)))
+	for line in out:gmatch("[^\r\n]+") do
+		local path = line:match("^%s*(.-)%s*$")
+		if path ~= "" then result[#result + 1] = path end
+	end
+	return result
+end
+
+--- Reads a whole file, or nil when it is absent.
+---
+--- The extension scanner needs manifests, and an absent manifest is the ordinary
+--- case rather than an error — an extension without one is named after its
+--- folder.
+--- @param path string Absolute path.
+--- @return string|nil
+function M.read_file(path)
+	if type(path) ~= "string" or path == "" then return nil end
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local text = fh:read("*a")
+	fh:close()
+	return text
 end
 
 return M

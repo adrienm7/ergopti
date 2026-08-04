@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "窗口侦察",
 	"menu.extensions.empty": "未安装扩展",
 	"menu.extensions.header": "扩展",
+	"menu.extensions.none_installed": "未安装扩展",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "动作：",
 	"menu.common.enabled": "已启用",

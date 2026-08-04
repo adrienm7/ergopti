@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Geen extensie geïnstalleerd",
 	"menu.extensions.header": "Extensies",
+	"menu.extensions.none_installed": "Geen extensie geïnstalleerd",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Actie: ",
 	"menu.common.enabled": "Ingeschakeld",

@@ -126,15 +126,23 @@ function M.build(ctx)
 	-- ===== 3.1) Dynamic Handlers for Manifest Items =====
 	-- =====================================================
 
-	-- Canonical state-key getters for the disabled_when resolver (MG-1) —
-	-- maps the manifest's driver-neutral keys to the concrete Lua state reads
-	-- they proxy. Shared by every dynamic handler below so the dependency
-	-- graph (which item greys out on which toggle) lives once in
-	-- menu_manifest.json instead of being re-derived per handler.
+	-- Canonical state-key getters for the disabled_when AND checked_when resolvers
+	-- — the manifest's driver-neutral keys mapped to the concrete Lua state reads
+	-- they proxy. Shared by every dynamic handler below so the dependency graph
+	-- (which item greys out on which toggle) lives once in menu_manifest.json
+	-- instead of being re-derived per handler.
+	-- The three filter getters were missing until 2026-08-04: the manifest declared
+	-- checked_when on those rows, macOS read `state.…` inline instead, and the two
+	-- declarations were free to drift apart with nothing comparing them. Linux
+	-- resolved the same three through the manifest, so the drivers already
+	-- disagreed about where the truth lived.
 	local STATE_GETTERS = {
-		keylogger_enabled   = function() return state.keylogger_enabled end,
-		wpm_widget_visible  = function() return state.keylogger_float_wpm end,
-		wpm_menubar_visible = function() return state.keylogger_menubar_wpm end,
+		keylogger_enabled      = function() return state.keylogger_enabled end,
+		wpm_widget_visible     = function() return state.keylogger_float_wpm end,
+		wpm_menubar_visible    = function() return state.keylogger_menubar_wpm end,
+		metrics_filter_private = function() return state.keylogger_private_filter_enabled end,
+		metrics_filter_secure  = function() return state.keylogger_secure_filter_enabled end,
+		metrics_filter_sysauth = function() return state.keylogger_system_auth_filter_enabled end,
 	}
 
 	local function dyn_show_typing(items, _ctx)
@@ -260,7 +268,7 @@ function M.build(ctx)
 	local function dyn_filter_private(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_private"),
-			checked  = state.keylogger_private_filter_enabled,
+			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_private", STATE_GETTERS),
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_private", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
@@ -276,7 +284,7 @@ function M.build(ctx)
 	local function dyn_filter_secure(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_secure"),
-			checked  = state.keylogger_secure_filter_enabled,
+			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_secure", STATE_GETTERS),
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_secure", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
@@ -292,7 +300,7 @@ function M.build(ctx)
 	local function dyn_filter_sysauth(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_sysauth"),
-			checked  = state.keylogger_system_auth_filter_enabled,
+			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_sysauth", STATE_GETTERS),
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_sysauth", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled

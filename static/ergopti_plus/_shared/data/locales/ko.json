@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "설치된 확장 기능 없음",
 	"menu.extensions.header": "확장 기능",
+	"menu.extensions.none_installed": "설치된 확장이 없습니다",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "동작: ",
 	"menu.common.enabled": "사용",

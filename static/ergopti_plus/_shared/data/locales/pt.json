@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Espião de Janela",
 	"menu.extensions.empty": "Nenhuma extensão instalada",
 	"menu.extensions.header": "Extensões",
+	"menu.extensions.none_installed": "Nenhuma extensão instalada",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Ação: ",
 	"menu.common.enabled": "Ativado",

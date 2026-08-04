@@ -723,11 +723,35 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
   Détail qui manquait au plan : `install.sh` copie les packs **à plat** dans le
   répertoire utilisateur, donc la fusion par stem est aussi ce qui évite de les
   compter deux fois.
-- [ ] **M3.6** **La gate de certification** `test-menu-parity.cjs` (I3) : rend le
+- [x] **M3.6** **La gate de certification** `test-menu-parity.cjs` (I3) : rend le
   manifeste pour les 3 plateformes, diffe les arbres de labels, assert identiques
   sauf `platforms`/`visible_when`. + ratchet « aucune rangée hors renderer » + la
   bijection `action_id ↔ handler` sur chaque driver.
   *Test :* la gate elle-même (rouge si une rangée diverge sans déclaration).
+  → Faite, câblée dans `run-js-suite.cjs`, alias `test:menu-parity`, et
+  **mutation-testée** : les trois défauts qu'elle a trouvés repassent au rouge si
+  on les réintroduit.
+  → **Correction au plan : « diffe les arbres de labels » ne peut pas être
+  l'assertion.** Un manifeste tient *un* tableau par menu, donc les trois
+  projections sont des sous-suites d'une seule séquence et ne peuvent pas
+  diverger sur l'ordre. Une première version vérifiait quand même ; déplacer une
+  rangée la laissait verte, parce que le déplacement vaut pour les trois à la
+  fois. Elle a été remplacée par des propriétés qui, elles, peuvent échouer —
+  et qui ont trouvé trois défauts réels le jour même :
+  - `tap_holds` déclaré pour macOS alors qu'aucun fichier macOS ne construit ce
+    menu et que *toutes* les rangées de `tap_holds_menu` sont `["ahk"]` : macOS
+    ouvrait un sous-menu **vide**. Invisible pour la gate top-level, qui ne lit
+    la chaîne macOS qu'à partir de `global_actions` — `tap_holds` est au-dessus.
+  - `gestures` non restreint (donc visible sous Linux) alors que le manifeste ne
+    projetait qu'**une** rangée pour Linux : un séparateur nu. `_build_gestures`
+    construit depuis toujours un toggle, deux actions de masse et tous les slots.
+  - `menu.extensions.header` sans `platforms` au-dessus d'une rangée `["ahk"]` :
+    un titre sans section dessous sur deux drivers.
+  → Elle a aussi trouvé que **macOS ne définissait aucun getter** pour les trois
+  `checked_when` de `metrics_menu` : il lisait `state.…` en ligne, donc le
+  `checked_when` du manifeste était une seconde déclaration que personne ne
+  consultait, pendant que Linux, lui, la résolvait. Deux drivers, deux réponses à
+  « où est la vérité » — la seule chose qu'un manifeste existe pour empêcher.
 
 ### M4 — Parité des fonctionnalités hotstrings (la demande utilisateur)
 

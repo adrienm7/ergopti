@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Inget tillägg installerat",
 	"menu.extensions.header": "Tillägg",
+	"menu.extensions.none_installed": "Inget tillägg installerat",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Åtgärd: ",
 	"menu.common.enabled": "Aktiverad",

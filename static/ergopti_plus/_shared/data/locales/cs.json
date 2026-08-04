@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Sledování okna",
 	"menu.extensions.empty": "Žádné rozšíření není nainstalováno",
 	"menu.extensions.header": "Rozšíření",
+	"menu.extensions.none_installed": "Není nainstalováno žádné rozšíření",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Akce: ",
 	"menu.common.enabled": "Zapnuto",

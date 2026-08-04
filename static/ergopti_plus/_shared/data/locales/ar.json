@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "لا توجد إضافة مثبتة",
 	"menu.extensions.header": "الإضافات",
+	"menu.extensions.none_installed": "لا توجد إضافات مثبتة",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "الإجراء: ",
 	"menu.common.enabled": "مُفعّل",

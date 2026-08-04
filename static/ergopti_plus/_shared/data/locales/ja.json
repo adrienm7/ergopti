@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "ウィンドウスパイ",
 	"menu.extensions.empty": "拡張機能がインストールされていません",
 	"menu.extensions.header": "拡張機能",
+	"menu.extensions.none_installed": "拡張機能はインストールされていません",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "アクション: ",
 	"menu.common.enabled": "有効",

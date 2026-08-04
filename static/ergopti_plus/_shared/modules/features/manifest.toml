@@ -2749,9 +2749,16 @@ id = "metrics"
 [[menu.top_level]]
 id = "shortcuts"
 
+# Windows only. The "hs" value was measured false on 2026-08-04: no macOS file
+# builds a tap-holds menu, and every row of menu.tap_holds_menu below is already
+# restricted to "ahk" — so macOS declared a top-level entry that opened an empty
+# submenu. Tap-holds on macOS are configured through Karabiner, which has its own
+# top-level row. Nothing could see this before: the top-level parity gate reads
+# the macOS dispatch chain only from `global_actions` onward, and this row sits
+# above that boundary.
 [[menu.top_level]]
 id = "tap_holds"
-platforms = ["ahk", "hs"]
+platforms = ["ahk"]
 
 [[menu.top_level]]
 id = "karabiner"
@@ -3217,15 +3224,16 @@ type = "---"
 type = "section_header"
 i18n = "menu.extensions.header"
 
+# Unrestricted since 2026-08-04. The old "ahk" restriction said the row "scans a
+# Windows extensions directory", which described the reader and not the feature:
+# the directory is static/ergopti_plus/extensions, it is part of this repository,
+# it ships to all three drivers, and the demo extension in it has carried a
+# shortcuts/menu.lua beside its menu.ahk since it was written. The format was
+# cross-platform from the start and only AHK had a scanner. Both Lua drivers now
+# read it through _shared/lua/hotstrings/extensions.lua.
 [[menu.hotstrings_menu]]
 type = "dynamic"
 id = "hotstring_extensions"
-# Lists the bundled extension packs found by scanning a Windows extensions
-# directory for TOML files (_HS_PreScanExtensions). Neither Lua driver ships
-# such a directory — their hotstrings come from _shared/modules/hotstrings —
-# so the row could only ever have drawn the "empty" placeholder.
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.hotstrings_params_group]]
 type = "dynamic"
@@ -3255,12 +3263,18 @@ type = "dynamic"
 id = "repeat_key"
 platforms = ["ahk"]
 
+# The "linux" values across this menu were added on 2026-08-04. Before them the
+# manifest projected exactly ONE row for Linux — a bare separator — while
+# _build_gestures in menu_builder.lua has always built a master toggle, both bulk
+# actions and every configurable slot. Same failure as kanata/updates/apps: the
+# manifest simply had no opinion about Linux, and an absent opinion reads as
+# "restricted elsewhere" rather than as the omission it was.
 [[menu.gestures_menu]]
 type = "toggle"
 i18n_on = "menu.gestures.on"
 i18n_off = "menu.gestures.off"
 category = "Gestures"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 
 [[menu.gestures_menu]]
 type = "action"
@@ -3278,13 +3292,13 @@ platforms = ["ahk"]
 type = "action"
 id = "disable_all"
 i18n = "menu.gestures.disable_all"
-platforms = ["hs", "ahk"]
+platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
 type = "action"
 id = "restore_defaults"
 i18n = "menu.gestures.restore_defaults"
-platforms = ["hs", "ahk"]
+platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
 type = "---"
@@ -3334,6 +3348,14 @@ platforms = ["hs"]
 type = "dynamic"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
+
+# One flat list rather than the per-finger-count groups macOS uses. The slots come
+# from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
+# count, so grouping would mean parsing the names back apart to regroup them.
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_linux"
+platforms = ["linux"]
 
 [[menu.tap_holds_menu]]
 type = "toggle"

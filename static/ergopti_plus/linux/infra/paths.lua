@@ -97,4 +97,27 @@ function M.driver_root()
 	return _driver_root
 end
 
+--- The directories extension packs are installed into, in precedence order.
+---
+--- The bundled root is a SIBLING of _shared and of this driver, not a child of
+--- either: extensions are shipped to all three drivers from one place, which is
+--- why the Windows driver's `_ExtensionsDir` points at the same directory. The
+--- user root comes second so an extension installed by the user overrides a
+--- bundled one of the same id — the overlay rule the hotstring packs already use.
+--- @return table Array of absolute paths; may be empty when neither exists.
+function M.extension_roots()
+	local roots = {}
+	local shared = M.shared_root()
+	if shared then
+		-- _shared/../extensions — resolved from the shared root because that is the
+		-- one anchor already probed for existence above.
+		roots[#roots + 1] = shared .. "/../extensions"
+	end
+	local ok_cfg, ConfigPaths = pcall(require, "infra.config_paths")
+	if ok_cfg and type(ConfigPaths.home) == "function" then
+		roots[#roots + 1] = ConfigPaths.home() .. "/.config/ergopti/extensions"
+	end
+	return roots
+end
+
 return M

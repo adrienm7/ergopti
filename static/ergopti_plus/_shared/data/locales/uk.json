@@ -643,6 +643,7 @@
 	"menu.debug.window_spy": "Спостерігач вікон",
 	"menu.extensions.empty": "Жодне розширення не встановлено",
 	"menu.extensions.header": "Розширення",
+	"menu.extensions.none_installed": "Розширення не встановлено",
 	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Дія: ",
 	"menu.common.enabled": "Увімкнено",
