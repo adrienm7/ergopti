@@ -6,6 +6,10 @@
 
 [hotstrings]
 trigger_char = "★"
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 [hotstrings.autocorrection.accents]
 enabled = true

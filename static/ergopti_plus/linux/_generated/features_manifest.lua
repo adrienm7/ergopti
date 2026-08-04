@@ -56,6 +56,18 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "hs", "linux" },
+	},
+	{
+		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "hs", "linux" },
+	},
+	{
+		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "hs", "linux" },
+	},
+	{
+		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "hs", "linux" },
+	},
+	{
 		path = "hotstrings.autocorrection.accents", id = "accents", section = "hotstrings.autocorrection", default = { enabled = true, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.accents", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -288,18 +300,6 @@ M.unavailable = {
 	},
 	{
 		path = "hotstrings.expansion_delay", section = "hotstrings", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "hotstrings.preview_ai_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "hotstrings.preview_autocorrect_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "hotstrings.preview_colored_tooltips", section = "hotstrings", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "hotstrings.preview_star_enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "llm.enabled", section = "llm", reason_key = "", platforms = { "ahk", "hs" },
