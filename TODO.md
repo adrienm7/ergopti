@@ -420,7 +420,27 @@ The two genuinely cheap entries were closed on 2026-08-03 (npm aliases, `tab.tap
 Everything below is either blocked on a prerequisite or deliberately incremental;
 none of it is a batch job, and the section title used to imply otherwise.
 
-- **Convention S stubs (I1).** Every canonical folder exists on every driver;
+- **Convention S stubs (I1) — la moitié « manquante » a été mesurée le
+  2026-08-04, et elle était plus petite qu'annoncé.** `features.json` déclarait
+  six capacités sans dossier canonique nulle part. **Deux n'étaient pas absentes**
+  — la liste utilisait un nom plus court que le dossier livré par les trois
+  drivers (`personal_info` → `ui/personal_info_editor`, `hotstrings_config` →
+  `ui/hotstrings_config_window`). Corrigé en `71879f6fb` : compte canonique
+  14 → 16, **sans toucher une ligne de code driver**, ratchet resserré.
+
+  **Il reste quatre features vraiment absentes partout** — `apps`, `download`,
+  `layout`, `metrics` — et le fichier dit lui-même pourquoi Convention S ne peut
+  pas les stubber : *« there is nothing to stub AROUND yet: the work is
+  extraction, not a README »*. Chacune est une capacité réelle éparpillée dans
+  d'autres modules. **C'est de l'extraction, pas de la documentation**, et donc
+  un chantier par feature, pas une passe.
+
+  Écart à surveiller, sorti par la même mesure : **`download` est livré sur macOS
+  et Linux et pas sur Windows** — un vrai manque 2-sur-3, pas un problème de nom.
+
+<details><summary>L'énoncé d'origine</summary>
+
+  Every canonical folder exists on every driver;
   where unimplemented it ships an `init` with a `STATUS: not implemented` line and
   a `REASON_KEY`. ⚠ **The stated blocker is wrong — measured 2026-08-03.**
   `test-menu-manifest-keys-have-readers.cjs` reads
@@ -428,6 +448,9 @@ none of it is a batch job, and the section title used to imply otherwise.
   never looked at the feature manifest, so it would not reject a `REASON_KEY`
   there and it is not what blocks this. The real dependency is the same as the
   entry below: something has to display the reason.
+
+</details>
+
 - ~~**`reason_key` for platform restrictions (I2)**~~ — **consumer DONE
   2026-08-03** (`4f25003`). The chain exists and carries a real value: the
   generator emits an `unavailable` table per driver (104 macOS / 107 Windows /
@@ -475,7 +498,16 @@ none of it is a batch job, and the section title used to imply otherwise.
   get described **as the feature around them is revisited** — one at a time, by
   someone who knows why that feature is missing. Lower the baseline then. This
   entry was filed under "cheap"; it is the opposite, deliberately.
-- **Menu rows outside the renderer (I3).** windows 220, macos 301, linux 3. The
+- **Menu rows outside the renderer (I3) — au ratchet exact, aucun mou (mesuré
+  2026-08-04).** 220/220, 301/301, 3/3. Le descendre veut dire **déplacer de
+  vraies lignes dans le manifeste et le renderer**, pas resserrer un chiffre : le
+  manifeste doit décrire chaque ligne déplacée et le renderer savoir dessiner son
+  type. Les trois plus gros blocs (`menu_remap.lua` 36, `menu_llm/models_selector.lua`
+  32, `menu_keyboard_layout.lua` 26) sont **un chantier chacun**, sur une UI que
+  l'utilisateur manipule. Incrémental par conception — pas un geste de fin de
+  session.
+
+  windows 220, macos 301, linux 3. The
   gate names the biggest offenders (`menu_remap.lua` 36,
   `menu_llm/models_selector.lua` 32, `menu_keyboard_layout.lua` 26). Lower it;
   never raise it.
