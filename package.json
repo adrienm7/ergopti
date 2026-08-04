@@ -138,6 +138,7 @@
 		"test:karabiner-namespace-is-merged": "node ./tools/test/test-karabiner-namespace-is-merged.cjs",
 		"test:generated-output-time-independent": "node ./tools/test/test-generated-output-is-time-independent.cjs",
 		"test:reason-keys-are-readable": "node ./tools/test/test-reason-keys-are-readable.cjs",
+		"test:luajit-52-isms": "node ./tools/test/test-luajit-52-isms.cjs",
 		"test:hotstrings-bridge-parity": "node ./tools/test/test-hotstrings-bridge-parity.cjs",
 		"test:menu-parity": "node ./tools/test/test-menu-parity.cjs",
 		"test:menu-top-level-parity": "node ./tools/test/test-menu-top-level-parity.cjs",
