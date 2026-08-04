@@ -134,6 +134,7 @@
 		"test:action-chord-notation": "node ./tools/test/test-action-chord-notation.cjs",
 		"test:action-registry-bijection": "node ./tools/test/test-action-registry-bijection.cjs",
 		"test:karabiner-namespace-is-merged": "node ./tools/test/test-karabiner-namespace-is-merged.cjs",
+		"test:generated-output-time-independent": "node ./tools/test/test-generated-output-is-time-independent.cjs",
 		"test:reason-keys-are-readable": "node ./tools/test/test-reason-keys-are-readable.cjs",
 		"test:menu-top-level-parity": "node ./tools/test/test-menu-top-level-parity.cjs",
 		"test:karabiner-binary-paths-single-source": "node ./tools/test/test-karabiner-binary-paths-single-source.cjs",

@@ -250,14 +250,25 @@ function buildDiagram(ports, domain, driverData) {
  * @returns {string} Full Markdown file content.
  */
 function wrapMarkdown(mermaid) {
-	const ts = new Date().toISOString().slice(0, 10);
+	// No date stamp. This file used to carry `Generated on <today>`, which made
+	// its content a function of the calendar rather than of its inputs: the drift
+	// gate compares generated output against what is committed, so the check
+	// failed on any day the repo had not been regenerated — every day, for a
+	// reason that said nothing about the architecture. A gate that cries wolf
+	// daily is a gate people learn to re-run and commit past without reading, and
+	// the next time it fires for a real reason it gets the same treatment.
+	//
+	// The information is not lost: `git log -1 static/ergopti_plus/docs/architecture.md`
+	// gives the date it was last regenerated, and gives it accurately, which the
+	// stamp did not — it recorded when the generator ran, not when the output
+	// last changed.
 	return [
 		'<!-- static/ergopti_plus/docs/architecture.md -->',
 		'<!-- AUTO-GENERATED — do not edit by hand. Run: npm run gen:diagram -->',
 		'',
 		'# Architecture Overview',
 		'',
-		`> Generated on ${ts} from port specs, domain specs, and adapter file listings.`,
+		'> Generated from port specs, domain specs, and adapter file listings.',
 		'',
 		'The diagram below shows the three-layer hexagonal architecture:',
 		'**Ports** (shared contracts) → **Adapters** (driver-specific implementations) → **Domain** (pure business logic).',
