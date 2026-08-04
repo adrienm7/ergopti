@@ -23,7 +23,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
 - [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
 - [project-generated-trees-are-not-reducible](#project-generated-trees-are-not-reducible) — The `_generated/` trees were audited 2026-08-03: 21 artefacts, 200.3 KB, zero orphans — do not re-open the question
-- [project-plan-entries-go-stale-faster-than-code](#project-plan-entries-go-stale-faster-than-code) — Eleven TODO measurements were wrong in one session; re-measure before starting and write the correction back
+- [project-plan-entries-go-stale-faster-than-code](#project-plan-entries-go-stale-faster-than-code) — Eighteen TODO measurements were wrong across two sessions; re-measure before starting and write the correction back
+- [project-a-second-vocabulary-fails-silently](#project-a-second-vocabulary-fails-silently) — Two modules naming the same data differently never raises: the receiver reads nil and takes its default, so every failure mode is plausible output
 - [project-instrumentation-absence-is-invisible](#project-instrumentation-absence-is-invisible) — A missing profiler segment produces a clean-looking profile, so the 20 segments and 5 boot stamps are inventoried
 - [project-a-green-probe-can-mean-redundant-guards](#project-a-green-probe-can-mean-redundant-guards) — A falsifiability probe that stays green can mean the hazard is guarded twice, not that the assertion is vacuous
 - [project-the-macos-logger-ring-is-per-process](#project-the-macos-logger-ring-is-per-process) — The shared Lua core is required under a bare name, so the test runner never evicts it and its state spans every test file
@@ -583,7 +584,7 @@ Related: [[project_ahk_invariant_incomplete_application]],
 
 ### project-plan-entries-go-stale-faster-than-code
 
-_Eleven TODO measurements were wrong in one session — re-measure before starting, and write the correction back_
+_Eighteen TODO measurements were wrong across two sessions — re-measure before starting, and write the correction back_
 
 <sub>slug: `project_plan_entries_go_stale_faster_than_code`</sub>
 
@@ -603,6 +604,20 @@ errors were not small — they inverted the work.
 | Lot 9 port row: "one JS gate saves ~1 000 lines" | Would have swapped a runtime check for a textual one. Only the cross-tree half was a gain |
 | Lot 7(2): adoption blocked on writing a corpus | Also blocked on something unrecorded: **the shared core had no dedup at all**, so adopting it would have silently removed flood suppression from a driver that had it |
 
+**A second session, 2026-08-04, and the rate did not improve.** Seven more, and
+this time the pattern is sharper: **every one of them was the plan describing the
+code rather than the code.**
+
+| Entry said | Actually |
+| --- | --- |
+| §2: macOS cannot adopt the shared matcher without either converting its buffer per keystroke or giving the core a second representation | Neither. Both predicates consume exactly the trigger-length tail and the one codepoint in front of it — **the buffer was never an input to the decision**, only where those two strings came from. The slice stays with the driver, the decision is shared |
+| Four canonical features are "absent from every driver — the work is extraction, not a README" | **Two of the four were the list mis-describing the drivers.** `metrics` is `modules/keylogger`, shared by all three; `download` is `ui/download_window`, shipped by two, filed under `modules/` against the file's own tree rule |
+| Lower the menu-row ratchet by migrating the three biggest blocks | Would have moved it by **zero**. Routing a menu through the renderer does not move the number — a `dynamic` handler appends its rows in the driver file. Three menus already do it and are still counted |
+| The three biggest blocks are 36 / 32 / 26 | A **three-way tie at 26**. The third was chosen and then presented as if the data had chosen it |
+| One shared reason on the 34 hs-only gesture entries: 138 → 105 for 21 strings | `platforms = ["hs"]` excludes **Linux** too, and Linux ships the gestures module, its menu and its defaults. That half of the reason would read "not coded yet" — the one thing the model reason forbids — in twenty-one languages |
+| `platform/remap` is the shared home `layout` was missing | It is the remap **engine** — tap-holds on Windows, Karabiner on macOS, the kanata daemon on Linux. A different capability that happens to sit next to this one on one driver |
+| The macOS renderer's lines 93-559 move to `_shared` verbatim | Line 237 is `if not is_for_hs(item)`. Followed literally, Linux would render the **hs** projection and drop the exact three rows the parity gate exists to expose |
+
 **How to apply:**
 
 - **Re-measure every entry before starting it.** Half the value of this session
@@ -614,9 +629,77 @@ errors were not small — they inverted the work.
   "55 rows" is 55 rows *plus 55 handlers*, because the bijection gate requires a
   handler on every platform a row is declared for — which changes it from a data
   edit into a product decision about whether a swipe may trigger `layer` hold.
+- **Before treating an absence as work, open the three drivers and find where
+  the capability lives.** It has been somewhere every single time — six entries
+  across two sessions, and the correction was always a rename in the list rather
+  than a move in the code.
+- **Before treating a metric as work, ask what mechanically moves it.** Two of
+  the seven above were plans to change a lot of code for a number that would not
+  have moved. The answer belongs in the gate's header, next to the number, where
+  the next person reads it — not in the plan, which they will not.
 
 Related: [[project-gate-scripts-must-be-wired]],
-[[project-generated-trees-are-not-reducible]].
+[[project-generated-trees-are-not-reducible]],
+[[project-a-second-vocabulary-fails-silently]].
+
+
+
+
+### project-a-second-vocabulary-fails-silently
+
+_When two modules name the same data differently, nothing raises — the receiver just sees absent fields_
+
+<sub>slug: `project_a_second_vocabulary_fails_silently`</sub>
+
+The Linux tray menu rendered top-level rows only. Every submenu was discarded,
+every disabled row rendered clickable, every separator rendered as an ordinary
+item labelled "-". Nothing raised, nothing logged, and two tests covering the
+exact path passed throughout — because they asserted `setMenu` "does not crash",
+and it did not.
+
+The cause was three vocabularies for one tree:
+
+| | submenu | unavailable | separator |
+| --- | --- | --- | --- |
+| the menu builders (both Lua drivers) | `menu` | `disabled = true` | a row titled `"-"` |
+| `_shared/lua/tray/protocol.lua` | `items` | `enabled = false` | `separator = true` |
+| `_shared/core/ports/TrayMenu.spec.js` | `children` | `enabled = false` | `separator = true` |
+
+Not one key matched between the producer and the serialiser. **Nothing in any
+driver had ever written the serialiser's spelling** — it shared that vocabulary
+with its own tests and nobody else.
+
+**Why it stayed invisible for so long.** A vocabulary mismatch does not throw:
+the receiver reads a field, finds `nil`, and takes the default branch. `enabled`
+defaulted to true, so a disabled row rendered enabled. `items` was absent, so a
+parent rendered as a leaf. Every failure mode is *plausible output*, which is
+exactly what a "does not crash" assertion cannot distinguish from correct output.
+
+There was a second consequence nobody would have predicted: the callback walk
+recursed on `menu` and the serialiser on `items`, both numbering children
+`id * 1000 + i`. So a submenu's callbacks were registered under ids the rendered
+menu never contained.
+
+**How to apply:**
+
+- **Delete the second spelling; do not write a translator.** Both were available
+  here. The translator leaves two shapes to keep in step and a third place for
+  them to drift; deleting the unused one leaves nothing to maintain. Choose the
+  vocabulary the *callers* already produce, not the one the receiver invented.
+- **A port spec marked "informative — not validated at runtime" is the document a
+  new driver is written from.** That is where a wrong shape costs most, not
+  least. This one carried a third spelling that no implementation had ever used.
+- **"Does not crash" is not a test of a serialiser.** Assert the output: that a
+  child label reaches the XML, that a disabled row says `enabled="false"`, that a
+  separator is a separator node. Then pin the abandoned spellings as dead, so a
+  half-revert that reintroduces one fails instead of going quiet again.
+- **Suspect this whenever two modules exchange records and only one of them
+  raises.** The tell is a receiver full of defaults: `x ~= false`, `or {}`,
+  `type(y) == "table" and … or nil`. Each of those turns a name mismatch into a
+  reasonable-looking value.
+
+Related: [[project-plan-entries-go-stale-faster-than-code]],
+[[feedback-regression-tests]].
 
 
 
