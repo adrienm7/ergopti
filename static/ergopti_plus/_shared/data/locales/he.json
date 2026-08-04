@@ -2375,6 +2375,7 @@
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "ל‑Windows בלבד: מפצה על פריסות מותאמות אישית (KbdEdit/MSKLC) שממפות מחדש את AltGr למקש וירטואלי אחר — מושג של מנהל התקן המקלדת ב‑Windows שאין לו מקבילה במקום אחר.",
+	"platform_reason.llm_mlx_is_apple_silicon": "macOS בלבד: MLX הוא מנוע ההסקה המקומי של Apple עבור Apple Silicon, ואין ממנו גרסה ל-Windows או ל-Linux.",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה"
 }

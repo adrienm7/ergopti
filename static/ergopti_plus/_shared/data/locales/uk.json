@@ -2375,6 +2375,7 @@
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "Лише Windows: компенсує користувацькі розкладки (KbdEdit/MSKLC), які перепризначають AltGr на іншу віртуальну клавішу — поняття драйвера клавіатури Windows, що не має відповідника деінде.",
+	"platform_reason.llm_mlx_is_apple_silicon": "Лише macOS: MLX — локальний фреймворк інференсу Apple для Apple Silicon, і версії для Windows чи Linux не існує.",
 	"metrics_apps.chart_time_series": "Час",
 	"metrics_apps.edit_category_hint": "Змінити категорію"
 }

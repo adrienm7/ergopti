@@ -350,7 +350,7 @@ M.unavailable = {
 		path = "llm.models.ollama", section = "llm.models", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.models.mlx", section = "llm.models", reason_key = "", platforms = { "hs" },
+		path = "llm.models.mlx", section = "llm.models", reason_key = "platform_reason.llm_mlx_is_apple_silicon", platforms = { "hs" },
 	},
 	{
 		path = "llm.profiles.active", section = "llm.profiles", reason_key = "", platforms = { "ahk", "hs" },

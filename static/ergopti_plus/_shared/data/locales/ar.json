@@ -2375,6 +2375,7 @@
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "ويندوز فقط: يعوّض تخطيطات لوحة المفاتيح المخصّصة (KbdEdit/MSKLC) التي تعيد تعيين AltGr إلى مفتاح افتراضي آخر — وهو مفهوم خاص ببرنامج تشغيل لوحة المفاتيح في ويندوز.",
+	"platform_reason.llm_mlx_is_apple_silicon": "macOS فقط: MLX هو إطار الاستدلال المحلي من Apple لمعالجات Apple Silicon، ولا توجد منه نسخة لنظامي Windows أو Linux.",
 	"metrics_apps.chart_time_series": "الوقت",
 	"metrics_apps.edit_category_hint": "تعديل الفئة"
 }

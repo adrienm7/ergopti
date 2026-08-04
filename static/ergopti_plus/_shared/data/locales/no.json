@@ -2375,6 +2375,7 @@
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "Kun Windows: kompenserer for egendefinerte oppsett (KbdEdit/MSKLC) som tilordner AltGr til en annen virtuell tast — et Windows-tastaturdriverbegrep uten motstykke andre steder.",
+	"platform_reason.llm_mlx_is_apple_silicon": "Kun macOS: MLX er Apples lokale inferensrammeverk for Apple Silicon, og det finnes ingen versjon for Windows eller Linux.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori"
 }

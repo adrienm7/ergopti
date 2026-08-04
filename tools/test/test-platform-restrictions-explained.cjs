@@ -70,7 +70,23 @@ const MANIFEST = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules',
 // The chain now exists (generator → manifest_reader.coverage_gaps() →
 // healthcheck), and `script.alt_gr_is_kana_remap` is the first one written
 // through it end to end.
-const BASELINE = 139;
+//
+// 2026-08-04: 139 → 138. `llm.models.mlx`, on the same criterion as the first:
+// MLX is Apple's on-device inference framework, built on Metal and Apple
+// Silicon's unified memory, and no Windows or Linux build of it exists. The
+// restriction therefore stays true however much of this repository gets written,
+// which is the test — a reason is only writable when it survives the assumption
+// that everything else is finished.
+//
+// A candidate that looked far larger was rejected the same day, and it is worth
+// recording so nobody re-derives it: the 34 hs-only `features.gestures` entries
+// would drop this number to 105 for one shared key. But `platforms = ["hs"]`
+// excludes Linux as well as Windows, and the Linux driver ships the gestures
+// module, its menu and its defaults — what it has no reader for is touch input,
+// which manager.lua's own header calls a TODO. So the Linux half of that reason
+// would read "not coded yet", the one thing the model reason forbids, and 21
+// translated strings would have frozen it in place.
+const BASELINE = 138;
 
 // Floor: the manifest holds 500 tables, so a low parse means the scan broke and
 // the ratchet would pass having measured nothing.

@@ -2375,6 +2375,7 @@
 	"mlx.init_subtitle": "AI initialization in progress, please wait…",
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "केवल Windows: यह कस्टम लेआउट (KbdEdit/MSKLC) की भरपाई करता है जो AltGr को किसी अन्य वर्चुअल कुंजी पर पुनः असाइन करते हैं — यह Windows कीबोर्ड ड्राइवर की अवधारणा है, जिसका कहीं और समकक्ष नहीं है।",
+	"platform_reason.llm_mlx_is_apple_silicon": "केवल macOS: MLX, Apple Silicon के लिए Apple का ऑन-डिवाइस इन्फ़रेंस फ़्रेमवर्क है, और Windows या Linux के लिए इसका कोई संस्करण मौजूद नहीं है।",
 	"metrics_apps.chart_time_series": "समय",
 	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें"
 }
