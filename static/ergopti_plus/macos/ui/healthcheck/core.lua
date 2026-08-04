@@ -633,6 +633,21 @@ function M.format_plain(snapshot)
 		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
 	end
 
+	-- Event-tap disables. Each `by_timeout` is a callback that overran the
+	-- CoreGraphics deadline on THIS machine under THIS load — the one latency
+	-- event macOS reports to us directly, and so the driver's only self-reported
+	-- performance metric. Reported unconditionally, including at zero: "0" is the
+	-- answer to "does it stall for you?", and an absent line is not.
+	local ok_guard, Guard = pcall(require, "adapters.event_tap_guard")
+	if ok_guard and type(Guard.disable_counts) == "function" then
+		local counts = Guard.disable_counts()
+		table.insert(lines, string.format("Tap disables      : %d after a callback overran, %d after an accessibility change",
+			counts.by_timeout or 0, counts.by_user or 0))
+		for label, n in pairs(counts.taps or {}) do
+			table.insert(lines, string.format("  · %s: %d", label, n))
+		end
+	end
+
 	-- Platform coverage: the only place a user can ask why a feature they read
 	-- about is not in their menu. The SILENT count is reported next to the
 	-- explained one on purpose — a list of only the explained absences would look

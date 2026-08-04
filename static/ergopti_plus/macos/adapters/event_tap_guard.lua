@@ -53,6 +53,35 @@ end
 -- =========================================
 -- =========================================
 
+-- How many times each cause has fired since boot, and on which taps.
+--
+-- The log line alone is recoverable but not OBSERVABLE: it takes a user willing
+-- to send their log and someone willing to grep it. A count the driver holds is
+-- something the same user reads in their own health report — and a timeout count
+-- is the driver's only self-reported performance metric, because a callback that
+-- overran the CoreGraphics deadline is the one latency event macOS tells us
+-- about directly.
+--
+-- Declared HERE, above the closure that writes to it. A `local` sitting
+-- textually below its caller is not captured — the caller binds the nil global
+-- instead, and the resulting error inside an eventtap callback goes to the
+-- Hammerspoon Console and never to the driver log
+-- (project-lua-closure-before-local-nil-global).
+local _counts = { by_timeout = 0, by_user = 0, taps = {} }
+
+--- Records one disable, by cause and by tap.
+--- @param label string Owner identifier.
+--- @param by_timeout boolean True when the cause was a callback overrun.
+local function record(label, by_timeout)
+	if by_timeout then
+		_counts.by_timeout = _counts.by_timeout + 1
+	else
+		_counts.by_user = _counts.by_user + 1
+	end
+	local key = tostring(label)
+	_counts.taps[key] = (_counts.taps[key] or 0) + 1
+end
+
 --- Re-engages a tap that macOS has switched off, and reports it.
 ---
 --- Call this as the FIRST statement of every `hs.eventtap` callback:
@@ -91,6 +120,8 @@ function M.handle_disabled(event, tap, label)
 	-- they are never collapsed into one message: a timeout means our own
 	-- callback was too slow and the latency is ours to fix, while a user-input
 	-- disable means the accessibility permission was toggled underneath us.
+	record(label, by_timeout)
+
 	Logger.warn(LOG, "Tap '%s' was DISABLED by macOS (%s) — re-engaging.",
 		tostring(label), by_timeout and "callback overran the deadline" or "user input")
 
@@ -108,6 +139,34 @@ function M.handle_disabled(event, tap, label)
 	end
 
 	return true
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Overrun Accounting ===========
+-- =========================================
+-- =========================================
+
+--- The disable tally since boot, copied so a caller cannot mutate it.
+---
+--- `by_timeout` is the number to read first: each one is a callback that blew
+--- the deadline on this machine, under this load. A non-zero count on a user's
+--- report turns "it feels sluggish sometimes" into a measurement.
+--- @return table { by_timeout, by_user, taps = { [label] = count } }
+function M.disable_counts()
+	local taps = {}
+	for label, n in pairs(_counts.taps) do taps[label] = n end
+	return { by_timeout = _counts.by_timeout, by_user = _counts.by_user, taps = taps }
+end
+
+--- Clears the tally. Test-only: the driver never resets it, because a count that
+--- restarts mid-session would under-report exactly when it matters.
+function M.reset_disable_counts()
+	_counts = { by_timeout = 0, by_user = 0, taps = {} }
 end
 
 return M
