@@ -654,6 +654,10 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),
+	// platform/ is where the OS seams live — the remap generator and the tray
+	// binding — and it held Lua that no convention check had ever read.
+	join(REPO_ROOT, 'static/ergopti_plus/linux/platform'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/platform'),
 	join(REPO_ROOT, 'static/ergopti_plus/_shared/lua')
 ];
 const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));
