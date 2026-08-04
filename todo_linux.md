@@ -1306,9 +1306,33 @@ déclarée.
 > bash static/ergopti_plus/linux/tests/hardware/validate.sh
 > ```
 
+> **Vérifié sur un vrai noyau Linux le 2026-08-05** (CI dispatché sur branche,
+> donc `event_name != 'push'` et la chaîne de release ne peut pas partir) :
+>
+> - `run_uinput_roundtrip` : **11/11**. Les numéros d'ioctl, la taille du struct,
+>   les offsets et les bits de capacité sont exécutés, plus seulement lus.
+> - `run_grab_race` : **12/12**. La propriété C4 — la corruption qui donne son nom
+>   au jalon — est prouvée : rafale entrelacée (effacements synthétiques + frappe
+>   utilisateur au milieu), tout revient entier et dans l'ordre.
+> - `run_layout_resolution` : `fr` rend **169 caractères typables**, tape `é è à ç
+>   ù` en frappe native, n'a **aucune touche** pour `ñ`, et refuse `señor` **en
+>   entier** en nommant `ñ` comme bloqueur. `us` 104 caractères, refuse `é ñ ç`.
+>   `de` tape `ä ö ü ß`. Réponse mesurée à la question « pack espagnol » : sur
+>   clavier espagnol `ñ` se tape et `á` se colle — les voyelles accentuées y sont
+>   des compositions à touche morte, pas des frappes uniques.
+>
+> Ces trois-là ne sont donc plus « à valider » : ils sont exécutés à chaque CI.
+> Ce qui reste ci-dessous est ce qui exige un écran, un panneau et des yeux.
+
 - [ ] Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
+      *(le cœur — capture, grab, ré-émission — est vérifié ; reste la partie
+      « le texte apparaît bien dans une vraie fenêtre », sur les deux serveurs)*
 - [ ] Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
+      *(la résolution de disposition est vérifiée sur de vraies keymaps ; reste
+      la frappe réelle dans une application)*
 - [ ] Frappe rapide pendant expansion → pas de corruption (C4).
+      *(l'ordre des événements est prouvé sur un vrai noyau ; reste la
+      confirmation visuelle dans un éditeur)*
 - [ ] Bascule logout-X11 → login-Wayland sans reconfiguration (C2).
 - [ ] Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
 - [ ] Trigger `★` changeable ; délais réglables ; tooltip au bon style.
