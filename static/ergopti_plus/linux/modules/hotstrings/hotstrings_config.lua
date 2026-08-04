@@ -24,6 +24,9 @@ local M = {}
 local Logger = require("logger.shim")
 local Loader = require("modules.hotstrings.loader")
 local Storage = require("adapters.storage")
+local DelayResolver = require("hotstrings.delay_resolver")
+local Paths = require("infra.paths")
+local TomlReader = require("toml_codec.reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 
@@ -31,6 +34,11 @@ local LOG = "modules.hotstrings.hotstrings_config"
 -- list rather than one key per category: the set is read and written whole, and
 -- a per-key layout leaves orphans behind when a category is renamed.
 local DISABLED_KEY = "hotstrings.disabled_categories"
+
+-- Where per-category and per-section overrides are persisted. A TOML beside the
+-- packs rather than a storage key, because it is a file the user is expected to
+-- open: the same one the config window edits and the same shape macOS writes.
+local OVERRIDES_FILE = "hotstrings_overrides.toml"
 
 
 -- =========================================
@@ -114,9 +122,272 @@ local function _collect_groups(mappings)
 end
 
 
+-- The cross-driver fallbacks, read once from the shared TOML. No literal here:
+-- the AutoHotkey and Hammerspoon drivers both read the same file, and a
+-- re-typed 0.75 is how three drivers end up disagreeing about how long a
+-- hotstring waits.
+local GLOBAL_DEFAULT_DELAY = nil
+local GLOBAL_DEFAULT_COLOR = nil
+local CATEGORY_DEFAULT_COLORS = {}
+
+--- Loads _shared/modules/hotstrings/defaults.toml, or raises.
+---
+--- Fail-fast, deliberately and in agreement with the other two drivers: a
+--- missing file is a broken install, and a driver that silently substituted its
+--- own numbers would expand at a different speed from the one the user
+--- configured, with nothing in the log to say so.
+local function load_shared_defaults()
+	local path = Paths.shared("modules/hotstrings/defaults.toml")
+	local parsed = TomlReader.parse(path)
+	local sections = type(parsed) == "table" and parsed.sections or nil
+	if type(sections) ~= "table" then
+		error("[hotstrings_config] shared defaults not readable: " .. tostring(path))
+	end
+
+	--- @param section string
+	--- @param key string
+	--- @return any
+	local function require_key(section, key)
+		local s = sections[section]
+		if type(s) ~= "table" or s[key] == nil then
+			error(string.format("[hotstrings_config] missing key [%s].%s in %s", section, key, path))
+		end
+		return s[key]
+	end
+
+	GLOBAL_DEFAULT_DELAY = tonumber(require_key("delays", "default_sec"))
+	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
+	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+
+	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
+		error("[hotstrings_config] [delays].default_sec must be a number in " .. path)
+	end
+end
+
+load_shared_defaults()
+
+
+
+
 -- =========================================
 -- =========================================
--- ======= 3/ Initialisation ===============
+-- ======= 3/ Delays and colours ===========
+-- =========================================
+-- =========================================
+
+--- User overrides, by category:
+--- { [category] = { delay, color, show_tooltip, sections = { [name] = { ... } } } }
+local _overrides = {}
+
+--- Memoised resolutions, cleared by every writer below. The tooltip preview
+--- resolves once per candidate on every keystroke, so the cascade would
+--- otherwise be walked several times per key on the input path.
+local _resolve_cache = {}
+
+--- The override file's path.
+--- @return string
+local function overrides_path()
+	local home = require("infra.config_paths").home()
+	return home .. "/.config/ergopti/" .. OVERRIDES_FILE
+end
+
+--- Reads the override file into memory. A missing file is the normal case.
+local function load_overrides()
+	_overrides = {}
+	_resolve_cache = {}
+
+	local path = overrides_path()
+	local fh = io.open(path, "r")
+	if not fh then return end
+	fh:close()
+
+	local ok, parsed = pcall(TomlReader.parse, path)
+	if not ok or type(parsed) ~= "table" or type(parsed.sections) ~= "table" then
+		-- Loud, not silent: a malformed override file means the user's delays are
+		-- being ignored, and the only symptom otherwise is "my settings did
+		-- nothing".
+		Logger.error(LOG, "Override file '%s' is malformed — user delays and colours ignored.", path)
+		return
+	end
+
+	-- A section is named either "category" or "category.section". Flat in the
+	-- file because that is what a user editing it by hand can read, and it is the
+	-- shape macOS writes.
+	for name, values in pairs(parsed.sections) do
+		local category, section = name:match("^([^%.]+)%.(.+)$")
+		category = category or name
+		local entry = _overrides[category] or { sections = {} }
+		entry.sections = entry.sections or {}
+		local target = entry
+		if section then
+			entry.sections[section] = entry.sections[section] or {}
+			target = entry.sections[section]
+		end
+		if values.delay ~= nil then target.delay = tonumber(values.delay) end
+		if values.color ~= nil then target.color = values.color end
+		if values.show_tooltip ~= nil then target.show_tooltip = values.show_tooltip end
+		_overrides[category] = entry
+	end
+end
+
+--- Writes the override file back.
+--- @return boolean
+local function save_overrides()
+	local lines = {
+		"# ~/.config/ergopti/" .. OVERRIDES_FILE,
+		"# Written by the Ergopti+ daemon. Safe to edit by hand.",
+		"",
+	}
+
+	local names = {}
+	for category in pairs(_overrides) do names[#names + 1] = category end
+	table.sort(names)
+
+	--- Emits one TOML table, or nothing when it carries no override.
+	--- @param header string
+	--- @param values table
+	local function emit(header, values)
+		if values.delay == nil and values.color == nil and values.show_tooltip == nil then return end
+		lines[#lines + 1] = "[" .. header .. "]"
+		if values.delay ~= nil then
+			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
+		end
+		if values.color ~= nil then
+			-- Escaped by hand rather than with string.format("%q"): that is a LUA
+			-- literal quoter, it emits Lua escape sequences a TOML reader does not
+			-- share, and a repo-wide ratchet forbids it outright because the same
+			-- call in a shell command leaves $VAR and `cmd` live.
+			local escaped = tostring(values.color):gsub("\\", "\\\\"):gsub('"', '\\"')
+			lines[#lines + 1] = 'color = "' .. escaped .. '"'
+		end
+		if values.show_tooltip ~= nil then
+			lines[#lines + 1] = string.format("show_tooltip = %s", tostring(values.show_tooltip))
+		end
+		lines[#lines + 1] = ""
+	end
+
+	for _, category in ipairs(names) do
+		local entry = _overrides[category]
+		emit(category, entry)
+		local sections = {}
+		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
+		table.sort(sections)
+		for _, name in ipairs(sections) do
+			emit(category .. "." .. name, entry.sections[name])
+		end
+	end
+
+	local path = overrides_path()
+	local fh = io.open(path, "w")
+	if not fh then
+		Logger.error(LOG, "Cannot write '%s' — the override will not survive a restart.", path)
+		return false
+	end
+	fh:write(table.concat(lines, "\n"))
+	fh:close()
+	Logger.debug(LOG, "Overrides written to %s.", path)
+	return true
+end
+
+--- The effective delay, colour and preview setting for a category or section.
+---
+--- The cascade lives in _shared/lua/hotstrings/delay_resolver.lua and is shared
+--- with macOS. What differs between the drivers is where the override file lives
+--- and how a TOML is parsed; what must not differ is the order of the rungs.
+--- @param category string
+--- @param section string|nil
+--- @return table { delay, color, show_tooltip, has_override }
+function M.resolve(category, section)
+	local key = tostring(category) .. "\1" .. tostring(section or "")
+	local cached = _resolve_cache[key]
+	if cached then return cached end
+
+	local user = _overrides[category] or {}
+	local meta = _categories[category] or {}
+
+	local resolved = DelayResolver.resolve({
+		user_category  = user,
+		user_section   = section and (user.sections or {})[section] or nil,
+		meta_category  = meta,
+		meta_section   = section and (meta.sections or {})[section] or nil,
+		default_delay  = GLOBAL_DEFAULT_DELAY,
+		default_color  = GLOBAL_DEFAULT_COLOR,
+		category_color = CATEGORY_DEFAULT_COLORS[category],
+	})
+	_resolve_cache[key] = resolved
+	return resolved
+end
+
+--- Sets one override field, persisting it.
+--- @param category string
+--- @param section string|nil nil targets the whole category.
+--- @param field string "delay" | "color" | "show_tooltip"
+--- @param value any nil clears the field.
+--- @return boolean
+function M.set_override(category, section, field, value)
+	if type(category) ~= "string" or category == "" then return false end
+	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" then
+		Logger.error(LOG, "set_override(): '%s' is not an overridable field.", tostring(field))
+		return false
+	end
+
+	local entry = _overrides[category] or { sections = {} }
+	entry.sections = entry.sections or {}
+	local target = entry
+	if section then
+		entry.sections[section] = entry.sections[section] or {}
+		target = entry.sections[section]
+	end
+	target[field] = value
+	_overrides[category] = entry
+
+	_resolve_cache = {}
+	local ok = save_overrides()
+	notify_change()
+	return ok
+end
+
+--- Clears every override for a category, or for one of its sections.
+--- @param category string
+--- @param section string|nil
+--- @return boolean
+function M.clear_override(category, section)
+	local entry = _overrides[category]
+	if not entry then return true end
+	if section then
+		if entry.sections then entry.sections[section] = nil end
+	else
+		_overrides[category] = nil
+	end
+	_resolve_cache = {}
+	local ok = save_overrides()
+	notify_change()
+	return ok
+end
+
+--- The shared global default delay, in milliseconds.
+---
+--- Published so the config window reads the canon instead of mirroring it: the
+--- macOS window carried its own 750 with a comment saying the two "must stay in
+--- sync", which is the definition of two sources.
+--- @return integer
+function M.get_global_default_delay_ms()
+	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
+end
+
+--- Test seam: replaces the in-memory overrides without touching the file.
+--- @param overrides table|nil
+function M._set_overrides_for_test(overrides)
+	_overrides = overrides or {}
+	_resolve_cache = {}
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Initialisation ===============
 -- =========================================
 -- =========================================
 
@@ -135,6 +406,7 @@ function M.init(engine, config_dir, on_change)
 		if fh then fh:close(); _config_dir = xdg end
 	end
 	_disabled_groups = load_disabled()
+	load_overrides()
 	Logger.info(LOG, "Config manager initialised (dir=%s, %d disabled).",
 		_config_dir or "(bundled)", count_disabled())
 end
@@ -142,7 +414,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 4/ Loading ======================
+-- ======= 5/ Loading ======================
 -- =========================================
 -- =========================================
 
@@ -248,7 +520,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 5/ Group Management =============
+-- ======= 6/ Category Management ==========
 -- =========================================
 -- =========================================
 
@@ -382,7 +654,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 6/ Queries ======================
+-- ======= 7/ Queries ======================
 -- =========================================
 -- =========================================
 

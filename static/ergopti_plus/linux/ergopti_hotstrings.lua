@@ -840,8 +840,13 @@ local function main()
 	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 	if ok_i18n and i18n_mod then
 		i18n_mod.init()
+		-- From the manifest, like every other reader of this value. This was the
+		-- last hardcoded backslash: the i18n layer substitutes the magic key into
+		-- every localised label that mentions it, so a driver that answered "\"
+		-- here printed the wrong key in 21 languages while the engine listened for
+		-- ★ — a menu that documented a keystroke nothing responded to.
 		i18n_mod.set_trigger_provider(function()
-			return "\\"  -- default magic key (backslash)
+			return ManifestReader.default_for("hotstrings.trigger_char")
 		end)
 	end
 

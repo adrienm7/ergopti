@@ -31,6 +31,10 @@ local M = {}
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
+-- The five-rung precedence, shared with Linux. It was written once here and
+-- once in AutoHotkey and the two had already drifted; the rule is the thing
+-- that must not differ, and where the override file lives is the thing that may.
+local DelayResolver = require("hotstrings.delay_resolver")
 local LOG        = "hotstrings_config"
 
 
@@ -450,40 +454,20 @@ function M.resolve(category, section)
 	local meta = get_toml_meta(category)
 	local meta_sec = section and meta.sections[section] or nil
 
-	local delay = (user_sec and user_sec.delay)
-		or user.delay
-		or (meta_sec and meta_sec.delay)
-		or meta.delay
-		or GLOBAL_DEFAULT_DELAY
-
-	-- Mirror the ext path: fall through to the per-category default first,
-	-- then to GLOBAL_DEFAULT_COLOR. Used to return nil here, which made
-	-- callers either crash or paint with whatever literal they happened to
-	-- have lying around — and the single source of truth could not be
-	-- enforced from a single constant.
-	local color = (user_sec and user_sec.color)
-		or user.color
-		or (meta_sec and meta_sec.color)
-		or meta.color
-		or CATEGORY_DEFAULT_COLORS[category]
-		or GLOBAL_DEFAULT_COLOR
-
-	-- show_tooltip: explicit false anywhere in the chain suppresses the tooltip; default is true
-	local show_tooltip = true
-	local st = first_set(
-		user_sec and user_sec.show_tooltip,
-		user.show_tooltip,
-		meta_sec and meta_sec.show_tooltip,
-		meta.show_tooltip
-	)
-	if st ~= nil then show_tooltip = st end
-
-	local has_override =
-		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil))
-		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
-		or false
-
-	local resolved = { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
+	-- The cascade itself lives in _shared/lua/hotstrings/delay_resolver.lua.
+	-- It was written once here and once in AutoHotkey, and the two had already
+	-- drifted on what an explicit `false` means — which matters, because a
+	-- category that ships `show_tooltip = false` is the common case and a rung
+	-- testing truthiness turns its preview back on.
+	local resolved = DelayResolver.resolve({
+		user_category  = user,
+		user_section   = user_sec,
+		meta_category  = meta,
+		meta_section   = meta_sec,
+		default_delay  = GLOBAL_DEFAULT_DELAY,
+		default_color  = GLOBAL_DEFAULT_COLOR,
+		category_color = CATEGORY_DEFAULT_COLORS[category],
+	})
 	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
 	return resolved
 end
