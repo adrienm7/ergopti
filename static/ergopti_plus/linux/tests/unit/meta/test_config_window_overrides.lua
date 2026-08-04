@@ -183,17 +183,30 @@ end)
 
 helpers.describe("config window: with no config module", function()
 
-	helpers.it("answers without raising", function()
+	helpers.it("still answers the window with a usable payload", function()
+		-- Called directly, not through pcall: a raise here IS the failure, and
+		-- wrapping it would turn the assertion into "pcall reported something",
+		-- which is true of every possible implementation. What is asserted is the
+		-- REPLY — the window redraws from it, so an override attempted before the
+		-- config manager exists must still come back with a shape the page can
+		-- render rather than nil.
 		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
-		local ok, err = pcall(function()
-			handler.on_message({ action = "set_delay", category = "rolls", value = 1 }, {})
-			handler.on_message({ action = "set_tooltip", category = "rolls", value = true }, {})
-			handler.on_message({ action = "reset_all" }, {})
-		end)
-		helpers.assert_eq(ok, true,
-			"the window can be opened before the config manager is ready, and a "
-				.. "raise here takes the WebView down rather than the message: "
-				.. tostring(err))
+
+		local reply = handler.on_message({ action = "set_delay", category = "rolls", value = 1 }, {})
+		helpers.assert_eq(type(reply), "table",
+			"the window redraws from the reply; nil blanks the page")
+		helpers.assert_eq(type(reply.groups), "table",
+			"and it iterates groups, so the key must exist even when there are none")
+		helpers.assert_eq(reply.mapping_count, 0,
+			"with no config module there are no mappings, and the count must say so "
+				.. "rather than be absent")
+
+		local after_tooltip = handler.on_message(
+			{ action = "set_tooltip", category = "rolls", value = true }, {})
+		helpers.assert_eq(type(after_tooltip), "table", "the same for every override action")
+
+		local after_reset = handler.on_message({ action = "reset_all" }, {})
+		helpers.assert_eq(type(after_reset), "table", "and for reset")
 	end)
 
 end)
