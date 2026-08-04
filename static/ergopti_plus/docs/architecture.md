@@ -42,6 +42,7 @@ graph TD
         LINUX_file_system["FileSystem.lua"]
         LINUX_http_client["HttpClient.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
+        LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]

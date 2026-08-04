@@ -32,6 +32,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
+local KeyboardLayout = require("adapters.keyboard_layout")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -64,6 +65,14 @@ local YDOTOOL_KEY_DELAY_MS = 12
 -- 0 on release, 1 on press and 2 for a kernel-generated autorepeat.
 local EVDEV_VALUE_UP     = 0
 local EVDEV_VALUE_DOWN   = 1
+
+-- The keys a synthetic modifier maps to. Named by the level vocabulary the
+-- keymap uses ("shift", "altgr") rather than by keycode, so the layout table and
+-- the injector cannot disagree about which level means which key.
+local MODIFIER_CODES = {
+	shift = EvdevCodes.KEY_LEFTSHIFT,
+	altgr = EvdevCodes.KEY_RIGHTALT,
+}
 
 
 -- =========================================
@@ -129,6 +138,44 @@ local function send_backspaces(count)
 	end
 end
 
+--- Types a string as keystrokes, under the layout the session actually has.
+---
+--- This is the path that makes accented replacements work at all. uinput sends
+--- keycodes and the compositor applies the user's XKB layout on top, so the
+--- keycode for "é" is a property of THEIR layout, not of ours. ydotool assumes
+--- US and produces gibberish on AZERTY, BÉPO, Dvorak and German — and this
+--- driver's replacements are overwhelmingly accented French.
+---
+--- All-or-nothing by design. A plan that covered only the first few characters
+--- would type half a replacement after the trigger had already been erased,
+--- which is worse than not typing it: the user loses text they had.
+--- @param text string
+--- @return boolean True when the whole string was typed.
+local function send_text_native(text)
+	if not (_uinput and _uinput.is_open()) then return false end
+	if not KeyboardLayout.is_ready() then return false end
+
+	local plan, blocker = KeyboardLayout.plan(text)
+	if not plan then
+		Logger.debug(LOG, "Layout cannot type %s — falling back.", tostring(blocker))
+		return false
+	end
+
+	for _, step in ipairs(plan) do
+		for _, mod in ipairs(step.mods) do
+			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_DOWN)
+		end
+		_uinput.emit(step.keycode, EVDEV_VALUE_DOWN)
+		_uinput.emit(step.keycode, EVDEV_VALUE_UP)
+		-- Released in reverse, and always: a modifier left held after an
+		-- interrupted injection turns every subsequent keystroke into a shortcut.
+		for i = #step.mods, 1, -1 do
+			_uinput.emit(MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP)
+		end
+	end
+	return true
+end
+
 --- Injects a text string via ydotool type.
 --- The replacement is passed as a single argument after -- to prevent any
 --- leading hyphens in the text from being parsed as flags.
@@ -138,7 +185,7 @@ end
 --- phase runs FIRST, every successful match deleted the user's trigger and then
 --- typed nothing. A silent data loss on the happy path, logged as one WARN.
 --- @param text string The replacement text to type.
-local function send_text(text)
+local function send_text_ydotool(text)
 	-- Escape single quotes for safe shell embedding.
 	local safe = text:gsub("'", "'\\''")
 	local cmd  = string.format(
@@ -150,6 +197,13 @@ local function send_text(text)
 	if not success then
 		Logger.warn(LOG, "send_text(): ydotool type returned non-zero for text '%s'.", text)
 	end
+end
+
+--- Types a replacement, preferring the layout-aware path.
+--- @param text string
+local function send_text(text)
+	if send_text_native(text) then return end
+	send_text_ydotool(text)
 end
 
 --- Sleeps for the given number of milliseconds without forking or spinning.
