@@ -32,6 +32,13 @@ local LOG = "ui.menu.menu_builder"
 -- Single source of the driver version.
 local Version = require("infra.version")
 
+-- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
+-- pcall for the same reason i18n_safe exists: the tray menu must still build when
+-- the shared tree is not reachable, which is a real boot-order case on a partial
+-- install rather than a hypothetical.
+local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
+
 --- Substitutes a single placeholder in a translated template.
 ---
 --- Plain indices rather than gsub: a release tag or an interval code is data,
@@ -226,6 +233,144 @@ local function _migration_status(k)
 	}
 end
 
+--- Renders the rows of the metrics submenu that the manifest describes.
+---
+--- Defined BEFORE its caller: a `local function` is not hoisted, so calling it
+--- above its definition would bind the nil global
+--- (project-lua-closure-before-local-nil-global).
+--- @param ctx table Menu context; ctx.webview opens the two metrics windows.
+--- @param k table The keylogger module.
+--- @return table Menu rows, empty when the renderer could not be bound.
+local function _manifest_metrics_rows(ctx, k)
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the metrics submenu loses its declared rows.")
+		return {}
+	end
+
+	--- Reads one flag out of the keylogger's privacy state.
+	--- @param key string
+	--- @return function
+	local function privacy(key)
+		return function()
+			if type(k.get_privacy_state) ~= "function" then return false end
+			return k.get_privacy_state()[key] == true
+		end
+	end
+
+	-- The canonical state keys the manifest's disabled_when / checked_when arrays
+	-- name. A key declared there with no getter here is an ERROR in the renderer,
+	-- not a silent always-enabled row — which is the whole point of resolving them
+	-- declaratively instead of re-deriving the condition at each call site.
+	local getters = {
+		keylogger_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
+		metrics_filter_private = privacy("private_filter_enabled"),
+		metrics_filter_secure  = privacy("secure_filter_enabled"),
+		metrics_filter_sysauth = privacy("system_auth_filter_enabled"),
+	}
+
+	--- One manifest row, with its disabled state resolved from the manifest.
+	--- @param id string Manifest item id.
+	--- @param label string Translated label.
+	--- @param checked boolean Whether to draw the checkmark.
+	--- @param on_click function
+	--- @return table
+	local function row(id, label, checked, on_click)
+		return {
+			title    = label .. (checked and " ✓" or ""),
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", id, getters) or nil,
+			fn       = on_click,
+		}
+	end
+
+	--- Opens one of the two metrics windows through the webview manager.
+	--- @param app string Window id, e.g. "metrics_typing".
+	--- @return function
+	local function open_window(app)
+		return function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager in the menu context — cannot open '%s'.", app)
+				return
+			end
+			ctx.webview.show(app)
+		end
+	end
+
+	--- Flips one privacy flag.
+	--- @param key string Privacy-state key.
+	--- @param setter function|nil
+	--- @return function
+	local function toggle(key, setter)
+		return function()
+			if type(setter) ~= "function" then
+				Logger.error(LOG, "No setter for privacy flag '%s' — the row does nothing.", key)
+				return
+			end
+			setter(not privacy(key)())
+		end
+	end
+
+	local handlers = {
+		show_typing = function(items)
+			items[#items + 1] = row("show_typing", i18n_safe("menu.metrics.show_typing"), false,
+				open_window("metrics_typing"))
+		end,
+		show_apps = function(items)
+			items[#items + 1] = row("show_apps", i18n_safe("menu.metrics.show_apps"), false,
+				open_window("metrics_apps"))
+		end,
+		filter_private = function(items)
+			items[#items + 1] = row("filter_private", i18n_safe("menu.metrics.filter_private"),
+				ManifestMenu.resolve_checked_when("metrics_menu", "filter_private", getters),
+				toggle("private_filter_enabled", k.set_private_filter_enabled))
+		end,
+		filter_secure = function(items)
+			-- Was hardcoded French here, shown to every locale. The key exists in all
+			-- 21 catalogues and always did; nothing was reading it.
+			items[#items + 1] = row("filter_secure", i18n_safe("menu.metrics.filter_secure"),
+				ManifestMenu.resolve_checked_when("metrics_menu", "filter_secure", getters),
+				toggle("secure_filter_enabled", k.set_secure_filter_enabled))
+		end,
+		filter_sysauth = function(items)
+			items[#items + 1] = row("filter_sysauth", i18n_safe("menu.metrics.filter_sysauth"),
+				ManifestMenu.resolve_checked_when("metrics_menu", "filter_sysauth", getters),
+				toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled))
+		end,
+		encryption = function(items)
+			-- Read from state rather than resolved: unlike the three filters above,
+			-- this manifest row declares no checked_when. Every driver therefore
+			-- computes the checkmark itself, and that asymmetry is worth one comment
+			-- rather than an invented predicate.
+			items[#items + 1] = row("encryption", i18n_safe("menu.metrics.encrypt_at_rest"),
+				privacy("encrypt")(),
+				toggle("encrypt", k.set_encrypt_enabled))
+		end,
+	}
+
+	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, ctx)
+end
+
+--- Builds the metrics submenu, with the rows the manifest describes rendered by
+--- the shared renderer and the rest appended after.
+---
+--- THE FIRST SUBMENU ON THIS DRIVER TO READ THE MANIFEST. Until 2026-08-04 Linux
+--- opened `menu_manifest.json` nowhere at all — the top-level parity gate had to
+--- parse this file's `_build_*` calls to compare the two, which is how `kanata`,
+--- `updates` and `apps` were found built here and undescribed there.
+---
+--- Six rows now come from the manifest, with their `disabled_when` and
+--- `checked_when` predicates resolved declaratively rather than re-derived here.
+--- Seven others were removed from this driver's projection in the same pass,
+--- because they configure features the FEATURE manifest already declares
+--- elsewhere: the WPM widget (`ui/wpm` exists on macOS and Windows and not here),
+--- the two metrics-window shortcuts, and the app-exclusion list, for which this
+--- driver's keylogger exposes no setter. A row that cannot be rendered is a
+--- promise the manifest makes on this driver's behalf and the driver breaks.
+---
+--- What stays hand-built below is what the manifest does not describe on any
+--- driver: this driver's own session-stats, WPM and per-app readouts, the
+--- encryption-migration status, and suspend/reset.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
@@ -234,7 +379,9 @@ local function _build_metrics(ctx)
 		}}
 	end
 
-	return { title = i18n_safe("menu.metrics.title"), menu = {
+	local items = _manifest_metrics_rows(ctx, k)
+
+	for _, row in ipairs({
 		{
 			title = "Statistiques de session",
 			fn = function()
@@ -262,18 +409,12 @@ local function _build_metrics(ctx)
 			end,
 		},
 		{ title = "-" },
-		-- Privacy posture. The four toggles below mirror macOS and Windows and
-		-- read the same shared manifest defaults; the driver shipped without any
-		-- of them, so metrics could not be turned off at all.
+		-- The collection master toggle stays hand-built: this menu's manifest
+		-- `toggle` row is platforms = ["hs"], so it describes macOS's row and not
+		-- this driver's. The four filter and encryption toggles that used to sit
+		-- beside it are gone from here — they are manifest rows now, rendered
+		-- above with their checked_when and disabled_when resolved declaratively.
 		_privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled),
-		_privacy_toggle(k, "private_filter_enabled",
-			i18n_safe("menu.metrics.filter_private"), k.set_private_filter_enabled),
-		_privacy_toggle(k, "secure_filter_enabled",
-			"Ignorer les champs de mot de passe", k.set_secure_filter_enabled),
-		_privacy_toggle(k, "system_auth_filter_enabled",
-			"Ignorer les invites d'authentification", k.set_system_auth_filter_enabled),
-		_privacy_toggle(k, "encrypt",
-			i18n_safe("menu.metrics.encrypt_at_rest"), k.set_encrypt_enabled),
 		_migration_status(k),
 		{ title = "-" },
 		{
@@ -291,7 +432,11 @@ local function _build_metrics(ctx)
 				Logger.info(LOG, "Metrics session reset.")
 			end,
 		},
-	}}
+	}) do
+		items[#items + 1] = row
+	end
+
+	return { title = i18n_safe("menu.metrics.title"), menu = items }
 end
 
 --- Builds the shortcuts submenu.

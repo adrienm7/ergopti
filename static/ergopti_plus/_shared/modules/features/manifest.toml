@@ -2897,6 +2897,10 @@ platforms = ["hs"]
 type = "dynamic"
 id = "script_control_shortcuts"
 
+# AHK-only, on the same evidence as personal_shortcuts below: the four
+# features.shortcuts.script_control entries this row lists are each
+# platforms = ["ahk"], so on macOS and Linux it had nothing to enumerate.
+platforms = ["ahk"]
 [[menu.shortcuts_menu]]
 type = "dynamic"
 id = "personal_shortcuts"
@@ -2917,6 +2921,10 @@ i18n = "menu.global.edit_shortcuts"
 type = "dynamic"
 id = "extensions_shortcuts"
 
+# AHK-only: the handler walks the Windows extensions directory
+# (_ExtensionsDir) for shortcut scripts. Neither Lua driver has that
+# concept, which is why both left the row unhandled rather than empty.
+platforms = ["ahk"]
 [[menu.modifier_combos_group]]
 type = "feature"
 path = "shortcuts.alt_gr_lalt"
@@ -2953,6 +2961,7 @@ type = "action"
 id = "shortcut_typing"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -2968,6 +2977,7 @@ type = "action"
 id = "shortcut_apps"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -2988,21 +2998,25 @@ disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
 type = "dynamic"
 id = "wpm_widget"
 disabled_when = ["keylogger_enabled"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "widget_colors"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "include_realtime"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "reset_wpm_position"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -3033,6 +3047,7 @@ disabled_when = ["keylogger_enabled"]
 type = "dynamic"
 id = "exclude_apps"
 disabled_when = ["keylogger_enabled"]
+platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -3052,6 +3067,12 @@ category = "Layout"
 type = "dynamic"
 id = "layout_features_base"
 
+# AHK-only, and the FEATURE manifest already said so. This row enumerates
+# features.layout.*, and all five of those entries are platforms = ["ahk"]
+# (ergopti_base, direct_access_digits, ergopti_alt_gr, ergopti_plus,
+# ctrl_magic_save). On the two Lua drivers it enumerated an empty set, so
+# the manifest promised a row neither of them could ever draw.
+platforms = ["ahk"]
 [[menu.layout_menu]]
 type = "group"
 id = "accented_letters"
@@ -3065,6 +3086,9 @@ type = "---"
 type = "dynamic"
 id = "layout_features_altgr"
 
+# Same evidence as layout_features_base above: every features.layout.* entry
+# it would list is platforms = ["ahk"].
+platforms = ["ahk"]
 [[menu.layout_menu]]
 type = "dynamic"
 id = "active_layouts"

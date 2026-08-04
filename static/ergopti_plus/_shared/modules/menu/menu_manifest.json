@@ -271,7 +271,10 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "script_control_shortcuts"
+			"id": "script_control_shortcuts",
+			"platforms": [
+				"ahk"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -287,7 +290,10 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "extensions_shortcuts"
+			"id": "extensions_shortcuts",
+			"platforms": [
+				"ahk"
+			]
 		}
 	],
 	"modifier_combos_group": [
@@ -340,6 +346,10 @@
 			"i18n_dynamic": "menu.metrics.shortcut_prefix",
 			"disabled_when": [
 				"keylogger_enabled"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -359,6 +369,10 @@
 			"i18n_dynamic": "menu.metrics.shortcut_prefix",
 			"disabled_when": [
 				"keylogger_enabled"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -390,6 +404,10 @@
 			"id": "wpm_widget",
 			"disabled_when": [
 				"keylogger_enabled"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -398,6 +416,10 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -406,6 +428,10 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -414,6 +440,10 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -458,6 +488,10 @@
 			"id": "exclude_apps",
 			"disabled_when": [
 				"keylogger_enabled"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -480,7 +514,10 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "layout_features_base"
+			"id": "layout_features_base",
+			"platforms": [
+				"ahk"
+			]
 		},
 		{
 			"type": "group",
@@ -495,7 +532,10 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "layout_features_altgr"
+			"id": "layout_features_altgr",
+			"platforms": [
+				"ahk"
+			]
 		},
 		{
 			"type": "dynamic",

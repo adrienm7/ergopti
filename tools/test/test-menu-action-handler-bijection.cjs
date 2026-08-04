@@ -57,11 +57,34 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
 
 // Frozen baselines — declared rows with no handler named, on 2026-08-01.
-const BASELINE = { ahk: 0, hs: 20, linux: 27 };
+// 2026-08-04: hs 20 → 16, linux 27 → 10. Two different kinds of progress, and
+// the distinction matters more than the numbers.
+//
+// SIX of the eleven that came off Linux are real handlers: its metrics submenu
+// is the first on that driver to render from the manifest at all, with
+// disabled_when and checked_when resolved declaratively instead of re-derived.
+//
+// The rest came off BOTH Lua drivers, because the rows could never have been
+// rendered on either: each enumerates features the FEATURE manifest already
+// declares platforms = ["ahk"]. layout_features_base and layout_features_altgr
+// list features.layout.*, all five of which are ahk. script_control_shortcuts
+// lists features.shortcuts.script_control, all four ahk. extensions_shortcuts
+// walks a Windows extensions directory. And seven metrics rows configure the WPM
+// widget, the two window shortcuts and the app-exclusion list — none of which
+// exists on Linux, where ui/wpm is absent and the keylogger exposes no
+// disabled-apps setter. A row declared for a driver that cannot draw it is not a
+// gap in the driver; it is the manifest making a promise on the driver's behalf.
+const BASELINE = { ahk: 0, hs: 16, linux: 10 };
 
 // Floors: a driver whose scan collapses would report zero unresolved rows and
 // pass while having read nothing.
-const MIN_DECLARED = { ahk: 30, hs: 30, linux: 20 };
+// linux 20 → 12 on 2026-08-04. The floor guards against a broken manifest walk,
+// which would report ~0 declared rows; it is not a target. Eleven rows were
+// restricted away from this driver in the same pass because they enumerate
+// ahk-only features, so the honest declared count fell to 16 and a floor of 20
+// would have failed on correct data. Twelve still separates "16 real rows" from
+// "the walk returned nothing".
+const MIN_DECLARED = { ahk: 30, hs: 30, linux: 12 };
 
 const PLATFORMS = [
 	{ key: 'ahk', driver: 'windows', ext: '.ahk' },
