@@ -486,7 +486,7 @@ Sans ceci, le moteur lit les mauvais keycodes et boucle sur ses injections.
 Corrige d'un coup les bugs 1, 4, 5, 6, 7. C'est **le** jalon qui rend les
 hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
 
-- [ ] **M1.1** Écrire un **lecteur evdev FFI** : `ffi.cdef` du `struct
+- [x] **M1.1** Écrire un **lecteur evdev FFI** : `ffi.cdef` du `struct
   input_event`, `ffi.sizeof` (tue l'hypothèse 24 o/64 bits), ouverture
   `O_NONBLOCK`, `poll()` piloté par l'event loop (fin de la lecture bloquante).
   Remplacer `libinput/evtest` scraping. Réutiliser `resolve_char`/`evdev.json`
@@ -495,22 +495,55 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
   *Test :* harnais **[MATÉRIEL]** créant un uinput de test, y écrivant des
   événements, et assertant le décodage. Sur CI : décodage de structs synthétiques
   (le décodeur cesse d'être du code mort avec couverture réelle).
-- [ ] **M1.2** Écrire un **écriveur uinput FFI** : `UI_SET_EVBIT`/`UI_DEV_SETUP`/
+  → `adapters/evdev_reader.lua` (backend syscall interchangeable, comme
+  `uinput_writer`) + `infra/input_event.lua` (le struct, **une** fois, dans les
+  deux sens). Taille mesurée par `ffi.sizeof`, offsets **dérivés** de la taille :
+  le cas 32 bits n'a plus de branche et ne peut plus être oublié. `M.new` mort
+  supprimé avec ses copies parallèles du shift, des touches de contrôle et du
+  struct. Corrections au plan : (a) la voie vivante en production était
+  `evtest --grab`, pas `libinput` — le masquage de keycodes ne cassait plus que
+  l'échappatoire ; (b) `O_NONBLOCK` suffit à tuer la lecture bloquante, `poll()`
+  est là pour qu'une boucle puisse dormir sur l'entrée, pas pour la correction.
+- [x] **M1.2** Écrire un **écriveur uinput FFI** : `UI_SET_EVBIT`/`UI_DEV_SETUP`/
   `UI_DEV_CREATE` au démarrage (nom `ergopti virtual keyboard`), `write()` par
   événement ensuite. **Zéro fork** par événement (fin de la dépendance ydotoold,
   du flag invalide, du fork-par-frappe). Ré-émettre EV_KEY + EV_SYN.
   *Test :* [MATÉRIEL] injection round-trip via une deuxième lecture uinput.
-- [ ] **M1.3** **Grab + ré-émission** (`EVIOCGRAB` via ioctl FFI sur le périph
+  → L'écriveur existait déjà, testé au niveau octet, et **injoignable** :
+  `open_fast_channel()` n'avait aucun appelant hors de son propre test, donc
+  `emit_key` retombait sur un `ydotool key` par frappe physique — sous un grab
+  activé par défaut au motif que ça n'arrivait plus. Le canal s'ouvre maintenant
+  **avant** le grab et se ferme après, sur les deux chemins de sortie. Le repli
+  ydotool de `emit_key` est supprimé : il refuse et le dit, et le daemon échoue
+  franchement au boot avec la raison. Les backspaces passent aussi par uinput.
+- [x] **M1.3** **Grab + ré-émission** (`EVIOCGRAB` via ioctl FFI sur le périph
   `kanata`) : ré-émettre **tout** (relâches, autorepeat valeur 2, codes inconnus,
   modificateurs) sur notre uinput **avant** dispatch domaine. Pendant une
   expansion, mettre en pause le forwarding → effacement+retape **atomique**, et
   file des touches tapées pendant. Corrige C4 à la racine.
   *Test :* [MATÉRIEL] frappe rapide pendant expansion → sortie déterministe ;
   garde-fou : ungrab sur panic/exit (sinon clavier mort).
-- [ ] **M1.4** Watchdog / ré-acquisition : inotify sur `/dev/input` pour attendre
+  → Le grab appartient au daemon (plus à un process enfant), et l'ordre est
+  épinglé par des tests : grab **avant** la première lecture, ungrab **avant** la
+  fermeture. Pas de « pause du forwarding » à écrire : avec le grab et un drain
+  séquentiel, ce qui est tapé pendant l'injection reste dans le buffer noyau et
+  est lu **après** — l'atomicité est structurelle. Le garde-fou ungrab-sur-panic
+  n'existe pas non plus, et c'est délibéré : `EVIOCGRAB` est lié au descripteur
+  et le noyau le relâche à la mort du process, quelle qu'en soit la cause.
+  **Divergence corrigée au passage** : l'autorepeat produit désormais un
+  caractère. Sous grab l'application voit ce qu'on ré-émet, répétitions
+  comprises ; un buffer qui ignorait la valeur 2 croyait « a » quand l'écran
+  disait « aaaa », puis effaçait le mauvais nombre de caractères.
+- [x] **M1.4** Watchdog / ré-acquisition : inotify sur `/dev/input` pour attendre
   l'apparition du périph `kanata` et le re-grab sur restart/reload kanata ;
   fallback grab du physique si kanata absent.
   *Test :* apparition/disparition simulée du périph → ré-acquisition.
+  → Sondage du tick périodique (toutes les 2 s) plutôt qu'inotify : `luv` n'est
+  pas installé en CI, donc une voie inotify serait la seule non testée du lot, et
+  l'événement surveillé arrive au plus deux fois par jour. Deux causes couvertes :
+  clavier débranché/rebranché (nouveau nœud `eventN`) et redémarrage du daemon de
+  remap (son périphérique de sortie est détruit puis recréé — la perte ne coupe
+  pas la capture, elle la **dégrade** silencieusement vers des keycodes pré-remap).
 
 ### M2 — Injection correcte multilingue + détection serveur partagée
 
