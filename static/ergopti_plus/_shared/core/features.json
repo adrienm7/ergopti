@@ -35,7 +35,7 @@
 		{ "name": "healthcheck", "tree": "ui", "role": "the health window and its probes" },
 		{ "name": "hotstring_editor", "tree": "ui", "role": "editor window for personal hotstrings" },
 		{ "name": "hotstrings", "tree": "modules", "role": "the expansion engine" },
-		{ "name": "hotstrings_config", "tree": "modules", "role": "which hotstring groups are on" },
+		{ "name": "hotstrings_config_window", "tree": "ui", "role": "which hotstring groups are on" },
 		{ "name": "layout", "tree": "modules", "role": "the physical keyboard layout and its install" },
 		{ "name": "llm", "tree": "modules", "role": "prediction backends, models and prompts" },
 		{ "name": "menu", "tree": "ui", "role": "the tray menu" },
@@ -43,7 +43,7 @@
 		{ "name": "model_browser", "tree": "ui", "role": "model catalogue window" },
 		{ "name": "onboarding", "tree": "ui", "role": "the first-run wizard" },
 		{ "name": "paths", "tree": "infra", "role": "resolution of every user file location" },
-		{ "name": "personal_info", "tree": "modules", "role": "the user's own data for dynamic expansions" },
+		{ "name": "personal_info_editor", "tree": "ui", "role": "the user's own data for dynamic expansions" },
 		{ "name": "prompt_editor", "tree": "ui", "role": "prompt editing window" },
 		{ "name": "shortcuts", "tree": "modules", "role": "chords, text transforms and their bindings" },
 		{ "name": "spotlight", "tree": "ui", "role": "the caret spotlight overlay" },
@@ -53,11 +53,23 @@
 	],
 
 	"_absent_everywhere": [
-		"apps, download, hotstrings_config, layout, metrics and personal_info have no",
-		"folder under their canonical name on ANY driver — the capability exists (app",
-		"profiles are read, models are downloaded, hotstring groups are toggled, the",
-		"layout is installed, personal info expands) but each is spread through",
-		"another module. They are the six that Convention S cannot stub, because",
-		"there is nothing to stub AROUND yet: the work is extraction, not a README."
+		"apps, download, layout and metrics have no folder under their canonical name",
+		"on ANY driver — the capability exists (app profiles are read, models are",
+		"downloaded, the layout is installed, keystrokes are captured) but each is",
+		"spread through another module. Convention S cannot stub them: there is",
+		"nothing to stub AROUND yet, so the work is extraction, not a README.",
+		"",
+		"CORRECTED 2026-08-04: this list named six. Two of them were not absent at",
+		"all — the canonical entry simply used a shorter name than the folder every",
+		"driver actually ships. personal_info is ui/personal_info_editor and",
+		"hotstrings_config is ui/hotstrings_config_window, both present on all",
+		"three. The three drivers already agreed; only this file disagreed with",
+		"them, which is the same shape as the ten features the tree field was",
+		"written to fix. Renaming the entries moved the canonical count 14 -> 16",
+		"without touching a line of driver code.",
+		"",
+		"download is the near miss worth watching: macOS and Linux both ship",
+		"ui/download_window and Windows does not, so it is a genuine 2-of-3 gap",
+		"rather than a naming one."
 	]
 }
