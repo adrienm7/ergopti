@@ -134,9 +134,87 @@ end
 
 
 
+-- ===============================================
+-- ===============================================
+-- ======= 4/ The Matcher, as a pure function ====
+-- ===============================================
+-- ===============================================
+
+--- Finds the best mapping ending at `body_len`, among those selected by
+--- `want_auto`.
+---
+--- WHY THIS IS MODULE-LEVEL AND NOT A CLOSURE.
+--- It lived inside `on_char`, capturing the engine instance's own codepoint
+--- buffer. That made the matcher inseparable from buffer OWNERSHIP, which is the
+--- single reason macOS could not adopt this core: its buffer belongs to the
+--- keymap core state and is read by the keylogger, the LLM preview, the tooltip
+--- and script control. "Adopting the core" would have meant surrendering all of
+--- that, so the section stalled — not on the matching logic, which agrees with
+--- the cross-driver corpus on every vector, but on who holds the characters.
+---
+--- Taking the buffer as an argument costs nothing here — `on_char` passes its own
+--- and behaves identically — and turns adoption into a call rather than a
+--- migration.
+---
+--- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).
+--- @param buckets table Tail-char buckets, longest-trigger-first within each.
+--- @param body_len number Index in `buf_cps` the candidate trigger must end at.
+--- @param want_auto boolean Select auto_expand mappings (true) or the rest.
+--- @return table|nil mapping, number|nil trigger length, string|nil effective replacement.
+function M.best_match_at(buf_cps, buckets, body_len, want_auto)
+	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return nil end
+	if type(body_len) ~= "number" or body_len < 1 then return nil end
+
+	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	if not bucket then return nil end
+
+	for _, mapping in ipairs(bucket) do
+		local tlen = mapping.tlen
+		if mapping.auto_expand == want_auto and body_len >= tlen then
+			-- Suffix check (case-aware), against the body rather than the
+			-- whole buffer so the terminator is excluded on the end-char path.
+			local buf_tail = table.concat(buf_cps, "", body_len - tlen + 1, body_len)
+			-- The effective replacement, which is the mapping's own EXCEPT in
+			-- conform mode where it takes the casing that was typed. nil means
+			-- this mapping does not fire: conform_replacement rejects a casing
+			-- that is neither lower, Title nor UPPER, because no variant would
+			-- have been registered for it.
+			local eff
+			local mode = mapping.match_mode
+			if mode == "exact" then
+				if buf_tail == mapping.trigger then eff = mapping.replacement end
+			elseif mode == "fold" then
+				if text_utils.trig_lower(buf_tail) == mapping.trigger_folded then
+					eff = mapping.replacement
+				end
+			else
+				if text_utils.trig_lower(buf_tail) == mapping.trigger then
+					eff = text_utils.conform_replacement(mapping.replacement, buf_tail, mapping.trigger)
+				end
+			end
+
+			if eff then
+				-- Word-boundary check: the character preceding the trigger must
+				-- not be a word character (or the trigger fills the whole body).
+				local boundary_ok = true
+				if mapping.is_word and body_len > tlen then
+					if is_word_char(buf_cps[body_len - tlen]) then boundary_ok = false end
+				end
+				-- The bucket is sorted longest-first, so the first survivor is
+				-- the longest for this path.
+				if boundary_ok then return mapping, tlen, eff end
+			end
+		end
+	end
+	return nil
+end
+
+
+
+
 -- =========================================
 -- =========================================
--- ======= 4/ Engine Instance ==============
+-- ======= 5/ Engine Instance ==============
 -- =========================================
 -- =========================================
 
@@ -344,57 +422,13 @@ function M.new()
 
 		local buf_len = #_buf_cps
 
-		--- Finds the best match ending at `body_len`, over mappings selected by
-		--- `want_auto`. Returns the mapping and its length, or nil.
-		---
-		--- Split out because the same search runs twice: once on the buffer as
-		--- typed (auto_expand entries, which fire the moment the trigger
-		--- completes) and once on the buffer minus a just-typed terminator
-		--- (non-auto entries, which wait for one).
+		-- Delegates to the module-level matcher rather than carrying its own copy.
+		-- This body used to be a closure over `_buf_cps`, which is precisely what
+		-- made the matcher inseparable from buffer ownership and blocked the macOS
+		-- adoption. Two copies of one search is also how a sibling gets forgotten,
+		-- which this repository has paid for more than once.
 		local function best_match(body_len, want_auto)
-			if body_len < 1 then return nil end
-			local bucket = _buckets[text_utils.trig_lower(_buf_cps[body_len])]
-			if not bucket then return nil end
-
-			for _, mapping in ipairs(bucket) do
-				local tlen = mapping.tlen
-				if mapping.auto_expand == want_auto and body_len >= tlen then
-					-- Suffix check (case-aware), against the body rather than the
-					-- whole buffer so the terminator is excluded on the end-char path.
-					local buf_tail = table.concat(_buf_cps, "", body_len - tlen + 1, body_len)
-					-- The effective replacement, which is the mapping's own EXCEPT in
-					-- conform mode where it takes the casing that was typed. nil means
-					-- this mapping does not fire: conform_replacement rejects a casing
-					-- that is neither lower, Title nor UPPER, because no variant would
-					-- have been registered for it.
-					local eff
-					local mode = mapping.match_mode
-					if mode == "exact" then
-						if buf_tail == mapping.trigger then eff = mapping.replacement end
-					elseif mode == "fold" then
-						if text_utils.trig_lower(buf_tail) == mapping.trigger_folded then
-							eff = mapping.replacement
-						end
-					else
-						if text_utils.trig_lower(buf_tail) == mapping.trigger then
-							eff = text_utils.conform_replacement(mapping.replacement, buf_tail, mapping.trigger)
-						end
-					end
-
-					if eff then
-						-- Word-boundary check: the character preceding the trigger must
-						-- not be a word character (or the trigger fills the whole body).
-						local boundary_ok = true
-						if mapping.is_word and body_len > tlen then
-							if is_word_char(_buf_cps[body_len - tlen]) then boundary_ok = false end
-						end
-						-- The bucket is sorted longest-first, so the first survivor is
-						-- the longest for this path.
-						if boundary_ok then return mapping, tlen, eff end
-					end
-				end
-			end
-			return nil
+			return M.best_match_at(_buf_cps, _buckets, body_len, want_auto)
 		end
 
 		-- Path A — auto_expand: fires on the trigger's own last character.
