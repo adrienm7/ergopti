@@ -2376,6 +2376,7 @@
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "Pouze Windows: kompenzuje vlastní rozložení (KbdEdit/MSKLC), která přemapují AltGr na jinou virtuální klávesu — což je pojem ovladače klávesnice Windows bez protějšku jinde.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Pouze macOS: MLX je lokální inferenční framework od Apple pro Apple Silicon a verze pro Windows ani Linux neexistuje.",
+	"platform_reason.lists_windows_only_settings": "Pouze Windows: vše, co by tento řádek vypsal, je samo o sobě jen pro Windows, takže na macOS a Linuxu by zobrazil prázdný seznam.",
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii"
 }

@@ -2376,6 +2376,7 @@
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "Только Windows: компенсирует пользовательские раскладки (KbdEdit/MSKLC), которые переназначают AltGr на другую виртуальную клавишу — понятие драйвера клавиатуры Windows, не имеющее аналога в других системах.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Только macOS: MLX — локальный фреймворк вывода Apple для Apple Silicon, и версии для Windows или Linux не существует.",
+	"platform_reason.lists_windows_only_settings": "Только Windows: всё, что перечисляла бы эта строка, само доступно лишь в Windows, поэтому в macOS и Linux она показывает пустой список.",
 	"metrics_apps.chart_time_series": "Время",
 	"metrics_apps.edit_category_hint": "Изменить категорию"
 }

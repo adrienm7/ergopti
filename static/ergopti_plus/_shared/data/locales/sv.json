@@ -2376,6 +2376,7 @@
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "Endast Windows: kompenserar för anpassade layouter (KbdEdit/MSKLC) som mappar om AltGr till en annan virtuell tangent — ett begrepp i Windows tangentbordsdrivrutin utan motsvarighet någon annanstans.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Endast macOS: MLX är Apples lokala inferensramverk för Apple Silicon, och det finns ingen version för Windows eller Linux.",
+	"platform_reason.lists_windows_only_settings": "Endast Windows: allt den här raden skulle lista är i sig Windows-exklusivt, så på macOS och Linux visas en tom lista.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori"
 }

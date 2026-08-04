@@ -2376,6 +2376,7 @@
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "仅限 Windows：用于补偿将 AltGr 重新映射到其他虚拟键的自定义布局（KbdEdit/MSKLC）——这是 Windows 键盘驱动程序特有的概念，其他系统没有对应物。",
 	"platform_reason.llm_mlx_is_apple_silicon": "仅限 macOS：MLX 是苹果面向 Apple Silicon 的本地推理框架，没有 Windows 或 Linux 版本。",
+	"platform_reason.lists_windows_only_settings": "仅限 Windows：此行将列出的内容本身都仅限 Windows，因此在 macOS 和 Linux 上只会显示空列表。",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别"
 }

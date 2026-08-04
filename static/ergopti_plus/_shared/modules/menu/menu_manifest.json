@@ -274,7 +274,8 @@
 			"id": "script_control_shortcuts",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
 			"type": "dynamic",
@@ -293,7 +294,8 @@
 			"id": "extensions_shortcuts",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		}
 	],
 	"modifier_combos_group": [
@@ -517,7 +519,8 @@
 			"id": "layout_features_base",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
 			"type": "group",
@@ -535,7 +538,8 @@
 			"id": "layout_features_altgr",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
 			"type": "dynamic",
