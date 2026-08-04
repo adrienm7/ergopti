@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Device Finder (Linux)
 --- DESCRIPTION:
---- Locates the most suitable keyboard input device under /dev/input/ by parsing
+--- Locates the input device the daemon should read by parsing
 --- /proc/bus/input/devices. This allows the daemon to start without manual
 --- --device configuration in most setups while still accepting an explicit path
 --- as an override.
@@ -14,10 +14,22 @@
 ---    EV=120013, which includes EV_KEY (0x1), EV_MSC (0x10), EV_LED (0x11),
 ---    and EV_REP (0x14). The finder matches any device with bit 0 set in the
 ---    EV mask (EV_KEY present) and at least one handler matching event[0-9]+.
---- 2. Name-based heuristics: devices whose name contains "keyboard" or "kbd"
----    (case-insensitive) are ranked first, providing a better default than
----    picking the first EV_KEY device (which might be a power button).
---- 3. No external tools: the entire detection is done with Lua file I/O so the
+--- 2. The remap daemon's output wins outright. Its device carries POST-remap
+---    keycodes — what the application actually receives — so reading anything
+---    else means the engine resolves characters the user never typed. Picking it
+---    is a rule, not a heuristic: it is matched by exact name before any ranking
+---    runs.
+--- 3. Synthetic devices are excluded, and that is a correctness fix rather than
+---    tidiness. Our own uinput device is called "Ergopti Virtual Keyboard", so
+---    the name heuristic below ranked it in the PREFERRED tier: whenever it
+---    enumerated first the daemon read back its own injections and expanded them
+---    again. Devices registered under /devices/virtual/ are dropped, with a name
+---    fallback for kernels that report no sysfs line.
+--- 4. Pure seams for the two halves. parse_devices() takes text and select()
+---    takes descriptors, so the whole selection can be driven from fixtures
+---    without a /proc to read — the reason this module had no regression test
+---    for the bug in point 3.
+--- 5. No external tools: the entire detection is done with Lua file I/O so the
 ---    module has zero runtime dependencies beyond the standard library.
 --- ==============================================================================
 
@@ -31,6 +43,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
+local DeviceNames = require("infra.device_names")
 
 local LOG = "modules.hotstrings.device_finder"
 
@@ -58,24 +71,26 @@ local EV_KEY_BIT = 0x2
 -- =========================================
 -- =========================================
 
---- Parses /proc/bus/input/devices into a list of device descriptor tables.
+--- Parses the text of /proc/bus/input/devices into device descriptor tables.
 --- Each descriptor has:
 ---   name     string   Human-readable device name.
+---   sysfs    string   Value of the `S: Sysfs=` line, "" when absent.
 ---   ev_mask  number   Decoded EV= bitmask (hex string → number).
 ---   handlers table    Array of handler strings (e.g. {"kbd", "event3"}).
---- @return table  Array of device descriptor tables.
-local function parse_proc_devices()
-	Logger.trace(LOG, "Parsing '%s'…", PROC_INPUT_DEVICES)
-	local fh, err = io.open(PROC_INPUT_DEVICES, "r")
-	if not fh then
-		Logger.warn(LOG, "parse_proc_devices(): cannot open '%s' — %s.", PROC_INPUT_DEVICES, tostring(err))
+--- @param text string  Raw file content.
+--- @return table       Array of device descriptor tables.
+function M.parse_devices(text)
+	if type(text) ~= "string" then
+		Logger.error(LOG, "parse_devices(): expected string, got %s.", type(text))
 		return {}
 	end
 
 	local devices = {}
 	local current = nil
 
-	for line in fh:lines() do
+	-- The trailing newline makes the final block flush through the same branch as
+	-- every other one, instead of needing a copy of the flush after the loop.
+	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
 		-- Blank line separates device blocks.
 		if line:match("^%s*$") then
 			if current then
@@ -85,12 +100,18 @@ local function parse_proc_devices()
 		else
 			-- Start a new block on the "I:" identity line.
 			if line:match("^I:") then
-				current = { name = "", ev_mask = 0, handlers = {} }
+				current = { name = "", sysfs = "", ev_mask = 0, handlers = {} }
 			end
 			if current then
 				-- N: Name="..."
 				local name = line:match('^N:%s*Name="(.*)"')
 				if name then current.name = name end
+
+				-- S: Sysfs=/devices/... — the kernel's own answer to "is this
+				-- device real", and the only classification that stays correct as
+				-- new virtual-device owners appear.
+				local sysfs = line:match("^S:%s*Sysfs=(.*)")
+				if sysfs then current.sysfs = (sysfs:gsub("%s+$", "")) end
 
 				-- B: EV=<hex>
 				local ev_hex = line:match("^B:%s*EV=(%x+)")
@@ -108,12 +129,23 @@ local function parse_proc_devices()
 			end
 		end
 	end
-	-- Flush the last block (file may not end with a blank line).
-	if current then devices[#devices + 1] = current end
 
-	fh:close()
-	Logger.done(LOG, "Found %d device block(s) in /proc/bus/input/devices.", #devices)
+	Logger.done(LOG, "Parsed %d device block(s).", #devices)
 	return devices
+end
+
+--- Reads and parses /proc/bus/input/devices.
+--- @return table Array of device descriptor tables, empty when unreadable.
+local function read_proc_devices()
+	Logger.trace(LOG, "Parsing '%s'…", PROC_INPUT_DEVICES)
+	local fh, err = io.open(PROC_INPUT_DEVICES, "r")
+	if not fh then
+		Logger.warn(LOG, "read_proc_devices(): cannot open '%s' — %s.", PROC_INPUT_DEVICES, tostring(err))
+		return {}
+	end
+	local text = fh:read("*a")
+	fh:close()
+	return M.parse_devices(text or "")
 end
 
 --- Extracts the /dev/input/eventN path from a device descriptor's handlers.
@@ -139,6 +171,13 @@ local function is_likely_keyboard(name)
 	return lower:find("keyboard") ~= nil or lower:find("kbd") ~= nil
 end
 
+--- True when the device is software-synthesised rather than physical hardware.
+--- @param dev table Device descriptor.
+--- @return boolean
+local function is_synthetic(dev)
+	return DeviceNames.is_virtual_sysfs(dev.sysfs) or DeviceNames.is_synthetic_name(dev.name)
+end
+
 
 -- =========================================
 -- =========================================
@@ -146,24 +185,22 @@ end
 -- =========================================
 -- =========================================
 
---- Finds the best keyboard device path.
---- Returns the path to a /dev/input/eventN device, or nil on failure.
+--- Chooses the device to read from a parsed descriptor list.
 ---
---- Selection criteria (in priority order):
----   1. Devices whose name contains "keyboard" or "kbd" with EV_KEY bit set.
----   2. Any device with EV_KEY bit set and an eventN handler.
---- @return string|nil  Absolute device path, e.g. "/dev/input/event3".
-function M.find_keyboard()
-	Logger.start(LOG, "Searching for keyboard device…")
-
-	local ok, devices = pcall(parse_proc_devices)
-	if not ok then
-		Logger.error(LOG, "find_keyboard(): parse failed — %s.", tostring(devices))
-		return nil
-	end
-
-	local preferred = nil   -- keyboard-named device
-	local fallback  = nil   -- any EV_KEY device
+--- Selection rules, in order:
+---   1. The remap daemon's output device, matched by exact name. It carries the
+---      keycodes the application receives, which is the only stream the engine
+---      can resolve characters from correctly.
+---   2. A physical device whose name says "keyboard" or "kbd".
+---   3. Any other physical EV_KEY device.
+--- Synthetic devices never reach rules 2 and 3 — reading one means reading our
+--- own injections back.
+--- @param devices table Array of descriptors from parse_devices().
+--- @return string|nil path, string|nil reason  Device path and the rule that chose it.
+function M.select(devices)
+	local remap    = nil   -- the remap daemon's output
+	local preferred = nil  -- physical, keyboard-named
+	local fallback  = nil  -- physical, anything else with EV_KEY
 
 	for _, dev in ipairs(devices) do
 		-- Must have EV_KEY capability. LuaJIT has no native `&` bitwise operator
@@ -172,6 +209,17 @@ function M.find_keyboard()
 
 		local path = event_path(dev)
 		if not path then goto next_dev end
+
+		if dev.name == DeviceNames.REMAP_OUTPUT then
+			if not remap then remap = path end
+			Logger.debug(LOG, "Remap output device: '%s' → %s", dev.name, path)
+			goto next_dev
+		end
+
+		if is_synthetic(dev) then
+			Logger.debug(LOG, "Skipping synthetic device: '%s' (sysfs=%s)", dev.name, dev.sysfs)
+			goto next_dev
+		end
 
 		Logger.debug(LOG, "EV_KEY device: '%s' → %s", dev.name, path)
 
@@ -185,9 +233,27 @@ function M.find_keyboard()
 		::next_dev::
 	end
 
-	local result = preferred or fallback
+	if remap     then return remap,     "remap_output" end
+	if preferred then return preferred, "named_keyboard" end
+	if fallback  then return fallback,  "any_key_device" end
+	return nil, nil
+end
+
+--- Finds the device path the daemon should read.
+--- Returns the path to a /dev/input/eventN device, or nil on failure.
+--- @return string|nil  Absolute device path, e.g. "/dev/input/event3".
+function M.find_keyboard()
+	Logger.start(LOG, "Searching for keyboard device…")
+
+	local ok, devices = pcall(read_proc_devices)
+	if not ok then
+		Logger.error(LOG, "find_keyboard(): parse failed — %s.", tostring(devices))
+		return nil
+	end
+
+	local result, reason = M.select(devices)
 	if result then
-		Logger.success(LOG, "Keyboard device selected: %s.", result)
+		Logger.success(LOG, "Keyboard device selected: %s (%s).", result, reason)
 	else
 		Logger.warn(LOG, "find_keyboard(): no suitable keyboard device found.")
 	end

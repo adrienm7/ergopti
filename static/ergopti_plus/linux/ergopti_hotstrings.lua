@@ -603,12 +603,14 @@ local function main()
 	-- straight to /dev/uinput through LuaJIT FFI. A fork per keystroke is what a
 	-- grab could not have paid for.
 	--
-	-- STILL UNVERIFIED ON HARDWARE, and deliberately shipped anyway: the device
-	-- kanata auto-detects is not coordinated with the one device_finder picks
-	-- here, so on a machine where they differ the grab may take the wrong
-	-- keyboard. `--no-grab` restores the old behaviour without a rebuild, which is
-	-- why that flag exists — but observe mode is a known-corrupting default, so it
-	-- is the escape hatch and not the norm.
+	-- The two daemons are coordinated through names, not luck: the generated
+	-- remap config excludes our uinput device by exact name, and device_finder
+	-- asks for the remap daemon's output device before it ranks anything else. So
+	-- the grab lands on the stream carrying POST-remap keycodes — the same ones
+	-- the application receives — and neither daemon can grab the other's output.
+	-- STILL UNVERIFIED ON HARDWARE. `--no-grab` restores the old behaviour without
+	-- a rebuild, which is why that flag exists — but observe mode is a
+	-- known-corrupting default, so it is the escape hatch and not the norm.
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,

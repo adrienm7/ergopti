@@ -1,6 +1,28 @@
 ;; === Configuration ===
+;;
+;; The three linux-* keys below are device coordination, not preference. kanata
+;; grabs every keyboard-like device it finds, and two of the devices on this
+;; machine are software keyboards that must never be grabbed:
+;;   - "Ergopti Virtual Keyboard" is what our daemon injects through. Grabbing it
+;;     means kanata re-maps text we already mapped, so an expansion comes out
+;;     mangled in a way that looks like a hotstring bug.
+;;   - "ydotoold virtual device" belongs to a third-party injector a user may run
+;;     alongside; the same corruption applies to whatever it types.
+;; Both names are matched EXACTLY by kanata and are pinned to
+;; linux/infra/device_names.lua by a gate — never edit them here alone.
+;;
+;; keyboard-only keeps kanata off pointers and tablets, whose event streams it
+;; has no reason to own. continue-if-no-devs-found lets it start before the
+;; keyboard is enumerated, which is normal ordering under a user unit rather than
+;; an error worth exiting for.
 (defcfg
   process-unmapped-keys yes
+  linux-dev-names-exclude (
+    "ydotoold virtual device"
+    "Ergopti Virtual Keyboard"
+  )
+  linux-device-detect-mode keyboard-only
+  linux-continue-if-no-devs-found yes
 )
 
 ;; === Physical key source ===

@@ -149,6 +149,40 @@ if (daemonExecStartsFound === 0) {
 	);
 }
 
+// ─── 6. The remap config is a copy the daemon owns, never a link to the source ──
+//
+// ROOT CAUSE ENCODED: install.sh used to symlink ~/.config/kanata/ergopti.kbd at
+// the tracked template, and platform/remap/manager.write_kbd() opens that exact
+// path for writing on every daemon start. The first restart therefore followed
+// the link and rewrote the template inside the install tree — so the file the
+// parity gate reads was being overwritten by the generator the gate exists to
+// check, and a machine that had ever run the daemon no longer had the config the
+// repo believes it ships.
+//
+// Two writers, one path is the defect; the fix is that only the generator writes
+// and the installer merely seeds. A regular file also means the unit below can be
+// enabled before the daemon has ever run, which is the order install.sh uses.
+
+const INSTALL_SH = 'static/ergopti_plus/linux/install.sh';
+const installSrc = read(INSTALL_SH);
+const KANATA_USER_CONFIG = '${KANATA_CONFIG_DIR}/ergopti.kbd';
+
+for (const line of installSrc.split('\n')) {
+	if (/^\s*ln\s+-s/.test(line) && line.includes('ergopti.kbd')) {
+		errors.push(
+			`${INSTALL_SH}: "${line.trim()}" links the generated remap config back at the ` +
+			'tracked template; the daemon writes that path, so the link makes it overwrite its own source.'
+		);
+	}
+}
+
+if (!installSrc.includes(`install -m 0644 "${'${KANATA_SRC}'}" "${KANATA_USER_CONFIG}"`)) {
+	errors.push(
+		`${INSTALL_SH}: must seed ${KANATA_USER_CONFIG} with a copy of the template ` +
+		'(install -m 0644), so the unit it enables has a loadable config before the daemon first runs.'
+	);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);

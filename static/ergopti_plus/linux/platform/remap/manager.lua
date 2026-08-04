@@ -378,7 +378,10 @@ function M.start()
 		fh:close()
 	end
 
-	-- Determine the device path. kanata --auto-detect works on most systems.
+	-- No --device and no --auto-detect: kanata has no such CLI flag, and device
+	-- selection is a defcfg concern. The generated config names the devices to
+	-- keep away from (our uinput device and any third-party injector) and limits
+	-- detection to keyboards, which is the only coordination the two daemons need.
 	local cmd = string.format(
 		"kanata --quiet --cfg '%s' 2>&1 & echo $!",
 		_kbd_path:gsub("'", "'\\''")

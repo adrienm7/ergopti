@@ -296,11 +296,11 @@ chmod +x "${BIN_DIR}/ergopti-hotstrings"
 echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
 
 
-# ============================================================
-# ============================================================
-# ======= 7/ Kanata Config Symlink & Systemd Service =======
-# ============================================================
-# ============================================================
+# =======================================
+# =======================================
+# ======= 7/ Kanata Configuration =======
+# =======================================
+# =======================================
 
 KANATA_CONFIG_DIR="${HOME}/.config/kanata"
 # The layout ships in two shapes: flattened beside install.sh in the built
@@ -323,17 +323,30 @@ echo "=== Configuration de kanata ==="
 
 install -d "${KANATA_CONFIG_DIR}"
 
+# A COPY, never a symlink. This used to link ~/.config/kanata/ergopti.kbd back at
+# the tracked template, and the daemon's generator opens that same path for
+# writing on every start — so the first restart followed the link and overwrote
+# the source of truth in the install tree. The two writers then disagreed in the
+# worst possible direction: the file the parity gate reads had been rewritten by
+# the thing the gate exists to check.
+#
+# Copying also closes an ordering gap. The unit below is enabled and started
+# before the daemon has ever run, so without a file already in place kanata would
+# start pointing at nothing. The committed template is a complete, loadable
+# config — its generated block is pinned byte for byte to what the generator
+# emits — so the copy is correct on its own and the daemon merely refreshes it
+# once the user has a tap-hold override worth applying.
 if [ -f "${KANATA_SRC}" ]; then
-	ln -sf "$(realpath "${KANATA_SRC}")" "${KANATA_CONFIG_DIR}/ergopti.kbd"
-	echo "  ✔  lien symbolique kanata : ${KANATA_CONFIG_DIR}/ergopti.kbd"
+	install -m 0644 "${KANATA_SRC}" "${KANATA_CONFIG_DIR}/ergopti.kbd"
+	echo "  ✔  configuration kanata : ${KANATA_CONFIG_DIR}/ergopti.kbd"
 else
-	echo "  Avertissement : fichier kanata source introuvable — lien ignoré." >&2
+	echo "  Avertissement : fichier kanata source introuvable — configuration ignorée." >&2
 fi
 
 
 # ========================================
 # ========================================
-# ======= 9/ Systemd Service Setup =======
+# ======= 8/ Systemd Service Setup =======
 # ========================================
 # ========================================
 
