@@ -290,3 +290,58 @@ helpers.describe("device_finder: parse_devices keeps the fields the rules depend
 	end)
 
 end)
+
+
+
+
+helpers.describe("device_finder: a path must be able to produce key events", function()
+
+	helpers.it("accepts an evdev node whose EV mask carries EV_KEY", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local devices = finder.parse_devices(PHYSICAL_KEYBOARD)
+		local ok = finder.is_key_device("/dev/input/event3", devices)
+		helpers.assert_true(ok, "a real keyboard node must be accepted")
+	end)
+
+	helpers.it("refuses a node that reports no EV_KEY", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		-- EV=21 is EV_SYN|EV_SW: a lid switch. It is an evdev node, it is readable,
+		-- and it can never emit a keystroke.
+		local devices = finder.parse_devices(block({
+			name     = "Lid Switch",
+			sysfs    = "/devices/LNXSYSTM:00/PNP0C0D:00/input/input1",
+			ev       = "21",
+			handlers = "event1",
+		}))
+		local ok, why = finder.is_key_device("/dev/input/event1", devices)
+		helpers.assert_true(not ok, "a switch is not a keyboard")
+		helpers.assert_true(type(why) == "string" and why:find("EV_KEY", 1, true) ~= nil,
+			"and the reason must name the missing capability, not just say no")
+	end)
+
+	helpers.it("refuses a path that is not an evdev node at all", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		-- The case a real Linux runner found: /dev/null is readable, so the only
+		-- check that existed passed, the hook reported itself running, and the
+		-- daemon waited forever for events that cannot arrive.
+		local ok, why = finder.is_key_device("/dev/null", {})
+		helpers.assert_true(not ok, "/dev/null must be refused")
+		helpers.assert_true(type(why) == "string" and why:find("eventN", 1, true) ~= nil,
+			"and the reason must say what kind of path was expected")
+	end)
+
+	helpers.it("refuses an eventN node the kernel does not list", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local ok, why = finder.is_key_device("/dev/input/event99", {})
+		helpers.assert_true(not ok, "a node absent from /proc cannot be verified, so it is refused")
+		helpers.assert_true(type(why) == "string" and why:find("not listed", 1, true) ~= nil,
+			"and the reason must distinguish 'absent' from 'not a keyboard'")
+	end)
+
+	helpers.it("refuses nil and the empty string without crashing", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		helpers.assert_true(not (finder.is_key_device(nil, {})), "nil is not a device")
+		helpers.assert_true(not (finder.is_key_device("", {})), "nor is the empty string")
+	end)
+
+end)

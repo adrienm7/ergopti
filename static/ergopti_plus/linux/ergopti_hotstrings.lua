@@ -430,6 +430,13 @@ local function main()
 	-- undo two words later would resurrect text from nowhere.
 	local _undoable = nil
 
+	-- Timestamp of the previous character, for the per-category expansion delay
+	-- below. Declared HERE, above the closure that reads it: a `local` written
+	-- after the closure is captured as a nil GLOBAL instead, and the read then
+	-- fails at the user's keystroke rather than at load — three bugs of exactly
+	-- that shape have already been fixed in this file.
+	local _last_key_ms = nil
+
 	-- 8.5) Define the character callback.
 	local function on_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
@@ -491,6 +498,32 @@ local function main()
 			is_terminator       = is_terminator,
 			terminator_consumed = is_terminator,
 		})
+
+		-- The per-category expansion delay, which nothing consumed until 2026-08-05.
+		-- hotstrings_config.resolve() had no production caller at all: the whole
+		-- five-rung cascade, the shared DelayResolver and every override the
+		-- settings window persisted resolved into nothing, so setting a delay saved
+		-- it to disk and changed no behaviour.
+		--
+		-- The semantics are macOS's, read out of keymap/init.lua so the two agree:
+		-- the delay is the maximum PAUSE BETWEEN CONSECUTIVE KEYSTROKES for which a
+		-- trigger stays live, and 0 means "always". A user who types half a trigger,
+		-- stops to think, and comes back should not have the rest of the word turn
+		-- into an expansion they had forgotten about.
+		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
+			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
+			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
+			if delay_sec and delay_sec > 0 and _last_key_ms then
+				local gap_sec = (now_ms - _last_key_ms) / 1000
+				if gap_sec > delay_sec then
+					Logger.debug(LOG,
+						"Expired: '%s' waited %.2fs, its category allows %.2fs.",
+						tostring(result.trigger), gap_sec, delay_sec)
+					result = nil
+				end
+			end
+		end
+		_last_key_ms = now_ms
 
 		if result then
 			Logger.info(

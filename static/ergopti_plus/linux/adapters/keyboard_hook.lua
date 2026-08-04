@@ -499,6 +499,25 @@ function M.start(opts)
 		return
 	end
 
+	-- Readable is not the same as "can produce key events", and until 2026-08-05
+	-- only the first was checked. /dev/null is readable, so `--device /dev/null`
+	-- opened it, reported the hook as running, and left the daemon in its read
+	-- loop forever waiting for events that cannot arrive. The kernel's own EV
+	-- bitmask is the authority, so ask it before committing to the device.
+	-- Required through pcall like the other two uses in this file: the finder reads
+	-- /proc, and a runtime without it must fail HERE with a reason rather than at
+	-- the first keystroke that never comes.
+	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+	if not ok_finder or type(Finder.is_key_device) ~= "function" then
+		Logger.error(LOG, "start(): device_finder unavailable — cannot verify %s is a keyboard.", target)
+		return
+	end
+	local is_key, key_why = Finder.is_key_device(target)
+	if not is_key then
+		Logger.error(LOG, "start(): %s cannot produce key events — %s.", target, tostring(key_why))
+		return
+	end
+
 	-- Refresh the foreground context before starting.
 	_read_context()
 

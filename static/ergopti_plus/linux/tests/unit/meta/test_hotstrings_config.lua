@@ -98,12 +98,37 @@ helpers.describe("hotstrings_config", function()
       helpers.assert_eq(count, 0, "returns 0 without init")
     end)
 
-    helpers.it("load_all with empty dir returns 0", function()
+    helpers.it("a user directory that does not exist still loads the bundled packs", function()
+      -- This asserted `count == 0` until 2026-08-05, i.e. that a user who has
+      -- written no personal hotstrings has none at all — which would mean the
+      -- product ships nothing. It only passed because the suite ran on Windows,
+      -- where the pack scan shells out to `find` and gets Windows' find.exe. A
+      -- real Linux runner failed it immediately.
+      --
+      -- The contract is the opposite and is the point of M3.5: bundled packs and
+      -- the user's directory are MERGED, so an absent user directory subtracts
+      -- nothing. Choosing one or the other is what used to make creating a single
+      -- personal file hide all five shipped categories.
       local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
       local engine = make_engine()
       cfg.init(engine, "/tmp/nonexistent_ergopti_hs_test_99999")
       local count = cfg.load_all()
-      helpers.assert_eq(count, 0, "returns 0 for empty dir")
+
+      helpers.assert_true(type(count) == "number" and count >= 0,
+        "a missing user directory must not crash the load")
+
+      -- Asserted against what the scan can actually see, so the case is
+      -- meaningful on Linux and honest on a machine whose `find` is not POSIX:
+      -- if any bundled pack was discovered at all, an absent user directory must
+      -- not have reduced the result to nothing.
+      local Loader = helpers.load_module("modules.hotstrings.loader")
+      local Paths = helpers.load_module("infra.paths")
+      local bundled_dir = Paths.shared and Paths.shared("modules/hotstrings") or nil
+      local bundled = bundled_dir and Loader.find_toml_files(bundled_dir) or {}
+      if #bundled > 0 then
+        helpers.assert_true(count > 0,
+          "the bundled packs are on disk and discoverable, so they must have loaded")
+      end
     end)
   end)
 

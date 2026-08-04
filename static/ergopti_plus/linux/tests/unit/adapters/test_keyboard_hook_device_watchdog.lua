@@ -50,6 +50,13 @@ local function stub_device_finder(initial)
 	local answer = initial
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_keyboard = function() return answer end,
+		-- The hook asks the finder whether a path can actually produce key events
+		-- before it commits to it — /dev/null is readable, and without this check
+		-- the daemon sat in its read loop forever waiting for events that cannot
+		-- arrive. These tests drive synthetic node paths that are in no /proc, so
+		-- the stub answers for them; the check itself is covered against real
+		-- fixture text in test_device_finder_selection.lua.
+		is_key_device = function() return true, nil end,
 	}
 	return function(next_answer) answer = next_answer end
 end
