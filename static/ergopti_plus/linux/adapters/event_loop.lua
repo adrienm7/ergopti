@@ -38,6 +38,37 @@ local LOG = "adapters.event_loop"
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
+--- A sleep that neither forks nor spins, bound once.
+---
+--- The pump fallback below runs when luv is absent, and it used to fork
+--- /bin/sleep once per iteration. FFI is a hard requirement of this driver
+--- already, so nanosleep is always available where the daemon actually runs;
+--- the forked form survives only for an interpreter with neither.
+--- @return function sleep(seconds)
+local nap = (function()
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if not ok_ffi or type(ffi) ~= "table" then
+		return function(seconds)
+			pcall(os.execute, string.format("sleep %.3f", seconds))
+		end
+	end
+	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
+		struct timespec { long tv_sec; long tv_nsec; };
+		int nanosleep(const struct timespec *req, struct timespec *rem);
+	]])
+	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
+		return function(seconds)
+			pcall(os.execute, string.format("sleep %.3f", seconds))
+		end
+	end
+	local req = ffi.new("struct timespec[1]")
+	return function(seconds)
+		req[0].tv_sec = math.floor(seconds)
+		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
+		ffi.C.nanosleep(req, nil)
+	end
+end)()
+
 --- True when the luv library is available and the event loop is native.
 M.HAS_LUV = (luv ~= nil)
 
@@ -198,7 +229,13 @@ local function _run_pump(opts)
 		-- silently tolerated — the loop becomes a controlled busy-wait,
 		-- which is still correct (the pipe read provides natural backpressure).
 		pcall(function()
-			os.execute("sleep 0.001 2>/dev/null")
+			-- nanosleep through FFI, not a fork. This ran once per loop
+			-- iteration — a thousand times a second on an idle daemon — and
+			-- forking /bin/sleep at that rate is a measurable share of a core
+			-- spent doing nothing. LuaJIT FFI is already a hard requirement of
+			-- this driver (uinput, evdev), so this is not a new dependency; luv
+			-- remains the preferred path and this is what runs without it.
+			nap(0.001)
 		end)
 	end
 end

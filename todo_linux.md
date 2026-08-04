@@ -954,13 +954,28 @@ pipeline Linux + un renderer natif.
   une répétition et un relâchement, et les relit. Il asserte aussi les deux
   choses qu'un mock ne peut pas montrer : un descripteur au repos rend `nil` au
   lieu de bloquer, et le nœud disparaît après `UI_DEV_DESTROY`.
-- [ ] **M6.2** Faire de **luv** (ou la boucle poll FFI) une dépendance dure du
+- [x] **M6.2** Faire de **luv** (ou la boucle poll FFI) une dépendance dure du
   daemon et l'installer en CI, pour que la boucle d'événements de prod,
   `luv.sleep` et les watchers inotify cessent de ship non testés. Garder toute
   op bit-à-bit et retour `os.execute` **LuaJIT-5.1-safe**.
-- [ ] **M6.3** **Couverture de parse** de l'entry point Linux (aujourd'hui zéro) ;
+  → **La question est tranchée dans l'autre sens** : c'est le **FFI** qui est la
+  dépendance dure, et il l'était déjà — uinput, evdev et le grab en dépendent
+  tous. `luv` reste optionnel et préféré quand il est là. Ce qui manquait, c'est
+  que le repli sans luv forkait `/bin/sleep` **une fois par itération de boucle**,
+  soit mille fois par seconde sur un daemon au repos ; il passe par `nanosleep`
+  en FFI, comme la pause inter-phase de l'injecteur. Les opérations bit-à-bit
+  restent écrites arithmétiquement (LuaJIT est 5.1) et les retours `os.execute`
+  acceptent les deux conventions.
+- [x] **M6.3** **Couverture de parse** de l'entry point Linux (aujourd'hui zéro) ;
   lint conventions Lua étendu à Linux + `_shared/lua` ; router les shell-outs du
   chemin frappe via `shell_runner`.
+  → La couverture de parse existait déjà et couvre l'entry point ; elle est
+  étendue à `tests/hardware/`, le seul arbre Lua que le runner ne charge jamais.
+  Le lint de conventions couvre désormais `linux/platform` et `macos/platform`,
+  qui contenaient du Lua qu'aucune vérification n'avait jamais lu. Les shell-outs
+  du chemin de frappe sont partis autrement que prévu : l'injecteur et le hook
+  n'en font **plus aucun** (uinput direct), et `window_info` et le loader passent
+  par `shell_runner`.
 - [x] **M6.4** Corriger le **contrat corpus** avant de générer le matcher partagé
   (risque R6 de `TODO.md`) : `backspace_count` = 3 sous Windows/Linux, 1 sous
   macOS. Puis fermer les divergences moteur du bug 12 (non-`auto_expand`, casse,
