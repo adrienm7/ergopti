@@ -103,6 +103,13 @@ local engine_mod        = require("modules.hotstrings.engine")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
+
+-- Preview tooltip (optional — needs lgi and a display; the daemon expands
+-- hotstrings perfectly well without one, and a driver whose expansions work
+-- must not stop working because it cannot draw a hint about them).
+local tooltip_preview = nil
+local ok_tip, tip_mod = pcall(require, "ui.tooltip.preview")
+if ok_tip then tooltip_preview = tip_mod end
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
@@ -336,6 +343,7 @@ local function install_signal_handlers()
 		Logger.info(LOG, "Session: %d keystroke(s), ~%d word(s), %ds.",
 			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 		keylogger.flush()
+		if tooltip_preview then tooltip_preview.destroy() end
 		keyboard_hook.stop()
 		-- After the hook, never before: closing the channel destroys the uinput
 		-- device, and the hook's ungrab may still have keys to put back through it.
@@ -431,6 +439,11 @@ local function main()
 			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
+
+		-- The preview describes the buffer as it was; the character being typed
+		-- now changes it. Dismissed here rather than redrawn, because the redraw
+		-- (if any) happens below once the engine has re-evaluated.
+		if tooltip_preview and tooltip_preview.is_visible() then tooltip_preview.hide() end
 
 		-- Any keystroke that is not the immediate Backspace ends the undo window.
 		-- Kept this narrow deliberately: an undo that survived a word of typing
@@ -656,6 +669,7 @@ local function main()
 	-- there now. The pointer is watched, never grabbed.
 	local function on_click()
 		_undoable = nil
+		if tooltip_preview then tooltip_preview.hide() end
 		engine:reset()
 		Logger.debug(LOG, "Pointer click — buffer reset.")
 	end
@@ -898,6 +912,25 @@ local function main()
 	-- 8.10) Install signal handlers.
 	install_signal_handlers()
 
+	-- 8.9b) Initialise the preview tooltip.
+	--
+	-- Fail-fast on the STYLE and soft on the renderer: a missing key in the
+	-- shared constants is a broken install and must be loud, while an absent lgi
+	-- is an ordinary machine that simply gets no preview.
+	if tooltip_preview then
+		local ok_style, style = pcall(function()
+			return require("ui.tooltip.config").load()
+		end)
+		if ok_style then
+			tooltip_preview.init({ style = style, config = hotstrings_config })
+			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
+				tostring(require("adapters.graphics_renderer").is_available()))
+		else
+			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
+			tooltip_preview = nil
+		end
+	end
+
 	-- 8.10a) Initialise i18n (loads persisted locale, enables ★ substitution).
 	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 	if ok_i18n and i18n_mod then
@@ -1047,6 +1080,7 @@ local function main()
 	})
 
 	-- 8.14) Clean exit.
+	if tooltip_preview then tooltip_preview.destroy() end
 	injector.close_fast_channel()
 	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end

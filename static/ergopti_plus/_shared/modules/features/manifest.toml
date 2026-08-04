@@ -316,21 +316,21 @@ description_key = "menu.hotstrings.expansion_delay"
 
 [[features.hotstrings]]
 id = "preview_ai_enabled"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = true
 type = "boolean"
 description_key = "menu.hotstrings.preview_ai_enabled"
 
 [[features.hotstrings]]
 id = "preview_autocorrect_enabled"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = true
 type = "boolean"
 description_key = "menu.hotstrings.preview_autocorrect_enabled"
 
 [[features.hotstrings]]
 id = "preview_colored_tooltips"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = true
 type = "boolean"
 description_key = "menu.hotstrings.preview_colored_tooltips"
@@ -340,7 +340,7 @@ id = "preview_star_enabled"
 default = true
 type = "boolean"
 description_key = "menu.hotstrings.preview_star_enabled"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 
 
 

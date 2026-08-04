@@ -41,6 +41,7 @@ graph TD
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
         LINUX_file_system["FileSystem.lua"]
+        LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_http_client["HttpClient.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
@@ -121,6 +122,7 @@ graph TD
     P_Clipboard -->|implements| LINUX_clipboard
     P_Crypto -->|implements| LINUX_crypto
     P_FileSystem -->|implements| LINUX_file_system
+    P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_HttpClient -->|implements| LINUX_http_client
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
