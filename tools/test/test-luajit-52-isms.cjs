@@ -69,18 +69,28 @@ const FORBIDDEN = [
 	}
 ];
 
-// NOT checked, deliberately: bare `utf8.len` / `utf8.char` and friends. LuaJIT
-// has no utf8 table, but both entry points install one before anything else
-// loads — ergopti_hotstrings.lua requires compat.utf8 at line 78, and
-// tests/run.lua installs it before the first test module. So a call site naming
-// `utf8.x` is correct by design, and a first version of this gate reported five
-// files' worth of them. A rule that fires on correct code gets suppressed, and a
-// suppressed rule protects nothing.
+// A bare `utf8.x` inside _shared/lua. LuaJIT has no utf8 table; the daemon and
+// the unit runner each install the compat shim as a global before loading
+// anything, which is why a first version of this gate called these correct and
+// dropped the rule entirely.
 //
-// The property that WOULD be worth checking is boot ORDER — that the shim is
-// installed before the first module that uses it. That is not a grep: it is a
-// question about require order, and the two call sites that matter already put it
-// first deliberately, each with a comment saying why.
+// CI then crashed in _shared/lua/keymap/terminators.lua from the E2E runner —
+// a THIRD entry point, which installs nothing. The reasoning was right about the
+// two call sites it looked at and wrong about the population: a SHARED module
+// cannot depend on its caller having installed a global, because it does not know
+// its callers. Each one asks for the shim itself, which costs a require and
+// removes a whole class of "works from here, crashes from there".
+//
+// Scoped to _shared/lua on purpose. A driver's own files may legitimately use the
+// global — that driver's entry point installs it, and it is the same codebase.
+const SHARED_ONLY = {
+	pattern: /\butf8\.(char|codepoint|len|offset|codes)\s*\(/g,
+	name: 'a bare utf8.* in shared code',
+	instead: 'a module-local `local utf8_lib = ... or require("compat.utf8")`, '
+		+ 'as _shared/lua/keymap/terminators.lua does',
+	// The shim necessarily names the functions it provides.
+	skip: (file) => file.endsWith(path.join('compat', 'utf8.lua'))
+};
 
 const errors = [];
 let scanned = 0;
@@ -120,7 +130,12 @@ for (const root of ROOTS) {
 		const src = fs.readFileSync(file, 'utf8');
 		const relative = path.relative(SP, file).replace(/\\/g, '/');
 
-		for (const rule of FORBIDDEN) {
+		// The shared-only rule applies to _shared/lua and nothing else.
+		const rules = relative.startsWith('_shared/lua/')
+			? FORBIDDEN.concat([SHARED_ONLY])
+			: FORBIDDEN;
+
+		for (const rule of rules) {
 			if (rule.skip && rule.skip(file)) continue;
 			rule.pattern.lastIndex = 0;
 			const hits = [...src.matchAll(rule.pattern)];

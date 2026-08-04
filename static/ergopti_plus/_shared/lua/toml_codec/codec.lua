@@ -3,6 +3,14 @@
 
 --- ==============================================================================
 
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and a shared module cannot depend on its caller having installed the compat
+-- shim — it does not know its callers. terminators.lua crashed from the E2E
+-- runner for exactly that reason while working from the daemon and the unit
+-- runner, both of which install one.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
+
 -- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
 -- unless the build enabled 5.2 compatibility, which the one CI and the Linux
 -- daemon run does not. Resolved once here rather than at each call site, and
@@ -288,12 +296,12 @@ local function unescape_string(s)
 	s = s:gsub("\\\\", "\1"):gsub('\\"', '\2')
 	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
 	     :gsub("\\b", "\8"):gsub("\\f", "\12")
-	     :gsub("\\u(%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
+	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
 	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
 	         local cp = tonumber(h, 16)
 	         -- Codepoints above U+10FFFF are not valid Unicode; utf8.char would throw.
 	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
-	         return utf8.char(cp)
+	         return utf8_lib.char(cp)
 	     end)
 	     :gsub("\1", "\\"):gsub("\2", '"')
 	return s
