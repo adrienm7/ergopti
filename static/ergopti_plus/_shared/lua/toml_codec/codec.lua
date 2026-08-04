@@ -299,7 +299,7 @@ local function unescape_string(s)
 	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
 	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
 	         local cp = tonumber(h, 16)
-	         -- Codepoints above U+10FFFF are not valid Unicode; utf8.char would throw.
+	         -- Codepoints above U+10FFFF are not valid Unicode; utf8_lib.char would throw.
 	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
 	         return utf8_lib.char(cp)
 	     end)

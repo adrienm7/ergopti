@@ -84,7 +84,11 @@ const FORBIDDEN = [
 // Scoped to _shared/lua on purpose. A driver's own files may legitimately use the
 // global — that driver's entry point installs it, and it is the same codebase.
 const SHARED_ONLY = {
-	pattern: /\butf8\.(char|codepoint|len|offset|codes)\s*\(/g,
+	// No trailing `\(` here, and that is the point: the crash CI found was
+	// `pcall(utf8.offset, s, 2)` — a function REFERENCE, not a call. A first
+	// version required the parenthesis and walked straight past all three of them,
+	// so the gate went green and the E2E job kept crashing on the same line.
+	pattern: /\butf8\.(char|codepoint|len|offset|codes)\b/g,
 	name: 'a bare utf8.* in shared code',
 	instead: 'a module-local `local utf8_lib = ... or require("compat.utf8")`, '
 		+ 'as _shared/lua/keymap/terminators.lua does',
@@ -138,7 +142,13 @@ for (const root of ROOTS) {
 		for (const rule of rules) {
 			if (rule.skip && rule.skip(file)) continue;
 			rule.pattern.lastIndex = 0;
-			const hits = [...src.matchAll(rule.pattern)];
+			// The shim's own declaration line probes the global to decide whether it
+			// is needed, so it names utf8.* legitimately. Blanked rather than dropped
+			// so the reported line numbers still match the file.
+			const subject = rule === SHARED_ONLY
+				? src.split('\n').map((l) => (l.includes('local utf8_lib =') ? '' : l)).join('\n')
+				: src;
+			const hits = [...subject.matchAll(rule.pattern)];
 			if (hits.length === 0) continue;
 
 			// Report the line, because a file-level "somewhere in here" is a grep the
