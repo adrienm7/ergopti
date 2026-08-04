@@ -11,11 +11,14 @@ pkgdesc="Ergonomic keyboard optimizer with AI-powered hotstrings"
 arch=('any')
 url="https://github.com/adrienm7/ergopti"
 license=('MIT')
-depends=('luajit' 'ydotool' 'xdotool' 'xclip' 'libnotify' 'curl')
+depends=('luajit' 'xclip' 'libnotify' 'curl')
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'
             'openssl: SHA-256 hashing for metrics privacy'
-            'yad: tray icon and tooltip support'
+            'libayatana-appindicator: tray icon'
+            'libxkbcommon: keymap dump, so replacements are typed rather than pasted'
+            'xdotool: focused-window identity on X11'
+            'wl-clipboard: clipboard fallback on Wayland'
             'kanata: advanced keyboard remapping')
 makedepends=('git' 'nodejs' 'lua')
 source=("ergopti::git+https://github.com/adrienm7/ergopti.git#branch=dev")
@@ -27,23 +30,33 @@ package() {
   # Build the driver bundle
   bash tools/build/build-linux-driver.sh --skip-smoke
 
-  # Install driver files
+  # Install driver files.
+  #
+  # From build/linux/LINUX/, not build/linux/. The builder puts the driver one
+  # level deeper than these lines used to read, and every one of them ended
+  # `2>/dev/null || true` — so makepkg SUCCEEDED and shipped a package
+  # containing the shared Lua tree, a wrapper with no LUA_PATH, a .desktop and a
+  # unit, and no driver at all. Verified empty on disk before this was fixed.
   install -d "$pkgdir/usr/lib/ergopti"
-  cp -r build/linux/*.lua "$pkgdir/usr/lib/ergopti/" 2>/dev/null || true
-  cp -r build/linux/modules "$pkgdir/usr/lib/ergopti/" 2>/dev/null || true
-  cp -r build/linux/adapters "$pkgdir/usr/lib/ergopti/" 2>/dev/null || true
-  cp -r build/linux/ui "$pkgdir/usr/lib/ergopti/" 2>/dev/null || true
-  cp -r build/linux/vendor "$pkgdir/usr/lib/ergopti/" 2>/dev/null || true
+  cp -r build/linux/linux/. "$pkgdir/usr/lib/ergopti/"
 
-  if [ -d "static/ergopti_plus/_shared/lua" ]; then
-    install -d "$pkgdir/usr/lib/ergopti/_shared"
-    cp -r static/ergopti_plus/_shared/lua "$pkgdir/usr/lib/ergopti/_shared/"
-  fi
+  # The shared tree is a SIBLING of the driver at runtime, and the daemon
+  # resolves it that way. _shared/data and _shared/modules are not optional
+  # extras: the keycode tables, the hotstring packs, the locales and the
+  # defaults the resolver fails fast on all live there.
+  install -d "$pkgdir/usr/lib/ergopti/_shared"
+  cp -r build/linux/_shared/. "$pkgdir/usr/lib/ergopti/_shared/"
 
-  # Wrapper script
+  # Wrapper script. LUA_PATH is what makes `require("logger.shim")` resolve;
+  # without it the daemon dies on its first require, which is the second half of
+  # why the previous package could not start.
   install -d "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/ergopti" << 'WRAPPER'
 #!/bin/bash
+set -euo pipefail
+DRIVER_ROOT="/usr/lib/ergopti"
+SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+export LUA_PATH="${DRIVER_ROOT}/?.lua;${DRIVER_ROOT}/?/init.lua;${SHARED_LUA}/?.lua;${SHARED_LUA}/?/init.lua;;"
 exec luajit /usr/lib/ergopti/ergopti_hotstrings.lua "$@"
 WRAPPER
   chmod 755 "$pkgdir/usr/bin/ergopti"
@@ -82,19 +95,28 @@ enabled = true
 CONFIG
 
   # systemd user service
-  install -Dm644 /dev/stdin "$pkgdir/usr/lib/systemd/user/ergopti.service" << 'SERVICE'
+  install -Dm644 /dev/stdin "$pkgdir/usr/lib/systemd/user/ergopti-hotstrings.service" << 'SERVICE'
 [Unit]
 Description=Ergopti — ergonomic keyboard optimizer
+Documentation=https://github.com/adrienm7/ergopti
+# PartOf, not just After: without it the daemon outlives the session it belongs
+# to, and logging back in under the other display server finds a daemon that
+# probed the old one at startup.
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/ergopti --tray
 Restart=on-failure
 RestartSec=5
+# No Environment=DISPLAY: the daemon probes the session at runtime, and a pinned
+# :0 is wrong on a second seat and under Wayland.
 
 [Install]
-WantedBy=default.target
+# graphical-session, not default: the daemon needs a session to read input from
+# and a tray to draw into, and default.target starts it on a TTY login too.
+WantedBy=graphical-session.target
 SERVICE
 
   # Post-install message
@@ -102,16 +124,16 @@ SERVICE
   cat > "$pkgdir/usr/share/doc/ergopti/README.install" << 'DOC'
 Post-installation steps:
   1. Enable and start the user service:
-       systemctl --user enable ergopti.service
-       systemctl --user start ergopti.service
+       systemctl --user enable ergopti-hotstrings.service
+       systemctl --user start ergopti-hotstrings.service
 
   2. Configure hotstrings in ~/.config/ergopti/hotstrings/
 
   3. For LLM features, start Ollama:
        ollama serve
 
-  4. For tray icon and tooltips, install yad:
-       sudo pacman -S yad
+  4. For the tray icon:
+       sudo pacman -S libayatana-appindicator
 
   5. For advanced keyboard remapping, install kanata:
        sudo pacman -S kanata

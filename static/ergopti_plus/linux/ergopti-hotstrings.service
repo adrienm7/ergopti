@@ -1,35 +1,52 @@
 # static/ergopti_plus/linux/ergopti-hotstrings.service
 #
-# Systemd user unit for the ergopti LuaJIT hotstring daemon.
-# Reads raw evdev events, matches triggers, injects replacements via ydotool.
+# THE systemd user unit for the daemon. Every packager installs this exact
+# content: install.sh, the .deb, the .rpm and the PKGBUILD each carried their
+# own copy, and the six copies disagreed on the unit's NAME (ergopti-hotstrings
+# vs ergopti), on its ExecStart (~/.local/bin vs /usr/bin) and on its WantedBy
+# (graphical-session vs default). A user who installed the .deb and then ran
+# install.sh ended up with two enabled units, both grabbing the keyboard.
 #
-# Install as a user unit (not system-wide) so the daemon inherits the
-# graphical session environment without elevated privileges.
+# A USER unit, not a system one: the daemon reads the session's input devices,
+# writes the session's clipboard and puts an icon in the session's tray. None of
+# that is meaningful outside the user's own session.
 #
 # Manual install:
 #   cp ergopti-hotstrings.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now ergopti-hotstrings
 #
-# The install.sh script does all of this automatically.
+# install.sh does this automatically.
 
 [Unit]
 Description=Ergopti — expansion de texte et métriques clavier (LuaJIT)
 Documentation=https://github.com/ergopti/ergopti
-# Wait for the graphical session so notify-send and ydotool can reach the
-# compositor; evdev reading itself works without a display server.
+
+# PartOf as well as After. Without it the daemon outlives the graphical session
+# it belongs to: logging out leaves it running against a display server that no
+# longer exists, and logging back in — possibly under the OTHER one — finds a
+# daemon that probed the old session at startup. Stopping with the session is
+# what makes "log out of X11, log in to Wayland, touch nothing" work at all.
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
-# The wrapper sets LUA_PATH and verifies ydotool before exec-ing luajit.
+# The wrapper sets LUA_PATH and exec's luajit.
 ExecStart=%h/.local/bin/ergopti-hotstrings --tray
-# Restart on transient failures (device not yet accessible at login, etc.).
+# Restart on transient failures (the device not yet enumerated at login, etc.).
 Restart=on-failure
 RestartSec=3s
-# Propagate the display session for notify-send and xdotool.
-Environment=DISPLAY=:0
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+
+# NO Environment=DISPLAY. It used to be pinned to :0 — wrong on a second seat,
+# wrong under Wayland, and worst of all silently RIGHT often enough that the bug
+# only ever appeared for the users who switch. The daemon probes the session at
+# runtime (infra/display_server.lua) and re-probes on demand, so the unit must
+# not tell it an answer.
+#
+# DBUS_SESSION_BUS_ADDRESS is not pinned either: a systemd --user service
+# already runs in its session's bus context, and hardcoding the socket path is
+# the same class of mistake.
 
 [Install]
 WantedBy=graphical-session.target

@@ -153,22 +153,33 @@ echo "  Config: /etc/ergopti/config.toml"
 # ----------------------------------------------------------------------
 # 8. systemd user service
 # ----------------------------------------------------------------------
-cat > "$DEB_ROOT/usr/lib/systemd/user/ergopti.service" << 'SERVICE_EOF'
+# ONE unit name across every packager. This file used to install
+# ergopti-hotstrings.service while install.sh installed ergopti-hotstrings.service, so a
+# user who did both ended up with two enabled units — both grabbing the keyboard.
+cat > "$DEB_ROOT/usr/lib/systemd/user/ergopti-hotstrings.service" << 'SERVICE_EOF'
 [Unit]
 Description=Ergopti — ergonomic keyboard optimizer
 Documentation=https://github.com/adrienm7/ergopti
+# PartOf, not just After: without it the daemon outlives the session it belongs
+# to, and logging back in under the other display server finds a daemon that
+# probed the old one at startup.
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/ergopti --tray
 Restart=on-failure
 RestartSec=5
+# No Environment=DISPLAY: the daemon probes the session at runtime, and a pinned
+# :0 is wrong on a second seat and under Wayland.
 
 [Install]
-WantedBy=default.target
+# graphical-session, not default: the daemon needs a session to read input from
+# and a tray to draw into, and default.target starts it on a TTY login too.
+WantedBy=graphical-session.target
 SERVICE_EOF
-echo "  systemd service: ergopti.service"
+echo "  systemd service: ergopti-hotstrings.service"
 
 # ----------------------------------------------------------------------
 # 9. DEBIAN control files
@@ -178,8 +189,8 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
-Depends: luajit (>= 2.1), ydotool, xdotool, xclip, libnotify-bin, curl
-Recommends: lua-luv, lua-filesystem, openssl, kanata
+Depends: luajit (>= 2.1), xclip, libnotify-bin, curl
+Recommends: lua-luv, lua-filesystem, openssl, kanata, libayatana-appindicator3-1, xdotool, wl-clipboard, libxkbcommon-tools
 Section: utils
 Priority: optional
 Homepage: https://github.com/adrienm7/ergopti
@@ -200,12 +211,12 @@ for uid in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
   if [ -d "$homedir" ]; then
     # Enable the user service (runs as the user, not root)
     su - "$uid" -c "systemctl --user daemon-reload" 2>/dev/null || true
-    su - "$uid" -c "systemctl --user enable ergopti.service" 2>/dev/null || true
+    su - "$uid" -c "systemctl --user enable ergopti-hotstrings.service" 2>/dev/null || true
   fi
 done
 
 echo "ergopti: user service enabled. Start manually with:"
-echo "  systemctl --user start ergopti.service"
+echo "  systemctl --user start ergopti-hotstrings.service"
 POSTINST_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/postinst"
 echo "  DEBIAN/postinst"
@@ -216,8 +227,8 @@ set -e
 
 # Stop the user service before removal
 for uid in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
-  su - "$uid" -c "systemctl --user stop ergopti.service" 2>/dev/null || true
-  su - "$uid" -c "systemctl --user disable ergopti.service" 2>/dev/null || true
+  su - "$uid" -c "systemctl --user stop ergopti-hotstrings.service" 2>/dev/null || true
+  su - "$uid" -c "systemctl --user disable ergopti-hotstrings.service" 2>/dev/null || true
 done
 PRERM_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/prerm"
