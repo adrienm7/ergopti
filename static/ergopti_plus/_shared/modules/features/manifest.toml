@@ -216,6 +216,22 @@ platforms = ["ahk"]
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk"]
 
+# ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
+# This section and all 45 of its features exclude Linux — 11 are ["ahk","hs"],
+# 34 are ["hs"], none mentions linux. But the Linux driver ships
+# modules/gestures/manager.lua, a _build_gestures tray submenu, Linux-specific
+# defaults (swipe_3_left, swipe_4_up, tap_3, tap_4) and a test file. What it has
+# no reader for is TOUCH INPUT: manager.lua's own header calls the libinput
+# subprocess a TODO.
+#
+# So "platforms" is being used for two different questions here — "which drivers
+# implement this?" and "which drivers can actuate it?" — and the answers differ.
+# That is the same shape as kanata / updates / apps, three rows found in 2026-08
+# to be built by Linux and undescribed by the manifest.
+#
+# DO NOT resolve it by writing a shared reason_key across the 34: the Linux half
+# would read "not coded yet", which is the one thing the restriction-reason model
+# forbids, and it would freeze that in twenty-one languages.
 [sections.gestures]
 description_key = "menu.gestures"
 platforms = ["ahk", "hs"]

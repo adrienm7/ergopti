@@ -11,7 +11,7 @@ platform-neutral core). Conformance to the **line format** is verified by replay
 `macos/tests/unit/lib/test_logger.lua`. There is no `_shared/core/domain/Logger.spec.js`;
 that file has never existed, and no behavioural corpus covers the rest of the spec
 (severity filtering, ring order, forced flush, dedup, date rollover) — adding one is
-lot 7 of [`TODO.md`](../../../../../TODO.md) §0.
+still to be written.
 
 > ⚠ The shared core is currently consumed by **Linux only**, through
 > `logger/shim.lua`, and the Linux driver installs no sink — so every `Logger.*` call

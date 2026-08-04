@@ -5,8 +5,8 @@ The macOS implementation of ErgoptiPlus.
 > **The three driver trees do not currently mirror each other** (18.9 % tree
 > identity, measured). Use the cross-driver path table in
 > [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
-> counterpart of a file; making the trees identical is invariant I1 of
-> [`TODO.md`](../../../TODO.md) §0.
+> counterpart of a file; making the trees identical is invariant I1, measured
+> and ratcheted by `tools/test/test-driver-tree-parity.cjs`.
 >
 > Name collision to know first: `modules/keymap/` is the **hotstring expansion
 > engine** here, while on Windows the same path is the **physical layout remap**.
@@ -52,5 +52,6 @@ Code is English, UI is French; tabs for indentation; EmmyLua docstrings; section
 banners and logging conventions are defined in
 [`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md); work that is
-known but not done is in [`../../../TODO.md`](../../../TODO.md).
+[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md). Work that is
+known but not done lives in the gate that measures it: each ratchet under
+`tools/test/` carries its own count and, in its header, what would move it.
