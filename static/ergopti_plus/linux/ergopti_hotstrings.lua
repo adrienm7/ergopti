@@ -23,7 +23,7 @@
 ---   --keymap  <path>   OUTPUT layout override: a keymap dump to type against,
 ---                       for a session whose keymap cannot be probed. Normally
 ---                       unnecessary — the layout is read from the server.
----   --tray             Enable the tray icon (requires yad).
+---   --tray             Enable the tray icon (needs libayatana-appindicator).
 ---   --dry-run          Log matches without injecting any keystrokes.
 ---   --verbose          Enable debug-level logging.
 ---   --help             Print usage and exit.
@@ -256,7 +256,7 @@ local function print_usage()
 	print("                      Default: auto-detected.")
 	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
 	print("                      Default: $XKBLAYOUT, else qwerty.")
-	print("  --tray              Enable the system tray icon (requires yad).")
+	print("  --tray              Enable the system tray icon.")
 	print("  --no-grab           Do NOT take an exclusive grab on the device.")
 	print("                      Physical keys then reach the application while an")
 	print("                      expansion is being typed, which can scramble it.")
@@ -767,6 +767,15 @@ local function main()
 			-- spawned — never this process — so Reload logged success and
 			-- reloaded nothing.
 			on_reload     = function() perform_reload("the tray menu") end,
+			-- Opens one category's TOML in the user's editor. The category submenu
+			-- offers it because a pack is a file people edit, and finding it by
+			-- hand means knowing whether it came from the bundle or the user's own
+			-- directory — which is exactly what the loader already resolved.
+			on_open_file = function(path)
+				if type(path) ~= "string" or path == "" then return end
+				Logger.info(LOG, "Opening hotstring file: %s", path)
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\''")))
+			end,
 			on_open_config = function(dir)
 				local d = dir or config_dir
 				Logger.info(LOG, "Opening config folder: %s", d)
@@ -826,7 +835,7 @@ local function main()
 			})
 		end
 	elseif opts.tray and not tray_menu then
-		Logger.warn(LOG, "Tray icon requested but tray_menu adapter unavailable (install yad).")
+		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")
 	else
 		-- Always state the tray decision: without this a launch that forgot --tray
 		-- looks identical in the log to one where the adapter failed to load.

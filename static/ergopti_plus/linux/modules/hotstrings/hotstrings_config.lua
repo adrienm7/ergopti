@@ -481,10 +481,14 @@ function M.load_all()
 		_parse_errors = #_toml_paths
 	end
 
-	-- Filter disabled groups.
+	-- Filter what the user switched off, at either level. A section is checked
+	-- separately from its category so re-enabling a category restores exactly the
+	-- sections it had rather than all of them.
 	local filtered = {}
 	for _, m in ipairs(_mappings) do
-		if not _disabled_groups[m.group] then
+		local off = _disabled_groups[m.group]
+			or (m.section and _disabled_groups[m.group .. "." .. m.section])
+		if not off then
 			filtered[#filtered + 1] = m
 		end
 	end
@@ -579,6 +583,9 @@ function M.disable_all()
 			changed = changed + 1
 		end
 	end
+	-- Section keys are left alone on purpose: disabling everything and enabling
+	-- it again should give the user back the sections they had chosen, not reset
+	-- their per-section choices as a side effect.
 	save_disabled()
 	M.load_all()
 	notify_change()
@@ -598,6 +605,67 @@ end
 
 function M.get_groups()
 	return _collect_groups(_mappings)
+end
+
+--- The storage key for one section's enable state.
+---
+--- Sections live in the same set as categories, keyed "category.section". One
+--- namespace rather than two, because a category and a section are both just
+--- "something the user switched off" and a second set would need its own
+--- persistence, its own reload and its own reset.
+--- @param category string
+--- @param section string
+--- @return string
+local function section_key(category, section)
+	return category .. "." .. section
+end
+
+--- Whether one section of a category is active.
+---
+--- A section inside a disabled category reports disabled regardless of its own
+--- state: the menu greys it, and a user who re-enables the category gets back
+--- exactly the sections they had, rather than all of them.
+--- @param category string
+--- @param section string
+--- @return boolean
+function M.is_section_enabled(category, section)
+	if _disabled_groups[category] then return false end
+	return not _disabled_groups[section_key(category, section)]
+end
+
+--- Flips one section.
+--- @param category string
+--- @param section string
+function M.toggle_section(category, section)
+	if type(category) ~= "string" or type(section) ~= "string" then return end
+	local key = section_key(category, section)
+	if _disabled_groups[key] then
+		_disabled_groups[key] = nil
+	else
+		_disabled_groups[key] = true
+	end
+	save_disabled()
+	M.load_all()
+	notify_change()
+end
+
+--- Sets every section of a category at once.
+--- @param category string
+--- @param enabled boolean
+function M.set_all_sections(category, enabled)
+	local cat = _categories[category]
+	if not cat then return end
+	for name in pairs(cat.sections or {}) do
+		local key = section_key(category, name)
+		if enabled then
+			_disabled_groups[key] = nil
+		else
+			_disabled_groups[key] = true
+		end
+	end
+	save_disabled()
+	M.load_all()
+	notify_change()
 end
 
 --- Every known category, keyed by id, with the metadata the menu renders.

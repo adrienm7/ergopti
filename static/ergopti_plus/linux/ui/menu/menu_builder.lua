@@ -18,7 +18,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Hierarchical items: items with a `menu` sub-table are rendered as
----    submenus on SNI/dbusmenu; on yad they are flattened with a separator.
+---    submenus, which the tray backend renders as real nested GtkMenus.
 --- 2. All callbacks are closures over the daemon's state — zero global coupling.
 --- 3. New sections (shortcuts, kanata, gestures, apps, global_actions, language,
 ---    config, debug) are added as documented stubs so the menu shape is correct.
@@ -146,17 +146,110 @@ local function _manifest_hotstring_rows(ctx, config)
 		return set
 	end
 
-	--- One toggle row for a hotstring group.
-	--- @param name string Group name as the config module reports it.
+	--- The name to show for a category, in the user's language.
+	---
+	--- The packs carry a description in 21 locales and the menu used to print the
+	--- file stem, in every language: "distancesreduction" rather than "Réduction
+	--- des distances". English is the fallback because it is the reference locale
+	--- the others are checked against, and the stem is the last resort.
+	--- @param id string Category id.
+	--- @param category table|nil Category metadata from the loader.
+	--- @return string
+	local function category_label(id, category)
+		local description = category and category.description or nil
+		if type(description) ~= "table" then return id end
+		local locale = "en"
+		local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+		if ok_i18n and type(i18n_mod.get_locale) == "function" then
+			local current = i18n_mod.get_locale()
+			if type(current) == "string" and current ~= "" then locale = current end
+		end
+		return description[locale] or description.en or id
+	end
+
+	--- One category, as a submenu rather than a single toggle.
+	---
+	--- This is where roughly four fifths of the rows the other two drivers show
+	--- come from, and Linux had none of them: a category was one line reading its
+	--- own file stem with a tick, and its sections, its counts and its file were
+	--- unreachable. Everything below comes from the loader's catalogue, which is
+	--- the same parse the engine already did.
+	--- @param id string Category id.
 	--- @return table
-	local function group_row(name)
-		local on = config.is_group_enabled and config.is_group_enabled(name)
-		return {
-			title = name .. (on and " ✓" or ""),
+	local function category_submenu(id)
+		local category = (type(config.get_category) == "function") and config.get_category(id) or nil
+		local on = config.is_group_enabled and config.is_group_enabled(id)
+		local count = category and category.count or 0
+
+		local sub = {}
+
+		-- The gate first, because everything under it is inert while it is off.
+		sub[#sub + 1] = {
+			title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
 			fn    = function()
-				if config.toggle_group then config.toggle_group(name) end
+				if config.toggle_group then config.toggle_group(id) end
 			end,
 		}
+
+		if category and category.path then
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.hotstrings.open_file"),
+				fn    = function()
+					if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
+				end,
+			}
+		end
+
+		local sections = category and category.sections_order or {}
+		if #sections > 0 then
+			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.hotstrings.check_all"),
+				disabled = not on,
+				fn = function()
+					if config.set_all_sections then config.set_all_sections(id, true) end
+				end,
+			}
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.hotstrings.uncheck_all"),
+				disabled = not on,
+				fn = function()
+					if config.set_all_sections then config.set_all_sections(id, false) end
+				end,
+			}
+			sub[#sub + 1] = { title = "-" }
+
+			for _, name in ipairs(sections) do
+				local section = (category.sections or {})[name]
+				local section_on = config.is_section_enabled and config.is_section_enabled(id, name)
+				sub[#sub + 1] = {
+					-- The count is the point of the row: a section with three entries
+					-- and one with nine hundred are the same line without it.
+					title    = string.format("%s (%d)", name, section and section.count or 0),
+					checked  = section_on and true or false,
+					-- Greyed rather than hidden while the category is off: a row that
+					-- disappears reads as a bug, and the user still needs to see what
+					-- they will get back when they switch the category on.
+					disabled = not on,
+					fn = function()
+						if config.toggle_section then config.toggle_section(id, name) end
+					end,
+				}
+			end
+		end
+
+		return {
+			title   = string.format("%s (%d)", category_label(id, category), count),
+			checked = on and true or false,
+			menu    = sub,
+		}
+	end
+
+	--- Kept as the name the callers below already use.
+	--- @param name string Category id.
+	--- @return table
+	local function group_row(name)
+		return category_submenu(name)
 	end
 
 	--- Appends every loaded group belonging to `class`.
