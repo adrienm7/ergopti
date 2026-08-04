@@ -58,7 +58,11 @@ M.MODIFIER_OF = {
 	[M.KEY_LEFTCTRL]   = "ctrl",
 	[M.KEY_RIGHTCTRL]  = "ctrl",
 	[M.KEY_LEFTALT]    = "alt",
-	[M.KEY_RIGHTALT]   = "alt",
+	-- AltGr is NOT Alt, and conflating them was a real defect: AltGr selects
+	-- level 3 of the layout, so it PRODUCES characters (é, €, «) while Alt starts
+	-- a shortcut. A driver that treats them alike either suppresses the accented
+	-- characters or lets Alt+key pollute the typing buffer.
+	[M.KEY_RIGHTALT]   = "altgr",
 	[M.KEY_LEFTMETA]   = "meta",
 	[M.KEY_RIGHTMETA]  = "meta",
 }

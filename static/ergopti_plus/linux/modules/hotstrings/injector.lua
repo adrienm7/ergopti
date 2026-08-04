@@ -81,6 +81,17 @@ local MODIFIER_CODES = {
 --- type a replacement, which is why the daemon refuses to grab without it.
 local _uinput = nil
 
+--- The layout-level modifiers the user is physically holding, from the hook that
+--- tracks them. Required lazily so this module still loads in a harness that has
+--- no hook, where the answer is simply "none".
+--- @return table Array of "shift" / "altgr".
+local function held_text_modifiers()
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook.held_text_modifiers) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_text_modifiers)
+	return (ok_call and type(held) == "table") and held or {}
+end
+
 --- The FFI nanosleep binding, or false when this runtime has no FFI. Probed once.
 local _nanosleep = nil
 
@@ -377,6 +388,16 @@ function M.inject(backspace_count, replacement_text)
 	Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
 
 	local ok, err = pcall(function()
+		-- Neutralise whatever the user is physically holding. Under a grab the
+		-- application has already seen the press we re-emitted, so it believes
+		-- Shift is down: an injected "e" would arrive as "E", and under AltGr as
+		-- "€". Waiting for the user to let go is not an option — the release event
+		-- is in the kernel buffer this injection is currently not reading.
+		local held = held_text_modifiers()
+		for _, mod in ipairs(held) do
+			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_UP)
+		end
+
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
 			send_backspaces(backspace_count)
@@ -386,6 +407,13 @@ function M.inject(backspace_count, replacement_text)
 
 		-- Phase 2: type the replacement.
 		send_text(replacement_text)
+
+		-- Put them back, so a user who was still holding Shift when the expansion
+		-- fired keeps holding it afterwards. Restored in reverse for symmetry with
+		-- how every other modifier pair in this file is emitted.
+		for i = #held, 1, -1 do
+			_uinput.emit(MODIFIER_CODES[held[i]], EVDEV_VALUE_DOWN)
+		end
 	end)
 
 	if not ok then

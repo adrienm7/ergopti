@@ -604,11 +604,32 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
   rate) et il ne peut pas tourner sous le grab. Le seam shell de l'injecteur est
   supprimé avec lui ; la pause inter-phase passe par `nanosleep` en FFI plutôt
   que par un `fork` de `/bin/sleep` par expansion.
-- [ ] **M2.4** Kit de sûreté d'espanso, porté : fenêtre de discard (ignorer notre
+- [x] **M2.4** Kit de sûreté d'espanso, porté : fenêtre de discard (ignorer notre
   propre écho), attente de relâche des modificateurs avant injection, comptage de
   backspace en **codepoints Unicode**, undo (backspace après expansion restaure
   le trigger), invalidation sur clic souris.
   *Test :* comptage backspace correct sur remplacement multi-octets ; undo.
+  → **Fenêtre de discard : superflue, et c'est structurel.** L'injection sort sur
+  un périphérique uinput distinct de celui qui est grabbé, donc notre propre écho
+  n'est jamais relu. Une fenêtre temporelle par-dessus serait un second mécanisme
+  pour une garantie déjà tenue.
+  → **Attente de relâche : impossible, remplacée par la neutralisation.** Le
+  relâchement est dans le buffer noyau que l'injection, en cours, ne lit pas —
+  attendre serait un interblocage. L'injecteur **relâche** donc les modificateurs
+  de niveau tenus (Shift, AltGr), tape, puis les **represse**. Déterministe.
+  → **Deux défauts trouvés en chemin, hors plan.** (1) Ctrl+S n'est pas la lettre
+  S : la disposition résout un caractère quel que soit l'état de Ctrl, donc
+  **chaque raccourci alimentait le buffer** et une expansion pouvait se
+  déclencher sur du texte que personne n'avait tapé. (2) AltGr n'est pas Alt : le
+  hook les repliait sur un seul drapeau, donc « supprimer les raccourcis » et
+  « taper les accents » étaient le même interrupteur — sur un clavier français,
+  é, € et « sont en niveau 3.
+  → **Clic** : le pointeur est ouvert en lecture seule (jamais grabbé — un
+  pointeur consommé, c'est un bureau sans souris) et une pression de bouton vide
+  le buffer. Le lecteur evdev est devenu multi-slot pour ça.
+  → **Comptage backspace** : déjà en codepoints côté moteur (le corpus le pinne),
+  et l'undo l'est aussi — décalé de un, parce que le Backspace a déjà été
+  ré-émis vers l'application avant que le callback ne tourne.
 - [x] **M2.5** `window_info` : vraie voie Wayland (`swaymsg`/`hyprctl` wlroots,
   introspection GNOME / portail fenêtre active pour Mutter) au lieu de
   xdotool-only, sinon `app_id=""` casse la suppression mot-de-passe. **Documenter

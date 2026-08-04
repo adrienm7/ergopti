@@ -79,6 +79,12 @@ local POLLIN = 0x001
 -- tray and the periodic tick — the very defect this module exists to remove.
 local MAX_EVENTS_PER_DRAIN = 256
 
+--- The device this daemon grabs: the keyboard, or the remap daemon's output.
+M.KEYBOARD = "keyboard"
+
+--- The device it only watches: a pointer, for the click that moves the caret.
+M.POINTER = "pointer"
+
 
 
 
@@ -92,15 +98,26 @@ local MAX_EVENTS_PER_DRAIN = 256
 -- someone binds one.
 local _backend = nil
 
--- Open descriptor, or nil when closed. Kept out of _backend so a backend swap
--- cannot leave a stale descriptor behind.
-local _fd = nil
+-- Open descriptors, by slot. The daemon reads two devices: the keyboard it
+-- grabs, and — when one is found — the pointer it only watches, because a click
+-- moves the caret and every character buffered before it belongs to a different
+-- position in a different line. One module rather than two because the syscall
+-- surface, the struct and the drain are identical; separate state because the
+-- keyboard is grabbed and the pointer must never be.
+local _slots = {}
 
--- Whether EVIOCGRAB is currently held on _fd.
-local _grabbed = false
-
--- The device path currently open, for log lines and re-acquisition.
-local _path = nil
+--- The state for a slot, created on first use.
+--- @param slot string|nil Defaults to the keyboard.
+--- @return table { fd, grabbed, path }
+local function state(slot)
+	local key = slot or M.KEYBOARD
+	local entry = _slots[key]
+	if not entry then
+		entry = { fd = nil, grabbed = false, path = nil }
+		_slots[key] = entry
+	end
+	return entry
+end
 
 --- Replaces the syscall backend. Test seam.
 ---
@@ -113,18 +130,17 @@ local _path = nil
 --- @param backend table|nil
 function M._set_backend(backend)
 	_backend = backend
-	_fd = nil
-	_grabbed = false
+	_slots = {}
 	Logger.debug(LOG, "Backend replaced: %s.", backend and "custom" or "none")
 end
 
 --- Drops the backend and any open descriptor. Test seam.
 function M._reset_backend()
-	if _fd and _backend and _backend.close then pcall(_backend.close, _fd) end
+	for _, entry in pairs(_slots) do
+		if entry.fd and _backend and _backend.close then pcall(_backend.close, entry.fd) end
+	end
 	_backend = nil
-	_fd = nil
-	_grabbed = false
-	_path = nil
+	_slots = {}
 	Logger.debug(LOG, "Backend reset.")
 end
 
@@ -235,9 +251,10 @@ end
 --- Opens the device for reading, non-blocking.
 --- @param path string Device path.
 --- @return boolean True when the descriptor is live.
-function M.open(path)
-	if _fd then
-		Logger.debug(LOG, "open(): already open on %s.", tostring(_path))
+function M.open(path, slot)
+	local st = state(slot)
+	if st.fd then
+		Logger.debug(LOG, "open(): already open on %s.", tostring(st.path))
 		return true
 	end
 	if type(path) ~= "string" or path == "" then
@@ -255,9 +272,9 @@ function M.open(path)
 		return false
 	end
 
-	_fd = fd
-	_path = path
-	_grabbed = false
+	st.fd = fd
+	st.path = path
+	st.grabbed = false
 	Logger.success(LOG, "Reading %s (non-blocking).", path)
 	return true
 end
@@ -268,59 +285,62 @@ end
 --- cannot check that, so the guard lives at the keyboard hook, which owns both
 --- ends; taking the grab here without one leaves the user with a dead keyboard.
 --- @return boolean True when the grab is held.
-function M.grab()
-	if not _fd then
+function M.grab(slot)
+	local st = state(slot)
+	if not st.fd then
 		Logger.error(LOG, "grab(): no device open.")
 		return false
 	end
-	if _grabbed then return true end
-	if not _backend.ioctl(_fd, EVIOCGRAB, GRAB_ON) then
+	if st.grabbed then return true end
+	if not _backend.ioctl(st.fd, EVIOCGRAB, GRAB_ON) then
 		Logger.error(LOG, "grab(): EVIOCGRAB failed on %s — another process may already hold it.",
-			tostring(_path))
+			tostring(st.path))
 		return false
 	end
-	_grabbed = true
-	Logger.success(LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(_path))
+	st.grabbed = true
+	Logger.success(LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(st.path))
 	return true
 end
 
 --- Releases EVIOCGRAB, returning the device to the desktop.
 --- @return boolean True when the device is no longer grabbed.
-function M.ungrab()
-	if not _fd or not _grabbed then return true end
-	if not _backend.ioctl(_fd, EVIOCGRAB, GRAB_OFF) then
+function M.ungrab(slot)
+	local st = state(slot)
+	if not st.fd or not st.grabbed then return true end
+	if not _backend.ioctl(st.fd, EVIOCGRAB, GRAB_OFF) then
 		Logger.warn(LOG, "ungrab(): EVIOCGRAB(0) failed — closing the descriptor will release it.")
 		return false
 	end
-	_grabbed = false
-	Logger.done(LOG, "Released %s.", tostring(_path))
+	st.grabbed = false
+	Logger.done(LOG, "Released %s.", tostring(st.path))
 	return true
 end
 
 --- Closes the device, releasing the grab on the way out.
-function M.close()
-	if not _fd then return end
-	M.ungrab()
-	pcall(_backend.close, _fd)
-	Logger.info(LOG, "Closed %s.", tostring(_path))
-	_fd = nil
-	_path = nil
-	_grabbed = false
+function M.close(slot)
+	local st = state(slot)
+	if not st.fd then return end
+	M.ungrab(slot)
+	pcall(_backend.close, st.fd)
+	Logger.info(LOG, "Closed %s.", tostring(st.path))
+	st.fd = nil
+	st.path = nil
+	st.grabbed = false
 end
 
 --- @return boolean True when a device is open.
-function M.is_open()
-	return _fd ~= nil
+function M.is_open(slot)
+	return state(slot).fd ~= nil
 end
 
 --- @return boolean True when EVIOCGRAB is currently held.
-function M.is_grabbed()
-	return _grabbed
+function M.is_grabbed(slot)
+	return state(slot).grabbed
 end
 
 --- @return string|nil The open device path.
-function M.device_path()
-	return _path
+function M.device_path(slot)
+	return state(slot).path
 end
 
 
@@ -340,19 +360,21 @@ end
 --- tick.
 --- @param timeout_ms integer Milliseconds; 0 returns immediately, -1 waits forever.
 --- @return boolean True when a read would return data.
-function M.wait_readable(timeout_ms)
-	if not _fd then return false end
+function M.wait_readable(timeout_ms, slot)
+	local st = state(slot)
+	if not st.fd then return false end
 	if type(_backend.poll) ~= "function" then return true end
-	local ok, readable = pcall(_backend.poll, _fd, timeout_ms or 0)
+	local ok, readable = pcall(_backend.poll, st.fd, timeout_ms or 0)
 	return ok and readable == true
 end
 
 --- Reads one event, or nil when none is available right now.
 --- @return table|nil { type = integer, code = integer, value = integer }.
-function M.read_event()
-	if not _fd then return nil end
+function M.read_event(slot)
+	local st = state(slot)
+	if not st.fd then return nil end
 	local size = InputEvent.native_size()
-	local ok, data = pcall(_backend.read, _fd, size)
+	local ok, data = pcall(_backend.read, st.fd, size)
 	if not ok or type(data) ~= "string" then return nil end
 	return InputEvent.decode(data, size)
 end
@@ -364,11 +386,12 @@ end
 --- because under a grab an aborted drain is input the user typed and never sees.
 --- @param handler function Called with (event_table).
 --- @return integer Number of events dispatched.
-function M.drain(handler)
-	if not _fd or type(handler) ~= "function" then return 0 end
+function M.drain(handler, slot)
+	local st = state(slot)
+	if not st.fd or type(handler) ~= "function" then return 0 end
 	local count = 0
 	for _ = 1, MAX_EVENTS_PER_DRAIN do
-		local ev = M.read_event()
+		local ev = M.read_event(slot)
 		if not ev then break end
 		count = count + 1
 		local ok, err = pcall(handler, ev)
