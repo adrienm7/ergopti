@@ -96,13 +96,15 @@ helpers.describe("hotstrings config window: the bridge calls the same functions 
 		-- module's own string guard — a settings window whose switches did
 		-- nothing. Its own test could not see it: the mock took a leading `self`,
 		-- i.e. it was written to the buggy convention.
-		local enabled_args, toggle_args = {}, {}
+		local enabled_args, override_args = {}, {}
 		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
 		local state = {
 			config = {
 				get_groups        = function() return { "code", "email" } end,
 				is_group_enabled  = function(gn) enabled_args[#enabled_args + 1] = gn; return true end,
-				toggle_group      = function(gn) toggle_args[#toggle_args + 1] = gn end,
+				set_override      = function(cat, sec, field, value)
+					override_args[#override_args + 1] = { cat = cat, sec = sec, field = field, value = value }
+				end,
 				reload            = function() return 0 end,
 				mapping_count     = function() return 0 end,
 				parse_error_count = function() return 0 end,
@@ -115,9 +117,15 @@ helpers.describe("hotstrings config window: the bridge calls the same functions 
 		helpers.assert_eq(enabled_args[1], "code",
 			"and it must ask about a category, not hand the module to itself")
 
-		handler.on_message({ action = "toggle_group", group = "email" }, state)
-		helpers.assert_eq(toggle_args[1], "email",
-			"a toggle must name the category the user clicked")
+		-- Re-pointed on 2026-08-05 from `toggle_group`, which the shared settings
+		-- window has never sent — the category gate lives in the tray menu. The
+		-- defect being guarded is the same one, on a path that actually runs: a
+		-- colour change must name the category the user clicked, not pass the config
+		-- module as the first argument.
+		handler.on_message({ action = "set_color", category = "email", value = "#ff0000" }, state)
+		helpers.assert_true(#override_args >= 1, "a colour change must reach the config module")
+		helpers.assert_eq(override_args[1].cat, "email",
+			"and it must name the category the user clicked, not hand the module to itself")
 	end)
 
 end)

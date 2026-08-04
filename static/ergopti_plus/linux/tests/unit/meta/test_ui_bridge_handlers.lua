@@ -623,47 +623,115 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(result.parse_errors, 2)
       helpers.assert_eq(result.config_dir, "/home/user/.config/ergopti/hotstrings")
     end)
-    helpers.it("'toggle_group' returns refreshed data", function()
-      local result = handler.on_message({ action = "toggle_group", group = "accents" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(#result.groups > 0)
+    -- Rewritten on 2026-08-05. The cases that stood here exercised toggle_group,
+    -- reload, add_hotstring and delete_hotstring — none of which the shared
+    -- settings window has ever sent. They tested this bridge against a protocol
+    -- that does not exist, which is exactly why the four actions the window DOES
+    -- send and this bridge did not answer (set_priority, clear_priority,
+    -- set_all_grey, close) went unnoticed: the suite was green and comparing
+    -- nothing.
+    helpers.it("'set_color' records the override for the category the user clicked", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, field = field, value = value }
+      end
+      handler.on_message({ action = "set_color", category = "accents", value = "#ff0000" }, s2)
+      helpers.assert_eq(#seen, 1, "a colour change must reach the config module exactly once")
+      helpers.assert_eq(seen[1].cat, "accents", "and name the category")
+      helpers.assert_eq(seen[1].field, "color", "under the colour field")
+      helpers.assert_eq(seen[1].value, "#ff0000", "with the colour the user picked")
     end)
-    helpers.it("'reload' returns refreshed data", function()
-      local result = handler.on_message({ action = "reload" }, state)
-      helpers.assert_true(type(result) == "table")
+    helpers.it("'set_color' with an empty section means the category itself", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, field = field, value = value }
+      end
+      -- The window sends section: '' for a category-level edit. Passing it
+      -- through writes an override under a section nothing has, so it never
+      -- resolves and the colour silently does not apply.
+      handler.on_message({ action = "set_color", category = "accents", section = "", value = "#00ff00" }, s2)
+      helpers.assert_eq(seen[1].sec, nil, "the empty string must become nil, not a section key")
     end)
-    helpers.it("'add_hotstring' merges into the existing group and reports the write result", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-        helpers.assert_true(result.added, "a successful write must report added = true")
-        -- Root cause: a single-entry payload used to overwrite the whole group,
-        -- destroying the two seeded siblings. Merge must preserve them.
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
-        local triggers = {}
-        for _, e in ipairs(entries) do triggers[e.trigger] = true end
-        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the add")
-        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
-      end)
+    helpers.it("'set_priority' accepts a value in range and refuses one outside it", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, field = field, value = value }
+      end
+      handler.on_message({ action = "set_priority", category = "accents", priority = 42 }, s2)
+      helpers.assert_eq(#seen, 1, "an in-range priority must be recorded")
+      helpers.assert_eq(seen[1].value, 42, "with the value the user typed")
+
+      -- Re-validated rather than trusted: a priority outside the tier range
+      -- silently reorders every hotstring source against every other, with
+      -- nothing on screen to say so.
+      handler.on_message({ action = "set_priority", category = "accents", priority = 500 }, s2)
+      helpers.assert_eq(#seen, 1, "an out-of-range priority must be refused, not clamped")
     end)
-    helpers.it("'add_hotstring' reports failure when the write fails", function()
-      local reader, writer = make_spies(false, "disk full")
-      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-        helpers.assert_eq(result.added, false, "a failed write must not report success")
-      end)
+    helpers.it("'clear_priority' removes the override rather than writing a default", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { field = field, value = value }
+      end
+      handler.on_message({ action = "clear_priority", category = "accents" }, s2)
+      helpers.assert_eq(#seen, 1, "clearing must reach the config module")
+      helpers.assert_eq(seen[1].value, nil,
+        "and pass nil — writing a number would pin the entry to whatever that default was")
     end)
-    helpers.it("'delete_hotstring' removes only the target and keeps siblings", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstrings_config_window.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "delete_hotstring", trigger = "omw", group = "english" }, state)
-        helpers.assert_true(result.deleted)
-        -- Root cause: delete used to write an empty entry list, wiping the group.
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
-        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
-      end)
+    helpers.it("'set_all_grey' repaints every category AND clears the section colours", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.get_neutral_color = function() return "#6e6e73" end
+      s2.config.get_categories = function()
+        return { accents = { sections_order = { "acute", "grave" } } }
+      end
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, value = value }
+      end
+      handler.on_message({ action = "set_all_grey" }, s2)
+
+      local category_painted, sections_cleared = false, 0
+      for _, call in ipairs(seen) do
+        if call.sec == nil and call.value == "#6e6e73" then category_painted = true end
+        if call.sec ~= nil and call.value == nil then sections_cleared = sections_cleared + 1 end
+      end
+      helpers.assert_true(category_painted, "the category's own colour must become the neutral shade")
+      -- The half that matters: leaving the per-section overrides repaints the
+      -- headings and leaves the rows beneath in their old colours, which reads to
+      -- the user as a button that half-worked.
+      helpers.assert_eq(sections_cleared, 2, "and every per-section colour override must be wiped")
+    end)
+    helpers.it("'set_all_grey' changes nothing when the neutral colour cannot be read", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.get_categories = function() return { accents = {} } end
+      s2.config.get_neutral_color = nil
+      s2.config.set_override = function() seen[#seen + 1] = true end
+      handler.on_message({ action = "set_all_grey" }, s2)
+      -- No hardcoded fallback: substituting a literal would repaint every category
+      -- a shade nothing else in the product uses.
+      helpers.assert_eq(#seen, 0, "a missing neutral colour must stop the repaint, not invent one")
+    end)
+    helpers.it("'reset_all' clears every category's overrides", function()
+      local cleared = {}
+      local s2 = build_mock_state()
+      s2.config.reset_defaults = function() end
+      s2.config.get_categories = function() return { accents = {}, code = {} } end
+      s2.config.clear_override = function(id) cleared[#cleared + 1] = id end
+      handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
+    end)
+    helpers.it("'close' is answered so the host can tear the webview down", function()
+      local closed = {}
+      local s2 = build_mock_state()
+      s2.close_webview = function(name) closed[#closed + 1] = name end
+      handler.on_message({ action = "close" }, s2)
+      -- A window whose X does nothing is one the user force-quits, and on a
+      -- webview host that can leave the process running with no visible window.
+      helpers.assert_eq(#closed, 1, "the close request must reach the host")
     end)
   end)
 
@@ -737,46 +805,112 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsEditor")
     end)
-    helpers.it("'ready' returns initial payload", function()
+    -- Rewritten on 2026-08-05. These asserted a payload of {groups, hotstrings}
+    -- and a save of {trigger, replacement, group} — a protocol the shared editor
+    -- has never spoken. window.initData reads {sections, trigger_char,
+    -- default_priority, open_mode}, and persist() sends the WHOLE model as
+    -- {sections_order, sections}. The suite was green while the editor opened
+    -- EMPTY on this driver, every time.
+    helpers.it("'ready' answers with the keys window.initData actually reads", function()
       local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.groups) == "table")
-      helpers.assert_true(type(result.hotstrings) == "table")
+      helpers.assert_true(type(result) == "table", "the editor must receive a payload")
+      helpers.assert_true(type(result.sections) == "table",
+        "render() walks D.sections — without it the window shows nothing at all")
+      helpers.assert_true(type(result.trigger_char) == "string",
+        "the editor prints the magic key in its hints")
+      helpers.assert_true(type(result.open_mode) == "string",
+        "open_mode decides whether the add-entry modal opens on load")
     end)
-    helpers.it("'save' merges into the existing group and reports the write result", function()
+    helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
       with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        local result = h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "work" },
+            sections = { work = { description = "Work", entries = {
+              { trigger = "btw", output = "by the way", is_word = true },
+              { trigger = "omw", output = "on my way" },
+            } } },
+          },
+        }, state)
         helpers.assert_true(result.saved, "a successful write must report saved = true")
+        local entries = captured.data.sections.work.entries
+        helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
+        helpers.assert_eq(entries[1].trigger, "btw", "in the order it sent them")
+        helpers.assert_eq(entries[1].is_word, true, "with its flags preserved")
+      end)
+    end)
+    helpers.it("'save' replaces rather than merges, so a deletion sticks", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        -- The shared script sends its ENTIRE state on every save, so an entry the
+        -- user deleted is simply absent from the payload. Merging into what is on
+        -- disk would bring it back, and the deletion would appear to work until
+        -- the next restart.
+        h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "english" },
+            sections = { english = { description = "English", entries = {
+              { trigger = "ty", output = "thank you" },
+            } } },
+          },
+        }, state)
         local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
-        local triggers = {}
-        for _, e in ipairs(entries) do triggers[e.trigger] = true end
-        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the save")
-        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
+        helpers.assert_eq(#entries, 1, "only what the editor sent may be on disk")
+        helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
+      end)
+    end)
+    helpers.it("'save' drops an entry with no trigger instead of writing it", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "work" },
+            sections = { work = { entries = {
+              { trigger = "", output = "orphaned" },
+              { trigger = "ok", output = "okay" },
+            } } },
+          },
+        }, state)
+        local entries = captured.data.sections.work.entries
+        helpers.assert_eq(#entries, 1,
+          "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
+        helpers.assert_eq(entries[1].trigger, "ok", "the real entry survives")
       end)
     end)
     helpers.it("'save' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
       with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        local result = h.on_message({
+          action = "save",
+          data = { sections_order = { "work" }, sections = { work = { entries = {} } } },
+        }, state)
         helpers.assert_eq(result.saved, false, "a failed write must not report success")
       end)
     end)
-    helpers.it("'delete' removes only the target and keeps siblings", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "delete", trigger = "omw", group = "english" }, state)
-        helpers.assert_true(result.deleted)
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
-        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
-      end)
+    helpers.it("'save_pref' stores a declared preference and refuses an unknown key", function()
+      local ok = handler.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = true } }, state)
+      helpers.assert_true(ok ~= nil and ok.saved == true, "a declared preference must be stored")
+
+      -- The page is the least trusted input the daemon has, and these share
+      -- storage with the category toggles: an unbounded key/value write is how a
+      -- UI bug becomes a corrupted config.
+      local refused = handler.on_message(
+        { action = "save_pref", data = { key = "../../evil", value = 1 } }, state)
+      helpers.assert_true(refused ~= nil and refused.saved == false,
+        "an undeclared preference key must be refused, not written")
     end)
-    helpers.it("handles 'duplicate' action", function()
-      local result = handler.on_message({ action = "duplicate", trigger = "btw" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.duplicated)
+    helpers.it("'window_focus' records the focus so expansions stop inside the editor", function()
+      local s2 = build_mock_state()
+      handler.on_message({ action = "window_focus", data = { focused = true } }, s2)
+      helpers.assert_eq(s2.editor_focused, true,
+        "without this, writing a hotstring whose trigger exists fires it in the editor's own field")
+      handler.on_message({ action = "window_focus", data = { focused = false } }, s2)
+      helpers.assert_eq(s2.editor_focused, false, "and the flag must clear when focus leaves")
     end)
   end)
 

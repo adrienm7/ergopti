@@ -37,6 +37,15 @@ global_default = "#1e88e5"
 # entries only stand out once the user picks a color themselves.
 personal = "#6e6e73"
 
+# The colour the settings window's "make everything grey" button applies to every
+# category at once, for a user who wants no colour coding at all.
+#
+# Declared here on 2026-08-04. It was a literal inside the macOS bridge, and it
+# happened to equal `personal` above — so the two were one value by coincidence
+# and would have diverged the moment either was tuned, with the button quietly
+# painting a shade that no longer matched anything. Both drivers read this key.
+neutral = "#6e6e73"
+
 
 
 

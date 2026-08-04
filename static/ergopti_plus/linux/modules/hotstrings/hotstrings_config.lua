@@ -129,6 +129,10 @@ end
 -- hotstring waits.
 local GLOBAL_DEFAULT_DELAY = nil
 local GLOBAL_DEFAULT_COLOR = nil
+-- The shade the settings window's "make everything grey" button applies. Read
+-- from the shared defaults rather than written here: it was a literal inside the
+-- macOS bridge, equal by coincidence to the personal category's colour.
+local NEUTRAL_COLOR = nil
 local CATEGORY_DEFAULT_COLORS = {}
 
 --- Loads _shared/modules/hotstrings/defaults.toml, or raises.
@@ -158,6 +162,7 @@ local function load_shared_defaults()
 
 	GLOBAL_DEFAULT_DELAY = tonumber(require_key("delays", "default_sec"))
 	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
+	NEUTRAL_COLOR        = require_key("colors", "neutral")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
@@ -374,6 +379,17 @@ end
 --- @return integer
 function M.get_global_default_delay_ms()
 	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
+end
+
+--- The neutral shade the settings window's "make everything grey" button applies.
+---
+--- Exposed rather than let the bridge read the TOML again: this module is where
+--- the shared defaults are loaded and validated, and a second reader is a second
+--- place to get the path or the key wrong. It cannot be nil — load_shared_defaults
+--- raises when the key is missing, so a caller never needs a fallback of its own.
+--- @return string A "#RRGGBB" colour.
+function M.get_neutral_color()
+	return NEUTRAL_COLOR
 end
 
 --- Test seam: replaces the in-memory overrides without touching the file.

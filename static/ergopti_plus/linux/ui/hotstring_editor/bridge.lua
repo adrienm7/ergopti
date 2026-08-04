@@ -2,205 +2,374 @@
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Hotstring Editor
---- Handles JS->Lua messages from _shared/ui/hotstring_editor/.
---- Bridge name: "hsEditor"
---- Persists save/delete operations via the shared toml_codec.writer.
+--- DESCRIPTION:
+--- Hosts _shared/ui/hotstring_editor/ — the window where a user writes their own
+--- hotstrings. Bridge name: "hsEditor".
+---
+--- WHY THIS FILE WAS REWRITTEN RATHER THAN EXTENDED:
+--- The window is ONE shared HTML/JS application; both Lua drivers host the same
+--- files. Everything a user sees is therefore identical by construction, and the
+--- only thing that can differ is the bridge. This one differed completely.
+---
+--- It answered `ready` with `{hotstrings, groups, config_dir}`. The shared script
+--- reads `{sections, trigger_char, star, compact_view, auto_close,
+--- default_section, default_priority, open_mode}` and not one of the three keys
+--- it was sent — `window.initData` assigns the payload to `D` and `render()` walks
+--- `D.sections`, which was nil. **The editor opened empty on Linux, every time.**
+--- It also called `state.config:get_all_hotstrings()`, a function that does not
+--- exist on this driver, through a `:` on a module of flat functions.
+---
+--- It had no branch for `save_pref` or `window_focus`, so the compact-view toggle
+--- and the focus tracking silently did nothing. And it dispatched on `refresh`,
+--- `delete`, `test` and `duplicate` — four actions the shared UI never sends. The
+--- `delete` branch persisted to disk and could not be reached, which is exactly
+--- the kind of thing that answers "does Linux support deleting a hotstring?" with
+--- a yes it has not earned.
+---
+--- The contract below is macOS's, because macOS is the driver whose editor works.
+---
+--- FEATURES & RATIONALE:
+--- 1. One file, one group. Personal hotstrings live in `personal.toml` inside the
+---    hotstrings config directory, which the loader turns into the `personal`
+---    category the menu already shows. Writing them anywhere else would produce a
+---    category the rest of the driver does not know about.
+--- 2. Whole-file writes. The UI sends its entire model on every save — that is
+---    what `persist()` in the shared script builds — so the file is replaced, not
+---    merged. Merging would resurrect entries the user just deleted.
+--- 3. Preferences persist. `compact_view` and the rest come back to a window that
+---    reopens the way it was left; a preference that resets is a preference the
+---    user sets once and then works around.
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "hsEditor"
 
 local Logger = require("logger.shim")
+local Storage = require("adapters.storage")
+local MagicKey = require("modules.hotstrings.magic_key")
+
 local LOG = "bridge.hsEditor"
 
--- Lazy-loaded writer for hotstring TOML persistence.
-local _writer = nil
-local function _get_writer()
+-- The file personal hotstrings live in, inside the hotstrings config directory.
+-- The stem IS the category id: the loader groups by file stem, so this name is
+-- what makes these entries the "personal" category the menu renders.
+local PERSONAL_FILE = "personal.toml"
+
+-- The category the shared priority table scores personal hotstrings under, used
+-- for the placeholder the priority field shows when an entry inherits.
+local PERSONAL_CATEGORY = "personal"
+
+-- Preferences the editor asks us to remember, and their defaults. Declared as a
+-- set so an unknown key from the UI is refused rather than written: the bridge is
+-- a storage boundary and the page is the least trusted thing on the other side.
+local PREF_DEFAULTS = {
+	compact_view    = false,
+	auto_close      = false,
+	default_section = "",
+}
+
+-- Where preferences live. Namespaced so they cannot collide with the hotstring
+-- category toggles, which share the same storage.
+local PREF_PREFIX = "hotstring_editor."
+
+-- Lazily-loaded codecs. Required at call time rather than at load so a driver
+-- missing the codec still boots and reports the failure when the window opens.
+local _writer, _reader = nil, nil
+
+--- @return table|nil
+local function get_writer()
 	if _writer then return _writer end
 	local ok, mod = pcall(require, "toml_codec.writer")
 	if ok and type(mod) == "table" and type(mod.write) == "function" then _writer = mod end
 	return _writer
 end
 
--- Lazy-loaded reader for merging into the existing on-disk set before writing.
-local _reader = nil
-local function _get_reader()
+--- @return table|nil
+local function get_reader()
 	if _reader then return _reader end
 	local ok, mod = pcall(require, "toml_codec.reader")
 	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
 	return _reader
 end
 
---- Reads the group's TOML, applies `mutate` to its entry list, then writes the
---- whole merged set back so a single-entry save/delete never clobbers the other
---- hotstrings already stored in that group file.
---- @param config_dir string Absolute hotstrings config directory.
---- @param group      string Target group (the TOML file's basename).
---- @param mutate     function Receives the section's entry list; edits it in place.
---- @return boolean, string|nil True on success, or false and an error string.
-local function _persist_group(config_dir, group, mutate)
-	local reader = _get_reader()
-	local writer = _get_writer()
-	if not reader or not writer then return false, "toml_codec unavailable" end
 
-	local path = config_dir .. "/" .. group .. ".toml"
 
-	-- Read the current set so we merge into it; a missing file parses to an
-	-- empty structure, which is exactly a first-time save.
-	local ok_read, existing = pcall(reader.parse, path)
-	if not ok_read or type(existing) ~= "table" then
-		existing = { meta = {}, sections_order = {}, sections = {} }
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Where the file lives =========
+-- =========================================
+-- =========================================
+
+--- The absolute path of the personal hotstrings file.
+---
+--- Through the config module rather than rebuilding the path here: it is the
+--- module that decides where a user's hotstrings live, and a second opinion about
+--- that is a second place for them to end up.
+--- @param state table Daemon state.
+--- @return string|nil
+local function personal_path(state)
+	local config = state and state.config
+	if type(config) ~= "table" or type(config.get_config_dir) ~= "function" then
+		Logger.error(LOG, "No hotstrings config module in the daemon state — the editor cannot save.")
+		return nil
 	end
-	existing.meta           = type(existing.meta) == "table" and existing.meta or {}
-	existing.sections_order = type(existing.sections_order) == "table" and existing.sections_order or {}
-	existing.sections       = type(existing.sections) == "table" and existing.sections or {}
-	if existing.meta.description == nil or existing.meta.description == "" then
-		existing.meta.description = group
+	-- A DOT, not a colon. These are flat module functions; calling them with `:`
+	-- passes the module as the first argument, which is the bug that made every
+	-- category read as enabled in the settings-window bridge.
+	local dir = config.get_config_dir()
+	if type(dir) ~= "string" or dir == "" then
+		Logger.error(LOG, "The hotstrings config directory is unset — the editor cannot save.")
+		return nil
 	end
-
-	-- Ensure the target section exists and is tracked in the write order.
-	local section = existing.sections[group]
-	if type(section) ~= "table" then
-		section = { description = group, entries = {} }
-		existing.sections[group] = section
-		existing.sections_order[#existing.sections_order + 1] = group
-	end
-	if type(section.entries) ~= "table" then section.entries = {} end
-
-	mutate(section.entries)
-
-	return writer.write(path, existing)
+	return dir .. "/" .. PERSONAL_FILE
 end
 
---- Builds the initial editor data payload.
---- @param state table Daemon state.
---- @return table
-local function _build_initial_payload(state)
-	local hotstrings = {}
-	local groups = {}
+--- Reads a stored preference, falling back to its declared default.
+--- @param key string
+--- @return boolean|string
+local function pref(key)
+	local stored = Storage.get(PREF_PREFIX .. key, nil)
+	if stored == nil then return PREF_DEFAULTS[key] end
+	return stored
+end
 
-	if state.config then
-		if type(state.config.get_groups) == "function" then
-			groups = state.config:get_groups() or {}
-		end
-		if type(state.config.get_all_hotstrings) == "function" then
-			hotstrings = state.config:get_all_hotstrings() or {}
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Reading, for the UI ==========
+-- =========================================
+-- =========================================
+
+--- Builds the payload `window.initData` reads.
+---
+--- Every key here is one the shared script destructures. That is the whole
+--- correctness condition, and the reason the previous payload — three keys, none
+--- of them read — produced an empty window while every branch of this file looked
+--- like it worked.
+--- @param state table Daemon state.
+--- @param open_mode string|nil "menu" or "shortcut".
+--- @return table
+local function build_payload(state, open_mode)
+	local sections = {}
+
+	local path = personal_path(state)
+	local reader = get_reader()
+	if path and reader then
+		local ok, parsed = pcall(reader.parse, path)
+		if ok and type(parsed) == "table" and type(parsed.sections_order) == "table" then
+			for _, name in ipairs(parsed.sections_order) do
+				-- "-" is the menu's separator marker in a sections_order list. It is
+				-- not a section, and rendering it would put an unnamed empty group in
+				-- the editor.
+				local sec = name ~= "-" and type(parsed.sections) == "table" and parsed.sections[name] or nil
+				if type(sec) == "table" then
+					local entries = {}
+					for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
+						entries[#entries + 1] = {
+							trigger           = type(e.trigger) == "string" and e.trigger or "",
+							output            = type(e.output) == "string" and e.output or "",
+							is_word           = e.is_word == true,
+							auto_expand       = e.auto_expand == true,
+							is_case_sensitive = e.is_case_sensitive == true,
+							final_result      = e.final_result == true,
+							-- Omitted rather than defaulted when absent: nil means "inherit
+							-- the source default", and writing a number here would silently
+							-- pin every entry to whatever that default happened to be.
+							priority          = type(e.priority) == "number" and e.priority or nil,
+						}
+					end
+					sections[#sections + 1] = {
+						name        = name,
+						description = type(sec.description) == "string" and sec.description or name,
+						entries     = entries,
+					}
+				end
+			end
 		end
 	end
 
+	-- The placeholder the priority field shows for an entry that inherits. From
+	-- the shared table, never a literal: the number lives in
+	-- _shared/modules/hotstrings/priority.json and a copy here would be a second
+	-- answer to a question with one.
+	local default_priority = nil
+	local ok_prio, Priority = pcall(require, "hotstring_priority")
+	if ok_prio and type(Priority.source_priority) == "function" then
+		local ok_value, value = pcall(Priority.source_priority, PERSONAL_CATEGORY)
+		if ok_value and type(value) == "number" then default_priority = value end
+	end
+
+	local star = MagicKey.default()
 	return {
-		hotstrings = hotstrings,
-		groups = groups,
-		config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil,
+		sections         = sections,
+		-- The key in effect, which is the user's if they chose one. `star` stays
+		-- the shipped character: the UI uses it for the literal it inserts from its
+		-- symbol palette, and that must not drift when someone rebinds the trigger.
+		trigger_char     = MagicKey.get(),
+		star             = star,
+		compact_view     = pref("compact_view") == true,
+		auto_close       = pref("auto_close") == true,
+		default_section  = pref("default_section"),
+		default_priority = default_priority,
+		open_mode        = open_mode or "menu",
 	}
 end
 
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Writing, from the UI =========
+-- =========================================
+-- =========================================
+
+--- Persists the editor's whole model.
+---
+--- The shared script's `persist()` sends its ENTIRE state on every save, so this
+--- replaces the file rather than merging into it. Merging would bring back every
+--- entry the user had just deleted, and the deletion would appear to work until
+--- the next restart.
+--- @param state table Daemon state.
+--- @param data table { sections_order, sections }.
+--- @return boolean
+local function save_all(state, data)
+	local path = personal_path(state)
+	local writer = get_writer()
+	if not path or not writer then return false end
+	if type(data) ~= "table" or type(data.sections) ~= "table" then
+		Logger.error(LOG, "Save rejected: the payload carries no sections.")
+		return false
+	end
+
+	local order = type(data.sections_order) == "table" and data.sections_order or {}
+	local toml = {
+		meta           = { description = "Personal" },
+		sections_order = {},
+		sections       = {},
+	}
+
+	for _, name in ipairs(order) do
+		local sec = data.sections[name]
+		if type(sec) == "table" then
+			local entries = {}
+			for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
+				if type(e.trigger) == "string" and e.trigger ~= "" then
+					entries[#entries + 1] = {
+						trigger           = e.trigger,
+						output            = type(e.output) == "string" and e.output or "",
+						is_word           = e.is_word == true,
+						auto_expand       = e.auto_expand == true,
+						is_case_sensitive = e.is_case_sensitive == true,
+						final_result      = e.final_result == true,
+						priority          = type(e.priority) == "number" and e.priority or nil,
+					}
+				end
+			end
+			toml.sections_order[#toml.sections_order + 1] = name
+			toml.sections[name] = {
+				description = type(sec.description) == "string" and sec.description or name,
+				entries     = entries,
+			}
+		end
+	end
+
+	local ok, err = writer.write(path, toml)
+	if not ok then
+		Logger.error(LOG, "Could not write '%s': %s.", path, tostring(err))
+		return false
+	end
+
+	local count = 0
+	for _, sec in pairs(toml.sections) do count = count + #sec.entries end
+	Logger.success(LOG, "Personal hotstrings saved (%d section(s), %d entrie(s)).",
+		#toml.sections_order, count)
+
+	-- Reload so the engine matches what the user just wrote. Without this the
+	-- window says "saved", the file says so too, and typing the trigger does
+	-- nothing until the daemon is restarted.
+	local config = state and state.config
+	if type(config) == "table" and type(config.reload) == "function" then
+		local ok_reload = pcall(config.reload)
+		if not ok_reload then
+			Logger.warn(LOG, "Saved, but the reload failed — the new hotstrings need a restart.")
+		end
+	end
+	return true
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Dispatch =====================
+-- =========================================
+-- =========================================
+
 --- Handles an incoming JS message.
---- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state.
---- @return any|nil  Response to send back to JS.
+--- @param payload any String or table from host_bridge.js.
+--- @param state table Daemon state.
+--- @return any|nil Response to send back to JS.
 function M.on_message(payload, state)
+	-- The shared script sends { action, data }. A bare string reaches here only
+	-- from the host shim's own lifecycle messages.
+	local action, data
 	if type(payload) == "string" then
-		if payload == "ready" then
-			Logger.info(LOG, "Hotstring editor UI ready.")
-			return _build_initial_payload(state)
-		end
-		if payload == "refresh" then
-			return _build_initial_payload(state)
-		end
-		if payload == "close" then
-			Logger.info(LOG, "Hotstring editor close requested.")
-			return nil
-		end
+		action, data = payload, {}
+	elseif type(payload) == "table" then
+		action = payload.action
+		data = type(payload.data) == "table" and payload.data or {}
+	else
 		return nil
 	end
 
-	if type(payload) ~= "table" then return nil end
+	if action == "ready" then
+		Logger.info(LOG, "Hotstring editor ready — sending %s.", "the personal set")
+		return build_payload(state, data.open_mode)
+	end
 
-	local action = payload.action
+	if action == "save" then
+		return { saved = save_all(state, data) }
+	end
 
-	if action == "save" and payload.trigger and payload.replacement then
-		local group = payload.group or "default"
-		Logger.info(LOG, "Save hotstring: %s -> %s (group=%s)",
-			payload.trigger, payload.replacement, group)
-
-		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil
-		local saved = false
-		if config_dir then
-			local entry = {
-				trigger           = payload.trigger,
-				output            = payload.replacement,
-				is_word           = payload.is_word ~= false,
-				auto_expand       = payload.auto_expand == true,
-				is_case_sensitive = payload.is_case_sensitive == true,
-				final_result      = payload.final_result == true,
-			}
-			local ok, err = _persist_group(config_dir, group, function(entries)
-				-- Upsert by trigger: re-saving an existing hotstring edits it in
-				-- place instead of appending a duplicate.
-				for i, e in ipairs(entries) do
-					if e.trigger == entry.trigger then entries[i] = entry return end
-				end
-				entries[#entries + 1] = entry
-			end)
-			saved = ok == true
-			if saved then
-				Logger.success(LOG, "Hotstring saved to disk: %s", payload.trigger)
-			else
-				Logger.error(LOG, "Failed to save hotstring: %s", tostring(err))
-			end
-		else
-			Logger.warn(LOG, "Save hotstring: no config directory — nothing persisted.")
+	if action == "save_pref" then
+		local key = data.key
+		if PREF_DEFAULTS[key] == nil then
+			-- Refused rather than stored. The page is the least trusted input the
+			-- daemon has, and an unbounded key/value write into the same storage the
+			-- category toggles use is how a UI bug becomes a corrupted config.
+			Logger.warn(LOG, "Refusing unknown editor preference '%s'.", tostring(key))
+			return { saved = false }
 		end
-		return { saved = saved }
+		Storage.set(PREF_PREFIX .. key, data.value)
+		Logger.debug(LOG, "Editor preference '%s' = %s.", tostring(key), tostring(data.value))
+		return { saved = true }
 	end
 
-	if action == "delete" and payload.trigger then
-		local group = payload.group or "default"
-		Logger.info(LOG, "Delete hotstring: %s (group=%s)", payload.trigger, group)
-
-		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil
-		local deleted = false
-		if config_dir then
-			local ok, err = _persist_group(config_dir, group, function(entries)
-				-- Drop only the matching trigger; every sibling entry survives.
-				for i = #entries, 1, -1 do
-					if entries[i].trigger == payload.trigger then table.remove(entries, i) end
-				end
-			end)
-			deleted = ok == true
-			if deleted then
-				Logger.success(LOG, "Hotstring deleted from disk: %s", payload.trigger)
-			else
-				Logger.error(LOG, "Failed to delete hotstring: %s", tostring(err))
-			end
-		else
-			Logger.warn(LOG, "Delete hotstring: no config directory — nothing persisted.")
-		end
-		return { deleted = deleted }
+	if action == "window_focus" then
+		-- The editor asks the daemon to stop expanding while the user types INTO
+		-- it. Without this, writing a hotstring whose trigger already exists fires
+		-- that hotstring inside the editor's own text field.
+		local focused = data.focused ~= false
+		if type(state) == "table" then state.editor_focused = focused end
+		Logger.debug(LOG, "Editor focus: %s.", tostring(focused))
+		return { ok = true }
 	end
 
-	if action == "test" and payload.trigger then
-		Logger.info(LOG, "Test hotstring: %s", payload.trigger)
-		-- Expand the hotstring in the current context.
-		if state.engine and payload.replacement then
-			local injector_ok, injector = pcall(require, "modules.hotstrings.injector")
-			if injector_ok and injector then
-				pcall(injector.inject, #payload.trigger, payload.replacement)
-			end
-		end
-		return { tested = true }
+	if action == "close" then
+		Logger.info(LOG, "Hotstring editor closed.")
+		return nil
 	end
 
-	if action == "duplicate" and payload.trigger then
-		Logger.info(LOG, "Duplicate hotstring: %s", payload.trigger)
-		return { duplicated = true }
-	end
-
-	Logger.debug(LOG, "Unknown action: %s", tostring(action))
+	Logger.debug(LOG, "Unhandled editor action: %s.", tostring(action))
 	return nil
 end
 
