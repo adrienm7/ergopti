@@ -44,12 +44,11 @@ const TEMPLATES = {
 
 // Each entry: the config key, and the ONLY driver that implements it.
 const SINGLE_DRIVER_KEYS = [
-	// The expansion preview is a Hammerspoon tooltip; no other driver draws one.
+	// The four preview toggles are no longer Hammerspoon-only: Linux draws a
+	// tooltip now, through the same shared tint and layout maths, so they are
+	// two-driver features and this list — which is for SINGLE-driver ones —
+	// stops being where they are recorded. The manifest pins their platforms.
 	['hotstrings.expansion_delay', 'hs'],
-	['hotstrings.preview_ai_enabled', 'hs'],
-	['hotstrings.preview_autocorrect_enabled', 'hs'],
-	['hotstrings.preview_colored_tooltips', 'hs'],
-	['hotstrings.preview_star_enabled', 'hs'],
 	// The Windows layout is installed by the AHK driver's own remapper.
 	['layout.ergopti_base', 'ahk'],
 	['layout.direct_access_digits', 'ahk'],
