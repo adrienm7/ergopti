@@ -134,13 +134,21 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    The union shrank 49 → 47 over the same period, which is the
 //                    healthy direction: fewer unshared directories, not more
 //                    shared ones bolted onto a growing tree.
-const BASELINE_SHARED = 25;
+//   26/48 (54.2 %) — platform/tray. Linux gained a real one (an SNI object it
+//                    has to HOST for the life of the process, bound through
+//                    libayatana-appindicator); macOS and Windows ship the
+//                    Convention S README saying what they use instead, because
+//                    hs.menubar and A_TrayMenu are one call each and a seam
+//                    around one call is a folder, not an abstraction. The union
+//                    grew with the shared count, which is the only shape of
+//                    growth this ratchet permits.
+const BASELINE_SHARED = 26;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
 // the programme drifting sideways — adding structure to one driver while the
 // shared count stands still.
-const BASELINE_UNION = 47;
+const BASELINE_UNION = 48;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
