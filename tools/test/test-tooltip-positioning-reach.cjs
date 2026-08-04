@@ -88,13 +88,17 @@ for (const [d, files] of Object.entries(drivers)) {
 const reads = (driver, key) => drivers[driver].some((s) => new RegExp(`\\b${key}\\b`).test(s));
 
 // The recorded state: which drivers read each key today.
+// Linux joined every shared positioning value when its tooltip stopped being
+// absent. That is the direction this gate exists to reward: three drivers
+// reading one number rather than three carrying their own.
 const RECORD = {
-	caret_offset_x: ['windows', 'macos'],
-	caret_offset_y: ['windows', 'macos'],
-	max_caret_height: ['windows', 'macos'],
+	caret_offset_x: ['windows', 'macos', 'linux'],
+	caret_offset_y: ['windows', 'macos', 'linux'],
+	max_caret_height: ['windows', 'macos', 'linux'],
 	window_bottom_inset_ahk: ['windows'],
 	window_bottom_inset_hs: ['macos'],
-	window_offset_y: ['macos']
+	window_bottom_inset_linux: ['linux'],
+	window_offset_y: ['macos', 'linux']
 };
 
 for (const key of keys) {

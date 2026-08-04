@@ -40,14 +40,6 @@
 			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
 		},
 		{
-			"id": "CONF-LINUX-TOOLTIP-LAYOUT",
-			"driver": "linux",
-			"subject": "_shared/tests/corpus/tooltip/{layout,dequeue}_vectors.json",
-			"status": "platform_gap",
-			"reason": "Linux has no Lua tooltip layout port; the canonical positioning maths lives in _shared/modules/tooltip/layout.js and the Linux UI does not render tooltips natively.",
-			"tracked": "TODO.md — Lot 5 (Linux UI host)"
-		},
-		{
 			"id": "CONF-LINUX-STAT-MTIME",
 			"driver": "linux",
 			"subject": "lib/file_watchers.lua — mtime detection",

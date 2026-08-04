@@ -15,6 +15,10 @@ local hs = hs
 local Logger = require("infra.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
+-- The two pieces of tooltip maths that must not differ between drivers, and
+-- are pinned to the same JSON vectors on both.
+local SharedTint   = require("tooltip.tint")
+local SharedLayout = require("tooltip.layout")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
 -- from the shared cross-driver source (_shared/modules/tooltip/constants.toml → Config)
@@ -89,6 +93,12 @@ end
 -- ====================================
 
 --- Generates a dark background color while injecting a slight tint hue if permitted.
+---
+--- The maths lives in _shared/lua/tooltip/tint.lua and is shared with Linux.
+--- Keeping the hue while imposing one lightness and one saturation is what makes
+--- every category recognisable AND every panel equally readable — darkening each
+--- accent by a fixed amount instead produces visibly different brightnesses side
+--- by side, because accents differ wildly in lightness to begin with.
 --- @param requested_tint table|nil Requested RGBA color tint.
 --- @return table The resolved background color object.
 function M.apply_tint(requested_tint)
@@ -96,54 +106,14 @@ function M.apply_tint(requested_tint)
 		return Config.colors.bg
 	end
 
-	if not requested_tint or type(requested_tint) ~= "table" then 
-		return Config.colors.bg 
-	end
-
-	local r = math.max(0, math.min(1, requested_tint.red or 0))
-	local g = math.max(0, math.min(1, requested_tint.green or 0))
-	local b = math.max(0, math.min(1, requested_tint.blue or 0))
-
-	local max_c = math.max(r, g, b)
-	local min_c = math.min(r, g, b)
-	local delta = max_c - min_c
-
-	-- Achromatic accent carries no hue — fall back to the neutral dark background,
-	-- matching the JS reference (mixTint in tint.js checks delta < 0.0001).
-	if delta < 0.0001 then
-		return Config.colors.bg
-	end
-
-	local hue = 0
-	if max_c == r then hue = ((g - b) / delta) % 6
-	elseif max_c == g then hue = (b - r) / delta + 2
-	else hue = (r - g) / delta + 4
-	end
-	hue = hue / 6
-
-	local lightness  = Config.tint_config.lightness
-	local saturation = Config.tint_config.saturation
-
-	local c = (1 - math.abs(2 * lightness - 1)) * saturation
-	local x = c * (1 - math.abs((hue * 6) % 2 - 1))
-	local m = lightness - c / 2
-	local h6 = hue * 6
-	local nr, ng, nb
-	
-	if h6 < 1 then nr, ng, nb = c, x, 0
-	elseif h6 < 2 then nr, ng, nb = x, c, 0
-	elseif h6 < 3 then nr, ng, nb = 0, c, x
-	elseif h6 < 4 then nr, ng, nb = 0, x, c
-	elseif h6 < 5 then nr, ng, nb = x, 0, c
-	else nr, ng, nb = c, 0, x
-	end
-
-	return {
-		red   = math.max(0, math.min(1, nr + m)),
-		green = math.max(0, math.min(1, ng + m)),
-		blue  = math.max(0, math.min(1, nb + m)),
-		alpha = Config.colors.bg_alpha,
-	}
+	return SharedTint.mix(requested_tint, {
+		lightness  = Config.tint_config.lightness,
+		saturation = Config.tint_config.saturation,
+		alpha      = Config.colors.bg_alpha,
+		-- An achromatic accent has no hue to keep, and inventing one produces a
+		-- red panel for a grey category.
+		neutral    = Config.colors.bg,
+	})
 end
 
 --- Resolves the best screen coordinates to display the tooltip.
@@ -229,33 +199,12 @@ end
 --- @param screen_frame table { x, y, w, h } The frame to place and clamp within.
 --- @return table { x, y } The clamped top-left corner.
 function M.compute_position(anchor, canvas, screen_frame)
-	local canvas_width, canvas_height = canvas.w, canvas.h
-	local pos_x, pos_y
-
-	if anchor then
-		if anchor.type == "caret" then
-			pos_x = anchor.x + Config.layout.caret_offset_x
-			pos_y = anchor.y + (anchor.h or 0) + Config.layout.caret_offset_y
-		else
-			pos_x = anchor.x - canvas_width / 2
-			pos_y = anchor.y + Config.layout.window_offset_y
-			-- Flip above the anchor when the tooltip would fall off the bottom.
-			if pos_y + canvas_height > screen_frame.y + screen_frame.h then
-				pos_y = anchor.y - canvas_height - Config.layout.window_offset_y
-			end
-		end
-	else
-		pos_x = screen_frame.x + (screen_frame.w - canvas_width) / 2
-		pos_y = screen_frame.y + screen_frame.h - canvas_height - Config.layout.window_offset_y
-	end
-
-	local margin = Config.layout.screen_margin
-	return {
-		x = math.max(screen_frame.x + margin,
-			math.min(pos_x, screen_frame.x + screen_frame.w - canvas_width - margin)),
-		y = math.max(screen_frame.y + margin,
-			math.min(pos_y, screen_frame.y + screen_frame.h - canvas_height - margin)),
-	}
+	return SharedLayout.compute_position(anchor, canvas, screen_frame, {
+		caret_offset_x  = Config.layout.caret_offset_x,
+		caret_offset_y  = Config.layout.caret_offset_y,
+		window_offset_y = Config.layout.window_offset_y,
+		screen_margin   = Config.layout.screen_margin,
+	})
 end
 
 function M.render(blocks, state, start_watchers_callback)
