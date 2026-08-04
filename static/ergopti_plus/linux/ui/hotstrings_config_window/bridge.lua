@@ -78,11 +78,11 @@ end
 local function _build_initial_payload(state)
 	local groups = {}
 	if state.config and type(state.config.get_groups) == "function" then
-		local raw = state.config:get_groups()
+		local raw = state.config.get_groups()
 		for _, g in ipairs(raw) do
 			local enabled = false
 			if type(state.config.is_group_enabled) == "function" then
-				enabled = state.config:is_group_enabled(g)
+				enabled = state.config.is_group_enabled(g)
 			end
 			groups[#groups + 1] = { name = g, enabled = enabled }
 		end
@@ -92,10 +92,10 @@ local function _build_initial_payload(state)
 	local error_count = 0
 	if state.config then
 		if type(state.config.mapping_count) == "function" then
-			mapping_count = state.config:mapping_count()
+			mapping_count = state.config.mapping_count()
 		end
 		if type(state.config.parse_error_count) == "function" then
-			error_count = state.config:parse_error_count()
+			error_count = state.config.parse_error_count()
 		end
 	end
 
@@ -104,7 +104,7 @@ local function _build_initial_payload(state)
 		mapping_count = mapping_count,
 		parse_errors = error_count,
 		config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil,
+			and state.config.get_config_dir() or nil,
 	}
 end
 
@@ -130,14 +130,14 @@ function M.on_message(payload, state)
 
 	if action == "toggle_group" and payload.group then
 		if state.config and type(state.config.toggle_group) == "function" then
-			state.config:toggle_group(payload.group)
+			state.config.toggle_group(payload.group)
 		end
 		return _build_initial_payload(state)
 	end
 
 	if action == "reload" then
 		if state.config and type(state.config.reload) == "function" then
-			state.config:reload()
+			state.config.reload()
 		end
 		return _build_initial_payload(state)
 	end
@@ -148,7 +148,7 @@ function M.on_message(payload, state)
 			payload.trigger, payload.replacement, group)
 
 		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil
+			and state.config.get_config_dir() or nil
 		local added = false
 		if config_dir then
 			local entry = {
@@ -184,7 +184,7 @@ function M.on_message(payload, state)
 		Logger.info(LOG, "Delete hotstring: %s (group=%s)", payload.trigger, group)
 
 		local config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config:get_config_dir() or nil
+			and state.config.get_config_dir() or nil
 		local deleted = false
 		if config_dir then
 			local ok, err = _persist_group(config_dir, group, function(entries)

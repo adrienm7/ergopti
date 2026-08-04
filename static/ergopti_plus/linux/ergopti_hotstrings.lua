@@ -378,7 +378,17 @@ local function main()
 
 	-- 8.2) Initialise hotstrings_config and load all mappings.
 	local config_path = resolve_config_path(opts.config)
-	hotstrings_config.init(engine, config_path)
+	-- Forward-declared so hotstrings_config can call it: the menu is built much
+	-- later (section 8.9), and a `local` declared after this closure would be
+	-- captured as a nil global instead — the trap this repo has hit three times.
+	local rebuild_tray_menu = nil
+
+	-- The rebuild is what makes a toggle visible. Without it the menu was drawn
+	-- once at startup and only ever redrawn by the updater's callback, so every
+	-- category the user enabled or disabled kept its old checkmark until restart.
+	hotstrings_config.init(engine, config_path, function()
+		if rebuild_tray_menu then rebuild_tray_menu() end
+	end)
 	local mapping_count = hotstrings_config.load_all()
 	Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
 		mapping_count, hotstrings_config.parse_error_count())
@@ -784,18 +794,13 @@ local function main()
 					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
 				end
 			end,
-			on_enable_all = function()
-				if hotstrings_config.enable_all then
-					hotstrings_config.enable_all()
-					Logger.info(LOG, "All hotstring groups enabled.")
-				end
-			end,
-			on_disable_all = function()
-				if hotstrings_config.disable_all then
-					hotstrings_config.disable_all()
-					Logger.info(LOG, "All hotstring groups disabled.")
-				end
-			end,
+			-- Called directly. These used to be guarded by `if
+			-- hotstrings_config.enable_all then`, and the functions did not exist —
+			-- so the guard was false, the row did nothing, and a click that did
+			-- nothing is indistinguishable from a click that missed.
+			on_enable_all  = function() hotstrings_config.enable_all() end,
+			on_disable_all = function() hotstrings_config.disable_all() end,
+			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if Logger.set_level then
 					Logger.set_level(lvl)
@@ -805,8 +810,15 @@ local function main()
 			}
 		end
 
-		local menu_items = menu_builder.build(_build_menu_ctx())
-		tray_menu.setMenu(menu_items)
+		rebuild_tray_menu = function()
+			local ok_build, items = pcall(menu_builder.build, _build_menu_ctx())
+			if not ok_build then
+				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
+				return
+			end
+			tray_menu.setMenu(items)
+		end
+		rebuild_tray_menu()
 		else
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
@@ -863,7 +875,7 @@ local function main()
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
 			-- Rebuild the tray menu so the update label changes.
 			if tray_menu and menu_builder then
-				tray_menu.setMenu(menu_builder.build(_build_menu_ctx()))
+				if rebuild_tray_menu then rebuild_tray_menu() end
 			end
 		end
 		updater.init({ on_available = on_available })

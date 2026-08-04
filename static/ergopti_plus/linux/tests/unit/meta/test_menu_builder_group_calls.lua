@@ -70,3 +70,48 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		helpers.assert_eq(toggle_args[1], "code", "toggle_group must receive the group name, not the config table")
 	end)
 end)
+
+
+
+
+
+-- ===================================================================
+-- ===================================================================
+-- ======= 2/ The same mistake, in the other consumer ================
+-- ===================================================================
+-- ===================================================================
+
+helpers.describe("hotstrings config window: the bridge calls the same functions flat", function()
+
+	helpers.it("passes the group name, not the config table", function()
+		-- The identical defect, in the file the fix above did not reach. The
+		-- config window's bridge called `state.config:is_group_enabled(g)`, so
+		-- every category reported itself enabled and every toggle no-opped on the
+		-- module's own string guard — a settings window whose switches did
+		-- nothing. Its own test could not see it: the mock took a leading `self`,
+		-- i.e. it was written to the buggy convention.
+		local enabled_args, toggle_args = {}, {}
+		local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+		local state = {
+			config = {
+				get_groups        = function() return { "code", "email" } end,
+				is_group_enabled  = function(gn) enabled_args[#enabled_args + 1] = gn; return true end,
+				toggle_group      = function(gn) toggle_args[#toggle_args + 1] = gn end,
+				reload            = function() return 0 end,
+				mapping_count     = function() return 0 end,
+				parse_error_count = function() return 0 end,
+				get_config_dir    = function() return "/tmp" end,
+			},
+		}
+
+		handler.on_message("ready", state)
+		helpers.assert_true(#enabled_args >= 1, "the window asks whether each category is enabled")
+		helpers.assert_eq(enabled_args[1], "code",
+			"and it must ask about a category, not hand the module to itself")
+
+		handler.on_message({ action = "toggle_group", group = "email" }, state)
+		helpers.assert_eq(toggle_args[1], "email",
+			"a toggle must name the category the user clicked")
+	end)
+
+end)

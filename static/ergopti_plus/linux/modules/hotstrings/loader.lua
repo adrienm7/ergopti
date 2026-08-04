@@ -11,12 +11,24 @@
 --- FEATURES & RATIONALE:
 --- 1. Single parser: parsing is handled by toml_codec.reader (shared across all
 ---    Lua drivers), which soft-resolves lib.logger so it loads on this runtime.
---- 2. Flat output: returns a plain array of mapping tables compatible with
----    engine:load_mappings(), regardless of source file or category.
---- 3. Graceful errors: a malformed file logs a warning and is skipped; valid
+--- 2. The category is the FILE STEM, not the parent directory. This is the fix
+---    for a defect that made the whole category menu wrong: the five shared packs
+---    live flat in _shared/modules/hotstrings/ and install.sh copies them flat
+---    into ~/.config/ergopti/hotstrings/, so deriving the group from the
+---    directory collapsed magickey, autocorrection, rolls, sfbsreduction and
+---    distancesreduction into ONE group literally named "hotstrings". Nothing
+---    could match the manifest's category ids, so the menu rendered three
+---    "no group loaded" stubs and the single real group fell into the personal
+---    bucket by exclusion.
+--- 3. Metadata comes back with the mappings. [_meta] carries the localised
+---    description in 21 locales, the section order, the delay and the tooltip
+---    colour, and every one of them was being thrown away — so the menu could
+---    only ever show a raw file stem, unordered and untranslated.
+--- 4. Underscore-prefixed files are skipped. _index.toml is the menu manifest
+---    for this directory, not a category, and loading it as one produced a group
+---    called "_index" with no entries.
+--- 5. Graceful errors: a malformed file logs a warning and is skipped; valid
 ---    entries from other files are still returned.
---- 4. API-stable: the returned mapping shape (trigger, replacement, is_word,
----    is_case_sensitive, group) is identical to the previous implementation.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +44,7 @@ local Logger = require("logger.shim")
 local Reader = require("toml_codec.reader")
 local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -70,6 +83,30 @@ local function tiers()
 end
 
 
+--- The category a TOML file belongs to: its file STEM.
+---
+--- Not the parent directory. The five shared packs live flat beside each other
+--- and are installed flat, so the directory is the same for all of them and the
+--- category the user sees would be the folder's name.
+--- @param path string Absolute path to a .toml file.
+--- @return string
+local function category_of(path)
+	local stem = path:match("([^/\\]+)%.toml$")
+	return stem or "unknown"
+end
+
+--- Counts the entries of a non-array table.
+--- @param t table
+--- @return integer
+local function count_categories(t)
+	local n = 0
+	for _ in pairs(t) do n = n + 1 end
+	return n
+end
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Public API ===================
@@ -78,41 +115,71 @@ end
 
 --- Loads hotstring definitions from a list of TOML file paths.
 --- Returns a flat array of mapping tables suitable for engine:load_mappings().
---- Each mapping has:
----   trigger           string
----   replacement       string
----   is_word           boolean
----   is_case_sensitive boolean
----   group             string  (category inferred from directory name)
 --- @param paths table Array of absolute TOML file paths.
 --- @return table  Flat array of mapping tables.
 function M.load(paths)
-	Logger.start(LOG, "Loading hotstrings from %d file(s)…", #paths)
+	return M.load_catalogue(paths).mappings
+end
+
+--- Loads hotstring definitions AND the metadata the menu needs to describe them.
+---
+--- One pass, because the two answers come from the same parse: splitting them
+--- would mean reading a 300 KB magickey.toml twice to learn its name.
+--- @param paths table Array of absolute TOML file paths.
+--- @return table { mappings = array, categories = { [stem] = category } }
+--- where a category is
+---   { id, path, description = {locale → text}, delay, show_tooltip, color,
+---     sections_order = array, sections = { [name] = { count } }, count }
+function M.load_catalogue(paths)
+	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
-		Logger.error(LOG, "load(): expected table of paths, got %s.", type(paths))
-		return {}
+		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
+		return { mappings = {}, categories = {} }
 	end
 
 	local mappings = {}
+	local categories = {}
 
 	for _, path in ipairs(paths) do
 		local ok, data = pcall(Reader.parse, path)
 		if not ok then
 			Logger.warn(LOG, "load(): error in '%s' — %s", tostring(path), tostring(data))
 		else
-			-- Derive the group name from the parent directory.
-			local group = path:match("[/\\]([^/\\]+)[/\\][^/\\]+%.toml$") or "unknown"
+			local group = category_of(path)
+			local meta = type(data.meta) == "table" and data.meta or {}
+
 			-- File-level priority override, the third rung of the cascade.
-			local file_priority = type(data.meta) == "table" and type(data.meta.priority) == "number"
-				and data.meta.priority or nil
-			local section_priorities = (type(data.meta) == "table"
-				and type(data.meta.section_priorities) == "table") and data.meta.section_priorities or {}
+			local file_priority = type(meta.priority) == "number" and meta.priority or nil
+			local section_priorities = type(meta.section_priorities) == "table"
+				and meta.section_priorities or {}
+
+			local category = categories[group] or {
+				id             = group,
+				path           = path,
+				description    = type(meta.description) == "table" and meta.description or {},
+				delay          = tonumber(meta.delay),
+				show_tooltip   = meta.show_tooltip,
+				color          = meta.color,
+				sections_order = {},
+				sections       = {},
+				count          = 0,
+			}
+			categories[group] = category
+
+			-- The declared order, minus the "-" separators the menu renders itself.
+			for _, name in ipairs(meta.sections_order or data.sections_order or {}) do
+				if name ~= "-" then
+					category.sections_order[#category.sections_order + 1] = name
+				end
+			end
 
 			for _, sec_name in ipairs(data.sections_order or {}) do
 				local section = data.sections[sec_name]
 				if section and type(section.entries) == "table" then
+					local entry_count = 0
 					for _, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
+							entry_count = entry_count + 1
 							mappings[#mappings + 1] = {
 								trigger           = entry.trigger,
 								replacement       = entry.output,
@@ -136,40 +203,61 @@ function M.load(paths)
 								priority          = Priority.resolve(
 									entry.priority, section_priorities[sec_name], file_priority, group, tiers()),
 								group             = group,
+								section           = sec_name,
 							}
 						end
 					end
+					category.sections[sec_name] = { count = entry_count }
+					category.count = category.count + entry_count
 				end
 			end
 		end
 	end
 
-	Logger.success(LOG, "Loaded %d mapping(s) total.", #mappings)
-	return mappings
+	Logger.success(LOG, "Loaded %d mapping(s) across %d categor(ies).",
+		#mappings, count_categories(categories))
+	return { mappings = mappings, categories = categories }
 end
 
---- Scans a directory tree and returns all .toml file paths found.
+--- Whether a discovered .toml file is a hotstring pack.
+---
+--- Underscore-prefixed files in that directory are not categories: _index.toml
+--- is the menu index for the directory and defaults.toml holds the resolver's
+--- fallback values. Loading either as a pack produced an empty group sitting in
+--- the menu beside the real ones.
+---
+--- A pure predicate rather than an inline condition inside the scan, because the
+--- scan shells out to `find` and cannot run on the interpreter this repo is
+--- developed on — the rule would otherwise be unassertable outside CI.
+--- @param path string A file path.
+--- @return boolean
+function M.is_pack_file(path)
+	if type(path) ~= "string" or path == "" then return false end
+	local name = path:match("([^/\\]+)$")
+	if not name or not name:match("%.toml$") then return false end
+	return name:sub(1, 1) ~= "_" and name ~= "defaults.toml"
+end
+
+--- Scans a directory tree and returns every hotstring pack in it.
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
 --- @param dir string Absolute path to the root directory to scan.
 --- @return table  Array of absolute .toml file paths.
 function M.find_toml_files(dir)
-	Logger.trace(LOG, "Scanning '%s' for .toml files…", dir)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
+
+	-- Through the shell adapter rather than a hand-quoted io.popen: this is a
+	-- path that can come from a config file, and quoting re-derived at a call
+	-- site is quoting that is eventually wrong.
 	local result = {}
-	local ok, err = pcall(function()
-		-- Use the POSIX find command available on any Linux system.
-		local cmd  = string.format("find '%s' -type f -name '*.toml' 2>/dev/null", dir:gsub("'", "'\\''"))
-		local pipe = io.popen(cmd)
-		if not pipe then return end
-		for line in pipe:lines() do
-			local p = line:match("^%s*(.-)%s*$")
-			if p and p ~= "" then result[#result + 1] = p end
-		end
-		pipe:close()
-	end)
-	if not ok then
-		Logger.warn(LOG, "find_toml_files('%s'): scan failed — %s", dir, tostring(err))
+	local out = Shell.exec(string.format(
+		"find %s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir)))
+	for line in out:gmatch("[^\r\n]+") do
+		local path = line:match("^%s*(.-)%s*$")
+		if M.is_pack_file(path) then result[#result + 1] = path end
 	end
-	Logger.done(LOG, "Found %d .toml file(s) under '%s'.", #result, dir)
+
+	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
 	return result
 end
 

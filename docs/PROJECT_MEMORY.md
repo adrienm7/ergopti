@@ -127,6 +127,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-git-stash-in-this-checkout-pops-a-stranger](#project-git-stash-in-this-checkout-pops-a-stranger) — `git stash push` can fail with "could not write index" and the reflex `git stash pop` then merges someone else's parked stash into your tree; never reach for stash here to get a clean tree
 - [project-drift-guard-needs-a-clean-tree](#project-drift-guard-needs-a-clean-tree) — `test-drift-guard-covers-every-output.cjs` fails whenever a generated file is modified-but-uncommitted, by design, and takes over two minutes
 
+- [project-python-slice-replace-can-shred-a-file](#project-python-slice-replace-can-shred-a-file) — A `str.replace` whose needle came from two `index()` calls silently becomes `replace("", …)` when the bounds invert, inserting the payload between every character; the original is recoverable because it is interleaved, not lost
+
 ## Working conventions & feedback
 
 ### project-hs-suite-order-contamination
@@ -3643,3 +3645,33 @@ The gate's own contract is "detects a change to every generator output **and nev
 - Re-run the drift guard only on a clean tree. It takes >120 s, so it will be moved to the background by the harness; start it deliberately rather than inside a chain.
 
 Related: [[project-gate-scripts-must-be-wired]], [[feedback-local-gate-mirrors-ci]].
+
+
+
+
+
+### project-python-slice-replace-can-shred-a-file
+
+_A `str.replace(old, new)` whose `old` was sliced between two `index()` results becomes `replace("", new)` when the bounds invert — the payload lands between every character of the file_
+
+<sub>slug: `project_python_slice_replace_can_shred_a_file`</sub>
+
+Hit on 2026-08-04 while editing `linux/modules/hotstrings/loader.lua`. The script did:
+
+```python
+old = s[s.index('--- Scans a directory tree'):s.index('return M')]
+s = s.replace(old, new)
+```
+
+`s.index('return M')` matched **`return M.load_catalogue(...)`**, hundreds of lines EARLIER than the start marker, so the slice was the empty string. Python's `replace("", new)` inserts `new` at every position: the 176-line file became 406 320 lines, and `loadfile` failed at line 15 on a fragment of the payload.
+
+**Why it matters here:** the file also held uncommitted work, so `git checkout` was not a recovery option.
+
+**How to apply:**
+
+- Never build a replacement needle from two `index()` calls without asserting the slice is non-empty and the bounds are ordered. `assert start < end and old.strip()` before the replace.
+- Prefer the Edit tool for structured edits. It fails loudly on a non-unique or absent match, which is exactly the failure this pattern converts into silent destruction.
+- **Recovery, if it happens:** the original characters are still there, interleaved. The file is `new + c0 + new + c1 + … + new`, so the repeated unit can be derived from the distance between the first two occurrences of its own first line — `unit = s[i1 : i2 - 1]` — and `s.replace(unit, "")` restores the file exactly. Verify with `loadfile` and the suite, not by eye.
+- Escaping a Lua pattern through a Python heredoc is its own trap: a Lua `"([^/\]+)"` is four backslashes in a non-raw Python literal and two in a raw one. When a `replace` reports zero occurrences, print `repr()` of the real line before guessing again.
+
+Related: [[project-git-stash-in-this-checkout-pops-a-stranger]].
