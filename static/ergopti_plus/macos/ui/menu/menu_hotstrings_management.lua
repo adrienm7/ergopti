@@ -489,20 +489,27 @@ function M.build_management(ctx)
 	-- a first pass read "no driver names magic_key_config" as "no Lua driver can
 	-- edit the magic key" and nearly restricted this very row out of the menu it
 	-- has always been in.
-	local menu = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
+	-- Named rows, not menu: a local called `menu` puts a bare `menu =` three lines
+	-- above the separator below, which is the context token the rows-outside-the-
+	-- renderer scan keys on — so the assignment alone made a separator read as a
+	-- hand-built row. The name is better this way regardless.
+	local rows = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
 		["word_expanders"]   = function(items) if exp_item then items[#items + 1] = exp_item end end,
 		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
 		["magic_key_config"] = function(items) items[#items + 1] = magic_key_item end,
 	}, nil, ctx)
 
 	-- Not manifest rows on any driver: the preview-bubble submenu and the
-	-- repeat-key toggle are this driver's own.
-	table.insert(menu, { title = "-" })
-	if bubble_item then table.insert(menu, bubble_item) end
-	table.insert(menu, { title = "-" })
-	table.insert(menu, repeat_item)
+	-- repeat-key toggle are this driver's own. Collected first and appended in one
+	-- pass, which keeps the manifest half and the hand-built half legible as two
+	-- halves rather than one interleaved sequence.
+	local own = { { title = "-" } }
+	if bubble_item then own[#own + 1] = bubble_item end
+	own[#own + 1] = { title = "-" }
+	own[#own + 1] = repeat_item
+	for _, row in ipairs(own) do rows[#rows + 1] = row end
 
-	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
+	return { title = i18n.get("menu.hotstrings.params"), menu = rows }
 end
 
 return M

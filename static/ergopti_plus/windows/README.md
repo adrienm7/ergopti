@@ -5,7 +5,7 @@ The Windows implementation of ErgoptiPlus.
 > **The three driver trees do not currently mirror each other.** Measured: of 53
 > distinct depth-≤2 subdirectories across `windows/`, `macos/` and `linux/`, only
 > 10 are present in all three (18.9 % tree identity). Making them identical is
-> tracked in [`TODO.md`](../../../TODO.md) §0
+> measured by `tools/test/test-driver-tree-parity.cjs`
 > (invariant I1). Until that lands, use the cross-driver path table in
 > [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
 > counterpart of a file — do not assume the same relative path.
@@ -61,5 +61,6 @@ Code is English, UI is French; tabs for indentation; section/subsection banners
 and logging conventions are defined in
 [`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md); work that is
-known but not done is in [`../../../TODO.md`](../../../TODO.md).
+[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md). Work that is
+known but not done lives in the gate that measures it: each ratchet under
+`tools/test/` carries its own count and, in its header, what would move it.

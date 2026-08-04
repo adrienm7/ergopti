@@ -26,6 +26,16 @@
 ; here (as constants) so the harness is self-contained and does not require
 ; a JSON parser at E2E time.
 ;
+; FIVE OF THIRTY-FOUR, and the ratio matters more than the five. The macOS and
+; Linux e2e runners replay the WHOLE corpus by reading the file; this one
+; replays a hand-copied subset. So the cross-driver contract on this driver is
+; carried by the UNIT meta-test (tests/meta/test_corpus_hotstrings.ahk), which
+; does parse the real file and walks every vector — this harness is a smoke test
+; of the injection path, not the contract. Two consequences worth knowing before
+; trusting a green run here: a vector added to the corpus is not exercised end to
+; end on Windows, and the inline copies can drift from the file they were taken
+; from without anything noticing.
+;
 ; USAGE (headless CI):
 ;   AutoHotkey64.exe run_e2e.ahk
 ; USAGE (real GUI):
