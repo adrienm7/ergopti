@@ -699,10 +699,30 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
   il émet la forme `hs.menubar` `{title, fn, menu, checked, disabled}` plutôt
   qu'un arbre neutre nommé — ce qui est sans conséquence tant que les deux
   consommateurs Lua parlent cette forme, et c'est le cas.
-- [ ] **M3.3** **Host de menu Linux** `linux/infra/menu_host.lua` (~180 l) : dessine
+- [x] **M3.3** **Host de menu Linux** `linux/infra/menu_host.lua` (~180 l) : dessine
   l'arbre neutre en SNI/dbusmenu. Supprime `menu_builder.lua` (889 l codées à la
   main). Consomme `menu_manifest.json` (le renderer AHK accepte déjà `"linux"`).
   *Test :* le host produit le même arbre de labels que macOS pour `hotstrings_menu`.
+  → **Deux tiers de la prémisse ne tiennent plus.** Le host SNI existe
+  (`platform/tray/appindicator.lua`, livré en M3.1), et le fichier à supprimer
+  n'est plus un second menu : **119 de ses 121 sites de rangée sont déjà dans le
+  renderer** (mesuré par `test-menu-rows-outside-renderer.cjs --measure`). Le
+  supprimer supprimerait les actions nommées, les getters d'état et les providers
+  de listes que le renderer partagé **exige du driver** — c'est la même couche que
+  macOS possède, en 301 rangées de plus. `infra/manifest_menu.lua` le dit dans son
+  propre en-tête : « le renderer ne fait que DISPATCHER ».
+  → Ce qui restait vraiment, ce sont les menus encore construits hors renderer.
+  `gestures_menu` y est passé : handlers clés par id de manifeste, écrivant dans
+  la table que le renderer leur passe — un handler qui écrit dans une table
+  capturée émet ses rangées dans un menu que le renderer ne retourne jamais, donc
+  toutes les rangées gestures disparaîtraient **sans que rien n'échoue**.
+  → Deux trouvailles en chemin : la rangée « Lecture libinput » n'était dans aucun
+  manifeste et portait un **libellé français codé en dur**, donc tout utilisateur
+  non francophone le lisait en français et aucune gate ne pouvait voir ni l'un ni
+  l'autre ; et le toggle maître reste au caller, par contrat du renderer (une
+  porte de catégorie est un état de driver, pas une donnée de manifeste).
+  → Les deux ratchets bougent dans le bon sens et sont regelés : rangées hors
+  renderer sous Linux **3 → 2**, menus rendus par le renderer partagé **3 → 4**.
 - [x] **M3.4** **Étendre le manifeste** aux 14 capacités du Lot 5 (`checked_when`,
   `action` résoluble, `label.format`+`args`, `provider` pour listes dynamiques,
   `count`/`count_policy`, `radio_group`, `visible_when`, `reason_key`…) pour que
@@ -1230,6 +1250,26 @@ déclarée.
   des périphériques), `test-tooltip-positioning-reach` mis à jour (Linux lit
   désormais toute la canon de positionnement), `test-port-adapter-matrix` et
   `test-driver-scoped-features-stay-scoped` mis à jour.
+> **Ces sept points ne peuvent pas être cochés depuis ce dépôt.** Ils exigent une
+> machine Linux avec un serveur d'affichage, un panneau et une vraie disposition
+> clavier ; ce checkout est sous Windows. Les cocher serait mentir.
+>
+> Ce qui *était* livrable d'ici l'est : **`tests/hardware/validate.sh`** répond à
+> tout ce qu'une machine peut répondre — permissions, groupes, `/dev/uinput`,
+> serveur d'affichage, dump de keymap et son compte de touches, outils de
+> presse-papiers, nombre d'unités systemd installées, présence d'un hôte
+> StatusNotifierItem — puis pose une à une les douze questions qui demandent
+> vraiment des yeux, et écrit **un seul rapport** couvrant les deux moitiés.
+> Vérifié : il échoue proprement hors Linux au lieu de faire semblant.
+>
+> Le reste est une liste que personne ne rejoue, donc qui cesse d'être vraie sans
+> que personne le remarque — c'est précisément pourquoi la moitié mécanisable est
+> devenue un script. Sur la machine cible :
+>
+> ```bash
+> bash static/ergopti_plus/linux/tests/hardware/validate.sh
+> ```
+
 - [ ] Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
 - [ ] Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
 - [ ] Frappe rapide pendant expansion → pas de corruption (C4).
