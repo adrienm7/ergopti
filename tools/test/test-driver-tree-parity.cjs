@@ -179,7 +179,14 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // metrics, personal_info — are the ones Convention S cannot stub, because there is
 // nothing to stub around: the capability exists, spread through another module,
 // so the work is extraction rather than a README.
-const BASELINE_CANONICAL_ON_ALL = 14;
+// 2026-08-04: 14 → 16. Not new implementations — two canonical entries were
+// simply named more shortly than the folder every driver actually ships
+// (`personal_info` against `ui/personal_info_editor`, `hotstrings_config`
+// against `ui/hotstrings_config_window`). The three drivers already agreed;
+// only the list disagreed with them. Renaming the entries moved the count
+// without touching a line of driver code, which is the same correction the
+// `tree` field was written to make for ten other features.
+const BASELINE_CANONICAL_ON_ALL = 16;
 
 if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
 	errors.push(
