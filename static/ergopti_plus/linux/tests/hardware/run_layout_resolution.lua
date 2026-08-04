@@ -57,8 +57,18 @@ local LAYOUTS = {
 	},
 	{
 		id      = "es",
-		typable = { "ñ", "á", "é", "í", "ó", "ú" },
-		refused = {},
+		-- Only ñ. Measured on a real es keymap 2026-08-05: the accented vowels are
+		-- NOT single keystrokes on a Spanish layout — they are composed with the
+		-- dead acute (´ then the vowel), which is two keystrokes and a compose
+		-- state. The planner refuses dead keys deliberately, because emitting the
+		-- first half of a composition would leave a floating accent in the user's
+		-- text; those characters go through the clipboard instead.
+		--
+		-- Worth stating plainly because it is the answer to "does a Spanish
+		-- hotstring pack work": on a Spanish keyboard, ñ is typed and á is pasted.
+		-- Both deliver; only one is a keystroke.
+		typable = { "ñ" },
+		refused = { "á", "é", "í", "ó", "ú" },
 	},
 	{
 		id      = "us",
