@@ -332,7 +332,12 @@ end
 --- @return boolean
 function M.set_override(category, section, field, value)
 	if type(category) ~= "string" or category == "" then return false end
-	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" then
+	-- "priority" was missing until 2026-08-05. The settings window has a priority
+	-- field per category and per section, the bridge forwards it, and this guard
+	-- rejected it — so the control wrote an ERROR to the log and nothing else. The
+	-- window gave no sign, because the bridge answered with a refreshed payload
+	-- either way.
+	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
 		Logger.error(LOG, "set_override(): '%s' is not an overridable field.", tostring(field))
 		return false
 	end

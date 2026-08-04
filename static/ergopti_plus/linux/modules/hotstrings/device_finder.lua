@@ -167,6 +167,52 @@ local function event_path(dev)
 	return nil
 end
 
+--- True when a bit of the EV capability mask is set.
+--- LuaJIT has no native `&` (that is Lua 5.3+), so the test is arithmetic.
+--- @param mask integer
+--- @param bit integer
+--- @return boolean
+local function has_bit(mask, bit)
+	return math.floor(mask / bit) % 2 == 1
+end
+
+--- Whether a path is an evdev node the kernel says can produce key events.
+---
+--- Added 2026-08-05, after a real Linux runner showed the hook happily starting
+--- on `/dev/null`. The only check before it was "is this readable", and every
+--- character device is: the daemon would then sit in its read loop forever,
+--- waiting for events that cannot arrive, reporting itself as running. On Windows
+--- the same test passed for the wrong reason — the open failed there.
+---
+--- Answered from /proc/bus/input/devices rather than by an ioctl, because this
+--- runs BEFORE the descriptor is opened and because the kernel's own EV bitmask
+--- is the authority on what a node can emit. A path that is not an evdev node at
+--- all simply does not appear there, which is the /dev/null case.
+--- @param path string|nil An absolute device path.
+--- @param devices table|nil Pre-parsed descriptors; reads /proc when omitted.
+---   The seam this module's header promises: it lets the rule be driven from
+---   fixture text, which is the only way to cover it from a machine that has no
+---   /proc to read.
+--- @return boolean ok, string|nil reason Why it was refused.
+function M.is_key_device(path, devices)
+	if type(path) ~= "string" or path == "" then
+		return false, "no device path"
+	end
+	local basename = path:match("([^/]+)$")
+	if not basename or not basename:match("^event%d+$") then
+		return false, path .. " is not an /dev/input/eventN node"
+	end
+	for _, dev in ipairs(type(devices) == "table" and devices or read_proc_devices()) do
+		for _, handler in ipairs(dev.handlers) do
+			if handler == basename then
+				if has_bit(dev.ev_mask, EV_KEY_BIT) then return true, nil end
+				return false, path .. " (" .. tostring(dev.name) .. ") reports no EV_KEY capability"
+			end
+		end
+	end
+	return false, path .. " is not listed in " .. PROC_INPUT_DEVICES
+end
+
 --- Returns true when the device name looks like a keyboard.
 --- Prefers devices with "keyboard" or "kbd" in their name.
 --- @param name string Device name string.
@@ -244,14 +290,6 @@ function M.select(devices)
 	return nil, nil
 end
 
---- True when a bit of the EV capability mask is set.
---- LuaJIT has no native `&` (that is Lua 5.3+), so the test is arithmetic.
---- @param mask integer
---- @param bit integer
---- @return boolean
-local function has_bit(mask, bit)
-	return math.floor(mask / bit) % 2 == 1
-end
 
 --- Chooses the pointer to watch, if there is one.
 ---
