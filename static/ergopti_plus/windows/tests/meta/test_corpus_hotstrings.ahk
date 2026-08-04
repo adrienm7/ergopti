@@ -188,6 +188,14 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		if (Vec.Has("auto_expand") && !Vec["auto_expand"]) {
 			continue
 		}
+		; A no-op mapping — replacement identical to the trigger — is the other
+		; legitimate non-match whose buffer DOES end with its trigger. It must not
+		; fire because firing consumes the triggering keystroke to inject the very
+		; characters it just erased; macOS shipped without that guard once and the
+		; character vanished from the screen.
+		if (Vec.Has("replacement") && Vec["replacement"] == Trigger) {
+			continue
+		}
 		BufTail := SubStr(Buf, -TLen)
 		; Use !== (case-sensitive) so "btw" and "BTW" are treated as distinct
 		AssertTrue(BufTail !== Trigger,

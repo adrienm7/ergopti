@@ -251,6 +251,26 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		; the winner is known.
 		if (BestEndChar == "")
 				HSE_TypoNbspStripped := false
+
+		; No-op guard. A winner whose replacement is byte-identical to the trigger
+		; the user just typed has nothing to inject: dispatching it erases those
+		; characters and writes the same ones back. macOS guards this in
+		; would_fire and shipped without it once — the triggering keystroke was
+		; consumed for an expansion that produced nothing, and the character
+		; vanished from the screen. This engine had no guard, and the divergence
+		; was invisible until a corpus vector covered a no-op on 2026-08-04.
+		;
+		; Compared case-SENSITIVELY on purpose: a cased family registers each
+		; variant separately, so "OK" -> "OK" is its own spec and is caught here,
+		; while a conform entry whose output differs in case still fires.
+		if (IsObject(BestMatch) && BestMatch.HasOwnProp("Replacement")
+				&& BestMatch.HasOwnProp("Trigger")
+				&& BestMatch.Replacement !== ""
+				&& BestMatch.Replacement == BestMatch.Trigger) {
+				BestMatch := ""
+				BestEndChar := ""
+		}
+
 		HSE_LastEndChar := BestEndChar
 		return BestMatch
 }
