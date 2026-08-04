@@ -112,43 +112,49 @@ end)
 
 -- ==============================================================
 -- ==============================================================
--- ======= 2/ Without a channel, the old path still works =======
+-- ======= 2/ Without a channel it refuses, it does not fork ====
 -- ==============================================================
 -- ==============================================================
 
-helpers.describe("injector: emit_key falls back to ydotool with no channel", function()
+helpers.describe("injector: emit_key has one channel and no fallback", function()
 
-	helpers.it("still emits, via a subprocess, when no channel is open", function()
+	helpers.it("refuses rather than spawning a subprocess when no channel is open", function()
 		local injector = helpers.load_module("modules.hotstrings.injector")
 		injector._set_uinput(nil)
 
-		local commands = {}
-		injector._set_runner(function(cmd) commands[#commands + 1] = cmd ; return true end)
-		local ok = injector.emit_key(30, 1)
-		injector._reset_runner()
+		-- The seam is deliberately NOT used to observe this: a test that watches
+		-- the seam would pass on an implementation that bypasses it. os.execute
+		-- and io.popen are the two ways a process can be spawned at all.
+		local real_execute, real_popen = os.execute, io.popen
+		local spawned = {}
+		os.execute = function(cmd) spawned[#spawned + 1] = tostring(cmd) ; return true end
+		io.popen = function(cmd) spawned[#spawned + 1] = tostring(cmd) ; return nil end
 
-		helpers.assert_true(ok, "the fallback path must still report success")
-		helpers.assert_eq(#commands, 1, "exactly one ydotool invocation per event — this is the cost "
-			.. "the uinput channel exists to remove, and it is affordable only while NOT grabbing")
-		helpers.assert_true(commands[1]:find("ydotool key 30:1", 1, true) ~= nil,
-			"the fallback must still emit the right event, got: " .. tostring(commands[1]))
+		local ok, result = pcall(injector.emit_key, 30, 1)
+
+		os.execute, io.popen = real_execute, real_popen
+		if not ok then error(result, 0) end
+
+		helpers.assert_eq(#spawned, 0,
+			"a subprocess per event is the cost that made the grab impossible; falling "
+				.. "back to it silently reintroduces the defect on exactly the machines "
+				.. "where uinput is unavailable. Spawned: " .. table.concat(spawned, " | "))
+		helpers.assert_eq(result, false,
+			"and it must SAY it failed, so the daemon can refuse to grab rather than "
+				.. "grabbing a keyboard it cannot give back")
 	end)
 
-	helpers.it("ignores a channel that reports itself closed", function()
+	helpers.it("treats a channel that reports itself closed as no channel", function()
 		local injector = helpers.load_module("modules.hotstrings.injector")
-		-- A half-open channel must not swallow events: is_open() is the contract,
-		-- and a channel that failed to open reports false rather than raising.
+		-- is_open() is the contract: a channel that failed to open reports false
+		-- rather than raising, and half-open must not read as open.
 		injector._set_uinput(fake_channel(false))
-
-		local commands = {}
-		injector._set_runner(function(cmd) commands[#commands + 1] = cmd ; return true end)
-		injector.emit_key(30, 1)
-		injector._reset_runner()
+		local result = injector.emit_key(30, 1)
 		injector._set_uinput(nil)
 
-		helpers.assert_eq(#commands, 1,
-			"a closed channel must fall through to ydotool rather than dropping the event — under "
-			.. "a grab a dropped event is a key the user pressed and the application never saw")
+		helpers.assert_eq(result, false,
+			"a closed channel cannot carry the event, and reporting success for an "
+				.. "event the application never received is the worst of the options")
 	end)
 
 end)

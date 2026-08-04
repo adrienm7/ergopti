@@ -193,32 +193,28 @@ end)
 -- =====================================================================
 
 helpers.describe("keycode single-source: keyboard_hook pump resolves via shared evdev.json", function()
-	helpers.it("qwerty layout: KEY_Q (code 16) resolves to 'q' through pump", function()
+	helpers.it("qwerty layout: KEY_Q (code 16) resolves to 'q' through the pump", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
-		-- Set layout to qwerty by default (the hook stores _layout)
-		-- We use the test inject path with intercept=true (evtest format)
-		-- code 16 = KEY_Q in evdev; in qwerty this maps to 'q'
+		-- code 16 = KEY_Q in evdev; in qwerty this maps to 'q'.
 		local received = {}
-		local mock_pipe = { read = function() return "Event: code 16 (KEY_Q), value 1" end }
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
+		kh._test_drive({ { type = 1, code = 16, value = 1 } }, {
+			onChar    = function(ch) received[#received + 1] = ch end,
+			onEmitRaw = function() end,
+		}, true)
 		helpers.assert_true(#received == 1, "on_char called once")
 		helpers.assert_eq(received[1], "q", "code 16 = 'q' in qwerty (default layout)")
 	end)
 
-	helpers.it("qwerty shifted: KEY_A (code 30) with shift resolves to 'A' through pump", function()
+	helpers.it("qwerty shifted: KEY_A (code 30) with shift resolves to 'A' through the pump", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
-		-- First inject a shift-down event to set _shift_held, then the key
 		local received = {}
-		local lines = {
-			"Event: code 42 (KEY_LEFTSHIFT), value 1",
-			"Event: code 30 (KEY_A), value 1",
-		}
-		local idx = 0
-		local mock_pipe = { read = function() idx = idx + 1; return lines[idx] end }
-		-- Pump twice to process both events
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		-- The shift keydown sets _shift_held=true, then KEY_A resolves as 'A'
+		kh._test_drive({
+			{ type = 1, code = 42, value = 1 },   -- Shift down
+			{ type = 1, code = 30, value = 1 },   -- A down
+		}, {
+			onChar    = function(ch) received[#received + 1] = ch end,
+			onEmitRaw = function() end,
+		}, true)
 		helpers.assert_true(#received >= 1, "on_char called at least once")
 		helpers.assert_eq(received[#received], "A", "code 30 with shift = 'A' in qwerty shifted")
 	end)

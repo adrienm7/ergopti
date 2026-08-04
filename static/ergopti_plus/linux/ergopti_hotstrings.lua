@@ -621,8 +621,17 @@ local function main()
 	-- ordering is the whole point: between a grab and an open channel the daemon
 	-- owns the keyboard and can only give keys back one fork at a time, which is
 	-- the state the grab was held back for in the first place.
-	if not injector.open_fast_channel() then
-		Logger.warn(LOG, "No uinput channel — every re-emitted key costs a subprocess.")
+	if not injector.open_fast_channel() and opts.grab then
+		-- Fail here, loudly, rather than three layers down as "no hotstrings
+		-- happen". A grab with no way to put keys back is a dead keyboard, and the
+		-- reason is almost always one the user can act on: /dev/uinput needs the
+		-- uinput group and the module loaded. Silence used to be the answer to all
+		-- three of "wrong permissions", "module absent" and "no FFI".
+		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
+		print("Erreur : impossible d'ouvrir /dev/uinput.")
+		print("Le daemon a besoin d'y écrire pour rendre les touches qu'il intercepte.")
+		print("Corrigez les permissions (bash install.sh --setup-perms) ou lancez avec --no-grab.")
+		os.exit(1)
 	end
 
 	keyboard_hook.start({

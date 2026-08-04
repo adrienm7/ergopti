@@ -31,6 +31,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
+local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -95,10 +96,24 @@ local function shell_run(cmd)
 	return ok and (result == true or result == 0)
 end
 
---- Emits count Backspace keystrokes via ydotool key.
+--- Emits count Backspace keystrokes.
+---
+--- Through the uinput channel when one is open, which is the normal case under a
+--- grab: the erase phase then costs no subprocess at all, on the one path where
+--- latency is visible to the user as a flicker between the trigger disappearing
+--- and the replacement arriving.
 --- @param count integer Number of Backspace strokes to send.
 local function send_backspaces(count)
 	if count < 1 then return end
+
+	if _uinput and _uinput.is_open() then
+		for _ = 1, count do
+			_uinput.emit(EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN)
+			_uinput.emit(EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP)
+		end
+		return
+	end
+
 	-- Build a space-separated list of down/up pairs for a single ydotool call.
 	-- This is faster than count separate process spawns.
 	local parts = {}
@@ -117,12 +132,17 @@ end
 --- Injects a text string via ydotool type.
 --- The replacement is passed as a single argument after -- to prevent any
 --- leading hyphens in the text from being parsed as flags.
+---
+--- NOTE: --clearmodifiers used to be passed here. It is xdotool vocabulary, not
+--- ydotool's, so ydotool rejected the whole invocation — and because the erase
+--- phase runs FIRST, every successful match deleted the user's trigger and then
+--- typed nothing. A silent data loss on the happy path, logged as one WARN.
 --- @param text string The replacement text to type.
 local function send_text(text)
 	-- Escape single quotes for safe shell embedding.
 	local safe = text:gsub("'", "'\\''")
 	local cmd  = string.format(
-		"ydotool type --key-delay=%d --clearmodifiers -- '%s'",
+		"ydotool type --key-delay=%d -- '%s'",
 		YDOTOOL_KEY_DELAY_MS,
 		safe
 	)
@@ -215,38 +235,36 @@ end
 --- ONLY remaining path to the application. Every physical event it consumes must
 --- therefore be put back, in arrival order, or the keyboard is dead.
 ---
---- The autorepeat value (2) is re-emitted as a fresh press: ydotool's
---- `<code>:<value>` wire format encodes only press and release, and a press is
---- what the application already derives from an autorepeat report.
+--- There is ONE channel and no fallback. A subprocess per event was the previous
+--- answer, and it is not an answer: under a grab that is a fork per physical
+--- keystroke on the input path, which is the measured reason the daemon could
+--- not grab in the first place. Batching is not an alternative either — the hook
+--- re-emits an event and THEN dispatches it, so collapsing a batch would run an
+--- injection triggered by event N before the re-emit of N, reintroducing exactly
+--- the interleaving the grab exists to remove.
+---
+--- So when the channel is absent this refuses and says so, rather than degrading
+--- into the cost that made the feature impossible. The daemon checks the channel
+--- before it grabs, which is what keeps this branch from ever being reached with
+--- a real keyboard behind it.
 ---
 --- @param code  integer evdev keycode (input-event-codes.h KEY_*).
 --- @param value integer 0 = release, 1 = press, 2 = autorepeat.
---- @return boolean True when ydotool accepted the event.
+--- @return boolean True when the event reached the wire.
 function M.emit_key(code, value)
 	if type(code) ~= "number" or type(value) ~= "number" then
 		Logger.error(LOG, "emit_key(): invalid arguments — code=%s value=%s.",
 			tostring(code), tostring(value))
 		return false
 	end
-	-- Preferred path: write the event straight to /dev/uinput. This exists
-	-- because the ydotool path below forks ONCE PER EVENT, and under EVIOCGRAB
-	-- that is a fork per physical keystroke on the input path — the measured
-	-- reason the daemon cannot take the grab. Batching is not an alternative:
-	-- _pump_one re-emits an event and then dispatches it, so collapsing a batch
-	-- would run an injection triggered by event N before the re-emit of N.
-	--
-	-- The uinput channel also carries the autorepeat value unchanged, which the
-	-- ydotool wire format cannot express (see the collapse below).
-	if _uinput and _uinput.is_open() then
-		return _uinput.emit(code, value)
+	if not _uinput or not _uinput.is_open() then
+		Logger.error(LOG, "emit_key(%s:%s): no uinput channel — the event cannot be put back.",
+			tostring(code), tostring(value))
+		return false
 	end
-
-	local wire = (value == EVDEV_VALUE_UP) and EVDEV_VALUE_UP or EVDEV_VALUE_DOWN
-	local success = shell_run(string.format("ydotool key %d:%d", code, wire))
-	if not success then
-		Logger.warn(LOG, "emit_key(%d:%d): ydotool key returned non-zero.", code, wire)
-	end
-	return success
+	-- The autorepeat value is passed through unchanged: under a grab this is a
+	-- pass-through, and a pass-through that rewrites what it passes is not one.
+	return _uinput.emit(code, value)
 end
 
 --- Opens the non-forking uinput channel, if this system can provide one.

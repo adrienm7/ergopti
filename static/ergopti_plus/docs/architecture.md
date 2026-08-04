@@ -37,6 +37,7 @@ graph TD
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
         LINUX_crypto["Crypto.lua"]
+        LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
         LINUX_file_system["FileSystem.lua"]
         LINUX_http_client["HttpClient.lua"]
