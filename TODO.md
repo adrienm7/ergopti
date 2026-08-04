@@ -25,65 +25,43 @@ to make a change pass, and run the gates that cover what you touched —
 
 ---
 
-## 1. Menu label-tree parity (I3) — the label half
+## 1. Menu label-tree parity (I3) — the last ten rows
 
-**The shape half is done.** The manifest has a Linux dimension,
-`test-menu-top-level-parity.cjs` holds it in both directions, and since
-2026-08-04 it also reads the two hardcoded dispatch chains on macOS and Windows —
-the direction nobody was checking, because "those drivers render from the
-manifest" is true and misleading: they iterate it and dispatch each id through an
-if/elseif chain, so the manifest supplies the ORDER and the driver supplies every
-ROW.
+**Steps 1 and 2 are done.** The renderer is `_shared/lua/menu/renderer.lua`, a
+factory each driver binds with its own decoder, manifest path, i18n, logger and
+**platform token** — the parameter a first extraction plan missed while calling
+467 lines "verbatim", and without which Linux would have rendered the macOS
+projection. Linux now reads the manifest; its metrics submenu is the first on
+that driver to render from it, predicates and all.
 
-**What remains is the label half, and it is three steps of very unequal size.**
+**Eleven rows turned out never to have been renderable** on the driver they were
+declared for, each enumerating features the FEATURE manifest already marks
+`["ahk"]`. Restricting them made the two manifests agree and took the
+handler-bijection ratchet to **hs 16, linux 10** (from 20 and 27).
 
-### Step 1 — extract the renderer to `_shared/lua/menu/`
+### What is left, and why each row needs a person
 
-`macos/infra/manifest_menu.lua` is 561 lines and makes **one** Hammerspoon call
-(`hs.json.decode`). 519 of the 561 relocate; the precedent for the dependency
-shape is `_shared/lua/keycodes/evdev.lua`, whose docstring already describes
-injecting a JSON decoder for exactly this reason.
+Ten rows on Linux, sixteen on macOS, and the two lists overlap almost exactly —
+these are capabilities BOTH Lua drivers have and implement by hand without ever
+naming the manifest id.
 
-⚠ **A first measurement said "lines 93-559 move verbatim" and it is wrong.**
-Line 237 is `if not is_for_hs(item)` and lines 119-122 define that macOS-only
-alias. Followed literally, Linux would render the **hs** projection and drop
-`kanata`, `updates` and `apps` — the three rows the parity gate was written to
-expose. **The module needs a platform token injected**, alongside the decoder,
-paths, i18n and logger. AutoHotkey hardcodes its own the same way
-(`_MI_IsForAhk`), which is the concrete reason the two 561-line files were never
-shareable as written.
+| rows | what has to be decided |
+| --- | --- |
+| `hotstring_categories_{standard,dynamic,ergopti}`, `hotstring_personal`, `hotstring_bulk_actions` | Mechanical, and the groundwork is done: `menu_manifest.hotstring_groups` classifies the groups, and macOS already tolerates the two spellings the repo uses for them (`distances_reduction` against `distancesreduction`) with `id:gsub("_", "")`. Copy that. |
+| `hotstring_extensions` | Windows scans a bundled-extensions directory for TOML packs. Whether either Lua driver has an equivalent is unanswered — do not restrict it on the guess that it does not. |
+| `hotstrings_params` group: `word_expanders`, `delays_colors`, `magic_key_config` | The blocker for the whole hotstrings migration on Linux. Migrating the five easy rows above without these leaves the group with no builder, so the renderer logs a warning on every menu build — worse than the hand-built menu it replaced. Answer these three first. |
+| `edit_shortcuts` | "Open the personal shortcuts file." macOS's own manifest comment says this action is what stands in for the introspectable registry it lacks — so macOS should implement it. Linux needs to know whether it has such a file at all. |
+| `active_layouts` (macOS only) | macOS builds the input-source list by hand in `menu_keyboard_layout.lua`; it is one handler away. |
+| `gestures_menu` ×6 (macOS only) | `restore_defaults`, `circular_spaces`, `gesture_slots_{2,3,4,5}`. |
 
-Inject the decoder rather than replacing it: macOS keeps `hs.json.decode` on the
-boot path. macOS then keeps a ~25-line shim, which `test-name-parity.cjs`
-requires — it asserts the path still exists.
+**Nothing here is blocked on the renderer any more.** Every remaining row is one
+question — *does this driver have this capability, and under what name?* — and
+the repository does not contain the answer for most of them.
 
-🚩 **This trips the menu-row ratchet, and that needs deciding, not patching.**
-`test-menu-rows-outside-renderer.cjs` counts `infra/manifest_menu.lua` as one of
-macOS's two renderers. Move the rows to `_shared` and macOS's in-renderer count
-falls to zero, which the gate reports as "the renderer path is wrong". Extending
-its `renderers` set to the shared module is defensible — the renderer moved — but
-it must be an explicit decision recorded in the gate, not a quiet edit.
-
-### Step 2 — wire Linux in
-
-~30 lines. `_shared/lua` is already on Linux's `package.path`, `Paths.shared` has
-the identical signature, `i18n.get` exists, and `i18n.section` is two lines
-wrapping the already-shared `decorate_section`.
-
-### Step 3 — the handlers, and this is the real work
-
-The renderer only DISPATCHES. `test-menu-action-handler-bijection.cjs` measures
-Linux at **27** unresolved `action`/`dynamic` rows, and `M.build` skips `toggle`
-(6 rows) and `feature` (7) entirely — so **40**, not 27. That is the label half.
-
-**Steps 1-2 change nothing a user sees.** They make Linux *capable* of manifest
-rendering; not one label moves until step 3. Anyone measuring "is the label half
-done" after them will find the menus identical, and the honest framing is that
-they remove duplication and unblock, rather than deliver, the goal.
-
-⚠ **macOS is not a finished target to copy.** Its own top-level menubar
-(`ui/menu/builder.lua`, 644 lines) does not go through the renderer at all, and
-it still has 20 unresolved rows of its own.
+⚠ **macOS is not a finished target to copy.** Its top-level menubar
+(`ui/menu/builder.lua`) does not go through the renderer at all: it iterates the
+manifest tail and dispatches through a hardcoded chain, which is what the
+extended parity gate now checks.
 
 ---
 
@@ -107,7 +85,9 @@ it still has 20 unresolved rows of its own.
 
 - **Menu rows outside the renderer (I3).** Frozen at windows 220, macos 301,
   linux 3, and it should stay frozen until someone converts rows to the `list`
-  type. **Routing a menu through `ManifestMenu.build` does not lower it** —
+  type. Unmoved by the renderer extraction, as predicted: macOS total fell 331 →
+  328 and its in-renderer count 30 → 27, because the three rows that moved to
+  `_shared` left both sides of the subtraction. **Routing a menu through `ManifestMenu.build` does not lower it** —
   `menu_gestures`, `menu_metrics` and `menu_shortcuts` all do and are all still
   counted, because a `dynamic` handler appends its rows in the driver file. The
   mechanism is written into the gate's header next to the number, along with
