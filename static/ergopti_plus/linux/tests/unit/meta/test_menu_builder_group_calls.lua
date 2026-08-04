@@ -48,16 +48,22 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		helpers.assert_true(#enabled_args >= 1, "is_group_enabled should be called for each group")
 		helpers.assert_eq(enabled_args[1], "code", "is_group_enabled must receive the group name, not the config table")
 
-		-- Find the "code" group item and invoke its toggle callback.
-		-- Group items are now nested inside the Hotstrings submenu's
-		-- `menu` array (hierarchical SNI menus). Search recursively.
+		-- Find the "code" category and invoke its gate toggle. A category is a
+		-- SUBMENU now, not a single row: its first child is the enable/disable
+		-- gate, and the rows under it are its sections. So the search descends to
+		-- the category, then takes the first callable row inside it.
 		local toggled = false
 		local function search(list)
 			for _, item in ipairs(list) do
-				if type(item.title) == "string" and item.title:find("code", 1, true) and type(item.fn) == "function" then
-					item.fn()
-					toggled = true
-					return
+				if type(item.title) == "string" and item.title:find("code", 1, true)
+					and type(item.menu) == "table" then
+					for _, row in ipairs(item.menu) do
+						if type(row.fn) == "function" then
+							row.fn()
+							toggled = true
+							return
+						end
+					end
 				end
 				if type(item.menu) == "table" then
 					search(item.menu)

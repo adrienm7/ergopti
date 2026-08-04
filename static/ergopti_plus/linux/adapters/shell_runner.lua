@@ -159,7 +159,7 @@ end
 -- ========================================
 
 --- Reports whether an executable is resolvable on PATH.
---- @param binary string Executable name, e.g. "yad".
+--- @param binary string Executable name, e.g. "xclip".
 --- @return boolean True when the binary exists and is executable.
 function M.has_command(binary)
 	if type(binary) ~= "string" or binary == "" then return false end
