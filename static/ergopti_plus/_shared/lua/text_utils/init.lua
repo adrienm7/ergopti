@@ -64,7 +64,7 @@ function M.utf8_chars(s)
 end
 
 --- Calculates the length of a common prefix between two UTF-8 strings.
---- Walks both `utf8.codes` iterators in lockstep, so no intermediate character
+--- Walks both `utf8_lib.codes` iterators in lockstep, so no intermediate character
 --- arrays are materialised — critical because this is called per expansion.
 --- @param s1 string First string.
 --- @param s2 string Second string.
@@ -92,7 +92,7 @@ function M.get_common_prefix_utf8(s1, s2)
 end
 
 --- Safely extracts a substring using UTF-8 character indexing.
---- Uses `utf8.offset` for O(|i|+|j|) byte-position lookup instead of building
+--- Uses `utf8_lib.offset` for O(|i|+|j|) byte-position lookup instead of building
 --- a character array, so long buffers don't pay an allocation per slice.
 --- @param s string The input string.
 --- @param i number The starting index.
@@ -119,14 +119,14 @@ function M.utf8_sub(s, i, j)
 	-- Translate codepoint indices to byte offsets. start_byte is the first
 	-- byte of codepoint #start_idx; end_byte is the last byte of codepoint
 	-- #end_idx, i.e. one byte before the start of codepoint #(end_idx+1).
-	local ok_s, start_byte = pcall(utf8.offset, s, start_idx)
+	local ok_s, start_byte = pcall(utf8_lib.offset, s, start_idx)
 	if not ok_s or not start_byte then return "" end
 
 	local end_byte
 	if end_idx == n then
 		end_byte = #s
 	else
-		local ok_e, next_byte = pcall(utf8.offset, s, end_idx + 1)
+		local ok_e, next_byte = pcall(utf8_lib.offset, s, end_idx + 1)
 		if not ok_e or not next_byte then return "" end
 		end_byte = next_byte - 1
 	end
@@ -140,8 +140,8 @@ end
 function M.utf8_len(s)
 	if type(s) ~= "string" then return 0 end
 
-	-- utf8.len returns nil on invalid UTF-8 sequences, fallback to raw length
-	local ok, len = pcall(utf8.len, s)
+	-- utf8_lib.len returns nil on invalid UTF-8 sequences, fallback to raw length
+	local ok, len = pcall(utf8_lib.len, s)
 	return (ok and len) and len or #s
 end
 
@@ -154,7 +154,7 @@ function M.utf8_ends_with(s, suffix)
 	if s == "" or suffix == "" then return false end
 
 	local n = M.utf8_len(suffix)
-	local ok, start_idx = pcall(utf8.offset, s, -n)
+	local ok, start_idx = pcall(utf8_lib.offset, s, -n)
 
 	return (ok and start_idx) and (s:sub(start_idx) == suffix) or false
 end
@@ -188,7 +188,7 @@ function M.unescape_text(s)
 	s = s:gsub("\\u(%x%x%x%x)", function(hex)
 		local code = tonumber(hex, 16)
 		if code then
-			local ok, char = pcall(utf8.char, code)
+			local ok, char = pcall(utf8_lib.char, code)
 			if ok then return char end
 		end
 		return "\\u" .. hex

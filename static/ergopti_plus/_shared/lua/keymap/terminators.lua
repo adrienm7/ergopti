@@ -101,7 +101,7 @@ rebuild_cache()
 --- @return string The first UTF-8 character, or "" when s is empty.
 local function first_codepoint(s)
 	if type(s) ~= "string" or s == "" then return "" end
-	local ok, off = pcall(utf8.offset, s, 2)
+	local ok, off = pcall(utf8_lib.offset, s, 2)
 	if ok and off then return s:sub(1, off - 1) end
 	return s:sub(1, 1)
 end
@@ -118,9 +118,9 @@ end
 --- @return string The last UTF-8 character, or "" when s is empty.
 local function last_codepoint(s)
 	if type(s) ~= "string" or s == "" then return "" end
-	local ok, len = pcall(utf8.len, s)
+	local ok, len = pcall(utf8_lib.len, s)
 	if not ok or not len or len < 1 then return s:sub(-1) end
-	local ok_off, off = pcall(utf8.offset, s, len)
+	local ok_off, off = pcall(utf8_lib.offset, s, len)
 	if ok_off and off then return s:sub(off) end
 	return s:sub(-1)
 end
