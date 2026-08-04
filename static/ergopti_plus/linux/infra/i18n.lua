@@ -21,6 +21,8 @@ local M = {}
 
 local locale_mod = require("infra.locale")
 local Logger     = require("logger.shim")
+-- The shared section-header decoration, the same one macOS and AutoHotkey draw.
+local Labels     = require("menu.labels")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -259,6 +261,33 @@ end
 function M.set_locale_injector(fn)
 	-- On Linux, persistence is handled by storage.lua (see _save_locale).
 	-- Kept for API parity with macOS.
+end
+
+
+
+
+-- ===================================
+-- ===== 9) Section Header Labels ====
+-- ===================================
+
+--- Wraps a section-header label in its "— … —" decoration.
+---
+--- The decoration itself is shared with macOS and AutoHotkey (menu/labels.lua),
+--- for the reason that module's own header gives: three drivers drew the same
+--- header three ways. This driver simply had no caller for it until the shared
+--- menu renderer arrived, which resolves every `section_header` row through it.
+--- @param text string
+--- @return string
+function M.decorate_section(text)
+	return Labels.decorate_section(text)
+end
+
+--- Resolves a key and decorates it as a section header. The renderer's
+--- `section_header` rows call exactly this, on every Lua driver.
+--- @param key string
+--- @return string
+function M.section(key)
+	return M.decorate_section(M.get(key))
 end
 
 return M

@@ -67,11 +67,21 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- Canonical hs-filtered signatures for layout_menu, in manifest order.
 -- ahk-only entries (accented_letters group, ahk.layout.ctrl_magic_save feature)
 -- are dropped by the hs platform filter, same as the real manifest reader.
+--
+-- UPDATED 2026-08-04, 7 -> 5, and this gate is what caught it — which is the
+-- behaviour it exists for. `layout_features_base` and `layout_features_altgr`
+-- were restricted to platforms = ["ahk"], because every one of the five
+-- features.layout.* entries they enumerate is itself ["ahk"]: on this driver the
+-- two rows listed an empty set, and the manifest was promising a row macOS could
+-- never draw. Nothing changed in the hand-built menu, because it never
+-- implemented either id — they are two of the twenty rows the handler-bijection
+-- ratchet counts for hs.
+-- The two separators that framed them stay: this gate pins the MANIFEST's
+-- signature, and the renderer is what collapses a separator with nothing between
+-- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
 	"toggle:Layout",
-	"dynamic:layout_features_base",
 	"---",
-	"dynamic:layout_features_altgr",
 	"dynamic:active_layouts",
 	"---",
 	"feature:hotstrings.magic_key.replace",
