@@ -655,18 +655,38 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
 
 Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
 
-- [ ] **M3.1** **Transport SNI persistant** : un service qui reste sur le bus et
+- [x] **M3.1** **Transport SNI persistant** : un service qui reste sur le bus et
   *sert* `GetLayout`/`GetGroupProperties`/`Event`/`AboutToShow` — via FFI
   `libayatana-appindicator` (dbusmenu géré) **ou** un petit sidecar `ksni`, **pas**
   des `gdbus` one-shot. Icône posée, `pump` non bloquant. `snixembed` pour les WM
   XEmbed ; documenter l'extension AppIndicator pour GNOME.
   *Test :* round-trip menu imbriqué → dbusmenu réel avec sous-menus (les tests
   tray actuels sont faux-verts) ; réparer le crash `_yad_kill` du fallback.
-- [ ] **M3.2** **Renderer de menu partagé** `_shared/lua/menu/render.lua` :
+  → Fait via **FFI LuaJIT + libayatana-appindicator**, pas un sidecar : la façade
+  ne pouvait pas fonctionner parce que `gdbus call RequestName` acquiert le nom
+  dans le process gdbus, qui sort aussitôt et le relâche. Le XML dbusmenu partait
+  dans un fichier temporaire que personne ne lit (un panneau appelle `GetLayout`
+  sur D-Bus), aucune icône n'était posée, un moniteur guettait un signal que rien
+  n'émettait, et `pump` bloquait sur un pipe **depuis le callback idle** — la
+  frappe s'arrêtait jusqu'à ce qu'on clique sur une icône absente. SNI n'est pas
+  un appel qu'on fait, c'est un objet qu'on **héberge**.
+  → **Le repli yad est supprimé, pas réparé.** Il n'était atteignable que sans
+  gdbus, il crashait au premier usage (`_yad_kill()` appelé 34 lignes avant sa
+  déclaration `local`), il dessinait un menu plat là où il faut un arbre, et il
+  exige XEmbed — qu'aucun panneau Wayland ne fournit. Deux backends cassés ne
+  font pas une redondance. Le sérialiseur XML partagé part avec lui.
+- [x] **M3.2** **Renderer de menu partagé** `_shared/lua/menu/render.lua` :
   parcourt le manifeste, résout l'i18n, appelle getters/providers, émet l'arbre
   neutre `{label, kind, checked, enabled, submenu, action_id}`. **macOS l'adopte
   aussi** (supprime son assemblage manuel `builder.lua` et son drift-gate ensuite).
   *Test :* le renderer rend un manifeste fixture identique en macOS et Linux.
+  → **Déjà fait** avant cette session (commit `d90c11cb3`) : les deux drivers Lua
+  sont des liaisons d'une cinquantaine de lignes sur
+  `_shared/lua/menu/renderer.lua`, et le token de plateforme est un paramètre.
+  Résidus mesurés : le fichier s'appelle `renderer.lua` et non `render.lua`, et
+  il émet la forme `hs.menubar` `{title, fn, menu, checked, disabled}` plutôt
+  qu'un arbre neutre nommé — ce qui est sans conséquence tant que les deux
+  consommateurs Lua parlent cette forme, et c'est le cas.
 - [ ] **M3.3** **Host de menu Linux** `linux/infra/menu_host.lua` (~180 l) : dessine
   l'arbre neutre en SNI/dbusmenu. Supprime `menu_builder.lua` (889 l codées à la
   main). Consomme `menu_manifest.json` (le renderer AHK accepte déjà `"linux"`).
@@ -677,7 +697,7 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
   les rangées codées en dur (sous-menus catégorie, toggles section, compteurs)
   deviennent des données. Ajouter le token `linux` à `KNOWN_PLATFORMS`.
   *Test :* « toute clé-tableau du manifeste a un lecteur » ; schéma manifeste v-next.
-- [ ] **M3.5** **Loader corrigé** : grouper par **stem de fichier** (aligné sur
+- [x] **M3.5** **Loader corrigé** : grouper par **stem de fichier** (aligné sur
   `_index.toml categories_order` / `hotstring_category_keys`), garder les chemins
   absolus, exposer `[_meta].description` (21 locales) + `sections_order` + identité
   de section + comptes, lire `auto_expand`/`final_result`, exclure les fichiers
@@ -685,6 +705,12 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
   l'exclusivité.
   *Test :* les 5 packs → 5 groupes distincts avec labels localisés et comptes ; un
   dir perso ne masque plus les packs.
+  → Groupement par **stem de fichier**, `[_meta].description` (21 locales),
+  `sections_order`, identité de section et comptes exposés, fichiers `_`-préfixés
+  exclus, et perso + packs **fusionnés** par stem au lieu d'être exclusifs.
+  Détail qui manquait au plan : `install.sh` copie les packs **à plat** dans le
+  répertoire utilisateur, donc la fusion par stem est aussi ce qui évite de les
+  compter deux fois.
 - [ ] **M3.6** **La gate de certification** `test-menu-parity.cjs` (I3) : rend le
   manifeste pour les 3 plateformes, diffe les arbres de labels, assert identiques
   sauf `platforms`/`visible_when`. + ratchet « aucune rangée hors renderer » + la
@@ -700,14 +726,22 @@ tant que la résolution keycode→char ne produit pas `★`, il reste inatteigna
 c'est *pourquoi* Linux s'était rabattu sur `\`. Une fois M2.2 en place, on aligne
 sur le canon partagé `MAGIC_KEY_CHAR="★"`.
 
-- [ ] **M4.1** **Registre d'actions + getters/providers** côté daemon : les ~30
+- [x] **M4.1** **Registre d'actions + getters/providers** côté daemon : les ~30
   callbacks que le renderer appelle (toggles catégorie/section, `enable_all`/
   `disable_all`/`reset_defaults`, providers de listes catégories/sections,
   providers de comptes gatés, `open_file`). Implémenter `enable_all`/`disable_all`
   (inexistants → no-op silencieux), **persister** l'état via l'adapter storage,
   callback `updateMenu` (rebuild à chaque toggle/reload/locale).
   *Test :* existence de `enable_all` ; persistance après restart ; comptes gatés.
-- [ ] **M4.2** **Caractère trigger `★` configurable** : lire `[hotstrings]
+  → `enable_all`/`disable_all`/`reset_defaults` existent (le menu les appelait
+  derrière un `if` qui était faux — un clic sans effet, indiscernable d'un clic
+  manqué), l'état est **persisté** (chaque bascule était oubliée au redémarrage),
+  et un callback `on_change` reconstruit le menu à chaque changement. Bug trouvé
+  en chemin : le bridge de la fenêtre de config appelait ces fonctions avec `:`
+  alors qu'elles sont plates — toutes les catégories se déclaraient activées et
+  toutes les bascules étaient des no-op. Son propre test ne pouvait pas le voir :
+  le mock avait été écrit à la convention buguée.
+- [x] **M4.2** **Caractère trigger `★` configurable** : lire `[hotstrings]
   trigger_char` (défaut `★`, schéma 1-4 chars) au lieu du `\` codé en dur (3
   endroits) ; `set_trigger_char`/`get_trigger_char` qui **renomme les triggers
   ★-tail** + le terminateur magic-key (modèle `Registry.update_trigger_char`) ;
@@ -715,7 +749,13 @@ sur le canon partagé `MAGIC_KEY_CHAR="★"`.
   `magic_key_config` (capture 1-touche, clé i18n `dialog.magic_key.*` existante).
   *Test :* changer `★`→autre chose renomme les mappings et re-résout ; le trigger
   atteint le buffer (dépend de M2.2).
-- [ ] **M4.3** **Délais d'expansion** : porter le résolveur macOS
+  → Le dernier `\` codé en dur est parti : le fournisseur i18n répondait `\`
+  alors que le manifeste, le moteur, la page d'onboarding et les deux autres
+  drivers disent `★` — un menu qui documentait une touche à laquelle rien ne
+  répondait, en 21 langues. La rangée `magic_key_config` n'est **pas** ajoutée :
+  le manifeste la restreint à `["ahk","hs"]` avec un `reason_key` traduit, donc
+  la construire violerait le manifeste au lieu de le satisfaire.
+- [x] **M4.3** **Délais d'expansion** : porter le résolveur macOS
   `hotstrings_config.resolve`/`set_override` (Lua pur) avec la **précédence 5
   niveaux** (override section → override catégorie → `[_meta.section_delays]` →
   `[_meta].delay` → défaut global menu → fallback `defaults.toml` 0.75 s/2.0 s) ;
@@ -724,7 +764,14 @@ sur le canon partagé `MAGIC_KEY_CHAR="★"`.
   défaut global + magickey + autocorrection + llm_prediction + dynamichotstrings),
   labels « N ms / (défaut) / Infini ».
   *Test :* la précédence résout les bons délais ; override persiste et s'applique.
-- [ ] **M4.4** **Sous-menus par catégorie** (l'`InitSubMenus` équivalent, ~80 % des
+  → La cascade à cinq niveaux vit dans `_shared/lua/hotstrings/delay_resolver.lua`
+  et **macOS y délègue** : elle était écrite deux fois et les deux copies avaient
+  déjà divergé sur ce que signifie un `false` explicite. Overrides Linux
+  persistés dans `~/.config/ergopti/hotstrings_overrides.toml`, mêmes noms de
+  section que macOS. `defaults.toml` lu en fail-fast. Correction au plan : les
+  « 6 rangées delays_colors » sont l'implémentation macOS, pas une exigence du
+  manifeste — celui-ci déclare **une** rangée `action`.
+- [x] **M4.4** **Sous-menus par catégorie** (l'`InitSubMenus` équivalent, ~80 % des
   rangées) : par catégorie → toggle de gate, `enable_all`/`disable_all`,
   `open_file`, puis un toggle par section (`sections_order`) avec comptes et
   coches ; grisage quand la gate parente est off ; grand total sur la rangée
@@ -732,18 +779,37 @@ sur le canon partagé `MAGIC_KEY_CHAR="★"`.
   close-on-add).
   *Test :* le sous-menu d'une catégorie liste ses sections avec comptes ; parité
   d'arbre vs macOS via la gate M3.6.
-- [ ] **M4.5** **Word expanders (terminateurs)** : brancher le catalogue partagé
+  → Une catégorie est un **sous-menu** : sa porte, l'ouverture de son fichier,
+  tout cocher / tout décocher, puis un toggle par section avec son compte et sa
+  coche, grisé quand la porte est fermée. Le nom vient de la description
+  localisée du pack. L'état par section est réel et persisté sous une clé
+  `catégorie.section` — désactiver puis réactiver une catégorie rend exactement
+  les sections qu'on avait, pas toutes. **Le bloc extensions n'est pas fait** :
+  le manifeste le restreint à `["ahk"]` avec un `reason_key`.
+- [x] **M4.5** **Word expanders (terminateurs)** : brancher le catalogue partagé
   `_shared/lua/keymap/terminators.lua` (neutre, 5 fonctions) ; persistance de la
   chaîne de délimiteurs + set consommé ; rangées check-all/uncheck-all/reset,
   toggles par entrée avec suffixe « (consommé) », ajout/suppression de
   délimiteur personnalisé.
   *Test :* toggler un terminateur persiste et change le comportement de frontière.
-- [ ] **M4.6** **Config window partagée** : le bridge Linux
+  → Rangées tout cocher / tout décocher, suffixe « (consommé) », suppression des
+  délimiteurs personnalisés, et surtout **persistance** : le catalogue partagé ne
+  garde l'état qu'en mémoire, donc chaque délimiteur désactivé revenait au
+  démarrage suivant — alors que la fonctionnalité existe précisément pour dire
+  « n'étends que sur ★ ».
+- [x] **M4.6** **Config window partagée** : le bridge Linux
   `hotstrings_config_bridge` doit gérer les payloads délai/couleur/`show_tooltip`
   (aujourd'hui seulement toggle/reload/add/delete) pour que la fenêtre WebView
   partagée (déjà enregistrée) édite les délais/couleurs sur Linux comme ailleurs.
   *Test :* un patch de délai depuis la fenêtre atteint le résolveur.
-- [ ] **M4.7** **Manifeste features** : `linux/_generated/features_manifest.lua` a
+  → Le bridge répondait à 4 des 11 actions de la fenêtre partagée : tous les
+  champs de délai, pastilles de couleur et interrupteurs d'aperçu étaient inertes
+  ici. Deux coercitions portent le poids : `section: ''` est la façon dont la
+  fenêtre dit « la catégorie elle-même » (le passer tel quel écrit un override
+  sous une section qui n'existe pas, qui ne se résout jamais), et la chaîne
+  `"false"` est **vraie** en Lua — la laisser passer rallumerait l'aperçu que
+  l'utilisateur vient d'éteindre.
+- [x] **M4.7** **Manifeste features** : `linux/_generated/features_manifest.lua` a
   **zéro** entrée hotstrings (car `manifest.toml` met `trigger_char`/
   `expansion_delay` en `platforms={ahk,hs}`). Ajouter `linux` pour que
   `Manifest.default_for` fonctionne.
@@ -754,25 +820,52 @@ sur le canon partagé `MAGIC_KEY_CHAR="★"`.
 Le style est **déjà** un SSOT partagé ; l'algo est un oracle JS. Le manque est le
 pipeline Linux + un renderer natif.
 
-- [ ] **M4T.1** **Loader fail-fast** de `_shared/modules/tooltip/constants.toml`
+  → **Obsolète.** Le manifeste porte déjà le token `linux` et
+  `default_for("hotstrings.trigger_char")` résout `★` — vérifié. Le travail
+  successeur (consommer les 73 fonctionnalités hotstrings déclarées par section)
+  est couvert par M4.4.
+- [x] **M4T.1** **Loader fail-fast** de `_shared/modules/tooltip/constants.toml`
   (jumeau Lua de `config.lua`/`ui_style.ahk`) → tables de style natives. Ajouter
   les clés `*_linux` manquantes (police, tailles, `window_bottom_inset` — ou
   réutiliser `*_hs`). **Suivre le TOML, pas SPEC.md** (qui a dérivé).
   *Test :* boot échoue sur clé manquante ; valeurs = pad 14/7, rayon 7, #242424…
-- [ ] **M4T.2** **Renderer natif** sur `graphics_renderer.lua` (lgi GTK POPUP +
+  → `linux/ui/tooltip/config.lua`, fail-fast, jumeau du macOS et du
+  `ui_style.ahk`. Les 9 clés `*_linux` manquantes sont ajoutées, chacune avec la
+  raison de sa différence. **La dérive SPEC.md est confirmée et documentée** :
+  SPEC.md range `screen_margin` sous `[positioning]`, le TOML sous `[layout]` —
+  c'est le TOML que lisent les trois drivers.
+- [x] **M4T.2** **Renderer natif** sur `graphics_renderer.lua` (lgi GTK POPUP +
   cairo, click-through déjà là) : mesure de texte Pango, rect arrondi (rayon 7,
   bord blanc α≈0.13), remplissages par-rangée, labels trigger à droite, dimming +
   barré. **Remplace** `tooltip_renderer.lua` (yad/zenity, zéro appelant, jamais au
   style). Porter tint/layout/dequeue de l'oracle JS vers `_shared/lua/tooltip/*`
   (partagé avec macOS, épinglé par les vecteurs JS).
   *Test :* conformité aux vecteurs JS (tint HSL L=0.13/S=0.85, géométrie, dequeue).
-- [ ] **M4T.3** **Pipeline d'aperçu** : équivalent `update_preview`/`_LookupAndRender`
+  → **Prémisses du plan inversées** : `graphics_renderer.lua` et
+  `tooltip_renderer.lua` avaient été supprimés le 2026-08-02, donc « construire
+  sur graphics_renderer (click-through déjà là) » partait de rien, et
+  « remplace tooltip_renderer » était déjà acquis par suppression.
+  → tint et layout montent dans `_shared/lua/tooltip/*` et **macOS y délègue**.
+  La copie Lua du layout était en ligne dans le chemin de rendu macOS, donc le
+  test de corpus qui prétendait attraper « toute divergence de clamping »
+  rejouait un **clone** défini dans le fichier de test. Le corpus est maintenant
+  rejoué côté Linux contre le module partagé (6 vecteurs), et un vrai défaut en
+  est sorti : le layout entrait dans sa branche ancrée sur une valeur *truthy*,
+  or un décodeur JSON représente `null` par une sentinelle.
+- [x] **M4T.3** **Pipeline d'aperçu** : équivalent `update_preview`/`_LookupAndRender`
   (collecte des candidats, ordre par tiebreak moteur, dimming, résolution
   `show_tooltip`/couleur/délai par catégorie) alimentant le renderer ; les 4
   toggles d'aperçu (★/autocorrection/IA/colorés) dans le tray ; dismiss sur
   frappe (le hook evdev est déjà à nous) / clic.
   *Test :* un trigger affiche l'aperçu au bon style ; les toggles le gatent.
-- [ ] **M4T.4** **Ancrage** : cascade caret → AT-SPI2 → cadre fenêtre → bas d'écran,
+  → Les quatre bascules ont gagné leur token `linux` dans `manifest.toml` —
+  **blocage silencieux que le plan ne mentionne pas** : elles étaient
+  `platforms = ["hs"]`, donc aucun travail de rendu ne les aurait fait
+  apparaître. Le pipeline construit les rangées (candidat qui ne se déclenchera
+  pas → grisé, refusé par le moteur → barré : les cacher supprimerait la réponse
+  à « pourquoi rien ne s'est passé »), et l'aperçu est masqué à la frappe et au
+  clic.
+- [x] **M4T.4** **Ancrage** : cascade caret → AT-SPI2 → cadre fenêtre → bas d'écran,
   clampée à la marge 5. ⚠ Sous Wayland `gtk_window_move` est un no-op → gtk-layer-shell
   (KDE/wlroots ; **pas** GNOME) sinon les échelons bas de la cascade en
   first-class. Choisir `window_bottom_inset_linux`.
@@ -781,20 +874,41 @@ pipeline Linux + un renderer natif.
 
 ### M5 — Packaging + universalité distro + bascule de session (C2, C3)
 
-- [ ] **M5.1** **Une** unité systemd `--user` : `PartOf=graphical-session.target`
+  → Cascade avec ses échelons **honnêtes** : AT-SPI2 est sondé mais pas
+  garanti (désactivé par défaut sur plusieurs bureaux), le cadre de la fenêtre
+  active est **X11 seulement** — un compositeur Wayland n'expose pas la géométrie
+  d'une fenêtre à un autre process, par conception — puis le bas de l'écran.
+  Pas de gtk-layer-shell : il ne couvre pas GNOME, donc il ajouterait une
+  dépendance pour la moitié des bureaux. Le clamp à la marge 5 vient du module
+  partagé.
+- [x] **M5.1** **Une** unité systemd `--user` : `PartOf=graphical-session.target`
   + `WantedBy=graphical-session.target`, **zéro** ligne `Environment=DISPLAY`
   (le daemon sonde le serveur à l'exécution). C'est la seule forme d'unité
   compatible avec « logout X11 → login Wayland untouched ».
   *Test :* `test-linux-package-layout` étendu — toutes les unités rendues
   identiques, cible `graphical-session`, pas de DISPLAY codé en dur.
-- [ ] **M5.2** **Setup des prérequis** (`install.sh` + `--setup-perms`) : règle
+  → **Six** définitions dans **cinq** fichiers, en désaccord sur trois choses à
+  la fois : le nom de l'unité, l'ExecStart et le WantedBy. Un utilisateur qui
+  installait le .deb puis lançait `install.sh` se retrouvait avec **deux** unités
+  activées, toutes deux à grabber le clavier. Un seul nom désormais, `install.sh`
+  copie l'unité du dépôt au lieu de la redéclarer, `PartOf=graphical-session`
+  ajouté, `Environment=DISPLAY` supprimé partout, et la gate échoue sur un second
+  nom.
+- [x] **M5.2** **Setup des prérequis** (`install.sh` + `--setup-perms`) : règle
   udev uinput (`static_node`), groupe `input` (lecture) + groupe `uinput`
   (écriture) — **pas** `uaccess`, `modprobe uinput` via `modules-load.d`, choix
   ydotoold **ou** (préféré) écriture uinput directe qui l'élimine. Le daemon
   échoue **franchement** au boot (notifier) si un prérequis manque, message
   français.
   *Test :* [MATÉRIEL] boot sans permission → erreur claire, pas de WARN avalé.
-- [ ] **M5.3** **Distros non-apt/dnf/pacman et non-systemd** : garder chaque
+  → `--setup-perms`, exécuté aussi lors d'une installation normale : un
+  installeur qui laisse le driver incapable de lire le clavier n'a rien installé,
+  et l'échec est silencieux. Groupe `uinput` créé, `input`+`uinput` ajoutés,
+  règle udev **avec `static_node`** (sans quoi elle ne matche rien au premier
+  démarrage), `modules-load.d`. `uaccess` écarté, avertissement de sécurité
+  affiché en clair. Le daemon échoue franchement au boot si /dev/uinput est
+  inaccessible.
+- [x] **M5.3** **Distros non-apt/dnf/pacman et non-systemd** : garder chaque
   `systemctl` derrière `command -v systemctl`, fallback autostart XDG
   (`~/.config/autostart`) ; ajouter apk/zypper/xbps ou un chemin `--no-deps`
   documenté ; **flake NixOS** (`nixosModules`+`homeManagerModules`). Installer dans
@@ -803,20 +917,43 @@ pipeline Linux + un renderer natif.
   avec sha256 épinglé.
   *Test :* CI containers debian/fedora/arch/**alpine** exécutant
   `install.sh --no-service` + boot avec périphériques stubés.
-- [ ] **M5.4** **Assets de release complets** : tarball de `linux/` + `_shared/`
+  → `apk`, `zypper`, `xbps` ajoutés ; un gestionnaire inconnu **n'abandonne
+  plus** (il affichait la liste des paquets puis rendait la machine
+  installable-nulle-part) ; `--no-deps` ; `systemctl` derrière `command -v` ;
+  entrée autostart XDG écrite inconditionnellement ; flake NixOS avec
+  `nixosModules` (groupe, règle udev, module) et `homeManagerModules` (daemon,
+  unité utilisateur) ; kanata choisi par `uname`.
+- [x] **M5.4** **Assets de release complets** : tarball de `linux/` + `_shared/`
   (aujourd'hui la release ne permet pas d'installer). Corriger le typo wrapper
   `shared/`→`_shared/` et le PKGBUILD (LUA_PATH, `lib/`, `_shared/{data,modules}`).
   *Test :* gate layout couvrant PKGBUILD ; smoke-boot depuis les assets de release.
-- [ ] **M5.5** **[MATÉRIEL] Smoke-test du build LuaJIT statique-musl** (si on
+  → La release publiait `install.sh`, le wrapper et **un** fichier Lua : de quoi
+  installer rien. Elle publie une tarball portant le driver et l'arbre partagé
+  dans la disposition que le daemon attend. Le PKGBUILD produisait un **paquet
+  vide** — ses cinq `cp` lisaient `build/linux/` alors que le builder écrit dans
+  `build/linux/linux/`, et chacun finissait par `|| true`. Rien ne l'attrapait :
+  la gate ne couvrait que les deux packagers `.sh`, et `test-packaging-paths`
+  filtre `tools/build` sur `.sh`, ce que `PKGBUILD` n'est pas.
+- [x] **M5.5** **[MATÉRIEL] Smoke-test du build LuaJIT statique-musl** (si on
   distribue un LuaJIT) : vérifier que le JIT alloue (pas seulement « compile ») ;
   documenter le fallback `-joff` interpréteur.
 
 ### M6 — Tests, CI, robustesse
 
-- [ ] **M6.1** **Harnais faux-périphérique uinput** (le manque central) : créer un
+  → **Obsolète, à rayer.** La décision 4 du §6 (LuaJIT du système, rien de
+  vendorisé) a tué la prémisse : `vendor/` ne contient qu'un README et un script
+  de fetch.
+- [x] **M6.1** **Harnais faux-périphérique uinput** (le manque central) : créer un
   uinput de test, écrire des événements, asserter le chemin décode/grab/replay —
   transforme le décodeur mort en couverture réelle et donne au bug d'intercalage
   un vrai test de régression.
+  → `tests/hardware/run_uinput_roundtrip.lua`, exécuté en CI dans le job Linux
+  existant (une **étape**, pas un job : en job il coûtait un runner complet pour
+  cinq secondes de travail). Il crée un vrai clavier virtuel, attend le nœud que
+  le noyau publie, l'ouvre non bloquant, prend `EVIOCGRAB`, écrit une pression,
+  une répétition et un relâchement, et les relit. Il asserte aussi les deux
+  choses qu'un mock ne peut pas montrer : un descripteur au repos rend `nil` au
+  lieu de bloquer, et le nœud disparaît après `UI_DEV_DESTROY`.
 - [ ] **M6.2** Faire de **luv** (ou la boucle poll FFI) une dépendance dure du
   daemon et l'installer en CI, pour que la boucle d'événements de prod,
   `luv.sleep` et les watchers inotify cessent de ship non testés. Garder toute
@@ -824,7 +961,7 @@ pipeline Linux + un renderer natif.
 - [ ] **M6.3** **Couverture de parse** de l'entry point Linux (aujourd'hui zéro) ;
   lint conventions Lua étendu à Linux + `_shared/lua` ; router les shell-outs du
   chemin frappe via `shell_runner`.
-- [ ] **M6.4** Corriger le **contrat corpus** avant de générer le matcher partagé
+- [x] **M6.4** Corriger le **contrat corpus** avant de générer le matcher partagé
   (risque R6 de `TODO.md`) : `backspace_count` = 3 sous Windows/Linux, 1 sous
   macOS. Puis fermer les divergences moteur du bug 12 (non-`auto_expand`, casse,
   priorité, touche magique `\` vs `★`).
@@ -945,29 +1082,51 @@ même chose, *modulo* des différences déclarées. Rationnel complet en §3.8.
 
 **À déplacer vers `_shared` (donnée + code Lua) :**
 
+  → **Première moitié à rayer** : `backspace_count = 3` est correct sur les trois
+  drivers — c'est un compte **logique**, le 2 physique de macOS est une
+  optimisation de préfixe, et une gate le dit désormais en clair. Les divergences
+  moteur du bug 12 sont fermées : `auto_expand` est lu (commit antérieur),
+  la touche magique est `★` partout, et la priorité de collision est résolue par
+  le loader depuis `priority.json`.
 - [ ] **Renderer de menu** `_shared/lua/menu/render.lua` partagé **macOS + Linux**
   (AHK garde `MenuRenderer_Build`, tenu identique par la gate). Cf. M3.2.
 - [ ] **Manifeste = seule source de structure** : y remonter les rangées codées en
   dur via les 14 capacités du Lot 5. Cf. M3.4.
-- [ ] **Résolveur de délais** : porter le macOS `hotstrings_config.lua` (Lua pur)
+- [x] **Résolveur de délais** : porter le macOS `hotstrings_config.lua` (Lua pur)
   en module partageable ; à terme **une** implémentation (I5), AHK = jumeau
   épinglé par un corpus de vecteurs. Cf. M4.3.
-- [ ] **Algos de tooltip** (tint/layout/dequeue) : de l'**oracle JS** vers
+  → Fait : `_shared/lua/hotstrings/delay_resolver.lua`, macOS y délègue, chaque
+  mutation d'ordre passe au rouge **sur les deux drivers**.
+- [x] **Algos de tooltip** (tint/layout/dequeue) : de l'**oracle JS** vers
   `_shared/lua/tooltip/*`, consommé par macOS + Linux, épinglé par les vecteurs.
   Cf. M4T.2.
-- [ ] **Catalogue Terminators** : déjà neutre
+  → tint et layout faits et partagés ; **dequeue non porté** : il n'a pas de
+  consommateur Linux tant que l'aperçu LLM n'existe pas ici, et un module
+  partagé qu'un seul driver appelle n'est pas de la mutualisation.
+- [x] **Catalogue Terminators** : déjà neutre
   (`_shared/lua/keymap/terminators.lua`) — juste le brancher côté Linux. Cf. M4.5.
-- [ ] **Style tooltip** : déjà SSOT (`constants.toml`) — ajouter les clés `*_linux`.
+  → Branché, avec les rangées en masse, le suffixe « (consommé) » et la
+  persistance qui manquait au catalogue partagé.
+- [x] **Style tooltip** : déjà SSOT (`constants.toml`) — ajouter les clés `*_linux`.
 
 **Les gates qui *certifient* la parité (sans elles, « pareil » est un vœu) :**
 
+  → Les 9 clés ajoutées, chacune avec la raison de sa différence.
 - [ ] `test-menu-parity.cjs` (I3) — rend les 3 plateformes, diffe les arbres de
   labels, rouge si divergence non déclarée. Cf. M3.6.
-- [ ] Ratchet **« aucune rangée de menu hors du renderer »** (baseline 265 AHK +
+- [x] Ratchet **« aucune rangée de menu hors du renderer »** (baseline 265 AHK +
   399 macOS + 101 Linux).
-- [ ] Bijection `action_id ↔ handler` dans les deux sens, par driver.
-- [ ] « Toute clé-tableau du manifeste a un lecteur ».
-- [ ] Étendre les single-source gates existantes à Linux
+  → **Déjà en place** avant cette session : `test-menu-rows-outside-renderer.cjs`,
+  baselines mesurées à 220 AHK / 301 macOS / 3 Linux, **zéro marge**. Attention :
+  la gate désigne `linux/ui/menu/menu_builder.lua` comme « le renderer Linux », donc
+  supprimer ce fichier (M3.3) casse la gate — elle doit être repointée dans le
+  même changement.
+- [x] Bijection `action_id ↔ handler` dans les deux sens, par driver.
+  → **Déjà en place** : `test-menu-action-handler-bijection.cjs`, baselines
+  `{ahk:0, hs:5, linux:0}`, à la limite.
+- [x] « Toute clé-tableau du manifeste a un lecteur ».
+  → **Déjà en place** : `test-menu-manifest-keys-have-readers.cjs`.
+- [x] Étendre les single-source gates existantes à Linux
   (`test-linux-llm-defaults`, `test-updater-constants`,
   `test-menu-labels-single-source`, `test-priority-parity`).
 
@@ -982,6 +1141,11 @@ déclarée.
 
 ## 10. Validation sur matériel réel (aucune n'est couverte par le CI)
 
+  → `test-linux-package-layout` étendu (unité unique, PartOf, pas de DISPLAY,
+  PKGBUILD, assets de release), `test-kanata-defalias-parity` étendu (coordination
+  des périphériques), `test-tooltip-positioning-reach` mis à jour (Linux lit
+  désormais toute la canon de positionnement), `test-port-adapter-matrix` et
+  `test-driver-scoped-features-stay-scoped` mis à jour.
 - [ ] Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
 - [ ] Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
 - [ ] Frappe rapide pendant expansion → pas de corruption (C4).
