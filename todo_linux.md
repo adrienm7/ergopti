@@ -653,6 +653,18 @@ hotstrings fonctionnelles sur vrai matériel, X11 et Wayland.
 
 ### M3 — Fondation du menu partagé + transport tray
 
+> **État au 2026-08-04.** M3.1, M3.2 et M3.5 sont faits. **M3.3, M3.4 et M3.6
+> restent**, et leur ordre est contraint : `test-menu-rows-outside-renderer.cjs`
+> désigne `linux/ui/menu/menu_builder.lua` comme « le renderer Linux » (baseline
+> 3/3, zéro marge) et `test-menu-top-level-parity.cjs` extrait la forme du menu
+> en regexant les appels `_build_*(ctx)` **de ce même fichier**. Supprimer
+> `menu_builder.lua` — le livrable de M3.3 — casse les deux, qui doivent donc
+> être repointées dans le même changement, sinon la suppression atterrit avec
+> deux ratchets aveuglés. Lire l'en-tête `:53-71` de la première avant de
+> planifier l'ordre de migration : router une rangée par `ManifestMenu.build` ne
+> fait **pas** baisser le compte ; seule une migration de type `list` l'a jamais
+> fait.
+
 Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
 
 - [x] **M3.1** **Transport SNI persistant** : un service qui reste sur le bus et
