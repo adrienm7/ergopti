@@ -159,10 +159,37 @@ const CANONICAL = JSON.parse(
 	fs.readFileSync(path.join(SP, '_shared', 'core', 'features.json'), 'utf8')
 ).features;
 
-/** True when a driver ships a canonical feature at its declared path. */
+/** True when `dir` contains at least one driver source file, at any depth. */
+function containsSource(dir) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		if (entry.isDirectory()) {
+			if (containsSource(path.join(dir, entry.name))) return true;
+		} else if (/\.(lua|ahk)$/.test(entry.name)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * True when a driver ships a canonical feature at its declared path.
+ *
+ * "Ships" means there is CODE there, not merely a path. This used to be a bare
+ * fs.existsSync, and the ratchet below is the number this function feeds — so
+ * three folders holding nothing but a README raised it, and nothing in the gate
+ * could tell that from the extraction it is supposed to reward. Convention S
+ * prescribes exactly such a README for an unimplemented folder, which makes the
+ * hole reachable by following the convention rather than by cheating.
+ *
+ * It stops at "a .lua or .ahk file exists" on purpose. Requiring the code to be
+ * REACHED by something would be the stronger test and would contradict
+ * Convention S directly: a stub declaring STATUS: not implemented has no callers
+ * by design. So the residual hole is a stub folder with one empty .lua in it,
+ * and that is a deliberate floor rather than an oversight.
+ */
 function hasFeature(driver, feature) {
 	const base = path.join(SP, driver, feature.tree, feature.name);
-	if (fs.existsSync(base)) return true;
+	if (fs.existsSync(base) && fs.statSync(base).isDirectory()) return containsSource(base);
 	return ['.lua', '.ahk'].some((ext) => fs.existsSync(base + ext));
 }
 
@@ -186,7 +213,15 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // only the list disagreed with them. Renaming the entries moved the count
 // without touching a line of driver code, which is the same correction the
 // `tree` field was written to make for ten other features.
-const BASELINE_CANONICAL_ON_ALL = 16;
+// 2026-08-04, second pass: 16 → 17. Same correction a third time. Of the four
+// entries the list still called absent from every driver, only two really are.
+// `metrics` is modules/keylogger, shared by all three; `download` is
+// ui/download_window, which two drivers ship — it was filed under modules/ in
+// contradiction of this file's own tree rule, so a window was being counted as
+// a missing module. Raised the same day it was measured: leaving it at 16 would
+// hand the ratchet exactly one feature of slack, which is the failure the note
+// above condemns and would silently undo the tightening it describes.
+const BASELINE_CANONICAL_ON_ALL = 17;
 
 if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
 	errors.push(
