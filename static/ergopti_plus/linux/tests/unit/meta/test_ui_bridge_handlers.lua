@@ -46,8 +46,14 @@ helpers.describe("ui.bridge_handlers", function()
         export_json       = function() return '{"keystrokes":42}' end,
       },
       config = {
+        -- Flat functions, matching how hotstrings_config actually defines them.
+        -- This mock used to take a leading `self` because the bridge called
+        -- through `:` — so `is_group_enabled` received the module as its group
+        -- name and answered "enabled" for everything, and `toggle_group`
+        -- silently no-opped on its own string guard. The mock was shaped to the
+        -- bug, which is why the bridge's own test could never see it.
         get_groups     = function() return { "accents", "math", "code" } end,
-        is_group_enabled = function(_, g) return g ~= "code" end,
+        is_group_enabled = function(g) return g ~= "code" end,
         toggle_group   = function(g) end,
         reload         = function() return 10 end,
         mapping_count  = function() return 50 end,
