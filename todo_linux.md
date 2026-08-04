@@ -1183,10 +1183,16 @@ même chose, *modulo* des différences déclarées. Rationnel complet en §3.8.
   moteur du bug 12 sont fermées : `auto_expand` est lu (commit antérieur),
   la touche magique est `★` partout, et la priorité de collision est résolue par
   le loader depuis `priority.json`.
-- [ ] **Renderer de menu** `_shared/lua/menu/render.lua` partagé **macOS + Linux**
+- [x] **Renderer de menu** `_shared/lua/menu/render.lua` partagé **macOS + Linux**
   (AHK garde `MenuRenderer_Build`, tenu identique par la gate). Cf. M3.2.
-- [ ] **Manifeste = seule source de structure** : y remonter les rangées codées en
+  → Fait (le fichier s'appelle `renderer.lua`, pas `render.lua`). Voir M3.2.
+- [x] **Manifeste = seule source de structure** : y remonter les rangées codées en
   dur via les 14 capacités du Lot 5. Cf. M3.4.
+  → Voir M3.4 pour ce que « 14 capacités » recouvrait réellement une fois mesuré,
+  et M3.3 pour les rangées effectivement remontées. Ce qu'un manifeste **ne peut
+  pas** porter reste hors de lui, et c'est une conclusion, pas un reste à faire :
+  le contenu d'une liste dépend de ce que l'utilisateur a installé, et un toggle
+  de catégorie est un état de driver — le renderer saute les `toggle` par contrat.
 - [x] **Résolveur de délais** : porter le macOS `hotstrings_config.lua` (Lua pur)
   en module partageable ; à terme **une** implémentation (I5), AHK = jumeau
   épinglé par un corpus de vecteurs. Cf. M4.3.
@@ -1207,8 +1213,11 @@ même chose, *modulo* des différences déclarées. Rationnel complet en §3.8.
 **Les gates qui *certifient* la parité (sans elles, « pareil » est un vœu) :**
 
   → Les 9 clés ajoutées, chacune avec la raison de sa différence.
-- [ ] `test-menu-parity.cjs` (I3) — rend les 3 plateformes, diffe les arbres de
+- [x] `test-menu-parity.cjs` (I3) — rend les 3 plateformes, diffe les arbres de
   labels, rouge si divergence non déclarée. Cf. M3.6.
+  → Faite, câblée, mutation-testée, et elle a trouvé trois défauts réels le jour
+  même. Voir M3.6 — dont la correction au plan : « diffe les arbres de labels »
+  ne peut pas être l'assertion, un manifeste ne peut pas se contredire sur l'ordre.
 - [x] Ratchet **« aucune rangée de menu hors du renderer »** (baseline 265 AHK +
   399 macOS + 101 Linux).
   → **Déjà en place** avant cette session : `test-menu-rows-outside-renderer.cjs`,
