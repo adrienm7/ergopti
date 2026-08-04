@@ -81,12 +81,21 @@ const DRIVERS = {
 
 // Frozen 2026-08-04, after the macOS deduplication took it from 3 to 1.
 // Windows was already at 1 — infra/menu_manifest.ahk — which is the measurement
-// that makes macOS's three a defect rather than the house style. Linux is 0
-// because it never reads the file: its tray menu is built by hand, and pinning
-// the zero is what will make the eventual renderer port show up as a deliberate
-// +1 instead of as noise.
+// that makes macOS's three a defect rather than the house style.
+//
+// linux 0 → 1 later the same day, and the zero did the job it was pinned for: it
+// made the renderer binding show up as a deliberate change rather than as noise.
+// Linux now has infra/manifest_menu.lua, the one place on that driver that knows
+// where the manifest is and how to decode it.
+//
+// WHAT THIS COUNTS, AFTER THE EXTRACTION. The io.open now lives in
+// _shared/lua/menu/renderer.lua, which is not a driver tree and is not scanned.
+// What each driver keeps is the BINDING — the file naming the path and supplying
+// the decoder — and one per driver is exactly the invariant worth holding. Three
+// bindings would be three answers to "where is the manifest", which is the
+// defect this gate was written for.
 // Lower it when a driver loses a reader; never raise it to make a change pass.
-const BASELINE = { macos: 1, windows: 1, linux: 0 };
+const BASELINE = { macos: 1, windows: 1, linux: 1 };
 
 // Floor on the total. A detector that matched nothing would report every driver
 // at zero and pass this gate while the menu had no source of truth at all.

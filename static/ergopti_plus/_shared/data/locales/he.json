@@ -2376,6 +2376,7 @@
 	"menu.shortcuts.key_layer_scroll": "Layer + Scroll",
 	"platform_reason.alt_gr_is_kana_remap": "ל‑Windows בלבד: מפצה על פריסות מותאמות אישית (KbdEdit/MSKLC) שממפות מחדש את AltGr למקש וירטואלי אחר — מושג של מנהל התקן המקלדת ב‑Windows שאין לו מקבילה במקום אחר.",
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS בלבד: MLX הוא מנוע ההסקה המקומי של Apple עבור Apple Silicon, ואין ממנו גרסה ל-Windows או ל-Linux.",
+	"platform_reason.lists_windows_only_settings": "Windows בלבד: כל מה שהשורה הזו הייתה מציגה הוא עצמו ייחודי ל-Windows, ולכן ב-macOS וב-Linux היא מציגה רשימה ריקה.",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה"
 }

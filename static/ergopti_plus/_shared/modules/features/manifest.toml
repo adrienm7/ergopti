@@ -2898,9 +2898,11 @@ type = "dynamic"
 id = "script_control_shortcuts"
 
 # AHK-only, on the same evidence as personal_shortcuts below: the four
-# features.shortcuts.script_control entries this row lists are each
-# platforms = ["ahk"], so on macOS and Linux it had nothing to enumerate.
+# features.shortcuts.script_control entries this row lists are each Windows-only,
+# so on macOS and Linux it had nothing to enumerate.
 platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
 [[menu.shortcuts_menu]]
 type = "dynamic"
 id = "personal_shortcuts"
@@ -2925,6 +2927,8 @@ id = "extensions_shortcuts"
 # (_ExtensionsDir) for shortcut scripts. Neither Lua driver has that
 # concept, which is why both left the row unhandled rather than empty.
 platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
 [[menu.modifier_combos_group]]
 type = "feature"
 path = "shortcuts.alt_gr_lalt"
@@ -3068,11 +3072,13 @@ type = "dynamic"
 id = "layout_features_base"
 
 # AHK-only, and the FEATURE manifest already said so. This row enumerates
-# features.layout.*, and all five of those entries are platforms = ["ahk"]
+# features.layout.*, and all five of those entries are Windows-only
 # (ergopti_base, direct_access_digits, ergopti_alt_gr, ergopti_plus,
 # ctrl_magic_save). On the two Lua drivers it enumerated an empty set, so
 # the manifest promised a row neither of them could ever draw.
 platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
 [[menu.layout_menu]]
 type = "group"
 id = "accented_letters"
@@ -3087,8 +3093,10 @@ type = "dynamic"
 id = "layout_features_altgr"
 
 # Same evidence as layout_features_base above: every features.layout.* entry
-# it would list is platforms = ["ahk"].
+# it would list is Windows-only.
 platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
 [[menu.layout_menu]]
 type = "dynamic"
 id = "active_layouts"
