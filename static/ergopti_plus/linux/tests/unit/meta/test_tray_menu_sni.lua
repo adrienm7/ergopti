@@ -15,6 +15,9 @@
 
 local helpers = require("tests.helpers")
 local tray    = helpers.load_module("adapters.tray_menu")
+-- The serialiser the adapter feeds. Loaded here so the cases below can assert
+-- what actually reaches D-Bus rather than that setMenu returned without raising.
+local TP      = require("tray.protocol")
 
 helpers.describe("tray_menu SNI compliance", function()
 
@@ -49,30 +52,85 @@ helpers.describe("tray_menu SNI compliance", function()
 
   helpers.describe("hierarchical menu items", function()
 
-    helpers.it("setMenu with nested items does not crash", function()
-      local ok = pcall(function()
-        tray.setMenu({
-          { title = "Section", menu = {
-            { title = "Item 1", fn = function() end },
-            { title = "Item 2", fn = function() end },
-          }},
-          { title = "Standalone", fn = function() end },
-        })
-      end)
-      helpers.assert_true(ok, "setMenu with nested items does not crash")
+    -- WHY THESE ASSERT THE XML AND NOT "does not crash".
+    -- They used to call setMenu inside a pcall and assert only that it returned.
+    -- Both passed for the whole life of the bug they were written to cover: the
+    -- menu builder emits hs.menubar-shaped nodes (`menu`, `disabled`, a row
+    -- titled "-") and the shared dbusmenu serialiser read a different vocabulary
+    -- (`items`, `enabled`, `separator = true`). Not one of the three keys
+    -- matched, so on the SNI backend — the primary one — every submenu was
+    -- silently dropped, every disabled row rendered clickable, and every
+    -- separator rendered as an ordinary item labelled "-". Nothing crashed,
+    -- which is exactly why "does not crash" could not see it.
+    --
+    -- The second vocabulary is gone: the serialiser reads what the builders
+    -- write, since nothing in any driver ever wrote the other spelling. These
+    -- cases feed builder-shaped nodes straight to it and assert the OUTPUT.
+
+    helpers.it("a submenu survives into the dbusmenu XML", function()
+      local xml = TP.build_dbus_menu_xml({
+        { title = "Section", menu = {
+          { title = "Item 1", fn = function() end },
+          { title = "Item 2", fn = function() end },
+        }},
+        { title = "Standalone", fn = function() end },
+      })
+      helpers.assert_true(xml:find("Section", 1, true) ~= nil, "the parent row is rendered")
+      helpers.assert_true(xml:find("Item 1", 1, true) ~= nil,
+        "the CHILD row must appear in the XML. When it does not, the tray shows a parent "
+        .. "with nothing under it and no error anywhere")
+      helpers.assert_true(xml:find('children-display', 1, true) ~= nil,
+        "and the parent must be marked as having a submenu, or the child is in the XML "
+        .. "but nothing tells the host to show it")
     end)
 
-    helpers.it("setMenu with deeply nested submenus (3 levels) does not crash", function()
-      local ok = pcall(function()
-        tray.setMenu({
-          { title = "L1", menu = {
-            { title = "L2", menu = {
-              { title = "L3", fn = function() end },
-            }},
+    helpers.it("three levels of nesting all reach the XML", function()
+      local xml = TP.build_dbus_menu_xml({
+        { title = "L1", menu = {
+          { title = "L2", menu = {
+            { title = "L3", fn = function() end },
           }},
-        })
-      end)
-      helpers.assert_true(ok, "setMenu with 3-level nesting does not crash")
+        }},
+      })
+      for _, label in ipairs({ "L1", "L2", "L3" }) do
+        helpers.assert_true(xml:find(label, 1, true) ~= nil, label .. " must be rendered")
+      end
+    end)
+
+    helpers.it("a disabled row is rendered disabled", function()
+      local xml = TP.build_dbus_menu_xml({
+        { title = "Off", disabled = true },
+      })
+      helpers.assert_true(xml:find('name="enabled" type="b" value="false"', 1, true) ~= nil,
+        "the builder says `disabled = true` and the wire format says `enabled`; without the "
+        .. "single spelling the row defaults to enabled and the user can click something the "
+        .. "driver considers unavailable")
+    end)
+
+    helpers.it("a separator row becomes a separator, not an item labelled \"-\"", function()
+      local xml = TP.build_dbus_menu_xml({
+        { title = "Above" },
+        { title = "-" },
+        { title = "Below" },
+      })
+      helpers.assert_true(xml:find('value="separator"', 1, true) ~= nil,
+        "the builders write a separator as a row titled \"-\", and that is now the only "
+        .. "spelling the serialiser knows. Reading separator = true instead showed the user "
+        .. "a menu entry whose label is a hyphen")
+    end)
+
+    helpers.it("the callback ids and the XML ids are the same numbers", function()
+      -- The two walks assign ids by the same id*1000+i scheme but used to recurse on
+      -- DIFFERENT keys — callbacks on `menu`, the XML on `items`. So a submenu's
+      -- callbacks were registered against ids the XML never contained. One spelling
+      -- makes the two walks see the same tree, which is what keeps a click on the
+      -- child running the child's function.
+      local xml = TP.build_dbus_menu_xml({
+        { title = "Parent", menu = { { title = "Child", fn = function() end } } },
+      })
+      helpers.assert_true(xml:find('<menu id="1001"', 1, true) ~= nil,
+        "the child of the first top-level row must carry id 1*1000+1, the id its callback "
+        .. "is registered under")
     end)
 
     -- Called directly throughout: a raise fails the case with the real error.

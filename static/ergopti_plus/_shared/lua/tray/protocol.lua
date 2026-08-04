@@ -26,14 +26,25 @@ end
 --- @return string XML node string.
 function M.build_menu_item_xml(item, id)
 	if type(item) ~= "table" then return "" end
-	if item.separator then
+	-- ONE NODE VOCABULARY, AND IT IS THE CALLERS'.
+	-- This module used to read `separator = true`, `enabled` and `items`. Nothing
+	-- in any driver produced those keys — the menu builders emit hs.menubar-shaped
+	-- nodes (a row titled "-", `disabled`, `menu`) and always have, so the three
+	-- keys were a vocabulary this file shared with its own tests and nobody else.
+	-- The result was silent on the SNI backend, which is the primary one: every
+	-- submenu was dropped, every disabled row rendered clickable, and every
+	-- separator rendered as an ordinary item labelled "-". Two tests asserting
+	-- "does not crash" passed throughout, because nothing did.
+	-- A translator at the adapter would have worked too; deleting the second
+	-- spelling is smaller and leaves nothing to keep in step.
+	if item.title == "-" then
 		return string.format(
 			'<menu id="%d"><property name="type" type="s" value="separator"/></menu>',
 			id or 0
 		)
 	end
 	local title   = xml_escape(item.title or "")
-	local enabled = item.enabled ~= false  -- default true
+	local enabled = not item.disabled
 	local checked = item.checked == true
 	local parts   = {}
 
@@ -49,10 +60,12 @@ function M.build_menu_item_xml(item, id)
 		parts[#parts + 1] = string.format('<property name="toggle-type" type="s" value="%s"/>', "checkmark")
 	end
 
-	-- Sub-items (recursive)
-	if type(item.items) == "table" and #item.items > 0 then
+	-- Sub-items (recursive). `menu`, matching the key the callback walk in
+	-- linux/adapters/tray_menu.lua recurses on, so both assign the same
+	-- id * 1000 + i to the same node.
+	if type(item.menu) == "table" and #item.menu > 0 then
 		parts[#parts + 1] = '<property name="children-display" type="s" value="submenu"/>'
-		for i, sub in ipairs(item.items) do
+		for i, sub in ipairs(item.menu) do
 			parts[#parts + 1] = M.build_menu_item_xml(sub, id * 1000 + i)
 		end
 	end
