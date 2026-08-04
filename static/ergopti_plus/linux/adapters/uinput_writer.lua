@@ -88,7 +88,10 @@ local INPUT_EVENT_SIZE = 24
 -- BUS_VIRTUAL is what a software-synthesised keyboard should claim; a real bus
 -- id would make the device indistinguishable from hardware in `libinput list`.
 local BUS_VIRTUAL   = 0x06
-local DEVICE_NAME   = "Ergopti Virtual Keyboard"
+-- Read, never redeclared: the remap daemon excludes this exact name and the
+-- device finder classifies by it, so a second copy here is a silent way for the
+-- three to disagree. See infra/device_names.lua for what that costs.
+local DEVICE_NAME   = require("infra.device_names").VIRTUAL_KEYBOARD
 local DEVICE_VENDOR = 0x0001
 local DEVICE_PROD   = 0x0001
 local DEVICE_VER    = 0x0001

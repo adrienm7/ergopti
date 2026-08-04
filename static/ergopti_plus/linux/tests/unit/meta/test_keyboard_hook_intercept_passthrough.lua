@@ -214,10 +214,10 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 	end)
 
 	helpers.it("--no-grab still exists as the way out", function()
-		-- The grab has never run on real hardware, and the device kanata
-		-- auto-detects is not coordinated with the one device_finder picks. If the
-		-- grab takes the wrong keyboard there has to be a way back that does not
-		-- need a rebuild.
+		-- The grab has never run on real hardware. The two daemons now agree on
+		-- which device is whose, but agreement in the config is not the same as
+		-- agreement on a machine we have never booted, so there has to be a way
+		-- back that does not need a rebuild.
 		local src = daemon_source()
 		helpers.assert_true(src:find('"%-%-no%-grab"') ~= nil,
 			"the --no-grab flag must remain parseable — it is the only recovery path "

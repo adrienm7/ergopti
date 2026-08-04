@@ -439,23 +439,47 @@ une vraie machine avant merge (le CI ne le couvre pas).
 
 Sans ceci, le moteur lit les mauvais keycodes et boucle sur ses injections.
 
-- [ ] **M0.1** Générer le defcfg kanata avec `linux-dev-names-exclude`
+- [x] **M0.1** Générer le defcfg kanata avec `linux-dev-names-exclude`
   (`"ydotoold virtual device"`, `"ergopti virtual keyboard"`),
   `linux-device-detect-mode keyboard-only`, `linux-continue-if-no-devs-found yes`.
   Supprimer le `--auto-detect` fantôme du commentaire et du lancement.
   *Test :* gate étendant `test-kanata-defalias-parity` — le defcfg généré
   contient les exclusions et le mode ; snapshot golden.
-- [ ] **M0.2** `device_finder` : exclure les périphériques dont le parent sysfs
+  → **Corrections au plan.** (a) Le nom réel du périphérique est
+  `Ergopti Virtual Keyboard` (majuscules) et non `ergopti virtual keyboard` ;
+  `linux-dev-names-exclude` matche **exactement**, donc la chaîne du plan
+  n'aurait rien exclu du tout. (b) `--auto-detect` n'a jamais été passé au
+  lancement — il n'existait que dans trois commentaires, tous corrigés.
+  (c) Le defcfg n'est pas *généré* : le générateur n'émet que le bloc
+  `defalias` et le préfixe du template est recopié tel quel. Les noms vivent
+  donc une seule fois dans `linux/infra/device_names.lua`, lu par
+  `uinput_writer` et `device_finder`, et une gate épingle le `.kbd` dessus.
+- [x] **M0.2** `device_finder` : exclure les périphériques dont le parent sysfs
   est `uinput` ou dont le nom matche `ydotool|kanata|ergopti|virtual`. Choisir
   explicitement de lire le périphérique **`kanata`** (post-remap) quand kanata
   tourne, sinon le physique.
   *Test :* fixtures `/proc/bus/input/devices` incluant un périph `kanata` et un
   `ydotoold` → `find_keyboard()` retourne `kanata`, jamais un virtuel.
-- [ ] **M0.3** Un seul propriétaire de config kanata : supprimer le symlink
+  → Le danger était pire que « non coordonné » : `Ergopti Virtual Keyboard`
+  contient « keyboard », donc notre propre périphérique d'injection était dans
+  le rang **préféré**, au-dessus du clavier physique. L'exclusion se fait
+  d'abord sur `S: Sysfs=/devices/virtual/` (réponse du noyau, couvre les
+  injecteurs qu'on ne connaît pas), les noms ne servant que de repli. La
+  préférence `kanata` est évaluée **avant** l'exclusion, sinon elle l'écarterait.
+  Deux seams purs (`parse_devices`, `select`) rendent le tout pilotable par
+  fixture — c'est leur absence qui empêchait d'écrire le test.
+- [x] **M0.3** Un seul propriétaire de config kanata : supprimer le symlink
   `install.sh` ; `manager.write_kbd()` seul écrivain de
   `~/.config/kanata/ergopti.kbd`.
   *Test :* le manager écrit un vrai fichier (pas à travers un symlink vers
   l'arbre source).
+  → Le symlink corrompait **le template suivi** : `write_kbd()` ouvre ce chemin
+  en écriture à chaque démarrage, donc le premier redémarrage suivait le lien et
+  réécrivait `platform/remap/data/kanata.kbd` dans l'arbre installé — le fichier
+  que la gate de parité lit était réécrit par le générateur qu'elle vérifie.
+  `install.sh` sème désormais une **copie** ; cela ferme aussi le trou d'ordre
+  que le lien masquait (l'unité kanata est activée avant que le daemon n'ait
+  jamais tourné).
 
 ### M1 — Le cœur : FFI evdev in / uinput out + grab (le gros morceau)
 

@@ -357,6 +357,167 @@ if (merged !== null) {
 	}
 }
 
+// ─── Device coordination (defcfg) ───────────────────────────────────────
+//
+// kanata grabs every keyboard-like device it can find, and two of the devices on
+// a machine running this driver are software keyboards it must never grab: our
+// own uinput device (kanata would re-map text we already mapped) and any
+// third-party injector a user runs alongside. The exclusion is an EXACT name
+// match on kanata's side, so a name that drifts by one character does not fail —
+// it silently stops excluding, and the corruption only reproduces on hardware.
+//
+// That is why this is a gate and not a comment: the names live once, in
+// linux/infra/device_names.lua, and the config below has to agree with them.
+
+const DEVICE_NAMES_PATH = path.join(ROOT, 'linux/infra/device_names.lua');
+
+/**
+ * Reads a `M.NAME = "value"` string constant out of the device-names module.
+ * @param {string} src - Module source.
+ * @param {string} field - Constant name without the `M.` prefix.
+ * @returns {string|null} The value, or null when the constant is absent.
+ */
+function luaStringConst(src, field) {
+	const m = src.match(new RegExp(`^M\\.${field}\\s*=\\s*"([^"]*)"`, 'm'));
+	return m ? m[1] : null;
+}
+
+/**
+ * Reads the ordered `M.REMAP_EXCLUDE` list, resolving its `M.FOO` references.
+ * @param {string} src - Module source.
+ * @returns {string[]} The device names, in declaration order.
+ */
+function remapExcludeList(src) {
+	const block = src.match(/^M\.REMAP_EXCLUDE\s*=\s*\{([\s\S]*?)\}/m);
+	if (!block) return [];
+	return [...block[1].matchAll(/M\.([A-Z_]+)/g)]
+		.map((r) => luaStringConst(src, r[1]))
+		.filter((v) => v !== null);
+}
+
+/**
+ * Extracts the `(defcfg …)` block from a kanata config.
+ * @param {string} src - Config source.
+ * @returns {string|null} The block including its parentheses, or null.
+ */
+function defcfgBlock(src) {
+	const clean = stripKanataComments(src);
+	const start = clean.indexOf('(defcfg');
+	if (start === -1) return null;
+	return clean.slice(start, skipGroup(clean, start));
+}
+
+/**
+ * Reads the quoted names of `linux-dev-names-exclude` from a defcfg block.
+ * @param {string} block - The defcfg block.
+ * @returns {string[]} Names in file order, empty when the key is absent.
+ */
+function excludedDeviceNames(block) {
+	const at = block.indexOf('linux-dev-names-exclude');
+	if (at === -1) return [];
+	const open = block.indexOf('(', at);
+	if (open === -1) return [];
+	const list = block.slice(open, skipGroup(block, open));
+	return [...list.matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+}
+
+console.log('');
+console.log('Device coordination (the two daemons must not grab each other)');
+console.log('='.repeat(60));
+
+const deviceNamesSrc = fs.readFileSync(DEVICE_NAMES_PATH, 'utf8');
+const declaredExclusions = remapExcludeList(deviceNamesSrc);
+const cfg = defcfgBlock(kanataTxt);
+
+if (declaredExclusions.length < 2) {
+	console.log(
+		`  ${FAIL}  device_names.lua declares ${declaredExclusions.length} exclusion(s) — ` +
+			'expected at least our own uinput device and the third-party injector'
+	);
+	fail++;
+} else {
+	console.log(`  ${PASS}  device_names.lua is the single source (${declaredExclusions.join(', ')})`);
+	pass++;
+}
+
+// The uinput writer stamps this exact string into struct uinput_setup. If it
+// carried its own copy, the exclusion could go stale without a single test
+// noticing — which is the whole failure mode this pair of checks exists for.
+const WRITER_PATH = path.join(ROOT, 'linux/adapters/uinput_writer.lua');
+const writerSrc = fs.readFileSync(WRITER_PATH, 'utf8');
+if (/DEVICE_NAME\s*=\s*require\(["']infra\.device_names["']\)\.VIRTUAL_KEYBOARD/.test(writerSrc)) {
+	console.log(`  ${PASS}  uinput_writer reads the name rather than redeclaring it`);
+	pass++;
+} else {
+	console.log(
+		`  ${FAIL}  uinput_writer must take DEVICE_NAME from infra.device_names.VIRTUAL_KEYBOARD — ` +
+			'a second literal is how the device we create and the device kanata excludes drift apart'
+	);
+	fail++;
+}
+
+if (cfg === null) {
+	console.log(`  ${FAIL}  kanata.kbd has no (defcfg) block`);
+	fail++;
+} else {
+	const excluded = excludedDeviceNames(cfg);
+	const missing = declaredExclusions.filter((n) => !excluded.includes(n));
+	const extra = excluded.filter((n) => !declaredExclusions.includes(n));
+
+	if (missing.length === 0 && extra.length === 0 && excluded.length > 0) {
+		console.log(`  ${PASS}  linux-dev-names-exclude matches device_names.lua exactly`);
+		pass++;
+	} else {
+		console.log(
+			`  ${FAIL}  linux-dev-names-exclude drifted — missing: [${missing.join(', ')}], ` +
+				`unexpected: [${extra.join(', ')}]`
+		);
+		console.log('        kanata matches these names byte for byte; a near-miss excludes nothing.');
+		fail++;
+	}
+
+	const REQUIRED_KEYS = [
+		[
+			/linux-device-detect-mode\s+keyboard-only/,
+			'linux-device-detect-mode keyboard-only',
+			'kanata has no reason to own pointer or tablet event streams',
+		],
+		[
+			/linux-continue-if-no-devs-found\s+yes/,
+			'linux-continue-if-no-devs-found yes',
+			'under a user unit the keyboard is routinely enumerated after the daemon starts',
+		],
+	];
+	for (const [re, label, why] of REQUIRED_KEYS) {
+		if (re.test(cfg)) {
+			console.log(`  ${PASS}  ${label}`);
+			pass++;
+		} else {
+			console.log(`  ${FAIL}  defcfg is missing \`${label}\` — ${why}`);
+			fail++;
+		}
+	}
+}
+
+// The generator replaces the LAST (defalias) block wholesale. defcfg lives in the
+// preserved prefix, but "lives in the prefix" is a property of where the split
+// falls, and the split has moved before. Assert it on the merged artifact, which
+// is what the daemon actually writes to disk.
+if (merged !== null) {
+	const mergedCfg = defcfgBlock(merged);
+	const survived = mergedCfg !== null && excludedDeviceNames(mergedCfg).length === declaredExclusions.length;
+	if (survived) {
+		console.log(`  ${PASS}  the exclusions survive the defalias replacement`);
+		pass++;
+	} else {
+		console.log(
+			`  ${FAIL}  the generated config loses its defcfg exclusions — the daemon would ship a ` +
+				'config in which kanata grabs our own virtual keyboard'
+		);
+		fail++;
+	}
+}
+
 console.log('');
 console.log(`Total: ${pass + fail} check(s) - ${pass} passed, ${fail} failed`);
 console.log('');
