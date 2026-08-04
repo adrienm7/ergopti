@@ -221,6 +221,39 @@ fi
 # ======= 5/ The parts only a person can see ===================================
 # ==============================================================================
 
+section "Automated kernel + keymap checks"
+
+# These two used to be human checks. They are not any more, and the difference
+# matters: a question a person answers once is a question that stops being
+# answered, while a script that fails is a script somebody fixes.
+LUA_BIN="$(command -v luajit || command -v lua5.4 || command -v lua || true)"
+HW_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+
+if [ -z "$LUA_BIN" ]; then
+	skip "no Lua interpreter — cannot run the kernel and keymap harnesses"
+else
+	if ( cd "$DRIVER_DIR" && sudo env LUA_PATH="$HW_PATH" "$LUA_BIN" \
+		tests/hardware/run_grab_race.lua >>"$REPORT" 2>&1 ); then
+		ok "grab holds and an interleaved burst comes back in order (C4, HARDWARE.md §4)"
+	else
+		case $? in
+			2) skip "grab race: this machine cannot host it (no writable /dev/uinput)" ;;
+			*) no  "grab race FAILED — see $REPORT; this is the 'abcd' -> 'acd' corruption" ;;
+		esac
+	fi
+
+	if ( cd "$DRIVER_DIR" && env LUA_PATH="$HW_PATH" "$LUA_BIN" \
+		tests/hardware/run_layout_resolution.lua >>"$REPORT" 2>&1 ); then
+		ok "real fr/es/us/de keymaps resolve, and each refuses the others' letters whole"
+	else
+		case $? in
+			2) skip "layout resolution: xkbcli is not installed" ;;
+			*) no  "layout resolution FAILED — see $REPORT" ;;
+		esac
+	fi
+fi
+
+
 section "Human checks (HARDWARE.md §1-§10)"
 
 say "  Start the daemon in another terminal first:"
@@ -230,7 +263,10 @@ say ""
 ask "Typing appears normally on screen with the daemon running and grabbing?"
 ask "Typing 'NT' + apostrophe expands to N'T immediately, with the right apostrophe?"
 ask "A French sentence (e a c u, guillemets) comes out correct on YOUR layout?"
-ask "Typing fast THROUGH an expansion leaves the text in order, ten times running? (C4)"
+# The event-ordering half of C4 is asserted by run_grab_race.lua above. What is
+# left for a person is whether the characters land in a real application's text
+# field, which needs a focused window and eyes on the screen.
+ask "Typing fast THROUGH an expansion leaves the text in order IN A REAL EDITOR, ten times? (C4)"
 ask "Holding a letter until it repeats, then a trigger, erases the right count?"
 ask "Ctrl+S / Ctrl+A / Alt+Tab cause no expansion, and a trigger still fires after?"
 ask "Backspace immediately after an expansion restores the trigger exactly?"
