@@ -1542,3 +1542,143 @@ déclarée.
       droit = déclencheur au lieu de touche de validation, et `show_tooltip` par
       section ignoré (résolu avec `section = nil`). Tous latents tant que l'aperçu
       n'est pas branché.
+
+
+
+
+
+## 12. Gestes 3/4/5 doigts sur Linux (audit du 2026-08-05)
+
+> **Demande :** « fais un audit de comment faire sur Linux pour mapper les gestes
+> 3 doigts / 4 doigts / 5 doigts, swipe up/down, tap etc. et assigne-leur des
+> actions », puis amener le sous-menu Gestes à parité.
+
+### 12.1 — Le fait qui tranche l'architecture
+
+**libinput plafonne les gestes tactiles à 4 doigts.** Vérifié mot pour mot dans
+`src/evdev-mt-touchpad-gestures.c` (libinput 1.31.3) — la dernière instruction de
+`tp_gesture_post_events()` est :
+
+```c
+if (tp->gesture.finger_count <= 4)
+        tp_gesture_handle_state(tp, time, ignore_motion);
+```
+
+Un swipe à 5 doigts n'entre jamais dans la machine à états : aucun
+`LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN` avec `finger_count = 5` n'existe. Et la
+documentation officielle dit que libinput « ne supporte pas les taps à quatre
+doigts ni aucun tap au-delà », les taps sortant comme
+`BTN_LEFT/RIGHT/MIDDLE` et jamais comme gestes.
+
+> Deux agents de recherche se sont **contredits** sur ce point. Celui qui affirmait
+> « il n'y a pas de plafond à 4 » citait le code de *comptage* des contacts et le
+> prenait pour la *grille* des gestes. La contradiction a été tranchée en allant
+> lire le corps complet de la fonction, pas en arbitrant entre deux résumés.
+
+Conséquence chiffrée : sur les 36 slots simples déclarés dans
+`_shared/modules/actions/actions.toml`, libinput peut en servir **16 au plus**
+(3 et 4 doigts × 8 directions) et **zéro** des quatre taps.
+
+### 12.2 — La route retenue
+
+**Lire le nœud `/dev/input/eventN` du pavé tactile directement, SANS EVIOCGRAB**,
+en décodant le protocole MT type B (slots `ABS_MT_*`) plus les bits
+`BTN_TOOL_{FINGER,DOUBLETAP,TRIPLETAP,QUADTAP,QUINTTAP}` — le même mécanisme FFI
+que `adapters/evdev_reader.lua` utilise déjà pour le clavier, sur un troisième
+slot de lecture.
+
+Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
+`input` et `uinput` et pose la règle udev.
+
+- **Pas de grab sur le pavé** : evdev est diffusé, plusieurs lecteurs voient tout.
+  Grabber le pavé prendrait le pointeur au compositeur et laisserait un curseur
+  mort. C'est aussi pourquoi libinput lui-même n'appelle jamais `EVIOCGRAB`.
+- **Le compte de doigts vient du matériel**, pas du nombre de contacts localisés :
+  libinput décrit les pavés capables de compter plus de doigts qu'ils n'en
+  localisent comme « la grande majorité ». Le recogniser actuel dérive le compte
+  de `#touches` et classerait donc un 5 doigts en 2 doigts sur cette majorité.
+- **Sonde de capacité à l'ouverture** : le noyau ne publie `BTN_TOOL_QUADTAP` que
+  si le périphérique a ≥ 4 slots, `QUINTTAP` que s'il en a ≥ 5
+  (`input_mt_init_slots()`). On peut donc savoir **avant qu'un doigt ne touche**
+  ce que la machine sait exprimer, et griser les lignes avec un `reason_key` —
+  le mécanisme que le manifeste utilise déjà — au lieu de livrer vingt liaisons
+  qui ne se déclencheront jamais.
+
+### 12.3 — Alternatives rejetées (à ne PAS re-proposer)
+
+- **Binder `libinput.so` en FFI** — perdu sur la capacité (plafond ci-dessus), et
+  hérite du « three-finger drag » activé par défaut depuis 1.28, qui convertit le
+  mouvement 3-4 doigts en glisser et supprime le swipe correspondant.
+- **Générer une config pour un outil existant** (façon kanata) — aucun outil
+  étudié ne couvre l'espace de slots déclaré : libinput-gestures n'a pas de taps,
+  fusuma se limite à 4 directions et 3-4 doigts, touchegg impose 3 doigts minimum
+  et son tap est tactile-only. Et chacun est un runtime séparé (Python, Ruby, Qt6)
+  sans lequel la fonctionnalité disparaîtrait en silence. Le précédent kanata ne
+  transfère pas : kanata est une dépendance assumée, détectée et signalée.
+- **Scraper `libinput debug-events`** — le header de `adapters/evdev_reader.lua`
+  documente le retrait de ce motif du chemin clavier pour quatre défauts précis
+  (lecture bloquante, dépendance binaire dure, parsing de prose, aucun contrôle du
+  descripteur). Le réintroduire pour le tactile contredirait une décision écrite
+  dans le même pilote. Le man dit d'ailleurs « Do not rely on the output ».
+  → **Les commentaires actuels de `manager.lua` et `menu_builder.lua` promettent
+  cette approche. Ils sont faux et doivent être corrigés, pas implémentés.**
+- **Réutiliser `device_finder.find_pointer()`** — il renvoie le premier
+  périphérique dont le nom contient mouse/touchpad/trackpoint, donc une souris USB
+  branchée peut gagner ; et `parse_devices` ne lit ni `B: ABS=` ni `B: PROP=`,
+  donc `/proc` seul ne peut pas confirmer la présence de `ABS_MT_SLOT`.
+
+### 12.4 — Ce qui ne marchera pas, et qu'il faut dire
+
+- [ ] **20 des 36 slots sont physiquement hors d'atteinte sur certaines machines.**
+      La spec Microsoft Precision Touchpad n'exige que 3 contacts simultanés.
+- [ ] **Le bureau agira sur le même geste.** Lecture sans grab ⇒ sur GNOME 47+,
+      KWin, Hyprland et cosmic-comp les swipes 3 et 4 doigts sont déjà réclamés :
+      l'action du démon **et** celle du bureau se déclenchent. Non corrigeable sans
+      le grab qui tue le curseur. Argument pour faire du **5 doigts** l'espace de
+      noms primaire du pilote : rien d'autre sous Linux ne peut le réclamer.
+- [ ] **Les slots 2 doigts (9 sur 36) se battront avec le défilement**, partout.
+- [ ] **Aucun processus externe ne peut déplacer/focaliser/fermer une fenêtre sous
+      Wayland.** Une action « aller à l'espace 3 » ne peut s'exprimer que comme une
+      combinaison de touches que le compositeur lie déjà — et Hyprland, sway, i3,
+      niri et river ne livrent aucune liaison par défaut.
+- [ ] **`ws_prev` / `ws_next` sont cassés aujourd'hui, sur les deux serveurs** :
+      `manager.lua` lance `wmctrl -s -1` et `wmctrl -s +1`, or `-s` prend un index
+      **absolu** et n'a pas de forme relative. Ces deux actions n'ont jamais marché.
+
+### 12.5 — Les étapes
+
+- [ ] Constantes EV_ABS / multitouch dans `infra/input_event.lua`.
+- [ ] Slot `TOUCHPAD` + sonde de capacité par ioctl dans `adapters/evdev_reader.lua`.
+- [ ] `modules/gestures/touchpad_finder.lua` — sélecteur dédié, avec confirmation
+      par ioctl (le sélecteur de pointeur ne convient pas, cf. 12.3).
+- [ ] `modules/gestures/mt_decoder.lua` — décodeur de trames, fonction pure sans FFI,
+      **latchant le compte de doigts au pic** entre `BTN_TOUCH 1` et `BTN_TOUCH 0`
+      (poser et lever passent par des comptes inférieurs).
+- [ ] Corriger `process_frame` : le compte de doigts vient du matériel, pas de
+      `#touches`.
+- [ ] Faire que `start_reading()` lise réellement.
+- [ ] Sortir le chemin d'émission de xdotool vers le uinput que le démon possède
+      déjà — l'actuel est **100 % xdotool, donc X11 seulement, et échoue en silence
+      sous Wayland**.
+- [ ] Remonter la capacité matérielle dans le menu au lieu de livrer des lignes
+      mortes.
+- [ ] Tests encodant les causes racines. **Les 508 lignes de tests gestes actuelles
+      passent contre un recogniser que rien n'alimente** — vert n'y est pas une
+      preuve.
+
+### 12.6 — Risques identifiés avant d'écrire une ligne
+
+- [ ] **Les numéros d'ioctl sont dérivés, pas testés.** `EVIOCGBIT(EV_KEY,96)`,
+      `EVIOCGPROP(4)`, `EVIOCGABS(ABS_MT_SLOT)` calculés depuis l'encodage `_IOC`
+      standard. Un mauvais numéro **n'échoue pas bruyamment** : l'ioctl renvoie des
+      bits de capacité arbitraires et le menu grise les mauvaises lignes.
+- [ ] **La trace d'événements est une reconstruction, pas une capture.**
+      L'entrelacement exact de `BTN_TOOL_*` dans une trame dépend du pilote.
+      Capturer le vrai pavé avec `evtest` ou `libinput record` avant d'écrire les
+      fixtures.
+- [ ] **Le volume tactile est d'une autre classe** : une trame toutes les ~8 ms
+      contre quelques événements par seconde en frappe. `MAX_EVENTS_PER_DRAIN = 256`
+      a été dimensionné pour l'autorépétition.
+- [ ] **`SYN_DROPPED` ne se produit que sous charge**, donc jamais en test. Si
+      l'état des slots n'est pas remis à zéro, un swipe 3 doigts déclenche par
+      intermittence l'action 5 doigts.
