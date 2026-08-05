@@ -222,6 +222,17 @@ check(true, "the driver's evdev_reader opened it")
 --- @param dy integer
 --- @return table|nil The gesture the decoder produced.
 local function play(fingers, dx, dy)
+	-- Drain whatever the previous gesture left behind FIRST.
+	--
+	-- The loop below stops as soon as the decoder yields a gesture, and the
+	-- kernel may still hold the events after it — the trailing SYN, or a lift
+	-- frame delivered late. Left in the buffer they arrive at the head of the
+	-- next gesture and desynchronise its slot state, which is why the third
+	-- gesture came back as nothing while the first two were correct.
+	for _ = 1, 5 do
+		if Reader.drain(function() end, Reader.TOUCHPAD) == 0 then break end
+	end
+
 	local decoder = Decoder.new()
 	local base_x, base_y = 1000, 900
 	local tool = {}

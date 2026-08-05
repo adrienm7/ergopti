@@ -579,8 +579,21 @@ function M._create_gtk_window(app_name, html, handler)
 		visible              = true,
 	})
 
-	-- Load the inline HTML (base_uri nil = no file:// origin).
-	webview:load_html(html, nil)
+	-- Load the inline HTML with an explicit base URI.
+	--
+	-- It was nil, and the comment called that "no file:// origin" as though the
+	-- absence were the point. A nil base makes WebKit treat the document as
+	-- about:blank with a unique opaque origin, and that is the only difference
+	-- between this path and the one in tests/hardware/run_page_errors.lua — which
+	-- builds the SAME html, loads it with "file:///", and finds window.setData
+	-- defined and no exception raised. Through this path it was undefined, so the
+	-- host's `if(window.setData)` guard discarded every push and the settings
+	-- window drew nothing.
+	--
+	-- Everything is inlined by build_injected_html, so nothing is ever fetched
+	-- relative to this URI. It exists to give the document an ordinary origin
+	-- rather than an opaque one.
+	webview:load_html(html, "file:///")
 
 	-- ── Window lifecycle: close → hide (don't destroy, allow re-show) ──
 	window.on_destroy = function()
