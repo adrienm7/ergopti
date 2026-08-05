@@ -818,9 +818,19 @@ jobs:
       # the slot semantics and the non-blocking read are all the kernel's, and
       # those are exactly what a hand-written table cannot check.
       - name: A gesture written to uinput comes back as a gesture
+        # Not skipped when an earlier harness fails. These are independent
+        # diagnostics, and letting the first failure hide the others' answers is
+        # how a run comes back saying less than it measured — the page-error trap
+        # below was skipped on its first outing for exactly that reason, so its
+        # question went unanswered for a whole cycle.
+        if: always()
         working-directory: static/ergopti_plus/linux
         run: |
-          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
+          # sudo, like the grab harness: the event node the kernel publishes for a
+          # new uinput device belongs to root:input at 0660, and the runner's user
+          # is in neither. Creating the device needs only /dev/uinput; READING it
+          # back needs the node, which is the half this harness exists for.
+          sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
         timeout-minutes: 4
 
       # Both hotstrings bridges were changed from RETURNING their payload to
@@ -840,12 +850,14 @@ jobs:
       # nothing whatever about the code, so the two are separated and the test
       # step below gets a budget sized for the test.
       - name: Install WebKit2GTK and lgi
+        if: always()
         run: |
           sudo apt-get install -y --no-install-recommends \
             xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
         timeout-minutes: 20
 
       - name: The webview push reaches a real WebKit page
+        if: always()
         working-directory: static/ergopti_plus/linux
         run: |
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
@@ -888,6 +900,7 @@ jobs:
       # run_javascript is too late by the whole page load — so this harness
       # builds the HTML itself and splices the trap in right after <head>.
       - name: What each page raises while loading
+        if: always()
         working-directory: static/ergopti_plus/linux
         run: |
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
