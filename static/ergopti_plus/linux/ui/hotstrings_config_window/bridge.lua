@@ -21,6 +21,12 @@ local LOG = "bridge.hotstrings_config"
 local PRIORITY_MIN = 0
 local PRIORITY_MAX = 100
 
+-- Delays cross this bridge in milliseconds and are stored in seconds. The window
+-- shows milliseconds because that is the unit a person means by "a bit longer";
+-- the cascade, the category TOMLs and the engine all speak seconds. The
+-- conversion belongs here, at the one boundary the two units meet.
+local MS_PER_SEC = 1000
+
 -- Lazy-loaded writer for hotstring TOML persistence.
 local _writer = nil
 local function _get_writer()
@@ -171,8 +177,24 @@ function M.on_message(payload, state)
 		return section
 	end
 
+	-- The window sends `ms`, `hex` and `show_tooltip` — never `value`. This bridge
+	-- read `payload.value` for all three until 2026-08-05, so every control did
+	-- the OPPOSITE of what it looked like: typing 500 into a delay field passed
+	-- tonumber(nil) and CLEARED that category's delay, picking a colour cleared
+	-- the colour, and ticking "show the preview" wrote show_tooltip = false
+	-- because `nil and true or false` is false. Nothing reported it, because the
+	-- bridge answers with a refreshed payload either way.
 	if action == "set_delay" and payload.category then
-		set_override(state, payload.category, section_of(payload), "delay", tonumber(payload.value))
+		-- Milliseconds on the wire, seconds in the store: the cascade, the TOMLs
+		-- and the engine all speak seconds, and the conversion belongs at this
+		-- boundary rather than in the resolver.
+		local ms = tonumber(payload.ms)
+		if not ms or ms < 0 then
+			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
+				tostring(payload.ms), tostring(payload.category))
+			return _build_initial_payload(state)
+		end
+		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC)
 		return _build_initial_payload(state)
 	end
 
@@ -182,7 +204,15 @@ function M.on_message(payload, state)
 	end
 
 	if action == "set_color" and payload.category then
-		set_override(state, payload.category, section_of(payload), "color", payload.value)
+		-- Guarded like both references: an empty select is the page's "no choice",
+		-- and writing it as an override would pin the category to nothing.
+		local hex = payload.hex
+		if type(hex) ~= "string" or hex == "" then
+			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
+				tostring(hex), tostring(payload.category))
+			return _build_initial_payload(state)
+		end
+		set_override(state, payload.category, section_of(payload), "color", hex)
 		return _build_initial_payload(state)
 	end
 
@@ -195,9 +225,9 @@ function M.on_message(payload, state)
 		-- Coerced rather than passed through: the window sends a JSON boolean,
 		-- and a string "false" is truthy in Lua — which would turn the preview on
 		-- for a user who had just turned it off.
-		local value = payload.value
+		local value = payload.show_tooltip
 		if type(value) == "string" then value = (value == "true") end
-		set_override(state, payload.category, section_of(payload), "show_tooltip", value and true or false)
+		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true)
 		return _build_initial_payload(state)
 	end
 
@@ -255,13 +285,22 @@ function M.on_message(payload, state)
 	end
 
 	if action == "reset_all" then
-		if state.config and type(state.config.reset_defaults) == "function" then
-			state.config.reset_defaults()
-		end
+		-- Overrides only. This used to call config.reset_defaults() first, and on
+		-- this driver that is `return M.enable_all()` — so a user who had switched
+		-- off, say, autocorrection and rolls, and then clicked reset to undo a
+		-- colour experiment, silently got every disabled pack switched back on and
+		-- thousands of expansions firing again. Neither reference driver touches
+		-- enablement here: macOS clears overrides category by category and section
+		-- by section, and that is the whole contract of this button.
 		if state.config and type(state.config.get_categories) == "function"
 			and type(state.config.clear_override) == "function" then
-			for id in pairs(state.config.get_categories()) do
+			for id, category in pairs(state.config.get_categories()) do
 				state.config.clear_override(id, nil)
+				-- Sections too: a per-section delay left behind after "reset
+				-- everything" is a setting the user cannot see and did not keep.
+				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
+					state.config.clear_override(id, section)
+				end
 			end
 		end
 		return _build_initial_payload(state)

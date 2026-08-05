@@ -72,6 +72,17 @@ local PREF_DEFAULTS = {
 -- category toggles, which share the same storage.
 local PREF_PREFIX = "hotstring_editor."
 
+-- The app name this bridge's page lives under in _shared/ui/. Named once: it is
+-- both the directory the HTML is read from and the key eval_js pushes to, and a
+-- second spelling of it is what made the settings window open on an error page.
+local APP_NAME = "hotstring_editor"
+
+-- How the window was opened, decided by whoever opened it. The shared page sends
+-- `ready` with an empty data object, so it cannot tell the host anything here —
+-- reading the mode off the message meant "shortcut" was unreachable and the
+-- quick-add flow the page gates on it could never run.
+local _pending_mode = "menu"
+
 -- Lazily-loaded codecs. Required at call time rather than at load so a driver
 -- missing the codec still boots and reports the failure when the window opens.
 local _writer, _reader = nil, nil
@@ -133,6 +144,44 @@ local function pref(key)
 	local stored = Storage.get(PREF_PREFIX .. key, nil)
 	if stored == nil then return PREF_DEFAULTS[key] end
 	return stored
+end
+
+--- Reads one editor preference.
+---
+--- Published so the tray menu reads the same store the page does. Both drivers
+--- expose these two preferences as menu rows; on this one they were readable
+--- only from inside the page, which sends `save_pref` for the compact-view
+--- toggle alone — so "default section" and "close after adding" were frozen at
+--- their declared defaults with no way to reach them.
+--- @param key string One of the PREF_DEFAULTS keys.
+--- @return boolean|string|nil
+function M.get_pref(key)
+	if PREF_DEFAULTS[key] == nil then
+		Logger.error(LOG, "get_pref(): '%s' is not an editor preference.", tostring(key))
+		return nil
+	end
+	return pref(key)
+end
+
+--- Writes one editor preference.
+--- @param key string
+--- @param value boolean|string
+--- @return boolean
+function M.set_pref(key, value)
+	if PREF_DEFAULTS[key] == nil then
+		Logger.error(LOG, "set_pref(): '%s' is not an editor preference.", tostring(key))
+		return false
+	end
+	-- Typed against the declared default rather than accepted as-is: a string
+	-- where a boolean belongs is truthy in Lua, so "false" would read as on.
+	if type(value) ~= type(PREF_DEFAULTS[key]) then
+		Logger.error(LOG, "set_pref(): '%s' expects a %s, got %s.",
+			key, type(PREF_DEFAULTS[key]), type(value))
+		return false
+	end
+	local ok = Storage.set(PREF_PREFIX .. key, value)
+	Logger.debug(LOG, "Editor preference %s: %s.", key, tostring(value))
+	return ok
 end
 
 
@@ -310,7 +359,73 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 4/ Dispatch =====================
+-- ======= 4/ Pushing the payload ==========
+-- =========================================
+-- =========================================
+
+--- Records how the next window opening should be presented to the page.
+---
+--- Called by whoever opens the editor. "shortcut" makes the page jump straight
+--- to the default section's add-entry field; "menu" opens it normally.
+--- @param mode string "menu" or "shortcut".
+function M.set_pending_mode(mode)
+	if mode ~= "menu" and mode ~= "shortcut" then
+		Logger.error(LOG, "set_pending_mode(): '%s' is not an open mode.", tostring(mode))
+		return
+	end
+	_pending_mode = mode
+	Logger.debug(LOG, "Editor open mode: %s.", mode)
+end
+
+--- Pushes the payload into the page by calling its own entry point.
+---
+--- The page reveals `#app` from inside window.initData and nowhere else, so this
+--- is not one way of delivering the data — it is the only one.
+--- @param state table Daemon state.
+--- @return boolean True when the push reached a live webview.
+function M.push_init(state)
+	local ok_json, json_mod = pcall(require, "json")
+	if not ok_json or type(json_mod.encode) ~= "function" then
+		Logger.error(LOG, "Cannot push initData(): the shared json module is unavailable — the editor stays on its loading screen.")
+		return false
+	end
+
+	local ok_payload, encoded = pcall(function()
+		return json_mod.encode(build_payload(state, _pending_mode))
+	end)
+	if not ok_payload or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot push initData(): payload encoding failed (%s).", tostring(encoded))
+		return false
+	end
+
+	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	if not ok_mgr or type(Manager.eval_js) ~= "function" then
+		Logger.error(LOG, "Cannot push initData(): webview_manager.eval_js is unavailable.")
+		return false
+	end
+
+	-- Guarded on the page side too, exactly as macOS guards it: a push that
+	-- arrives before the function is defined would throw inside the webview,
+	-- where nothing on this side would ever see it.
+	local pushed = Manager.eval_js(APP_NAME, "if(window.initData) window.initData(" .. encoded .. ")")
+	if pushed then
+		Logger.success(LOG, "Hotstring editor initialised (%d byte(s), mode '%s').", #encoded, _pending_mode)
+	else
+		Logger.warn(LOG, "The editor reported ready but its window is gone — initData() not pushed.")
+	end
+
+	-- One shortcut opening must not make every later menu opening behave like a
+	-- shortcut one.
+	_pending_mode = "menu"
+	return pushed
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Dispatch =====================
 -- =========================================
 -- =========================================
 
@@ -332,8 +447,18 @@ function M.on_message(payload, state)
 	end
 
 	if action == "ready" then
-		Logger.info(LOG, "Hotstring editor ready — sending %s.", "the personal set")
-		return build_payload(state, data.open_mode)
+		Logger.info(LOG, "Hotstring editor ready — sending the personal set.")
+		-- PUSHED, not returned. The page has no reader for a bridge response: it
+		-- reveals `#app` (display:none in the markup) only from inside
+		-- `window.initData`, at script.js:1376, the way macOS calls it. Returning
+		-- the payload left the editor on "Chargement…" for ever — every entry, every
+		-- section and the Add button all behind a div nothing ever unhid.
+		--
+		-- The mode is the host's to decide, not the page's: script.js sends
+		-- `ready` with an empty data object, so `data.open_mode` was always nil and
+		-- "shortcut" could never be reached. Whoever opens the window sets it.
+		M.push_init(state)
+		return nil
 	end
 
 	if action == "save" then

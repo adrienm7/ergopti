@@ -636,7 +636,7 @@ helpers.describe("ui.bridge_handlers", function()
       s2.config.set_override = function(cat, sec, field, value)
         seen[#seen + 1] = { cat = cat, sec = sec, field = field, value = value }
       end
-      handler.on_message({ action = "set_color", category = "accents", value = "#ff0000" }, s2)
+      handler.on_message({ action = "set_color", category = "accents", hex = "#ff0000" }, s2)
       helpers.assert_eq(#seen, 1, "a colour change must reach the config module exactly once")
       helpers.assert_eq(seen[1].cat, "accents", "and name the category")
       helpers.assert_eq(seen[1].field, "color", "under the colour field")
@@ -651,7 +651,7 @@ helpers.describe("ui.bridge_handlers", function()
       -- The window sends section: '' for a category-level edit. Passing it
       -- through writes an override under a section nothing has, so it never
       -- resolves and the colour silently does not apply.
-      handler.on_message({ action = "set_color", category = "accents", section = "", value = "#00ff00" }, s2)
+      handler.on_message({ action = "set_color", category = "accents", section = "", hex = "#00ff00" }, s2)
       helpers.assert_eq(seen[1].sec, nil, "the empty string must become nil, not a section key")
     end)
     helpers.it("'set_priority' accepts a value in range and refuses one outside it", function()
@@ -811,15 +811,34 @@ helpers.describe("ui.bridge_handlers", function()
     -- default_priority, open_mode}, and persist() sends the WHOLE model as
     -- {sections_order, sections}. The suite was green while the editor opened
     -- EMPTY on this driver, every time.
-    helpers.it("'ready' answers with the keys window.initData actually reads", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table", "the editor must receive a payload")
-      helpers.assert_true(type(result.sections) == "table",
-        "render() walks D.sections — without it the window shows nothing at all")
-      helpers.assert_true(type(result.trigger_char) == "string",
-        "the editor prints the magic key in its hints")
-      helpers.assert_true(type(result.open_mode) == "string",
-        "open_mode decides whether the add-entry modal opens on load")
+    helpers.it("'ready' PUSHES window.initData rather than returning the payload", function()
+      -- The second half of the same bug. The keys were right; the delivery was
+      -- not. This bridge returned the payload as a bridge response, and the
+      -- shared editor page has no reader for one — it reveals #app (display:none
+      -- in the markup) only from inside window.initData, at script.js:1376. So
+      -- the editor stayed on "Chargement…" for ever, with a perfectly correct
+      -- payload sitting in a return value nothing collected.
+      local pushed = {}
+      local manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
+      }
+      local ok, err = pcall(handler.on_message, "ready", state)
+      package.loaded["ui.webview_manager"] = manager
+      helpers.assert_true(ok, "the ready branch must not throw: " .. tostring(err))
+
+      helpers.assert_eq(#pushed, 1, "exactly one push into the page")
+      helpers.assert_eq(pushed[1].app, "hotstring_editor",
+        "into the page's own directory name — the key eval_js looks a live webview up by")
+      helpers.assert_true(pushed[1].js:find("window.initData(", 1, true) ~= nil,
+        "calling the entry point the page defines, not some other function")
+      helpers.assert_true(pushed[1].js:find("if(window.initData)", 1, true) ~= nil,
+        "guarded, because a push landing before the page defines it throws inside "
+          .. "the webview where nothing on this side would see it")
+      for _, key in ipairs({ "sections", "trigger_char", "open_mode" }) do
+        helpers.assert_true(pushed[1].js:find('"' .. key .. '"', 1, true) ~= nil,
+          "and carrying " .. key .. ", which the page destructures")
+      end
     end)
     helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)

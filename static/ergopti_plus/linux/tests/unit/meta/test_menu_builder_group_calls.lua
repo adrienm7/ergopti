@@ -122,7 +122,7 @@ helpers.describe("hotstrings config window: the bridge calls the same functions 
 		-- defect being guarded is the same one, on a path that actually runs: a
 		-- colour change must name the category the user clicked, not pass the config
 		-- module as the first argument.
-		handler.on_message({ action = "set_color", category = "email", value = "#ff0000" }, state)
+		handler.on_message({ action = "set_color", category = "email", hex = "#ff0000" }, state)
 		helpers.assert_true(#override_args >= 1, "a colour change must reach the config module")
 		helpers.assert_eq(override_args[1].cat, "email",
 			"and it must name the category the user clicked, not hand the module to itself")

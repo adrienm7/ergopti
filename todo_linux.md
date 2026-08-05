@@ -1447,54 +1447,75 @@ déclarée.
       `"'\''"` écrit `"'\''"` s'effondre en trois apostrophes et casse la
       commande. Un pack sous `/home/me/l'ergopti` n'ouvrait rien, en silence.
 
+- [x] **L'éditeur de hotstrings personnelles était inatteignable.** Aucune ligne,
+      aucun raccourci, rien n'ouvrait `_shared/ui/hotstring_editor/`. Le bridge
+      était complet et **avait ses propres tests qui passaient** — c'est
+      exactement pourquoi rien ne l'a signalé : on teste un bridge que personne
+      n'ouvre. La ligne « Ouvrir l'éditeur » existe désormais, avec le sélecteur
+      de section par défaut et « fermer après ajout », les deux préférences que
+      le bridge lisait et que rien ne pouvait écrire.
+- [x] **L'éditeur restait sur « Chargement… »** même une fois ouvert : le bridge
+      *retournait* le payload, et la page n'a aucun lecteur de réponse — elle
+      révèle `#app` (`display:none` dans le markup) uniquement depuis
+      `window.initData`. Le payload était correct et attendait dans une valeur de
+      retour que personne ne collectait. Poussé maintenant, comme macOS.
+      → Le mode d'ouverture appartient à l'hôte : la page envoie `ready` avec un
+      objet vide, donc `"shortcut"` était inatteignable par construction.
+- [x] **Chaque contrôle de la fenêtre de config effaçait au lieu d'écrire.** Le
+      bridge lisait `payload.value` ; la page envoie `ms`, `hex`,
+      `show_tooltip`. Saisir 500 ms **supprimait** le délai ; cocher « afficher
+      le tooltip » écrivait `false` — `nil and true or false` vaut `false`.
+      Aucun message : le bridge répond un payload rafraîchi dans les deux cas.
+      → **Quatre tests épinglaient le mauvais contrat** et rendaient la suite
+      verte sur un bridge incapable de recevoir un seul message de la vraie page.
+      Réécrits sur les payloads copiés depuis `script.js`, plus un test qui
+      refuse explicitement l'ancien champ `value` au lieu d'écrire `nil`.
+- [x] **Pas de bascule maîtresse Hotstrings.** Ligne 1 du manifeste, sautée par
+      le renderer partagé *par contrat* (« Category toggles rendered by caller ») —
+      donc un gate manifeste voyait une ligne déclarée, un gate renderer voyait un
+      saut voulu, et personne ne vérifiait que l'appelant en construisait une.
+      → Placée **dans** le sous-menu comme Windows, pas sur le parent comme
+      macOS : `appindicator.lua` lie `item.fn` uniquement quand la ligne n'a pas
+      de sous-menu, donc un parent cliquable n'est pas représentable ici.
+      → Elle passe par `enable_all`/`disable_all` : une boucle de `toggle_group`
+      re-parse tout le catalogue une fois par catégorie, dans un callback de menu.
+- [x] **Changer la touche magique ne réenregistrait rien.** `MagicKey.set()`
+      déclenchait son callback `_on_change` depuis toujours ; personne n'en
+      enregistrait un. Le menu se relabellisait, les 21 locales suivaient, et
+      **aucune expansion n'écoutait la nouvelle touche**. Le démon enregistre
+      maintenant le callback : réinit des règles dynamiques, rechargement du
+      catalogue, reconstruction du tray.
+- [x] **« Tout réinitialiser » réactivait toutes les catégories désactivées.**
+      Il appelait `reset_defaults()`, qui sur ce pilote est `return M.enable_all()` :
+      nettoyer une expérimentation de couleurs rallumait en silence chaque pack
+      éteint. Le bouton ne touche plus qu'aux surcharges, sections comprises.
+      → Là encore **le test épinglait le mauvais comportement** (`assert_eq(log.resets, 1,
+      "the enable state goes back to shipped")`) — il est maintenant son inverse.
+
 ### 11.2 — Bloquants restants
 
-- [ ] **L'éditeur de hotstrings personnelles est inatteignable.** Aucune ligne,
-      aucun raccourci, rien n'ouvre `_shared/ui/hotstring_editor/` sur Linux. Le
-      bridge existe et est complet ; personne ne l'appelle.
-- [ ] **L'éditeur resterait sur « Chargement… »** même ouvert : le bridge
-      *retourne* le payload là où macOS l'*injecte* par `window.initData(...)`.
-      `#app` est `display:none` jusqu'à cet appel.
-- [ ] **Chaque contrôle de la fenêtre de config efface au lieu d'écrire.** Le
-      bridge lit `payload.value` ; la page envoie `ms`, `hex`, `show_tooltip`.
-      Saisir 500 ms **supprime** le délai ; cocher « afficher le tooltip » écrit
-      `false`. Aucun message d'erreur : le bridge répond un payload rafraîchi
-      dans les deux cas.
-      → **Et le test épingle le mauvais contrat** (`test_config_window_overrides.lua`
-      envoie `value = 1.5`), donc la suite est verte sur un bridge qui ne peut rien
-      recevoir de la vraie page.
 - [ ] **Le bridge n'envoie pas les données que la page affiche** : ni catégories,
       ni presets de couleur, ni délai global. Page vide même une fois ouverte.
 - [ ] **L'aperçu n'est jamais affiché** : `preview.lua M.show()` n'a aucun appelant
       dans tout le pilote. Toute la surface aperçu — et donc les quatre bascules
       ci-dessus — est inerte tant qu'un énumérateur de candidats n'existe pas.
-- [ ] **Pas de bascule maîtresse Hotstrings.** Première ligne du manifeste, rendue
-      par personne : le renderer partagé saute les `toggle` par contrat et
-      l'appelant Linux n'en construit aucune.
 - [ ] **La catégorie « hotstrings dynamiques » est inatteignable** : une ligne
       grisée « (aucun groupe chargé) », alors que le moteur tourne.
 - [ ] **Impossible d'ajouter un délimiteur personnalisé** : la ligne déléguait à
       la fenêtre qui ne s'ouvrait pas. Rien n'appelle jamais
       `add_custom_terminator`.
-- [ ] **Changer la touche magique ne réenregistre rien** : `MagicKey.init()` n'est
-      jamais appelé, donc le callback `_on_change` ne part pas. Le menu se
-      relabellise, les 21 locales suivent, et **aucune expansion n'écoute la
-      nouvelle touche**. Pire qu'absent : l'UI annonce un succès que le produit
-      contredit.
 - [ ] **La touche « répétition ★ » n'existe pas sur Linux**, et
       `platforms = ["ahk"]` est faux : macOS livre le moteur *et* la bascule
       depuis toujours. Même forme d'erreur que `hotstring_extensions` et
       `magic_key_config` — le manifeste enregistre qui a implémenté en premier.
-- [ ] **« Tout réinitialiser » réactive toutes les catégories désactivées** — et
-      là encore le test épingle ce comportement comme voulu.
-
-### 11.3 — Majeurs et mineurs restants
-
 - [ ] Un délimiteur **activé** est perdu au redémarrage (seule la liste OFF est
       persistée) ; 15 des 25 délimiteurs sont livrés désactivés.
 - [ ] Pas de « ↺ Valeurs par défaut » dans les expanseurs de mots.
-- [ ] « Tout activer » ne restaure pas les **sections**, seulement les portails de
-      catégorie — et re-parse tout le catalogue une fois par catégorie.
+- [x] « Tout activer » ne restaurait pas les **sections** et re-parsait tout le
+      catalogue une fois par catégorie, dans un callback de menu. Les deux moitiés
+      tombent avec le même changement : `enable_all` vide l ensemble `_disabled_groups`,
+      qui porte les clés `categorie.section` dans le même espace de noms que les
+      identifiants de catégorie.
 - [ ] Les compteurs ne reflètent pas l'état : une catégorie éteinte affiche
       toujours « (14 231) ». Windows a une politique dédiée et testée pour ça.
 - [ ] « Tout cocher / décocher » d'une catégorie est **grisé quand elle est

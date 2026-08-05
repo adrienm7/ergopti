@@ -1011,6 +1011,26 @@ local function main()
 		end)
 	end
 
+	-- 8.10b) Let a magic-key change actually reach the engine.
+	--
+	-- MagicKey.set() has always fired an _on_change callback after persisting, and
+	-- until 2026-08-05 nobody registered one — so changing the key from the menu
+	-- relabelled the row, relabelled the 21 locales through the provider above,
+	-- and left every expansion listening for the old character. That is worse than
+	-- the feature being absent: the interface reports success and the product
+	-- silently disagrees with it.
+	--
+	-- The dynamic rules bake the character into their triggers at registration
+	-- time, so they have to be rebuilt; the catalogue reload covers the rest.
+	MagicKey.init(function(new_char)
+		Logger.info(LOG, "Magic key changed to '%s' — re-registering.", tostring(new_char))
+		if dyn_hotstrings then
+			dyn_hotstrings.init({ trigger_char = new_char })
+		end
+		perform_reload("the magic key")
+		if rebuild_tray_menu then rebuild_tray_menu() end
+	end)
+
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
 		gestures.init({ enabled = false, persist = true })
