@@ -836,6 +836,65 @@ local function _manifest_hotstring_rows(ctx, config)
 			local on    = dyn.is_enabled()
 			local count = type(dyn.get_rules_count) == "function" and dyn.get_rules_count() or 0
 
+			local sub = {
+				{
+					title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+					fn    = function()
+						if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				},
+			}
+
+			-- One row per rule family, as Windows and macOS offer. The plan recorded
+			-- this as blocked by the shared engine "registering the date rules as a
+			-- batch with no identifier". That was wrong: add_rule has always carried
+			-- a section, and match_buffer has always taken a predicate to filter on
+			-- it. This driver simply passed nil for it.
+			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
+			if #families > 0 then
+				-- The two bulk rows the other drivers put at the top of this submenu.
+				-- They act on the families only; the category gate above is separate,
+				-- and "tout désactiver" leaving the category on is the point — it is
+				-- what lets the user switch families back on one at a time.
+				sub[#sub + 1] = { title = "-" }
+				for _, bulk in ipairs({ { key = "enable_all", on = true }, { key = "disable_all", on = false } }) do
+					sub[#sub + 1] = {
+						title    = i18n_safe("menu.hotstrings." .. bulk.key),
+						disabled = not on,
+						fn       = function()
+							for _, family in ipairs(families) do
+								if family.section then dyn.set_rule_enabled(family.section, bulk.on) end
+							end
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					}
+				end
+				sub[#sub + 1] = { title = "-" }
+
+				for _, family in ipairs(families) do
+					if family.separator then
+						sub[#sub + 1] = { title = "-" }
+					else
+						local section, enabled = family.section, family.enabled
+						sub[#sub + 1] = {
+							-- Resolved by the manager, which owns both the locale key
+							-- and the engine that answers what "{date}" is today.
+							title    = family.label,
+							checked  = enabled,
+							-- Greyed while the category itself is off, like a section
+							-- row: the tick still says what comes back when it is
+							-- switched on.
+							disabled = not on,
+							fn       = function()
+								dyn.set_rule_enabled(section, not enabled)
+								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							end,
+						}
+					end
+				end
+			end
+
 			items[#items + 1] = {
 				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
 				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
@@ -843,15 +902,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- rendered as the raw string.
 				title   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
 				checked = on,
-				menu    = {
-					{
-						title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-						fn    = function()
-							if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						end,
-					},
-				},
+				menu    = sub,
 			}
 		end,
 		["hotstring_categories_ergopti"]  = function(items) append_class(items, "ergopti") end,

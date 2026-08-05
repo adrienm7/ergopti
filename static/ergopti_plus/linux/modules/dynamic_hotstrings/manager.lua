@@ -30,6 +30,10 @@ local TomlCodec = require("toml_codec")
 
 local LOG = "modules.dynamic_hotstrings.manager"
 
+-- The category these rules belong to, as the menu and the delay cascade name it.
+-- Passed to the shared engine's section guard, which takes (group, section).
+local DYNAMIC_GROUP = "dynamichotstrings"
+
 
 -- =========================================
 -- =========================================
@@ -189,7 +193,7 @@ function M.on_trigger(buffer, trigger)
 	local prefix = buffer:sub(1, -2)
 	if prefix == "" then return false end
 
-	local match = Engine.match_buffer(prefix, nil, nil)
+	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled)
 	if not match then return false end
 
 	-- Inject: erase the suffix + trigger, type the result.
@@ -223,7 +227,10 @@ function M.preview(buffer)
 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
 	if not ok_eng or not Engine then return nil end
 
-	return Engine.preview(buffer:sub(1, -2), nil, nil)
+	-- The same guard as the match path. A preview that offers what the engine
+	-- will refuse is worse than no preview: the user sees a rule they switched
+	-- off and concludes the toggle does nothing.
+	return Engine.preview(buffer:sub(1, -2), DYNAMIC_GROUP, M.is_rule_enabled)
 end
 
 
@@ -251,6 +258,145 @@ function M.get_info()
 	local copy = {}
 	for k, v in pairs(_info) do copy[k] = v end
 	return copy
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 6/ Per-rule switches ============
+-- =========================================
+-- =========================================
+
+--- The rule families the manifest declares, in the order Windows and macOS
+--- render them (`_DYNAMIC_HOTSTRINGS_ORDER` in tray_menu.ahk, `_sections` in
+--- macos/modules/dynamic_hotstrings/rules_engine.lua — the two already agree).
+---
+--- `id` is the manifest id under `hotstrings.dynamic`; `section` is what the
+--- shared engine registers the rule under, and the two differ because the locale
+--- catalogue folds underscores away. `_shared/modules/features/manifest.toml`
+--- and `_shared/data/locales/*.json` are those two spellings' sources.
+---
+--- Windows and macOS offer one toggle per family; Linux offered only the
+--- category gate, and the plan recorded the blocker as "the shared engine
+--- registers the date rules as a batch with no identifier". That was wrong —
+--- `add_rule(suffix, section, resolver)` has carried a section all along, and
+--- `match_buffer` has always taken a predicate to filter on it. The gap was that
+--- this driver passed nil for it.
+---
+--- The three prefix families (iban, phone, ssn) are declared in the manifest,
+--- rendered by the other two drivers, and registered by no Linux code at all, so
+--- they are absent here rather than listed and inert: a switch for a rule that
+--- does not exist is a worse lie than a missing switch. Implementing them is its
+--- own item, tracked as a parity gap in the Linux plan.
+local RULE_FAMILIES = {
+	{ id = "date_long_fr",                        section = "datelongfr" },
+	{ id = "date_fr",                             section = "datefr" },
+	{ id = "date",                                section = "date" },
+	{ separator = true },
+	{ id = "text_expansion_personal_information", section = "personal_info",
+	  label_key = "dynamichotstrings.textexpansionpersonalinformation" },
+}
+
+-- Where a family's OFF state lives, matching the `hotstrings.dynamic.<key>`
+-- path macOS stores under (infra/preferences.lua). Only the OFF state is
+-- written: every family ships enabled, so persisting the default would freeze
+-- today's default for anyone who had already run the driver once.
+local RULE_PREF_PREFIX = "hotstrings.dynamic."
+
+-- Which live date each label's "{date}" placeholder stands for. The label
+-- promises what the rule inserts, so it must be resolved from the same engine
+-- that inserts it rather than re-derived here.
+local DATE_FIELD_FOR_SECTION = {
+	date        = "iso",
+	datefr      = "fr",
+	datelongfr  = "long_fr",
+}
+
+M.RULE_FAMILIES = RULE_FAMILIES
+
+--- Resolves one family's menu label, with today's date substituted in.
+--- @param family table An entry of RULE_FAMILIES.
+--- @return string
+local function _family_label(family)
+	local key = family.label_key or ("dynamichotstrings." .. family.section)
+	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	local label = ok_i18n and i18n and i18n.get(key) or key
+
+	local field = DATE_FIELD_FOR_SECTION[family.section]
+	if not field or not label:find("{date}", 1, true) then return label end
+
+	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
+	if not ok_eng or not Engine then return label end
+	local today = Engine.today_date_strings()
+	local value = today and today[field]
+	if type(value) ~= "string" then return label end
+
+	-- "%" is the escape in a gsub REPLACEMENT. No date format in use produces
+	-- one, but a future format that did would corrupt the label rather than fail.
+	return (label:gsub("{date}", (value:gsub("%%", "%%%%"))))
+end
+
+--- The families, for a menu, in render order.
+--- @return table Array of { id, section, enabled, label } and { separator = true }.
+function M.rule_families()
+	local out = {}
+	for _, family in ipairs(RULE_FAMILIES) do
+		if family.separator then
+			out[#out + 1] = { separator = true }
+		else
+			out[#out + 1] = {
+				id      = family.id,
+				section = family.section,
+				enabled = M.is_rule_enabled(nil, family.section),
+				label   = _family_label(family),
+			}
+		end
+	end
+	return out
+end
+
+--- Whether one engine section may fire.
+---
+--- Shaped as the predicate `match_buffer` expects — (group, section) — so it can
+--- be handed straight to the shared engine rather than wrapped at each call site.
+--- @param _group string|nil Unused: this driver has a single dynamic group.
+--- @param section string
+--- @return boolean
+function M.is_rule_enabled(_group, section)
+	if type(section) ~= "string" then return true end
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then return true end
+	return Storage.get(RULE_PREF_PREFIX .. section, nil) ~= false
+end
+
+--- Turns one family on or off, persisting the choice.
+--- @param section string
+--- @param enabled boolean
+--- @return boolean True when the choice was recorded.
+function M.set_rule_enabled(section, enabled)
+	local known = false
+	for _, family in ipairs(RULE_FAMILIES) do
+		if family.section == section then known = true ; break end
+	end
+	if not known then
+		Logger.error(LOG, "set_rule_enabled(): '%s' is not a rule family.", tostring(section))
+		return false
+	end
+
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then
+		Logger.error(LOG, "set_rule_enabled(): no storage adapter — '%s' not persisted.", section)
+		return false
+	end
+	if enabled then
+		Storage.delete(RULE_PREF_PREFIX .. section)
+	else
+		Storage.set(RULE_PREF_PREFIX .. section, false)
+	end
+	Logger.debug(LOG, "Dynamic rule family %s: %s.", section, enabled and "on" or "off")
+	return true
 end
 
 return M

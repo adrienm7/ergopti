@@ -478,12 +478,30 @@ pas les rouvrir sans raison nouvelle.
         fichier sur disque se réconcilient exactement (l écart correspondait à un
         ajout fait après la mesure).
 
-- [ ] **Bascules par famille de règle dynamique** (date, date_fr, date_long_fr,
-      iban/phone/ssn_prefixes, text_expansion_personal_information — 7 déclarées).
-      Windows et macOS en offrent une par famille ; Linux offre le portail global.
-      → Bloqué par le moteur partagé : `register_date_rules` enregistre les trois
-        règles de date **en lot, sans identifiant**, donc il n’y a rien à quoi
-        rattacher une bascule. Le travail est dans le moteur, pas dans le menu.
+- [x] **Bascules par famille de règle dynamique** — fait le 2026-08-05 pour les
+      4 familles que ce pilote enregistre (date, date_fr, date_long_fr,
+      text_expansion_personal_information), dans l ordre et sous les libellés des
+      deux autres pilotes, date du jour substituée, plus les deux lignes « tout
+      activer / tout désactiver ».
+      → **Le bloquant consigné ici était faux.** Il disait que
+        `register_date_rules` enregistrait les trois règles de date « en lot, sans
+        identifiant ». La lecture tranche : `add_rule(suffix, section, resolver)`
+        porte une section depuis toujours, `register_date_rules` passe
+        `date`/`datefr`/`datelongfr`, et `match_buffer(buffer, group, prédicat)`
+        filtre dessus. Rien n était bloqué — ce pilote passait `nil` en prédicat
+        aux **deux** sites d appel, `match_buffer` et `preview`. Le travail était
+        dans le pilote, pas dans le moteur.
+      → Le défaut visé est « une bascule qui écrit un booléen que rien ne relit » :
+        sans le prédicat, la préférence se serait persistée, la coche affichée, et
+        le pilote aurait continué de taper. Les trois assertions de fond du test
+        de régression sont rouges quand on remet `nil`.
+
+- [ ] **Les trois familles de préfixes (iban, phone, ssn) ne sont enregistrées par
+      aucun code Linux.** Le manifeste les déclare, Windows et macOS les rendent,
+      ce pilote n en enregistre aucune règle — d où leur absence assumée de la
+      liste des bascules : une bascule pour une règle inexistante ment davantage
+      qu une bascule manquante. C est un écart de parité distinct des bascules, et
+      il porte sur le moteur de règles, pas sur le menu.
 
 ### 11.3 — Majeurs et mineurs restants
 
