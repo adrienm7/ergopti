@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "ל‑Windows בלבד: מפצה על פריסות מותאמות אישית (KbdEdit/MSKLC) שממפות מחדש את AltGr למקש וירטואלי אחר — מושג של מנהל התקן המקלדת ב‑Windows שאין לו מקבילה במקום אחר.",
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS בלבד: MLX הוא מנוע ההסקה המקומי של Apple עבור Apple Silicon, ואין ממנו גרסה ל-Windows או ל-Linux.",
 	"platform_reason.lists_windows_only_settings": "Windows בלבד: כל מה שהשורה הזו הייתה מציגה הוא עצמו ייחודי ל-Windows, ולכן ב-macOS וב-Linux היא מציגה רשימה ריקה.",
+	"platform_reason.preview_bubbles_are_lua_previews": "לא ב-Windows: מתגים אלה שולטים בבועת התצוגה המקדימה שמנהלי ההתקן של macOS ושל Linux מציירים בעצמם. Windows מציג את המשוב על מחרוזות חמות דרך חלונית אחרת, שאין לה מתגים מקבילים.",
 	"platform_reason.no_magic_key_editor_on_linux": "לא ב-Linux: השורה משנה את מקש הקסם. ב-macOS וב-Windows נפתחת לכך תיבת דו-שיח; מנהל ההתקן של Linux רק קורא את המקש מההגדרות ואינו מאפשר לשנותו מהתפריט.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",

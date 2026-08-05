@@ -681,6 +681,22 @@
 			"id": "magic_key_config"
 		},
 		{
+			"type": "---",
+			"platforms": [
+				"hs",
+				"linux"
+			]
+		},
+		{
+			"type": "dynamic",
+			"id": "preview_bubbles",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		},
+		{
 			"type": "dynamic",
 			"id": "repeat_key",
 			"platforms": [

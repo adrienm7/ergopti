@@ -112,18 +112,32 @@ end
 --- menu-manifest sections look unreferenced and Windows look short of thirteen
 --- gesture actions it implements.
 ---
---- The directory names come from `_shared/ui/`, which is the canonical set of
---- pages — not from what this driver felt like calling them. Four app names do
---- not equal their directory, and `personal_toml_editor` is not even a page of
---- its own: it is a second bridge onto `personal_info_editor`, the TOML flavour.
---- That is the whole reason a lookup beats a suffix rule.
+--- The keys ARE the directory names under `_shared/ui/`, and that is not a
+--- stylistic preference: `webkit_host.resolve_app_dir()` builds
+--- `_shared/ui/<key>/index.html` and the window shows an error page when it is
+--- not there. Until 2026-08-05 this table said otherwise, and its own comment
+--- called it a feature — "four app names do not equal their directory". Three of
+--- those four (`dl`, `token`, `hotstrings_config`) were names with a working
+--- bridge and no page, and the one that was actually called opened the hotstring
+--- delays-and-colours window as "Error: app 'hotstrings_config' not found".
+---
+--- `personal_toml_editor` is the one real exception: not a page of its own but a
+--- second bridge onto `personal_info_editor`, the TOML flavour, reached through
+--- the page it shares. That is what still makes a lookup better than a suffix
+--- rule. tests/unit/meta/test_webview_app_names_have_pages.lua pins both halves.
 local BRIDGE_MODULES = {
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
-	dl                    = "ui.download_window.bridge",
+	download_window       = "ui.download_window.bridge",
 	healthcheck           = "ui.healthcheck.bridge",
 	hotstring_editor      = "ui.hotstring_editor.bridge",
-	hotstrings_config     = "ui.hotstrings_config_window.bridge",
+	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
+	-- which gave that name a working bridge and no page: resolve_app_dir() looks
+	-- for _shared/ui/<name>/index.html and there is no _shared/ui/hotstrings_config,
+	-- so every caller using it got a window rendering "Error: app not found" while
+	-- the bridge behind it was perfectly healthy. A half-registered name is worse
+	-- than an unregistered one — it looks supported at the only place anyone checks.
+	hotstrings_config_window = "ui.hotstrings_config_window.bridge",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
 	model_browser         = "ui.model_browser.bridge",
@@ -132,7 +146,7 @@ local BRIDGE_MODULES = {
 	personal_info_editor  = "ui.personal_info_editor.bridge",
 	personal_toml_editor  = "ui.personal_info_editor.bridge_toml",
 	prompt_editor         = "ui.prompt_editor.bridge",
-	token                 = "ui.token_prompt.bridge",
+	token_prompt          = "ui.token_prompt.bridge",
 }
 
 --- Loads a bridge handler module by pcall-requiring it.

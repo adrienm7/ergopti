@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Лише Windows: компенсує користувацькі розкладки (KbdEdit/MSKLC), які перепризначають AltGr на іншу віртуальну клавішу — поняття драйвера клавіатури Windows, що не має відповідника деінде.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Лише macOS: MLX — локальний фреймворк інференсу Apple для Apple Silicon, і версії для Windows чи Linux не існує.",
 	"platform_reason.lists_windows_only_settings": "Лише Windows: усе, що перелічувала б ця стрічка, саме доступне тільки у Windows, тож у macOS і Linux вона показує порожній список.",
+	"platform_reason.preview_bubbles_are_lua_previews": "Не у Windows: ці перемикачі керують спливаючою підказкою попереднього перегляду, яку драйвери macOS і Linux малюють самі. Windows показує відгук хотстрингів через іншу підказку, що не має відповідних перемикачів.",
 	"platform_reason.no_magic_key_editor_on_linux": "Не в Linux: рядок змінює «магічну» клавішу. macOS і Windows відкривають для цього діалог; драйвер Linux лише читає клавішу з конфігурації і змінити її з меню не можна.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: рядок відкриває файл особистих скорочень. У macOS і Windows він є; скорочення драйвера Linux — це перемикачі та перетворення виділення, редагувати нічого.",
 	"platform_reason.libinput_reader_is_linux_only": "Читання libinput — лише в Linux",

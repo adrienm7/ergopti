@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Windows uniquement : compense les dispositions personnalisées (KbdEdit/MSKLC) qui réassignent AltGr à une autre touche virtuelle — une notion de pilote clavier Windows sans équivalent ailleurs.",
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS uniquement : MLX est le moteur d'inférence local d'Apple pour Apple Silicon, et il n'en existe aucune version pour Windows ou Linux.",
 	"platform_reason.lists_windows_only_settings": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide.",
+	"platform_reason.preview_bubbles_are_lua_previews": "Pas sous Windows : ces interrupteurs pilotent la bulle d’aperçu que les pilotes macOS et Linux dessinent eux-mêmes. Windows affiche son retour hotstring via une autre infobulle, qui n’a pas d’interrupteurs équivalents.",
 	"platform_reason.no_magic_key_editor_on_linux": "Pas sous Linux : cette ligne change la touche magique. macOS et Windows ouvrent chacun une boîte de dialogue pour cela ; le pilote Linux se contente de lire la touche depuis la configuration et n'offre aucun moyen de la changer depuis le menu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Pas sous Linux : cette ligne ouvre le fichier de raccourcis personnels. macOS et Windows en ont un ; les raccourcis du pilote Linux sont des bascules et des transformations de la sélection, sans aucun fichier à éditer.",
 	"platform_reason.libinput_reader_is_linux_only": "Lecture libinput — propre à Linux",
