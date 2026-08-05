@@ -114,9 +114,15 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 
 	helpers.it("orders the wrapping pairs, so a rebuild does not shuffle them", function()
 		local rows = shortcuts_menu()
+		-- By its label, not by "the last submenu with more than one row". That
+		-- shortcut passed here and failed in CI, where the bundled demo extension's
+		-- shortcuts/menu.lua resolves and adds a second submenu after this one —
+		-- so the test was asserting the ordering of an extension's rows, which are
+		-- its author's to order.
+		local wanted = require("infra.i18n").get("menu.shortcuts.wrap_symbols")
 		local wrap = nil
 		for _, row in ipairs(rows) do
-			if type(row.menu) == "table" and #row.menu > 1 then wrap = row.menu end
+			if row.title == wanted and type(row.menu) == "table" then wrap = row.menu end
 		end
 		helpers.assert_not_nil(wrap, "the wrapping-symbols submenu is present")
 
