@@ -816,11 +816,21 @@ jobs:
       # handed to eval_js. None proves the string arrives, that the page defines
       # the function it calls, or that the function survives a payload built by
       # Lua. Three separate ways for the same fix to be wrong with the suite green.
+      # Its own step, and a generous budget, because it is a DOWNLOAD: WebKit2GTK
+      # pulls the whole GStreamer tree, and the first attempt at this spent eight
+      # minutes fetching packages and timed out before running a single
+      # assertion. A timeout that fires during dependency installation says
+      # nothing whatever about the code, so the two are separated and the test
+      # step below gets a budget sized for the test.
+      - name: Install WebKit2GTK and lgi
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
+        timeout-minutes: 20
+
       - name: The webview push reaches a real WebKit page
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends \
-            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0 libwebkit2gtk-4.1-0
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
           # path has to be widened rather than assumed. Reported, not guessed at:
