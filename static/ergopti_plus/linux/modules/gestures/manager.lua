@@ -788,6 +788,19 @@ function M.touchpad()
 	return _touchpad
 end
 
+--- Test seam: puts the manager into the reading state with a given decoder.
+---
+--- `start_reading` needs a real /proc entry and a real device node, so the join
+--- between the reader, the decoder and the dispatcher could only be exercised on
+--- a machine with a touchpad — which is to say nowhere the unit suite runs. This
+--- opens that seam and nothing else: the pump, the decoder and the dispatch are
+--- all the real ones, and only the device underneath is faked.
+--- @param decoder table An mt_decoder instance.
+function M._test_begin_reading(decoder)
+	_decoder = decoder
+	_reading = true
+end
+
 --- Returns true if the touch reader is active.
 --- @return boolean
 function M.is_reading()
