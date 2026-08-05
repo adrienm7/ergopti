@@ -1178,24 +1178,24 @@ local function _build_llm(ctx)
 	end
 
 	local items = {}
-	local enabled = llm.is_enabled and llm:is_enabled() or false
+	local enabled = llm.is_enabled and llm.is_enabled() or false
 
 	items[#items + 1] = {
 		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
 		fn = function()
-			if llm.toggle then llm:toggle() end
+			if llm.toggle then llm.toggle() end
 		end,
 	}
 
 	if type(llm.get_models) == "function" then
-		local models = llm:get_models()
+		local models = llm.get_models()
 		if type(models) == "table" then
 			for _, model in ipairs(models) do
-				local is_current = (llm.get_current_model and llm:get_current_model() == model)
+				local is_current = (llm.get_current_model and llm.get_current_model() == model)
 				items[#items + 1] = {
 					title = model .. (is_current and " ✓" or ""),
 					fn = function()
-						if llm.set_model then llm:set_model(model) end
+						if llm.set_model then llm.set_model(model) end
 					end,
 				}
 			end

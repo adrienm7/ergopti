@@ -1033,6 +1033,16 @@ function M.flush()
 				hs_chars    = app_stats.hs_chars or 0,
 				hs_triggers = app_stats.hs_triggers or 0,
 				hs_input_chars = app_stats.hs_input_chars or 0,
+				-- The three LLM counters, missing from this table until 2026-08-06.
+				-- record_synthetic_output has always incremented them in memory and
+				-- upsert_app_day has always accepted them — they were simply never
+				-- named here, so every accepted completion was counted for the life of
+				-- the process and forgotten at the next start. The dashboard's
+				-- LLM-gain figure read zero on a machine that had been using it all
+				-- day, which looks exactly like a feature nobody uses.
+				llm_chars       = app_stats.llm_chars or 0,
+				llm_triggers    = app_stats.llm_triggers or 0,
+				llm_input_chars = app_stats.llm_input_chars or 0,
 			}
 			local previous = _flushed_app_totals[app_id] or {}
 			local delta = {}

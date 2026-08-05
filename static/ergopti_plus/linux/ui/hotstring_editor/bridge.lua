@@ -16,7 +16,7 @@
 --- default_section, default_priority, open_mode}` and not one of the three keys
 --- it was sent — `window.initData` assigns the payload to `D` and `render()` walks
 --- `D.sections`, which was nil. **The editor opened empty on Linux, every time.**
---- It also called `state.config:get_all_hotstrings()`, a function that does not
+--- It also called `state.config.get_all_hotstrings()`, a function that does not
 --- exist on this driver, through a `:` on a module of flat functions.
 ---
 --- It had no branch for `save_pref` or `window_focus`, so the compact-view toggle

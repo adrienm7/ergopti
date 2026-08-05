@@ -42,14 +42,14 @@ local function _build_initial_payload(state)
 	if state.keylogger then
 		local stats = { keystrokes = 0 }
 		if type(state.keylogger.get_session_stats) == "function" then
-			stats = state.keylogger:get_session_stats()
+			stats = state.keylogger.get_session_stats()
 		end
 		modules.keylogger = {
 			loaded = true,
 			status = "ok",
 			keystrokes = stats.keystrokes,
 			suppressed = type(state.keylogger.is_suppressed) == "function"
-				and state.keylogger:is_suppressed() or false,
+				and state.keylogger.is_suppressed() or false,
 		}
 	else
 		modules.keylogger = { loaded = false, status = "missing" }
@@ -61,9 +61,9 @@ local function _build_initial_payload(state)
 			loaded = true,
 			status = "ok",
 			mapping_count = type(state.config.mapping_count) == "function"
-				and state.config:mapping_count() or 0,
+				and state.config.mapping_count() or 0,
 			parse_errors = type(state.config.parse_error_count) == "function"
-				and state.config:parse_error_count() or 0,
+				and state.config.parse_error_count() or 0,
 		}
 	else
 		modules.config = { loaded = false, status = "missing" }
@@ -73,11 +73,11 @@ local function _build_initial_payload(state)
 	if state.llm then
 		local enabled = false
 		if type(state.llm.is_enabled) == "function" then
-			pcall(function() enabled = state.llm:is_enabled() end)
+			pcall(function() enabled = state.llm.is_enabled() end)
 		end
 		local model = ""
 		if type(state.llm.get_current_model) == "function" then
-			pcall(function() model = state.llm:get_current_model() or "" end)
+			pcall(function() model = state.llm.get_current_model() or "" end)
 		end
 		modules.llm = {
 			loaded = true,

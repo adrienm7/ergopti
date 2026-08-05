@@ -92,7 +92,7 @@ local function _handle_llm_setup(data, state)
 	Logger.info(LOG, "Onboarding LLM setup: model=%s url=%s",
 		tostring(data.model), tostring(data.url))
 	if state.llm and data.model and type(state.llm.set_model) == "function" then
-		pcall(state.llm.set_model, state.llm, data.model)
+		pcall(state.llm.set_model, data.model)
 	end
 	-- Persist LLM settings.
 	local writer = _get_writer()
