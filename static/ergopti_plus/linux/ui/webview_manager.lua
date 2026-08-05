@@ -320,6 +320,19 @@ function M.eval_js(app_name, js_code)
 	return true
 end
 
+--- The live WebKit view for an app, or nil when it has no window.
+---
+--- Published for the hardware harness, which has to read a value BACK out of the
+--- page: `eval_js` is fire-and-forget by design, and the only honest way to ask
+--- "did that push change anything" is to query the DOM afterwards. Nothing in
+--- the driver uses this — the daemon pushes and never reads.
+--- @param app_name string
+--- @return userdata|nil
+function M.webview_for(app_name)
+	local window = _gtk_windows[app_name]
+	return window and window.webview or nil
+end
+
 --- Routes a JS message from host_bridge.js to the appropriate bridge handler.
 --- Called by the GTK script-message-received callback or by tests.
 --- @param bridge_name string The bridge handler name (e.g. "action_picker_bridge").
