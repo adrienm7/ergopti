@@ -455,6 +455,26 @@ pas les rouvrir sans raison nouvelle.
 
 ### 11.2 — Bloquants restants
 
+- [ ] **La fenêtre de réglages n exécute pas son script dans WebKit.** Trouvé par
+      `tests/hardware/run_webview_push.lua`, reproductible : `window.setData` est
+      `undefined`, donc l hôte — qui garde `if(window.setData)` — jette chaque push.
+      L éditeur, lui, est **vert et stable** (5/5, payload de 146 octets reçu), ce qui
+      établit que le mécanisme de push et le harnais fonctionnent.
+      → **Éliminé localement** : le script EST inliné (aucune balise externe ne
+        survit dans l une ou l autre page) ; la balise est au niveau `body`, après
+        les `<template>`, pas dedans ; les trois blocs assemblés **parsent** (page
+        réassemblée et chaque bloc compilé) ; `makeHostBridge` répond `function`,
+        donc les blocs 1 et 2 s exécutent bien.
+      → **Éliminé en CI** : ce n est pas une interférence entre fenêtres — depuis que
+        chaque page tourne dans son propre processus, l éditeur est vert et celle-ci
+        échoue seule.
+      → Une assignation explicite `window.setData = setData` en fin de fichier n y a
+        rien changé, ce qui **exclut** la simple non-globalisation d une déclaration :
+        si le script s exécutait jusqu au bout, cette ligne suffirait. L hypothèse
+        restante est que le troisième bloc ne s exécute pas du tout, ou lève avant sa
+        fin — à instrumenter avec un `window.onerror` posé AVANT les scripts de la
+        page, ce que le harnais ne fait pas encore.
+
 - [ ] **Bascules par famille de règle dynamique** (date, date_fr, date_long_fr,
       iban/phone/ssn_prefixes, text_expansion_personal_information — 7 déclarées).
       Windows et macOS en offrent une par famille ; Linux offre le portail global.
