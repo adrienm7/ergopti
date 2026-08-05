@@ -806,6 +806,41 @@ jobs:
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
         timeout-minutes: 4
 
+      # Both hotstrings bridges were changed from RETURNING their payload to
+      # PUSHING it, because makeHostBridge is fire-and-forget and only two of the
+      # fourteen shared pages define window.__hostBridgeResponse — a returned
+      # payload reached nobody, so the settings window drew an empty page and the
+      # editor sat on "Chargement…" for ever.
+      #
+      # Every unit test of that fix asserts the SHAPE of the JavaScript string
+      # handed to eval_js. None proves the string arrives, that the page defines
+      # the function it calls, or that the function survives a payload built by
+      # Lua. Three separate ways for the same fix to be wrong with the suite green.
+      - name: The webview push reaches a real WebKit page
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0 libwebkit2gtk-4.1-0
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
+          # path has to be widened rather than assumed. Reported, not guessed at:
+          # the harness exits 2 when lgi is unreachable and the step says so.
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          set +e
+          xvfb-run -a luajit tests/hardware/run_webview_push.lua
+          STATUS=$?
+          set -e
+          # 2 is "this machine cannot host the test", which is a fact about the
+          # runner and not a failure of the code. Reported and not swallowed: a
+          # step that always passes is worse than no step.
+          if [ "$STATUS" = "2" ]; then
+            echo "::warning::WebKit/lgi unavailable on this runner — the webview push was not exercised."
+            exit 0
+          fi
+          exit $STATUS
+        timeout-minutes: 8
+
 
   # ─────────────────────────────────────────────────
   # 4.1b) Linux install, per distribution family
