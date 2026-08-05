@@ -210,6 +210,13 @@ function M.load_catalogue(paths)
 								auto_expand       = entry.auto_expand       or false,
 								final_result      = entry.final_result      or false,
 								is_case_sensitive_strict = entry.is_case_sensitive_strict or false,
+								-- Marks a payload that must never be persisted or logged in
+								-- clear. No bundled pack sets it — the prefix expansions built
+								-- from personal_info.toml do, and those are assembled in code
+								-- rather than read from a file. It is read here all the same so
+								-- a user's own pack can declare it, and so the flag has exactly
+								-- one meaning whichever source produced the mapping.
+								is_private        = entry.is_private        or false,
 								-- Resolved here rather than in the engine because only the
 								-- loader knows which file and section an entry came from,
 								-- which is what the lower rungs of the cascade are. An

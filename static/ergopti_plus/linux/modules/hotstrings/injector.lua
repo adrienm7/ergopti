@@ -228,7 +228,8 @@ end
 --- to be rare, because pasting is visible, races clipboard managers, and
 --- destroys what the user had copied unless it is put back.
 --- @param text string
-local function send_text(text)
+--- @param is_private boolean|nil True when `text` is PII and must not be logged.
+local function send_text(text, is_private)
 	if send_text_native(text) then return end
 
 	if Clipboard.paste_text(text, _uinput, sleep_ms) then
@@ -238,8 +239,15 @@ local function send_text(text)
 
 	-- Reached only when the layout cannot type it AND there is no clipboard tool.
 	-- Said loudly: the trigger has already been erased, so the user has lost text
-	-- and deserves to know why rather than to wonder.
-	Logger.error(LOG, "Cannot deliver '%s' — not typable on this layout and no clipboard route.", text)
+	-- and deserves to know why rather than to wonder. For a private payload the
+	-- loudness has to survive without the content, since this log is kept for 14
+	-- days and the driver's default level prints it.
+	if is_private then
+		Logger.error(LOG,
+			"Cannot deliver a private replacement — not typable on this layout and no clipboard route.")
+	else
+		Logger.error(LOG, "Cannot deliver '%s' — not typable on this layout and no clipboard route.", text)
+	end
 end
 
 
@@ -374,18 +382,30 @@ end
 ---
 --- @param backspace_count  integer  Number of Backspace keystrokes to emit.
 --- @param replacement_text string   The replacement string to type.
-function M.inject(backspace_count, replacement_text)
+--- @param is_private       boolean|nil True when the replacement is PII. It
+---   changes nothing about what is TYPED — only about what is written to the
+---   log, which the driver keeps for 14 days at a level that prints TRACE.
+function M.inject(backspace_count, replacement_text, is_private)
 	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string" then
+		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
+		-- are not what was expected, so neither position can be trusted to hold a
+		-- non-secret — a caller that swapped them puts the payload in the count.
+		-- The types are also the whole diagnosis here: the fault is always "a
+		-- string where a number goes", never a particular string.
 		Logger.error(
 			LOG,
-			"inject(): invalid arguments — bc=%s text=%s.",
-			tostring(backspace_count),
-			tostring(replacement_text)
+			"inject(): invalid arguments — bc is %s, text is %s.",
+			type(backspace_count),
+			type(replacement_text)
 		)
 		return
 	end
 
-	Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
+	if is_private then
+		Logger.trace(LOG, "inject(): bc=%d, private text (content withheld)…", backspace_count)
+	else
+		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
+	end
 
 	local ok, err = pcall(function()
 		-- Neutralise whatever the user is physically holding. Under a grab the
@@ -406,7 +426,7 @@ function M.inject(backspace_count, replacement_text)
 		end
 
 		-- Phase 2: type the replacement.
-		send_text(replacement_text)
+		send_text(replacement_text, is_private)
 
 		-- Put them back, so a user who was still holding Shift when the expansion
 		-- fired keeps holding it afterwards. Restored in reverse for symmetry with

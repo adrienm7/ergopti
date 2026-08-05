@@ -550,20 +550,30 @@ local function main()
 		end
 
 		if result then
-			Logger.info(
-				LOG,
-				"Match: trigger='%s' → '%s' (bc=%d).",
-				result.trigger,
-				result.replacement,
-				result.backspace_count
-			)
+			-- A private mapping's trigger is a fragment of its own secret — the
+			-- first six characters of the IBAN, the first five digits of the SSN —
+			-- so neither half of this line may be printed. The driver's default
+			-- level is DEBUG and this log is kept for 14 days, which makes it the
+			-- same sink as the database as far as a leak is concerned.
+			if result.is_private then
+				Logger.info(LOG, "Match: private mapping fired (content withheld, bc=%d).",
+					result.backspace_count)
+			else
+				Logger.info(
+					LOG,
+					"Match: trigger='%s' → '%s' (bc=%d).",
+					result.trigger,
+					result.replacement,
+					result.backspace_count
+				)
+			end
 			if not opts.dry_run then
 				-- Keep the keylogger's aggregate contract aligned with macOS and
 				-- Windows: generated text and the physical trigger are distinct.
 				keylogger.record_hotstring(app_id, result.trigger, result.replacement,
-					now_ms, result.group, result.backspace_count)
+					now_ms, result.group, result.backspace_count, result.is_private)
 				injector._begin_injection()
-				injector.inject(result.backspace_count, result.replacement)
+				injector.inject(result.backspace_count, result.replacement, result.is_private)
 				-- Armed AFTER the injection, so a failed one leaves nothing to undo.
 				_undoable = {
 					trigger     = result.trigger,

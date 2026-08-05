@@ -668,6 +668,13 @@ function M.new()
 			-- it always resolved at the CATEGORY level and a per-section delay, the
 			-- third rung of five, could never take effect.
 			section            = mapping.section,
+			-- The mapping's payload is PII and must not be persisted or logged in
+			-- clear. This travels with the RESULT rather than being looked up again
+			-- by the caller because the caller no longer holds the mapping: by the
+			-- time it decides what to record, all it has is this table. macOS learnt
+			-- the same thing — see expander.lua, which threads the flag through every
+			-- sink rather than re-deriving it.
+			is_private         = mapping.is_private,
 		}
 	end
 
