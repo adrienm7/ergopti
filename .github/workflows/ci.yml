@@ -806,6 +806,23 @@ jobs:
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
         timeout-minutes: 4
 
+      # test_mt_decoder feeds the decoder a table written by hand from the
+      # kernel's documentation. It proves the state machine agrees with MY
+      # reading of the protocol and nothing about what a kernel delivers — the
+      # plan records that as "the event trace is a reconstruction, not a
+      # capture".
+      #
+      # Here the events make a round trip: written to /dev/uinput, published on
+      # an input node, found by the driver's own finder, opened by its own
+      # reader, decoded by its own decoder. The struct layout, the ioctl numbers,
+      # the slot semantics and the non-blocking read are all the kernel's, and
+      # those are exactly what a hand-written table cannot check.
+      - name: A gesture written to uinput comes back as a gesture
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
+        timeout-minutes: 4
+
       # Both hotstrings bridges were changed from RETURNING their payload to
       # PUSHING it, because makeHostBridge is fire-and-forget and only two of the
       # fourteen shared pages define window.__hostBridgeResponse — a returned
@@ -858,6 +875,34 @@ jobs:
           fi
           exit $STATUS
         timeout-minutes: 8
+
+      # window.setData is undefined in the settings window, so the host's
+      # `if(window.setData)` guard discards every push. Seven explanations are
+      # ruled out, and the informative one is the last: an explicit
+      # `window.setData = setData` at the END of the file changed nothing. If the
+      # script ran to completion that line alone would be enough — so it throws.
+      #
+      # A throw during load is invisible to every probe run afterwards, because
+      # by then the page merely looks incomplete. window.onerror only catches
+      # what is raised after it is installed, and installing it with
+      # run_javascript is too late by the whole page load — so this harness
+      # builds the HTML itself and splices the trap in right after <head>.
+      - name: What each page raises while loading
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          set +e
+          xvfb-run -a luajit tests/hardware/run_page_errors.lua
+          STATUS=$?
+          set -e
+          if [ "$STATUS" = "2" ]; then
+            echo "::warning::WebKit/lgi unavailable — page errors were not inspected."
+            exit 0
+          fi
+          exit $STATUS
+        timeout-minutes: 5
 
 
   # ─────────────────────────────────────────────────
