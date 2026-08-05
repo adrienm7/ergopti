@@ -27,6 +27,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Renderer = require("adapters.graphics_renderer")
+local Scheduler = require("adapters.timer_scheduler")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 
@@ -52,6 +53,10 @@ local FALLBACK_SCREEN = { x = 0, y = 0, w = 1920, h = 1080 }
 
 local _style = nil
 local _config = nil
+
+-- The handle of the pending auto-hide, so a new bubble cancels the previous
+-- one's timer rather than letting it fire over the top of the replacement.
+local _expiry = nil
 local _enabled = {
 	star = true,
 	autocorrect = true,
@@ -204,6 +209,37 @@ local function accent_for(group, section)
 	}
 end
 
+--- Schedules the bubble's own disappearance.
+---
+--- Without this the panel was hidden only by the next keystroke or by a click,
+--- so a user who typed half a trigger and then stopped thinking was left with it
+--- on screen indefinitely — offering an expansion the engine would by then
+--- REFUSE, because the same delay that governs the bubble governs whether the
+--- trigger is still live. The bubble outlived the thing it was describing.
+---
+--- The timeout is that same per-category delay, read through the same cascade
+--- the keystroke path reads, so the two cannot disagree. A delay of 0 means "the
+--- trigger never expires", and a bubble for it is left up.
+--- @param group string|nil
+--- @param section string|nil
+local function arm_expiry(group, section)
+	if _expiry then
+		Scheduler.cancel(_expiry)
+		_expiry = nil
+	end
+	if not _config or type(_config.resolve) ~= "function" or not group then return end
+
+	local ok, resolved = pcall(_config.resolve, group, section)
+	if not ok or type(resolved) ~= "table" then return end
+	local delay = tonumber(resolved.delay)
+	if not delay or delay <= 0 then return end
+
+	_expiry = Scheduler.after(delay, function()
+		_expiry = nil
+		M.hide()
+	end)
+end
+
 --- Turns engine candidates into the rows the renderer draws.
 ---
 --- Pure, so the ordering and the dimming can be asserted without a display
@@ -278,7 +314,7 @@ function M.show(candidates, kind)
 		return false
 	end
 
-	return Renderer.show(rows, {
+	local drawn = Renderer.show(rows, {
 		style = _style,
 		-- The panel takes the firing candidate's colour; each row carries its own
 		-- as a bar, so a bubble holding several categories says so.
@@ -286,10 +322,19 @@ function M.show(candidates, kind)
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),
 	})
+
+	if drawn then arm_expiry(group, section) end
+	return drawn
 end
 
 --- Hides the preview.
 function M.hide()
+	-- The pending expiry goes with it, so a bubble hidden by the next keystroke
+	-- does not leave a timer that fires over the top of its replacement.
+	if _expiry then
+		Scheduler.cancel(_expiry)
+		_expiry = nil
+	end
 	Renderer.hide()
 end
 
