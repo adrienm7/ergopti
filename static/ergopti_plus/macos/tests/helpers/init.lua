@@ -89,6 +89,17 @@ end
 --- @return any The module's return value.
 function M.load_with_stubs(module_name, hs_overrides)
 	-- Drop any previous instance so module-level state resets between tests.
+	--
+	-- Only the NAMED module, deliberately. Clearing the subtree as well looks
+	-- like the more thorough choice and breaks twenty-one tests: many place a
+	-- stub submodule in package.loaded and then load the parent to assert it
+	-- calls into that stub, and wiping the subtree throws the stub away. The
+	-- caller decides what its module tree contains; this helper does not.
+	--
+	-- The cost is a real one and worth naming: a submodule that captures `hs`
+	-- with `local hs = hs` at load time keeps whatever stub was global when IT
+	-- was first required, and no later call here can reach it. A test that needs
+	-- such a submodule re-read must clear it itself.
 	package.loaded[module_name] = nil
 	package.loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak

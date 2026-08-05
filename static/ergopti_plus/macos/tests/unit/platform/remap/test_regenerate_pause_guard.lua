@@ -59,6 +59,17 @@ local function load_karabiner(paused)
 	}
 
 	package.loaded["platform.remap"] = nil
+	-- The layout watcher too. platform/remap/watchers.lua:28 does `local hs = hs`,
+	-- so it keeps whatever stub was global when it was FIRST required — and
+	-- load_with_stubs clears only the module it is given, by design (clearing the
+	-- subtree throws away stubs other tests deliberately place there).
+	--
+	-- Left cached, it reaches start_input_source_watcher holding an `hs` whose
+	-- keycodes table has no inputSourceChanged, and the two cases below fail with
+	-- "attempt to call a nil value". That happened in CI and not locally, because
+	-- test discovery uses lfs when installed and `find` when not, the two orders
+	-- differ, and the failure needs something else to have loaded watchers first.
+	package.loaded["platform.remap.watchers"] = nil
 	-- load_with_stubs replaces hs.keycodes wholesale, so the override must carry its
 	-- own .map: the layout watcher resolves a key name at load time via
 	-- Keycodes.to_name(), which iterates hs.keycodes.map.
