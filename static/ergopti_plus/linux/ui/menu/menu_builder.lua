@@ -1992,98 +1992,98 @@ local function _build_updates(ctx)
 		}}
 	end
 
-	local channel = up.get_channel()
-	local version = up.current_version()
-	local items = {}
+	--- The rows, as DATA. Every checkmark here is `checked`, not a "✓" glued onto
+	--- a label: the tray draws its own, so the string form was one platform's
+	--- convention leaking into text that twenty other languages also read.
+	--- @return table
+	local function rows()
+		local channel  = up.get_channel()
+		local interval = up.get_check_interval()
+		local out = {}
 
-	-- Header showing current version and channel.
-	items[#items + 1] = {
-		title = "v" .. version .. " (" .. channel .. ")",
-		fn = function() end,
-		disabled = true,
-	}
-	items[#items + 1] = { title = "-" }
+		-- The version and channel the user is on, which is the question this
+		-- submenu is opened to answer.
+		out[#out + 1] = {
+			label = string.format("v%s (%s)", up.current_version(), channel),
+			disabled = true,
+		}
+		out[#out + 1] = { separator = true }
 
-	-- Check for updates now.
-	items[#items + 1] = {
-		title = up.get_menu_label(),
-		fn = function()
-			local available = up.check_for_updates()
-			if available then
-				local rel = up.get_cached_release()
-				if rel then
-					Logger.info(LOG, "Update available: %s.", rel.tag)
+		out[#out + 1] = {
+			label = up.get_menu_label(),
+			action = function()
+				if up.check_for_updates() then
+					local rel = up.get_cached_release()
+					if rel then Logger.info(LOG, "Update available: %s.", rel.tag) end
+				else
+					Logger.info(LOG, "No update available (current: %s).", up.current_version())
 				end
-			else
-				Logger.info(LOG, "No update available (current: %s).", up.current_version())
-			end
-		end,
-	}
+			end,
+		}
 
-	-- Download + install (only shown when an update is available).
-	local state = up.get_state()
-	if state == "available" then
-		local rel = up.get_cached_release()
-		if rel then
-			items[#items + 1] = {
-				title = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
-				fn = function()
-					local archive = up.download_update()
-					if archive then
-						up.install_update(archive)
-					end
+		-- Only once there is something to install: a permanently visible
+		-- "download" row that does nothing is indistinguishable from a broken one.
+		if up.get_state() == "available" then
+			local rel = up.get_cached_release()
+			if rel then
+				out[#out + 1] = {
+					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
+					action = function()
+						local archive = up.download_update()
+						if archive then up.install_update(archive) end
+					end,
+				}
+			end
+		end
+
+		out[#out + 1] = { separator = true }
+
+		for _, entry in ipairs({
+			{ code = "stable", key = "menu.updates.channel_stable" },
+			{ code = "dev",    key = "menu.updates.channel_dev" },
+		}) do
+			out[#out + 1] = {
+				label   = i18n_safe(entry.key),
+				checked = channel == entry.code,
+				action  = function()
+					up.set_channel(entry.code)
+					Logger.info(LOG, "Update channel set to %s.", entry.code)
 				end,
 			}
 		end
-	end
 
-	items[#items + 1] = { title = "-" }
+		out[#out + 1] = { separator = true }
 
-	-- Channel switching.
-	items[#items + 1] = {
-		title = i18n_safe("menu.updates.channel_stable") .. (channel == "stable" and " ✓" or ""),
-		fn = function()
-			up.set_channel("stable")
-			Logger.info(LOG, "Update channel set to stable.")
-		end,
-	}
-	items[#items + 1] = {
-		title = i18n_safe("menu.updates.channel_dev") .. (channel == "dev" and " ✓" or ""),
-		fn = function()
-			up.set_channel("dev")
-			Logger.info(LOG, "Update channel set to dev.")
-		end,
-	}
+		for _, preset in ipairs(up.INTERVAL_PRESETS) do
+			out[#out + 1] = {
+				label   = _fill(i18n_safe("menu.updates.check_every"), "{interval}", preset.code),
+				checked = preset.seconds == interval,
+				action  = function()
+					up.set_check_interval(preset.seconds)
+					up.stop_background_checks()
+					up.start_background_checks()
+				end,
+			}
+		end
 
-	items[#items + 1] = { title = "-" }
+		out[#out + 1] = { separator = true }
 
-	-- Interval presets.
-	local current_interval = up.get_check_interval()
-	for _, preset in ipairs(up.INTERVAL_PRESETS) do
-		local is_current = (preset.seconds == current_interval)
-		items[#items + 1] = {
-			title = _fill(i18n_safe("menu.updates.check_every"), "{interval}", preset.code)
-				.. (is_current and " ✓" or ""),
-			fn = function()
-				up.set_check_interval(preset.seconds)
-				up.stop_background_checks()
-				up.start_background_checks()
+		out[#out + 1] = {
+			label  = i18n_safe("menu.updates.open_releases"),
+			action = function()
+				local url = up.releases_page_url()
+				Logger.info(LOG, "Opening releases page: %s", url)
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", url:gsub("'", "'\\''")))
 			end,
 		}
+
+		return out
 	end
 
-	items[#items + 1] = { title = "-" }
-
-	-- Open releases page.
-	items[#items + 1] = {
-		title = i18n_safe("menu.updates.open_releases"),
-		fn = function()
-			local url = up.releases_page_url()
-			Logger.info(LOG, "Opening releases page: %s", url)
-			os.execute(string.format("xdg-open '%s' 2>/dev/null &", url:gsub("'", "'\\''")))
-		end,
-	}
-
+	local providers = { ["updates_actions"] = rows }
+	local items = ManifestMenu
+		and ManifestMenu.build("updates_menu", "Updates", nil, nil, ctx, providers)
+		or {}
 	return { title = i18n_safe("menu.updates.title"), menu = items }
 end
 

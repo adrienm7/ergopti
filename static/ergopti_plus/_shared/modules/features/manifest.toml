@@ -2845,6 +2845,17 @@ type = "list"
 id = "kanata_actions"
 platforms = ["linux"]
 
+# The updates submenu — Linux is the only driver with an in-app updater surface
+# at top level; the other two carry theirs under "about". Same reasoning as the
+# kanata block above for why this is a `list`: its rows are the current version,
+# the channel the user picked and the interval presets, none of which a static
+# entry can enumerate, and a `list` is what puts them in the renderer rather than
+# in the driver.
+[[menu.updates_menu]]
+type = "list"
+id = "updates_actions"
+platforms = ["linux"]
+
 [[menu.global_actions]]
 id = "enable_all"
 
