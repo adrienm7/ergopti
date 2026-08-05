@@ -1271,6 +1271,13 @@ local function main()
 				pcall(tray_menu.pump)
 			end
 			pcall(keyboard_hook.pump)
+			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
+			-- reading: gestures.pump() returns 0 immediately unless start_reading()
+			-- found a device and opened it, so a machine without a touchpad pays a
+			-- function call per tick and nothing else.
+			if gestures and type(gestures.pump) == "function" then
+				pcall(gestures.pump)
+			end
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,

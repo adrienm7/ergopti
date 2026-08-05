@@ -376,6 +376,21 @@ local function _execute_action(action_name, go_next, binding)
 	-- with macOS (alt+F4 and ctrl+Right on both, against cmd+w and alt+right).
 	local emit_combo = _EMIT_ROWS[action_name]
 	if emit_combo then
+		-- uinput first, xdotool only if it could not be written.
+		--
+		-- `xdotool key` is X11 only, and under Wayland it talks to nothing: the
+		-- command succeeds, the shell exits zero, and the gesture does nothing.
+		-- That is the worst shape of failure, because there is no error to find.
+		-- uinput sits BELOW the display server, so the same chord reaches X11,
+		-- every Wayland compositor and a bare TTY alike.
+		--
+		-- The fallback stays for the case where the device could not be opened at
+		-- all — on X11 that still works, and losing it would trade a real failure
+		-- mode for a worse one.
+		local ok_emitter, Emitter = pcall(require, "modules.gestures.combo_emitter")
+		if ok_emitter and Emitter.press(emit_combo) then return end
+		Logger.debug(LOG, "uinput unavailable for '%s' — falling back to xdotool (X11 only).",
+			emit_combo)
 		_run("xdotool key " .. emit_combo)
 		return
 	end
