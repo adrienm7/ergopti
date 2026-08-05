@@ -94,7 +94,11 @@ end
 --- @param trigger string
 --- @param replacement string
 --- @param case_sensitive boolean
-local function add(out, seen, section, trigger, replacement, case_sensitive)
+--- @param field string The personal_info.toml field this value came from. It
+---   travels to the preview row, which asks fields.toml whether the value may be
+---   shown in full — so a mapping built without it is a mapping the bubble has to
+---   assume is a secret.
+local function add(out, seen, section, trigger, replacement, case_sensitive, field)
 	if trigger == "" or replacement == "" or seen[trigger] then return end
 	seen[trigger] = true
 
@@ -103,6 +107,7 @@ local function add(out, seen, section, trigger, replacement, case_sensitive)
 		replacement = replacement,
 		group       = GROUP,
 		section     = section,
+		field       = field,
 	}
 	for key, value in pairs(BASE_OPTS) do mapping[key] = value end
 	mapping.is_case_sensitive = case_sensitive
@@ -146,22 +151,22 @@ function M.build(info, is_section_enabled)
 
 	if enabled("phoneprefixes") then
 		if #phone >= PHONE_MIN_FOR_SHORT then
-			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_SHORT), phone, true)
+			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_SHORT), phone, true, "phone_number")
 			add(out, seen, "phoneprefixes",
 				FRANCE_DIAL_PREFIX .. phone:sub(1, PHONE_MIN_FOR_SHORT),
-				FRANCE_DIAL_PREFIX .. phone, true)
+				FRANCE_DIAL_PREFIX .. phone, true, "phone_number")
 		end
 		if #phone >= PHONE_MIN_FOR_PLAIN then
-			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_PLAIN), phone, true)
+			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_PLAIN), phone, true, "phone_number")
 			add(out, seen, "phoneprefixes",
 				FRANCE_DIAL_PREFIX .. phone:sub(2, PHONE_MIN_FOR_PLAIN),
-				FRANCE_DIAL_PREFIX .. phone, true)
+				FRANCE_DIAL_PREFIX .. phone, true, "phone_number")
 		end
 		if #phone >= PHONE_MIN_FOR_INNER then
-			add(out, seen, "phoneprefixes", phone:sub(2, 5), phone, true)
+			add(out, seen, "phoneprefixes", phone:sub(2, 5), phone, true, "phone_number")
 		end
 		if #fphone >= PHONE_FORMATTED_CHARS then
-			add(out, seen, "phoneprefixes", fphone:sub(1, PHONE_FORMATTED_CHARS), fphone, true)
+			add(out, seen, "phoneprefixes", fphone:sub(1, PHONE_FORMATTED_CHARS), fphone, true, "phone_number_clean")
 		end
 	end
 
@@ -172,9 +177,9 @@ function M.build(info, is_section_enabled)
 			-- The no-space trigger gives back the no-space value and the spaced one
 			-- gives back the spaced value, so the user gets the form they started
 			-- typing rather than the one that happens to be stored.
-			add(out, seen, "ssnprefixes", raw_prefix, ssn_raw, true)
+			add(out, seen, "ssnprefixes", raw_prefix, ssn_raw, true, "social_security_number")
 			if spaced_prefix ~= raw_prefix then
-				add(out, seen, "ssnprefixes", spaced_prefix, ssn, true)
+				add(out, seen, "ssnprefixes", spaced_prefix, ssn, true, "social_security_number")
 			end
 		end
 	end
@@ -185,9 +190,9 @@ function M.build(info, is_section_enabled)
 			local spaced_prefix = Engine.spaced_prefix(iban, IBAN_PREFIX_CHARS)
 			-- Case-INsensitive, alone among the three: an IBAN is conventionally
 			-- written in capitals and typed in whatever the user's hands produce.
-			add(out, seen, "ibanprefixes", raw_prefix, iban_raw, false)
+			add(out, seen, "ibanprefixes", raw_prefix, iban_raw, false, "iban")
 			if spaced_prefix ~= raw_prefix then
-				add(out, seen, "ibanprefixes", spaced_prefix, iban, false)
+				add(out, seen, "ibanprefixes", spaced_prefix, iban, false, "iban")
 			end
 		end
 	end
