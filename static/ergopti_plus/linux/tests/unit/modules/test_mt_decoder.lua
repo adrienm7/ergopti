@@ -227,6 +227,60 @@ helpers.describe("mt decoder: taps", function()
 		helpers.assert_true(out.tap, "a few device units of travel is a finger resting, not a swipe")
 	end)
 
+	helpers.it("does not call a long stationary hold a tap", function()
+		-- Carried from the engine this decoder replaces, where it was found and
+		-- fixed: fingers RESTING on the pad travel no distance either, so distance
+		-- alone cannot tell a tap from a hand put down and lifted later. Without
+		-- the ceiling, resting a hand fires whatever tap_3 is bound to.
+		--
+		-- The clock is injected because the original bug was using os.clock(): CPU
+		-- time barely advances in an I/O-bound daemon, so a gesture held for
+		-- seconds reported almost no elapsed time and fired anyway.
+		local clock = 100.0
+		local decoder = Decoder.new({ now_sec = function() return clock end, tap_max_sec = 0.25 })
+		local events = gesture_events(3, 0, 0)
+
+		local out = nil
+		for index, e in ipairs(events) do
+			-- Two seconds pass while the fingers are down.
+			if index == math.floor(#events / 2) then clock = clock + 2.0 end
+			local result = decoder:feed({ type = e[1], code = e[2], value = e[3] })
+			if result then out = result end
+		end
+
+		helpers.assert_nil(out,
+			"a two-second near-stationary hold exceeds the tap ceiling and must fire "
+				.. "nothing at all")
+	end)
+
+	helpers.it("still calls a brief stationary touch a tap", function()
+		local clock = 100.0
+		local decoder = Decoder.new({ now_sec = function() return clock end, tap_max_sec = 0.25 })
+		local out = nil
+		for _, e in ipairs(gesture_events(3, 0, 0)) do
+			local result = decoder:feed({ type = e[1], code = e[2], value = e[3] })
+			if result then out = result end
+		end
+		helpers.assert_true(out ~= nil and out.tap,
+			"the ceiling must not swallow the gesture it exists to distinguish from")
+	end)
+
+	helpers.it("does not time-limit a swipe", function()
+		-- Someone dragging slowly across the pad means it. A ceiling here would
+		-- drop the gesture they were halfway through.
+		local clock = 100.0
+		local decoder = Decoder.new({ now_sec = function() return clock end, tap_max_sec = 0.25 })
+		local events = gesture_events(3, 0, -400)
+		local out = nil
+		for index, e in ipairs(events) do
+			if index == math.floor(#events / 2) then clock = clock + 3.0 end
+			local result = decoder:feed({ type = e[1], code = e[2], value = e[3] })
+			if result then out = result end
+		end
+		helpers.assert_true(out ~= nil and out.direction == "up",
+			"a slow swipe is still a swipe")
+	end)
+
 end)
 
 

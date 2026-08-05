@@ -3,28 +3,35 @@
 --- ==============================================================================
 --- MODULE: Gestures Manager (Linux)
 --- DESCRIPTION:
---- Gesture recognition and action mapping for Linux. Defines the canonical gesture
---- slot registry (tap/swipe slots matching the macOS driver), an action registry
---- that maps gesture actions to xdotool/ytool commands, and a skeleton engine
---- ready for libinput touch-event parsing.
+--- Binds gestures to actions, reads the touchpad, and runs the action a
+--- completed gesture is bound to.
 ---
---- The raw touch-event reader (libinput debug-events for touch frames) is
---- deferred — it requires the same subprocess pattern as keyboard_hook but for
---- touch devices. The engine skeleton exposes the same process_frame(touches)
---- contract as macOS so the reader can be plugged in later without changing
---- the gesture recognition logic.
+--- HOW A GESTURE GETS HERE:
+--- `touchpad_finder` chooses the device by CAPABILITY rather than by name, and
+--- reports how many fingers it can express before one has touched it.
+--- `evdev_reader` opens its node — WITHOUT a grab, because grabbing a touchpad
+--- takes the pointer from the compositor and leaves a dead cursor, and evdev is
+--- broadcast so reading in parallel costs nothing. `mt_decoder` turns the
+--- multitouch protocol into a finished gesture. This module dispatches it.
+---
+--- WHY NOT libinput, WHICH WOULD HAVE BEEN LESS CODE:
+--- It gates its whole gesture state machine on `finger_count <= 4`, so
+--- five-finger swipes never become events, and its documentation rules out taps
+--- past three fingers. Against the 39 slots this project declares it can serve
+--- 16 and none of the four taps. This module's header described that route as
+--- the plan until 2026-08-05; it was never the plan, and scraping a subprocess
+--- had already been removed from the keyboard path for four documented defects.
 ---
 --- FEATURES & RATIONALE:
---- 1. Action registry: ~50+ actions mapped to xdotool/ytool commands. Mirrors
----    the macOS actions where Linux equivalents exist (xdotool key, ydotool,
----    wmctrl, playerctl, brightnessctl, pamixer).
---- 2. Gesture slots: full tap/swipe matrix (2-5 fingers, 8 directions) matching
----    the macOS DEFAULT_GESTURES. Defaults are Linux-appropriate (e.g., 3-finger
----    swipe for workspace navigation via wmctrl).
---- 3. Skeleton engine: process_frame API ready for libinput touch data. Current
----    implementation is pure state management — the touch-event subprocess is a
----    TODO wired the same way as keyboard_hook.
---- 4. Enable/disable: menu toggle suspends gesture processing.
+--- 1. Slot key-space shared with macOS, derived from
+---    `_shared/modules/actions/actions.toml` so the two cannot drift.
+--- 2. NO default bindings on this driver. The desktop acts on the same gesture —
+---    every compositor claims 3- and 4-finger swipes, and two-finger motion is
+---    scrolling everywhere — so a shipped binding fires twice with nothing on
+---    screen to explain it. The user chooses.
+--- 3. Emission through uinput, below the display server, so a chord reaches X11,
+---    every Wayland compositor and a bare TTY alike. `xdotool` remains only as
+---    the fallback for a device that could not be opened.
 --- ==============================================================================
 
 local M = {}
@@ -634,102 +641,20 @@ end
 -- =========================================
 -- =========================================
 
--- Thresholds (match macOS Geometry module).
-local SWIPE_MIN     = 1.5    -- 3+ fingers: minimum travel to validate a swipe
-local SWIPE_MIN_2   = 3.0    -- 2 fingers: higher threshold (left to macOS native)
-local DIAG_MIN_2    = 5.0    -- 2-finger diagonal: minimum total distance
-local TAP_MAX_SEC   = Timings.sec("gestures", "tap_max_ms")   -- Canonical tap ceiling (shared registry; was a drifted 0.25 literal)
-local TAP_MAX_DELTA = 8.0    -- Maximum centroid displacement for tap classification
+-- The thresholds, the centroid helper, _compute_dir and _slot_for_dir were
+-- removed on 2026-08-05 along with process_frame, the only thing that used
+-- them. mt_decoder carries its own threshold and names directions itself;
+-- a second copy of the naming rule is what let the decoder emit "up_right"
+-- against a slot space that spells it "right_up".
 
---- Computes the centroid position from an array of touch points.
---- @param touches table Array of {x=number, y=number} points.
---- @return table {x, y}
-local function _avg_pos(touches)
-	local x, y = 0, 0
-	if type(touches) ~= "table" or #touches == 0 then return { x = 0, y = 0 } end
-	for _, t in ipairs(touches) do
-		if type(t) == "table" then
-			x = x + (tonumber(t.x) or 0)
-			y = y + (tonumber(t.y) or 0)
-		end
-	end
-	return { x = x / #touches, y = y / #touches }
-end
-
---- Classifies a displacement into a direction (horiz/vert/diag).
---- @param dx number X delta.
---- @param dy number Y delta.
---- @param mf number Finger count (2 uses looser thresholds).
---- @return string|nil "horiz", "vert", "diag", or nil if below threshold.
-local function _compute_dir(dx, dy, mf)
-	local adx  = math.abs(dx)
-	local ady  = math.abs(dy)
-	local dist = adx + ady
-	local min  = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
-
-	if dist < min then return nil end
-
-	local angle = math.deg(math.atan(ady, adx))
-
-	if angle >= 65 then
-		return "vert"
-	elseif angle <= 25 then
-		return "horiz"
-	else
-		local diag_min = (mf == 2) and DIAG_MIN_2 or (min * 1.5)
-		if dist >= diag_min then return "diag" end
-		return (adx >= ady) and "horiz" or "vert"
-	end
-end
-
---- Resolves a finger count + direction + delta into an action slot name.
---- @param mf number Finger count.
---- @param dir string "horiz" | "vert" | "diag".
---- @param dx number X delta.
---- @param dy number Y delta.
---- @return string|nil Slot name like "swipe_3_left".
-local function _slot_for_dir(mf, dir, dx, dy)
-	local prefix = "swipe_" .. tostring(mf) .. "_"
-	if dir == "horiz" then
-		return prefix .. (dx > 0 and "right" or "left")
-	elseif dir == "vert" then
-		return prefix .. (dy > 0 and "down" or "up")
-	elseif dir == "diag" then
-		if dx > 0 then
-			return prefix .. (dy > 0 and "right_down" or "right_up")
-		else
-			return prefix .. (dy > 0 and "left_down" or "left_up")
-		end
-	end
-	return nil
-end
-
-
--- =========================================
--- =========================================
 -- ======= 6/ Touch Event Engine ===========
 -- =========================================
 -- =========================================
 
--- Gesture tracking state (per-gesture, cleared on finger lift).
-local _gesture = {
-	active     = false,
-	start_time = nil,
-	start_pos  = nil,
-	end_pos    = nil,
-	max_fingers = 0,
-}
-
---- Resets gesture tracking state.
-local function _reset_gesture()
-	_gesture = {
-		active      = false,
-		start_time  = nil,
-		start_pos   = nil,
-		end_pos     = nil,
-		max_fingers = 0,
-	}
-end
+-- The per-gesture tracking state that lived here went with process_frame: the
+-- decoder owns it now, because tracking a gesture and decoding the protocol that
+-- describes it are the same job and splitting them across two modules is how the
+-- two came to disagree about what a diagonal is called.
 
 --- The slot name a completed gesture belongs to.
 --- @param fingers integer
@@ -848,10 +773,12 @@ function M.stop_reading()
 			pcall(Reader.close, Reader.TOUCHPAD)
 		end
 	end
+	-- Dropping the decoder IS the reset: it holds the slot state and the latched
+	-- finger count, so a half-finished gesture cannot survive into the next
+	-- reader. There is no separate tracking state left to clear.
 	_reading = false
 	_decoder = nil
 	_touchpad = nil
-	_reset_gesture()
 	Logger.info(LOG, "Touchpad reader stopped.")
 end
 
@@ -867,95 +794,6 @@ function M.is_reading()
 	return _reading
 end
 
---- Processes a raw touch frame from libinput.
---- The contract matches macOS Engine.process_frame(touches).
----
---- Algorithm (simplified port of macOS gestures/engine.lua):
---- 1. On first frame with >=2 touches: record start position and time.
---- 2. Track centroid through subsequent frames.
---- 3. On all fingers lifted (n=0): classify as tap or swipe, dispatch action.
----
---- @param touches table Array of touch points { x, y }.
-function M.process_frame(touches)
-	if not _enabled then return end
-	if type(touches) ~= "table" then return end
-
-	local n = #touches
-	local now = _now_sec()
-
-	if n == 0 then
-		-- All fingers lifted — commit the gesture.
-		if not _gesture.active or not _gesture.start_pos or not _gesture.end_pos then
-			_reset_gesture()
-			return
-		end
-
-		local dx = _gesture.end_pos.x - _gesture.start_pos.x
-		local dy = _gesture.end_pos.y - _gesture.start_pos.y
-		local elapsed = now - (_gesture.start_time or now)
-		local total_delta = math.abs(dx) + math.abs(dy)
-		local mf = _gesture.max_fingers
-
-		-- Tap detection: short duration + minimal movement.
-		if total_delta < TAP_MAX_DELTA and elapsed <= TAP_MAX_SEC then
-			local tap_slot = nil
-			if     mf == 2 then tap_slot = "tap_2"
-			elseif mf == 3 then tap_slot = "tap_3"
-			elseif mf == 4 then tap_slot = "tap_4"
-			elseif mf >= 5 then tap_slot = "tap_5" end
-
-			if tap_slot and _actions[tap_slot] and _actions[tap_slot] ~= "none" then
-				Logger.info(LOG, "TAP FIRE: slot=%s action=%s fingers=%d elapsed=%.3fs",
-					tap_slot, _actions[tap_slot], mf, elapsed)
-				_execute_action(_actions[tap_slot], nil, tap_slot)
-			end
-			_reset_gesture()
-			return
-		end
-
-		-- Swipe detection.
-		local dir = _compute_dir(dx, dy, mf)
-		if not dir then
-			Logger.debug(LOG, "Swipe below threshold: dx=%.2f dy=%.2f mf=%d", dx, dy, mf)
-			_reset_gesture()
-			return
-		end
-
-		local slot = _slot_for_dir(mf, dir, dx, dy)
-		if not slot or not _actions[slot] or _actions[slot] == "none" then
-			Logger.debug(LOG, "No action for slot: %s", tostring(slot))
-			_reset_gesture()
-			return
-		end
-
-		Logger.info(LOG, "SWIPE FIRE: slot=%s action=%s dir=%s mf=%d dx=%.2f dy=%.2f elapsed=%.3fs",
-			slot, _actions[slot], dir, mf, dx, dy, elapsed)
-		_execute_action(_actions[slot], nil, slot)
-		_reset_gesture()
-		return
-	end
-
-	-- Active tracking: record start on first frame, update centroid.
-	if n >= 2 then
-		local pos = _avg_pos(touches)
-		if not _gesture.active then
-			Logger.debug(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f)", n, pos.x, pos.y)
-			_gesture.active      = true
-			_gesture.start_time  = now
-			_gesture.start_pos   = { x = pos.x, y = pos.y }
-			_gesture.end_pos     = { x = pos.x, y = pos.y }
-			_gesture.max_fingers = n
-		else
-			_gesture.end_pos = pos
-			if n > _gesture.max_fingers then
-				_gesture.max_fingers = n
-			end
-		end
-	end
-end
-
--- =========================================
--- =========================================
 -- ======= 6/ Init =========================
 -- =========================================
 -- =========================================

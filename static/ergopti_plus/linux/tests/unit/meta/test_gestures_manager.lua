@@ -37,7 +37,12 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(type(M.is_reading) == "function", "is_reading")
     helpers.assert_true(type(M.get_action_label) == "function", "get_action_label")
     helpers.assert_true(type(M.get_action_names) == "function", "get_action_names")
-    helpers.assert_true(type(M.process_frame) == "function", "process_frame")
+    -- process_frame was retired on 2026-08-05. dispatch_gesture replaced it:
+    -- it takes an already-classified gesture whose finger count is the one the
+    -- KERNEL reported, rather than inferring it from how many contacts it was
+    -- handed — which libinput says is wrong on most touchpads.
+    helpers.assert_true(type(M.dispatch_gesture) == "function", "dispatch_gesture")
+    helpers.assert_true(type(M.pump) == "function", "pump")
     helpers.assert_true(type(M.init) == "function", "init")
     helpers.assert_true(type(M.DEFAULT_GESTURES) == "table", "DEFAULT_GESTURES")
     helpers.assert_true(type(M.SINGLE_SLOTS) == "table", "SINGLE_SLOTS")
@@ -279,32 +284,6 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- 7. Process frame (no-op stub)
   -- ==========================================================================
 
-  helpers.it("process_frame with no touches fires no gesture", function()
-    -- Called directly: a raise fails with the real error. The claim is that an
-    -- empty frame recognises nothing — a frame loop that fired on emptiness would
-    -- trigger an action every tick the user is not touching the trackpad.
-    local before = M.get_last_gesture and M.get_last_gesture() or nil
-    M.process_frame({})
-    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
-      "an empty frame must not recognise a gesture")
-  end)
-
-  helpers.it("process_frame with a single touch fires no gesture", function()
-    local before = M.get_last_gesture and M.get_last_gesture() or nil
-    M.process_frame({ { x = 100, y = 200 } })
-    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
-      "one finger is not a gesture — every slot needs three or more")
-  end)
-
-  helpers.it("process_frame does nothing when disabled", function()
-    M.disable()
-    local before = M.get_last_gesture and M.get_last_gesture() or nil
-    M.process_frame({ { x = 100, y = 200 } })
-    helpers.assert_eq(M.get_last_gesture and M.get_last_gesture() or nil, before,
-      "a disabled manager must not recognise anything — the menu toggle is the only "
-        .. "thing standing between the user and an action they turned off")
-  end)
-
   -- ==========================================================================
   -- 8. Init
   -- ==========================================================================
@@ -385,89 +364,6 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- ==========================================================================
   -- 10. Full recognition pipeline (frame sequence -> slot -> action dispatch)
   -- ==========================================================================
-
-  helpers.it("3-finger tap sequence resolves tap_3 and dispatches its action", function()
-    -- Stub os.execute so we observe WHICH command the pipeline dispatched. This
-    -- proves slot resolution + action dispatch, not merely no-crash (sections 7-8).
-    local captured = {}
-    local real_execute = os.execute
-    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
-
-    M.reset_defaults()
-    M.enable()
-    -- Bind a distinctive action so the captured command is unambiguous.
-    M.set_action("tap_3", "enter")  -- "enter" maps to `xdotool key Return`
-
-    -- Full gesture: three fingers down at one spot, then all lifted (n = 0).
-    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
-    M.process_frame({})
-
-    os.execute = real_execute  -- Restore before any assertion can abort the test.
-
-    helpers.assert_eq(#captured, 1, "exactly one action should fire for a single tap")
-    helpers.assert_contains(captured[1], "xdotool key Return",
-      "3-finger tap must resolve tap_3 and dispatch its bound action")
-
-    M.reset_defaults()
-    M.disable()
-  end)
-
-  helpers.it("3-finger swipe-left sequence resolves swipe_3_left and dispatches its action", function()
-    local captured = {}
-    local real_execute = os.execute
-    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
-
-    M.reset_defaults()
-    M.enable()
-    M.set_action("swipe_3_left", "escape")  -- "escape" maps to `xdotool key Escape`
-
-    -- Three fingers travel left far enough to beat both TAP_MAX_DELTA and SWIPE_MIN,
-    -- forcing the swipe branch (a tap requires travel below TAP_MAX_DELTA).
-    M.process_frame({ { x = 200, y = 100 }, { x = 200, y = 100 }, { x = 200, y = 100 } })
-    M.process_frame({ { x = 140, y = 100 }, { x = 140, y = 100 }, { x = 140, y = 100 } })
-    M.process_frame({})
-
-    os.execute = real_execute
-
-    helpers.assert_eq(#captured, 1, "exactly one action should fire for a single swipe")
-    helpers.assert_contains(captured[1], "xdotool key Escape",
-      "3-finger left swipe must resolve swipe_3_left and dispatch its bound action")
-
-    M.reset_defaults()
-    M.disable()
-  end)
-
-  helpers.it("a slow near-stationary hold is not misclassified as a tap (wall clock, not CPU time)", function()
-    -- The bug: process_frame timed gestures with os.clock() (CPU time). In an
-    -- I/O-bound daemon CPU time barely advances, so a gesture held for seconds
-    -- reported elapsed ~= 0 and was wrongly fired as a tap. With an injected
-    -- wall clock a long hold exceeds the tap ceiling and must NOT fire.
-    local captured = {}
-    local real_execute = os.execute
-    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
-
-    local fake_t = 0
-    M.init({ now_sec = function() return fake_t end })
-    M.reset_defaults()
-    M.enable()
-    M.set_action("tap_3", "enter")
-
-    -- Three fingers down, essentially stationary, held for 2 s of wall time
-    -- (far beyond the tap ceiling), then lifted.
-    fake_t = 100.0
-    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
-    fake_t = 102.0
-    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
-    M.process_frame({})
-
-    os.execute = real_execute
-
-    helpers.assert_eq(#captured, 0,
-      "a 2 s near-stationary hold exceeds the tap ceiling and must not dispatch a tap")
-
-    M.reset_defaults()
-    M.disable()
-  end)
 
   -- ==========================================================================
   -- 11. Slot-space is derived from the shared actions.toml (single source)
