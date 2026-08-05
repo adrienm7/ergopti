@@ -474,6 +474,9 @@ pas les rouvrir sans raison nouvelle.
         restante est que le troisième bloc ne s exécute pas du tout, ou lève avant sa
         fin — à instrumenter avec un `window.onerror` posé AVANT les scripts de la
         page, ce que le harnais ne fait pas encore.
+      → **Pas une troncature** non plus : la taille du bloc assemblé et celle du
+        fichier sur disque se réconcilient exactement (l écart correspondait à un
+        ajout fait après la mesure).
 
 - [ ] **Bascules par famille de règle dynamique** (date, date_fr, date_long_fr,
       iban/phone/ssn_prefixes, text_expansion_personal_information — 7 déclarées).
