@@ -181,7 +181,14 @@ jobs:
     needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
     steps:
+      # Enough history for test_no_coauthor_in_commits.lua, which scans
+      # HEAD~20..HEAD. The default checkout is a depth-1 clone, so that range does
+      # not exist and the test fails — correctly, and saying so: it refuses to
+      # report a clean history it could not read. Giving it the commits is the fix;
+      # letting it pass on an empty range would make the whole check ornamental.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 25
 
       - name: Install Lua 5.4 + luarocks
         run: |
