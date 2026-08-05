@@ -176,6 +176,7 @@ const CHECKS = [
 	{ name: 'mutation-test harness passes un-mutated (Stryker precondition)', cmd: 'node', args: ['tools/test/test-mutation-targets.cjs'], repro: 'node tools/test/test-mutation-targets.cjs' },
 	{ name: 'every gate script is actually wired into a runner', cmd: 'node', args: ['tools/test/test-gate-scripts-are-wired.cjs'], repro: 'node tools/test/test-gate-scripts-are-wired.cjs' },
 	{ name: 'hotstrings config window bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-hotstrings-config-window-bridge.cjs'], repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs' },
+	{ name: 'hotstring colour presets identical on macOS and Linux', cmd: 'node', args: ['tools/test/test-color-presets-parity.cjs'], repro: 'node tools/test/test-color-presets-parity.cjs' },
 	{ name: 'prompt editor bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-prompt-editor-bridge.cjs'], repro: 'node tools/test/test-prompt-editor-bridge.cjs' },
 	{ name: 'action picker bridge (shared frontend ↔ both hosts)', cmd: 'node', args: ['tools/test/test-action-picker-bridge.cjs'], repro: 'node tools/test/test-action-picker-bridge.cjs' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' },

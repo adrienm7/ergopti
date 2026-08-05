@@ -609,19 +609,29 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hotstrings_config_bridge")
     end)
-    helpers.it("'ready' returns groups + stats", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.groups) == "table")
-      helpers.assert_eq(#result.groups, 3)
-      helpers.assert_eq(result.groups[1].name, "accents")
-      helpers.assert_true(result.groups[1].enabled)
-      -- "code" should be disabled per mock.
-      helpers.assert_eq(result.groups[3].name, "code")
-      helpers.assert_eq(result.groups[3].enabled, false)
-      helpers.assert_eq(result.mapping_count, 50)
-      helpers.assert_eq(result.parse_errors, 2)
-      helpers.assert_eq(result.config_dir, "/home/user/.config/ergopti/hotstrings")
+    helpers.it("'ready' pushes the keys the settings page renders from", function()
+      -- This asserted `{groups = {{name, enabled}}, mapping_count, parse_errors,
+      -- config_dir}` — four keys, and the page destructures none of them. It
+      -- walks state.categories and state.presets, and its group selector wants
+      -- {key, label}. So the suite was green while the window drew an empty page
+      -- with a selector full of blank entries.
+      local pushed = {}
+      local manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
+      }
+      handler.on_message("ready", state)
+      package.loaded["ui.webview_manager"] = manager
+
+      helpers.assert_eq(#pushed, 1, "exactly one push into the page")
+      helpers.assert_eq(pushed[1].app, "hotstrings_config_window",
+        "into the page's own directory name")
+      for _, key in ipairs({ "categories", "groups", "presets", "global_default_delay_ms" }) do
+        helpers.assert_true(pushed[1].js:find('"' .. key .. '"', 1, true) ~= nil,
+          "carrying " .. key .. ", which script.js reads")
+      end
+      helpers.assert_true(pushed[1].js:find('"mapping_count"', 1, true) == nil,
+        "and not the four keys it never read")
     end)
     -- Rewritten on 2026-08-05. The cases that stood here exercised toggle_group,
     -- reload, add_hotstring and delete_hotstring — none of which the shared

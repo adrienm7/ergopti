@@ -167,6 +167,11 @@ function M.load_catalogue(paths)
 				delay          = tonumber(meta.delay),
 				show_tooltip   = meta.show_tooltip,
 				color          = meta.color,
+				-- The file-level priority, kept rather than only folded into each
+				-- entry: the settings window shows it as the category's default, and
+				-- reading it back from an entry would report whatever the last one
+				-- resolved to.
+				priority       = file_priority,
 				-- Set only for a pack that came from an extension. The menu groups
 				-- those under their own heading and labels them with the extension's
 				-- name, which a bare file stem like "demo-phrases" cannot convey.
@@ -218,7 +223,16 @@ function M.load_catalogue(paths)
 							}
 						end
 					end
-					category.sections[sec_name] = { count = entry_count }
+					-- The section's own TOML metadata, not just how many entries it
+					-- holds. `[_meta.section_delays]` is parsed by the shared reader
+					-- and was dropped here, so rung 3 of the five-rung cascade — the
+					-- section's declared delay — resolved to nil on this driver and a
+					-- pack shipping per-section timings had them silently ignored.
+					category.sections[sec_name] = {
+						count    = entry_count,
+						delay    = tonumber((meta.section_delays or {})[sec_name]),
+						priority = section_priorities[sec_name],
+					}
 					category.count = category.count + entry_count
 				end
 			end

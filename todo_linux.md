@@ -1494,8 +1494,22 @@ déclarée.
 
 ### 11.2 — Bloquants restants
 
-- [ ] **Le bridge n'envoie pas les données que la page affiche** : ni catégories,
-      ni presets de couleur, ni délai global. Page vide même une fois ouverte.
+- [x] **Le bridge n'envoyait pas les données que la page affiche.** Il renvoyait
+      `{groups={{name,enabled}}, mapping_count, parse_errors, config_dir}` — quatre
+      clés, dont la page n'en lit **aucune**. `render()` parcourt `state.categories`
+      et `state.presets`, et le sélecteur veut `{key,label}`.
+      → Payload complet maintenant, **poussé** par `setData(...)` : `makeHostBridge`
+        est fire-and-forget et **2 pages sur 14** définissent `window.__hostBridgeResponse`,
+        donc tout payload retourné ne parvenait à personne. Même défaut que l’éditeur.
+      → Deux accesseurs manquaient (`get_toml_defaults`, `get_user_override`) : sans
+        eux la fenêtre ne peut pas distinguer une valeur livrée d’une valeur choisie,
+        donc chaque ligne se lisait comme modifiée par l’utilisateur.
+      → Et le **cran 3 de la cascade était mort** : `[_meta.section_delays]` était parsé
+        par le lecteur partagé puis jamais stocké par le loader, donc un pack livrant
+        des délais par section les voyait ignorés.
+      → `test-color-presets-parity.cjs` tient les deux palettes identiques — le lecteur
+        TOML partagé ne gère que des scalaires, la liste ordonnée ne peut donc pas être
+        partagée.
 - [ ] **L'aperçu n'est jamais affiché** : `preview.lua M.show()` n'a aucun appelant
       dans tout le pilote. Toute la surface aperçu — et donc les quatre bascules
       ci-dessus — est inerte tant qu'un énumérateur de candidats n'existe pas.

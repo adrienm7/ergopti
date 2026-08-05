@@ -406,6 +406,56 @@ function M.set_override(category, section, field, value)
 	return ok
 end
 
+--- The values a category's own TOML declares, with no user override applied.
+---
+--- Published for the settings window, which shows the shipped value as the
+--- placeholder behind an empty field and marks a row "(default)" when the user
+--- has not overridden it. Without it the window cannot tell the two apart and
+--- every row reads as user-set.
+--- @param category string
+--- @param section string|nil
+--- @return table { delay, color, show_tooltip, priority } — any may be nil.
+function M.get_toml_defaults(category, section)
+	local meta = _categories[category] or {}
+	if section then
+		local entry = (meta.sections or {})[section] or {}
+		return {
+			delay        = entry.delay,
+			color        = entry.color,
+			show_tooltip = entry.show_tooltip,
+			priority     = entry.priority,
+		}
+	end
+	return {
+		delay        = meta.delay,
+		color        = meta.color,
+		show_tooltip = meta.show_tooltip,
+		priority     = meta.priority,
+	}
+end
+
+--- The user's own override table for a category or section.
+---
+--- Returned as a copy: the window is handed this to decide which fields are
+--- marked as overridden, and a caller that mutated the live table would change
+--- the cascade without going through set_override or clearing the resolve cache.
+--- @param category string
+--- @param section string|nil
+--- @return table Possibly empty; never nil.
+function M.get_user_override(category, section)
+	local entry = _overrides[category]
+	if not entry then return {} end
+	local source = entry
+	if section then source = (entry.sections or {})[section] end
+	if type(source) ~= "table" then return {} end
+	return {
+		delay        = source.delay,
+		color        = source.color,
+		show_tooltip = source.show_tooltip,
+		priority     = source.priority,
+	}
+end
+
 --- Clears every override for a category, or for one of its sections.
 --- @param category string
 --- @param section string|nil
