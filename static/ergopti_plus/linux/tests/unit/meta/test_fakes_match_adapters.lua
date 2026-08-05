@@ -83,9 +83,20 @@ helpers.describe("fakes: every adapter function exists on its double", function(
 		-- The inverse direction, so a fake cannot invent a port that does not
 		-- exist — which would let a module be written against something the driver
 		-- has no adapter for and still look tested.
+		--
+		-- Asserting the REQUIRE succeeded would only say "it did not crash", which
+		-- is true of an empty file. What makes it an adapter is a surface, so that
+		-- is what is checked.
 		for _, pair in ipairs(PAIRS) do
-			local ok = pcall(require, pair.adapter)
-			helpers.assert_true(ok, pair.adapter .. " must be a real module")
+			local real = helpers.load_module(pair.adapter)
+			helpers.assert_true(type(real) == "table", pair.adapter .. " must return a table")
+			local public = 0
+			for name, value in pairs(real) do
+				if type(value) == "function" and name:sub(1, 1) ~= "_" then public = public + 1 end
+			end
+			helpers.assert_true(public > 0, string.format(
+				"%s exports no public function — a fake standing in for it would be "
+					.. "standing in for nothing", pair.adapter))
 		end
 	end)
 
