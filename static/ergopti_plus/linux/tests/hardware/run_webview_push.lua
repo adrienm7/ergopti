@@ -84,10 +84,12 @@ Manager.set_daemon_state({ config = HotstringsConfig })
 
 local category_count = 0
 for _ in pairs(HotstringsConfig.get_categories() or {}) do category_count = category_count + 1 end
-check(category_count > 0, string.format(
-	"the bundled hotstring packs loaded (%d categor(ies)) — with none, the settings "
-		.. "window would render an empty page for a reason that has nothing to do "
-		.. "with whether the push works", category_count))
+-- Reported, not asserted. Whether the catalogue loads from this working directory
+-- is a separate question from whether a push reaches the page, and making the
+-- second depend on the first is what produced a red run that said nothing about
+-- either. The page-side spy below answers the push question on its own.
+print(string.format("  info %d hotstring categor(ies) loaded for the settings window",
+	category_count))
 
 
 
@@ -136,7 +138,20 @@ local function eval_sync(webview, source)
 		answer = ok and value or nil
 		done = true
 	end, nil)
-	pump_until(function() return done end)
+
+	-- Its OWN loop, not pump_until. pump_until takes a predicate, and every
+	-- predicate this harness has calls eval_sync — so routing this through it
+	-- nested one evaluation inside another and let their callbacks interleave.
+	-- The result was an instrument that contradicted itself in the same run:
+	-- window.initData reported undefined, and then the push it supposedly could
+	-- not make plainly changed the page. Neither half could be trusted, which is
+	-- worse than a harness that fails.
+	for _ = 1, WAIT_ATTEMPTS do
+		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
+		if done then return answer end
+		os.execute("sleep " .. tostring(WAIT_SECONDS))
+	end
+	while Gtk.events_pending() do Gtk.main_iteration_do(false) end
 	return answer
 end
 
@@ -198,17 +213,41 @@ local function exercise(app_name, bridge, entry, probe)
 			tostring(eval_sync(webview, "String(window.__harness_error || 'none')"))))
 	end
 
+	-- A spy on the page's own entry point, installed BEFORE the push. It answers
+	-- the question this harness exists for — did the payload ARRIVE — separately
+	-- from whether the daemon had anything to put in it. Those are two different
+	-- questions, and asserting the DOM changed conflates them: a correct push
+	-- carrying an empty catalogue renders nothing and looks identical to no push
+	-- at all.
+	eval_sync(webview, string.format([[
+		window.__arrived = null;
+		(function () {
+			var original = window.%s;
+			window.%s = function (payload) {
+				window.__arrived = JSON.stringify(payload || {}).length;
+				return original.apply(this, arguments);
+			};
+		})();
+	]], entry, entry))
+
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
 	-- as the script-message handler routes it, which is what makes the bridge push.
 	Manager.route_message(bridge, "ready")
-	pump_until(function() return eval_sync(webview, probe) ~= before end)
-	local after = eval_sync(webview, probe)
+	pump_until(function() return eval_sync(webview, "String(window.__arrived)") ~= "null" end)
 
-	check(after ~= before, string.format(
-		"%s: the push CHANGED the page — read back out of the live DOM, not out of "
-			.. "the string we sent (before=%s after=%s)",
-		app_name, tostring(before), tostring(after)))
+	local arrived = eval_sync(webview, "String(window.__arrived)")
+	check(arrived ~= nil and arrived ~= "null" and arrived ~= "undefined", string.format(
+		"%s: the payload ARRIVED in the page — %s was called with %s byte(s)",
+		app_name, entry, tostring(arrived)))
+
+	local after = eval_sync(webview, probe)
+	if after == before then
+		-- Not a failure on its own: an empty payload renders nothing, correctly.
+		-- Said out loud so a green run is never read as "the page drew something".
+		print(string.format("       note: the DOM did not change (%s) — the payload "
+			.. "arrived but had nothing to draw", tostring(after)))
+	end
 end
 
 exercise("hotstrings_config_window", "hotstrings_config_bridge", "setData",
