@@ -71,6 +71,9 @@ local _parse_errors   = 0
 --- daemon; nil in the harness, where nothing is drawn.
 local _on_change = nil
 
+--- Supplies mappings that no TOML file describes. See set_extra_mappings_provider.
+local _extra_mappings_provider = nil
+
 --- Reads the persisted disabled set.
 local function load_disabled()
 	local raw = Storage.get(DISABLED_KEY, "")
@@ -563,6 +566,25 @@ function M.init(engine, config_dir, on_change)
 		_config_dir or "(bundled)", count_disabled())
 end
 
+--- Registers a source of mappings that do not come from a TOML file.
+---
+--- The prefix expansions built from personal_info.toml are the only caller: they
+--- are assembled in code, they change when the user edits that file or flips a
+--- dynamic-family toggle, and they must be rebuilt on every load rather than
+--- cached. Injected rather than required directly so this module keeps knowing
+--- nothing about the dynamic-hotstrings layer — and so a test can supply two
+--- mappings instead of a personal_info.toml.
+--- @param provider function|nil Returns an array of mapping tables. nil clears it.
+function M.set_extra_mappings_provider(provider)
+	if provider ~= nil and type(provider) ~= "function" then
+		Logger.error(LOG, "set_extra_mappings_provider(): expected a function, got %s.", type(provider))
+		return false
+	end
+	_extra_mappings_provider = provider
+	Logger.debug(LOG, "Extra mappings provider: %s.", provider and "set" or "cleared")
+	return true
+end
+
 
 -- =========================================
 -- =========================================
@@ -662,9 +684,12 @@ function M.load_all()
 
 	_toml_paths = resolve_paths()
 
+	-- An empty catalogue is not an empty load. This used to return here, which
+	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
+	-- the prefix expansions built from personal_info.toml — two unrelated files,
+	-- one of which was punishing the other.
 	if #_toml_paths == 0 then
 		Logger.warn(LOG, "load_all(): no TOML files found.")
-		return 0
 	end
 
 	local catalogue = Loader.load_catalogue(_toml_paths)
@@ -673,6 +698,24 @@ function M.load_all()
 	_parse_errors = 0
 	if #_mappings == 0 and #_toml_paths > 0 then
 		_parse_errors = #_toml_paths
+	end
+
+	-- Mappings that no file describes — today, the prefix expansions built from
+	-- personal_info.toml. Appended AFTER the catalogue and BEFORE the filter, so
+	-- the disable set and the dedup pass treat them exactly like any other
+	-- mapping: a user who switches the dynamic category off loses these too, which
+	-- is what the category claims to control.
+	if _extra_mappings_provider then
+		local ok, extra = pcall(_extra_mappings_provider)
+		if not ok then
+			Logger.error(LOG, "The extra mappings provider raised — those mappings are absent: %s.",
+				tostring(extra))
+		elseif type(extra) == "table" then
+			for _, mapping in ipairs(extra) do
+				_mappings[#_mappings + 1] = mapping
+			end
+			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
+		end
 	end
 
 	-- Filter what the user switched off, at either level. A section is checked
@@ -694,7 +737,14 @@ function M.load_all()
 	for _, m in ipairs(filtered) do
 		if triggers[m.trigger] then
 			dupes = dupes + 1
-			Logger.warn(LOG, "Duplicate trigger '%s' skipped.", m.trigger)
+			-- A private mapping's trigger is a fragment of its own secret — the
+			-- first six characters of the IBAN — so it cannot be named even while
+			-- explaining why it was dropped.
+			if m.is_private then
+				Logger.warn(LOG, "Duplicate trigger in a private mapping skipped (content withheld).")
+			else
+				Logger.warn(LOG, "Duplicate trigger '%s' skipped.", m.trigger)
+			end
 		else
 			triggers[m.trigger] = true
 			deduped[#deduped + 1] = m

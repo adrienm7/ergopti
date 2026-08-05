@@ -833,8 +833,13 @@ local function _manifest_hotstring_rows(ctx, config)
 				return
 			end
 
-			local on    = dyn.is_enabled()
-			local count = type(dyn.get_rules_count) == "function" and dyn.get_rules_count() or 0
+			local on = dyn.is_enabled()
+			-- active_count, not get_rules_count: the latter counts the RULES the
+			-- dynamic engine registered and knows nothing about the prefix
+			-- expansions, which are mappings held by the ordinary matcher. The
+			-- category would have advertised 3 while offering 13, and would not have
+			-- moved when a family was switched off.
+			local count = type(dyn.active_count) == "function" and dyn.active_count() or 0
 
 			local sub = {
 				{
@@ -877,10 +882,17 @@ local function _manifest_hotstring_rows(ctx, config)
 						sub[#sub + 1] = { title = "-" }
 					else
 						local section, enabled = family.section, family.enabled
+						-- The count, on the families that have one. A prefix family with
+						-- 0 behind it is a switch that can do nothing until the user
+						-- fills in that field of personal_info.toml, and the count is
+						-- the only thing on the row that says so.
+						local title = family.count
+							and string.format("%s (%d)", family.label, family.count)
+							or family.label
 						sub[#sub + 1] = {
 							-- Resolved by the manager, which owns both the locale key
 							-- and the engine that answers what "{date}" is today.
-							title    = family.label,
+							title    = title,
 							checked  = enabled,
 							-- Greyed while the category itself is off, like a section
 							-- row: the tick still says what comes back when it is
@@ -888,6 +900,14 @@ local function _manifest_hotstring_rows(ctx, config)
 							disabled = not on,
 							fn       = function()
 								dyn.set_rule_enabled(section, not enabled)
+								-- A prefix family is matched by the ORDINARY engine, which
+								-- knows nothing about dynamic families — so its switch has
+								-- to add or remove mappings rather than filter them, and
+								-- that means a reload. The date families need none of this;
+								-- their guard is read at match time.
+								if family.count and config and type(config.reload) == "function" then
+									config.reload()
+								end
 								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 							end,
 						}

@@ -496,12 +496,30 @@ pas les rouvrir sans raison nouvelle.
         le pilote aurait continué de taper. Les trois assertions de fond du test
         de régression sont rouges quand on remet `nil`.
 
-- [ ] **Les trois familles de préfixes (iban, phone, ssn) ne sont enregistrées par
-      aucun code Linux.** Le manifeste les déclare, Windows et macOS les rendent,
-      ce pilote n en enregistre aucune règle — d où leur absence assumée de la
-      liste des bascules : une bascule pour une règle inexistante ment davantage
-      qu une bascule manquante. C est un écart de parité distinct des bascules, et
-      il porte sur le moteur de règles, pas sur le menu.
+- [x] **Les trois familles de préfixes (iban, phone, ssn)** — faites le
+      2026-08-05. Le manifeste les déclarait depuis toujours, Windows et macOS les
+      rendaient, et aucun code Linux n en enregistrait une seule : la
+      fonctionnalité était trois lignes dans un fichier que personne ne lisait, sur
+      un pilote sur trois.
+      → Ce ne sont **pas** des règles dynamiques. Un préfixe n a pas de touche de
+        validation — taper `0750` EST le déclencheur — donc ce sont des mappings
+        auto-expansifs ordinaires (`prefix_rules.lua`), remis au moteur habituel
+        via un fournisseur injecté dans `hotstrings_config`. C est aussi pourquoi
+        leur bascule ne peut pas être lue au moment du match : elle doit retirer
+        les mappings, donc déclencher un rechargement.
+      → Les seuils viennent du moteur partagé (`compute_prefix_counts`,
+        `spaced_prefix`), pas d une deuxième implémentation.
+      → **Prérequis livré séparément** : chaque mapping est `is_private`, et rien
+        sur Linux n honorait ce drapeau. Sans lui, porter les préfixes aurait écrit
+        l IBAN en clair dans `events_hotstring`, dans le `events_json` que l export
+        multi-machines réplique, et dans le journal de 14 jours.
+      → **Deux défauts trouvés en chemin**, tous deux corrigés avec leur test :
+        `load_all()` sortait avant d ajouter les mappings du fournisseur quand
+        aucun TOML n était trouvé (deux fichiers sans rapport, l un punissant
+        l autre) ; et la garde d arguments de `inject()` imprimait
+        `tostring(backspace_count)`, donc un appelant qui inversait ses deux
+        arguments journalisait la charge depuis la position censée ne jamais en
+        contenir.
 
 ### 11.3 — Majeurs et mineurs restants
 
