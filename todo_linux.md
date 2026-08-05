@@ -1585,17 +1585,30 @@ déclarée.
       silence, et effaçait les quatre champs au lieu d'un.
 - [x] Les actions groupées des délimiteurs ne touchent plus les délimiteurs
       personnalisés — les deux références les épargnent délibérément.
-- [ ] Le `shortcuts/menu.lua` des extensions n'est jamais exécuté sur Linux.
-- [ ] Aperçu : teinte par **catégorie** au lieu de par **genre**, une seule teinte
-      pour tout le panneau au lieu d'une par ligne, aucune expiration, libellé
-      droit = déclencheur au lieu de touche de validation, et `show_tooltip` par
-      section ignoré (résolu avec `section = nil`). Tous latents tant que l'aperçu
-      n'est pas branché.
-
-
-
-
-
+- [x] Le `shortcuts/menu.lua` des extensions est exécuté sur Linux : scan par le
+      scanner partagé, exécution en sandbox exposant `add_item`, `t` et `ext_name`
+      comme chez macOS, bibliothèque standard atteignable par `__index`. Une
+      extension dont le menu lève affiche une ligne grisée plutôt que rien — sinon
+      son auteur ne peut pas distinguer « échoue » de « ne déclare rien ».
+- [ ] **Rendre le menu Raccourcis Linux pilotable par le manifeste.** Il est
+      écrit à la main et ne dispatche pas par id, donc élargir `platforms` sur
+      `extensions_shortcuts` ferait promettre au manifeste une ligne que ce menu
+      ne peut pas rendre — le ratchet de bijection le signalerait aussitôt.
+      → La restriction actuelle (`["ahk"]`, « aucun pilote Lua n'a ce concept »)
+        est **fausse pour les deux** : macOS l'implémente depuis toujours, Linux
+        depuis 2026-08-05. Le commentaire du manifeste le dit maintenant.
+- [x] Aperçu : **une teinte par ligne** (barre à gauche) au lieu d'une seule pour
+      tout le panneau, et le panneau prend la couleur du candidat **qui va tirer**
+      et non du premier listé. Expiration branchée sur le même délai que le garde
+      de frappe. `show_tooltip` par section honoré.
+- [ ] Aperçu : teinte par **catégorie appariée** (Linux) vs par **genre** (macOS).
+      Divergence assumée pour l'instant, pas un oubli : la fenêtre de réglages
+      définit les couleurs **par catégorie**, donc teinter par la catégorie qui a
+      réellement matché rend ce réglage visible, là où macOS afficherait la couleur
+      de la famille (magickey/autocorrection/personal). À trancher ensemble.
+- [ ] Aperçu : libellé droit = déclencheur (Linux) vs touche de validation (macOS).
+      Choix documenté côté Linux (`preview.lua`), pas un oubli. macOS montre les
+      deux informations ; Linux une seule. À trancher aussi.
 ## 12. Gestes 3/4/5 doigts sur Linux (audit du 2026-08-05)
 
 > **Demande :** « fais un audit de comment faire sur Linux pour mapper les gestes
