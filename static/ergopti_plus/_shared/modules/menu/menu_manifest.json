@@ -837,7 +837,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "gesture_slots_linux",
 			"platforms": [
 				"linux"
@@ -850,7 +850,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "gesture_reading_linux",
 			"platforms": [
 				"linux"

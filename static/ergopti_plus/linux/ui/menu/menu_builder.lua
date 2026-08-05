@@ -1787,7 +1787,9 @@ local function _build_gestures(ctx)
 	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
 	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
 	-- count, so grouping would mean parsing the names apart only to regroup them.
-	gesture_rows["gesture_slots_linux"] = function(out)
+	local providers = {}
+	providers["gesture_slots_linux"] = function()
+		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
 		-- parameterized actions unreachable for the omitted gesture bindings.
 		local slots = {}
@@ -1817,10 +1819,9 @@ local function _build_gestures(ctx)
 				-- reads as a bug, and the user cannot tell "this hardware cannot"
 				-- from "this driver forgot".
 				out[#out + 1] = {
-					title    = gesture_slot_label(slot) .. " — "
+					label    = gesture_slot_label(slot) .. " — "
 						.. i18n_safe("platform_reason.touchpad_cannot_count_that_many"),
 					disabled = true,
-					fn       = function() end,
 				}
 				goto continue
 			end
@@ -1830,18 +1831,22 @@ local function _build_gestures(ctx)
 				or ge.get_action_label(action)
 			local choices = {}
 			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
-				local selected = option == action
 				choices[#choices + 1] = {
-					title = ge.get_action_label(option) .. (selected and " ✓" or ""),
-					fn = function() assign_action(slot, option) end,
+					label   = ge.get_action_label(option),
+					-- `checked`, not a "✓" glued to the label: the tray draws its own
+					-- mark, and the glued form put one platform's convention inside a
+					-- string that twenty other languages also read.
+					checked = option == action,
+					action  = function() assign_action(slot, option) end,
 				}
 			end
 			out[#out + 1] = {
-				title = gesture_slot_label(slot) .. " → " .. label,
-				menu = choices,
+				label = gesture_slot_label(slot) .. " → " .. label,
+				items = choices,
 			}
 			::continue::
 		end
+		return out
 	end
 
 	-- Declared in the manifest since 2026-08-04. Linux reads gestures from
@@ -1849,20 +1854,22 @@ local function _build_gestures(ctx)
 	-- the reader is startable here and has no counterpart elsewhere. Its label was
 	-- a hardcoded French string, which every non-French user read in French — and
 	-- being in no manifest, no gate could see either that or the row itself.
-	gesture_rows["gesture_reading_linux"] = function(out)
-		out[#out + 1] = {
-			title = i18n_safe(ge.is_reading() and "menu.gestures.reading_on" or "menu.gestures.reading_off"),
-			fn    = function()
-				if ge.is_reading() then ge.stop_reading() else ge.start_reading() end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
+	providers["gesture_reading_linux"] = function()
+		return {
+			{
+				label  = i18n_safe(ge.is_reading() and "menu.gestures.reading_on" or "menu.gestures.reading_off"),
+				action = function()
+					if ge.is_reading() then ge.stop_reading() else ge.start_reading() end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			},
 		}
 	end
 
 	-- The master toggle stays with the caller: the renderer skips `toggle` rows by
 	-- contract, because the category gate is driver state rather than manifest
 	-- data. Everything below it is the manifest's, in the manifest's order.
-	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, ctx)
+	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, ctx, providers)
 	local menu = { master_toggle }
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
