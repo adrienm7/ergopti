@@ -1555,6 +1555,9 @@ déclarée.
       tombent avec le même changement : `enable_all` vide l ensemble `_disabled_groups`,
       qui porte les clés `categorie.section` dans le même espace de noms que les
       identifiants de catégorie.
+
+### 11.3 — Majeurs et mineurs restants
+
 - [ ] Les compteurs ne reflètent pas l'état : une catégorie éteinte affiche
       toujours « (14 231) ». Windows a une politique dédiée et testée pour ça.
 - [ ] « Tout cocher / décocher » d'une catégorie est **grisé quand elle est
