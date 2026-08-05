@@ -163,6 +163,24 @@ local function exercise(app_name, bridge, entry, probe)
 	check(defined == "function", string.format(
 		"%s: the page defines window.%s (got %s)", app_name, entry, tostring(defined)))
 
+	if defined ~= "function" then
+		-- Say WHY, rather than leaving the reader to guess from one word. The
+		-- three things that can be wrong here are: the script tag was dropped
+		-- during inlining (an asset the host could not read), the script was
+		-- inlined but failed to parse, or it parsed and threw before the
+		-- declaration. Each leaves a different fingerprint, and the whole point
+		-- of running against a real page is to be able to read it.
+		print(string.format("       inline scripts in the DOM : %s",
+			tostring(eval_sync(webview, "String(document.scripts.length)"))))
+		print(string.format("       bytes of inlined script   : %s",
+			tostring(eval_sync(webview,
+				"String(Array.from(document.scripts).reduce((n,s)=>n+s.textContent.length,0))"))))
+		print(string.format("       makeHostBridge defined    : %s",
+			tostring(eval_sync(webview, "typeof makeHostBridge"))))
+		print(string.format("       first script error        : %s",
+			tostring(eval_sync(webview, "String(window.__harness_error || 'none')"))))
+	end
+
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
 	-- as the script-message handler routes it, which is what makes the bridge push.

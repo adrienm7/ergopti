@@ -120,6 +120,18 @@ end
 -- ============================================================================
 
 --- Reads a file from disk and returns its raw content.
+--- Drops the cache-busting query from an asset reference.
+---
+--- `script.js?v=3` names the file `script.js`. The query means something to a
+--- browser fetching over HTTP and nothing to `io.open`, so it has to come off
+--- before the path is built — otherwise the read misses, the tag is replaced with
+--- nothing, and the page loads with that asset silently absent.
+--- @param reference string As written in the HTML.
+--- @return string
+local function strip_asset_query(reference)
+	return (tostring(reference):gsub("[?#].*$", ""))
+end
+
 --- @param path string Full path to the file.
 --- @return string The file content, or empty string if unreadable.
 local function read_file(path)
@@ -153,7 +165,7 @@ function M.build_injected_html(assets_dir, html_name)
 		if href:match("^https?://") then
 			return '<link rel="stylesheet" href="' .. href .. '" />'
 		end
-		local css = read_file(assets_dir .. "/" .. href)
+		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
 		return css ~= "" and ("<style>" .. css .. "</style>") or ""
 	end)
 
@@ -162,7 +174,19 @@ function M.build_injected_html(assets_dir, html_name)
 		if src:match("^https?://") then
 			return '<script src="' .. src .. '"></script>'
 		end
-		local js = read_file(assets_dir .. "/" .. src)
+		-- The cache-busting query is stripped before the file is opened.
+		-- `script.js?v=3` is a perfectly ordinary thing for a page author to
+		-- write — it means something to a browser fetching over HTTP — and it is
+		-- not part of the FILENAME. Concatenated raw, it made read_file miss, the
+		-- tag was replaced with nothing, and the page loaded with its entire
+		-- script absent: window.initData undefined, so every push the host made
+		-- was silently discarded by its own `if(window.initData)` guard.
+		--
+		-- Found by tests/hardware/run_webview_push.lua, which is the only thing
+		-- that ever asked the page whether it had the function. Every unit test
+		-- asserted the shape of the string handed to eval_js and none of them
+		-- could see this.
+		local js = read_file(assets_dir .. "/" .. strip_asset_query(src))
 		return js ~= "" and ("<script>" .. js .. "</script>") or ""
 	end)
 
