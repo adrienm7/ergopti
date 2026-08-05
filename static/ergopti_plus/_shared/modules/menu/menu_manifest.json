@@ -429,10 +429,6 @@
 			"id": "wpm_widget",
 			"disabled_when": [
 				"keylogger_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
 			]
 		},
 		{
@@ -441,10 +437,6 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
 			]
 		},
 		{

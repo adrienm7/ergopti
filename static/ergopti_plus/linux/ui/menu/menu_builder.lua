@@ -1281,6 +1281,15 @@ local function _manifest_metrics_rows(ctx, k)
 		metrics_filter_private = privacy("private_filter_enabled"),
 		metrics_filter_secure  = privacy("secure_filter_enabled"),
 		metrics_filter_sysauth = privacy("system_auth_filter_enabled"),
+		-- The manifest gates the colour row on the widget being visible: choosing
+		-- how to colour something that is not on screen is a control with no
+		-- subject. Without this getter the resolver logs an error and falls back to
+		-- the safe answer, so the row would be permanently greyed — right by
+		-- accident, and wrong the moment the widget is shown.
+		wpm_widget_visible     = function()
+			local ok, widget = pcall(require, "ui.wpm.widget")
+			return ok and widget.is_running() or false
+		end,
 	}
 
 	--- One manifest row, with its disabled state resolved from the manifest.
@@ -1324,7 +1333,39 @@ local function _manifest_metrics_rows(ctx, k)
 		end
 	end
 
+	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
+	--- missing still builds its menu — the row then reports the widget as off,
+	--- which is what it is.
+	--- @return table|nil
+	local function wpm_widget()
+		local ok, widget = pcall(require, "ui.wpm.widget")
+		return ok and widget or nil
+	end
+
 	local handlers = {
+		wpm_widget = function(items)
+			local widget = wpm_widget()
+			items[#items + 1] = row("wpm_widget", i18n_safe("menu.metrics.show_wpm_widget"),
+				widget ~= nil and widget.is_running(),
+				function()
+					if not widget then
+						Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
+						return
+					end
+					if widget.is_running() then widget.stop() else widget.start() end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end)
+		end,
+		widget_colors = function(items)
+			local widget = wpm_widget()
+			items[#items + 1] = row("widget_colors", i18n_safe("menu.metrics.colors_by_source"),
+				widget ~= nil and widget.uses_source_colors(),
+				function()
+					if not widget then return end
+					widget.set_use_source_colors(not widget.uses_source_colors())
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end)
+		end,
 		show_typing = function(items)
 			items[#items + 1] = row("show_typing", i18n_safe("menu.metrics.show_typing"), false,
 				open_window("metrics_typing"))

@@ -92,6 +92,11 @@ local _flushed_app_totals = {}
 -- flush, then written in the exact events_* tables used by macOS and Windows.
 local _pending_typing_events = {}
 local _pending_hotstring_events = {}
+-- Shortcut firings, buffered like their hotstring siblings. macOS has recorded
+-- these since its keylogger existed; this driver recorded nothing, so every
+-- action that types no text — CapsWord, the selection transforms, the wrapping
+-- pairs, everything an extension registers — was absent from the metrics.
+local _pending_shortcut_events = {}
 local _pending_app_switch_events = {}
 local _flushed_app_ngrams = {}
 local _flushed_app_scancodes = {}
@@ -514,6 +519,36 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 		replacement = replacement,
 		h_type = h_type or "static",
 		net_saved_chars = char_count(replacement) - char_count(trigger),
+	}
+end
+
+--- Records a shortcut firing — an action the user triggered that types no text.
+---
+--- CapsWord, the selection transforms, the wrapping pairs and every action an
+--- extension registers all end here. They produced nothing measurable before, so
+--- "what did I actually use" — the question the dashboard exists to answer —
+--- could only be answered about hotstrings on this driver.
+---
+--- Deliberately NOT counted as synthetic output: these actions type nothing of
+--- their own. Adding them to the character totals would inflate the saved-
+--- keystrokes figure with keystrokes nobody saved.
+--- @param app_id string Focused application identifier.
+--- @param key string What fired, e.g. "caps_word" or "wrap_selection".
+--- @param timestamp_ms number|nil Event timestamp; unused today, taken for
+---   symmetry with its siblings and so a caller need not know which of them
+---   stamps its own time.
+function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
+	if not may_record() then return end
+	if type(key) ~= "string" or key == "" then
+		Logger.warn(LOG, "record_shortcut(): no key name — the event would say only that "
+			.. "something fired, so it is dropped.")
+		return
+	end
+	_pending_shortcut_events[#_pending_shortcut_events + 1] = {
+		ts   = os.date("!%Y-%m-%d %H:%M:%S"),
+		date = os.date("!%Y-%m-%d"),
+		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
+		key  = key,
 	}
 end
 
@@ -975,6 +1010,10 @@ function M.flush()
 			if not SqliteWriter.insert_hotstring_events(_device_id, _pending_hotstring_events) then return end
 			_pending_hotstring_events = {}
 		end
+		if #_pending_shortcut_events > 0 then
+			if not SqliteWriter.insert_shortcut_events(_device_id, _pending_shortcut_events) then return end
+			_pending_shortcut_events = {}
+		end
 		if #_pending_app_switch_events > 0 then
 			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end
 			_pending_app_switch_events = {}
@@ -1126,6 +1165,7 @@ function M.reset_session()
 	_manifest_cache         = { revision = nil, manifest = nil }
 	_pending_typing_events  = {}
 	_pending_hotstring_events = {}
+	_pending_shortcut_events = {}
 	_pending_app_switch_events = {}
 	_session_started_at = os.time() * 1000
 end

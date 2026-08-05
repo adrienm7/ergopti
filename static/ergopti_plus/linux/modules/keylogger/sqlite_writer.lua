@@ -410,6 +410,39 @@ function M.insert_hotstring_events(device_id, events)
 		.. table.concat(parts, ",") .. ";")
 end
 
+--- Inserts shortcut firings — the actions a user triggers that type no text.
+---
+--- macOS has written this table since its keylogger existed; this driver wrote
+--- nothing, so CapsWord, the selection transforms, the wrapping pairs and every
+--- action an extension registers were invisible in the metrics. "What did I
+--- actually use" is the question the dashboard exists to answer, and it could
+--- only ever answer it about hotstrings here.
+---
+--- Both columns are TEXT NOT NULL: an event with no key name still records that
+--- something fired, which is worth more than a row lost to INSERT OR IGNORE.
+--- @param device_id string
+--- @param events table Array of { ts, date, app, key }.
+--- @return boolean|nil
+function M.insert_shortcut_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local parts = {}
+	for i, ev in ipairs(events) do
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s','%s')",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.app or "unknown"),
+			_sql_escape(ev.key or "")
+		)
+	end
+	return _exec("INSERT OR IGNORE INTO events_shortcut "
+		.. "(device_id,id,ts,date,app,key) VALUES "
+		.. table.concat(parts, ",") .. ";")
+end
+
 --- Inserts foreground transitions in the shared events_app_switch format.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,prev_app,next_app,duration_ms}.

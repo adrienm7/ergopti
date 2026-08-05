@@ -419,7 +419,12 @@ for (const menuKey of MENU_KEYS) {
 //   40 → 39 when repeat_key did the same. macOS had shipped both the engine and
 //        the toggle all along, so the restriction recorded who wrote it first
 //        rather than what the platforms can do; Linux now has it too.
-const UNREASONED_BASELINE = 39;
+//   39 → 37 on 2026-08-06 when the floating WPM widget and its colour toggle
+//        stopped being Windows-and-macOS-only. Same story a third time: the
+//        restriction was true when written — that driver had no floating widget
+//        at all — and stopped being true when linux/ui/wpm/widget.lua drew one on
+//        the GTK surface the preview bubble already uses.
+const UNREASONED_BASELINE = 37;
 
 if (unreasoned.length > UNREASONED_BASELINE) {
 	errors.push(
