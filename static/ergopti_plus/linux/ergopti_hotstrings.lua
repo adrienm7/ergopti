@@ -406,6 +406,33 @@ local function main()
 	hotstrings_config.init(engine, config_path, function()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
+
+	-- Dynamic hotstrings come up BEFORE the catalogue is loaded, not after, because
+	-- the prefix expansions they build from personal_info.toml are part of what
+	-- load_all() assembles. Initialising them afterwards would need a second full
+	-- load — magickey.toml alone is 305 KB — to pick the mappings up.
+	--
+	-- The magic key is declared once, in the shared feature manifest, and every
+	-- driver reads it from there. Linux used to hardcode a backslash while the
+	-- manifest, both other drivers, the shared engine and the onboarding page all
+	-- say "★" — so the @-tag expansions were the only feature in the product
+	-- listening for a different key, and the personal-info editor told the user so.
+	-- Through MagicKey, not the manifest default: the default is what ships, and
+	-- reading it here would ignore a key the user chose from the menu.
+	if dyn_hotstrings then
+		dyn_hotstrings.init({ trigger_char = MagicKey.get() })
+		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
+			dyn_hotstrings.get_rules_count())
+
+		-- Rebuilt on every load rather than cached: the user can edit
+		-- personal_info.toml or switch a prefix family off, and either has to change
+		-- what the engine holds. The gate is read here and not at match time because
+		-- the ordinary matcher knows nothing about dynamic families.
+		hotstrings_config.set_extra_mappings_provider(function()
+			return dyn_hotstrings.prefix_mappings()
+		end)
+	end
+
 	local mapping_count = hotstrings_config.load_all()
 	Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
 		mapping_count, hotstrings_config.parse_error_count())
@@ -709,22 +736,6 @@ local function main()
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
-	if dyn_hotstrings then
-		-- The magic key is declared once, in the shared feature manifest, and every
-		-- driver reads it from there. Linux used to hardcode a backslash while the
-		-- manifest, both other drivers, the shared engine and the onboarding page
-		-- all say "★" — so the @-tag expansions were the only feature in the
-		-- product listening for a different key, and the personal-info editor told
-		-- the user so.
-		-- Through MagicKey, not the manifest default: the default is what ships,
-		-- and reading it here would ignore a key the user chose from the menu.
-		dyn_hotstrings.init({
-			trigger_char = MagicKey.get(),
-		})
-		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
-			dyn_hotstrings.get_rules_count())
-	end
-
 	-- 8.7) Define the control-key callback.
 	local function on_control(key_name)
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.

@@ -34,6 +34,11 @@ local LOG = "modules.dynamic_hotstrings.manager"
 -- Passed to the shared engine's section guard, which takes (group, section).
 local DYNAMIC_GROUP = "dynamichotstrings"
 
+-- How many rules register_date_rules adds: td, dt and date. Named because the
+-- rule total is also read back the other way — to work out how many @-tags there
+-- are, which is everything that is not one of these three.
+local DATE_RULE_COUNT = 3
+
 
 -- =========================================
 -- =========================================
@@ -136,7 +141,7 @@ function M.init(opts)
 
 	-- Register date rules (td, dt, date).
 	Engine.register_date_rules(_trigger_char)
-	_rules_count = _rules_count + 3  -- td, dt, date
+	_rules_count = _rules_count + DATE_RULE_COUNT
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
@@ -247,9 +252,45 @@ function M.get_trigger_char()
 end
 
 --- Returns the number of registered rules.
+---
+--- The RULES only — the @-tags and the three dates. The prefix expansions are
+--- mappings held by the ordinary matcher and are not registered here, so the
+--- menu asks `active_count()` instead; this stays what its name says for the
+--- boot log, which reports what the dynamic engine took.
 --- @return number
 function M.get_rules_count()
 	return _rules_count
+end
+
+--- How many expansions this category currently offers, switches accounted for.
+---
+--- What the other two drivers show beside the category name: the sum over
+--- ENABLED families, so the number tracks what is live rather than what would
+--- come back. Windows computes it the same way in `_HS_CategoriesDynamic`.
+--- @return number
+function M.active_count()
+	local total = 0
+
+	-- One rule each, and the engine registers them as a batch, so the count is
+	-- the number of enabled date families rather than anything it can be asked.
+	for _, section in ipairs({ "date", "datefr", "datelongfr" }) do
+		if M.is_rule_enabled(nil, section) then total = total + 1 end
+	end
+
+	-- The @-tags: whatever [letters] mapped to a field that exists.
+	if M.is_rule_enabled(nil, "personal_info") then
+		total = total + math.max(0, _rules_count - DATE_RULE_COUNT)
+	end
+
+	local ok, Prefix = pcall(require, "modules.dynamic_hotstrings.prefix_rules")
+	if ok and Prefix then
+		local counts = Prefix.counts(_info)
+		for _, section in ipairs({ "phoneprefixes", "ssnprefixes", "ibanprefixes" }) do
+			if M.is_rule_enabled(nil, section) then total = total + (counts[section] or 0) end
+		end
+	end
+
+	return total
 end
 
 --- Returns a copy of the parsed personal info (for testing/diagnostics).
@@ -285,15 +326,19 @@ end
 --- `match_buffer` has always taken a predicate to filter on it. The gap was that
 --- this driver passed nil for it.
 ---
---- The three prefix families (iban, phone, ssn) are declared in the manifest,
---- rendered by the other two drivers, and registered by no Linux code at all, so
---- they are absent here rather than listed and inert: a switch for a rule that
---- does not exist is a worse lie than a missing switch. Implementing them is its
---- own item, tracked as a parity gap in the Linux plan.
+--- The three prefix families are not dynamic RULES: a prefix has no trigger
+--- character, so they are ordinary auto-expanding mappings assembled by
+--- prefix_rules.lua and handed to the hotstring matcher. Their switches live
+--- here all the same, because a user does not care which matcher answers them —
+--- they care that the dynamic-hotstrings submenu has one line per family, as it
+--- does on the other two drivers.
 local RULE_FAMILIES = {
 	{ id = "date_long_fr",                        section = "datelongfr" },
 	{ id = "date_fr",                             section = "datefr" },
 	{ id = "date",                                section = "date" },
+	{ id = "phone_prefixes",                      section = "phoneprefixes",  is_prefix = true },
+	{ id = "ssn_prefixes",                        section = "ssnprefixes",    is_prefix = true },
+	{ id = "iban_prefixes",                       section = "ibanprefixes",   is_prefix = true },
 	{ separator = true },
 	{ id = "text_expansion_personal_information", section = "personal_info",
 	  label_key = "dynamichotstrings.textexpansionpersonalinformation" },
@@ -339,22 +384,55 @@ local function _family_label(family)
 end
 
 --- The families, for a menu, in render order.
---- @return table Array of { id, section, enabled, label } and { separator = true }.
+---
+--- A prefix family carries its `count`, which the other two drivers show beside
+--- the label and which is 0 until the user fills in that field of
+--- personal_info.toml — a switch with nothing behind it, and the count is the
+--- only thing that says so.
+--- @return table Array of { id, section, enabled, label, count? } and { separator = true }.
 function M.rule_families()
+	local counts = nil
 	local out = {}
 	for _, family in ipairs(RULE_FAMILIES) do
 		if family.separator then
 			out[#out + 1] = { separator = true }
 		else
-			out[#out + 1] = {
+			local entry = {
 				id      = family.id,
 				section = family.section,
 				enabled = M.is_rule_enabled(nil, family.section),
 				label   = _family_label(family),
 			}
+			if family.is_prefix then
+				-- Resolved once for the whole list rather than per family: the shared
+				-- helper answers all three at a time.
+				if not counts then
+					local ok, Prefix = pcall(require, "modules.dynamic_hotstrings.prefix_rules")
+					counts = (ok and Prefix) and Prefix.counts(_info) or {}
+				end
+				entry.count = counts[family.section] or 0
+			end
+			out[#out + 1] = entry
 		end
 	end
 	return out
+end
+
+--- The prefix expansions the user's data and their toggles currently allow.
+---
+--- Handed to `hotstrings_config.set_extra_mappings_provider` by the daemon, and
+--- called again on every load — which is what makes a toggle take effect, since
+--- the ordinary matcher these mappings live in has no notion of a dynamic family
+--- to filter on.
+--- @return table Array of mapping tables.
+function M.prefix_mappings()
+	if not _enabled then return {} end
+	local ok, Prefix = pcall(require, "modules.dynamic_hotstrings.prefix_rules")
+	if not ok or not Prefix then
+		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")
+		return {}
+	end
+	return Prefix.build(_info, M.is_rule_enabled)
 end
 
 --- Whether one engine section may fire.
