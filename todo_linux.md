@@ -265,8 +265,29 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
 - [ ] **M3.4 — le menu Raccourcis Linux dispatché par le manifeste.** Même
       travail que l'item de §11.3 : sans lui, `extensions_shortcuts` ne peut pas
       être élargi à `linux` sans que le ratchet de bijection le signale.
-- [ ] **M3.6 — certifier** que les trois menus rendent la même chose modulo les
-      différences déclarées.
+- [x] **M3.6 — certifié** le 2026-08-05 pour Linux, au **runtime**.
+      → Les portes de `tools/test` lisent le manifeste et la **source**. Elles
+        attrapent une ligne promise qu aucun handler ne répond, et un pilote qui
+        construit des lignes qu aucun manifeste ne décrit. Aucune ne voit le
+        troisième cas : un handler qui existe, est enregistré, est atteint — et
+        n ajoute rien, parce qu une garde au-dessus est sortie tôt ou qu une clé de
+        contexte était mal orthographiée. Cette ligne est déclarée, gérée,
+        invisible, et tout reste vert. C est arrivé deux fois (les onze lignes de
+        gestes, la catégorie dynamique grisée).
+      → `linux/tests/unit/meta/test_menu_matches_manifest.lua` construit le plateau
+        entier avec le builder du démon et vérifie chaque `action`, `group` et
+        `section_header` que le manifeste promet à `linux`. Il tourne dans la suite
+        du pilote, donc sur un vrai Linux en CI et sur le LuaJIT de chaque distro.
+        Vérifié rouge : neutraliser le rendu manifeste des hotstrings nomme les six
+        lignes disparues.
+      → Il couvre aussi « aucun sous-menu vide » : un sous-menu qui s ouvre sur rien
+        est pire qu absent, l utilisateur ne peut pas le distinguer d une
+        fonctionnalité qui a échoué à charger.
+      → **Hors périmètre, assumé** : les lignes `dynamic`, `feature` et `toggle`,
+        dont le libellé appartient au handler ou à l appelant — le ratchet de
+        bijection pose sur elles la question plus étroite « un handler est-il
+        enregistré ». Et les 39 lignes cachées sans `reason_key` : ce compteur est
+        une dette gelée par son propre ratchet, pas une certification.
 
 
 ---
