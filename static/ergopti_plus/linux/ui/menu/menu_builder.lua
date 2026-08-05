@@ -2136,11 +2136,19 @@ local function _build_updates(ctx)
 end
 
 --- Builds the about item.
-local function _build_about(_ctx)
+local function _build_about(ctx)
 	return {
 		title = i18n_safe("menu.about.title"),
+		-- Opens the release notes. It used to log one line to a file the user
+		-- never sees and call that an About box — while ui/changelog/ was written,
+		-- registered in webview_manager's bridge table and given a window title,
+		-- with no caller anywhere. The page existed and nothing could reach it.
 		fn = function()
-			Logger.info(LOG, "Ergopti — ergonomic keyboard optimizer.")
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager — the release notes cannot open.")
+				return
+			end
+			ctx.webview.show("changelog")
 		end,
 	}
 end
