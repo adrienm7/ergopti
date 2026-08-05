@@ -1090,7 +1090,7 @@ local function _build_hotstrings(ctx)
 
 	if type(config) ~= "table" then
 		return { title = i18n_safe("menu.hotstrings.title"), menu = {
-			{ title = "(config non disponible)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.hotstrings.unavailable"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -1172,7 +1172,7 @@ local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
 		return { title = i18n_safe("menu.llm.title"), menu = {
-			{ title = "LLM non disponible", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.llm.unavailable"), fn = function() end, disabled = true },
 			{ title = i18n_safe("menu.llm.ollama_start_hint"), fn = function() end, disabled = true },
 		}}
 	end
@@ -1233,11 +1233,11 @@ end
 --- @return table One menu entry.
 local function _migration_status(k)
 	if type(k.get_migration_progress) ~= "function" then
-		return { title = "Migration du chiffrement (indisponible)", fn = function() end, disabled = true }
+		return { title = i18n_safe("menu.metrics.migration_unavailable"), fn = function() end, disabled = true }
 	end
 	local progress = k.get_migration_progress()
 	if not progress.running then
-		return { title = "Migration du chiffrement : inactive", fn = function() end, disabled = true }
+		return { title = i18n_safe("menu.metrics.migration_idle"), fn = function() end, disabled = true }
 	end
 	return {
 		title = string.format(i18n_safe("menu.metrics.migration_progress"),
@@ -1398,7 +1398,7 @@ local function _build_metrics(ctx)
 
 	for _, row in ipairs({
 		{
-			title = "Statistiques de session",
+			title = i18n_safe("menu.metrics.session_stats"),
 			fn = function()
 				if type(k.get_session_stats) ~= "function" then return end
 				local s = k.get_session_stats()
@@ -1407,14 +1407,14 @@ local function _build_metrics(ctx)
 			end,
 		},
 		{
-			title = "WPM actuel",
+			title = i18n_safe("menu.metrics.current_wpm"),
 			fn = function()
 				if type(k.get_wpm) ~= "function" then return end
 				Logger.info(LOG, "WPM: %.1f", k.get_wpm())
 			end,
 		},
 		{
-			title = "Stats par application",
+			title = i18n_safe("menu.metrics.per_app_stats"),
 			fn = function()
 				if type(k.get_app_stats) ~= "function" then return end
 				local apps = k.get_app_stats()
@@ -1433,7 +1433,7 @@ local function _build_metrics(ctx)
 		_migration_status(k),
 		{ title = "-" },
 		{
-			title = "Suspendre " .. (type(k.is_suppressed) == "function" and k.is_suppressed() and "✓" or ""),
+			title = i18n_safe("menu.global.suspend") .. (type(k.is_suppressed) == "function" and k.is_suppressed() and " ✓" or ""),
 			fn = function()
 				if type(k.is_suppressed) ~= "function" then return end
 				if k.is_suppressed() then k.unsuppress() else k.suppress() end
@@ -1542,7 +1542,7 @@ local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
 		return { title = i18n_safe("menu.shortcuts.title"), menu = {
-			{ title = "(shortcuts non disponible)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.shortcuts.unavailable"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -1710,7 +1710,7 @@ local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
 		return { title = i18n_safe("menu.gestures.title"), menu = {
-			{ title = "(gestures non disponible)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.gestures.unavailable"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -1983,7 +1983,7 @@ local function _build_updates(ctx)
 	local up = ctx.updater
 	if not up then
 		return { title = i18n_safe("menu.updates.title"), menu = {
-			{ title = "(updater non disponible)", fn = function() end, disabled = true },
+			{ title = i18n_safe("menu.updates.unavailable"), fn = function() end, disabled = true },
 		}}
 	end
 
@@ -2036,7 +2036,7 @@ local function _build_updates(ctx)
 
 	-- Channel switching.
 	items[#items + 1] = {
-		title = "Canal stable" .. (channel == "stable" and " ✓" or ""),
+		title = i18n_safe("menu.updates.channel_stable") .. (channel == "stable" and " ✓" or ""),
 		fn = function()
 			up.set_channel("stable")
 			Logger.info(LOG, "Update channel set to stable.")
@@ -2071,7 +2071,7 @@ local function _build_updates(ctx)
 
 	-- Open releases page.
 	items[#items + 1] = {
-		title = "Ouvrir la page des releases",
+		title = i18n_safe("menu.updates.open_releases"),
 		fn = function()
 			local url = up.releases_page_url()
 			Logger.info(LOG, "Opening releases page: %s", url)
