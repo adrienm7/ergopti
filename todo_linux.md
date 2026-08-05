@@ -644,11 +644,18 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       l’entrelacement des événements dans une trame.
       → Capturer un vrai pavé (`evtest` ou `libinput record`) et rebâtir les
         fixtures dessus. Demande votre machine.
-- [ ] **Vérifier `MAX_EVENTS_PER_DRAIN = 256` sous charge tactile.** Dimensionné
-      pour l’autorépétition clavier. Une trame toutes les ~8 ms à plusieurs
-      `EV_ABS` chacune reste sous la borne en régime normal ; le doute porte sur le
-      mouvement multi-doigts soutenu, où atteindre la borne à chaque tick ferait
-      traîner le geste derrière le doigt.
-- [ ] **`SYN_DROPPED` ne se produit que sous charge**, donc jamais en test. Si
-      l'état des slots n'est pas remis à zéro, un swipe 3 doigts déclenche par
-      intermittence l'action 5 doigts.
+- [x] **`MAX_EVENTS_PER_DRAIN = 256` vérifié** le 2026-08-05. « Ne reproduit que
+      sous charge » avait été lu comme « n est testable que sous charge », ce qui
+      était faux : la charge ne fait que changer l arithmétique, et l arithmétique
+      s énonce. Une trame à 5 doigts fait 16 événements (dérivée du vocabulaire du
+      décodeur, pas comptée à la main, pour qu un axe ajouté plus tard déplace le
+      chiffre) : la borne en tient 16, et couvre encore les 12 trames d un loop
+      affamé 100 ms — cent fois sa cadence nominale. Un geste à cheval sur deux
+      drains est décodé correctement, ce qui est le vrai risque : la borne est un
+      point de rendu, pas une frontière.
+- [x] **`SYN_DROPPED` vérifié** le 2026-08-05. La remise à zéro était déjà testée
+      au niveau du décodeur ; ce qui ne l était pas, c est la panne que l audit
+      annonçait — que le geste **suivant** hérite du compte périmé. Cinq doigts
+      posés, trame perdue, puis swipe à trois : le geste sort bien à trois. Et le
+      geste que la perte a interrompu n émet rien, y compris quand la perte
+      survient une trame avant le lever, où tout ce qui le nomme a déjà été vu.
