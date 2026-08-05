@@ -29,10 +29,24 @@ local helpers = require("tests.helpers")
 
 local Fakes = helpers.load_module("tests.fakes")
 
+-- What was in package.loaded before this file displaced it. RESTORED rather than
+-- cleared, and that distinction cost a CI run: clearing left the next test file
+-- to re-require a fresh keylogger, which no longer had the password_apps its own
+-- init() had configured — so four suppression tests failed on Linux and passed
+-- on Windows, purely because `find` and `dir /b /s` return files in a different
+-- order. A test that reaches into package.loaded owes the files after it the
+-- state it found.
+local _displaced = { storage = nil, keylogger = nil, held = false }
+
 --- Loads the keylogger over a fake storage, so nothing touches a real file.
 --- @param initial table|nil Pre-existing stored values.
 --- @return table keylogger, table storage
 local function load_over_storage(initial)
+	if not _displaced.held then
+		_displaced.storage   = package.loaded["adapters.storage"]
+		_displaced.keylogger = package.loaded["modules.keylogger.keylogger"]
+		_displaced.held      = true
+	end
 	local storage = Fakes.storage({ initial = initial })
 	package.loaded["adapters.storage"] = storage
 	package.loaded["modules.keylogger.keylogger"] = nil
@@ -40,9 +54,10 @@ local function load_over_storage(initial)
 	return keylogger, storage
 end
 
+--- Puts back exactly what was there.
 local function drop_storage()
-	package.loaded["adapters.storage"] = nil
-	package.loaded["modules.keylogger.keylogger"] = nil
+	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["modules.keylogger.keylogger"] = _displaced.keylogger
 end
 
 
