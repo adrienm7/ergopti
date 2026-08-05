@@ -114,11 +114,58 @@ local _suppressed = false
 -- three drivers cannot drift. Linux had none of these: it recorded
 -- unconditionally, because the metrics section of the manifest did not list
 -- "linux" and the codegen emitted no manifest for this driver to read.
-local _enabled                    = Manifest.default_for("metrics.enabled")
-local _private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled")
-local _secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled")
-local _system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled")
-local _encrypt_enabled            = Manifest.default_for("metrics.encrypt")
+--
+-- Where each toggle's user choice is kept, and the shape of that keeping: only a
+-- CHANGE from the shipped default is stored. Persisting the default too would
+-- freeze today's default for anyone who had already run the driver, which is the
+-- same reasoning the dynamic-hotstring families are stored under.
+--
+-- Until 2026-08-06 nothing was stored at all. Every one of these reverted to the
+-- manifest default at the next start, so a user who switched metrics off found
+-- them back on after a reboot — and the two filters they had deliberately
+-- relaxed silently tightened again, which is the harmless direction. The master
+-- switch is the other direction: off means off, and it did not stay off.
+local PREF_PREFIX = "metrics."
+
+--- Reads a persisted boolean, falling back to the manifest default.
+--- @param key string Suffix under PREF_PREFIX.
+--- @param fallback boolean The shipped default.
+--- @return boolean
+local function stored_bool(key, fallback)
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then return fallback end
+	local value = Storage.get(PREF_PREFIX .. key, nil)
+	if value == nil then return fallback end
+	return value == true
+end
+
+--- Persists a boolean, or clears it when it matches the shipped default.
+--- @param key string
+--- @param value boolean
+--- @param default_value boolean
+local function store_bool(key, value, default_value)
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then return end
+	if value == default_value then
+		Storage.delete(PREF_PREFIX .. key)
+	else
+		Storage.set(PREF_PREFIX .. key, value)
+	end
+end
+
+local _DEFAULTS = {
+	enabled                    = Manifest.default_for("metrics.enabled"),
+	private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled"),
+	secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled"),
+	system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled"),
+	encrypt                    = Manifest.default_for("metrics.encrypt"),
+}
+
+local _enabled                    = stored_bool("enabled", _DEFAULTS.enabled)
+local _private_filter_enabled     = stored_bool("private_filter_enabled", _DEFAULTS.private_filter_enabled)
+local _secure_filter_enabled      = stored_bool("secure_filter_enabled", _DEFAULTS.secure_filter_enabled)
+local _system_auth_filter_enabled = stored_bool("system_auth_filter_enabled", _DEFAULTS.system_auth_filter_enabled)
+local _encrypt_enabled            = stored_bool("encrypt", _DEFAULTS.encrypt)
 
 -- Whether the focused window is a private/incognito browser session. Set from
 -- the focus-change callback, never computed on the keystroke path.
@@ -814,6 +861,7 @@ end
 --- @param enabled boolean
 function M.set_enabled(enabled)
 	_enabled = (enabled == true)
+	store_bool("enabled", _enabled, _DEFAULTS.enabled)
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
 end
 
@@ -842,6 +890,7 @@ end
 --- @param enabled boolean
 function M.set_private_filter_enabled(enabled)
 	_private_filter_enabled = (enabled == true)
+	store_bool("private_filter_enabled", _private_filter_enabled, _DEFAULTS.private_filter_enabled)
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
 end
 
@@ -849,6 +898,7 @@ end
 --- @param enabled boolean
 function M.set_secure_filter_enabled(enabled)
 	_secure_filter_enabled = (enabled == true)
+	store_bool("secure_filter_enabled", _secure_filter_enabled, _DEFAULTS.secure_filter_enabled)
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
 end
 
@@ -856,6 +906,7 @@ end
 --- @param enabled boolean
 function M.set_system_auth_filter_enabled(enabled)
 	_system_auth_filter_enabled = (enabled == true)
+	store_bool("system_auth_filter_enabled", _system_auth_filter_enabled, _DEFAULTS.system_auth_filter_enabled)
 	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
 end
 
@@ -878,6 +929,10 @@ function M.set_encrypt_enabled(enabled)
 	-- plaintext untouched while the toggle is off, so an encrypting pass launched
 	-- first would convert nothing and report success.
 	TextCipher.set_enabled(want)
+	-- Persisted like its siblings. This one matters most of the three: a user who
+	-- turned encryption ON and found it off after a reboot would have a database
+	-- half encrypted and half not, with nothing saying when the posture changed.
+	store_bool("encrypt", _encrypt_enabled, _DEFAULTS.encrypt)
 	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_encrypt_enabled))
 	if changed then M.migrate_stored_text() end
 	return _encrypt_enabled
