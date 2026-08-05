@@ -328,3 +328,17 @@ function bindTooltip(field, cat, sec) {
 		});
 	});
 }
+
+// ============================================================
+// 6/ The contract with the host
+// ============================================================
+
+// The host pushes data by calling `window.setData(...)`, guarded with
+// `if(window.setData)`. Publishing it explicitly rather than relying on a
+// top-level function declaration being globalised: the guard means a page that
+// does not expose it turns every push into a silent no-op, and an implicit
+// global is a fragile thing to hang that on across two files in two languages.
+//
+// The Linux hardware harness found this window unreachable that way while the
+// editor — which has always assigned `window.initData` explicitly — worked.
+window.setData = setData;
