@@ -323,6 +323,31 @@ local function primary_selection()
 	return (value:gsub("%s+$", ""))
 end
 
+--- A shell command that switches to the workspace `delta` steps away.
+---
+--- `wmctrl -s` takes an ABSOLUTE, zero-based desktop index and has no relative
+--- form. This shipped as `wmctrl -s -1` and `wmctrl -s +1`, which wmctrl rejects
+--- every time — so the wmctrl branch was dead and the `||` fallback carried the
+--- feature, which makes both actions silently X11-only. libinput-gestures hit the
+--- same wall and had to add its own ws_up/ws_down for exactly this reason.
+---
+--- The neighbour is therefore computed from `wmctrl -d`, whose current desktop is
+--- the row marked `*`, with wraparound at both ends. The keystroke fallback stays
+--- for the case where wmctrl is absent, and it is the only thing that can work at
+--- all under Wayland — where switching workspace from another process is not
+--- expressible except as a combination the compositor already binds.
+--- @param delta integer -1 for the previous workspace, 1 for the next.
+--- @param fallback_keys string An xdotool key combination to try when wmctrl fails.
+--- @return string
+local function workspace_switch_command(delta, fallback_keys)
+	-- Single-quoted so the awk program reaches the shell intact; it contains no
+	-- single quotes of its own, which is what makes that safe here.
+	local awk = "awk -v d=" .. tostring(delta)
+		.. " '$2==\"*\"{cur=$1} END{n=NR; if(n>0){t=(cur+d)%n; if(t<0)t+=n; print t}}'"
+	return "{ wmctrl -d | " .. awk .. " | xargs -r wmctrl -s ; } 2>/dev/null"
+		.. " || xdotool key " .. fallback_keys
+end
+
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
 
@@ -368,9 +393,9 @@ local function _execute_action(action_name, go_next, binding)
 	elseif action_name == "right_click_toggle" then
 		_run("xdotool mousedown 3")
 	elseif action_name == "ws_prev" then
-		_run("wmctrl -s -1 2>/dev/null || xdotool key ctrl+alt+Left")
+		_run(workspace_switch_command(-1, "ctrl+alt+Left"))
 	elseif action_name == "ws_next" then
-		_run("wmctrl -s +1 2>/dev/null || xdotool key ctrl+alt+Right")
+		_run(workspace_switch_command(1, "ctrl+alt+Right"))
 	elseif action_name == "vol_up" then
 		_run("pactl set-sink-volume @DEFAULT_SINK@ +5% 2>/dev/null || xdotool key XF86AudioRaiseVolume")
 	elseif action_name == "vol_down" then

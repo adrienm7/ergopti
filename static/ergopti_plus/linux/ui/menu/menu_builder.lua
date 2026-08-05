@@ -794,7 +794,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			local count = type(dyn.get_rules_count) == "function" and dyn.get_rules_count() or 0
 
 			items[#items + 1] = {
-				title   = string.format("%s (%d)", i18n_safe("menu.hotstrings.dynamic"), count),
+				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
+				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
+				-- description key and has no translation of its own, so it would have
+				-- rendered as the raw string.
+				title   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
 				checked = on,
 				menu    = {
 					{

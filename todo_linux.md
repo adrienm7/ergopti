@@ -1684,19 +1684,28 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       Wayland.** Une action « aller à l'espace 3 » ne peut s'exprimer que comme une
       combinaison de touches que le compositeur lie déjà — et Hyprland, sway, i3,
       niri et river ne livrent aucune liaison par défaut.
-- [ ] **`ws_prev` / `ws_next` sont cassés aujourd'hui, sur les deux serveurs** :
-      `manager.lua` lance `wmctrl -s -1` et `wmctrl -s +1`, or `-s` prend un index
-      **absolu** et n'a pas de forme relative. Ces deux actions n'ont jamais marché.
-
+- [x] **`ws_prev` / `ws_next` étaient cassés sur les deux serveurs** : `wmctrl -s`
+      prend un index **absolu** et n’a pas de forme relative, donc `-s -1` et
+      `-s +1` échouaient à chaque fois et c’était le repli `xdotool` qui portait la
+      fonctionnalité — ce qui la rendait X11-seulement, en silence. Le voisin est
+      maintenant calculé depuis `wmctrl -d`, avec bouclage aux deux extrémités.
 ### 12.5 — Les étapes
 
 - [ ] Constantes EV_ABS / multitouch dans `infra/input_event.lua`.
 - [ ] Slot `TOUCHPAD` + sonde de capacité par ioctl dans `adapters/evdev_reader.lua`.
 - [ ] `modules/gestures/touchpad_finder.lua` — sélecteur dédié, avec confirmation
       par ioctl (le sélecteur de pointeur ne convient pas, cf. 12.3).
-- [ ] `modules/gestures/mt_decoder.lua` — décodeur de trames, fonction pure sans FFI,
-      **latchant le compte de doigts au pic** entre `BTN_TOUCH 1` et `BTN_TOUCH 0`
-      (poser et lever passent par des comptes inférieurs).
+- [x] `modules/gestures/mt_decoder.lua` — décodeur de trames, fonction pure sans FFI,
+      **latchant le compte de doigts au pic** entre `BTN_TOUCH 1` et `BTN_TOUCH 0`.
+      → 19 assertions, dont les quatre cas qu’aucune route libinput ne peut servir :
+        swipe 5 doigts, et taps à 4 et 5 doigts.
+      → Chaque règle testée est une règle du **protocole noyau**, facile à écrire
+        de façon plausible et fausse : la marche du compte qui monte *et* descend,
+        les six doigts qui éteignent tous les bits `BTN_TOOL_*` sans lever la main,
+        le registre `ABS_MT_SLOT` que le pilote n’émet qu’au changement, l’axe Y
+        qui croît vers le bas, et `SYN_DROPPED` qui ne survient que sous charge.
+      → Un piège attrapé en écrivant les tests : `//` est du 5.3, et la CI tourne
+        sous LuaJIT — le fichier n’aurait même pas **parsé**.
 - [ ] Corriger `process_frame` : le compte de doigts vient du matériel, pas de
       `#touches`.
 - [ ] Faire que `start_reading()` lise réellement.
