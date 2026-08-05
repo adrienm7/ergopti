@@ -197,6 +197,12 @@ if ok_fw then file_watchers = fw_mod end
 -- Default hotstring data location (XDG-compliant user config).
 local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
+-- How many candidates the preview asks the engine for. The panel itself caps the
+-- rows it draws; this cap is about the WORK — the enumeration runs on every
+-- keystroke, and a bucket for a common tail character holds hundreds of mappings.
+-- Slightly above the panel's own limit so it never shows fewer than it could.
+local PREVIEW_MAX_CANDIDATES = 8
+
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
 	local ok, mod = pcall(require, "keymap.terminators")
@@ -584,6 +590,35 @@ local function main()
 				engine:reset()
 			else
 				engine:apply_expansion(result)
+			end
+		end
+
+		-- The preview bubble, which nothing drew until 2026-08-05.
+		--
+		-- ui/tooltip/preview.lua was complete — it gates on the four toggles,
+		-- resolves the accent, builds the rows and calls the renderer — and
+		-- `M.show` had no caller anywhere in the driver. So the whole preview
+		-- surface was inert on every desktop and in every configuration, even with
+		-- lgi installed and the renderer reporting itself available, and the four
+		-- toggles above it governed nothing.
+		--
+		-- Skipped entirely when an expansion just fired: the bubble describes what
+		-- is ABOUT to happen, and after a match the buffer no longer says that.
+		if tooltip_preview and not result then
+			local ok_preview, err_preview = pcall(function()
+				local candidates = engine:candidates(PREVIEW_MAX_CANDIDATES)
+				if #candidates == 0 then
+					tooltip_preview.hide()
+					return
+				end
+				-- "star" while the last character typed is the magic key, since that
+				-- is the family about to validate; "autocorrect" otherwise. The kind
+				-- decides which of the four toggles gates the bubble.
+				local kind = (ch == MagicKey.get()) and "star" or "autocorrect"
+				tooltip_preview.show(candidates, kind)
+			end)
+			if not ok_preview then
+				Logger.error(LOG, "Preview failed for '%s': %s", tostring(ch), tostring(err_preview))
 			end
 		end
 

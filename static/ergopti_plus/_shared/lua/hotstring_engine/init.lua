@@ -286,6 +286,67 @@ end
 
 
 
+--- Every mapping the engine would CONSIDER at this position, not just the winner.
+---
+--- WHY THIS EXISTS SEPARATELY FROM best_match_at:
+--- The preview bubble is not a completion list. It shows what the driver is about
+--- to do, which is the only way a user can learn a trigger they half-remember and
+--- the only way they can tell "nothing happened" from "something else won". So it
+--- needs the losers as well as the winner, in the order the engine ranked them,
+--- and it needs to know WHY each loser lost.
+---
+--- best_match_at returns on the first survivor by design — it is the hot path, and
+--- collecting the rest there would allocate a table on every keystroke for a
+--- result nothing reads when no preview is drawn.
+---
+--- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).
+--- @param buckets table Tail-char buckets, longest-trigger-first within each.
+--- @param body_len number Index in `buf_cps` the candidate trigger must end at.
+--- @param start_is_boundary boolean Whether the buffer's start abuts a terminator.
+--- @param limit number|nil Stop after this many; the panel shows a handful.
+--- @return table Array of { trigger, replacement, group, section, fires, blocked }.
+function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
+	local out = {}
+	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return out end
+	if type(body_len) ~= "number" or body_len < 1 then return out end
+
+	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	if not bucket then return out end
+
+	-- The first survivor of the auto_expand pass is the one that would actually
+	-- fire; everything after it, and every non-survivor, is shown dimmed. Tracked
+	-- rather than recomputed so the preview and the engine cannot disagree about
+	-- which row is the live one.
+	local winner_found = false
+
+	for _, mapping in ipairs(bucket) do
+		if limit and #out >= limit then break end
+		local eff = M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
+		local fires = false
+		if eff and mapping.auto_expand and not winner_found then
+			fires = true
+			winner_found = true
+		end
+		out[#out + 1] = {
+			trigger     = mapping.trigger,
+			replacement = eff or mapping.replacement,
+			group       = mapping.group,
+			section     = mapping.section,
+			fires       = fires,
+			-- Distinguished from merely losing: a mapping whose own conditions
+			-- refuse it here (word boundary, case, terminator) is struck through,
+			-- while one that simply ranked lower is only dimmed. The user asking
+			-- "why did nothing happen" needs those to look different.
+			blocked     = eff == nil,
+		}
+	end
+
+	return out
+end
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 5/ Engine Instance ==============
@@ -389,6 +450,14 @@ function M.new()
 				-- and every such entry scores the same, so relative order is unchanged.
 				priority     = tonumber(source.priority) or 0,
 				group        = source.group or "",
+				-- The section inside that group, carried since 2026-08-05. It was
+				-- dropped here, so every consumer asking the delay/colour cascade
+				-- about a match could only ever name the CATEGORY — the per-section
+				-- rung was unreachable from the engine no matter what the settings
+				-- window stored. That silently affected two things at once: the
+				-- expansion-delay gate on the keystroke path, and the preview's
+				-- per-section "hide the bubble" override.
+				section      = source.section,
 				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
 				-- stable, so two entries equal on every other key came out in an order
 				-- that depended on the sort's internals — a collision could elect a
@@ -593,6 +662,12 @@ function M.new()
 			end_char           = via_end_char,
 			final_result       = mapping.final_result,
 			group              = mapping.group,
+			-- Carried alongside the group since 2026-08-05. The Linux daemon's
+			-- expansion-delay gate already asked the cascade for
+			-- `resolve(result.group, result.section)`, and this key was not here — so
+			-- it always resolved at the CATEGORY level and a per-section delay, the
+			-- third rung of five, could never take effect.
+			section            = mapping.section,
 		}
 	end
 
@@ -641,6 +716,18 @@ function M.new()
 	--- @return string The concatenated codepoints currently in the buffer.
 	function engine:current_buffer()
 		return table.concat(_buf_cps)
+	end
+
+	--- The mappings the engine is currently considering, for the preview bubble.
+	---
+	--- Reads the instance's own buffer and boundary state so a caller does not
+	--- have to reconstruct either — reconstructing `_start_is_boundary` outside is
+	--- exactly how a preview ends up disagreeing with the engine about whether a
+	--- trigger can fire.
+	--- @param limit number|nil Stop after this many candidates.
+	--- @return table Array of { trigger, replacement, group, section, fires, blocked }.
+	function engine:candidates(limit)
+		return M.candidates_at(_buf_cps, _buckets, #_buf_cps, _start_is_boundary, limit)
 	end
 
 	return engine

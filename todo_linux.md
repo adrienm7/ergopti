@@ -1510,21 +1510,35 @@ déclarée.
       → `test-color-presets-parity.cjs` tient les deux palettes identiques — le lecteur
         TOML partagé ne gère que des scalaires, la liste ordonnée ne peut donc pas être
         partagée.
-- [ ] **L'aperçu n'est jamais affiché** : `preview.lua M.show()` n'a aucun appelant
-      dans tout le pilote. Toute la surface aperçu — et donc les quatre bascules
-      ci-dessus — est inerte tant qu'un énumérateur de candidats n'existe pas.
+- [x] **L'aperçu n'était jamais affiché.** `preview.lua` était complet — bascules,
+      résolution de teinte, construction des lignes, appel au renderer — et
+      `M.show` n'avait **aucun appelant** dans tout le pilote. Toute la surface
+      aperçu était inerte, quel que soit le bureau et la configuration.
+      → `hotstring_engine.candidates_at` ajouté au moteur **partagé** : les mêmes
+        candidats que `best_match_at`, mais tous, avec `fires` et `blocked`.
+      → Deux vrais bugs trouvés en le branchant : le moteur **jetait la section**
+        à l'enregistrement, et `on_char` ne la renvoyait pas — donc le cran par
+        section de la cascade était inatteignable **pour tout le monde**, y compris
+        pour le garde de délai d'expansion qui la demandait déjà.
 - [ ] **La catégorie « hotstrings dynamiques » est inatteignable** : une ligne
       grisée « (aucun groupe chargé) », alors que le moteur tourne.
-- [ ] **Impossible d'ajouter un délimiteur personnalisé** : la ligne déléguait à
-      la fenêtre qui ne s'ouvrait pas. Rien n'appelle jamais
-      `add_custom_terminator`.
-- [ ] **La touche « répétition ★ » n'existe pas sur Linux**, et
-      `platforms = ["ahk"]` est faux : macOS livre le moteur *et* la bascule
-      depuis toujours. Même forme d'erreur que `hotstring_extensions` et
-      `magic_key_config` — le manifeste enregistre qui a implémenté en premier.
-- [ ] Un délimiteur **activé** est perdu au redémarrage (seule la liste OFF est
-      persistée) ; 15 des 25 délimiteurs sont livrés désactivés.
-- [ ] Pas de « ↺ Valeurs par défaut » dans les expanseurs de mots.
+- [x] **Impossible d'ajouter un délimiteur personnalisé.** La ligne déléguait à
+      la fenêtre de réglages au motif que « ce pilote n'a pas de champ texte » —
+      or la fenêtre ne s'ouvrait pas, et le champ texte est `prompt_text`, dans le
+      même fichier, déjà utilisé deux handlers plus bas. Prompt natif maintenant,
+      validé en **codepoints** et non en octets, avec la question « consommé ? ».
+      → La sous-ligne « Supprimer » était inatteignable par construction.
+- [x] **La touche « répétition ★ » n'existait pas sur Linux**, et
+      `platforms = ["ahk"]` était faux le jour où il a été écrit : macOS livre le
+      moteur *et* la bascule depuis toujours. Écrite en module pur + bascule
+      persistée ; macOS rend désormais sa ligne par id au lieu de la bricoler.
+      → Ligne de base des lignes cachées sans raison : **40 → 39**.
+- [x] Un délimiteur **activé** était perdu au redémarrage : seule la liste OFF
+      était stockée, or 15 des 25 délimiteurs sont livrés désactivés — un delta ne
+      marche que contre un défaut unilatéral. Les deux sens sont stockés, plus les
+      définitions personnalisées, qui ne l'étaient pas du tout.
+- [x] « ↺ Valeurs par défaut » ajouté dans les expanseurs de mots, à côté des deux
+      lignes groupées comme sur les deux autres pilotes.
 - [x] « Tout activer » ne restaurait pas les **sections** et re-parsait tout le
       catalogue une fois par catégorie, dans un callback de menu. Les deux moitiés
       tombent avec le même changement : `enable_all` vide l ensemble `_disabled_groups`,
@@ -1542,14 +1556,15 @@ déclarée.
 - [ ] Pas de total général sur l'entrée Hotstrings du tray.
 - [ ] La catégorie personnelle s'affiche « personal » et non « Hotstrings
       personnels ».
-- [ ] Pas de sélecteur de section par défaut, pas de « fermer après ajout » — deux
-      préférences que le bridge lit et que rien ne peut écrire.
+- [x] Sélecteur de section par défaut et « fermer après ajout » ajoutés sous la ligne
+      de l'éditeur — deux préférences que le bridge relisait à chaque ouverture et
+      que rien ne pouvait écrire.
 - [ ] Un échec d'écriture est **silencieux** : la page affiche « enregistré » quoi
       qu'il arrive.
 - [ ] `clear_override` n'a pas le paramètre `field` : le portage naturel des
       boutons ↺ par champ effacerait les quatre champs.
-- [ ] Les actions groupées des délimiteurs touchent aussi les délimiteurs
-      personnalisés, contrairement aux deux références.
+- [x] Les actions groupées des délimiteurs ne touchent plus les délimiteurs
+      personnalisés — les deux références les épargnent délibérément.
 - [ ] Le `shortcuts/menu.lua` des extensions n'est jamais exécuté sur Linux.
 - [ ] Aperçu : teinte par **catégorie** au lieu de par **genre**, une seule teinte
       pour tout le panneau au lieu d'une par ligne, aucune expiration, libellé
