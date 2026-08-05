@@ -254,7 +254,16 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return string
 	local function category_label(id, category)
 		local description = category and category.description or nil
-		if type(description) ~= "table" then return id end
+		-- A pack whose [_meta] description is a plain string, not a locale table —
+		-- which is what the editor writes for personal.toml — used to fall straight
+		-- through to the file stem, so the user's own hotstrings appeared as
+		-- "personal (12)" while the other two drivers show "Hotstrings personnels".
+		-- The category.* keys exist in all 21 locales for exactly this.
+		if type(description) ~= "table" then
+			local translated = i18n_safe("category." .. id)
+			if translated ~= "category." .. id then return translated end
+			return id
+		end
 		local locale = "en"
 		local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
 		if ok_i18n and type(i18n_mod.get_locale) == "function" then
@@ -284,6 +293,20 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 		return extension_id
+	end
+
+	--- How many hotstrings a category is firing right now.
+	---
+	--- Asked of the config module, which owns the gate and section state; the
+	--- fallback is only for a harness that supplies a partial config table, and it
+	--- is the honest one — the total the file holds, which is what this row showed
+	--- unconditionally before.
+	--- @param id string
+	--- @param category table|nil
+	--- @return integer
+	local function active_count(id, category)
+		if type(config.active_count) == "function" then return config.active_count(id) end
+		return (category and category.count) or 0
 	end
 
 	--- One category, as a submenu rather than a single toggle.
@@ -322,15 +345,23 @@ local function _manifest_hotstring_rows(ctx, config)
 		local sections = category and category.sections_order or {}
 		if #sections > 0 then
 			sub[#sub + 1] = { title = "-" }
+			-- enable_all / disable_all, the keys both other drivers use for these two
+			-- rows. Linux said "Tout cocher / Tout décocher" where macOS and Windows
+			-- say "Tout activer / Tout désactiver", in all 21 languages, for the same
+			-- pair of controls.
+			--
+			-- No longer greyed while the category is off, either. Enabling now lifts
+			-- the gate (config.set_all_sections does it), so this is one click from a
+			-- switched-off category to a fully-on one — which is what the other two
+			-- do. Greying it forced the user to find a second control first.
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.check_all"),
-				disabled = not on,
+				title = i18n_safe("menu.hotstrings.enable_all"),
 				fn = function()
 					if config.set_all_sections then config.set_all_sections(id, true) end
 				end,
 			}
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.uncheck_all"),
+				title = i18n_safe("menu.hotstrings.disable_all"),
 				disabled = not on,
 				fn = function()
 					if config.set_all_sections then config.set_all_sections(id, false) end
@@ -340,12 +371,20 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
-				local section_on = config.is_section_enabled and config.is_section_enabled(id, name)
+				-- CHECKED, not ENABLED. The two are different questions and answering
+				-- both with the effective state made a switched-off category untick
+				-- every section it holds — so the information "here is what comes back
+				-- when you switch it on" disappeared, and it looked as though the
+				-- per-section choices had been reset. They never were; only the screen
+				-- said so.
+				local section_checked = config.is_section_checked
+					and config.is_section_checked(id, name)
+					or (config.is_section_enabled and config.is_section_enabled(id, name))
 				sub[#sub + 1] = {
 					-- The count is the point of the row: a section with three entries
 					-- and one with nine hundred are the same line without it.
 					title    = string.format("%s (%d)", name, section and section.count or 0),
-					checked  = section_on and true or false,
+					checked  = section_checked and true or false,
 					-- Greyed rather than hidden while the category is off: a row that
 					-- disappears reads as a bug, and the user still needs to see what
 					-- they will get back when they switch the category on.
@@ -358,7 +397,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		end
 
 		return {
-			title   = string.format("%s (%d)", category_label(id, category), count),
+			-- The ACTIVE count, not the file's total. A user reads this figure as
+			-- "what is firing right now" and checks a disable by watching it fall;
+			-- it never moved, so a fully disabled Autocorrection went on advertising
+			-- every entry it would have had.
+			title   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
 			checked = on and true or false,
 			menu    = sub,
 		}
@@ -1033,7 +1076,24 @@ local function _build_hotstrings(ctx)
 		end,
 	}
 
-	return { title = i18n_safe("menu.hotstrings.title"), menu = items }
+	-- The grand total, which macOS and Windows both put on this entry and Linux
+	-- did not. On a driver that re-scans its catalogue from disk it is the fastest
+	-- confirmation that a reload found the packs at all.
+	--
+	-- Summed from the ACTIVE counts, not the files' totals: a grand total computed
+	-- the naive way would contradict the per-category numbers directly beneath it
+	-- the moment anything was switched off.
+	local grand_total = 0
+	if type(config.get_groups) == "function" and type(config.active_count) == "function" then
+		for _, name in ipairs(config.get_groups() or {}) do
+			grand_total = grand_total + (config.active_count(name) or 0)
+		end
+	end
+
+	local title = i18n_safe("menu.hotstrings.title")
+	if grand_total > 0 then title = string.format("%s (%d)", title, grand_total) end
+
+	return { title = title, menu = items }
 end
 
 --- Builds the AI / LLM submenu.
