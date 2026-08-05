@@ -273,10 +273,18 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
         « l interdire aujourd hui voudrait dire réécrire deux couches de menu d un
         coup ». Formulé comme « supprimer le fichier », M3.3 vise un état qu aucun
         pilote de référence n a atteint.
-      → **La moitié migration a commencé** le 2026-08-05, sans attendre la décision
-        ci-dessous : `kanata_menu` et `updates_menu` sont déclarés en `list` et
-        leurs 14 rangées sont **matérialisées par le renderer**, pas construites
-        ici. C est la seule forme qui déplace quoi que ce soit — router un menu par
+      → **Décision prise le 2026-08-05 : repointer.** Le ratchet ne traite plus
+        `menu_builder.lua` comme « le renderer Linux » — c en est un **appelant**,
+        exactement comme `menu_shortcuts.lua` sur macOS, que ce même fichier a
+        toujours compté dehors. Linux est le seul pilote dont le renderer est
+        entièrement partagé. L ancienne définition rendait la mesure vide : 2/2
+        quoi qu il arrive.
+      → **État : 120 rangées dehors, 4 fournisseurs `list`.** Trois blocs migrés —
+        `kanata_menu`, `updates_menu`, et les deux lignes de gestes Linux-only
+        (`gesture_slots_linux` compte à lui seul une trentaine de rangées avec un
+        sélecteur d action imbriqué chacune). Gelé sur le mesuré, pas sur le chiffre
+        d avant migration : figer à 136 aurait silencieusement rendu les seize
+        rangées que ces blocs ont coûté à déplacer. C est la seule forme qui déplace quoi que ce soit — router un menu par
         `ManifestMenu.build` en laissant ses handlers ajouter les rangées ne bouge
         rien, et quatre menus de ce pilote le faisaient déjà sans qu une seule
         rangée soit sortie.
@@ -286,14 +294,18 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
         arbitrage. Première version comptait les clés du pilote, et renommer l une
         d elles laissait le nombre intact pendant que le sous-menu se vidait — il
         compte contre le manifeste désormais.
-      → **Décision à prendre pour la seconde moitié.** Aujourd hui le ratchet déclare
-        `menu_builder.lua` « le renderer Linux », donc les 134 rangées comptent
-        comme *dedans* et Linux affiche 2/2 : il n existe aucune pression chiffrée
-        vers la migration. Le premier pas honnête est de repointer le ratchet pour
-        qu il mesure la vraie dette — ce qui fait passer Linux de 2 à 134 et
-        ressemble à une régression alors que c est un changement de définition.
-        C est un arbitrage du mainteneur sur ce que le nombre veut dire, pas une
-        décision à prendre en passant.
+      → **Bloc suivant à ne PAS migrer tel quel : `apps_menu`.** Tenté puis annulé
+        le 2026-08-05. `top_level/apps` est déclaré `["hs", "linux"]`, et macOS a
+        bien le même sous-menu par application — mais il le construit lui-même
+        (`ui/menu/menu_apps.lua`) sans lire de clé de manifeste. Déclarer
+        `apps_menu` en Linux-only fait donc que macOS ouvre une entrée de premier
+        niveau sur un menu qui ne projette aucune rangée pour lui, ce que la porte
+        de parité signale — à juste titre. Le décrire honnêtement des deux côtés
+        demande d abord du travail côté macOS ; ce n est pas une migration Linux.
+      → **Le menu Débogage est bloqué de la même façon** : ses rangées de manifeste
+        n ont **aucun `type`**, donc le renderer les journaliserait en « Unknown
+        item type » et les sauterait. Les typer touche les trois pilotes, et
+        Windows les charge par son propre `MenuManifest_LoadDebugMenu`.
 - [x] **M3.4 — fait** le 2026-08-05. `_build_shortcuts` passe par
       `ManifestMenu.build("shortcuts_menu", …)` et `extensions_shortcuts` a perdu
       sa restriction `["ahk"]`. Détails dans l item de §11.3.
