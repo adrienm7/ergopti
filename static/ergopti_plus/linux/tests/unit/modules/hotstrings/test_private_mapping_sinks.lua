@@ -165,6 +165,60 @@ helpers.describe("private mapping: the synthetic character record", function()
 				.. "arithmetic stay correct")
 	end)
 
+	helpers.it("carries the LLM counters into the day's aggregates", function()
+		-- Not about privacy; it rides here because this file is the only one that
+		-- drives a real flush through a fake writer. record_synthetic_output has
+		-- always incremented these in memory and upsert_app_day has always accepted
+		-- them, but the flush delta never named them — so an accepted completion
+		-- was counted for the life of the process and forgotten at the next start,
+		-- and the dashboard's LLM-gain figure read zero on a machine that had used
+		-- it all day.
+		local calls = { app_days = {} }
+		local writer_name = "modules.keylogger.sqlite_writer"
+		local logger_name = "modules.keylogger.keylogger"
+		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
+		package.loaded[writer_name] = {
+			open_db = function() return true end,
+			register_device = function() return true end,
+			is_available = function() return true end,
+			bump_rev = function() return true end,
+			insert_typing_events = function() return true end,
+			insert_hotstring_events = function() return true end,
+			insert_shortcut_events = function() return true end,
+			insert_app_switch_events = function() return true end,
+			upsert_app_day = function(_d, _date, _app, fields)
+				calls.app_days[#calls.app_days + 1] = fields
+				return true
+			end,
+			upsert_ngrams = function() return true end,
+			upsert_scancodes = function() return true end,
+		}
+		package.loaded[logger_name] = nil
+
+		local ok, err = pcall(function()
+			local kl = require(logger_name)
+			kl.init({ sqlite_path = "/tmp/ergopti_llm_delta.sqlite" })
+			kl.reset_session()
+			kl.on_app_focus("app.test", 1000)
+			kl.record_synthetic_output("app.test", "une completion", "llm", 1100, 0, 4)
+			kl.on_app_focus("other", 2000)
+			kl.flush()
+		end)
+
+		package.loaded[writer_name] = prev_writer
+		package.loaded[logger_name] = prev_logger
+		helpers.assert_true(ok, "the flush must complete: " .. tostring(err))
+
+		local saw = false
+		for _, fields in ipairs(calls.app_days) do
+			if (fields.llm_chars or 0) > 0 then saw = true end
+		end
+		helpers.assert_true(saw,
+			"the writer accepts llm_chars, llm_triggers and llm_input_chars and has "
+				.. "always accepted them; the delta simply never named them, so the "
+				.. "columns stayed zero forever")
+	end)
+
 	helpers.it("counts the private expansion in the day's aggregates", function()
 		local function hs_chars(calls)
 			for _, fields in ipairs(calls.app_days) do

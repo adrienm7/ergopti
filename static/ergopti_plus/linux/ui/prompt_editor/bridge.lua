@@ -38,15 +38,15 @@ local function _build_initial_payload(state)
 
 	if state.llm then
 		if type(state.llm.is_enabled) == "function" then
-			local ok, result = pcall(state.llm.is_enabled, state.llm)
+			local ok, result = pcall(state.llm.is_enabled)
 			if ok then enabled = result end
 		end
 		if type(state.llm.get_current_model) == "function" then
-			local ok, result = pcall(state.llm.get_current_model, state.llm)
+			local ok, result = pcall(state.llm.get_current_model)
 			if ok then current_model = result or "" end
 		end
 		if type(state.llm.get_models) == "function" then
-			local ok, result = pcall(state.llm.get_models, state.llm)
+			local ok, result = pcall(state.llm.get_models)
 			if ok and type(result) == "table" then models = result end
 		end
 	end
@@ -57,7 +57,7 @@ local function _build_initial_payload(state)
 		available_models = models,
 		triggers = (function()
 			if not state.llm or type(state.llm.get_triggers) ~= "function" then return {} end
-			local ok, result = pcall(state.llm.get_triggers, state.llm)
+			local ok, result = pcall(state.llm.get_triggers)
 			return (ok and type(result) == "table" and result) or {}
 		end)(),
 	}
@@ -75,7 +75,7 @@ function M.on_message(payload, state)
 		end
 		if payload == "refresh_models" then
 			if state.llm and type(state.llm.refresh_models) == "function" then
-				pcall(state.llm.refresh_models, state.llm)
+				pcall(state.llm.refresh_models)
 			end
 			return _build_initial_payload(state)
 		end
@@ -105,7 +105,7 @@ function M.on_message(payload, state)
 	if action == "set_model" and payload.model then
 		Logger.info(LOG, "Set model: %s", payload.model)
 		if state.llm and type(state.llm.set_model) == "function" then
-			pcall(state.llm.set_model, state.llm, payload.model)
+			pcall(state.llm.set_model, payload.model)
 		end
 		local writer = _get_writer()
 		if writer then
@@ -125,18 +125,18 @@ function M.on_message(payload, state)
 		if state.llm then
 			if payload.enabled then
 				if type(state.llm.enable) == "function" then
-					pcall(state.llm.enable, state.llm)
+					pcall(state.llm.enable)
 				elseif type(state.llm.toggle) == "function" then
-					if not (pcall(state.llm.is_enabled, state.llm) and true) then
-						pcall(state.llm.toggle, state.llm)
+					if not (pcall(state.llm.is_enabled) and true) then
+						pcall(state.llm.toggle)
 					end
 				end
 			else
 				if type(state.llm.disable) == "function" then
-					pcall(state.llm.disable, state.llm)
+					pcall(state.llm.disable)
 				elseif type(state.llm.toggle) == "function" then
-					if pcall(state.llm.is_enabled, state.llm) then
-						pcall(state.llm.toggle, state.llm)
+					if pcall(state.llm.is_enabled) then
+						pcall(state.llm.toggle)
 					end
 				end
 			end
@@ -146,11 +146,11 @@ function M.on_message(payload, state)
 
 	if action == "toggle_enabled" then
 		if state.llm and type(state.llm.toggle) == "function" then
-			pcall(state.llm.toggle, state.llm)
+			pcall(state.llm.toggle)
 		end
 		local enabled = false
 		if state.llm and type(state.llm.is_enabled) == "function" then
-			pcall(function() enabled = state.llm:is_enabled() end)
+			pcall(function() enabled = state.llm.is_enabled() end)
 		end
 		return { enabled = enabled }
 	end
@@ -158,7 +158,7 @@ function M.on_message(payload, state)
 	if action == "test_prediction" and payload.context then
 		Logger.info(LOG, "Test prediction with context: %d chars", #payload.context)
 		if state.llm and type(state.llm.predict) == "function" then
-			pcall(state.llm.predict, state.llm, payload.context)
+			pcall(state.llm.predict, payload.context)
 		end
 		return { requested = true }
 	end

@@ -26,13 +26,13 @@ local function _build_initial_payload(state)
 
 	if state.llm then
 		if type(state.llm.get_models) == "function" then
-			models = state.llm:get_models() or {}
+			models = state.llm.get_models() or {}
 		end
 		if type(state.llm.get_current_model) == "function" then
-			current_model = state.llm:get_current_model() or ""
+			current_model = state.llm.get_current_model() or ""
 		end
 		if type(state.llm.get_provider_url) == "function" then
-			provider_url = state.llm:get_provider_url() or provider_url
+			provider_url = state.llm.get_provider_url() or provider_url
 		end
 	end
 
@@ -43,7 +43,7 @@ local function _build_initial_payload(state)
 		provider_url = provider_url,
 		enabled = state.llm and (function()
 			if type(state.llm.is_enabled) == "function" then
-				return state.llm:is_enabled()
+				return state.llm.is_enabled()
 			end
 			return false
 		end)() or false,
@@ -62,7 +62,7 @@ function M.on_message(payload, state)
 		end
 		if payload == "refresh" then
 			if state.llm and type(state.llm.refresh_models) == "function" then
-				pcall(state.llm.refresh_models, state.llm)
+				pcall(state.llm.refresh_models)
 			end
 			return _build_initial_payload(state)
 		end
@@ -80,7 +80,7 @@ function M.on_message(payload, state)
 	if action == "select" and payload.model then
 		Logger.info(LOG, "Select model: %s", payload.model)
 		if state.llm and type(state.llm.set_model) == "function" then
-			pcall(state.llm.set_model, state.llm, payload.model)
+			pcall(state.llm.set_model, payload.model)
 		end
 		return { model = payload.model }
 	end
@@ -88,7 +88,7 @@ function M.on_message(payload, state)
 	if action == "download" and payload.model then
 		Logger.info(LOG, "Download model: %s", payload.model)
 		if state.llm and type(state.llm.download_model) == "function" then
-			pcall(state.llm.download_model, state.llm, payload.model)
+			pcall(state.llm.download_model, payload.model)
 		end
 		return { downloading = true, model = payload.model }
 	end
@@ -101,7 +101,7 @@ function M.on_message(payload, state)
 	if action == "set_provider_url" and payload.url then
 		Logger.info(LOG, "Set provider URL: %s", payload.url)
 		if state.llm and type(state.llm.set_provider_url) == "function" then
-			pcall(state.llm.set_provider_url, state.llm, payload.url)
+			pcall(state.llm.set_provider_url, payload.url)
 		end
 		return { url = payload.url }
 	end

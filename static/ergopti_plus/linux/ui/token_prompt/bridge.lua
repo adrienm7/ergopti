@@ -27,22 +27,22 @@ local function _build_initial_payload(state)
 
 	if state.llm then
 		if type(state.llm.get_max_tokens) == "function" then
-			settings.max_tokens = state.llm:get_max_tokens()
+			settings.max_tokens = state.llm.get_max_tokens()
 		end
 		if type(state.llm.get_temperature) == "function" then
-			settings.temperature = state.llm:get_temperature()
+			settings.temperature = state.llm.get_temperature()
 		end
 		if type(state.llm.get_stop_sequences) == "function" then
-			settings.stop_sequences = state.llm:get_stop_sequences() or {}
+			settings.stop_sequences = state.llm.get_stop_sequences() or {}
 		end
 		if type(state.llm.get_triggers) == "function" then
-			settings.triggers = state.llm:get_triggers() or settings.triggers
+			settings.triggers = state.llm.get_triggers() or settings.triggers
 		end
 		if type(state.llm.get_max_context) == "function" then
-			settings.max_context = state.llm:get_max_context()
+			settings.max_context = state.llm.get_max_context()
 		end
 		if type(state.llm.is_auto_inject) == "function" then
-			settings.auto_inject = state.llm:is_auto_inject()
+			settings.auto_inject = state.llm.is_auto_inject()
 		end
 	end
 
@@ -78,16 +78,16 @@ function M.on_message(payload, state)
 		if state.llm then
 			local s = payload.settings
 			if s.max_tokens and type(state.llm.set_max_tokens) == "function" then
-				pcall(state.llm.set_max_tokens, state.llm, s.max_tokens)
+				pcall(state.llm.set_max_tokens, s.max_tokens)
 			end
 			if s.temperature and type(state.llm.set_temperature) == "function" then
-				pcall(state.llm.set_temperature, state.llm, s.temperature)
+				pcall(state.llm.set_temperature, s.temperature)
 			end
 			if s.triggers and type(state.llm.set_triggers) == "function" then
-				pcall(state.llm.set_triggers, state.llm, s.triggers)
+				pcall(state.llm.set_triggers, s.triggers)
 			end
 			if s.max_context and type(state.llm.set_max_context) == "function" then
-				pcall(state.llm.set_max_context, state.llm, s.max_context)
+				pcall(state.llm.set_max_context, s.max_context)
 			end
 		end
 		return { saved = true }
@@ -96,7 +96,7 @@ function M.on_message(payload, state)
 	if action == "test_prompt" and payload.prompt then
 		Logger.info(LOG, "Test prompt (length=%d).", #payload.prompt)
 		if state.llm and type(state.llm.predict) == "function" then
-			pcall(state.llm.predict, state.llm, payload.prompt)
+			pcall(state.llm.predict, payload.prompt)
 		end
 		return { requested = true }
 	end

@@ -45,7 +45,7 @@ local function _build_initial_payload(state)
 
 	-- Override with actual config dir if available.
 	if state.config and type(state.config.get_config_dir) == "function" then
-		paths.config_dir = state.config:get_config_dir() or paths.config_dir
+		paths.config_dir = state.config.get_config_dir() or paths.config_dir
 	end
 
 	return {

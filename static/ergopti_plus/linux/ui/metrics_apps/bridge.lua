@@ -64,14 +64,14 @@ function M.on_message(payload, state)
 
 	if action == "reset" then
 		if state.keylogger and type(state.keylogger.reset_session) == "function" then
-			pcall(state.keylogger.reset_session, state.keylogger)
+			pcall(state.keylogger.reset_session)
 		end
 		return _build_initial_payload(state, true)
 	end
 
 	if action == "export" then
 		if state.keylogger and type(state.keylogger.export_json) == "function" then
-			local ok, json = pcall(state.keylogger.export_json, state.keylogger)
+			local ok, json = pcall(state.keylogger.export_json)
 			return { exported = ok, json = ok and json or nil }
 		end
 		return { exported = false }
@@ -79,14 +79,14 @@ function M.on_message(payload, state)
 
 	if action == "pause" then
 		if state.keylogger and type(state.keylogger.suppress) == "function" then
-			state.keylogger:suppress()
+			state.keylogger.suppress()
 		end
 		return { suppressed = true }
 	end
 
 	if action == "resume" then
 		if state.keylogger and type(state.keylogger.unsuppress) == "function" then
-			state.keylogger:unsuppress()
+			state.keylogger.unsuppress()
 		end
 		return { suppressed = false }
 	end
@@ -94,7 +94,7 @@ function M.on_message(payload, state)
 	if action == "app_detail" and payload.app_id then
 		-- Return deeper stats for a specific app.
 		if state.keylogger and type(state.keylogger.get_app_detail) == "function" then
-			local detail = state.keylogger:get_app_detail(payload.app_id)
+			local detail = state.keylogger.get_app_detail(payload.app_id)
 			return detail
 		end
 		return nil
