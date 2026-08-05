@@ -698,10 +698,7 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "repeat_key",
-			"platforms": [
-				"ahk"
-			]
+			"id": "repeat_key"
 		}
 	],
 	"gestures_menu": [

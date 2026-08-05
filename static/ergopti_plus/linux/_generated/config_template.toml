@@ -6,6 +6,7 @@
 
 [hotstrings]
 trigger_char = "★"
+repeat_key_enabled = true
 preview_ai_enabled = true
 preview_autocorrect_enabled = true
 preview_colored_tooltips = true

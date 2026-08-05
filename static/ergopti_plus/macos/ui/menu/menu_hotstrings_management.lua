@@ -504,17 +504,12 @@ function M.build_management(ctx)
 		-- four toggles for BOTH drivers from the start. Naming the row is what let
 		-- Linux render the same one instead of reimplementing it.
 		["preview_bubbles"]  = function(items) if bubble_item then items[#items + 1] = bubble_item end end,
+		-- Rendered by id since 2026-08-05. This row was built by hand here while
+		-- the manifest called `repeat_key` Windows-only, so the ratchet counted it
+		-- as a row macOS never wired — and Linux, reading the same manifest, drew
+		-- nothing. It now has the feature too, so the restriction is gone.
+		["repeat_key"]       = function(items) items[#items + 1] = repeat_item end,
 	}, nil, ctx)
-
-	-- Not a manifest row on this driver: the repeat-key toggle. The manifest
-	-- restricts `repeat_key` to AHK, and this row is the standing evidence that
-	-- the restriction has been wrong for as long as both have existed — macOS
-	-- ships the engine (modules/keymap/expander.lua try_repeat_feature) as well as
-	-- the toggle. Recorded in todo_linux.md §11.2 rather than widened here,
-	-- because widening it is only honest once Linux has the feature too.
-	local own = { { title = "-" } }
-	own[#own + 1] = repeat_item
-	for _, row in ipairs(own) do rows[#rows + 1] = row end
 
 	return { title = i18n.get("menu.hotstrings.params"), menu = rows }
 end

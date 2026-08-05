@@ -10,6 +10,7 @@ log_level = "INFO"
 
 [hotstrings]
 trigger_char = "★"
+repeat_key_enabled = true
 expansion_delay = 0.75
 preview_ai_enabled = true
 preview_autocorrect_enabled = true
