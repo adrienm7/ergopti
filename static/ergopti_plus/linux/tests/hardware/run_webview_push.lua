@@ -72,6 +72,23 @@ if not ok_webkit or not WebKit then abort("WebKit2GTK is not available to lgi.")
 
 local Manager = require("ui.webview_manager")
 
+-- The daemon state the bridges read. Without it the settings window's payload is
+-- an empty shell — correctly, since it has nothing to describe — and the "did the
+-- push change the page" assertion would fail for a reason that says nothing about
+-- the push. The REAL config module is used, loading the bundled packs, so what
+-- the page renders is what a user would see.
+local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+HotstringsConfig.init(nil, nil, nil)
+HotstringsConfig.load_all()
+Manager.set_daemon_state({ config = HotstringsConfig })
+
+local category_count = 0
+for _ in pairs(HotstringsConfig.get_categories() or {}) do category_count = category_count + 1 end
+check(category_count > 0, string.format(
+	"the bundled hotstring packs loaded (%d categor(ies)) — with none, the settings "
+		.. "window would render an empty page for a reason that has nothing to do "
+		.. "with whether the push works", category_count))
+
 
 
 
