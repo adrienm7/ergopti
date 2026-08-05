@@ -135,8 +135,22 @@ local function stored_bool(key, fallback)
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage then return fallback end
 	local value = Storage.get(PREF_PREFIX .. key, nil)
-	if value == nil then return fallback end
-	return value == true
+	-- Only a real boolean overrides the shipped default. `value == true` was the
+	-- first version and it collapses EVERY other stored shape to false — a string
+	-- "true" from a hand-edited store, a table from an older schema, a number from
+	-- a foreign writer. For a privacy flag that is the wrong direction to fail in:
+	-- it would silently switch a filter off because the value was unrecognisable.
+	if type(value) ~= "boolean" then
+		if value ~= nil then
+			-- Said out loud: a stored value of an unexpected shape is a store written
+			-- by something else, and silently ignoring it hides that.
+			Logger.warn(LOG, "Stored '%s%s' is a %s, not a boolean — using the shipped default.",
+				PREF_PREFIX, key, type(value))
+		end
+		return fallback
+	end
+	Logger.debug(LOG, "Metrics '%s%s' restored from storage: %s.", PREF_PREFIX, key, tostring(value))
+	return value
 end
 
 --- Persists a boolean, or clears it when it matches the shipped default.
