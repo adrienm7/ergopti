@@ -1524,6 +1524,20 @@ local function _extension_shortcut_rows()
 	return rows
 end
 
+--- Builds the shortcuts submenu: this driver's own rows, then the manifest's.
+---
+--- Hand-rolled until 2026-08-05, which is what kept `extensions_shortcuts`
+--- restricted to Windows in the manifest even after both Lua drivers had
+--- implemented it: a menu that dispatches nothing by id cannot be promised a row
+--- by id, and the handler-bijection ratchet says so. It dispatches now, and the
+--- restriction is gone.
+---
+--- The rows above the manifest section are this driver's own — CapsWord, the
+--- selection transforms, the wrap pairs — and no manifest entry describes them
+--- yet. macOS is in the same position with `at_hash` and `layer_scroll`, and
+--- prepends them the same way.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
@@ -1536,36 +1550,38 @@ local function _build_shortcuts(ctx)
 	local caps_active = sc.is_caps_word_active()
 	local items = {}
 
-	-- Master toggle.
+	-- Row 1 of [[menu.shortcuts_menu]] is a `toggle`, which the shared renderer
+	-- skips by contract ("Category toggles rendered by caller") — so this caller
+	-- builds it, exactly as the hotstrings submenu does.
 	items[#items + 1] = {
-		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
-		fn = function() sc.toggle() end,
+		title = i18n_safe(enabled and "menu.shortcuts.on" or "menu.shortcuts.off"),
+		fn = function()
+			sc.toggle()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 	}
 	items[#items + 1] = { title = "-" }
 
 	-- CapsWord toggle.
 	items[#items + 1] = {
-		title = "CapsWord " .. (caps_active and "✓" or ""),
+		title   = i18n_safe("sg_actions.caps_word"),
+		checked = caps_active,
 		fn = function()
 			sc.toggle_caps_word()
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 	}
 
 	-- Text transforms (operate on current X11 selection).
 	items[#items + 1] = { title = "-" }
-	items[#items + 1] = {
-		title = "→ MAJUSCULES",
-		fn = function() sc.transform_uppercase() end,
-	}
-	items[#items + 1] = {
-		title = "→ minuscules",
-		fn = function() sc.transform_lowercase() end,
-	}
-	items[#items + 1] = {
-		title = "→ Title Case",
-		fn = function() sc.transform_titlecase() end,
-	}
+	for _, transform in ipairs({
+		{ key = "menu.shortcuts.to_uppercase", run = sc.transform_uppercase },
+		{ key = "menu.shortcuts.to_lowercase", run = sc.transform_lowercase },
+		{ key = "menu.shortcuts.to_titlecase", run = sc.transform_titlecase },
+	}) do
+		items[#items + 1] = { title = i18n_safe(transform.key), fn = function() transform.run() end }
+	end
 
 	items[#items + 1] = { title = "-" }
 
@@ -1579,35 +1595,50 @@ local function _build_shortcuts(ctx)
 		fn = function() sc.select_line() end,
 	}
 	items[#items + 1] = {
-		title = "Coller sans formatage",
+		title = i18n_safe("sg_actions.paste_plain"),
 		fn = function() sc.paste_plain() end,
 	}
 
-	-- Wrap symbols submenu.
+	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
+	-- `pairs` would give the user a different order on every rebuild.
 	local wrap_items = {}
-	local wrap_pairs = sc.get_wrap_pairs()
-	for ch, pair in pairs(wrap_pairs) do
-		-- Only include opening chars to avoid duplicates.
-		if ch == pair.left then
-			local cap = ch
-			wrap_items[#wrap_items + 1] = {
-				title = ch .. " … " .. pair.right .. "  (" .. ch .. "texte" .. pair.right .. ")",
-				fn = function() sc.wrap_selection(pair.left, pair.right) end,
-			}
-		end
+	local opening = {}
+	for ch, pair in pairs(sc.get_wrap_pairs()) do
+		-- Only the opening character: each pair is stored under both of its ends.
+		if ch == pair.left then opening[#opening + 1] = { ch = ch, pair = pair } end
 	end
-	items[#items + 1] = { title = "Wrap symbols", menu = wrap_items }
+	table.sort(opening, function(a, b) return a.ch < b.ch end)
+	for _, entry in ipairs(opening) do
+		local pair = entry.pair
+		-- The pair around an ellipsis, and nothing else. This used to append a
+		-- second illustration, "(«texte»)", whose only content was a French word —
+		-- so the row was a translated label followed by an untranslated one, and
+		-- the ellipsis had already said the same thing in every language.
+		wrap_items[#wrap_items + 1] = {
+			title = string.format("%s … %s", entry.ch, pair.right),
+			fn    = function() sc.wrap_selection(pair.left, pair.right) end,
+		}
+	end
+	items[#items + 1] = { title = i18n_safe("menu.shortcuts.wrap_symbols"), menu = wrap_items }
 
-	-- One submenu per installed extension that ships shortcuts/menu.lua.
-	--
-	-- An extension author writes that file and it appears under Raccourcis on
-	-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
-	-- action an extension declared was unreachable — and the bundled demo
-	-- extension carries the file, so this reproduced out of the box.
-	local extension_rows = _extension_shortcut_rows()
-	if #extension_rows > 0 then
+	local handlers = {
+		-- One submenu per installed extension that ships shortcuts/menu.lua.
+		--
+		-- An extension author writes that file and it appears under Raccourcis on
+		-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
+		-- action an extension declared was unreachable — and the bundled demo
+		-- extension carries the file, so this reproduced out of the box.
+		["extensions_shortcuts"] = function(rows)
+			for _, row in ipairs(_extension_shortcut_rows()) do rows[#rows + 1] = row end
+		end,
+	}
+
+	local manifest_rows = ManifestMenu
+		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, ctx)
+		or {}
+	if #manifest_rows > 0 then
 		items[#items + 1] = { title = "-" }
-		for _, row in ipairs(extension_rows) do items[#items + 1] = row end
+		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
 	end
 
 	return { title = i18n_safe("menu.shortcuts.title"), menu = items }

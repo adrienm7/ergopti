@@ -242,7 +242,12 @@
 		},
 		{
 			"type": "list",
-			"id": "keyboard_slots"
+			"id": "keyboard_slots",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.no_keyboard_slot_binding_on_linux"
 		},
 		{
 			"type": "group",
@@ -295,11 +300,7 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "extensions_shortcuts",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"id": "extensions_shortcuts"
 		}
 	],
 	"modifier_combos_group": [
