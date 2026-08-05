@@ -837,9 +837,17 @@ jobs:
           # the harness exits 2 when lgi is unreachable and the step says so.
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          # One page per invocation. Both in one process made the verdict move
+          # between them run to run — two webviews share a GTK loop, so pumping
+          # for one processes the other's events and a probe can land while the
+          # other page is still settling.
           set +e
-          xvfb-run -a luajit tests/hardware/run_webview_push.lua
-          STATUS=$?
+          STATUS=0
+          for APP in hotstrings_config_window hotstring_editor; do
+            xvfb-run -a luajit tests/hardware/run_webview_push.lua "$APP"
+            CASE=$?
+            [ "$CASE" = "0" ] || STATUS=$CASE
+          done
           set -e
           # 2 is "this machine cannot host the test", which is a fact about the
           # runner and not a failure of the code. Reported and not swallowed: a
