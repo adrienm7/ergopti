@@ -214,6 +214,18 @@ _setup_permissions() {
 	sudo usermod -aG uinput "${target_user}"
 	echo "  ✔  ${target_user} ajouté aux groupes input et uinput"
 
+	# The directory is created first, and its absence is not fatal. A Fedora
+	# container aborted here — no udev installed, so /etc/udev/rules.d does not
+	# exist — after the files were already copied and the groups already changed.
+	# A missing udev is a real configuration (minimal images, some immutable
+	# systems): the rule simply has nothing to configure there, and saying so beats
+	# stopping halfway.
+	if ! sudo install -d "$(dirname "${UDEV_RULE_PATH}")" 2>/dev/null; then
+		echo "  ⚠  $(dirname "${UDEV_RULE_PATH}") introuvable — pas d'udev sur ce système."
+		echo "     /dev/uinput devra être rendu accessible autrement."
+		return 0
+	fi
+
 	sudo tee "${UDEV_RULE_PATH}" >/dev/null << 'UDEV_EOF'
 # Ergopti — write access to /dev/uinput for the uinput group.
 #
@@ -228,6 +240,7 @@ KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"
 UDEV_EOF
 	echo "  ✔  règle udev : ${UDEV_RULE_PATH}"
 
+	sudo install -d "$(dirname "${MODULES_LOAD_PATH}")" 2>/dev/null || true
 	sudo tee "${MODULES_LOAD_PATH}" >/dev/null << 'MODULES_EOF'
 # Ergopti — load the uinput module at boot so /dev/uinput exists before the
 # user session (and therefore before the daemon) starts.
