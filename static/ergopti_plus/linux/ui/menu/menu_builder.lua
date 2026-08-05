@@ -777,7 +777,36 @@ local function _manifest_hotstring_rows(ctx, config)
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.disable_all"), fn = set_all(false) }
 		end,
 		["hotstring_categories_standard"] = function(items) append_class(items, "standard") end,
-		["hotstring_categories_dynamic"]  = function(items) append_class(items, "dynamic") end,
+		["hotstring_categories_dynamic"] = function(items)
+			-- Its own handler, not append_class. This driver's group list comes from
+			-- TOML file stems and there is no dynamic-hotstrings TOML — the rules are
+			-- registered in code — so append_class matched nothing and the row
+			-- resolved to a greyed "(aucun groupe chargé)" while the engine was
+			-- running and expanding dates and @-tags. A user could not see the
+			-- category, count it, or switch it off.
+			local dyn = ctx.dyn_hotstrings
+			if type(dyn) ~= "table" or type(dyn.is_enabled) ~= "function" then
+				Logger.error(LOG, "No dynamic-hotstrings manager in the menu context — its category is not shown.")
+				return
+			end
+
+			local on    = dyn.is_enabled()
+			local count = type(dyn.get_rules_count) == "function" and dyn.get_rules_count() or 0
+
+			items[#items + 1] = {
+				title   = string.format("%s (%d)", i18n_safe("menu.hotstrings.dynamic"), count),
+				checked = on,
+				menu    = {
+					{
+						title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+						fn    = function()
+							if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					},
+				},
+			}
+		end,
 		["hotstring_categories_ergopti"]  = function(items) append_class(items, "ergopti") end,
 		["hotstring_personal"] = function(items)
 			-- The editor comes first, and until 2026-08-05 it was not here at all:

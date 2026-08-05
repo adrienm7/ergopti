@@ -1520,8 +1520,19 @@ déclarée.
         à l'enregistrement, et `on_char` ne la renvoyait pas — donc le cran par
         section de la cascade était inatteignable **pour tout le monde**, y compris
         pour le garde de délai d'expansion qui la demandait déjà.
-- [ ] **La catégorie « hotstrings dynamiques » est inatteignable** : une ligne
-      grisée « (aucun groupe chargé) », alors que le moteur tourne.
+- [x] **La catégorie « hotstrings dynamiques » était inatteignable.** Le row du
+      manifeste passait par `append_class`, et les groupes de ce pilote viennent
+      des stems de fichiers TOML — or les règles dynamiques sont enregistrées **en
+      code**, sans TOML. Donc la ligne se résolvait en « (aucun groupe chargé) »
+      pendant que le moteur tournait et expansait dates et @-tags.
+      → Handler dédié maintenant : nom localisé, nombre de règles, coche, et une
+        ligne de portail qui allume/éteint la catégorie.
+- [ ] **Bascules par famille de règle dynamique** (date, date_fr, date_long_fr,
+      iban/phone/ssn_prefixes, text_expansion_personal_information — 7 déclarées).
+      Windows et macOS en offrent une par famille ; Linux offre le portail global.
+      → Bloqué par le moteur partagé : `register_date_rules` enregistre les trois
+        règles de date **en lot, sans identifiant**, donc il n’y a rien à quoi
+        rattacher une bascule. Le travail est dans le moteur, pas dans le menu.
 - [x] **Impossible d'ajouter un délimiteur personnalisé.** La ligne déléguait à
       la fenêtre de réglages au motif que « ce pilote n'a pas de champ texte » —
       or la fenêtre ne s'ouvrait pas, et le champ texte est `prompt_text`, dans le

@@ -941,6 +941,11 @@ local function main()
 				_version      = Version.VERSION,
 				config        = hotstrings_config,
 				engine        = engine,
+				-- The dynamic-hotstrings manager, so its category can be a real row
+				-- rather than the greyed "(no group loaded)" the manifest's
+				-- hotstring_categories_dynamic used to resolve to: this driver's
+				-- groups come from TOML file stems, and there is no dynamic TOML.
+				dyn_hotstrings = dyn_hotstrings,
 				layout        = opts.layout,
 				on_layout_change = function(new_layout)
 					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
