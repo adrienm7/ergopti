@@ -2827,6 +2827,24 @@ id = "quit"
 [[menu.top_level]]
 id = "debug"
 
+# The kanata submenu, which only the Linux driver has — kanata is its remap
+# daemon, as Karabiner-Elements is macOS's. Declared as a `list` rather than four
+# `action` rows on purpose: an `action` names a handler and the handler appends
+# the row IN THE DRIVER, so the manifest would describe the slot while the driver
+# still built the menu. A `list` provider returns row DATA and the shared
+# renderer materialises it, which is the only shape that actually moves a row out
+# of the driver — see the header of tools/test/test-menu-rows-outside-renderer.cjs,
+# which records that a `list` migration is the only kind that has ever lowered
+# that count.
+#
+# Its four rows were hand-built in linux/ui/menu/menu_builder.lua until
+# 2026-08-05. This is the first block of that file to move, and the pattern the
+# rest of M3.3 follows.
+[[menu.kanata_menu]]
+type = "list"
+id = "kanata_actions"
+platforms = ["linux"]
+
 [[menu.global_actions]]
 id = "enable_all"
 

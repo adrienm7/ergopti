@@ -89,7 +89,12 @@ const OPENS_SUBMENU = {
 	tap_holds: 'tap_holds_menu',
 	modifier_combos: 'modifier_combos_group',
 	accented_letters: 'accented_letters_group',
-	hotstrings_params: 'hotstrings_params_group'
+	hotstrings_params: 'hotstrings_params_group',
+	// Linux's remap daemon, as Karabiner-Elements is macOS's. Mapped so its rows
+	// inherit `top_level/kanata`'s own linux-only visibility instead of each one
+	// having to repeat it — the same reason tap_holds_menu's children do not each
+	// carry "Windows only".
+	kanata: 'kanata_menu'
 };
 
 const errors = [];
@@ -450,7 +455,12 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // ["ahk"] restriction — the manifest had refused to promise a row to a menu that
 // could not answer by id, and both Lua drivers had implemented the row for
 // months while the manifest said neither had the concept.
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 5 };
+// linux raised 5 → 6 on 2026-08-05: the kanata submenu became the first block of
+// menu_builder.lua whose rows the renderer MATERIALISES, through a `list`
+// provider. Routing a menu through the renderer and moving its rows out of the
+// driver are two different things, and only the second one moves the bypass
+// ratchet — this number counts the first.
+const RENDERED_THROUGH_SHARED = { hs: 4, linux: 6 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
