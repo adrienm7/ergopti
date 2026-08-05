@@ -176,9 +176,13 @@ end
 --- Whether a candidate's category wants a preview at all.
 --- @param group string|nil
 --- @return boolean
-local function category_shows_tooltip(group)
+local function category_shows_tooltip(group, section)
 	if not _config or type(_config.resolve) ~= "function" or not group then return true end
-	local ok, resolved = pcall(_config.resolve, group, nil)
+	-- The SECTION, not nil. The settings window keys its per-section "hide the
+	-- bubble" override by exactly this name, so resolving without it consults only
+	-- the category level and keeps drawing for a section the user just silenced.
+	-- macOS hit this same bug and its comment says the same thing.
+	local ok, resolved = pcall(_config.resolve, group, section)
 	if not ok or type(resolved) ~= "table" then return true end
 	return resolved.show_tooltip ~= false
 end
@@ -186,10 +190,10 @@ end
 --- The accent colour for a group, or nil when colouring is off.
 --- @param group string|nil
 --- @return table|nil { red, green, blue }
-local function accent_for(group)
+local function accent_for(group, section)
 	if not _enabled.colored then return nil end
 	if not _config or type(_config.resolve) ~= "function" or not group then return nil end
-	local ok, resolved = pcall(_config.resolve, group, nil)
+	local ok, resolved = pcall(_config.resolve, group, section)
 	if not ok or type(resolved) ~= "table" or type(resolved.color) ~= "string" then return nil end
 	local r, g, b = resolved.color:match("^#(%x%x)(%x%x)(%x%x)$")
 	if not r then return nil end
@@ -254,15 +258,16 @@ function M.show(candidates, kind)
 		return false
 	end
 
-	local group = candidates[1] and candidates[1].group or nil
-	if not category_shows_tooltip(group) then
+	local leading = candidates[1] or {}
+	local group, section = leading.group, leading.section
+	if not category_shows_tooltip(group, section) then
 		M.hide()
 		return false
 	end
 
 	return Renderer.show(rows, {
 		style  = _style,
-		accent = accent_for(group),
+		accent = accent_for(group, section),
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),
 	})
