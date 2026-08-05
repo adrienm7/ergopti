@@ -53,6 +53,19 @@ end)()
 -- ===================================
 
 --- Reads a file from disk and returns its raw content.
+--- Drops a cache-busting query or fragment from an asset reference.
+---
+--- `script.js?v=3` is an ordinary thing for a page author to write — it means
+--- something to a browser fetching over HTTP — and it is not part of the
+--- FILENAME. Concatenated raw onto the assets directory it makes the open miss,
+--- and the tag is then replaced with nothing. The Linux driver carries the same
+--- helper for the same reason.
+--- @param reference string An href or src attribute value.
+--- @return string The reference with everything from "?" or "#" removed.
+local function strip_asset_query(reference)
+	return (tostring(reference):gsub("[?#].*$", ""))
+end
+
 --- @param path string Full path to the file.
 --- @return string The file content, or empty string if unreadable.
 local function read_file(path)
@@ -107,8 +120,12 @@ function M.build_injected_html(assets_dir, html_name)
 		if href:match("^https?://") then
 			return '<link rel="stylesheet" href="' .. href .. '" />'
 		end
-		local css = read_file(assets_dir .. href)
-		return css ~= "" and ("<style>" .. css .. "</style>") or ""
+		local css = read_file(assets_dir .. strip_asset_query(href))
+		if css == "" then
+			Logger.error(LOG, "Stylesheet '%s' could not be read — the page loads unstyled.", href)
+			return ""
+		end
+		return "<style>" .. css .. "</style>"
 	end)
 
 	-- Inline local <script src="..."></script> tags; leave CDN URLs intact
@@ -116,8 +133,19 @@ function M.build_injected_html(assets_dir, html_name)
 		if src:match("^https?://") then
 			return '<script src="' .. src .. '"></script>'
 		end
-		local js = read_file(assets_dir .. src)
-		return js ~= "" and ("<script>" .. js .. "</script>") or ""
+		local js = read_file(assets_dir .. strip_asset_query(src))
+		if js == "" then
+			-- Said out loud rather than silently deleted. The tag used to be
+			-- replaced with nothing, so a page whose script could not be read
+			-- loaded LOOKING fine and did nothing: every function the host later
+			-- called was undefined, and every push it made was discarded by the
+			-- page's own `if (window.x)` guard. The Linux driver spent five CI
+			-- cycles on exactly that shape of silence.
+			Logger.error(LOG, "Script '%s' could not be read — the page loads without it, "
+				.. "so every function it defines will be undefined.", src)
+			return ""
+		end
+		return "<script>" .. js .. "</script>"
 	end)
 
 	_html_cache[cache_key] = html
