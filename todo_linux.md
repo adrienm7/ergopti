@@ -563,40 +563,31 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       niri et river ne livrent aucune liaison par défaut.
 ### 12.5 — Les étapes
 
-- [ ] **Slot `TOUCHPAD` dans `adapters/evdev_reader.lua`.** Le mécanisme de slots
-      est déjà générique (`state(slot)` crée à la demande), donc c’est une
-      constante plus les appels `open`/`drain`. **Sans grab** : evdev est diffusé,
-      et grabber le pavé prendrait le pointeur au compositeur.
-      → La **sonde de capacité est faite, sans ioctl** :
-        `modules/gestures/touchpad_finder.lua` lit `/proc/bus/input/devices`,
-        validé sur vrai noyau par `tests/hardware/run_touchpad_capability.lua`
-        (8/8, un pavé à 5 slots se relit à 5).
-- [ ] **Retirer `process_frame` au profit de `mt_decoder`.** Il dérive le compte
-      de doigts de `#touches`, ce qui le trompe sur « la grande majorité » des
-      pavés (ceux qui comptent plus de doigts qu’ils n’en localisent). Le décodeur
-      classe déjà entièrement — compte, direction, tap — donc `process_frame` n’est
-      pas à corriger mais à remplacer.
-      → **Attention** : les 508 lignes de tests gestes actuelles l’exercent, et
-        elles passent contre un recogniser que rien n’alimente. Elles partent avec
-        lui, remplacées par des tests du nouveau chemin. Ne pas garder les deux :
-        du code mort est interdit (règle 5.6) et deux chemins divergent.
-- [ ] **Faire que `start_reading()` lise réellement.** C’est aujourd’hui un talon
-      qui journalise, et sa docstring décrit encore la route
-      `libinput debug-events` que le §12.3 **rejette** — la corriger fait partie du
-      travail, pas l’implémenter.
-      → Séquence : `touchpad_finder.find()` → `evdev_reader.open(path, TOUCHPAD)` →
-        pompe → `mt_decoder:feed(ev)` → à chaque geste rendu, exécuter l’action liée
-        au slot `swipe_<n>_<dir>` ou `tap_<n>`.
-- [ ] **Sortir le chemin d’émission de xdotool vers le uinput du démon.** Les 26
-      actions passent par `_run("xdotool key …")`, donc **X11 seulement, et muet
-      sous Wayland sans le dire**. Le démon possède déjà un écrivain uinput et un
-      résolveur de disposition.
-      → `adapters/text_sender.lua` a le même défaut sur `pressKey`, préexistant.
-        Décider si les deux consomment le même résolveur plutôt que de diverger.
-- [ ] **Remonter la capacité matérielle dans le menu.** `slot_is_reachable()` existe
-      et répond déjà, avec le bon sens d’échec (capacité illisible ⇒ tout est
-      offert). Ce qui manque est le câblage : griser les lignes injouables avec une
-      raison traduite, mécanisme que le manifeste utilise déjà.
+- [x] Slot `TOUCHPAD` ajouté, **sans grab** — grabber le pavé prendrait le pointeur
+      au compositeur, et evdev est diffusé, donc lire en parallèle ne coûte rien.
+      Sonde de capacité faite sans ioctl, validée sur vrai noyau (8/8).
+- [ ] **Retirer `process_frame`.** `dispatch_gesture` est en place et reçoit du
+      décodeur un geste déjà classé, avec le compte de doigts du **matériel**.
+      `process_frame` subsiste, dérive encore son compte de `#touches`, et n’est
+      plus alimenté par rien — du code mort avec ses 508 lignes de tests.
+      → Les deux partent ensemble : garder les deux chemins les fait diverger, et
+        du code mort est interdit (règle 5.6).
+- [x] `start_reading()` lit réellement : `touchpad_finder.find()` →
+      `evdev_reader.open(path, TOUCHPAD)` → `mt_decoder` → `dispatch_gesture`,
+      avec `pump()` branché sur le tick du démon.
+      → Il **refuse et le dit** sans pavé, au lieu de prétendre lire. La ligne de
+        menu « lecteur actif » basculait un talon et annonçait le contraire dans
+        21 langues ; elle dit vrai maintenant.
+- [x] Émission par **uinput**. `xdotool` est X11 seulement : sous Wayland la
+      commande réussit, le shell sort zéro, et le geste ne fait rien — aucune
+      erreur à trouver, et ça ressemble exactement à un slot non lié.
+      → Table de 18 noms (ce que le catalogue utilise réellement), **bornée par un
+        test** qui parcourt chaque combo généré : ajouter une action avec un nom
+        absent fait échouer la suite au lieu de produire un geste muet.
+      → Repli xdotool conservé quand le périphérique ne s’ouvre pas.
+- [x] Capacité matérielle remontée au menu : les slots que le matériel ne peut pas
+      servir sont **grisés avec une raison traduite** (21 locales), pas livrés
+      vivants. Capacité illisible ⇒ tout reste offert.
 - [ ] **Tests du nouveau chemin.** `mt_decoder` (19 assertions) et
       `touchpad_finder` (13) sont couverts. Ne le sont pas : la lecture réelle, le
       dispatch geste→action, et l’émission par uinput.
