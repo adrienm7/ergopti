@@ -184,14 +184,16 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		-- Not "it did not throw": that would pass just as well if build returned an
 		-- empty list. What the user must still get is every OTHER submenu, and a
 		-- shortcuts entry that says it is unavailable rather than vanishing.
+		-- Compared against the resolved key, not against a substring of the French
+		-- label: the label became a catalogue entry on 2026-08-05 and a test that
+		-- pinned its spelling would have reported that improvement as a defect.
+		local unavailable = require("infra.i18n").get("menu.shortcuts.unavailable")
 		local top_level, placeholder = 0, false
 		for _, item in ipairs(tree) do
 			if type(item.menu) == "table" then
 				top_level = top_level + 1
 				for _, row in ipairs(item.menu) do
-					if type(row.title) == "string" and row.title:find("shortcuts", 1, true) then
-						placeholder = row.disabled == true
-					end
+					if row.title == unavailable then placeholder = row.disabled == true end
 				end
 			end
 		end
