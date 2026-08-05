@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Pouze Windows: kompenzuje vlastní rozložení (KbdEdit/MSKLC), která přemapují AltGr na jinou virtuální klávesu — což je pojem ovladače klávesnice Windows bez protějšku jinde.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Pouze macOS: MLX je lokální inferenční framework od Apple pro Apple Silicon a verze pro Windows ani Linux neexistuje.",
 	"platform_reason.lists_windows_only_settings": "Pouze Windows: vše, co by tento řádek vypsal, je samo o sobě jen pro Windows, takže na macOS a Linuxu by zobrazil prázdný seznam.",
+	"platform_reason.touchpad_cannot_count_that_many": "Tento touchpad neumí spočítat tolik prstů — jádro hlásí kontakty čtyřmi a pěti prsty jen na hardwaru, který pro ně má sloty.",
 	"platform_reason.preview_bubbles_are_lua_previews": "Ne ve Windows: tyto přepínače řídí bublinu náhledu, kterou si ovladače pro macOS a Linux vykreslují samy. Windows zobrazuje zpětnou vazbu hotstringů jinou bublinovou nápovědou, která odpovídající přepínače nemá.",
 	"platform_reason.no_magic_key_editor_on_linux": "Ne na Linuxu: tento řádek mění magickou klávesu. macOS i Windows k tomu nabízejí dialog; linuxový ovladač klávesu z konfigurace jen čte a z nabídky ji změnit nelze.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ne na Linuxu: tento řádek otevírá soubor osobních zkratek. macOS a Windows takový soubor mají; zkratky linuxového ovladače jsou přepínače a transformace výběru, bez souboru na disku, který by šlo upravit.",

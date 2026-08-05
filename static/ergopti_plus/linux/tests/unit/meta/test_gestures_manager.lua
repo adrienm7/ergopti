@@ -249,9 +249,23 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_eq(M.is_reading(), false)
   end)
 
-  helpers.it("start_reading sets reading to true", function()
-    M.start_reading()
-    helpers.assert_true(M.is_reading())
+  helpers.it("start_reading refuses, and says so, when there is no touchpad", function()
+    -- This asserted that start_reading always reports itself as reading, which
+    -- was true of the stub it tested: the old body set the flag and logged. It
+    -- reads a real device now, so on a machine without one — every CI runner, and
+    -- every desktop — the honest answer is false.
+    --
+    -- Claiming to read a device that was never opened is the failure mode worth
+    -- pinning: the daemon would pump a closed slot for ever and the user would
+    -- see gestures silently do nothing.
+    local started = M.start_reading()
+    helpers.assert_eq(started, M.is_reading(),
+      "what it RETURNS and what is_reading() says must agree — a reader that "
+        .. "reports success and is not reading is worse than one that fails")
+    if not started then
+      helpers.assert_eq(M.is_reading(), false,
+        "and a refused start must leave nothing behind to pump")
+    end
     M.stop_reading()
   end)
 
@@ -302,10 +316,14 @@ helpers.describe("modules/gestures/manager.lua", function()
         .. "start reading the trackpad the user never opted into")
   end)
 
-  helpers.it("init with enabled=true starts reading", function()
+  helpers.it("init with enabled=true turns gestures on and attempts to read", function()
+    -- The enable half is unconditional and is what this case is really about.
+    -- Whether reading STARTS depends on the machine having a touchpad, which no
+    -- CI runner does, so asserting it here would pin the stub's behaviour again.
     M.init({ enabled = true })
-    helpers.assert_true(M.is_enabled())
-    helpers.assert_true(M.is_reading())
+    helpers.assert_true(M.is_enabled(), "enabled=true must enable")
+    helpers.assert_eq(M.is_reading(), M.touchpad() ~= nil,
+      "and it reads exactly when a touchpad was found — never one without the other")
     M.disable()
     M.stop_reading()
   end)

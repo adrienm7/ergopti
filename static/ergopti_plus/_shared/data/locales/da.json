@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Kun Windows: kompenserer for tilpassede layouts (KbdEdit/MSKLC), der ommapper AltGr til en anden virtuel tast — et Windows-tastaturdriverbegreb uden modstykke andre steder.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Kun macOS: MLX er Apples lokale inferensframework til Apple Silicon, og der findes ingen version til Windows eller Linux.",
 	"platform_reason.lists_windows_only_settings": "Kun Windows: alt, hvad denne række ville vise, er selv kun til Windows, så på macOS og Linux viser den en tom liste.",
+	"platform_reason.touchpad_cannot_count_that_many": "Denne touchpad kan ikke tælle så mange fingre — kernen rapporterer kun kontakter med fire og fem fingre på hardware, der har pladserne til det.",
 	"platform_reason.preview_bubbles_are_lua_previews": "Ikke på Windows: disse kontakter styrer den forhåndsvisningsboble, som macOS- og Linux-driverne selv tegner. Windows viser sin hotstring-tilbagemelding gennem et andet værktøjstip, der ikke har tilsvarende kontakter.",
 	"platform_reason.no_magic_key_editor_on_linux": "Ikke på Linux: rækken ændrer magitasten. macOS og Windows viser en dialog til det; Linux-driveren læser blot tasten fra konfigurationen og kan ikke ændre den fra menuen.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: rækken åbner filen med personlige genveje. macOS og Windows har sådan en fil; Linux-driverens genveje er skift og markeringstransformationer, uden nogen fil på disken at redigere.",

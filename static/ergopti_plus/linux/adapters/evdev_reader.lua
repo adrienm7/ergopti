@@ -85,6 +85,15 @@ M.KEYBOARD = "keyboard"
 --- The device it only watches: a pointer, for the click that moves the caret.
 M.POINTER = "pointer"
 
+--- The touchpad, read for gestures and NEVER grabbed.
+---
+--- The grab is right for the keyboard, where every keystroke has to be swallowed
+--- and re-emitted. It would be wrong here: taking the touchpad from the
+--- compositor leaves the user with a dead cursor, and evdev is broadcast, so
+--- reading in parallel costs nothing. libinput never calls EVIOCGRAB for the same
+--- reason — the caller owns the fd.
+M.TOUCHPAD = "touchpad"
+
 
 
 

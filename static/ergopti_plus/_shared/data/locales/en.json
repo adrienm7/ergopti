@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Windows only: it compensates for custom layouts (KbdEdit/MSKLC) that reassign AltGr to another virtual key — a Windows keyboard-driver concept with no counterpart elsewhere.",
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS only: MLX is Apple's on-device inference framework for Apple Silicon, and no build of it exists for Windows or Linux.",
 	"platform_reason.lists_windows_only_settings": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
+	"platform_reason.touchpad_cannot_count_that_many": "This touchpad cannot count that many fingers — the kernel only reports four- and five-finger contacts on hardware that has the slots for them.",
 	"platform_reason.preview_bubbles_are_lua_previews": "Not on Windows: these switches govern the preview bubble that the macOS and Linux drivers draw themselves. Windows shows its hotstring feedback through a different tooltip, which has no equivalent switches.",
 	"platform_reason.no_magic_key_editor_on_linux": "Not on Linux: this row changes the magic key. macOS and Windows each open a dialog for it; the Linux driver only reads the key from configuration and offers no way to change it from the menu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Not on Linux: this row opens the personal shortcuts file. macOS and Windows each have one; the Linux driver's shortcuts are toggles and selection transforms, with nothing on disk to edit.",
