@@ -1334,6 +1334,25 @@ déclarée.
       *(l'ordre des événements est prouvé sur un vrai noyau ; reste la
       confirmation visuelle dans un éditeur)*
 - [ ] Bascule logout-X11 → login-Wayland sans reconfiguration (C2).
+      *(la moitié mécanisable est vérifiée : `run_display_server.lua` tourne sous
+      **Xvfb** puis sous **sway headless**, même binaire, zéro configuration entre
+      les deux, et le cas piège — DISPLAY laissé positionné comme le fait XWayland
+      sur toute session Wayland — est celui qui est testé. Reste que la session
+      redémarre bien l'unité, ce qui exige une vraie ouverture de session)*
 - [ ] Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
 - [ ] Trigger `★` changeable ; délais réglables ; tooltip au bon style.
-- [ ] Install testée par distro-famille (Ubuntu, Fedora, Arch, Alpine, +1 immuable).
+- [x] Install testée par distro-famille (Ubuntu, Fedora, Arch, Alpine, +1 immuable).
+      → **Fait, en conteneurs, à chaque CI** : debian, fedora, arch, alpine,
+      opensuse — chacun son vrai gestionnaire de paquets. La ligne de checklist
+      demandait à quelqu'un de trouver cinq machines, ce qui se fait une fois.
+      → **Trois vrais bugs trouvés du premier coup, tous de la même forme : abandon
+      TARDIF, après avoir déjà modifié le système** — le pire moment pour un
+      installeur, et la raison pour laquelle aucun n'était rattrapable en relançant.
+      - `USER: unbound variable` sous `set -u`. Un shell de login le définit ; ni
+        un conteneur, ni une unité systemd, ni cron, ni `su -c`.
+      - `command -v systemctl` était la mauvaise question : sur Arch le binaire est
+        là et le **bus de session** ne l'est pas. Même symptôme en SSH sans session
+        et depuis un TTY nu.
+      - la règle udev était écrite dans un répertoire jamais créé.
+      → Le conteneur couvre aussi le cas « distribution immuable » du plan : pas de
+      root, pas de systemd, tout sous `$HOME`.
