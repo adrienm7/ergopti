@@ -1232,6 +1232,25 @@ local function main()
 	-- share it); the onFocusChange callback below keeps it current off the
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
+
+	--- Asks AT-SPI whether the focused element is a password field, and tells the
+	--- keylogger.
+	---
+	--- pcall'd end to end: the adapter shells out to a D-Bus query, and a desktop
+	--- with no accessibility bus must cost the FILTER, not the focus callback that
+	--- also updates the app id. A refusal leaves the previous verdict rather than
+	--- clearing it, because "we could not ask" is not "it is safe to record".
+	local function update_secure_field()
+		local ok_mod, Detector = pcall(require, "adapters.secure_field_detector")
+		if not ok_mod or type(Detector.refresh) ~= "function" then return end
+		local ok_refresh = pcall(Detector.refresh)
+		if not ok_refresh then
+			Logger.debug(LOG, "Secure-field probe failed — keeping the previous verdict.")
+			return
+		end
+		keylogger.set_secure_field(Detector.isSecureField())
+	end
+
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
@@ -1239,6 +1258,17 @@ local function main()
 			-- The title was previously received and discarded, which is why the
 			-- driver had no private-browsing filter at all.
 			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
+			-- And the secure-field verdict, likewise. adapters/secure_field_detector
+			-- was written, tested and never called: `refresh()` had no caller
+			-- anywhere in the driver, so `isSecureField()` answered false forever and
+			-- keylogger.set_secure_field was a setter nothing set. The whole
+			-- password-field filter — the reason the metrics manifest ships
+			-- secure_filter_enabled at all — was inert, and it fails in the direction
+			-- that records what it exists to suppress.
+			--
+			-- Here rather than per keystroke, deliberately: the probe spawns an AT-SPI
+			-- query, and the focused element is what it can answer about.
+			update_secure_field()
 			if _cached_app_id then
 				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 			end
@@ -1251,6 +1281,10 @@ local function main()
 		_cached_app_id = foreground and foreground.appId or nil
 		keylogger.set_private_window(
 			keylogger.is_private_window(foreground and foreground.windowTitle))
+		-- Primed here too. Without it the first window of the session — which on a
+		-- login that restores a password manager is exactly the window that matters
+		-- — is recorded until the user switches away from it.
+		update_secure_field()
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
 			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end
