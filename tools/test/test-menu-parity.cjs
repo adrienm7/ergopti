@@ -445,7 +445,12 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // still hand-built. Windows is excluded: its AHK loader exposes one function per
 // key (MenuManifest_LoadDebugMenu and friends) instead of taking the key as an
 // argument, so the same count would mean something different there.
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 4 };
+// linux raised 4 → 5 on 2026-08-05: the shortcuts submenu now dispatches through
+// the renderer. That is what let `extensions_shortcuts` lose its platforms =
+// ["ahk"] restriction — the manifest had refused to promise a row to a menu that
+// could not answer by id, and both Lua drivers had implemented the row for
+// months while the manifest said neither had the concept.
+const RENDERED_THROUGH_SHARED = { hs: 4, linux: 5 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

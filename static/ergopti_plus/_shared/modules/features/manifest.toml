@@ -2905,6 +2905,17 @@ id = "keyboard_slots"
 # groups in with a Menu.Insert sequence that had already duplicated them once
 # per updater refresh; a list entry cannot, because the renderer builds the menu
 # fresh every time.
+#
+# Restricted on 2026-08-05, when the Linux shortcuts menu started dispatching
+# through the shared renderer and this row became the one it could not answer.
+# It was never rendered there — the menu was hand-rolled and read no manifest —
+# so the restriction records a gap that already existed rather than creating one.
+# Linux has no slot-binding surface AT ALL: modules/shortcuts/manager.lua is
+# toggles, selection transforms and wrap pairs, with no chord capture, no
+# assignment store and nothing for a list to enumerate. Widening this again is a
+# feature job, not a projection job.
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.no_keyboard_slot_binding_on_linux"
 
 [[menu.shortcuts_menu]]
 type = "group"
@@ -2960,24 +2971,18 @@ i18n = "menu.global.edit_shortcuts"
 [[menu.shortcuts_menu]]
 type = "dynamic"
 id = "extensions_shortcuts"
-
-# The restriction below is WRONG and is left in place only because correcting it
-# is a manifest-projection job rather than a feature job. Recorded here on
-# 2026-08-05 so the next reader does not take it at face value:
+# One submenu per installed extension that ships shortcuts/menu.lua (menu.ahk on
+# Windows). All three drivers walk the extensions tree, load each file in a
+# sandbox and render what the extension collects.
 #
-#   "Neither Lua driver has that concept" is false for BOTH of them. macOS has
-#   implemented this row since ui/menu/menu_shortcuts.lua:543 was written — it
-#   walks the extensions tree, loads each shortcuts/menu.lua in a sandbox and
-#   renders what the extension collects. Linux gained the same scan on
-#   2026-08-05 (ui/menu/menu_builder.lua, _extension_shortcut_rows).
-#
-# Widening `platforms` here would make the manifest promise a row that Linux's
-# shortcuts menu cannot render BY ID: unlike the hotstrings menu, that menu is
-# hand-rolled and does not dispatch through the shared renderer, so the
-# handler-bijection ratchet would flag it immediately. Converting it is the real
-# task, and it is recorded in todo_linux.md section 11.3.
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+# This carried platforms = ["ahk"] with the reason "neither Lua driver has that
+# concept", which was false for both: macOS has done it since
+# ui/menu/menu_shortcuts.lua:543 was written, and Linux since 2026-08-05
+# (ui/menu/menu_builder.lua, _extension_shortcut_rows). The restriction survived
+# a correction attempt because Linux's shortcuts menu was hand-rolled and could
+# not render any row BY ID, so widening it would have made the manifest promise
+# something the handler-bijection ratchet would flag. That menu now dispatches
+# through the shared renderer, which is what let the restriction go.
 
 [[menu.modifier_combos_group]]
 type = "feature"
