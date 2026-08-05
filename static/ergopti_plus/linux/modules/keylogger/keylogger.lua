@@ -60,6 +60,8 @@ local TextCipher = require("modules.keylogger.text_cipher")
 -- logs is asking for when they tick it.
 local TextMigration = require("modules.keylogger.text_migration")
 local MigrationPlan = require("keylogger.text_migration")
+-- The nine n-gram families, over the shared driver-agnostic accumulators.
+local NgramWalker = require("modules.keylogger.ngram_walker")
 
 local LOG = "modules.keylogger.keylogger"
 
@@ -1086,6 +1088,11 @@ function M.flush()
 		-- 1. Persist buffered physical key events before any aggregate. This is
 		-- the canonical, replayable source shared with the macOS/AHK drivers.
 		local typing_batch = {}
+		-- The nine n-gram families, walked from the SAME buffered stream the raw
+		-- events are built from. Built here rather than accumulated per keystroke
+		-- because a sequence is only knowable in context — a bigram needs the
+		-- character before it, and a long pause has to be able to un-make one.
+		local ngram_batch = nil
 		for app_id, pending in pairs(_pending_typing_events) do
 			if #pending.events > 0 then
 				local total_time_ms = 0
@@ -1096,6 +1103,17 @@ function M.flush()
 					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 					events_json = _to_json(pending.events),
 				}
+				local ok_walk, walked = pcall(NgramWalker.walk,
+					pending.events, date, dashboard_app_name(app_id), ngram_batch)
+				if ok_walk then
+					ngram_batch = walked
+				else
+					-- Loudly, and without taking the raw events down with it: the
+					-- replayable stream is the source of truth and the aggregates are
+					-- derived from it, so losing the derivation must never lose the source.
+					Logger.error(LOG, "N-gram walk failed for '%s' — aggregates skipped: %s.",
+						tostring(app_id), tostring(walked))
+				end
 			end
 		end
 		if #typing_batch > 0 then
@@ -1109,6 +1127,12 @@ function M.flush()
 		if #_pending_shortcut_events > 0 then
 			if not SqliteWriter.insert_shortcut_events(_device_id, _pending_shortcut_events) then return end
 			_pending_shortcut_events = {}
+		end
+		if ngram_batch then
+			for _, group in ipairs(NgramWalker.batches_for_writer(ngram_batch)) do
+				SqliteWriter.upsert_ngrams(_device_id, group.date, group.app,
+					group.ngrams, group.table_name)
+			end
 		end
 		if #_pending_app_switch_events > 0 then
 			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end

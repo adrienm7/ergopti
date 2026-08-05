@@ -511,14 +511,39 @@ function M.upsert_app_day(device_id, date, app, fields)
 	return _exec(sql)
 end
 
---- Inserts or upserts n-gram counts into the ngram_chars table.
+-- Every n-gram family the shared schema declares, and the only names this
+-- writer will target. A whitelist rather than a formatted parameter: the table
+-- name cannot be escaped as a value, so an unchecked caller is an injection —
+-- and the nine names are known at authoring time.
+local NGRAM_TABLES = {
+	ngram_chars = true, ngram_bigrams = true, ngram_trigrams = true,
+	ngram_quadgrams = true, ngram_pentagrams = true, ngram_hexagrams = true,
+	ngram_heptagrams = true, ngram_words = true, ngram_word_bigrams = true,
+}
+
+M.NGRAM_TABLES = NGRAM_TABLES
+
+--- Inserts or upserts n-gram counts into one of the shared n-gram tables.
+---
+--- Took no table name until 2026-08-06 and always wrote ngram_chars, so this
+--- driver produced single characters and nothing else. Eight of the nine
+--- families the dashboard reads were empty by construction: the same-finger
+--- bigram analysis, the word lists, the error analysis and the heatmap's
+--- first/last counts all had nothing to read on Linux and rendered blank.
 --- @param device_id string Device identifier.
 --- @param date      string "YYYY-MM-DD".
 --- @param app       string Application name.
 --- @param ngrams    table  { [token] = count|{c=count,sources={source=count}} } map.
-function M.upsert_ngrams(device_id, date, app, ngrams)
+--- @param table_name string|nil One of NGRAM_TABLES; defaults to ngram_chars.
+function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 	if not M.is_available() then return end
 	if type(ngrams) ~= "table" then return end
+	local target = table_name or "ngram_chars"
+	if not NGRAM_TABLES[target] then
+		Logger.error(LOG, "upsert_ngrams(): '%s' is not an n-gram table — nothing written.",
+			tostring(target))
+		return
+	end
 
 	local parts = {}
 	for token, value in pairs(ngrams) do
@@ -547,7 +572,7 @@ function M.upsert_ngrams(device_id, date, app, ngrams)
 	if #parts == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO ngram_chars (device_id, date, app, token, c, td, cd, e, esrc_json) "
+		"INSERT INTO " .. target .. " (device_id, date, app, token, c, td, cd, e, esrc_json) "
 		.. "VALUES %s "
 		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
 		.. "c = c + excluded.c, "
