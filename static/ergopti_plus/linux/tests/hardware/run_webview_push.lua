@@ -187,48 +187,51 @@ local function exercise(app_name, bridge, entry, probe)
 	check(loaded, app_name .. ": the page finished loading")
 	if not loaded then return end
 
-	-- The half no unit test can reach: the page must DEFINE what the host calls.
-	-- The host guards with `if(window.setData)`, so a page that does not define it
-	-- turns every push into a silent no-op — which is exactly the failure mode
-	-- that hid the returned-payload bug for as long as it did.
-	local defined = eval_sync(webview, "typeof window." .. entry)
-	check(defined == "function", string.format(
-		"%s: the page defines window.%s (got %s)", app_name, entry, tostring(defined)))
-
-	if defined ~= "function" then
-		-- Say WHY, rather than leaving the reader to guess from one word. The
-		-- three things that can be wrong here are: the script tag was dropped
-		-- during inlining (an asset the host could not read), the script was
-		-- inlined but failed to parse, or it parsed and threw before the
-		-- declaration. Each leaves a different fingerprint, and the whole point
-		-- of running against a real page is to be able to read it.
-		print(string.format("       inline scripts in the DOM : %s",
-			tostring(eval_sync(webview, "String(document.scripts.length)"))))
-		print(string.format("       bytes of inlined script   : %s",
-			tostring(eval_sync(webview,
-				"String(Array.from(document.scripts).reduce((n,s)=>n+s.textContent.length,0))"))))
-		print(string.format("       makeHostBridge defined    : %s",
-			tostring(eval_sync(webview, "typeof makeHostBridge"))))
-		print(string.format("       first script error        : %s",
-			tostring(eval_sync(webview, "String(window.__harness_error || 'none')"))))
-	end
-
 	-- A spy on the page's own entry point, installed BEFORE the push. It answers
-	-- the question this harness exists for — did the payload ARRIVE — separately
-	-- from whether the daemon had anything to put in it. Those are two different
-	-- questions, and asserting the DOM changed conflates them: a correct push
-	-- carrying an empty catalogue renders nothing and looks identical to no push
-	-- at all.
+	-- BOTH halves at one instant, which is why it replaced a separate `typeof`
+	-- probe: that probe ran a moment earlier and disagreed with the spy in the
+	-- same run — reporting the entry point undefined while the push it supposedly
+	-- could not make plainly arrived. Two measurements of one fact, taken at
+	-- different times, is how an instrument comes to contradict itself.
+	--
+	-- `__had_entry` is read at the instant the spy wraps it. That is the half no
+	-- unit test can reach: the host guards with `if(window.setData)`, so a page
+	-- that does not define it turns every push into a silent no-op — exactly the
+	-- failure that hid the returned-payload bug, and then the missing-script bug
+	-- behind it.
 	eval_sync(webview, string.format([[
 		window.__arrived = null;
 		(function () {
 			var original = window.%s;
+			window.__had_entry = (typeof original === 'function');
+			window.__scripts = document.scripts.length;
+			window.__script_bytes = Array.from(document.scripts)
+				.reduce(function (n, s) { return n + s.textContent.length; }, 0);
 			window.%s = function (payload) {
 				window.__arrived = JSON.stringify(payload || {}).length;
-				return original.apply(this, arguments);
+				return typeof original === 'function' ? original.apply(this, arguments) : undefined;
 			};
 		})();
 	]], entry, entry))
+
+	local had_entry = eval_sync(webview, "String(window.__had_entry)")
+	check(had_entry == "true", string.format(
+		"%s: the page defines window.%s (got %s)", app_name, entry, tostring(had_entry)))
+
+	if had_entry ~= "true" then
+		-- Say WHY rather than leaving the reader to guess from one word. Three
+		-- things can be wrong: the script tag was dropped during inlining (an
+		-- asset the host could not read), it was inlined but failed to parse, or
+		-- it parsed and threw before the assignment. Each leaves its own
+		-- fingerprint, and being able to read them is the point of running
+		-- against a real page.
+		print(string.format("       inline scripts in the DOM : %s",
+			tostring(eval_sync(webview, "String(window.__scripts)"))))
+		print(string.format("       bytes of inlined script   : %s",
+			tostring(eval_sync(webview, "String(window.__script_bytes)"))))
+		print(string.format("       makeHostBridge defined    : %s",
+			tostring(eval_sync(webview, "typeof makeHostBridge"))))
+	end
 
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
