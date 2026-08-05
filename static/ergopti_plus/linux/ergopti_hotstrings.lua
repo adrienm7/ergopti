@@ -118,6 +118,7 @@ local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
 local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
+local Timings           = require("infra.timings")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -195,6 +196,15 @@ if ok_fw then file_watchers = fw_mod end
 -- =========================================
 
 -- Default hotstring data location (XDG-compliant user config).
+-- How many periodic ticks between metric flushes. The periodic callback runs
+-- four times a second (periodSec = 0.25 below), and the cross-driver ingest
+-- cadence is _shared/modules/timings/constants.toml [keylogger] ingest_tick_ms —
+-- what Windows uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Derived
+-- rather than written as a literal so a change to the canon moves all three.
+local PERIODIC_TICK_MS   = 250
+local FLUSH_EVERY_TICKS  = math.max(1,
+	math.floor(Timings.ms("keylogger", "ingest_tick_ms") / PERIODIC_TICK_MS))
+
 local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
 -- How many candidates the preview asks the engine for. The panel itself caps the
@@ -1314,6 +1324,21 @@ local function main()
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
 		pcall(keylogger.pump_migration)
+
+		-- Persist. Until now the ONLY two flush() call sites were the SIGTERM
+		-- handler and the clean exit after the loop returns — so a SIGKILL, an OOM
+		-- kill, a power loss or an X crash discarded the entire session's metrics,
+		-- and a session spanning midnight was stamped end to end with the shutdown
+		-- date because both the date and the timestamp are computed at flush time.
+		--
+		-- The cadence is the cross-driver one: _shared/modules/timings/constants
+		-- .toml [keylogger] ingest_tick_ms, which Windows already uses as its
+		-- INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Counted in ticks rather than
+		-- measured against a clock, because the periodic callback's own period is
+		-- the only interval this loop can be sure of.
+		if tick_count % FLUSH_EVERY_TICKS == 0 then
+			pcall(keylogger.flush)
+		end
 	end
 
 	event_loop.run({
