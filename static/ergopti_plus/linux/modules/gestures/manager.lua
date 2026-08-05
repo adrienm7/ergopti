@@ -461,7 +461,9 @@ local _action_params = {}   -- binding__action -> configured value
 local _config_path   = nil
 local _persist       = false
 local _actions       = {}   -- slot → action_name
-local _reading       = false -- touch event subprocess active
+local _reading       = false -- the touchpad's evdev node is open and being drained
+local _decoder       = nil   -- the multitouch frame decoder for that device
+local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 
 -- Initialize actions with defaults.
 for k, v in pairs(M.DEFAULT_GESTURES) do
@@ -714,26 +716,134 @@ local function _reset_gesture()
 	}
 end
 
---- Starts reading touch events from libinput.
---- Spawns `libinput debug-events --device <touchpad>` subprocess and parses
---- touch frames (same pattern as keyboard_hook). Touch events are:
----   event3  TOUCH_DOWN  +0.00s    0 (0) 45.00/67.00
----   event3  TOUCH_FRAME +0.02s
----   event3  TOUCH_UP    +0.50s    0
----   event3  TOUCH_FRAME +0.50s
---- The subprocess pipe is read in a pump loop (mirroring keyboard_hook.pump())
---- and each complete TOUCH_FRAME batch is passed to process_frame().
-function M.start_reading()
-	if _reading then return end
-	_reading = true
-	Logger.info(LOG, "Touch event reader started (libinput subprocess deferred — implement same pattern as keyboard_hook).")
+--- The slot name a completed gesture belongs to.
+--- @param fingers integer
+--- @param direction string|nil
+--- @param tap boolean
+--- @return string|nil
+local function _slot_for_gesture(fingers, direction, tap)
+	if type(fingers) ~= "number" or fingers < 1 then return nil end
+	if tap then return "tap_" .. math.min(fingers, 5) end
+	if type(direction) ~= "string" or direction == "" then return nil end
+	return string.format("swipe_%d_%s", math.min(fingers, 5), direction)
 end
 
---- Stops the touch event subprocess.
+--- Runs the action bound to a gesture the decoder has already classified.
+---
+--- Separate from process_frame, which does its own classification from a list of
+--- touch points. This takes the finished answer — how many fingers, which way —
+--- because the decoder reads the count the KERNEL reports rather than inferring
+--- it from how many contacts it could locate. libinput describes devices that
+--- count more fingers than they can position as "the vast majority of
+--- touchpads", so inferring it is wrong on most hardware.
+--- @param gesture table { fingers, direction, tap }
+--- @return boolean True when an action ran.
+function M.dispatch_gesture(gesture)
+	if not _enabled or type(gesture) ~= "table" then return false end
+
+	local slot = _slot_for_gesture(gesture.fingers, gesture.direction, gesture.tap)
+	if not slot then
+		Logger.debug(LOG, "Gesture with no slot: fingers=%s direction=%s tap=%s",
+			tostring(gesture.fingers), tostring(gesture.direction), tostring(gesture.tap))
+		return false
+	end
+
+	local action = _actions[slot]
+	if not action or action == "none" then
+		-- Not a warning. Linux ships no default bindings, so an unbound slot is
+		-- the normal state until the user chooses — saying so at INFO would make
+		-- every stray touch a log line.
+		Logger.debug(LOG, "No action bound to %s.", slot)
+		return false
+	end
+
+	Logger.info(LOG, "GESTURE FIRE: slot=%s action=%s", slot, action)
+	_execute_action(action, nil, slot)
+	return true
+end
+
+--- Starts reading the touchpad.
+---
+--- Reads the device's evdev node directly, WITHOUT a grab, and decodes the
+--- multitouch protocol in process. The docstring here used to describe scraping
+--- `libinput debug-events`; that route is rejected in todo_linux.md §12.3 for
+--- two independent reasons — this driver removed exactly that pattern from the
+--- keyboard path for four documented defects, and libinput gates its whole
+--- gesture state machine on `finger_count <= 4`, so five-finger swipes and
+--- multi-finger taps never leave it at all.
+--- @return boolean True when a touchpad was found and opened.
+function M.start_reading()
+	if _reading then return true end
+
+	local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
+	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	local ok_decoder, Decoder = pcall(require, "modules.gestures.mt_decoder")
+	if not (ok_finder and ok_reader and ok_decoder) then
+		Logger.error(LOG, "Gesture reading needs touchpad_finder, evdev_reader and mt_decoder — one is missing.")
+		return false
+	end
+
+	local touchpad, reason = Finder.find()
+	if not touchpad then
+		-- Not an error: a desktop machine has no touchpad, and gestures are simply
+		-- unavailable there. Said once, at INFO, so a user who expected them can
+		-- tell this apart from a silent failure.
+		Logger.info(LOG, "No touchpad found (%s) — gestures are unavailable on this machine.",
+			tostring(reason))
+		return false
+	end
+
+	if not Reader.open(touchpad.path, Reader.TOUCHPAD) then
+		Logger.error(LOG, "Could not open %s for reading — check membership of the 'input' group.",
+			touchpad.path)
+		return false
+	end
+
+	_decoder = Decoder.new()
+	_touchpad = touchpad
+	_reading = true
+	Logger.success(LOG, "Reading %s (%s), up to %d finger(s)%s.",
+		touchpad.path, touchpad.name, touchpad.max_fingers,
+		touchpad.semi_mt and ", semi-MT" or "")
+	return true
+end
+
+--- Drains whatever the touchpad has produced since the last call.
+---
+--- Called from the daemon's pump, like the keyboard's. Returns the number of
+--- events consumed so a caller can tell a quiet tick from a stalled reader.
+--- @return integer
+function M.pump()
+	if not _reading or not _decoder then return 0 end
+
+	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	if not ok_reader then return 0 end
+
+	return Reader.drain(function(event)
+		local gesture = _decoder:feed(event)
+		if gesture then M.dispatch_gesture(gesture) end
+	end, Reader.TOUCHPAD)
+end
+
+--- Stops reading the touchpad.
 function M.stop_reading()
+	if _reading then
+		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+		if ok_reader and type(Reader.close) == "function" then
+			pcall(Reader.close, Reader.TOUCHPAD)
+		end
+	end
 	_reading = false
+	_decoder = nil
+	_touchpad = nil
 	_reset_gesture()
-	Logger.info(LOG, "Touch event reader stopped.")
+	Logger.info(LOG, "Touchpad reader stopped.")
+end
+
+--- The touchpad being read, or nil.
+--- @return table|nil
+function M.touchpad()
+	return _touchpad
 end
 
 --- Returns true if the touch reader is active.

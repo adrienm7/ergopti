@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "केवल Windows: यह कस्टम लेआउट (KbdEdit/MSKLC) की भरपाई करता है जो AltGr को किसी अन्य वर्चुअल कुंजी पर पुनः असाइन करते हैं — यह Windows कीबोर्ड ड्राइवर की अवधारणा है, जिसका कहीं और समकक्ष नहीं है।",
 	"platform_reason.llm_mlx_is_apple_silicon": "केवल macOS: MLX, Apple Silicon के लिए Apple का ऑन-डिवाइस इन्फ़रेंस फ़्रेमवर्क है, और Windows या Linux के लिए इसका कोई संस्करण मौजूद नहीं है।",
 	"platform_reason.lists_windows_only_settings": "केवल Windows: यह पंक्ति जो कुछ भी सूचीबद्ध करती, वह स्वयं केवल Windows के लिए है, इसलिए macOS और Linux पर यह खाली सूची दिखाती है।",
+	"platform_reason.touchpad_cannot_count_that_many": "यह टचपैड इतनी उंगलियाँ नहीं गिन सकता — कर्नेल चार और पाँच उंगलियों के संपर्क केवल उस हार्डवेयर पर बताता है जिसमें उसके लिए स्लॉट हों।",
 	"platform_reason.preview_bubbles_are_lua_previews": "Windows पर नहीं: ये स्विच उस पूर्वावलोकन बुलबुले को नियंत्रित करते हैं जिसे macOS और Linux ड्राइवर स्वयं बनाते हैं। Windows अपनी हॉटस्ट्रिंग प्रतिक्रिया एक अलग टूलटिप के माध्यम से दिखाता है, जिसमें समकक्ष स्विच नहीं हैं।",
 	"platform_reason.no_magic_key_editor_on_linux": "Linux पर नहीं: यह पंक्ति मैजिक-की बदलती है। macOS और Windows इसके लिए एक संवाद खोलते हैं; Linux ड्राइवर कुंजी केवल कॉन्फ़िगरेशन से पढ़ता है और मेन्यू से बदलने का कोई तरीका नहीं देता।",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux पर नहीं: यह पंक्ति व्यक्तिगत शॉर्टकट फ़ाइल खोलती है। macOS और Windows दोनों के पास ऐसी फ़ाइल है; Linux ड्राइवर के शॉर्टकट टॉगल और चयन-रूपांतरण हैं, संपादित करने योग्य कोई फ़ाइल नहीं।",

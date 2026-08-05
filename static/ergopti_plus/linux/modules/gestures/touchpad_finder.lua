@@ -60,25 +60,33 @@ local DEVICES_PATH = "/proc/bus/input/devices"
 -- being wrong about it is safe.
 local BITS_PER_WORD = 64
 
+-- The kernel codes, read from the decoder rather than repeated here.
+--
+-- They were written out in both files, and nothing held the two lists equal — so
+-- a corrected code in one would have left the other reading the wrong bit, and
+-- the symptom would be a capability answer that is merely wrong rather than
+-- absent. One source (rule 5.2); the decoder owns them because it is the module
+-- that has to know the whole protocol.
+local Decoder = require("modules.gestures.mt_decoder")
+
 -- The multitouch slot axis. A device without it cannot report per-finger
 -- positions and is not a touchpad for our purposes, whatever it is called.
-local ABS_MT_SLOT = 0x2f
+local ABS_MT_SLOT = Decoder.ABS_MT_SLOT
 
 -- Device properties, from include/uapi/linux/input-event-codes.h.
 local INPUT_PROP_POINTER   = 0x00
 local INPUT_PROP_BUTTONPAD = 0x02
 local INPUT_PROP_SEMI_MT   = 0x03
 
--- The finger-count bits, in ascending order of fingers. QUINTTAP is out of
--- sequence in the kernel's own numbering — it was retrofitted into a free code —
--- so this list is written out rather than computed.
-local FINGER_BITS = {
-	{ fingers = 1, bit = 0x145 }, -- BTN_TOOL_FINGER
-	{ fingers = 2, bit = 0x14d }, -- BTN_TOOL_DOUBLETAP
-	{ fingers = 3, bit = 0x14e }, -- BTN_TOOL_TRIPLETAP
-	{ fingers = 4, bit = 0x14f }, -- BTN_TOOL_QUADTAP
-	{ fingers = 5, bit = 0x148 }, -- BTN_TOOL_QUINTTAP
-}
+-- The finger-count bits, derived from the decoder's own map so the two cannot
+-- disagree about which code means how many fingers. Sorted by finger count
+-- because the kernel's numbering is not: QUINTTAP was retrofitted into a free
+-- code and sits below QUADTAP.
+local FINGER_BITS = {}
+for code, fingers in pairs(Decoder.FINGER_COUNT_CODES) do
+	FINGER_BITS[#FINGER_BITS + 1] = { fingers = fingers, bit = code }
+end
+table.sort(FINGER_BITS, function(a, b) return a.fingers < b.fingers end)
 
 M.ABS_MT_SLOT = ABS_MT_SLOT
 M.FINGER_BITS = FINGER_BITS

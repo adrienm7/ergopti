@@ -1686,7 +1686,38 @@ local function _build_gestures(ctx)
 		local slots = {}
 		for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
 		table.sort(slots)
+
+		-- What this machine's touchpad can physically express. The kernel only
+		-- advertises BTN_TOOL_QUADTAP at four slots and QUINTTAP at five, so a pad
+		-- that stops at three — which the Precision Touchpad spec permits — can
+		-- never fire twenty of these rows. Offering them anyway is the dead-line
+		-- delivery the manifest's reason mechanism exists to avoid.
+		--
+		-- nil when no touchpad was found or its capability could not be read, and
+		-- slot_is_reachable answers TRUE for everything in that case: a probe that
+		-- could not read the hardware must never take a working gesture away.
+		local touchpad = type(ge.touchpad) == "function" and ge.touchpad() or nil
+		local max_fingers = touchpad and touchpad.max_fingers or nil
+		local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
+
 		for _, slot in ipairs(slots) do
+			local reachable = true
+			if ok_finder and type(Finder.slot_is_reachable) == "function" then
+				reachable = Finder.slot_is_reachable(slot, max_fingers)
+			end
+			if not reachable then
+				-- Greyed with its reason rather than hidden: a row that vanishes
+				-- reads as a bug, and the user cannot tell "this hardware cannot"
+				-- from "this driver forgot".
+				out[#out + 1] = {
+					title    = gesture_slot_label(slot) .. " — "
+						.. i18n_safe("platform_reason.touchpad_cannot_count_that_many"),
+					disabled = true,
+					fn       = function() end,
+				}
+				goto continue
+			end
+
 			local action = ge.get_action(slot) or "none"
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
@@ -1702,6 +1733,7 @@ local function _build_gestures(ctx)
 				title = gesture_slot_label(slot) .. " → " .. label,
 				menu = choices,
 			}
+			::continue::
 		end
 	end
 

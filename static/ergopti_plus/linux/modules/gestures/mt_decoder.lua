@@ -168,9 +168,14 @@ function M.new(opts)
 		if ax >= ay * M.DIAGONAL_RATIO then return dx > 0 and "right" or "left" end
 		if ay >= ax * M.DIAGONAL_RATIO then return dy > 0 and "down" or "up" end
 
-		local vertical = dy > 0 and "down" or "up"
+		-- HORIZONTAL first: the declared slots are spelled `swipe_3_left_up`,
+		-- `swipe_3_right_down` and so on (_shared/modules/actions/actions.toml).
+		-- Emitting "up_right" instead produced a name no slot carries, so every
+		-- diagonal silently bound to nothing — which is the quiet half of getting
+		-- this wrong. The loud half would be binding to the WRONG slot.
 		local horizontal = dx > 0 and "right" or "left"
-		return vertical .. "_" .. horizontal
+		local vertical = dy > 0 and "down" or "up"
+		return horizontal .. "_" .. vertical
 	end
 
 	--- Feeds one decoded event.

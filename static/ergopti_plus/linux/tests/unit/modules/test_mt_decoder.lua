@@ -173,11 +173,27 @@ helpers.describe("mt decoder: which way", function()
 		helpers.assert_eq(feed_all(Decoder.new(), gesture_events(4, 400, 0)).direction, "right")
 	end)
 
-	helpers.it("names a diagonal rather than rejecting it", function()
+	helpers.it("names a diagonal the way the slot space spells it", function()
 		local out = feed_all(Decoder.new(), gesture_events(3, 400, -400))
-		helpers.assert_eq(out.direction, "up_right",
-			"this project's slot space has explicit diagonals, so a diagonal is an "
-				.. "answer and not a failure to classify")
+		helpers.assert_eq(out.direction, "right_up",
+			"HORIZONTAL first: the declared slots are swipe_3_left_up, "
+				.. "swipe_3_right_down and so on. This said \"up_right\" until the "
+				.. "dispatch test caught it — a name no slot carries, so every diagonal "
+				.. "bound to nothing")
+	end)
+
+	helpers.it("names all four diagonals", function()
+		local cases = {
+			{ dx = 400,  dy = -400, want = "right_up" },
+			{ dx = -400, dy = -400, want = "left_up" },
+			{ dx = 400,  dy = 400,  want = "right_down" },
+			{ dx = -400, dy = 400,  want = "left_down" },
+		}
+		for _, case in ipairs(cases) do
+			local out = feed_all(Decoder.new(), gesture_events(3, case.dx, case.dy))
+			helpers.assert_eq(out.direction, case.want,
+				string.format("dx=%d dy=%d must be %s", case.dx, case.dy, case.want))
+		end
 	end)
 
 end)

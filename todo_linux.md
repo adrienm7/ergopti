@@ -563,33 +563,60 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       niri et river ne livrent aucune liaison par défaut.
 ### 12.5 — Les étapes
 
-- [ ] Constantes EV_ABS / multitouch dans `infra/input_event.lua`.
-- [ ] Slot `TOUCHPAD` + sonde de capacité par ioctl dans `adapters/evdev_reader.lua`.
-- [ ] Corriger `process_frame` : le compte de doigts vient du matériel, pas de
-      `#touches`.
-- [ ] Faire que `start_reading()` lise réellement.
-- [ ] Sortir le chemin d'émission de xdotool vers le uinput que le démon possède
-      déjà — l'actuel est **100 % xdotool, donc X11 seulement, et échoue en silence
-      sous Wayland**.
-- [ ] Remonter la capacité matérielle dans le menu au lieu de livrer des lignes
-      mortes.
-- [ ] Tests encodant les causes racines. **Les 508 lignes de tests gestes actuelles
-      passent contre un recogniser que rien n'alimente** — vert n'y est pas une
-      preuve.
-
+- [ ] **Slot `TOUCHPAD` dans `adapters/evdev_reader.lua`.** Le mécanisme de slots
+      est déjà générique (`state(slot)` crée à la demande), donc c’est une
+      constante plus les appels `open`/`drain`. **Sans grab** : evdev est diffusé,
+      et grabber le pavé prendrait le pointeur au compositeur.
+      → La **sonde de capacité est faite, sans ioctl** :
+        `modules/gestures/touchpad_finder.lua` lit `/proc/bus/input/devices`,
+        validé sur vrai noyau par `tests/hardware/run_touchpad_capability.lua`
+        (8/8, un pavé à 5 slots se relit à 5).
+- [ ] **Retirer `process_frame` au profit de `mt_decoder`.** Il dérive le compte
+      de doigts de `#touches`, ce qui le trompe sur « la grande majorité » des
+      pavés (ceux qui comptent plus de doigts qu’ils n’en localisent). Le décodeur
+      classe déjà entièrement — compte, direction, tap — donc `process_frame` n’est
+      pas à corriger mais à remplacer.
+      → **Attention** : les 508 lignes de tests gestes actuelles l’exercent, et
+        elles passent contre un recogniser que rien n’alimente. Elles partent avec
+        lui, remplacées par des tests du nouveau chemin. Ne pas garder les deux :
+        du code mort est interdit (règle 5.6) et deux chemins divergent.
+- [ ] **Faire que `start_reading()` lise réellement.** C’est aujourd’hui un talon
+      qui journalise, et sa docstring décrit encore la route
+      `libinput debug-events` que le §12.3 **rejette** — la corriger fait partie du
+      travail, pas l’implémenter.
+      → Séquence : `touchpad_finder.find()` → `evdev_reader.open(path, TOUCHPAD)` →
+        pompe → `mt_decoder:feed(ev)` → à chaque geste rendu, exécuter l’action liée
+        au slot `swipe_<n>_<dir>` ou `tap_<n>`.
+- [ ] **Sortir le chemin d’émission de xdotool vers le uinput du démon.** Les 26
+      actions passent par `_run("xdotool key …")`, donc **X11 seulement, et muet
+      sous Wayland sans le dire**. Le démon possède déjà un écrivain uinput et un
+      résolveur de disposition.
+      → `adapters/text_sender.lua` a le même défaut sur `pressKey`, préexistant.
+        Décider si les deux consomment le même résolveur plutôt que de diverger.
+- [ ] **Remonter la capacité matérielle dans le menu.** `slot_is_reachable()` existe
+      et répond déjà, avec le bon sens d’échec (capacité illisible ⇒ tout est
+      offert). Ce qui manque est le câblage : griser les lignes injouables avec une
+      raison traduite, mécanisme que le manifeste utilise déjà.
+- [ ] **Tests du nouveau chemin.** `mt_decoder` (19 assertions) et
+      `touchpad_finder` (13) sont couverts. Ne le sont pas : la lecture réelle, le
+      dispatch geste→action, et l’émission par uinput.
+      → **Les 508 lignes actuelles passent contre un recogniser que rien
+        n’alimente.** Vert n’y est pas une preuve, et elles partent avec
+        `process_frame`.
 ### 12.6 — Risques identifiés avant d'écrire une ligne
 
-- [ ] **Les numéros d'ioctl sont dérivés, pas testés.** `EVIOCGBIT(EV_KEY,96)`,
-      `EVIOCGPROP(4)`, `EVIOCGABS(ABS_MT_SLOT)` calculés depuis l'encodage `_IOC`
-      standard. Un mauvais numéro **n'échoue pas bruyamment** : l'ioctl renvoie des
-      bits de capacité arbitraires et le menu grise les mauvaises lignes.
-- [ ] **La trace d'événements est une reconstruction, pas une capture.**
-      L'entrelacement exact de `BTN_TOOL_*` dans une trame dépend du pilote.
-      Capturer le vrai pavé avec `evtest` ou `libinput record` avant d'écrire les
-      fixtures.
-- [ ] **Le volume tactile est d'une autre classe** : une trame toutes les ~8 ms
-      contre quelques événements par seconde en frappe. `MAX_EVENTS_PER_DRAIN = 256`
-      a été dimensionné pour l'autorépétition.
+- [ ] **La trace d’événements du décodeur est une reconstruction, pas une capture.**
+      Les fixtures de `test_mt_decoder.lua` sont dérivées du protocole documenté,
+      pas d’un vrai pilote. `run_touchpad_capability.lua` a validé le format des
+      **bitmaps** publiés par le noyau, ce qui est une autre question que
+      l’entrelacement des événements dans une trame.
+      → Capturer un vrai pavé (`evtest` ou `libinput record`) et rebâtir les
+        fixtures dessus. Demande votre machine.
+- [ ] **Vérifier `MAX_EVENTS_PER_DRAIN = 256` sous charge tactile.** Dimensionné
+      pour l’autorépétition clavier. Une trame toutes les ~8 ms à plusieurs
+      `EV_ABS` chacune reste sous la borne en régime normal ; le doute porte sur le
+      mouvement multi-doigts soutenu, où atteindre la borne à chaque tick ferait
+      traîner le geste derrière le doigt.
 - [ ] **`SYN_DROPPED` ne se produit que sous charge**, donc jamais en test. Si
       l'état des slots n'est pas remis à zéro, un swipe 3 doigts déclenche par
       intermittence l'action 5 doigts.
