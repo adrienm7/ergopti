@@ -142,7 +142,14 @@ helpers.describe("keylogger", function()
   helpers.describe("password detection", function()
     helpers.it("detects known password apps", function()
       keylogger.init({})
-      helpers.assert_true(keylogger.is_password_app("1password"))
+      -- Temporary diagnostic: this fails on the Linux runner and passes on the
+      -- development machine, and two plausible explanations have already been
+      -- disproved. The message carries the state so the next CI run says which.
+      local st = keylogger.get_privacy_state and keylogger.get_privacy_state() or {}
+      helpers.assert_true(keylogger.is_password_app("1password"),
+        string.format("DIAG secure_filter=%s sysauth_filter=%s enabled=%s",
+          tostring(st.secure_filter_enabled), tostring(st.system_auth_filter_enabled),
+          tostring(st.enabled)))
       helpers.assert_true(keylogger.is_password_app("Bitwarden"))
       helpers.assert_true(keylogger.is_password_app("org.keepass.KeePass"))
     end)
