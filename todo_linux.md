@@ -1712,8 +1712,22 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 
 - [ ] Constantes EV_ABS / multitouch dans `infra/input_event.lua`.
 - [ ] Slot `TOUCHPAD` + sonde de capacité par ioctl dans `adapters/evdev_reader.lua`.
-- [ ] `modules/gestures/touchpad_finder.lua` — sélecteur dédié, avec confirmation
-      par ioctl (le sélecteur de pointeur ne convient pas, cf. 12.3).
+- [x] `modules/gestures/touchpad_finder.lua` — sélecteur dédié, **sans ioctl**.
+      → Le sélecteur de pointeur existant renvoie le premier périphérique dont le
+        nom contient mouse/touchpad/trackpoint : une souris USB branchée gagne.
+        Et son parseur ne lit ni `B: ABS=` ni `B: PROP=`, donc il ne peut pas
+        confirmer la présence de slots multitouch.
+      → **Les ioctl sont évités** : le noyau publie les mêmes bits dans
+        `/proc/bus/input/devices`, en texte, parsable et épinglable par fixture.
+        Un numéro d'ioctl faux n'échoue pas bruyamment — il renvoie des bits
+        arbitraires. Ce risque (§12.6) disparaît.
+      → Le compte de doigts est connu **avant** qu'un doigt ne touche :
+        `input_mt_init_slots()` n'annonce QUADTAP qu'à 4 slots et QUINTTAP qu'à 5.
+      → **Sens de l'échec choisi** : une capacité illisible offre TOUS les gestes,
+        jamais aucun. Un parse faux peut manquer une explication, pas retirer une
+        fonctionnalité. C'est ce qui rend acceptable l'hypothèse de mots 64 bits.
+      → 13 assertions. Une a attrapé une erreur de ma fixture : `PROP=5` est
+        POINTER+BUTTONPAD, pas SEMI_MT (bit 3).
 - [x] `modules/gestures/mt_decoder.lua` — décodeur de trames, fonction pure sans FFI,
       **latchant le compte de doigts au pic** entre `BTN_TOUCH 1` et `BTN_TOUCH 0`.
       → 19 assertions, dont les quatre cas qu’aucune route libinput ne peut servir :
