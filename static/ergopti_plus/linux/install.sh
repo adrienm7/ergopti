@@ -202,9 +202,17 @@ _setup_permissions() {
 	sudo groupadd -f uinput 2>/dev/null || true
 	sudo groupadd -f input  2>/dev/null || true
 
-	sudo usermod -aG input  "${USER}"
-	sudo usermod -aG uinput "${USER}"
-	echo "  ✔  ${USER} ajouté aux groupes input et uinput"
+	# `id -un` rather than $USER. This script runs under `set -u`, and $USER is set
+	# by a login shell — not by a container, a systemd unit, a cron job or
+	# `su -c`. Fedora and Arch containers proved it: the installer aborted here
+	# with "USER: unbound variable" after having already copied every file, so the
+	# user was left with a half-installed driver and a shell error. `id -un` asks
+	# the kernel, which always answers.
+	local target_user
+	target_user="$(id -un)"
+	sudo usermod -aG input  "${target_user}"
+	sudo usermod -aG uinput "${target_user}"
+	echo "  ✔  ${target_user} ajouté aux groupes input et uinput"
 
 	sudo tee "${UDEV_RULE_PATH}" >/dev/null << 'UDEV_EOF'
 # Ergopti — write access to /dev/uinput for the uinput group.
@@ -573,7 +581,15 @@ KANATA_SERVICE
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry
 	# below instead, which every desktop environment honours regardless of init.
-	if command -v systemctl >/dev/null 2>&1; then
+	# `command -v systemctl` is the wrong question, and an Arch container proved
+	# it: the binary is there and the SESSION BUS is not, so every --user call
+	# fails and the script aborted under `set -e` having already copied the files.
+	# The same happens over SSH without a session, from a bare TTY, and inside any
+	# container. What matters is whether a user bus can be reached, so ask that —
+	# and treat "no" as "install the unit, enable it later", never as a failure:
+	# the unit file is written above either way, and the XDG autostart entry below
+	# starts the daemon on any desktop regardless of init.
+	if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 		systemctl --user daemon-reload
 
 		systemctl --user enable  ergopti-hotstrings.service
@@ -588,6 +604,10 @@ KANATA_SERVICE
 		else
 			echo "  ⚠  kanata binaire absent — service créé mais non activé"
 		fi
+	elif command -v systemctl >/dev/null 2>&1; then
+		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
+		echo "     L'unité est installée. Dans une vraie session graphique, activez-la avec :"
+		echo "       systemctl --user enable --now ergopti-hotstrings"
 	else
 		echo "  ⚠  systemd absent — utilisation du démarrage automatique XDG."
 	fi
