@@ -56,7 +56,13 @@ src.split(/\r?\n/).forEach((line, i) => {
 	}
 });
 
-const calls = [...src.matchAll(/i18n_safe\(\s*"([^"]+)"/g)].map((m) => m[1]);
+// The closing paren is required, so a COMPOSED key — i18n_safe("category." .. id)
+// — is not mistaken for a literal one. Those cannot be checked here: the key is
+// only known at runtime, and reporting the prefix as missing sends the reader to
+// look for a translation of "category." that should not exist. Every such call
+// site guards itself instead, by comparing the result against the key it asked
+// for and falling back when the two are equal.
+const calls = [...src.matchAll(/i18n_safe\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]);
 const distinct = [...new Set(calls)];
 const missing = distinct.filter((k) => !Object.prototype.hasOwnProperty.call(en, k));
 
