@@ -63,6 +63,11 @@ local MigrationPlan = require("keylogger.text_migration")
 
 local LOG = "modules.keylogger.keylogger"
 
+-- What a private expansion's characters are persisted as. U+2022 BULLET, the
+-- same character macOS substitutes (keylogger/init.lua), so a database merged
+-- across a user's two machines redacts identically on both.
+local PRIVATE_PLACEHOLDER_CHAR = "\226\128\162"
+
 
 -- =========================================
 -- =========================================
@@ -422,7 +427,29 @@ local function add_synthetic_ngram(app, char, source)
 	app.ngram_sources[char][source] = (app.ngram_sources[char][source] or 0) + 1
 end
 
-local function append_synthetic_events(app_id, text, source, deletes)
+--- What actually gets persisted for one synthetic character.
+---
+--- For a private expansion the SHAPE is preserved — one entry per character, so
+--- counts, timings and the net-gain arithmetic stay correct — while the
+--- character itself is replaced. Dropping the entries instead would be worse
+--- than the leak: the per-character record is what tells the daemon these
+--- characters were synthetic, and without it the physical echoes fall through as
+--- ordinary human keystrokes and the secret lands in the metrics anyway, in a
+--- different column. macOS reached the same conclusion; the comment above its
+--- `notify_synthetic` says so at length.
+---
+--- Backspace markers are never redacted: they carry no content, and rewriting
+--- them would desynchronise the deletion count.
+--- @param char string
+--- @param is_private boolean|nil
+--- @return string
+local function recorded_char(char, is_private)
+	if is_private and char ~= "[BS]" then return PRIVATE_PLACEHOLDER_CHAR end
+	return char
+end
+
+--- @param is_private boolean|nil True when `text` is PII and must be redacted.
+local function append_synthetic_events(app_id, text, source, deletes, is_private)
 	local pending = ensure_pending(app_id)
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
 		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
@@ -431,12 +458,17 @@ local function append_synthetic_events(app_id, text, source, deletes)
 	if type(text) ~= "string" or text == "" then return end
 	local ok, len = pcall(utf8.len, text)
 	if not ok or not len then
-		pending.events[#pending.events + 1] = { text, 0, { s = 1, st = source } }
-		add_synthetic_ngram(_app_stats[app_id], text, source)
+		-- A malformed sequence has no codepoints to walk, so the whole string is
+		-- recorded as one entry. Redacting it to a single placeholder loses the
+		-- length, which is the price of not being able to count the characters —
+		-- and losing the length is the right way round.
+		local blob = recorded_char(text, is_private)
+		pending.events[#pending.events + 1] = { blob, 0, { s = 1, st = source } }
+		add_synthetic_ngram(_app_stats[app_id], blob, source)
 		return
 	end
 	for _, codepoint in utf8.codes(text) do
-		local char = utf8.char(codepoint)
+		local char = recorded_char(utf8.char(codepoint), is_private)
 		pending.events[#pending.events + 1] = { char, 0, { s = 1, st = source } }
 		add_synthetic_ngram(_app_stats[app_id], char, source)
 	end
@@ -449,7 +481,17 @@ end
 --- @param trigger string Typed hotstring trigger.
 --- @param replacement string Generated replacement text.
 --- @param timestamp_ms number Event timestamp.
-function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes)
+--- @param h_type string|nil Expansion kind, as the dashboard groups them.
+--- @param deletes number|nil Characters erased before the replacement was typed.
+--- @param is_private boolean|nil True when the payload is PII.
+---   Two sinks are affected, and only one of them is skipped. The per-character
+---   synthetic record is REDACTED, never dropped — see `recorded_char`. The
+---   events_hotstring row is dropped outright, because BOTH its columns are
+---   secret: the replacement is the IBAN, and the trigger is its first six
+---   characters. Redacting only the replacement would still leak. macOS makes
+---   the same split — `expander.lua` skips `log_hotstring` and forwards the flag
+---   to `notify_synthetic`.
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local app = ensure_app_stats(app_id, timestamp_ms)
@@ -457,7 +499,12 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	app.hs_triggers    = app.hs_triggers + 1
 	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
 	append_synthetic_events(app_id, replacement, "hotstring",
-		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""))
+		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
+		is_private)
+	if is_private then
+		Logger.debug(LOG, "Private expansion fired (content withheld).")
+		return
+	end
 	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
 		ts = os.date("!%Y-%m-%d %H:%M:%S"),
 		date = os.date("!%Y-%m-%d"),
