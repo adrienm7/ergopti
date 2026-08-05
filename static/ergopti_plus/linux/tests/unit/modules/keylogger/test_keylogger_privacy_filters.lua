@@ -283,6 +283,45 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 			"the window title must no longer be received and discarded")
 	end)
 
+	helpers.it("asks AT-SPI whether the focused element is a password field", function()
+		-- The sibling of the defect above, and worse, because this one had a whole
+		-- adapter behind it. adapters/secure_field_detector.lua was written and
+		-- tested, keylogger.set_secure_field was written, and `refresh()` had no
+		-- caller anywhere in the driver — so isSecureField() answered false forever
+		-- and the setter was never called. metrics.secure_filter_enabled ships
+		-- enabled by default, so the manifest promised a password-field filter the
+		-- driver did not have, and it failed in the direction that RECORDS what the
+		-- filter exists to suppress.
+		--
+		-- Asserted on the wiring rather than behaviourally for the same reason the
+		-- case above is: every behavioural test of the filter still passes with the
+		-- call deleted, because the filter simply never fires.
+		local code = code_of("ergopti_hotstrings.lua")
+		helpers.assert_contains(code, "adapters.secure_field_detector",
+			"the daemon must reach the detector at all")
+		helpers.assert_contains(code, "keylogger.set_secure_field(",
+			"and push its verdict to the keylogger, or the setter stays a setter "
+				.. "nothing sets")
+		helpers.assert_contains(code, "Detector.isSecureField()",
+			"the verdict pushed must be the one the probe just produced")
+
+		-- COUNTED, not merely present. A first version asserted only that those
+		-- three strings existed, and deleting both call sites left it green: the
+		-- helper still contained every one of them. A probe that is defined and
+		-- never invoked is the exact defect this test was written for, one level
+		-- down.
+		--
+		-- Three occurrences: the definition, the focus callback, and the priming
+		-- call for the window already focused at startup — which on a login that
+		-- restores a password manager is the window that matters most.
+		local uses = 0
+		for _ in code:gmatch("update_secure_field") do uses = uses + 1 end
+		helpers.assert_true(uses >= 3,
+			"the probe must be CALLED, from the focus change and from the startup "
+				.. "priming — found " .. uses .. " mention(s), which is not enough for "
+				.. "a definition plus both call sites")
+	end)
+
 	helpers.it("uses the shared keyword list rather than a driver-local copy", function()
 		local code = code_of("modules/keylogger/keylogger.lua")
 		helpers.assert_contains(code, 'require("keylogger.private_window")',
