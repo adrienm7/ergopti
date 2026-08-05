@@ -1340,6 +1340,13 @@ déclarée.
       sur toute session Wayland — est celui qui est testé. Reste que la session
       redémarre bien l'unité, ce qui exige une vraie ouverture de session)*
 - [ ] Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
+      *(la moitié qui échoue **en silence** est vérifiée à chaque CI :
+      `run_tray_symbols.lua` charge les trois sonames et résout les quinze
+      symboles contre de vraies libayatana et GTK3 — 15/15. Un soname faux ou un
+      symbole déplacé ne donne ni erreur ni crash, juste pas d'icône, et aucun
+      test unitaire ne peut l'attraper puisqu'il doit stubber, et qu'un stub
+      répond à n'importe quel nom. Reste que l'icône soit **visible**, ce qui
+      exige un panneau qui héberge un StatusNotifierWatcher)*
 - [ ] Trigger `★` changeable ; délais réglables ; tooltip au bon style.
 - [x] Install testée par distro-famille (Ubuntu, Fedora, Arch, Alpine, +1 immuable).
       → **Fait, en conteneurs, à chaque CI** : debian, fedora, arch, alpine,
