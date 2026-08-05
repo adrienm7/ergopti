@@ -232,6 +232,30 @@ local function tint_category(kind, group)
 	return TINT_FAMILY[kind or ""]
 end
 
+--- What a candidate's replacement may look like on screen.
+---
+--- Only values built from personal_info.toml carry a `field`, and only those are
+--- ever masked: an ordinary hotstring has no field, is not in the declaration,
+--- and passes through untouched. The classification is asked for by NAME rather
+--- than by a boolean on the candidate, so a mapping that gains a new secret field
+--- is covered by editing one shared TOML instead of every producer.
+--- @param candidate table A record from engine:candidates().
+--- @return string
+local function masked_for_preview(candidate)
+	local value = candidate.replacement
+	if type(value) ~= "string" or candidate.field == nil then return value end
+
+	local ok, Fields = pcall(require, "infra.personal_info_fields")
+	if not ok or type(Fields.for_preview) ~= "function" then
+		-- Fail closed. A candidate that declared itself a personal-info value and
+		-- a classifier that cannot be reached is the one combination where showing
+		-- the value is the wrong guess.
+		Logger.error(LOG, "Field classification unavailable — withholding a personal-info preview.")
+		return ("•"):rep(8)
+	end
+	return Fields.for_preview(value, candidate.field)
+end
+
 --- The accent for a row, or nil when colouring is off.
 --- @param kind string|nil
 --- @param group string|nil
@@ -309,7 +333,14 @@ function M.build_rows(candidates, opts)
 			-- otherwise. It used to repeat the trigger the user had just typed and
 			-- was already looking at, so the bubble never said how to fire anything.
 			-- Aligned with macOS on the maintainer's decision.
-			text   = candidate.replacement,
+			--
+			-- Masked when the value is a declared secret. DISPLAY only: the
+			-- injector reads `result.replacement` from a different call, so a
+			-- masked row cannot corrupt what gets typed — and a test at the
+			-- injection seam pins that. Which fields are secrets, and how much of
+			-- one stays visible, is _shared/modules/personal_info/fields.toml; the
+			-- phone number is deliberately not among them.
+			text   = masked_for_preview(candidate),
 			label  = (kind == "star") and magic_key or TERMINATOR_LABEL,
 			-- Dimmed rather than dropped: a candidate that will not fire is the
 			-- answer to "why did nothing happen", and hiding it deletes the answer.

@@ -338,6 +338,15 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 			-- while one that simply ranked lower is only dimmed. The user asking
 			-- "why did nothing happen" needs those to look different.
 			blocked     = eff == nil,
+			-- Provenance, carried since 2026-08-05 so a display path can decide
+			-- what it may SHOW. This record was strictly poorer than `decide`'s,
+			-- which has carried is_private all along — and the layer that most
+			-- needs to know a value is a secret is the one that puts it on screen.
+			-- `field` names the personal_info.toml field a value was built from,
+			-- and is nil for everything else; _shared/modules/personal_info/
+			-- fields.toml says which of those are masked in a preview.
+			is_private  = mapping.is_private,
+			field       = mapping.field,
 		}
 	end
 
@@ -458,6 +467,17 @@ function M.new()
 				-- expansion-delay gate on the keystroke path, and the preview's
 				-- per-section "hide the bubble" override.
 				section      = source.section,
+				-- Provenance, carried since 2026-08-05. This record is a WHITELIST —
+				-- anything the loader does not copy is gone by the time a consumer
+				-- sees a match — and both of these were being dropped here, one layer
+				-- below the place they were needed. `is_private` says the payload may
+				-- not be persisted or logged; `field` names the personal_info.toml
+				-- field it came from, which is what lets a preview ask
+				-- _shared/modules/personal_info/fields.toml whether it may be SHOWN.
+				-- The two answer different questions and neither implies the other:
+				-- the phone number is private and unmasked.
+				is_private   = source.is_private == true,
+				field        = source.field,
 				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
 				-- stable, so two entries equal on every other key came out in an order
 				-- that depended on the sort's internals — a collision could elect a
