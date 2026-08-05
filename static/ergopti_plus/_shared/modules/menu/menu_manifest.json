@@ -157,6 +157,15 @@
 			"id": "debug"
 		}
 	],
+	"kanata_menu": [
+		{
+			"type": "list",
+			"id": "kanata_actions",
+			"platforms": [
+				"linux"
+			]
+		}
+	],
 	"global_actions": [
 		{
 			"id": "enable_all"

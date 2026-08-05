@@ -1646,6 +1646,18 @@ end
 
 --- Builds the Kanata submenu (Linux's Karabiner equivalent).
 --- Actions delegate to the kanata manager module passed via ctx.kanata.
+--- Builds the kanata submenu — the first block of this file the shared renderer
+--- materialises rather than this driver.
+---
+--- The rows are DATA here: the provider returns `{ label, action, checked }` and
+--- `manifest_menu` turns each into a menu item. That distinction is the whole of
+--- M3.3. Routing a menu through `ManifestMenu.build` while its handlers still
+--- append rows moves nothing — the manifest then describes the slot and the
+--- driver still builds the row, which is what the bypass ratchet measures and
+--- why four of this driver's menus already call the renderer without having
+--- moved a single row out of it.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
 local function _build_kanata(ctx)
 	local km = ctx.kanata
 
@@ -1655,54 +1667,47 @@ local function _build_kanata(ctx)
 		if ok_km then km = km_mod end
 	end
 
-	local running = km and km.is_running() or false
+	--- Wraps a manager call so a row is clickable even before the manager loads.
+	--- @param name string The manager function to call.
+	--- @return function
+	local function call(name)
+		return function()
+			if not km then
+				Logger.error(LOG, "Kanata manager not loaded — '%s' did nothing.", name)
+				return
+			end
+			local ok, result = pcall(km[name])
+			if not ok then
+				Logger.error(LOG, "kanata.%s() raised: %s.", name, tostring(result))
+			elseif name == "write_kbd" then
+				-- The only one with a meaningful return: it says whether the file
+				-- was written, and a silent failure here leaves kanata running the
+				-- previous layout with no sign that the new one never landed.
+				if result then
+					Logger.info(LOG, "Kanata .kbd generated.")
+				else
+					Logger.error(LOG, "Kanata .kbd generation failed.")
+				end
+			end
+		end
+	end
 
-	return { title = i18n_safe("menu.kanata.title"), menu = {
-		{
-			title = i18n_safe("menu.kanata.generate_kbd"),
-			fn = function()
-				if km then
-					if km.write_kbd() then
-						Logger.info(LOG, "Kanata .kbd generated.")
-					else
-						Logger.error(LOG, "Kanata .kbd generation failed.")
-					end
-				else
-					Logger.info(LOG, "[stub] Kanata manager not loaded.")
-				end
-			end,
-		},
-		{
-			title = i18n_safe("menu.kanata.start") .. (running and " ✓" or ""),
-			fn = function()
-				if km then
-					km.start()
-				else
-					Logger.info(LOG, "[stub] Kanata manager not loaded.")
-				end
-			end,
-		},
-		{
-			title = i18n_safe("menu.kanata.stop"),
-			fn = function()
-				if km then
-					km.stop()
-				else
-					Logger.info(LOG, "[stub] Kanata manager not loaded.")
-				end
-			end,
-		},
-		{
-			title = i18n_safe("menu.kanata.restart"),
-			fn = function()
-				if km then
-					km.restart()
-				else
-					Logger.info(LOG, "[stub] Kanata manager not loaded.")
-				end
-			end,
-		},
-	}}
+	local providers = {
+		["kanata_actions"] = function()
+			local running = km and km.is_running() or false
+			return {
+				{ label = i18n_safe("menu.kanata.generate_kbd"), action = call("write_kbd") },
+				{ label = i18n_safe("menu.kanata.start"),   action = call("start"),   checked = running },
+				{ label = i18n_safe("menu.kanata.stop"),     action = call("stop") },
+				{ label = i18n_safe("menu.kanata.restart"),  action = call("restart") },
+			}
+		end,
+	}
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("kanata_menu", "Kanata", nil, nil, ctx, providers)
+		or {}
+	return { title = i18n_safe("menu.kanata.title"), menu = rows }
 end
 
 --- Builds the gestures submenu.

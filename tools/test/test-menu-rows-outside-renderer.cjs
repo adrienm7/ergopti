@@ -209,6 +209,69 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 	}
 }
 
+// ==================================================
+// ==================================================
+// ======= 2/ The migration needs its own dial ======
+// ==================================================
+// ==================================================
+
+// The count above cannot see the Linux migration at all. It treats
+// menu_builder.lua as "the Linux renderer", so all 134 of that file's row sites
+// count as INSIDE and Linux reads 2/2 no matter what moves. Repointing it would
+// take Linux from 2 to 134 — a change of DEFINITION that reads as a regression,
+// and a judgment about what the number means rather than a fact to be measured.
+//
+// So this counts the other direction instead: how many `list` providers the
+// Linux driver registers. A `list` is the one manifest type whose rows the
+// shared renderer materialises — `dynamic` and `action` hand the rendering
+// straight back to platform code — so it is exactly the unit of progress, and a
+// number that only goes UP needs nobody's arbitration to be honest.
+//
+// Raise it as blocks move. Never lower it: a provider that disappears is rows
+// going back into the driver.
+const LIST_PROVIDERS_FLOOR = { linux: 1 };
+
+const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'menu_builder.lua');
+if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
+	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));
+	const src = fs.readFileSync(LINUX_SRC, 'utf8');
+	// Each `local providers = { ["id"] = function … }` block is one migrated
+	// submenu. Keyed on that exact name because it is the sixth argument of
+	// ManifestMenu.build — the provider table — and naming it anything else would
+	// make the block invisible here, which is a rename the reader can see rather
+	// than a regex that quietly matches the wrong table.
+	const declared = new Set();
+	for (const rows of Object.values(menuManifest)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (row.type !== 'list' || typeof row.id !== 'string') continue;
+			const on = Array.isArray(row.platforms) ? row.platforms : ['ahk', 'hs', 'linux'];
+			if (on.includes('linux')) declared.add(row.id);
+		}
+	}
+
+	// Counted against what the MANIFEST declares, not against the driver's own
+	// spelling. A first version counted the table's keys, and renaming one left
+	// the number unchanged while the submenu went empty — the provider was still
+	// there, answering an id nobody asks for.
+	const providers = new Set(
+		[...src.matchAll(/local\s+providers\s*=\s*\{([\s\S]*?)\n\t\}/g)].flatMap((m) =>
+			[...m[1].matchAll(/\["([a-z0-9_]+)"\]\s*=/g)].map((k) => k[1])
+		)
+	);
+	const found = [...providers].filter((id) => declared.has(id)).length;
+	if (found < LIST_PROVIDERS_FLOOR.linux) {
+		errors.push(
+			`linux: ${found} list provider(s) registered, down from ${LIST_PROVIDERS_FLOOR.linux}. A ` +
+				'provider that disappears is rows moving back into the driver, which is the migration ' +
+				'running backwards.'
+		);
+	} else {
+		summary.push(`linux list providers ${found}/${LIST_PROVIDERS_FLOOR.linux}`);
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] menu rows built outside the renderer:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
