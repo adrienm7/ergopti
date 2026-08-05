@@ -229,7 +229,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 //
 // Raise it as blocks move. Never lower it: a provider that disappears is rows
 // going back into the driver.
-const LIST_PROVIDERS_FLOOR = { linux: 1 };
+const LIST_PROVIDERS_FLOOR = { linux: 2 };
 
 const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
 const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'menu_builder.lua');
