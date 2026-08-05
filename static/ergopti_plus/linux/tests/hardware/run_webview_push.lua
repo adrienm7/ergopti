@@ -199,39 +199,27 @@ local function exercise(app_name, bridge, entry, probe)
 	-- that does not define it turns every push into a silent no-op — exactly the
 	-- failure that hid the returned-payload bug, and then the missing-script bug
 	-- behind it.
+	-- Kept deliberately small. A larger version of this script — three more
+	-- assignments, one of them an Array.from over document.scripts — stopped
+	-- running altogether: every value it set read back as undefined while
+	-- `typeof makeHostBridge` still answered "function", so the PAGE was healthy
+	-- and the instrumentation was not. Whatever the cause, the lesson took: the
+	-- probe that reports on the subject must be the least of what runs.
 	eval_sync(webview, string.format([[
 		window.__arrived = null;
+		window.__had_entry = (typeof window.%s === 'function');
 		(function () {
 			var original = window.%s;
-			window.__had_entry = (typeof original === 'function');
-			window.__scripts = document.scripts.length;
-			window.__script_bytes = Array.from(document.scripts)
-				.reduce(function (n, s) { return n + s.textContent.length; }, 0);
 			window.%s = function (payload) {
 				window.__arrived = JSON.stringify(payload || {}).length;
-				return typeof original === 'function' ? original.apply(this, arguments) : undefined;
+				return original.apply(this, arguments);
 			};
 		})();
-	]], entry, entry))
+	]], entry, entry, entry))
 
 	local had_entry = eval_sync(webview, "String(window.__had_entry)")
 	check(had_entry == "true", string.format(
 		"%s: the page defines window.%s (got %s)", app_name, entry, tostring(had_entry)))
-
-	if had_entry ~= "true" then
-		-- Say WHY rather than leaving the reader to guess from one word. Three
-		-- things can be wrong: the script tag was dropped during inlining (an
-		-- asset the host could not read), it was inlined but failed to parse, or
-		-- it parsed and threw before the assignment. Each leaves its own
-		-- fingerprint, and being able to read them is the point of running
-		-- against a real page.
-		print(string.format("       inline scripts in the DOM : %s",
-			tostring(eval_sync(webview, "String(window.__scripts)"))))
-		print(string.format("       bytes of inlined script   : %s",
-			tostring(eval_sync(webview, "String(window.__script_bytes)"))))
-		print(string.format("       makeHostBridge defined    : %s",
-			tostring(eval_sync(webview, "typeof makeHostBridge"))))
-	end
 
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
