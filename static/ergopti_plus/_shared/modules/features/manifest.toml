@@ -3429,8 +3429,12 @@ platforms = ["ahk"]
 # One flat list rather than the per-finger-count groups macOS uses. The slots come
 # from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
 # count, so grouping would mean parsing the names back apart to regroup them.
+# A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
+# inside the driver, so the manifest would name the slot while menu_builder.lua
+# still built all thirty-odd rows and their nested action pickers. A list provider
+# returns row DATA and the shared renderer materialises it.
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_linux"
 platforms = ["linux"]
 
@@ -3444,7 +3448,7 @@ platforms = ["linux"]
 # 2026-08-04, which every non-French user read in French, and it was in no
 # manifest, so no gate could see either fact.
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_reading_linux"
 platforms = ["linux"]
 reason_key = "platform_reason.libinput_reader_is_linux_only"

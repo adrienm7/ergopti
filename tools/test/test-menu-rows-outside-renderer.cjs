@@ -93,11 +93,14 @@ const MEASURE = process.argv.includes('--measure');
 // figure would have quietly given back the twelve rows those two blocks cost.
 //
 // It may now fall, and each `list` migration is what lowers it. See the paragraph
-// above for why nothing else does.
+// above for why nothing else does. 124 → 120 the same day, when the two
+// Linux-only gesture rows moved from `dynamic` to `list` — the slot list alone is
+// thirty-odd rows with a nested action picker each, all of which the renderer now
+// materialises from data.
 const BASELINE = {
 	windows: 220,
 	macos: 301,
-	linux: 124
+	linux: 120
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
@@ -260,7 +263,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 //
 // Raise it as blocks move. Never lower it: a provider that disappears is rows
 // going back into the driver.
-const LIST_PROVIDERS_FLOOR = { linux: 2 };
+const LIST_PROVIDERS_FLOOR = { linux: 4 };
 
 const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
 const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'menu_builder.lua');
