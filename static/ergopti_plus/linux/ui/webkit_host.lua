@@ -16,6 +16,20 @@
 
 local M = {}
 
+-- pcall, not a hard require: this module is read by tests and tooling that load
+-- it before the driver's own package.path is set, and a missing logger must cost
+-- a diagnostic rather than the whole webview layer.
+local Logger
+local ok_logger, logger_mod = pcall(require, "logger.shim")
+if ok_logger and type(logger_mod) == "table" then
+	Logger = logger_mod
+else
+	local function noop() end
+	Logger = { error = noop, warn = noop, info = noop, debug = noop }
+end
+
+local LOG = "ui.webkit_host"
+
 -- ============================================================================
 -- 1. Bridge handler registry (mirrors host_bridge.js contract)
 -- ============================================================================
@@ -166,7 +180,11 @@ function M.build_injected_html(assets_dir, html_name)
 			return '<link rel="stylesheet" href="' .. href .. '" />'
 		end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
-		return css ~= "" and ("<style>" .. css .. "</style>") or ""
+		if css == "" then
+			Logger.error(LOG, "Stylesheet '%s' could not be read — the page loads unstyled.", href)
+			return ""
+		end
+		return "<style>" .. css .. "</style>"
 	end)
 
 	-- Inline local <script src="..."></script>; leave CDN URLs intact
@@ -187,7 +205,17 @@ function M.build_injected_html(assets_dir, html_name)
 		-- asserted the shape of the string handed to eval_js and none of them
 		-- could see this.
 		local js = read_file(assets_dir .. "/" .. strip_asset_query(src))
-		return js ~= "" and ("<script>" .. js .. "</script>") or ""
+		if js == "" then
+			-- Said out loud rather than silently deleted. Stripping the query fixed
+			-- ONE reason the read can miss; a typo, a missing file or a permission
+			-- refusal all still land here, and each produced a page that looked
+			-- fine and did nothing. The five CI cycles this cost were spent because
+			-- nothing anywhere said the script was absent.
+			Logger.error(LOG, "Script '%s' could not be read — the page loads without it, "
+				.. "so every function it defines will be undefined.", src)
+			return ""
+		end
+		return "<script>" .. js .. "</script>"
 	end)
 
 	return html
