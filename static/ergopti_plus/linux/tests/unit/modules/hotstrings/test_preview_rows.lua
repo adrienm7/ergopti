@@ -28,7 +28,7 @@ local helpers = require("tests.helpers")
 --- A config module whose categories have distinct colours.
 --- @return table
 local function fake_config()
-	local COLORS = { rolls = "#ff0000", autocorrection = "#00ff00", magickey = "#0000ff" }
+	local COLORS = { magickey = "#0000ff", autocorrection = "#00ff00", personal = "#666666", rolls = "#ff0000" }
 	return {
 		resolve = function(category, _section)
 			return {
@@ -66,20 +66,31 @@ local CANDIDATES = {
 
 helpers.describe("preview rows: colour", function()
 
-	helpers.it("gives each row the colour of its OWN category", function()
-		local rows = preview().build_rows(CANDIDATES, {})
+	helpers.it("colours by FAMILY, so the colour says what will validate the row", function()
+		-- Aligned with macOS on the maintainer's decision: a ★-validated row wears
+		-- the magic-key colour whichever pack it came from, so the colour tells the
+		-- user which kind of expansion is about to fire rather than which file it
+		-- happens to live in.
+		local rows = preview().build_rows(CANDIDATES, { kind = "star" })
 		helpers.assert_eq(#rows, 3, "every candidate becomes a row")
+		for index, row in ipairs(rows) do
+			helpers.assert_eq(row.accent.blue, 1,
+				"row " .. index .. " is ★-validated, so it wears the magickey colour")
+		end
+	end)
 
-		-- #ff0000 / #00ff00 / #0000ff, as normalised components.
-		helpers.assert_eq(rows[1].accent.red, 1, "the rolls row is red")
-		helpers.assert_eq(rows[2].accent.green, 1, "the autocorrection row is green")
-		helpers.assert_eq(rows[3].accent.blue, 1, "the magickey row is blue")
+	helpers.it("keeps a personal entry in its own colour whatever validates it", function()
+		-- "personal" is a family as much as a pack, and macOS treats it that way.
+		local rows = preview().build_rows(
+			{ { trigger = "sig", replacement = "…", group = "personal", fires = true } },
+			{ kind = "star" })
+		helpers.assert_eq(rows[1].accent.red, 0.4, "the personal grey, not the magickey blue")
 	end)
 
 	helpers.it("drops every accent when coloured previews are off", function()
 		local P = preview()
 		P.set_enabled("colored", false)
-		for _, row in ipairs(P.build_rows(CANDIDATES, {})) do
+		for _, row in ipairs(P.build_rows(CANDIDATES, { kind = "star" })) do
 			helpers.assert_nil(row.accent,
 				"the toggle governs the colour on every row, not only on the panel")
 		end
@@ -108,10 +119,17 @@ helpers.describe("preview rows: what each row says", function()
 				.. "nothing happen\" needs those two to look different")
 	end)
 
-	helpers.it("shows the replacement, with the trigger as the right-hand label", function()
-		local rows = preview().build_rows(CANDIDATES, {})
-		helpers.assert_eq(rows[1].text, "by the way", "what the user is about to get")
-		helpers.assert_eq(rows[1].label, "btw", "and the trigger they half-remember")
+	helpers.it("labels each row with the key that VALIDATES it, not the trigger", function()
+		-- The column used to repeat the trigger the user had just typed and was
+		-- already looking at, so the bubble never said how to fire anything.
+		-- Aligned with macOS on the maintainer's decision.
+		local star = preview().build_rows(CANDIDATES, { kind = "star" })
+		helpers.assert_eq(star[1].text, "by the way", "the text is what they are about to get")
+		helpers.assert_true(star[1].label ~= "btw", "and the label is no longer the trigger")
+
+		local ended = preview().build_rows(CANDIDATES, { kind = "autocorrect" })
+		helpers.assert_eq(ended[1].label, "↵",
+			"an end-char row is fired by a terminator, and the bubble should say so")
 	end)
 
 	helpers.it("honours the row limit", function()
