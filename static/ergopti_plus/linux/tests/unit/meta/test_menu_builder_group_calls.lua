@@ -112,10 +112,11 @@ helpers.describe("hotstrings config window: the bridge calls the same functions 
 			},
 		}
 
+		-- `ready` no longer asks is_group_enabled: the settings window is about
+		-- delays, colours and priorities, and enablement lives in the tray menu.
+		-- The defect this case exists for is unchanged and is asserted below on
+		-- set_color, which is a path the window really walks.
 		handler.on_message("ready", state)
-		helpers.assert_true(#enabled_args >= 1, "the window asks whether each category is enabled")
-		helpers.assert_eq(enabled_args[1], "code",
-			"and it must ask about a category, not hand the module to itself")
 
 		-- Re-pointed on 2026-08-05 from `toggle_group`, which the shared settings
 		-- window has never sent — the category gate lives in the tray menu. The

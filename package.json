@@ -85,6 +85,7 @@
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
 		"test:dynamic-hs-labels": "node ./tools/test/test-dynamic-hotstrings-menu-labels.cjs",
 		"test:hs-config-bridge": "node ./tools/test/test-hotstrings-config-window-bridge.cjs",
+		"test:color-presets-parity": "node ./tools/test/test-color-presets-parity.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",

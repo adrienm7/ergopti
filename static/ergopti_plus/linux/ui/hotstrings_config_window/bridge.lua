@@ -11,7 +11,48 @@ local M = {}
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("logger.shim")
+local Extensions = require("hotstrings.extensions")
 local LOG = "bridge.hotstrings_config"
+
+-- The page's directory under _shared/ui/, which is both where its HTML is read
+-- from and the key eval_js finds a live webview by.
+local APP_NAME = "hotstrings_config_window"
+
+-- The category id holding the user's own hotstrings, which the window puts in a
+-- group of its own rather than among the shipped packs.
+local PERSONAL_CATEGORY = "personal"
+
+-- The colour palette the window offers. Deliberately identical to
+-- macos/ui/hotstrings_config_window/init.lua COLOR_PRESETS, and duplicated rather
+-- than shared because the shared hotstrings TOML reader parses scalars only — it
+-- has no array support, so an ordered palette cannot be expressed in
+-- _shared/modules/hotstrings/defaults.toml the way the three single colours are.
+-- tools/test/test-color-presets-parity.cjs is what keeps the two lists equal;
+-- without it this is exactly the second source rule 5.2 forbids.
+local COLOR_PRESETS = {
+	{ i18n = "hs_config.color_red",    hex = "#e53935" },
+	{ i18n = "hs_config.color_green",  hex = "#43a047" },
+	{ i18n = "hs_config.color_orange", hex = "#fb8c00" },
+	{ i18n = "hs_config.color_blue",   hex = "#1e88e5" },
+	{ i18n = "hs_config.color_purple", hex = "#8e44ad" },
+	{ i18n = "hs_config.color_cyan",   hex = "#00838f" },
+	{ i18n = "hs_config.color_yellow", hex = "#fdd835" },
+	{ i18n = "hs_config.color_gray",   hex = "#6e6e73" },
+}
+
+--- Translates a key, falling back to the key itself.
+---
+--- pcall'd for the same reason the menu's i18n_safe is: this window must still
+--- draw when the shared locale tree is unreachable, which is a real partial
+--- install rather than a hypothetical.
+--- @param key string
+--- @return string
+local function i18n_label(key)
+	local ok, i18n = pcall(require, "infra.i18n")
+	if not ok or type(i18n.get) ~= "function" then return key end
+	local value = i18n.get(key)
+	return (type(value) == "string" and value ~= "") and value or key
+end
 
 -- The collision-priority range the settings window offers. Mirrored from the
 -- window's own `v >= 0 && v <= 100` guard, and re-checked here rather than
@@ -86,40 +127,182 @@ local function _persist_group(config_dir, group, mutate)
 	return writer.write(path, existing)
 end
 
---- Builds the initial data payload for the config UI.
+--- Converts seconds to the milliseconds the window shows.
+--- @param seconds number|nil
+--- @return integer|nil
+local function to_ms(seconds)
+	if type(seconds) ~= "number" then return nil end
+	return math.floor(seconds * MS_PER_SEC + 0.5)
+end
+
+--- The localised display name of a category, or its file stem.
+--- @param id string
+--- @param category table|nil
+--- @return string
+local function category_title(id, category)
+	local description = category and category.description or nil
+	if type(description) ~= "table" then return id end
+	local locale = "en"
+	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	if ok_i18n and type(i18n.get_locale) == "function" then
+		local current = i18n.get_locale()
+		if type(current) == "string" and current ~= "" then locale = current end
+	end
+	return description[locale] or description.en or id
+end
+
+--- Builds one category entry in the shape the page destructures.
+--- @param config table The hotstrings config module.
+--- @param id string
+--- @param category table Loader metadata.
+--- @param group string "common" | "personal" | "ext:<id>"
+--- @return table
+local function build_category_entry(config, id, category, group)
+	--- @param section string|nil
+	--- @return table
+	local function fields_for(section)
+		local effective = config.resolve(id, section) or {}
+		local declared  = config.get_toml_defaults(id, section) or {}
+		local override  = config.get_user_override(id, section) or {}
+
+		-- show_tooltip defaults to shown; the cascade already applied that, so a
+		-- nil here means the resolver could not answer at all.
+		local shown = effective.show_tooltip
+		if shown == nil then shown = true end
+
+		return {
+			delay_ms                = to_ms(effective.delay),
+			delay_default_ms        = to_ms(declared.delay),
+			delay_overridden        = override.delay ~= nil,
+			color                   = effective.color,
+			color_default           = declared.color,
+			color_overridden        = override.color ~= nil,
+			show_tooltip            = shown,
+			show_tooltip_overridden = override.show_tooltip ~= nil,
+			priority                = override.priority or declared.priority,
+			priority_default        = declared.priority,
+			priority_overridden     = override.priority ~= nil,
+		}
+	end
+
+	local entry = fields_for(nil)
+	entry.name     = id
+	entry.group    = group
+	entry.title    = category_title(id, category)
+	entry.sections = {}
+
+	for _, name in ipairs(category and category.sections_order or {}) do
+		local section = fields_for(name)
+		section.name  = name
+		section.title = name
+		entry.sections[#entry.sections + 1] = section
+	end
+
+	return entry
+end
+
+--- Builds the payload the settings page renders from.
+---
+--- Every key here is one `_shared/ui/hotstrings_config_window/script.js` reads.
+--- It used to return `{ groups = {{ name, enabled }}, mapping_count,
+--- parse_errors, config_dir }` — four keys, not one of which the page destructures.
+--- `render()` walks `state.categories` and `state.presets`, and the group selector
+--- wants `{ key, label }`, so the window drew an empty page with a selector full of
+--- blank entries even on the one call site that reached it with a bridge attached.
 --- @param state table Daemon state.
---- @return table Data the JS UI expects.
+--- @return table
 local function _build_initial_payload(state)
-	local groups = {}
-	if state.config and type(state.config.get_groups) == "function" then
-		local raw = state.config.get_groups()
-		for _, g in ipairs(raw) do
-			local enabled = false
-			if type(state.config.is_group_enabled) == "function" then
-				enabled = state.config.is_group_enabled(g)
-			end
-			groups[#groups + 1] = { name = g, enabled = enabled }
-		end
+	local config = state and state.config
+	-- The page wants { label, hex }; the constant holds the i18n key so the label
+	-- is resolved in the user's language at build time rather than baked in.
+	local presets = {}
+	for _, preset in ipairs(COLOR_PRESETS) do
+		presets[#presets + 1] = { label = i18n_label(preset.i18n), hex = preset.hex }
 	end
 
-	local mapping_count = 0
-	local error_count = 0
-	if state.config then
-		if type(state.config.mapping_count) == "function" then
-			mapping_count = state.config.mapping_count()
-		end
-		if type(state.config.parse_error_count) == "function" then
-			error_count = state.config.parse_error_count()
-		end
-	end
-
-	return {
-		groups = groups,
-		mapping_count = mapping_count,
-		parse_errors = error_count,
-		config_dir = state.config and type(state.config.get_config_dir) == "function"
-			and state.config.get_config_dir() or nil,
+	local out = {
+		categories              = {},
+		groups                  = {},
+		presets                 = presets,
+		global_default_delay_ms = 0,
 	}
+
+	if type(config) ~= "table" or type(config.resolve) ~= "function" then
+		Logger.error(LOG, "No hotstrings config module — the settings window has nothing to show.")
+		return out
+	end
+
+	if type(config.get_global_default_delay_ms) == "function" then
+		out.global_default_delay_ms = config.get_global_default_delay_ms()
+	end
+
+	-- One group per family, and only when it has members: the selector shows every
+	-- key it is given, so an empty "Extensions" entry is a dead option.
+	local seen_group = {}
+	--- @param key string
+	--- @param label_key string
+	local function ensure_group(key, label_key)
+		if seen_group[key] then return end
+		seen_group[key] = true
+		out.groups[#out.groups + 1] = { key = key, label = i18n_label(label_key) }
+	end
+
+	local order = type(config.get_category_order) == "function" and config.get_category_order() or nil
+	if type(order) ~= "table" or #order == 0 then
+		order = {}
+		for id in pairs(config.get_categories() or {}) do order[#order + 1] = id end
+		table.sort(order)
+	end
+
+	local categories = config.get_categories() or {}
+	for _, id in ipairs(order) do
+		local category = categories[id]
+		if category then
+			local extension_id = Extensions.parse_category_key(id)
+			local group, label_key
+			if extension_id then
+				group, label_key = "ext:" .. extension_id, "hs_config.group_extensions"
+			elseif id == PERSONAL_CATEGORY then
+				group, label_key = "personal", "hs_config.group_personal"
+			else
+				group, label_key = "common", "hs_config.group_common"
+			end
+			ensure_group(group, label_key)
+			out.categories[#out.categories + 1] = build_category_entry(config, id, category, group)
+		end
+	end
+
+	return out
+end
+
+--- Pushes the payload into the page by calling its own entry point.
+---
+--- The page has no reader for a bridge response: `makeHostBridge` is
+--- fire-and-forget, and only two of the fourteen shared pages define
+--- `window.__hostBridgeResponse` at all — this is not one of them. So a returned
+--- payload reached nobody. macOS pushes `setData(...)`; so does this now.
+--- @param state table Daemon state.
+--- @return boolean
+local function push_state(state)
+	local ok_json, json_mod = pcall(require, "json")
+	if not ok_json or type(json_mod.encode) ~= "function" then
+		Logger.error(LOG, "Cannot push setData(): the shared json module is unavailable.")
+		return false
+	end
+	local ok_payload, encoded = pcall(function()
+		return json_mod.encode(_build_initial_payload(state))
+	end)
+	if not ok_payload or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot push setData(): payload encoding failed (%s).", tostring(encoded))
+		return false
+	end
+
+	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	if not ok_mgr or type(Manager.eval_js) ~= "function" then
+		Logger.error(LOG, "Cannot push setData(): webview_manager.eval_js is unavailable.")
+		return false
+	end
+	return Manager.eval_js(APP_NAME, "if(window.setData)setData(" .. encoded .. ")")
 end
 
 --- Applies one override through the config module, if this driver has one.
@@ -149,10 +332,10 @@ function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Hotstrings config UI ready.")
-			return _build_initial_payload(state)
+			return push_state(state)
 		end
 		if payload == "refresh" then
-			return _build_initial_payload(state)
+			return push_state(state)
 		end
 		return nil
 	end
@@ -192,15 +375,15 @@ function M.on_message(payload, state)
 		if not ms or ms < 0 then
 			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
 				tostring(payload.ms), tostring(payload.category))
-			return _build_initial_payload(state)
+			return push_state(state)
 		end
 		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "clear_delay" and payload.category then
 		set_override(state, payload.category, section_of(payload), "delay", nil)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "set_color" and payload.category then
@@ -210,15 +393,15 @@ function M.on_message(payload, state)
 		if type(hex) ~= "string" or hex == "" then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
-			return _build_initial_payload(state)
+			return push_state(state)
 		end
 		set_override(state, payload.category, section_of(payload), "color", hex)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "clear_color" and payload.category then
 		set_override(state, payload.category, section_of(payload), "color", nil)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "set_tooltip" and payload.category then
@@ -228,12 +411,12 @@ function M.on_message(payload, state)
 		local value = payload.show_tooltip
 		if type(value) == "string" then value = (value == "true") end
 		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "clear_tooltip" and payload.category then
 		set_override(state, payload.category, section_of(payload), "show_tooltip", nil)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	-- Collision priority. The window validates 0-100 before sending, and this
@@ -245,15 +428,15 @@ function M.on_message(payload, state)
 		if not value or value < PRIORITY_MIN or value > PRIORITY_MAX then
 			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
 				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
-			return _build_initial_payload(state)
+			return push_state(state)
 		end
 		set_override(state, payload.category, section_of(payload), "priority", value)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "clear_priority" and payload.category then
 		set_override(state, payload.category, section_of(payload), "priority", nil)
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "set_all_grey" then
@@ -281,7 +464,7 @@ function M.on_message(payload, state)
 		else
 			Logger.error(LOG, "'set_all_grey' needs get_categories and get_neutral_color — nothing changed.")
 		end
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "reset_all" then
@@ -303,7 +486,7 @@ function M.on_message(payload, state)
 				end
 			end
 		end
-		return _build_initial_payload(state)
+		return push_state(state)
 	end
 
 	if action == "close" then
