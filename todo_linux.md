@@ -262,9 +262,28 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
 - [ ] **M3.3 — supprimer `linux/ui/menu/menu_builder.lua`** au profit du renderer
       partagé. Contrainte d'ordre ci-dessus : deux ratchets désignent ce fichier
       par son nom et doivent être repointés dans le même changement.
-- [ ] **M3.4 — le menu Raccourcis Linux dispatché par le manifeste.** Même
-      travail que l'item de §11.3 : sans lui, `extensions_shortcuts` ne peut pas
-      être élargi à `linux` sans que le ratchet de bijection le signale.
+      → **Mesuré le 2026-08-05** (`--measure`) : le fichier contient **134 sites de
+        rangée**. Les supprimer signifie migrer 134 rangées en entrées manifeste de
+        type `list`/`action`/`group` avec leurs fournisseurs — et l en-tête du
+        ratchet le dit : router par `ManifestMenu.build` ne fait **pas** baisser le
+        compte, seule une migration `list` l a jamais fait.
+      → **Cet item demande à Linux d aller plus loin que les deux autres pilotes.**
+        macOS a 301 rangées hors renderer, Windows 220 ; ni l un ni l autre n a
+        fait cette migration, et le ratchet existe précisément parce que
+        « l interdire aujourd hui voudrait dire réécrire deux couches de menu d un
+        coup ». Formulé comme « supprimer le fichier », M3.3 vise un état qu aucun
+        pilote de référence n a atteint.
+      → **Décision à prendre avant de commencer.** Aujourd hui le ratchet déclare
+        `menu_builder.lua` « le renderer Linux », donc les 134 rangées comptent
+        comme *dedans* et Linux affiche 2/2 : il n existe aucune pression chiffrée
+        vers la migration. Le premier pas honnête est de repointer le ratchet pour
+        qu il mesure la vraie dette — ce qui fait passer Linux de 2 à 134 et
+        ressemble à une régression alors que c est un changement de définition.
+        C est un arbitrage du mainteneur sur ce que le nombre veut dire, pas une
+        décision à prendre en passant.
+- [x] **M3.4 — fait** le 2026-08-05. `_build_shortcuts` passe par
+      `ManifestMenu.build("shortcuts_menu", …)` et `extensions_shortcuts` a perdu
+      sa restriction `["ahk"]`. Détails dans l item de §11.3.
 - [x] **M3.6 — certifié** le 2026-08-05 pour Linux, au **runtime**.
       → Les portes de `tools/test` lisent le manifeste et la **source**. Elles
         attrapent une ligne promise qu aucun handler ne répond, et un pilote qui
@@ -476,7 +495,17 @@ pas les rouvrir sans raison nouvelle.
 
 ### 11.2 — Bloquants restants
 
-- [ ] **La fenêtre de réglages n exécute pas son script dans WebKit.** Trouvé par
+- [x] **La fenêtre de réglages n exécutait pas son script dans WebKit** — corrigé.
+      La cause n était dans aucune des sept hypothèses ci-dessous : `load_html(html,
+      nil)` donne à la page une origine opaque `about:blank`, où les assignations
+      `window.X` ne survivent pas. Le second argument est une URI de base, et il
+      vaut `"file:///"` désormais (`ui/webview_manager.lua`). Le harnais de pièges
+      d erreurs avait servi à établir que la page était saine, ce qui a déplacé
+      l attention de la page vers la façon dont elle était chargée.
+      → Journal d enquête conservé : sept hypothèses éliminées, dont aucune n était
+        la bonne, ce qui est précisément ce qui rend le journal utile.
+
+  **Journal d enquête (conservé).** Trouvé par
       `tests/hardware/run_webview_push.lua`, reproductible : `window.setData` est
       `undefined`, donc l hôte — qui garde `if(window.setData)` — jette chaque push.
       L éditeur, lui, est **vert et stable** (5/5, payload de 146 octets reçu), ce qui
@@ -544,13 +573,19 @@ pas les rouvrir sans raison nouvelle.
 
 ### 11.3 — Majeurs et mineurs restants
 
-- [ ] **Rendre le menu Raccourcis Linux pilotable par le manifeste.** Il est
-      écrit à la main et ne dispatche pas par id, donc élargir `platforms` sur
-      `extensions_shortcuts` ferait promettre au manifeste une ligne que ce menu
-      ne peut pas rendre — le ratchet de bijection le signalerait aussitôt.
-      → La restriction actuelle (`["ahk"]`, « aucun pilote Lua n'a ce concept »)
-        est **fausse pour les deux** : macOS l'implémente depuis toujours, Linux
-        depuis 2026-08-05. Le commentaire du manifeste le dit maintenant.
+- [x] **Menu Raccourcis Linux pilotable par le manifeste** — fait le 2026-08-05.
+      La restriction `["ahk"]` disait « aucun pilote Lua n a ce concept », ce qui
+      était faux pour les deux : macOS l implémente depuis que son menu Raccourcis
+      existe, Linux depuis le 2026-08-05. Elle avait survécu à une tentative de
+      correction parce qu un menu qui ne dispatche rien **par id** ne peut pas se
+      voir promettre une ligne par id — le ratchet de bijection l aurait signalé.
+      → Ce que le changement rend en échange : `keyboard_slots` était déclaré pour
+        toutes les plateformes et Linux ne peut pas y répondre (aucune capture
+        d accord, aucun stockage d assignation dans `modules/shortcuts/manager.lua`),
+        donc le renderer aurait journalisé un avertissement « pas de fournisseur »
+        à chaque construction. Restreint à `ahk`+`hs`, avec sa clé de raison dans
+        les 21 locales — cela consigne un écart qui existait déjà, ce menu ne lisant
+        aucun manifeste avant.
 ## 12. Gestes 3/4/5 doigts sur Linux (audit du 2026-08-05)
 
 > **Demande :** « fais un audit de comment faire sur Linux pour mapper les gestes
@@ -650,12 +685,15 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [x] Capacité matérielle remontée au menu : les slots que le matériel ne peut pas
       servir sont **grisés avec une raison traduite** (21 locales), pas livrés
       vivants. Capacité illisible ⇒ tout reste offert.
-- [ ] **Tests du nouveau chemin.** `mt_decoder` (19 assertions) et
-      `touchpad_finder` (13) sont couverts. Ne le sont pas : la lecture réelle, le
-      dispatch geste→action, et l’émission par uinput.
-      → **Les 508 lignes actuelles passent contre un recogniser que rien
-        n’alimente.** Vert n’y est pas une preuve, et elles partent avec
-        `process_frame`.
+- [x] **Tests du nouveau chemin** — faits. Les trois trous nommés ici sont
+      couverts : `test_gesture_pump_chain.lua` va du lecteur au dispatch avec un
+      lecteur factice, `test_gesture_dispatch.lua` lit la liste de slots
+      **déclarée** (c est ce qui a attrapé `up_right` contre `right_up`), et
+      `test_combo_press_order.lua` vérifie l ordre exact écrit sur le périphérique
+      — un modificateur relâché avant sa touche donne une frappe nue, et aucun test
+      de parsing ne peut le voir.
+      → Ajouté depuis : `test_gesture_under_load.lua` couvre la borne de drain et
+        `SYN_DROPPED`, les deux risques que l audit avait laissés « non testables ».
 ### 12.6 — Risques identifiés avant d'écrire une ligne
 
 - [ ] **La trace d’événements du décodeur est une reconstruction, pas une capture.**
