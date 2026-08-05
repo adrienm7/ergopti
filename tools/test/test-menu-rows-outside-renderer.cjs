@@ -73,10 +73,31 @@ const MEASURE = process.argv.includes('--measure');
 // ManifestMenu.build, so the rows the daemon used to append by hand — including
 // an undeclared libinput row with a hardcoded French label — are dispatched from
 // the manifest. The two that remain are in ergopti_hotstrings.lua.
+//
+// ── linux 2 → 124 on 2026-08-05, and that is NOT a regression ──
+//
+// Read the number before reading the jump. Until today this file listed
+// `ui/menu/menu_builder.lua` as "the Linux renderer", so every one of that file's
+// row sites counted as INSIDE and Linux read 2/2 — a number that could not move
+// no matter how much of the menu was hand-built, because the hand-building WAS
+// the renderer by definition. Linux is the only driver whose renderer is entirely
+// shared (_shared/lua/menu/renderer.lua, bound by infra/manifest_menu.lua), and
+// menu_builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
+// which this file has always counted as outside.
+//
+// So the definition was wrong and the measurement was vacuous. Nothing got worse
+// today; the dial started working. The debt was 136 when the definition changed
+// (134 sites in menu_builder.lua plus the 2 in ergopti_hotstrings.lua the old
+// baseline named) and is frozen here at the 124 measured after the kanata and
+// updates submenus moved onto `list` providers — freezing at the pre-migration
+// figure would have quietly given back the twelve rows those two blocks cost.
+//
+// It may now fall, and each `list` migration is what lowers it. See the paragraph
+// above for why nothing else does.
 const BASELINE = {
 	windows: 220,
 	macos: 301,
-	linux: 2
+	linux: 124
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
@@ -109,7 +130,14 @@ const DRIVER_SPEC = {
 		// Same row shape as macOS — `{ title = …, fn = … }`.
 		patterns: [/\btitle\s*=\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		renderers: new Set(['ui/menu/menu_builder.lua'])
+		// This driver's renderer lives entirely in _shared/lua/menu/renderer.lua;
+		// infra/manifest_menu.lua is the binding that hands it this platform's
+		// token, its manifest path and its JSON decoder, and builds no row itself.
+		// So the set is empty ON PURPOSE, and `sharedRenderer` says so — without it
+		// the "a renderer that draws no rows is not a renderer" guard below reads
+		// the empty count as a stale path and refuses to measure anything.
+		renderers: new Set([]),
+		sharedRenderer: true
 	}
 };
 
@@ -176,7 +204,10 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 	}
 
 	// A renderer that draws no rows is not a renderer; the path is probably stale.
-	if (inRenderer === 0) {
+	// Unless the driver has no renderer of its own — Linux renders entirely through
+	// the shared module, so zero here is the correct answer rather than a stale
+	// path, and treating it as an error is what let the old definition stand.
+	if (inRenderer === 0 && !spec.sharedRenderer) {
 		errors.push(
 			`${driver}: no rows found in ${[...spec.renderers].join(', ')} — the renderer path is wrong, ` +
 				'so every row counts as a bypass and the baseline below is meaningless'
