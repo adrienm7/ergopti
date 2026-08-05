@@ -566,12 +566,17 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [x] Slot `TOUCHPAD` ajouté, **sans grab** — grabber le pavé prendrait le pointeur
       au compositeur, et evdev est diffusé, donc lire en parallèle ne coûte rien.
       Sonde de capacité faite sans ioctl, validée sur vrai noyau (8/8).
-- [ ] **Retirer `process_frame`.** `dispatch_gesture` est en place et reçoit du
-      décodeur un geste déjà classé, avec le compte de doigts du **matériel**.
-      `process_frame` subsiste, dérive encore son compte de `#touches`, et n’est
-      plus alimenté par rien — du code mort avec ses 508 lignes de tests.
-      → Les deux partent ensemble : garder les deux chemins les fait diverger, et
-        du code mort est interdit (règle 5.6).
+- [x] `process_frame` retiré, avec ses 508 lignes de tests et la logique qu il
+      était seul à utiliser (`_slot_for_dir`, `_compute_dir`, seuils, état de suivi).
+      → **Une régression évitée de justesse** : un de ces tests épinglait qu un
+        maintien immobile de 2 s n est PAS un tap. Mon décodeur classait par
+        distance seule — poser les doigts aurait déclenché l action liée. Le
+        plafond de temps est porté dans `mt_decoder`, horloge injectable (le bug
+        d origine était `os.clock()`, dont le temps CPU n avance presque pas dans
+        un démon I/O-bound).
+      → Et une duplication de moins : `_slot_for_dir` orthographiait les mêmes
+        noms de slots que `_slot_for_gesture`. Deux orthographes d une règle,
+        c est exactement ce qui a produit `up_right` contre `right_up`.
 - [x] `start_reading()` lit réellement : `touchpad_finder.find()` →
       `evdev_reader.open(path, TOUCHPAD)` → `mt_decoder` → `dispatch_gesture`,
       avec `pump()` branché sur le tick du démon.

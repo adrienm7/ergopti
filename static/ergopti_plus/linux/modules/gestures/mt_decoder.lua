@@ -40,6 +40,10 @@
 
 local M = {}
 
+local Logger = require("logger.shim")
+
+local LOG = "gestures.mt_decoder"
+
 
 
 
@@ -99,6 +103,21 @@ M.DEFAULT_SWIPE_THRESHOLD = 120
 -- directions, so it is a real answer rather than a rejection.
 M.DIAGONAL_RATIO = 2.0
 
+-- How long a touch may last and still be a tap, from the shared timings registry
+-- so the three drivers cannot drift on it.
+--
+-- Without a ceiling, resting fingers on the pad and lifting them later is
+-- indistinguishable from tapping: both travel no distance. The old engine had
+-- this and a test pinned it — a two-second near-stationary hold must NOT fire a
+-- tap — so it is carried here rather than lost with that engine.
+local ok_timings, Timings = pcall(require, "infra.timings")
+M.TAP_MAX_SEC = ok_timings and Timings.sec("gestures", "tap_max_ms") or nil
+if not M.TAP_MAX_SEC then
+	-- Loud, not defaulted. A missing key is a broken install, and inventing a
+	-- ceiling here would make every driver disagree about what a tap is.
+	Logger.error(LOG, "[gestures].tap_max_ms is unreadable — taps cannot be time-bounded.")
+end
+
 
 
 
@@ -115,6 +134,17 @@ function M.new(opts)
 	opts = opts or {}
 	local threshold = tonumber(opts.swipe_threshold) or M.DEFAULT_SWIPE_THRESHOLD
 
+	-- Wall clock, injectable. Deliberately NOT os.clock(): its CPU time barely
+	-- advances in an I/O-bound daemon, so a gesture held for seconds would report
+	-- almost no elapsed time and be misclassified as a tap. That exact bug was
+	-- found and fixed in the engine this decoder replaces.
+	local now_sec = opts.now_sec
+	if type(now_sec) ~= "function" then
+		local ok_mono, Monotonic = pcall(require, "infra.monotonic")
+		now_sec = ok_mono and Monotonic.now_sec or os.time
+	end
+	local tap_max_sec = tonumber(opts.tap_max_sec) or M.TAP_MAX_SEC
+
 	local decoder = {}
 
 	-- Per-slot contact state, and the slot register the kernel expects us to keep.
@@ -130,6 +160,9 @@ function M.new(opts)
 	local _origin_x, _origin_y = nil, nil
 	local _last_x, _last_y = nil, nil
 
+	-- When the first finger landed, so a hold can be told from a tap.
+	local _started_at = nil
+
 	--- Discards everything and returns to "no fingers down".
 	local function reset()
 		_slots = {}
@@ -138,6 +171,7 @@ function M.new(opts)
 		_peak_fingers = 0
 		_origin_x, _origin_y = nil, nil
 		_last_x, _last_y = nil, nil
+		_started_at = nil
 	end
 
 	--- The mean position of every live contact, or nil when there is none.
@@ -239,7 +273,10 @@ function M.new(opts)
 
 		if _touching then
 			if cx and cy then
-				if not _origin_x then _origin_x, _origin_y = cx, cy end
+				if not _origin_x then
+					_origin_x, _origin_y = cx, cy
+					_started_at = now_sec()
+				end
 				_last_x, _last_y = cx, cy
 			end
 			return nil
@@ -255,14 +292,27 @@ function M.new(opts)
 		local dx = (_last_x and _origin_x) and (_last_x - _origin_x) or 0
 		local dy = (_last_y and _origin_y) and (_last_y - _origin_y) or 0
 		local direction = direction_of(dx, dy)
+		local elapsed = (_started_at and now_sec() - _started_at) or 0
 
 		reset()
 
 		if direction then
+			-- A swipe is a swipe however long it took: someone dragging slowly
+			-- across the pad means it, and a ceiling here would drop the gesture
+			-- they were halfway through.
 			return { fingers = fingers, direction = direction, tap = false }
 		end
-		-- No meaningful travel: a tap. Reported for every finger count the hardware
-		-- can express, which is the half libinput cannot do at all.
+
+		-- No meaningful travel. That is a tap only if it was BRIEF — otherwise it
+		-- is fingers resting on the pad, which travels no distance either. Without
+		-- this, putting a hand down and lifting it later fires whatever tap_N is
+		-- bound to.
+		if tap_max_sec and elapsed > tap_max_sec then
+			return nil
+		end
+
+		-- Reported for every finger count the hardware can express, which is the
+		-- half libinput cannot do at all.
 		return { fingers = fingers, direction = nil, tap = true }
 	end
 
