@@ -58,8 +58,11 @@ command -v xev >/dev/null 2>&1     || { echo "ENVIRONMENT: xev is not installed 
 PROBE_CHARS='a Z 5'
 
 # ── The X client that reports what arrived ──────────────────────────────────
-# xev with a window, so keystrokes are delivered to it rather than to the root.
-xev -event keyboard > /tmp/xev-out.txt 2>/dev/null &
+# On the ROOT window. Under a bare Xvfb there is no window manager to give an
+# ordinary xev window the input focus, so its own window receives nothing and
+# every character reads as a mismatch. The root window is where key events land
+# when focus is PointerRoot, which is the default with no WM running.
+xev -root -event keyboard > /tmp/xev-out.txt 2>/dev/null &
 XEV_PID=$!
 sleep 1
 
