@@ -3082,17 +3082,20 @@ id = "menubar_colors"
 platforms = ["hs"]
 disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
 
+# Linux joined on 2026-08-06. The restriction was accurate when written — that
+# driver had no floating widget at all — and is not any more: ui/wpm/widget.lua
+# draws the same pill on the GTK surface the preview bubble already uses, and
+# reads its geometry and colours from _shared/modules/wpm_widget/constants.toml
+# rather than mirroring them the way the other two do.
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "wpm_widget"
 disabled_when = ["keylogger_enabled"]
-platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "widget_colors"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-platforms = ["ahk", "hs"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
