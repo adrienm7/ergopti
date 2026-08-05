@@ -25,6 +25,18 @@
 # WHAT IT STILL CANNOT SEE: whether a human would call the result correct in
 # their editor's font. It reports keysyms, not pixels. That is the residue.
 #
+# IT DOES NOT RUN IN CI, AND THE REASON IS ARCHITECTURAL RATHER THAN A BUG.
+# Tried on 2026-08-05 under xvfb-run: every character failed, with the driver
+# resolving and emitting correctly each time. Xvfb is a virtual X server with a
+# DUMMY keyboard — it does not enumerate /dev/input and has no evdev backend at
+# all, so a keystroke on a uinput device has no path to reach it. No amount of
+# focus or root-window listening changes that; the events never arrive.
+#
+# It needs a real Xorg with the evdev or libinput driver, which means a machine
+# with a graphics stack. So this runs from HARDWARE.md on the target machine, and
+# it is the only item there that a person does not have to JUDGE — they start it
+# and read the exit code.
+#
 # Exit 0 = every character came back as itself. 1 = a mismatch. 2 = the
 # environment cannot host the test.
 # ==============================================================================

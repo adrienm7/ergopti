@@ -765,26 +765,6 @@ jobs:
           exit $STATUS
         timeout-minutes: 6
 
-      # The one round trip that was never closed. Everything downstream of the
-      # driver's keycode choice is verified — ioctls, struct, grab, ordering — and
-      # the XKB parse is verified against fixtures and real system keymaps. None of
-      # that says whether the (keycode, modifiers) pair we pick actually produces
-      # the character we meant when a real X server maps it back. Our parse and the
-      # server's could agree with each other and both differ from our intent: a
-      # level index off by one, a shift that should have been AltGr, and every
-      # accented expansion types the wrong glyph with every test still green.
-      #
-      # xev is an ordinary X client reading the same keymap every application
-      # reads, so it answers the question from the far end.
-      - name: Our keycodes come back as the characters we meant
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends xvfb x11-utils
-          sudo modprobe uinput || true
-          # Root because /dev/uinput is root-owned until install.sh --setup-perms
-          # writes the udev rule, which a runner has no reason to have done.
-          sudo -E env "PATH=$PATH" xvfb-run -a bash tests/hardware/run_keysym_roundtrip.sh
-        timeout-minutes: 5
 
   # ─────────────────────────────────────────────────
   # 4.1b) Linux install, per distribution family

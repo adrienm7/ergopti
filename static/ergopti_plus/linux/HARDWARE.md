@@ -106,6 +106,24 @@ grep -E 'Layout resolved|typable character' /tmp/ergopti.log
 with N in the hundreds. A number under 60 is refused as a parse failure and
 logged as such.
 
+Then run the one check here that you do not have to judge — you start it and read
+the exit code:
+
+```bash
+bash tests/hardware/run_keysym_roundtrip.sh
+```
+
+It presses exactly what the driver's layout table says produces each character
+and asks the X server, through `xev`, what actually arrived. That closes the only
+loop CI cannot: our XKB parse and the server's could agree with each other and
+both differ from what we intended — a level index off by one, a shift where AltGr
+belonged — and every accented expansion would type the wrong glyph with every
+other test still green.
+
+It needs a real Xorg. CI cannot run it: Xvfb is a virtual server with a dummy
+keyboard, it has no evdev backend, and a uinput keystroke has no path to reach
+it. That was measured, not assumed.
+
 ---
 
 ## 4. Typing during an expansion (C4)
