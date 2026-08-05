@@ -743,3 +743,87 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       posés, trame perdue, puis swipe à trois : le geste sort bien à trois. Et le
       geste que la perte a interrompu n émet rien, y compris quand la perte
       survient une trame avant le lever, où tout ce qui le nomme a déjà été vu.
+
+---
+
+## 13. Audit de parité Linux ↔ macOS/Windows (2026-08-06)
+
+> Cinq relevés parallèles — métriques/keylogger, fenêtres webview, LLM,
+> keymap/raccourcis, cycle de vie — fusionnés en une liste ordonnée par
+> (impact visible) × (1 / coût). Chaque écart porte ses preuves `fichier:ligne`
+> des deux côtés. Ce qui suit est ce qui **reste**.
+
+### 13.1 — Fait dans la foulée de l audit
+
+- [x] **Le filtre champ-mot-de-passe n avait aucun appelant.**
+      `secure_field_detector.refresh()` n était appelé de nulle part, donc
+      `isSecureField()` répondait faux pour toujours et le filtre — livré **activé**
+      par le manifeste — était inerte. Il échouait dans le sens qui enregistre ce
+      qu il existe pour supprimer.
+- [x] **41 appels de pont passaient la table de module en `self`.** L audit en
+      nommait six ; le scan écrit pour empêcher le retour en a trouvé 41. La garde
+      `if type(x) ~= "string" then return end` faisait exactement son travail sur un
+      argument qui n était jamais la faute de l appelant : le seul contrôle LLM du
+      tray ne faisait rien, ni le sélecteur de modèle, ni le téléchargement, ni
+      l URL de fournisseur, ni les six lectures de la fenêtre de diagnostic.
+- [x] **La persistance n avait lieu qu à l arrêt.** Deux sites d appel de
+      `flush()`, tous deux des chemins d extinction : un SIGKILL, un OOM kill, une
+      coupure de courant jetaient toute la session. Cadence prise du canon partagé.
+- [x] **Les cinq bascules métriques ne survivaient pas au redémarrage**, dont
+      l interrupteur principal — éteint par l utilisateur, rallumé au reboot.
+- [x] **Le gain LLM disparaissait au redémarrage** : trois noms de champs absents
+      du delta que le writer acceptait déjà.
+- [x] **Le rapporteur de crash était orphelin**, et `protect()` prenait sa trace
+      après le déroulement de pile — donc chaque rapport aurait listé les mêmes
+      trois cadres survivants quelle qu ait été la panne.
+- [x] **Widget MPM** et **`events_shortcut`** (voir §13.3).
+- [x] **La fenêtre changelog n avait aucun ouvreur.**
+
+### 13.2 — Reste à faire, par ordre de rentabilité
+
+- [ ] **La requête Ollama ne porte ni `keep_alive` ni séquences d arrêt.** Les deux
+      valeurs sont dans `_shared/modules/llm/inference.json`, déjà chargé.
+- [ ] **Un changement de disposition n atteint jamais l injecteur.** Câbler
+      `on_layout_change` sur `adapters/keyboard_layout.lua M.refresh()`.
+- [ ] **Les paramètres de prompt sont des littéraux** alors que les deux modules
+      partagés sont déjà chargés.
+- [ ] **Le bouton de remise à zéro des tableaux de bord ne fait rien**, et
+      `metrics_apps` appelle une fonction qui n existe pas.
+- [ ] **La couche navigation laisse la molette transparente** (`volu`/`vold` sur
+      `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK).
+- [ ] **« Démarrer kanata » peut lancer une seconde instance** à côté de celle que
+      systemd gère : `is_running()` ne teste que le processus qu il a lancé lui-même.
+- [ ] **Un `tap_hold.toml` utilisateur remplace les défauts partagés en bloc** au
+      lieu de fusionner touche par touche.
+- [ ] **Le cycle de vie des suggestions n est jamais enregistré** — le KPI de taux
+      d acceptation lit 0 %.
+- [ ] **Les fichiers de log tournent chaque jour et ne sont jamais purgés.**
+- [ ] **Aucune surface de notification** : le port `Notifier` n a pas d adaptateur
+      Linux. Les chaînes existent déjà dans les 21 locales.
+- [ ] **La fenêtre de diagnostic s ouvre vide** : `_shared/lua/healthcheck/snapshot
+      .lua` n est lié que par macOS.
+- [ ] **Activer `[sections.llm]` pour `linux`** dans le manifeste partagé, puis
+      écrire les lecteurs et setters. Débloque le sous-menu LLM à 8 lignes.
+
+### 13.3 — Le gros morceau : le walker de frappes
+
+- [ ] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
+      se déclare « ZERO driver dependencies », nomme déjà les neuf tables n-grammes
+      manquantes et les finaliseurs de rafale et de session — et n est requis que
+      par macOS. Linux écrit 8 tables sur 25.
+      → **Ce qui en dépend** : les neuf familles de n-grammes (bigrammes à
+        heptagrammes, mots, bigrammes de mots), les douze tables `agg_app_day_*` et
+        `agg_system_day`. Donc l analyse SFB, l analyse d erreurs, les panneaux de
+        rafale et de session, les frises horaires, les catégories et titres de
+        fenêtre du tableau de bord applications — tout cela est vide par
+        construction, pas par accident.
+      → Taille : **large**. C est le seul item de l audit qui ne se fait pas en une
+        soirée, et il débloque plus que tous les autres réunis.
+
+### 13.4 — Bloqués sur autre chose
+
+- [ ] **Tout comportement LLM interactif est bloqué sur un transport HTTP
+      asynchrone.** `api_ollama.lua` ouvre `io.popen` et draine le tuyau jusqu au
+      bout sur le fil unique.
+- [ ] **Les backends d API distants sont en plus bloqués sur un coffre à secrets.**
+      macOS utilise le trousseau, Windows DPAPI ; Linux n a pas d équivalent.
