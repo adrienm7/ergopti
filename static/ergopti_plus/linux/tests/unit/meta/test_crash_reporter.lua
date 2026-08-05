@@ -217,4 +217,28 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		end)
 		helpers.assert_nil(cap.path, "count reads no crash files")
 	end)
+
+	helpers.it("captures the stack where the error was RAISED", function()
+		-- protect() used pcall and then took debug.traceback afterwards. By then
+		-- the throwing stack has been unwound, so every crash report in the driver
+		-- listed the same three frames — protect, its caller, and the entry point —
+		-- whatever had actually failed. A report that cannot say where is a report
+		-- that costs the reader the same hour every time.
+		local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
+		local captured = nil
+		local real_dump = Reporter.dump
+		Reporter.dump = function(_module, _err, ctx) captured = ctx and ctx.stack_trace end
+
+		local function inner_frame_that_throws()
+			error("boom from the inner frame")
+		end
+		Reporter.protect("probe", function() inner_frame_that_throws() end)
+
+		Reporter.dump = real_dump
+		helpers.assert_not_nil(captured, "a failure must produce a stack trace at all")
+		helpers.assert_contains(captured, "inner_frame_that_throws",
+			"the frame that raised must be IN the trace; a trace taken after the "
+				.. "unwind names only the frames that survived it")
+	end)
+
 end)

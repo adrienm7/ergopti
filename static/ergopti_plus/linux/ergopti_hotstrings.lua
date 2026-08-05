@@ -119,6 +119,7 @@ local keyboard_hook     = require("adapters.keyboard_hook")
 local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local Timings           = require("infra.timings")
+local CrashReporter     = require("modules.diagnostics.crash_reporter")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -1377,4 +1378,20 @@ local function main()
 	Logger.info(LOG, "Daemon exiting.")
 end
 
-main()
+-- The daemon runs under the crash reporter, which until now had no caller at
+-- all: modules/diagnostics/crash_reporter.lua was written, tested, and reachable
+-- only from its own test file. A driver that runs for weeks in the background
+-- and dies at 3 a.m. leaves the user with a tray icon that is simply gone and
+-- nothing on disk saying why — the log's last line is whatever it was doing, not
+-- what killed it.
+--
+-- protect() rather than a bare xpcall here, so the traceback, the log line and
+-- the crash file all come from one place. It captures the stack inside the
+-- message handler, before the unwind.
+local ok_main, err_main = CrashReporter.protect("ergopti_hotstrings", main)
+if not ok_main then
+	Logger.error(LOG, "Daemon terminated by an unhandled error: %s", tostring(err_main))
+	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
+	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
+	os.exit(1)
+end
