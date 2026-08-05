@@ -107,6 +107,30 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 -- The most recently shown hotstring suggestion; kept for dismissal telemetry.
 local last_shown_hotstring = nil
 
+--- Whether a previewed match may be written to the PERSISTED telemetry.
+---
+--- A named predicate rather than an inline `not m.is_private` at each of the two
+--- call sites, because those two sites are 100 lines apart, one of them fires
+--- from a different function entirely (reset_predictions, on dismissal), and the
+--- last time this rule was applied per-site rather than at the decision it was
+--- applied to one of them and missed the other for months.
+---
+--- The rule: both columns are secret. The replacement IS the IBAN and the
+--- trigger is a fragment of it, so redacting one and keeping the other still
+--- leaks — the row is withheld whole. The tooltip is unaffected: showing users
+--- their own data on their own screen is the feature.
+--- @param match table|nil A preview match, or the last_shown_hotstring record.
+--- @return boolean True when the row may be persisted.
+local function may_persist_preview(match)
+	if type(match) ~= "table" then return false end
+	return not match.is_private
+end
+
+--- Exposed for tests. The two call sites are deferred through a timer and land
+--- in a module the harness cannot substitute reliably, so the decision is
+--- asserted here directly rather than through a preview that never reaches it.
+M._may_persist_preview = may_persist_preview
+
 -- Persistent Escape trap, created lazily on first tooltip show.
 -- Inserting a new eventtap at HEAD ensures it fires before any pre-existing tap (e.g. Raycast).
 -- The trap checks tooltip.is_visible() at runtime so it never needs to be disarmed.
@@ -772,16 +796,34 @@ function M.update_preview(buf)
 		local type_str    = primary_match.type == "star" and "star"
 			or (primary_match.type == "autocorrect" and "autocorrect" or "personal")
 		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
-			last_shown_hotstring = { trigger = trigger_key, replacement = primary_match.repl, h_type = type_str }
+			-- is_private travels with the record because the DISMISS telemetry fires
+			-- from reset_predictions, long after `matches` is gone — so the flag has
+			-- to be carried, not looked up again.
+			last_shown_hotstring = {
+				trigger     = trigger_key,
+				replacement = primary_match.repl,
+				h_type      = type_str,
+				is_private  = primary_match.is_private,
+			}
 			-- Off the HID thread. This is pure telemetry: nothing downstream depends
 			-- on it landing before the keystroke completes, and it ends in a
 			-- synchronous file write on the very callback whose overrun makes macOS
 			-- disable the keyboard tap. The values are captured now so a later
 			-- keystroke cannot change what gets recorded.
-			local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
-			TimerScheduler.after(0, function()
-				pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
-			end)
+			--
+			-- Withheld entirely for a private mapping, exactly as expander.lua
+			-- withholds log_hotstring: both columns are secret — the replacement IS
+			-- the IBAN and the trigger is a fragment of it — so redacting one and
+			-- keeping the other still leaks. The DEBUG line sixty lines above
+			-- already says "it is only the persisted sink that must withhold it";
+			-- these two ARE that sink, and they were writing the value verbatim.
+			-- docs/PROJECT_MEMORY.md records the same class shipping once before.
+			if may_persist_preview(primary_match) then
+				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
+				TimerScheduler.after(0, function()
+					pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+				end)
+			end
 		end
 	else
 		-- No hotstring match — let the inactivity timer drive the LLM.
@@ -867,9 +909,14 @@ function M.reset_predictions(keep_hotstring_log)
 		local d_trigger = last_shown_hotstring.trigger
 		local d_repl    = last_shown_hotstring.replacement
 		local d_type    = last_shown_hotstring.h_type
-		TimerScheduler.after(0, function()
-			pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
-		end)
+		-- Withheld for a private mapping, like its suggested sibling. This one is
+		-- the easier of the two to miss: the value was captured on a keystroke that
+		-- has already happened, and the record outlives the match it came from.
+		if may_persist_preview(last_shown_hotstring) then
+			TimerScheduler.after(0, function()
+				pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+			end)
+		end
 		last_shown_hotstring = nil
 	end
 	engine.reset()
