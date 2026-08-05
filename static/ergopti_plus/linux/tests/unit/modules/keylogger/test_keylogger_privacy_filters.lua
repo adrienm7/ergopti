@@ -249,6 +249,16 @@ helpers.describe("keylogger privacy — coverage never narrows", function()
 			"turning off the secure filter must not disable OS auth prompts")
 		helpers.assert_eq(kl.is_password_app("keepassxc"), false,
 			"turning off the secure filter must actually turn it off")
+
+		-- PUT THEM BACK. These setters persist since 2026-08-06, so a flip left
+		-- behind is not a value in one module's memory any more — it is a line in
+		-- the user's store that every later fresh load reads. It cost a CI run to
+		-- learn: on Linux `find` returns this file BEFORE tests/unit/meta/
+		-- test_keylogger.lua, so four password-suppression tests there saw a filter
+		-- this one had switched off, and on Windows `dir /b /s` returns them the
+		-- other way round and everything passed.
+		kl.set_secure_filter_enabled(true)
+		kl.set_system_auth_filter_enabled(true)
 	end)
 
 	helpers.it("still ignores ordinary applications", function()
