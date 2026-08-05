@@ -228,6 +228,11 @@ function M.build_rows(candidates, opts)
 			-- answer to "why did nothing happen", and hiding it deletes the answer.
 			dimmed = candidate.fires == false,
 			struck = candidate.fires == false and candidate.blocked == true,
+			-- Each row carries its OWN colour. The panel used to take one accent
+			-- from the first candidate, so with several categories pending at once
+			-- — the common case — every row after the first wore a colour belonging
+			-- to a different category.
+			accent = accent_for(candidate.group, candidate.section),
 		}
 	end
 
@@ -258,7 +263,15 @@ function M.show(candidates, kind)
 		return false
 	end
 
+	-- The candidate that will actually FIRE decides both questions below, falling
+	-- back to the first listed when none will. Taking the first unconditionally
+	-- made a panel whose whole colour, and whose right to exist at all, came from
+	-- a candidate the engine had already ruled out.
 	local leading = candidates[1] or {}
+	for _, candidate in ipairs(candidates) do
+		if candidate.fires then leading = candidate ; break end
+	end
+
 	local group, section = leading.group, leading.section
 	if not category_shows_tooltip(group, section) then
 		M.hide()
@@ -266,7 +279,9 @@ function M.show(candidates, kind)
 	end
 
 	return Renderer.show(rows, {
-		style  = _style,
+		style = _style,
+		-- The panel takes the firing candidate's colour; each row carries its own
+		-- as a bar, so a bubble holding several categories says so.
 		accent = accent_for(group, section),
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),

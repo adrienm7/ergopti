@@ -46,6 +46,13 @@ local PANGO_SCALE = 1024
 -- "popup" in GTK terms; the enum value is GTK_WINDOW_POPUP.
 local GTK_WINDOW_POPUP = 1
 
+-- The per-row accent bar: how wide, and how far in from the panel's left edge.
+-- Deliberately inside the padding, so it reads as a marker belonging to the row
+-- rather than as a border belonging to the panel, and so it cannot collide with
+-- the text that starts at pad_x.
+local ACCENT_BAR_WIDTH = 3
+local ACCENT_BAR_INSET = 4
+
 
 
 
@@ -236,6 +243,17 @@ local function paint(cr, rows, metrics, style, size, background)
 		-- greyed rather than hiding it is what tells the user WHY nothing
 		-- happened.
 		local alpha = row.dimmed and 0.45 or 1.0
+
+		-- The row's own accent, as a bar down its left edge. One accent for the
+		-- WHOLE panel is what this used to draw, taken from the first candidate —
+		-- so when several categories were pending at once, which is the common
+		-- case, every row after the first was labelled by a colour belonging to
+		-- another category. A bar per row is the smallest thing that cannot lie.
+		if row.accent then
+			cr:set_source_rgba(row.accent.red, row.accent.green, row.accent.blue, alpha)
+			cr:rectangle(ACCENT_BAR_INSET, y, ACCENT_BAR_WIDTH, m.height)
+			cr:fill()
+		end
 
 		local description = g.Pango.FontDescription.from_string(style.fonts.main)
 		description:set_size(style.sizes.main * PANGO_SCALE)
