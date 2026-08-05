@@ -6,6 +6,12 @@
 --- That the five metrics switches are read from storage at load and written back
 --- when they change.
 ---
+--- WHERE THE CHOICE IS APPLIED:
+--- In init(), not at module load. Loading is when a consumer asks for the TYPE;
+--- reading $HOME there gave the module a file-system dependency it never had,
+--- and made its state depend on load order — which differs between `dir /b /s`
+--- and `find`, and cost a CI run to learn.
+---
 --- THE DEFECT THIS PINS:
 --- None of them were stored. Every one reverted to its manifest default at the
 --- next start, and the directions are not equally harmless. The two privacy
@@ -51,6 +57,10 @@ local function load_over_storage(initial)
 	package.loaded["adapters.storage"] = storage
 	package.loaded["modules.keylogger.keylogger"] = nil
 	local keylogger = require("modules.keylogger.keylogger")
+	-- init(), because that is where the stored choice is applied. Reading it at
+	-- module load gave this module a file-system dependency at require time and
+	-- made its state depend on which test file happened to load it first.
+	keylogger.init({ sqlite_path = "/tmp/ergopti_toggle_probe.sqlite" })
 	return keylogger, storage
 end
 

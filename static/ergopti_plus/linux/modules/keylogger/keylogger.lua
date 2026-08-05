@@ -175,11 +175,25 @@ local _DEFAULTS = {
 	encrypt                    = Manifest.default_for("metrics.encrypt"),
 }
 
-local _enabled                    = stored_bool("enabled", _DEFAULTS.enabled)
-local _private_filter_enabled     = stored_bool("private_filter_enabled", _DEFAULTS.private_filter_enabled)
-local _secure_filter_enabled      = stored_bool("secure_filter_enabled", _DEFAULTS.secure_filter_enabled)
-local _system_auth_filter_enabled = stored_bool("system_auth_filter_enabled", _DEFAULTS.system_auth_filter_enabled)
-local _encrypt_enabled            = stored_bool("encrypt", _DEFAULTS.encrypt)
+-- Seeded from the manifest at LOAD, and re-seeded from storage inside M.init().
+--
+-- Reading the store here was the first version and it was wrong twice over. It
+-- gave this module a file-system dependency at require time that it never had —
+-- so requiring it began touching $HOME, and any consumer that had only ever
+-- needed the type suddenly needed a working config directory. And it made the
+-- module's state depend on load ORDER, which differs between the machine this is
+-- developed on and the one it is gated on: `dir /b /s` and `find` do not return
+-- the suite in the same sequence, and four password-suppression tests failed on
+-- one and not the other for reasons that had nothing to do with passwords.
+--
+-- init() is where a driver decides what it is; that is where the user's stored
+-- choice belongs. Anything that reads a flag before init gets the shipped
+-- default, which is exactly what it got before any of this existed.
+local _enabled                    = _DEFAULTS.enabled
+local _private_filter_enabled     = _DEFAULTS.private_filter_enabled
+local _secure_filter_enabled      = _DEFAULTS.secure_filter_enabled
+local _system_auth_filter_enabled = _DEFAULTS.system_auth_filter_enabled
+local _encrypt_enabled            = _DEFAULTS.encrypt
 
 -- Whether the focused window is a private/incognito browser session. Set from
 -- the focus-change callback, never computed on the keystroke path.
@@ -347,6 +361,12 @@ function M.init(opts)
 		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
 	end
 
+	-- The stored encryption choice, read before the cipher is configured below:
+	-- the migration this block launches depends on which posture is in force, so
+	-- reading it afterwards would resume the wrong direction on the first start
+	-- after the user changed it.
+	_encrypt_enabled = stored_bool("encrypt", _DEFAULTS.encrypt)
+
 	-- Push the configured posture into the cipher. Without this the cipher stayed
 	-- off while get_privacy_state() reported the manifest's value, which is the
 	-- "the box is ticked and nothing is encrypted" defect this feature replaced.
@@ -361,6 +381,13 @@ function M.init(opts)
 	TextMigration.resume(
 		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
 		_device_id)
+
+	-- The user's stored choices, applied over the manifest defaults. Here rather
+	-- than at module load: see the note beside the declarations.
+	_enabled                    = stored_bool("enabled", _DEFAULTS.enabled)
+	_private_filter_enabled     = stored_bool("private_filter_enabled", _DEFAULTS.private_filter_enabled)
+	_secure_filter_enabled      = stored_bool("secure_filter_enabled", _DEFAULTS.secure_filter_enabled)
+	_system_auth_filter_enabled = stored_bool("system_auth_filter_enabled", _DEFAULTS.system_auth_filter_enabled)
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
