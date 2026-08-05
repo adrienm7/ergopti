@@ -765,6 +765,21 @@ jobs:
           exit $STATUS
         timeout-minutes: 6
 
+      # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
+      # and each is a claim about a library this project does not ship. A wrong
+      # soname, or a symbol that moved between releases, has exactly one symptom:
+      # no tray icon. Not an error, not a crash; the menu is simply absent while
+      # the daemon expands hotstrings perfectly, so nothing points at the cause.
+      #
+      # No unit test can catch it: with no libayatana to load it must stub, and a
+      # stub answers to whatever name the binding asks for.
+      - name: The tray binding names libraries and symbols that exist
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
+        timeout-minutes: 4
+
 
   # ─────────────────────────────────────────────────
   # 4.1b) Linux install, per distribution family
