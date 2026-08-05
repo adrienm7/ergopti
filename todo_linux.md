@@ -1392,3 +1392,132 @@ déclarée.
       - la règle udev était écrite dans un répertoire jamais créé.
       → Le conteneur couvre aussi le cas « distribution immuable » du plan : pas de
       root, pas de systemd, tout sous `$HOME`.
+
+
+
+
+
+## 11. Parité hotstrings Linux ↔ macOS/Windows (audit du 2026-08-05)
+
+> **Question posée :** « a-t-on sur Linux 100 % des features hotstrings de AHK et
+> HS ? notamment l'UI pour créer des hotstrings perso, les tooltips de différentes
+> couleurs, définir les délais d'expansion… on doit aussi avoir exactement le même
+> sous-menu hotstrings sur Linux que sur Windows et macOS. »
+>
+> **Réponse : non.** Six dimensions auditées en parallèle, chacune réfutée par un
+> sceptique indépendant chargé de démolir ses conclusions : **46 écarts confirmés**,
+> 3 réfutés (ceux-là étaient du travail en cours pendant l'audit). Onze sont
+> bloquants au sens strict : la fonctionnalité est inatteignable ou fait le
+> contraire de ce que le contrôle annonce.
+>
+> Ce que §5 mesurait, c'est ce qui avait été **construit**. Personne n'avait
+> comparé **ligne à ligne** avec les deux autres pilotes, et c'est là que se
+> cachait l'essentiel : des surfaces entières câblées à moitié, dont le côté
+> visible passait tous les gates existants.
+
+### 11.1 — Ce qui est corrigé
+
+- [x] **La fenêtre « Délais et couleurs » ne pouvait pas s'ouvrir.** Deux sites
+      appelaient `show("hotstrings_config")` ; le répertoire est
+      `hotstrings_config_window`. `resolve_app_dir()` est une concaténation
+      littérale, donc la fenêtre s'ouvrait sur *« Error: app not found »*.
+      → Le troisième site utilisait le bon nom et tombait sur l'autre moitié du
+      même bug : HTML trouvé, **aucun bridge**, car `BRIDGE_MODULES` était clé sur
+      le mauvais nom. Une seule correction ferme les deux moitiés.
+      → `dl` et `token` avaient le même défaut, jamais appelés donc jamais vus.
+      → **Test de régression :** `test_webview_app_names_have_pages.lua` — tout nom
+      passé à `show()` et toute clé de `BRIDGE_MODULES` doit résoudre une vraie
+      page. Il a attrapé `dl` immédiatement.
+- [x] **Les quatre bascules d'aperçu n'existaient nulle part.** `preview.lua`
+      honorait ses quatre interrupteurs sur le chemin chaud et `set_enabled()`
+      n'avait **aucun appelant** : figées à leur valeur de chargement à vie.
+      Le manifeste déclarait pourtant les quatre pour `["hs","linux"]`.
+      → `modules/hotstrings/preview_settings.lua` les possède, les persiste et les
+      applique au boot ; la ligne `preview_bubbles` est désormais **déclarée au
+      manifeste** et rendue par le renderer partagé sur les deux pilotes Lua —
+      macOS la construisait à la main.
+- [x] **Le sous-menu des délais n'existait pas sur Linux** : une ligne, là où
+      Windows et macOS en ont huit. Le commentaire qui le justifiait — « ce pilote
+      n'a pas de délais par catégorie » — était faux à l'écriture : `resolve()`
+      parcourt la même cascade à cinq crans, et le démon la consomme à chaque
+      frappe.
+      → Ajout du cran `_global` (clé réservée, orthographiée comme AHK) qui
+      manquait à Linux, plus les lignes délai global / magickey / autocorrection.
+- [x] **Bug de quoting shell** dans « ouvrir le fichier » de chaque catégorie :
+      `"'\''"` écrit `"'\''"` s'effondre en trois apostrophes et casse la
+      commande. Un pack sous `/home/me/l'ergopti` n'ouvrait rien, en silence.
+
+### 11.2 — Bloquants restants
+
+- [ ] **L'éditeur de hotstrings personnelles est inatteignable.** Aucune ligne,
+      aucun raccourci, rien n'ouvre `_shared/ui/hotstring_editor/` sur Linux. Le
+      bridge existe et est complet ; personne ne l'appelle.
+- [ ] **L'éditeur resterait sur « Chargement… »** même ouvert : le bridge
+      *retourne* le payload là où macOS l'*injecte* par `window.initData(...)`.
+      `#app` est `display:none` jusqu'à cet appel.
+- [ ] **Chaque contrôle de la fenêtre de config efface au lieu d'écrire.** Le
+      bridge lit `payload.value` ; la page envoie `ms`, `hex`, `show_tooltip`.
+      Saisir 500 ms **supprime** le délai ; cocher « afficher le tooltip » écrit
+      `false`. Aucun message d'erreur : le bridge répond un payload rafraîchi
+      dans les deux cas.
+      → **Et le test épingle le mauvais contrat** (`test_config_window_overrides.lua`
+      envoie `value = 1.5`), donc la suite est verte sur un bridge qui ne peut rien
+      recevoir de la vraie page.
+- [ ] **Le bridge n'envoie pas les données que la page affiche** : ni catégories,
+      ni presets de couleur, ni délai global. Page vide même une fois ouverte.
+- [ ] **L'aperçu n'est jamais affiché** : `preview.lua M.show()` n'a aucun appelant
+      dans tout le pilote. Toute la surface aperçu — et donc les quatre bascules
+      ci-dessus — est inerte tant qu'un énumérateur de candidats n'existe pas.
+- [ ] **Pas de bascule maîtresse Hotstrings.** Première ligne du manifeste, rendue
+      par personne : le renderer partagé saute les `toggle` par contrat et
+      l'appelant Linux n'en construit aucune.
+- [ ] **La catégorie « hotstrings dynamiques » est inatteignable** : une ligne
+      grisée « (aucun groupe chargé) », alors que le moteur tourne.
+- [ ] **Impossible d'ajouter un délimiteur personnalisé** : la ligne déléguait à
+      la fenêtre qui ne s'ouvrait pas. Rien n'appelle jamais
+      `add_custom_terminator`.
+- [ ] **Changer la touche magique ne réenregistre rien** : `MagicKey.init()` n'est
+      jamais appelé, donc le callback `_on_change` ne part pas. Le menu se
+      relabellise, les 21 locales suivent, et **aucune expansion n'écoute la
+      nouvelle touche**. Pire qu'absent : l'UI annonce un succès que le produit
+      contredit.
+- [ ] **La touche « répétition ★ » n'existe pas sur Linux**, et
+      `platforms = ["ahk"]` est faux : macOS livre le moteur *et* la bascule
+      depuis toujours. Même forme d'erreur que `hotstring_extensions` et
+      `magic_key_config` — le manifeste enregistre qui a implémenté en premier.
+- [ ] **« Tout réinitialiser » réactive toutes les catégories désactivées** — et
+      là encore le test épingle ce comportement comme voulu.
+
+### 11.3 — Majeurs et mineurs restants
+
+- [ ] Un délimiteur **activé** est perdu au redémarrage (seule la liste OFF est
+      persistée) ; 15 des 25 délimiteurs sont livrés désactivés.
+- [ ] Pas de « ↺ Valeurs par défaut » dans les expanseurs de mots.
+- [ ] « Tout activer » ne restaure pas les **sections**, seulement les portails de
+      catégorie — et re-parse tout le catalogue une fois par catégorie.
+- [ ] Les compteurs ne reflètent pas l'état : une catégorie éteinte affiche
+      toujours « (14 231) ». Windows a une politique dédiée et testée pour ça.
+- [ ] « Tout cocher / décocher » d'une catégorie est **grisé quand elle est
+      éteinte**, et ne relève pas le portail — deux clics et un aller-retour là où
+      les autres en demandent un.
+- [ ] Les libellés diffèrent : `check_all`/`uncheck_all` au lieu de
+      `enable_all`/`disable_all`. Les deux clés existent déjà partout.
+- [ ] Éteindre une catégorie **efface les coches** de ses sections au lieu de les
+      griser : l'information « ce qui reviendra » disparaît.
+- [ ] Pas de total général sur l'entrée Hotstrings du tray.
+- [ ] La catégorie personnelle s'affiche « personal » et non « Hotstrings
+      personnels ».
+- [ ] Pas de sélecteur de section par défaut, pas de « fermer après ajout » — deux
+      préférences que le bridge lit et que rien ne peut écrire.
+- [ ] Un échec d'écriture est **silencieux** : la page affiche « enregistré » quoi
+      qu'il arrive.
+- [ ] `clear_override` n'a pas le paramètre `field` : le portage naturel des
+      boutons ↺ par champ effacerait les quatre champs.
+- [ ] Les actions groupées des délimiteurs touchent aussi les délimiteurs
+      personnalisés, contrairement aux deux références.
+- [ ] Le `shortcuts/menu.lua` des extensions n'est jamais exécuté sur Linux.
+- [ ] Aperçu : teinte par **catégorie** au lieu de par **genre**, une seule teinte
+      pour tout le panneau au lieu d'une par ligne, aucune expiration, libellé
+      droit = déclencheur au lieu de touche de validation, et `show_tooltip` par
+      section ignoré (résolu avec `section = nil`). Tous latents tant que l'aperçu
+      n'est pas branché.

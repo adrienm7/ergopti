@@ -2386,6 +2386,7 @@
 	"platform_reason.alt_gr_is_kana_remap": "Tylko Windows: kompensuje układy niestandardowe (KbdEdit/MSKLC), które przypisują AltGr do innego klawisza wirtualnego — to pojęcie sterownika klawiatury Windows bez odpowiednika gdzie indziej.",
 	"platform_reason.llm_mlx_is_apple_silicon": "Tylko macOS: MLX to lokalny framework inferencji firmy Apple dla Apple Silicon i nie istnieje jego wersja dla Windows ani Linuksa.",
 	"platform_reason.lists_windows_only_settings": "Tylko Windows: wszystko, co ten wiersz by wypisał, samo jest wyłącznie dla Windows, więc na macOS i Linuksie pokazuje pustą listę.",
+	"platform_reason.preview_bubbles_are_lua_previews": "Nie w systemie Windows: te przełączniki sterują dymkiem podglądu, który sterowniki macOS i Linux rysują samodzielnie. Windows pokazuje informacje o hotstringach przez inną podpowiedź, która nie ma odpowiednich przełączników.",
 	"platform_reason.no_magic_key_editor_on_linux": "Nie w Linuksie: ten wiersz zmienia klawisz magiczny. macOS i Windows otwierają w tym celu okno dialogowe; sterownik linuksowy jedynie odczytuje klawisz z konfiguracji i nie pozwala go zmienić z menu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nie w Linuksie: ten wiersz otwiera plik skrótów osobistych. macOS i Windows taki plik mają; skróty sterownika linuksowego to przełączniki i przekształcenia zaznaczenia, bez pliku do edycji.",
 	"platform_reason.libinput_reader_is_linux_only": "Odczyt libinput — tylko w systemie Linux",

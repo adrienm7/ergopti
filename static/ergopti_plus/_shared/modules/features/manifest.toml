@@ -3258,6 +3258,27 @@ type = "---"
 type = "dynamic"
 id = "magic_key_config"
 
+# The four preview-bubble toggles, declared here on 2026-08-05. They were the
+# only part of the hotstrings surface that no manifest row described: macOS built
+# the submenu by hand and Linux built nothing, while
+# `features.hotstrings.preview_*` had declared all four for BOTH drivers since
+# they were written. So the manifest promised the features and described no way
+# to reach them, and on Linux there was none — ui/tooltip/preview.lua honoured
+# its four switches and nothing ever called set_enabled, leaving them stuck at
+# their load-time value for the life of the process.
+#
+# Restricted to the two Lua drivers because the AHK tooltip is a different
+# surface with its own controls, not because Windows is behind.
+[[menu.hotstrings_params_group]]
+type = "---"
+platforms = ["hs", "linux"]
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "preview_bubbles"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
 [[menu.hotstrings_params_group]]
 type = "dynamic"
 id = "repeat_key"

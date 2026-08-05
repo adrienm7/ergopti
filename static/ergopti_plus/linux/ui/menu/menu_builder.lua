@@ -29,7 +29,23 @@ local M = {}
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
 local MagicKey = require("modules.hotstrings.magic_key")
+local PreviewSettings = require("modules.hotstrings.preview_settings")
 local LOG = "ui.menu.menu_builder"
+
+-- Delays are stored in seconds and typed in milliseconds: seconds is what the
+-- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
+-- bit longer". The conversion happens only at this boundary.
+local MS_PER_SEC = 1000
+
+-- The categories whose delay the other two drivers put directly in the delays
+-- submenu rather than only in the settings window. They are the two a user
+-- actually retunes — the magic key because it fires on a single character, and
+-- autocorrection because it rewrites what was already typed — so both are one
+-- click away here, exactly as on Windows and macOS.
+local QUICK_DELAY_CATEGORIES = {
+	{ category = "magickey",       label = "menu.hotstrings.delay_magic_key" },
+	{ category = "autocorrection", label = "menu.hotstrings.delay_autocorrection" },
+}
 
 -- Single source of the driver version.
 local Version = require("infra.version")
@@ -354,6 +370,104 @@ local function _manifest_hotstring_rows(ctx, config)
 		end
 	end
 
+	--- Renders a delay for a menu label: "750 ms", or the infinity sign for 0.
+	---
+	--- Zero does not mean "fire instantly" — it means the trigger never expires,
+	--- so the category stays armed however long the user pauses. Printing "0 ms"
+	--- would read as the exact opposite of what it does.
+	--- @param seconds number
+	--- @return string
+	local function delay_display(seconds)
+		local ms = math.floor(seconds * MS_PER_SEC + 0.5)
+		if ms == 0 then return i18n_safe("menu.hotstrings.infinite") end
+		return ms .. " ms"
+	end
+
+	--- Asks for a delay in milliseconds and returns it in seconds.
+	--- @param title string Already-translated dialog title.
+	--- @param current_sec number
+	--- @return number|nil Seconds, or nil when cancelled or refused.
+	local function prompt_delay(title, current_sec)
+		local raw = prompt_text(
+			title,
+			i18n_safe("menu.hotstrings.delay_prompt"),
+			tostring(math.floor(current_sec * MS_PER_SEC + 0.5)))
+		if raw == nil then return nil end
+
+		local value = tonumber((raw:gsub("%s", "")))
+		-- Refused rather than clamped: a negative or fractional millisecond is a
+		-- typo, and silently rounding it would store a number the user never chose
+		-- and cannot see is different from what they typed.
+		if not value or value < 0 or value ~= math.floor(value) then
+			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
+			return nil
+		end
+		return value / MS_PER_SEC
+	end
+
+	--- The row for the global default delay — the one every category inherits
+	--- when neither it nor its sections declare one.
+	--- @return table
+	local function global_delay_row()
+		local current = config.get_global_delay and config.get_global_delay() or nil
+		if type(current) ~= "number" then
+			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
+			return {
+				title    = i18n_safe("menu.hotstrings.tooltip_default") .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				disabled = true,
+				fn       = function() end,
+			}
+		end
+
+		local overridden = config.has_global_delay_override and config.has_global_delay_override() or false
+		local title = i18n_safe("menu.hotstrings.tooltip_default")
+		return {
+			-- menu.settings.default_indicator carries its own leading space.
+			title = title .. " : " .. delay_display(current)
+				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
+			fn = function()
+				local chosen = prompt_delay(title, current)
+				if chosen == nil then return end
+				if config.set_global_delay then config.set_global_delay(chosen) end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
+
+	--- The row for one category's default delay.
+	---
+	--- Reads the EFFECTIVE value through resolve() so the number matches what the
+	--- settings window shows and what the engine actually applies, and writes
+	--- through set_override() so both UIs share one store.
+	--- @param category string
+	--- @param label_key string
+	--- @return table
+	local function category_delay_row(category, label_key)
+		local title = i18n_safe(label_key)
+		local ok, resolved = pcall(config.resolve, category, nil)
+		local current = ok and type(resolved) == "table" and tonumber(resolved.delay) or nil
+		if type(current) ~= "number" then
+			Logger.error(LOG, "No resolvable delay for category '%s' — its row shows no value.", tostring(category))
+			return {
+				title    = title .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				disabled = true,
+				fn       = function() end,
+			}
+		end
+
+		local overridden = resolved.has_override == true
+		return {
+			title = title .. " : " .. delay_display(current)
+				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
+			fn = function()
+				local chosen = prompt_delay(title, current)
+				if chosen == nil then return end
+				if config.set_override then config.set_override(category, nil, "delay", chosen) end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
+
 	local ok_term, Terminators = pcall(require, "keymap.terminators")
 	if not ok_term then Terminators = nil end
 
@@ -477,20 +591,61 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end,
 		["delays_colors"] = function(items)
-			-- One row, not the Windows submenu: that one also carries per-category
-			-- delay prompts, and this driver has no per-category delays to prompt
-			-- for. What it does have is the settings window, which is what the row
-			-- is for.
-			items[#items + 1] = {
-				title = i18n_safe("menu.hotstrings.delays_colors"),
+			-- A submenu, not the single row this used to be. The old row opened the
+			-- settings window and stopped there, justified by a comment saying "this
+			-- driver has no per-category delays to prompt for" — which was false when
+			-- it was written: hotstrings_config.resolve() walks the same five-rung
+			-- cascade as macOS, set_override() persists to the same file, and
+			-- ergopti_hotstrings.lua consumes the resolved delay on every keystroke.
+			-- The values were all there; only the prompts were missing.
+			local sub = {}
+
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.hotstrings.config_item"),
 				fn    = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
 						return
 					end
-					ctx.webview.show("hotstrings_config")
+					-- The directory name under _shared/ui/. "hotstrings_config" has a
+					-- bridge but no page, so this row opened a window reading
+					-- "Error: app 'hotstrings_config' not found" — the settings window
+					-- this whole submenu points at had never once opened on Linux.
+					ctx.webview.show("hotstrings_config_window")
 				end,
 			}
+			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = global_delay_row()
+
+			for _, entry in ipairs(QUICK_DELAY_CATEGORIES) do
+				sub[#sub + 1] = category_delay_row(entry.category, entry.label)
+			end
+
+			items[#items + 1] = { title = i18n_safe("menu.hotstrings.delays_colors"), menu = sub }
+		end,
+		["preview_bubbles"] = function(items)
+			-- The four toggles the manifest has declared for this driver all along
+			-- and that nothing could reach: ui/tooltip/preview.lua honoured them on
+			-- the hot path while its set_enabled() had no caller, so they were fixed
+			-- at their load-time value. PreviewSettings owns them now; this menu is
+			-- the way in.
+			local sub = {}
+			for index, toggle in ipairs(PreviewSettings.toggles()) do
+				-- "colored" is a different kind of switch from the three above it —
+				-- they choose WHICH previews appear, it chooses how they look — so it
+				-- is separated, the same way macOS separates it.
+				if index == #PreviewSettings.toggles() then sub[#sub + 1] = { title = "-" } end
+				local name = toggle.name
+				sub[#sub + 1] = {
+					title   = i18n_safe(toggle.label),
+					checked = PreviewSettings.get(name),
+					fn      = function()
+						PreviewSettings.toggle(name)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			end
+			items[#items + 1] = { title = i18n_safe("menu.hotstrings.preview_bubbles"), menu = sub }
 		end,
 	}
 

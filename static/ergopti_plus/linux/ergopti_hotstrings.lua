@@ -104,6 +104,7 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("modules.hotstrings.magic_key")
+local PreviewSettings   = require("modules.hotstrings.preview_settings")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -869,7 +870,12 @@ local function main()
 			-- would mean a second dialog toolkit for one input.
 			on_add_delimiter = function()
 				if type(webview_manager) == "table" and type(webview_manager.show) == "function" then
-					webview_manager.show("hotstrings_config")
+					-- The directory name under _shared/ui/, which is what
+					-- webkit_host.resolve_app_dir() looks for. It used to say
+					-- "hotstrings_config": that name has a bridge in BRIDGE_MODULES but
+					-- no page on disk, so the window opened and rendered
+					-- "Error: app 'hotstrings_config' not found".
+					webview_manager.show("hotstrings_config_window")
 				else
 					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
 				end
@@ -877,7 +883,12 @@ local function main()
 			on_open_file = function(path)
 				if type(path) ~= "string" or path == "" then return end
 				Logger.info(LOG, "Opening hotstring file: %s", path)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\''")))
+				-- "'\\''" in Lua source is the four characters '\'' — the POSIX
+				-- close-escape-reopen idiom. Written "'\''" it collapses to three
+				-- apostrophes, which closes the quote and leaves the rest of the path
+				-- unquoted: a pack under "/home/me/l'ergopti" then reached xdg-open as
+				-- two broken words and silently opened nothing.
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
 			end,
 			on_open_config = function(dir)
 				local d = dir or config_dir
@@ -965,6 +976,23 @@ local function main()
 			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
 			tooltip_preview = nil
 		end
+	end
+
+	-- 8.9c) Apply the user's four preview toggles.
+	--
+	-- Until 2026-08-05 nothing did. preview.lua initialises its switch table to
+	-- four `true`s at load and exposes set_enabled() to change them; no caller
+	-- existed, so the manifest declared the four features for this driver, the
+	-- renderer honoured them on the hot path, and the values could never be
+	-- anything but the load-time ones. The stored choice is pushed in once here
+	-- and again on every menu change, rather than read inside M.show — that runs
+	-- on the keystroke that might fire a hotstring, and a file read belongs
+	-- nowhere near it.
+	if tooltip_preview then
+		PreviewSettings.init(function(name, value)
+			tooltip_preview.set_enabled(name, value)
+		end)
+		PreviewSettings.apply(tooltip_preview)
 	end
 
 	-- 8.10a) Initialise i18n (loads persisted locale, enables ★ substitution).

@@ -497,15 +497,22 @@ function M.build_management(ctx)
 		["word_expanders"]   = function(items) if exp_item then items[#items + 1] = exp_item end end,
 		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
 		["magic_key_config"] = function(items) items[#items + 1] = magic_key_item end,
+		-- Declared in the manifest since 2026-08-05, and rendered here by id
+		-- rather than appended by hand below. It was the last part of the
+		-- hotstrings surface no row described: this driver drew the submenu and
+		-- Linux drew nothing, while features.hotstrings.preview_* had declared all
+		-- four toggles for BOTH drivers from the start. Naming the row is what let
+		-- Linux render the same one instead of reimplementing it.
+		["preview_bubbles"]  = function(items) if bubble_item then items[#items + 1] = bubble_item end end,
 	}, nil, ctx)
 
-	-- Not manifest rows on any driver: the preview-bubble submenu and the
-	-- repeat-key toggle are this driver's own. Collected first and appended in one
-	-- pass, which keeps the manifest half and the hand-built half legible as two
-	-- halves rather than one interleaved sequence.
+	-- Not a manifest row on this driver: the repeat-key toggle. The manifest
+	-- restricts `repeat_key` to AHK, and this row is the standing evidence that
+	-- the restriction has been wrong for as long as both have existed — macOS
+	-- ships the engine (modules/keymap/expander.lua try_repeat_feature) as well as
+	-- the toggle. Recorded in todo_linux.md §11.2 rather than widened here,
+	-- because widening it is only honest once Linux has the feature too.
 	local own = { { title = "-" } }
-	if bubble_item then own[#own + 1] = bubble_item end
-	own[#own + 1] = { title = "-" }
 	own[#own + 1] = repeat_item
 	for _, row in ipairs(own) do rows[#rows + 1] = row end
 

@@ -41,6 +41,17 @@ local DISABLED_KEY = "hotstrings.disabled_categories"
 -- open: the same one the config window edits and the same shape macOS writes.
 local OVERRIDES_FILE = "hotstrings_overrides.toml"
 
+-- The reserved override key holding the user's GLOBAL default delay, as opposed
+-- to any one category's. Spelled exactly as AHK spells it
+-- (infra/hotstrings/hotstrings_catalogue.ahk consults `_HotstringsOverrides["_global"]`
+-- as the lowest-priority user value) so the two override files stay readable by
+-- the same rules — where the file LIVES differs per driver by design, but what a
+-- key means inside it must not.
+--
+-- The leading underscore is what keeps it out of the catalogue: category ids are
+-- TOML file stems, and no pack is named "_global".
+local GLOBAL_CATEGORY = "_global"
+
 
 -- =========================================
 -- =========================================
@@ -316,12 +327,49 @@ function M.resolve(category, section)
 		user_section   = section and (user.sections or {})[section] or nil,
 		meta_category  = meta,
 		meta_section   = section and (meta.sections or {})[section] or nil,
-		default_delay  = GLOBAL_DEFAULT_DELAY,
+		default_delay  = M.get_global_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 	})
 	_resolve_cache[key] = resolved
 	return resolved
+end
+
+--- The delay used by every category that declares none: the user's global
+--- choice, or the shipped default.
+---
+--- Occupies the same rung as AHK's reserved "_global" override key — the lowest
+--- USER value, sitting just above the hardcoded shared default and below
+--- anything a category or section says. It is spelled as a normal override entry
+--- rather than as a field of its own so that one writer, one file and one
+--- clear-override path serve it like all the others; GLOBAL_CATEGORY is not a
+--- real category, and nothing enumerates it, because the catalogue is what
+--- lists categories and this key never appears there.
+--- @return number Seconds.
+function M.get_global_delay()
+	local entry = _overrides[GLOBAL_CATEGORY]
+	local delay = entry and tonumber(entry.delay) or nil
+	if delay then return delay end
+	return GLOBAL_DEFAULT_DELAY
+end
+
+--- Whether the user has set a global delay of their own.
+--- @return boolean
+function M.has_global_delay_override()
+	local entry = _overrides[GLOBAL_CATEGORY]
+	return entry ~= nil and tonumber(entry.delay) ~= nil
+end
+
+--- Sets the global default delay.
+--- @param seconds number|nil nil clears it, restoring the shipped default.
+--- @return boolean
+function M.set_global_delay(seconds)
+	if seconds == nil then return M.clear_override(GLOBAL_CATEGORY, nil) end
+	if type(seconds) ~= "number" or seconds < 0 then
+		Logger.error(LOG, "set_global_delay(): %s is not a non-negative number.", tostring(seconds))
+		return false
+	end
+	return M.set_override(GLOBAL_CATEGORY, nil, "delay", seconds)
 end
 
 --- Sets one override field, persisting it.
