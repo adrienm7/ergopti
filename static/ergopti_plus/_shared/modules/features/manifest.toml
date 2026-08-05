@@ -2961,9 +2961,21 @@ i18n = "menu.global.edit_shortcuts"
 type = "dynamic"
 id = "extensions_shortcuts"
 
-# AHK-only: the handler walks the Windows extensions directory
-# (_ExtensionsDir) for shortcut scripts. Neither Lua driver has that
-# concept, which is why both left the row unhandled rather than empty.
+# The restriction below is WRONG and is left in place only because correcting it
+# is a manifest-projection job rather than a feature job. Recorded here on
+# 2026-08-05 so the next reader does not take it at face value:
+#
+#   "Neither Lua driver has that concept" is false for BOTH of them. macOS has
+#   implemented this row since ui/menu/menu_shortcuts.lua:543 was written — it
+#   walks the extensions tree, loads each shortcuts/menu.lua in a sandbox and
+#   renders what the extension collects. Linux gained the same scan on
+#   2026-08-05 (ui/menu/menu_builder.lua, _extension_shortcut_rows).
+#
+# Widening `platforms` here would make the manifest promise a row that Linux's
+# shortcuts menu cannot render BY ID: unlike the hotstrings menu, that menu is
+# hand-rolled and does not dispatch through the shared renderer, so the
+# handler-bijection ratchet would flag it immediately. Converting it is the real
+# task, and it is recorded in todo_linux.md section 11.3.
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 

@@ -1384,6 +1384,75 @@ local function _build_metrics(ctx)
 end
 
 --- Builds the shortcuts submenu.
+--- One menu row per installed extension that ships `shortcuts/menu.lua`.
+---
+--- The file is executed in a sandbox exposing exactly what the macOS host
+--- exposes — `add_item`, `t` and `ext_name` — with the standard library reachable
+--- through __index so an author can use `string` and `table` without either host
+--- listing them. Anything the extension collects becomes a submenu under its own
+--- name.
+---
+--- setfenv rather than a _ENV upvalue: this driver runs LuaJIT, which is 5.1, and
+--- setfenv is the 5.1 spelling. The macOS host uses the same call.
+--- @return table Array of menu rows, empty when nothing is installed.
+local function _extension_shortcut_rows()
+	local rows = {}
+
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_loader, Loader = pcall(require, "modules.hotstrings.loader")
+	if not ok_paths or not ok_loader or type(Paths.extension_roots) ~= "function" then return rows end
+
+	-- The same io functions hotstrings_config.extension_packs() injects. The
+	-- scanner takes them rather than reaching for the filesystem itself, which is
+	-- what lets it be shared and tested; passing nil returns an empty list, so
+	-- this is not optional.
+	local ok_scan, packs = pcall(Extensions.scan, Paths.extension_roots(), {
+		list_dirs  = Loader.list_subdirs,
+		list_files = Loader.find_toml_files,
+		read_file  = Loader.read_file,
+	})
+	if not ok_scan or type(packs) ~= "table" then return rows end
+
+	-- One entry per extension: the scanner already collapses an id that appears
+	-- under more than one root (bundled and user-installed).
+	for _, pack in ipairs(packs) do
+		local id, dir = pack.id, pack.dir
+		if id and dir then
+			local menu_path = dir .. "/shortcuts/menu.lua"
+			local chunk = loadfile(menu_path)
+			if chunk then
+				local collected = {}
+				local sandbox = {
+					add_item = function(item)
+						if type(item) == "table" then collected[#collected + 1] = item end
+					end,
+					t        = i18n_safe,
+					ext_name = pack.name or id,
+				}
+				setmetatable(sandbox, { __index = _G })
+				sandbox._G = sandbox
+
+				if setfenv then setfenv(chunk, sandbox) end
+				local ok_run, err = pcall(chunk)
+				if not ok_run then
+					-- Surfaced as a row, not only logged: an extension whose menu
+					-- throws would otherwise be indistinguishable from one that
+					-- declares nothing, and its author would have no way to tell.
+					Logger.warn(LOG, "Extension '%s' shortcuts/menu.lua failed: %s", id, tostring(err))
+					rows[#rows + 1] = {
+						title = (pack.name or id) .. " — " .. i18n_safe("common.error_title"),
+						fn = function() end, disabled = true,
+					}
+				elseif #collected > 0 then
+					rows[#rows + 1] = { title = pack.name or id, menu = collected }
+				end
+			end
+		end
+	end
+
+	return rows
+end
+
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
@@ -1457,6 +1526,18 @@ local function _build_shortcuts(ctx)
 		end
 	end
 	items[#items + 1] = { title = "Wrap symbols", menu = wrap_items }
+
+	-- One submenu per installed extension that ships shortcuts/menu.lua.
+	--
+	-- An extension author writes that file and it appears under Raccourcis on
+	-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
+	-- action an extension declared was unreachable — and the bundled demo
+	-- extension carries the file, so this reproduced out of the box.
+	local extension_rows = _extension_shortcut_rows()
+	if #extension_rows > 0 then
+		items[#items + 1] = { title = "-" }
+		for _, row in ipairs(extension_rows) do items[#items + 1] = row end
+	end
 
 	return { title = i18n_safe("menu.shortcuts.title"), menu = items }
 end
