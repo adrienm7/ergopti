@@ -62,6 +62,9 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "hs" },
 	},
 	{
@@ -708,9 +711,6 @@ M.features = {
 M.unavailable = {
 	{
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
-	},
-	{
-		path = "hotstrings.repeat_key_enabled", section = "hotstrings", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },

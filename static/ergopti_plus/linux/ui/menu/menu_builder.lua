@@ -30,6 +30,7 @@ local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
 local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
+local RepeatKey = require("modules.hotstrings.repeat_key")
 local LOG = "ui.menu.menu_builder"
 
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
@@ -118,6 +119,40 @@ local function show_error(message)
 		-- rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
 	end
+end
+
+--- Asks a yes/no question.
+---
+--- Returns nil rather than false when the dialog could not be shown at all, so a
+--- caller can tell "the user said no" from "there was nobody to ask" — the second
+--- must not be recorded as a choice.
+--- @param title string Already-translated.
+--- @param text string Already-translated.
+--- @param ok_label string Already-translated.
+--- @param cancel_label string Already-translated.
+--- @return boolean|nil
+local function ask_yes_no(title, text, ok_label, cancel_label)
+	local command = "zenity --question --title=" .. shell_quote(title)
+		.. " --text=" .. shell_quote(text)
+		.. " --ok-label=" .. shell_quote(ok_label)
+		.. " --cancel-label=" .. shell_quote(cancel_label)
+		.. " 2>/dev/null"
+	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+.
+	--- @param status any
+	--- @return boolean
+	local function succeeded(status)
+		return status == true or status == 0
+	end
+
+	-- Probed rather than assumed, because the exit code alone cannot distinguish
+	-- "the user pressed Cancel" from "no such binary" — both are non-zero, and
+	-- treating the second as a No would silently record a choice nobody made.
+	if not succeeded(os.execute("command -v zenity >/dev/null 2>&1")) then
+		Logger.error(LOG, "Zenity is unavailable: cannot ask '%s'.", tostring(title))
+		return nil
+	end
+	-- zenity exits 0 for the OK button and 1 for cancel.
+	return succeeded(os.execute(command))
 end
 
 local function gesture_slot_label(slot)
@@ -497,17 +532,22 @@ local function _manifest_hotstring_rows(ctx, config)
 				return
 			end
 
-			--- Every delimiter key currently known, custom ones included.
+			--- The CATALOGUE delimiter keys — the user's own are excluded.
+			---
+			--- This used to include custom ones, and its comment said so as if it
+			--- were a decision. Both reference drivers skip them deliberately: a
+			--- delimiter the user added by hand must not be wiped by a bulk action
+			--- aimed at the shipped set.
 			--- @return table Array of key strings.
 			local function all_keys()
 				local keys = {}
 				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
-					if def.key then keys[#keys + 1] = def.key end
+					if def.key and not def.custom then keys[#keys + 1] = def.key end
 				end
 				return keys
 			end
 
-			--- Sets every delimiter at once.
+			--- Sets every catalogue delimiter at once.
 			--- @param on boolean
 			--- @return function
 			local function set_all(on)
@@ -526,6 +566,21 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- clicking through twenty rows to get there is not an interface.
 			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.check_all"),   fn = set_all(true) }
 			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.uncheck_all"), fn = set_all(false) }
+			-- The way back. Both other drivers put it beside the two bulk rows, and
+			-- without it a user who clicked "Tout décocher" had no route to the
+			-- shipped set short of editing storage by hand — 15 of the 25 catalogue
+			-- delimiters ship disabled, so "check all" is not that route either.
+			sub[#sub + 1] = {
+				title = i18n_safe("menu.global.reset_defaults"),
+				fn    = function()
+					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+						if def.key and not def.custom then
+							Terminators.set_terminator_enabled(def.key, def.default_enabled ~= false)
+						end
+					end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
 			sub[#sub + 1] = { title = "-" }
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
@@ -533,7 +588,11 @@ local function _manifest_hotstring_rows(ctx, config)
 					sub[#sub + 1] = { title = "-" }
 				elseif def.key then
 					local key = def.key
-					local label = def.label or key
+					-- The live magic key, not the ★ the catalogue was written with.
+					-- The label is shipped as a literal star; a user who changed the
+					-- key saw the delimiter list still naming a character that is no
+					-- longer their trigger, in every language.
+					local label = (def.label or key):gsub("★", MagicKey.get())
 					-- A consumed delimiter is swallowed by the expansion; an unconsumed
 					-- one is typed after it. The difference is visible only in the
 					-- output, so the row has to say which it is — a space that vanishes
@@ -566,8 +625,41 @@ local function _manifest_hotstring_rows(ctx, config)
 			sub[#sub + 1] = { title = "-" }
 			sub[#sub + 1] = {
 				title = i18n_safe("menu.hotstrings.add_delimiter"),
-				fn    = function()
-					if type(ctx.on_add_delimiter) == "function" then ctx.on_add_delimiter() end
+				-- Asked here, natively, rather than delegated to the settings window.
+				-- The delegation was justified in the daemon by "this driver's only
+				-- text field is the settings window" — but the window it opened did
+				-- not exist, so no custom delimiter could ever be created and the
+				-- "delete" sub-row below was unreachable by construction. The text
+				-- field it claimed not to have is prompt_text, in this same file,
+				-- and the magic-key row two handlers down already uses it.
+				fn = function()
+					local char = prompt_text(
+						i18n_safe("dialog.hotstrings.new_delimiter_title"),
+						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
+						"")
+					if char == nil then return end
+
+					-- Codepoints, not bytes: "…" is three bytes and one character, so
+					-- a byte-length check would refuse most of what a user would pick.
+					local codepoints = 0
+					for _ in char:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+						codepoints = codepoints + 1
+					end
+					if codepoints ~= 1 then
+						show_error(i18n_safe("dialog.magic_key.error_length"))
+						return
+					end
+
+					local consume = ask_yes_no(
+						i18n_safe("dialog.hotstrings.consume_title"),
+						i18n_safe("dialog.hotstrings.consume_body"),
+						i18n_safe("dialog.hotstrings.consume_yes"),
+						i18n_safe("dialog.hotstrings.consume_no"))
+					-- nil is "nobody could be asked", which must not be stored as a No.
+					if consume == nil then return end
+
+					Terminators.add_custom_terminator("custom_" .. char, char, char, consume)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end,
 			}
 
@@ -641,6 +733,17 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.delays_colors"), menu = sub }
+		end,
+		["repeat_key"] = function(items)
+			local enabled = RepeatKey.is_enabled()
+			items[#items + 1] = {
+				title   = i18n_safe("menu.hotstrings.repeat_key_toggle"),
+				checked = enabled,
+				fn      = function()
+					RepeatKey.toggle()
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
 		end,
 		["preview_bubbles"] = function(items)
 			-- The four toggles the manifest has declared for this driver all along

@@ -406,11 +406,14 @@ for (const menuKey of MENU_KEYS) {
 }
 
 // Frozen at the measurement of 2026-08-04. Convention S wants the row present
-// and greyed with its reason rather than absent, and 40 rows predate that; making
-// them all red at once would mean this gate could only land by being silenced.
-// It may fall, never rise — 41 became 40 the moment hotstring_extensions stopped
-// claiming to be Windows-only.
-const UNREASONED_BASELINE = 40;
+// and greyed with its reason rather than absent, and these rows predate that;
+// making them all red at once would mean this gate could only land by being
+// silenced. It may fall, never rise:
+//   41 → 40 when hotstring_extensions stopped claiming to be Windows-only
+//   40 → 39 when repeat_key did the same. macOS had shipped both the engine and
+//        the toggle all along, so the restriction recorded who wrote it first
+//        rather than what the platforms can do; Linux now has it too.
+const UNREASONED_BASELINE = 39;
 
 if (unreasoned.length > UNREASONED_BASELINE) {
 	errors.push(

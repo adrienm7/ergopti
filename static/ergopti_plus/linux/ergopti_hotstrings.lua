@@ -105,6 +105,7 @@ local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("modules.hotstrings.magic_key")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
+local RepeatKey         = require("modules.hotstrings.repeat_key")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -526,6 +527,22 @@ local function main()
 		end
 		_last_key_ms = now_ms
 
+		-- The magic-key repeat, when nothing else matched: `po★` gives `poo`. A real
+		-- match always wins, which is why this is tested against `result` being nil
+		-- rather than run before the engine.
+		if not result and RepeatKey.is_enabled() then
+			local repeated = RepeatKey.resolve(engine:current_buffer(), MagicKey.get())
+			if repeated then
+				result = {
+					trigger         = MagicKey.get(),
+					replacement     = repeated.replacement,
+					backspace_count = repeated.backspace_count,
+					group           = "repeat_key",
+					final_result    = true,
+				}
+			end
+		end
+
 		if result then
 			Logger.info(
 				LOG,
@@ -717,32 +734,86 @@ local function main()
 	-- switched off came back on at the next start — and the feature exists
 	-- precisely so a user can say "expand on ★ and nothing else". A setting that
 	-- forgets itself is worse than one that is missing.
-	local TERMINATORS_KEY = "hotstrings.disabled_terminators"
+	-- The FULL state, both directions, plus the user's own delimiters.
+	--
+	-- This stored only the OFF list until 2026-08-05, and that is not the same
+	-- thing: 15 of the 25 catalogue delimiters ship DISABLED, so a user who
+	-- switched ")" or "/" on got it for the session and found it off again after
+	-- a restart, with nothing said. Recording a delta against a default only works
+	-- when the default is one-sided, and this one is not.
+	--
+	-- Custom delimiters were not stored at all, so one added from the menu
+	-- vanished at the next start.
+	local TERMINATORS_KEY = "hotstrings.terminator_state"
+	local CUSTOM_TERMINATORS_KEY = "hotstrings.custom_terminators"
+
+	-- The record separator inside each stored list. Chosen because a delimiter is
+	-- a single printable character and a comma is a plausible one, so the old
+	-- comma-joined format could not have held custom entries unambiguously.
+	local RECORD_SEP = "\30"
+	local FIELD_SEP = "\31"
+
 	local function persist_terminators()
 		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return end
-		local off = {}
+		local ok_storage, Storage = pcall(require, "adapters.storage")
+		if not ok_storage then return end
+
+		local state, custom = {}, {}
 		for _, def in ipairs(terminators_mod.get_terminator_defs() or {}) do
-			if def.key and not terminators_mod.is_terminator_enabled(def.key) then
-				off[#off + 1] = def.key
+			if def.key then
+				state[#state + 1] = def.key .. FIELD_SEP
+					.. (terminators_mod.is_terminator_enabled(def.key) and "1" or "0")
+				if def.custom then
+					local char = type(def.chars) == "table" and def.chars[1] or nil
+					if char then
+						custom[#custom + 1] = table.concat({
+							def.key, char, def.label or char, def.consume and "1" or "0",
+						}, FIELD_SEP)
+					end
+				end
 			end
 		end
-		table.sort(off)
-		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if ok_storage then Storage.set(TERMINATORS_KEY, table.concat(off, ",")) end
+		table.sort(state)
+		table.sort(custom)
+		Storage.set(TERMINATORS_KEY, table.concat(state, RECORD_SEP))
+		Storage.set(CUSTOM_TERMINATORS_KEY, table.concat(custom, RECORD_SEP))
 	end
 
 	local function restore_terminators()
 		if not terminators_mod or type(terminators_mod.set_terminator_enabled) ~= "function" then return end
 		local ok_storage, Storage = pcall(require, "adapters.storage")
 		if not ok_storage then return end
-		local raw = Storage.get(TERMINATORS_KEY, "")
-		if type(raw) ~= "string" or raw == "" then return end
-		local count = 0
-		for key in raw:gmatch("[^,]+") do
-			terminators_mod.set_terminator_enabled(key, false)
-			count = count + 1
+
+		-- The user's own delimiters first: their enabled state is in the same list
+		-- as the catalogue's, and applying it to a delimiter that does not exist yet
+		-- would be dropped.
+		local restored_custom = 0
+		local raw_custom = Storage.get(CUSTOM_TERMINATORS_KEY, "")
+		if type(raw_custom) == "string" and raw_custom ~= "" then
+			for record in raw_custom:gmatch("[^" .. RECORD_SEP .. "]+") do
+				local fields = {}
+				for field in record:gmatch("[^" .. FIELD_SEP .. "]+") do fields[#fields + 1] = field end
+				if #fields >= 4 and type(terminators_mod.add_custom_terminator) == "function" then
+					terminators_mod.add_custom_terminator(fields[1], fields[2], fields[3], fields[4] == "1")
+					restored_custom = restored_custom + 1
+				end
+			end
 		end
-		Logger.info(LOG, "Restored %d disabled word delimiter(s).", count)
+
+		local applied = 0
+		local raw = Storage.get(TERMINATORS_KEY, "")
+		if type(raw) == "string" and raw ~= "" then
+			for record in raw:gmatch("[^" .. RECORD_SEP .. "]+") do
+				local key, flag = record:match("^(.-)" .. FIELD_SEP .. "([01])$")
+				if key then
+					terminators_mod.set_terminator_enabled(key, flag == "1")
+					applied = applied + 1
+				end
+			end
+		end
+
+		Logger.info(LOG, "Restored %d word-delimiter state(s) and %d custom delimiter(s).",
+			applied, restored_custom)
 	end
 
 	restore_terminators()
