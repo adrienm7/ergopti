@@ -1243,7 +1243,7 @@ déclarée.
 ---
 
 
-## 10. Validation sur matériel réel (aucune n'est couverte par le CI)
+## 10. Validation sur matériel réel
 
 > **Procédure écrite** : `static/ergopti_plus/linux/HARDWARE.md` — chaque point
 > ci-dessous y a sa commande et la réponse attendue, dans un ordre où un échec
@@ -1324,22 +1324,51 @@ déclarée.
 > Ces trois-là ne sont donc plus « à valider » : ils sont exécutés à chaque CI.
 > Ce qui reste ci-dessous est ce qui exige un écran, un panneau et des yeux.
 
-- [ ] Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
+### 10.0 — Le livrable d'implémentation du §10
+
+- [x] **La procédure de validation existe, est mécanisée partout où c'est
+  possible, et est exécutable d'une commande.**
+  → `HARDWARE.md` (12 sections, chacune sa commande et sa réponse attendue) et
+  `tests/hardware/validate.sh`, qui répond à tout ce qu'une machine peut répondre
+  puis pose une à une les questions restantes et écrit **un seul rapport**.
+  → Cinq harnais tournent désormais à chaque CI sur un vrai noyau :
+  `run_uinput_roundtrip` (11/11), `run_grab_race` (12/12, la corruption C4),
+  `run_layout_resolution` (fr/es/us/de), `run_display_server` (Xvfb **et** sway
+  headless), `run_tray_symbols` (15/15 contre libayatana + GTK3 réels), plus
+  l'installation sur **cinq familles de distributions** en conteneurs.
+  → Un sixième, `run_keysym_roundtrip.sh`, ne peut pas tourner en CI : Xvfb est un
+  serveur X virtuel à clavier factice, sans backend evdev, donc une frappe uinput
+  n'a aucun chemin pour l'atteindre. Mesuré, pas supposé. Il tourne depuis
+  `HARDWARE.md` sur une machine à pile graphique, et c'est le seul point qu'un
+  opérateur n'a pas à **juger** : il le lance et lit le code de sortie.
+
+### 10.1 — Ce qu'un opérateur doit constater de ses yeux
+
+> Ces lignes ne sont **pas** des tâches d'implémentation, et leur donner la forme
+> `- [ ]` était une erreur de structure : aucun travail de code ne peut les
+> cocher. Ce sont des observations sur un bureau Linux réel, elles vivent dans
+> `HARDWARE.md`, et `validate.sh` les pose une par une.
+>
+> La moitié mécanisable de chacune est faite et tourne en CI — voir la note sous
+> chaque ligne pour savoir laquelle exactement, et ce qui reste.
+
+
+- 👁 Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
       *(le cœur — capture, grab, ré-émission — est vérifié ; reste la partie
       « le texte apparaît bien dans une vraie fenêtre », sur les deux serveurs)*
-- [ ] Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
+- 👁 Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
       *(la résolution de disposition est vérifiée sur de vraies keymaps ; reste
       la frappe réelle dans une application)*
-- [ ] Frappe rapide pendant expansion → pas de corruption (C4).
+- 👁 Frappe rapide pendant expansion → pas de corruption (C4).
       *(l'ordre des événements est prouvé sur un vrai noyau ; reste la
       confirmation visuelle dans un éditeur)*
-- [ ] Bascule logout-X11 → login-Wayland sans reconfiguration (C2).
+- 👁 Bascule logout-X11 → login-Wayland sans reconfiguration (C2).
       *(la moitié mécanisable est vérifiée : `run_display_server.lua` tourne sous
       **Xvfb** puis sous **sway headless**, même binaire, zéro configuration entre
       les deux, et le cas piège — DISPLAY laissé positionné comme le fait XWayland
       sur toute session Wayland — est celui qui est testé. Reste que la session
       redémarre bien l'unité, ce qui exige une vraie ouverture de session)*
-- [ ] Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
+- 👁 Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
       *(la moitié qui échoue **en silence** est vérifiée à chaque CI :
       `run_tray_symbols.lua` charge les trois sonames et résout les quinze
       symboles contre de vraies libayatana et GTK3 — 15/15. Un soname faux ou un
@@ -1347,7 +1376,7 @@ déclarée.
       test unitaire ne peut l'attraper puisqu'il doit stubber, et qu'un stub
       répond à n'importe quel nom. Reste que l'icône soit **visible**, ce qui
       exige un panneau qui héberge un StatusNotifierWatcher)*
-- [ ] Trigger `★` changeable ; délais réglables ; tooltip au bon style.
+- 👁 Trigger `★` changeable ; délais réglables ; tooltip au bon style.
 - [x] Install testée par distro-famille (Ubuntu, Fedora, Arch, Alpine, +1 immuable).
       → **Fait, en conteneurs, à chaque CI** : debian, fedora, arch, alpine,
       opensuse — chacun son vrai gestionnaire de paquets. La ligne de checklist
