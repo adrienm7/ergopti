@@ -397,6 +397,21 @@ function M.get_neutral_color()
 	return NEUTRAL_COLOR
 end
 
+--- Test seam: replaces the parsed category metadata without a filesystem scan.
+---
+--- The sibling of _set_overrides_for_test, and needed for the same reason. The
+--- cross-driver resolve corpus is about the PRECEDENCE cascade, not about finding
+--- files: routing it through load_all() would make it depend on `find`, which is
+--- Windows' find.exe on a developer's machine and answers with silence. The
+--- vectors then all resolve to the global default and the corpus reports a
+--- divergence from macOS that does not exist. The parse itself is covered by
+--- test_loader_catalogue.lua, which is where it belongs.
+--- @param categories table|nil Map of category id to its parsed metadata.
+function M._set_categories_for_test(categories)
+	_categories = categories or {}
+	_resolve_cache = {}
+end
+
 --- Test seam: replaces the in-memory overrides without touching the file.
 --- @param overrides table|nil
 function M._set_overrides_for_test(overrides)
