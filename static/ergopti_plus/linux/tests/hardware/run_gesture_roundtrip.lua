@@ -41,6 +41,10 @@ local SLOT_COUNT = 5
 local SETTLE_ATTEMPTS = 50
 local SETTLE_SECONDS  = 0.1
 
+-- Moves every gesture's starting point, so no coordinate is ever emitted twice
+-- in a row. See the note in play().
+local _origin_nudge = 0
+
 local _failures, _checks = 0, 0
 
 --- @param condition boolean
@@ -234,7 +238,16 @@ local function play(fingers, dx, dy)
 	end
 
 	local decoder = Decoder.new()
-	local base_x, base_y = 1000, 900
+
+	-- A DIFFERENT origin for every gesture. The kernel's input core drops an
+	-- EV_ABS event whose value has not changed, so replaying a gesture from the
+	-- same coordinates emits no positions at all: the decoder sees fingers land
+	-- and lift with no movement between, and classifies a swipe as a tap. That is
+	-- what made the third gesture come back without a direction while the first
+	-- two were right — a property of the kernel that no hand-written fixture
+	-- could have shown, and precisely why this harness exists.
+	_origin_nudge = (_origin_nudge or 0) + 137
+	local base_x, base_y = 1000 + _origin_nudge, 900 + _origin_nudge
 	local tool = {}
 	for _, entry in ipairs(Finder.FINGER_BITS) do tool[entry.fingers] = entry.bit end
 

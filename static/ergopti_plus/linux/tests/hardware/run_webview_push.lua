@@ -180,12 +180,29 @@ local function exercise(app_name, bridge, entry, probe)
 	check(webview ~= nil, app_name .. ": a WebKit view was created for it")
 	if not webview then return end
 
-	-- The page loads asynchronously; nothing below means anything until it has.
-	local loaded = pump_until(function()
-		return eval_sync(webview, "document.readyState") == "complete"
+	-- Waits for the ENTRY POINT, not for readyState.
+	--
+	-- readyState reaching "complete" was the earlier condition and it is not the
+	-- same question: the editor carries 69 KB of inline script against the
+	-- settings window's 24 KB, and a probe that fires the moment the document
+	-- reports complete can still land before the last of it has run. That is
+	-- what made the verdict alternate between the two pages across runs while
+	-- neither page changed.
+	--
+	-- Waiting for what the host actually needs removes the ambiguity: if it never
+	-- appears, that is a real failure and the timeout says so.
+	local ready = pump_until(function()
+		return eval_sync(webview, "typeof window." .. entry) == "function"
 	end)
-	check(loaded, app_name .. ": the page finished loading")
-	if not loaded then return end
+	check(ready, string.format(
+		"%s: the page defines window.%s before the host pushes to it", app_name, entry))
+	if not ready then
+		print(string.format("       readyState=%s scripts=%s makeHostBridge=%s",
+			tostring(eval_sync(webview, "document.readyState")),
+			tostring(eval_sync(webview, "String(document.scripts.length)")),
+			tostring(eval_sync(webview, "typeof makeHostBridge"))))
+		return
+	end
 
 	-- A spy on the page's own entry point, installed BEFORE the push. It answers
 	-- BOTH halves at one instant, which is why it replaced a separate `typeof`
@@ -217,10 +234,9 @@ local function exercise(app_name, bridge, entry, probe)
 		})();
 	]], entry, entry, entry))
 
-	local had_entry = eval_sync(webview, "String(window.__had_entry)")
-	check(had_entry == "true", string.format(
-		"%s: the page defines window.%s (got %s)", app_name, entry, tostring(had_entry)))
-
+	-- Not asserted again here: the wait above already established it, and a second
+	-- reading of one fact taken at a different instant is how this harness came to
+	-- contradict itself once already. It is kept as a sanity value the spy carries.
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
 	-- as the script-message handler routes it, which is what makes the bridge push.
