@@ -241,10 +241,35 @@ local function exercise(app_name, bridge, entry, probe)
 	end
 end
 
-exercise("hotstrings_config_window", "hotstrings_config_bridge", "setData",
-	"String(document.querySelectorAll('.cat').length)")
-exercise("hotstring_editor", "hsEditor", "initData",
-	"String(document.getElementById('app') && document.getElementById('app').style.display)")
+-- ONE page per invocation, chosen by argument.
+--
+-- Exercising both in one process made the verdict move between them run to run:
+-- config failed twice while the editor passed, then the reverse, with nothing
+-- about the editor changed in between. Two webviews in one GTK loop means
+-- pumping for one processes the other's events, and a probe can land while the
+-- other page is still settling — so a per-page verdict could not be trusted even
+-- when it was green.
+--
+-- Separate processes remove the interference rather than time around it. The
+-- cost is a second interpreter start, which is nothing next to a result that
+-- alternates.
+local CASES = {
+	hotstrings_config_window = { bridge = "hotstrings_config_bridge", entry = "setData",
+		probe = "String(document.querySelectorAll('.cat').length)" },
+	hotstring_editor = { bridge = "hsEditor", entry = "initData",
+		probe = "String(document.getElementById('app') && document.getElementById('app').style.display)" },
+}
+
+local requested = arg and arg[1]
+local case = requested and CASES[requested]
+if not case then
+	local names = {}
+	for name in pairs(CASES) do names[#names + 1] = name end
+	table.sort(names)
+	abort("usage: run_webview_push.lua <" .. table.concat(names, "|") .. ">")
+end
+
+exercise(requested, case.bridge, case.entry, case.probe)
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)
