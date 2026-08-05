@@ -37,6 +37,23 @@ local LOG = "ui.tooltip.preview"
 -- is useful and covers the text it annotates.
 local MAX_ROWS = 6
 
+-- The category whose colour each FAMILY of expansion wears. Mirrored from macOS
+-- (ui/tooltip/config.lua TINT_KEY_TO_CATEGORY) so a ★-validated row is the same
+-- colour on both drivers.
+local TINT_FAMILY = {
+	star        = "magickey",
+	autocorrect = "autocorrection",
+	ai          = "personal",
+}
+
+-- The user's own hotstrings, which keep their own colour whichever key validates
+-- them.
+local PERSONAL_CATEGORY = "personal"
+
+-- The key shown at the right of a row that a terminator validates. The magic key
+-- is read live for the rows it validates, because the user can change it.
+local TERMINATOR_LABEL = "↵"
+
 -- Fallback screen frame, used only when no geometry can be read at all. A
 -- tooltip drawn against a wrong-but-plausible frame is still on screen; one
 -- drawn against nothing is at 0,0.
@@ -195,10 +212,35 @@ end
 --- The accent colour for a group, or nil when colouring is off.
 --- @param group string|nil
 --- @return table|nil { red, green, blue }
-local function accent_for(group, section)
+--- The category whose colour a row of this FAMILY wears.
+---
+--- macOS colours by family rather than by the pack that matched, so the colour
+--- says which kind of expansion is about to fire: a ★-validated row is always the
+--- magic-key colour, an end-char row always autocorrection. Aligned here on the
+--- maintainer's decision.
+---
+--- Note what this does NOT change: the "hide the bubble" gate still asks about
+--- the MATCHED category and section, exactly as macOS does. Colour is a family
+--- question; whether to draw at all is the pack's own.
+--- @param kind string|nil "star" | "autocorrect" | "ai"
+--- @param group string|nil The matched category.
+--- @return string|nil
+local function tint_category(kind, group)
+	-- A user's own hotstring keeps its own colour whichever key validates it:
+	-- "personal" is a family as much as a pack, and macOS treats it that way.
+	if group == PERSONAL_CATEGORY then return PERSONAL_CATEGORY end
+	return TINT_FAMILY[kind or ""]
+end
+
+--- The accent for a row, or nil when colouring is off.
+--- @param kind string|nil
+--- @param group string|nil
+--- @return table|nil { red, green, blue }
+local function accent_for(kind, group)
 	if not _enabled.colored then return nil end
-	if not _config or type(_config.resolve) ~= "function" or not group then return nil end
-	local ok, resolved = pcall(_config.resolve, group, section)
+	local category = tint_category(kind, group)
+	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
+	local ok, resolved = pcall(_config.resolve, category, nil)
 	if not ok or type(resolved) ~= "table" or type(resolved.color) ~= "string" then return nil end
 	local r, g, b = resolved.color:match("^#(%x%x)(%x%x)(%x%x)$")
 	if not r then return nil end
@@ -251,15 +293,24 @@ function M.build_rows(candidates, opts)
 	opts = opts or {}
 	local rows = {}
 	local limit = opts.max_rows or MAX_ROWS
+	local kind = opts.kind
+
+	-- The key that fires a ★ row, read once per bubble rather than per row: it
+	-- cannot change while one is being built, and reading it is a storage lookup.
+	local magic_key = TERMINATOR_LABEL
+	local ok_magic, MagicKey = pcall(require, "modules.hotstrings.magic_key")
+	if ok_magic and type(MagicKey.get) == "function" then magic_key = MagicKey.get() end
 
 	for _, candidate in ipairs(candidates or {}) do
 		if #rows >= limit then break end
 		rows[#rows + 1] = {
-			-- The replacement is what the user is about to get; the trigger is the
-			-- label, right-aligned, because a column of triggers down the right is
-			-- how someone learns the one they half-remember.
+			-- The replacement is what the user is about to get; the right-hand
+			-- column is the key that VALIDATES it — ★ for the magic-key family, ↵
+			-- otherwise. It used to repeat the trigger the user had just typed and
+			-- was already looking at, so the bubble never said how to fire anything.
+			-- Aligned with macOS on the maintainer's decision.
 			text   = candidate.replacement,
-			label  = candidate.trigger,
+			label  = (kind == "star") and magic_key or TERMINATOR_LABEL,
 			-- Dimmed rather than dropped: a candidate that will not fire is the
 			-- answer to "why did nothing happen", and hiding it deletes the answer.
 			dimmed = candidate.fires == false,
@@ -267,8 +318,8 @@ function M.build_rows(candidates, opts)
 			-- Each row carries its OWN colour. The panel used to take one accent
 			-- from the first candidate, so with several categories pending at once
 			-- — the common case — every row after the first wore a colour belonging
-			-- to a different category.
-			accent = accent_for(candidate.group, candidate.section),
+			-- to a different one.
+			accent = accent_for(kind, candidate.group),
 		}
 	end
 
@@ -293,7 +344,7 @@ function M.show(candidates, kind)
 	if kind and _enabled[kind] == false then return false end
 	if not Renderer.is_available() then return false end
 
-	local rows = M.build_rows(candidates)
+	local rows = M.build_rows(candidates, { kind = kind })
 	if #rows == 0 then
 		M.hide()
 		return false
@@ -316,9 +367,10 @@ function M.show(candidates, kind)
 
 	local drawn = Renderer.show(rows, {
 		style = _style,
-		-- The panel takes the firing candidate's colour; each row carries its own
-		-- as a bar, so a bubble holding several categories says so.
-		accent = accent_for(group, section),
+		-- The panel takes the firing candidate's family colour; each row carries
+		-- its own as a bar, so a bubble holding a personal entry beside a shipped
+		-- one says so.
+		accent = accent_for(kind, group),
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),
 	})

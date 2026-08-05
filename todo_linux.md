@@ -471,14 +471,6 @@ pas les rouvrir sans raison nouvelle.
       → La restriction actuelle (`["ahk"]`, « aucun pilote Lua n'a ce concept »)
         est **fausse pour les deux** : macOS l'implémente depuis toujours, Linux
         depuis 2026-08-05. Le commentaire du manifeste le dit maintenant.
-- [ ] Aperçu : teinte par **catégorie appariée** (Linux) vs par **genre** (macOS).
-      Divergence assumée pour l'instant, pas un oubli : la fenêtre de réglages
-      définit les couleurs **par catégorie**, donc teinter par la catégorie qui a
-      réellement matché rend ce réglage visible, là où macOS afficherait la couleur
-      de la famille (magickey/autocorrection/personal). À trancher ensemble.
-- [ ] Aperçu : libellé droit = déclencheur (Linux) vs touche de validation (macOS).
-      Choix documenté côté Linux (`preview.lua`), pas un oubli. macOS montre les
-      deux informations ; Linux une seule. À trancher aussi.
 ## 12. Gestes 3/4/5 doigts sur Linux (audit du 2026-08-05)
 
 > **Demande :** « fais un audit de comment faire sur Linux pour mapper les gestes
