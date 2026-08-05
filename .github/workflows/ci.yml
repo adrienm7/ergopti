@@ -988,6 +988,42 @@ jobs:
           exit $FAIL
         timeout-minutes: 5
 
+      # The whole unit suite, on THIS distribution's own LuaJIT.
+      #
+      # Everything else in this workflow runs on Ubuntu's build, so a difference
+      # that belongs to the interpreter or the C library is invisible to it —
+      # and those are the differences that actually bite here. Alpine is musl
+      # rather than glibc; Arch ships whatever LuaJIT released last; several
+      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
+      # thin FFI layer, so running them where the interpreter differs is cheap
+      # certification of exactly the part that varies.
+      #
+      # Reported, not required: a distribution with no LuaJIT package is a fact
+      # about that distribution, and failing the job for it would say the driver
+      # is broken when the runner simply has no interpreter to run it with. The
+      # install checks above already gate that image.
+      - name: The unit suite on this distribution's LuaJIT
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set +e
+          case "${{ matrix.distro }}" in
+            debian)   apt-get install -y --no-install-recommends luajit ;;
+            fedora)   dnf install -y luajit ;;
+            arch)     pacman -Sy --noconfirm luajit ;;
+            alpine)   apk add --no-cache luajit ;;
+            opensuse) zypper --non-interactive install luajit ;;
+          esac
+          if ! command -v luajit >/dev/null 2>&1; then
+            echo "::warning::${{ matrix.distro }} has no luajit package — the suite was not run here."
+            exit 0
+          fi
+          luajit -v
+          luajit tests/run.lua
+          STATUS=$?
+          set -e
+          exit $STATUS
+        timeout-minutes: 10
+
   # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
   # ─────────────────────────────────────────────────
