@@ -47,6 +47,11 @@ local QUICK_DELAY_CATEGORIES = {
 	{ category = "autocorrection", label = "menu.hotstrings.delay_autocorrection" },
 }
 
+-- The category id of the user's own hotstrings — the stem of personal.toml, and
+-- the same name the editor bridge writes under. Named here so the default-section
+-- picker reads the sections of that pack rather than guessing at a spelling.
+local PERSONAL_CATEGORY = "personal"
+
 -- Single source of the driver version.
 local Version = require("infra.version")
 
@@ -358,15 +363,29 @@ local function _manifest_hotstring_rows(ctx, config)
 		for id in pairs(members_of(class)) do classified[id] = true end
 	end
 
-	--- Flips every loaded group to `on`.
+	--- Flips everything on or off, in one write.
+	---
+	--- This looped `toggle_group` over each category until 2026-08-05, which was
+	--- wrong twice. It never touched the SECTION keys, so a user who had unticked
+	--- sections and then clicked "Tout activer" did not get them back and had to
+	--- walk into every category by hand — the row silently did less than its label
+	--- promised. And each `toggle_group` ends in a full `load_all()`, so one click
+	--- re-parsed the whole catalogue — magickey.toml alone is 305 KB — once per
+	--- category, inside a menu callback, with the tray rebuilt each time.
+	---
+	--- `enable_all` clears the whole `_disabled_groups` set, and that set holds the
+	--- "category.section" keys in the same namespace as the bare category ids —
+	--- which is exactly what makes it the correct answer for both halves.
 	--- @param on boolean
 	--- @return function
 	local function set_all(on)
 		return function()
-			for _, name in ipairs(groups) do
-				local is_on = config.is_group_enabled and config.is_group_enabled(name)
-				if is_on ~= on and config.toggle_group then config.toggle_group(name) end
+			if on then
+				if config.enable_all then config.enable_all() end
+			else
+				if config.disable_all then config.disable_all() end
 			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 	end
 
@@ -658,6 +677,70 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_categories_dynamic"]  = function(items) append_class(items, "dynamic") end,
 		["hotstring_categories_ergopti"]  = function(items) append_class(items, "ergopti") end,
 		["hotstring_personal"] = function(items)
+			-- The editor comes first, and until 2026-08-05 it was not here at all:
+			-- `_shared/ui/hotstring_editor/` shipped with this driver, its bridge was
+			-- complete and tested, and no code path anywhere opened it. A Linux user
+			-- could not create, edit or delete a single personal hotstring — the row
+			-- expanded to the same generic category submenu every pack gets.
+			items[#items + 1] = {
+				title = i18n_safe("menu.hotstrings.open_editor"),
+				fn    = function()
+					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstring editor.")
+						return
+					end
+					ctx.webview.show("hotstring_editor")
+				end,
+			}
+
+			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
+			if ok_editor and type(Editor.get_pref) == "function" then
+				-- Which section a new entry lands in. Built from the personal pack's
+				-- own section order so the list is what the user actually has, and
+				-- "none" is offered because leaving it unset is a real choice.
+				local current = Editor.get_pref("default_section")
+				local personal = type(config.get_category) == "function"
+					and config.get_category(PERSONAL_CATEGORY) or nil
+				local sub = {}
+				sub[#sub + 1] = {
+					title   = i18n_safe("common.none"),
+					checked = (current == nil or current == ""),
+					fn      = function()
+						Editor.set_pref("default_section", "")
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+				for _, name in ipairs(personal and personal.sections_order or {}) do
+					sub[#sub + 1] = {
+						title   = name,
+						checked = (current == name),
+						fn      = function()
+							Editor.set_pref("default_section", name)
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					}
+				end
+				items[#items + 1] = {
+					title = i18n_safe("menu.hotstrings.default_category_prefix")
+						.. ((current ~= nil and current ~= "") and current or i18n_safe("common.none")),
+					menu  = sub,
+				}
+
+				local close_on_add = Editor.get_pref("auto_close") == true
+				items[#items + 1] = {
+					title   = i18n_safe("menu.hotstrings.close_on_add"),
+					checked = close_on_add,
+					fn      = function()
+						Editor.set_pref("auto_close", not close_on_add)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			else
+				Logger.error(LOG, "The hotstring editor bridge is unavailable — its preferences cannot be shown.")
+			end
+
+			items[#items + 1] = { title = "-" }
+
 			local added = 0
 			for _, name in ipairs(groups) do
 				-- Extension packs are unclassified too, but they are not personal
@@ -763,12 +846,52 @@ local function _build_hotstrings(ctx)
 
 	local items = _manifest_hotstring_rows(ctx, config)
 
+	-- Row 1 of [[menu.hotstrings_menu]] is a `toggle`, and the shared renderer
+	-- skips those by contract ("Category toggles rendered by caller") — so this
+	-- caller has to build it, and did not. There was no single switch that turned
+	-- hotstrings off on this driver and no indication of whether they were on.
+	--
+	-- Inside the submenu rather than on the parent, which is where Windows puts
+	-- it: platform/tray/appindicator.lua binds item.fn only when the row has NO
+	-- submenu (`if item.menu … elseif item.fn …`), so macOS's clickable parent is
+	-- not representable on this backend. Prepended, because it is the manifest's
+	-- first row and belongs at that position.
+	local all_on = false
+	if type(config.get_groups) == "function" and type(config.is_group_enabled) == "function" then
+		local groups = config.get_groups() or {}
+		all_on = #groups > 0
+		for _, name in ipairs(groups) do
+			if not config.is_group_enabled(name) then
+				all_on = false
+				break
+			end
+		end
+	end
+	table.insert(items, 1, {
+		title = i18n_safe(all_on and "menu.hotstrings.on" or "menu.hotstrings.off"),
+		fn    = function()
+			-- The batched writers, not a loop of toggle_group: each toggle_group
+			-- ends in a full load_all(), which re-parses every pack — magickey.toml
+			-- alone is 305 KB — once per category, inside a menu callback.
+			if all_on then
+				if config.disable_all then config.disable_all() end
+			else
+				if config.enable_all then config.enable_all() end
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+	})
+
 	-- Not a manifest row on any driver: reloading the catalogue from disk is this
 	-- driver's own affordance, because it is the only one whose hotstrings can
 	-- change under it without a restart.
 	items[#items + 1] = { title = "-" }
 	items[#items + 1] = {
-		title = "Recharger les hotstrings",
+		-- The generic reload label, not a hotstrings-specific one: this row sat on
+		-- a hardcoded French string, which is a label in one of the twenty-one
+		-- languages this menu is drawn in. Inside the Hotstrings submenu the
+		-- context already says what is being reloaded.
+		title = i18n_safe("menu.global.reload"),
 		fn = function()
 			if config.reload then config.reload() end
 		end,
