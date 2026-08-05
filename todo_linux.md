@@ -273,7 +273,20 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
         « l interdire aujourd hui voudrait dire réécrire deux couches de menu d un
         coup ». Formulé comme « supprimer le fichier », M3.3 vise un état qu aucun
         pilote de référence n a atteint.
-      → **Décision à prendre avant de commencer.** Aujourd hui le ratchet déclare
+      → **La moitié migration a commencé** le 2026-08-05, sans attendre la décision
+        ci-dessous : `kanata_menu` et `updates_menu` sont déclarés en `list` et
+        leurs 14 rangées sont **matérialisées par le renderer**, pas construites
+        ici. C est la seule forme qui déplace quoi que ce soit — router un menu par
+        `ManifestMenu.build` en laissant ses handlers ajouter les rangées ne bouge
+        rien, et quatre menus de ce pilote le faisaient déjà sans qu une seule
+        rangée soit sortie.
+      → **Un cadran qui n attend personne** a été ajouté au ratchet : le nombre de
+        fournisseurs `list` que le pilote Linux enregistre et dont le manifeste
+        déclare l id pour `linux`. Il ne fait que monter, donc il n exige aucun
+        arbitrage. Première version comptait les clés du pilote, et renommer l une
+        d elles laissait le nombre intact pendant que le sous-menu se vidait — il
+        compte contre le manifeste désormais.
+      → **Décision à prendre pour la seconde moitié.** Aujourd hui le ratchet déclare
         `menu_builder.lua` « le renderer Linux », donc les 134 rangées comptent
         comme *dedans* et Linux affiche 2/2 : il n existe aucune pression chiffrée
         vers la migration. Le premier pas honnête est de repointer le ratchet pour
