@@ -377,6 +377,38 @@ function M.set_pending_mode(mode)
 	Logger.debug(LOG, "Editor open mode: %s.", mode)
 end
 
+--- Translates a key, falling back to the key itself.
+--- @param key string
+--- @return string
+local function i18n_label(key)
+	local ok, i18n = pcall(require, "infra.i18n")
+	if not ok or type(i18n.get) ~= "function" then return key end
+	local value = i18n.get(key)
+	return (type(value) == "string" and value ~= "") and value or key
+end
+
+--- Shows a message inside the editor window.
+---
+--- The page defines showAlert (script.js:183) and that is the only channel this
+--- driver has into it — there is no native notification path here, and a failure
+--- that reaches only the log is a failure the user never learns about.
+--- @param message string Already translated.
+--- @return boolean
+function M.show_alert(message)
+	local ok_json, json_mod = pcall(require, "json")
+	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	if not ok_json or not ok_mgr or type(Manager.eval_js) ~= "function" then
+		Logger.error(LOG, "%s", tostring(message))
+		return false
+	end
+	local ok_enc, encoded = pcall(json_mod.encode, tostring(message))
+	if not ok_enc then
+		Logger.error(LOG, "%s", tostring(message))
+		return false
+	end
+	return Manager.eval_js(APP_NAME, "if(window.showAlert)showAlert(" .. encoded .. ")")
+end
+
 --- Pushes the payload into the page by calling its own entry point.
 ---
 --- The page reveals `#app` from inside window.initData and nowhere else, so this
@@ -462,7 +494,17 @@ function M.on_message(payload, state)
 	end
 
 	if action == "save" then
-		return { saved = save_all(state, data) }
+		local saved = save_all(state, data)
+		if not saved then
+			-- The page flashes its "saved" toast whatever this returns — it does not
+			-- read bridge responses — so a failed write was visible only as a log
+			-- line the user never sees, and their edits vanished at the next restart
+			-- with a confirmation on screen saying otherwise. macOS raises a native
+			-- notification here; this driver's channel into the page is the alert
+			-- the shared script already defines.
+			M.show_alert(i18n_label("editor.hotstrings.save_error"))
+		end
+		return { saved = saved }
 	end
 
 	if action == "save_pref" then

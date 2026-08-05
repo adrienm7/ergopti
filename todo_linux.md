@@ -1558,25 +1558,31 @@ déclarée.
 
 ### 11.3 — Majeurs et mineurs restants
 
-- [ ] Les compteurs ne reflètent pas l'état : une catégorie éteinte affiche
-      toujours « (14 231) ». Windows a une politique dédiée et testée pour ça.
-- [ ] « Tout cocher / décocher » d'une catégorie est **grisé quand elle est
-      éteinte**, et ne relève pas le portail — deux clics et un aller-retour là où
-      les autres en demandent un.
-- [ ] Les libellés diffèrent : `check_all`/`uncheck_all` au lieu de
-      `enable_all`/`disable_all`. Les deux clés existent déjà partout.
-- [ ] Éteindre une catégorie **efface les coches** de ses sections au lieu de les
-      griser : l'information « ce qui reviendra » disparaît.
-- [ ] Pas de total général sur l'entrée Hotstrings du tray.
-- [ ] La catégorie personnelle s'affiche « personal » et non « Hotstrings
-      personnels ».
+- [x] Les compteurs reflètent l'état : `active_count()` somme les sections cochées
+      et rend 0 pour une catégorie éteinte, et le total général en fait autant —
+      un total calculé naïvement aurait contredit les nombres juste en dessous.
+- [x] « Tout activer » d'une catégorie n'est plus grisé quand elle est éteinte, et
+      relève le portail — un clic là où il en fallait deux et un aller-retour.
+- [x] Libellés alignés sur `enable_all`/`disable_all`, les clés des deux autres
+      pilotes. Aucune traduction à écrire : elles existaient déjà partout.
+- [x] Éteindre une catégorie **grise** ses sections au lieu de les décocher.
+      `is_section_checked` sépare les deux questions que `is_section_enabled`
+      confondait ; les choix n'étaient jamais perdus, seul l'écran le disait.
+- [x] Total général ajouté sur l'entrée Hotstrings, sommé des compteurs actifs.
+- [x] La catégorie personnelle affiche son nom localisé : une description `[_meta]`
+      scalaire — ce que l'éditeur écrit — tombait directement sur le stem de
+      fichier. Les clés `category.*` existent dans les 21 locales pour cela.
 - [x] Sélecteur de section par défaut et « fermer après ajout » ajoutés sous la ligne
       de l'éditeur — deux préférences que le bridge relisait à chaque ouverture et
       que rien ne pouvait écrire.
-- [ ] Un échec d'écriture est **silencieux** : la page affiche « enregistré » quoi
-      qu'il arrive.
-- [ ] `clear_override` n'a pas le paramètre `field` : le portage naturel des
-      boutons ↺ par champ effacerait les quatre champs.
+- [x] Un échec d'écriture n'est plus silencieux : la page affichait « enregistré »
+      quoi qu'il arrive, donc les modifications disparaissaient au redémarrage avec
+      une confirmation à l'écran disant le contraire. Le bridge passe maintenant par
+      `showAlert`, le seul canal que ce pilote a vers la page.
+- [x] `clear_override` a son paramètre `field`. Ce n'était pas un bug mais un piège :
+      les boutons ↺ de la fenêtre sont **par champ** sur les trois pilotes, donc le
+      portage naturel depuis macOS compilait, jetait le troisième argument en
+      silence, et effaçait les quatre champs au lieu d'un.
 - [x] Les actions groupées des délimiteurs ne touchent plus les délimiteurs
       personnalisés — les deux références les épargnent délibérément.
 - [ ] Le `shortcuts/menu.lua` des extensions n'est jamais exécuté sur Linux.

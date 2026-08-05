@@ -142,21 +142,26 @@ end
 M.SINGLE_SLOTS, M.AXIS_SLOTS = load_slot_space()
 M.ACTION_PARAMETER_SPECS = load_action_parameter_specs()
 
---- Linux-specific default action VALUES. Every slot not listed defaults to
---- "none". The KEY-SPACE comes from the shared TOML, never from these keys:
---- 3-finger swipe → workspace nav, 4-finger swipe → volume/brightness.
-local DEFAULT_ACTIONS = {
-	tap_3         = "left_click_toggle",
-	tap_4         = "app_window_previous",
-	swipe_3_left  = "ws_prev",
-	swipe_3_right = "ws_next",
-	swipe_3_up    = "tab_prev",
-	swipe_3_down  = "tab_next",
-	swipe_4_left  = "vol_down",
-	swipe_4_right = "vol_up",
-	swipe_4_up    = "brightness_up",
-	swipe_4_down  = "brightness_down",
-}
+--- Linux ships NO default bindings. Every slot defaults to "none".
+---
+--- Emptied on 2026-08-05, on the maintainer's decision, and the reason is a
+--- property of Linux rather than of this driver: the touchpad is read WITHOUT a
+--- grab, because grabbing it would take the pointer from the compositor and
+--- leave a dead cursor. evdev is broadcast, so the desktop sees every gesture
+--- the daemon sees — and GNOME 47+, KWin, Hyprland and cosmic-comp all claim
+--- 3- and 4-finger swipes already. A default binding there means the user's
+--- gesture fires the daemon's action AND the desktop's, at once, on a fresh
+--- install, with nothing on screen to explain it. Two-finger motion is scrolling
+--- on every Linux desktop and has the same problem.
+---
+--- That is not fixable from here, so it is not papered over with a smaller
+--- default set: the user chooses, and until they do the driver does nothing they
+--- did not ask for.
+---
+--- The KEY-SPACE is untouched and comes from the shared TOML — all 36 single
+--- slots and 3 axis slots are offered and configurable, exactly as on the other
+--- two drivers. What differs is only which of them arrive pre-bound.
+local DEFAULT_ACTIONS = {}
 
 --- Default gesture-to-action mapping. The key-space is the union of the derived
 --- single and axis slots; each value is the Linux default (or "none").

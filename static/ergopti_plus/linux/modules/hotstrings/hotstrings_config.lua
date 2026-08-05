@@ -456,18 +456,35 @@ function M.get_user_override(category, section)
 	}
 end
 
---- Clears every override for a category, or for one of its sections.
+--- Clears overrides for a category, or one of its sections, or one field of one.
+---
+--- The third parameter was missing until 2026-08-05, and it was a trap rather
+--- than a bug: the settings window's ↺ buttons are PER FIELD on all three
+--- drivers, so the natural port of macOS's `clear_override(cat, sec, "color")`
+--- compiled here, silently discarded the third argument, and wiped that scope's
+--- delay, colour, tooltip AND priority instead of just its colour.
 --- @param category string
---- @param section string|nil
+--- @param section string|nil nil targets the whole category.
+--- @param field string|nil nil clears every field of that scope.
 --- @return boolean
-function M.clear_override(category, section)
+function M.clear_override(category, section, field)
 	local entry = _overrides[category]
 	if not entry then return true end
-	if section then
+
+	if field ~= nil then
+		if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
+			Logger.error(LOG, "clear_override(): '%s' is not an overridable field.", tostring(field))
+			return false
+		end
+		local target = entry
+		if section then target = (entry.sections or {})[section] end
+		if type(target) == "table" then target[field] = nil end
+	elseif section then
 		if entry.sections then entry.sections[section] = nil end
 	else
 		_overrides[category] = nil
 	end
+
 	_resolve_cache = {}
 	local ok = save_overrides()
 	notify_change()
@@ -810,6 +827,57 @@ function M.is_section_enabled(category, section)
 	return not _disabled_groups[section_key(category, section)]
 end
 
+--- Whether the user has this section TICKED, regardless of its category's gate.
+---
+--- Two different questions live behind one answer above, and conflating them
+--- cost the menu real information: a category switched off made every one of its
+--- sections read as disabled, so the menu unticked them all at once and the user
+--- could no longer see which ones would come back. Their choices were never lost
+--- — they are still stored — but the screen said otherwise, which looks exactly
+--- like a reset.
+---
+--- `is_section_enabled` stays the EFFECTIVE answer and is what the loader filters
+--- on. This one is what a checkbox should show. macOS keeps them separate for the
+--- same reason and feeds them to `checked` and `disabled` independently.
+--- @param category string
+--- @param section string
+--- @return boolean
+function M.is_section_checked(category, section)
+	return not _disabled_groups[section_key(category, section)]
+end
+
+--- How many hotstrings a category is ACTUALLY firing right now.
+---
+--- Not the same as the number it holds. A user reads the figure beside a category
+--- as "what this is doing"; switch the category off, or untick half its sections,
+--- and the number must fall — that is how they check a disable took effect, which
+--- is the main reason to look at it. It never moved, so a fully disabled
+--- Autocorrection went on advertising 14 231 entries.
+---
+--- Windows encodes the same rule in hotstring_count_policy.ahk: a disabled scope
+--- shows no active hotstrings, not the count it would have if re-enabled.
+--- @param category string
+--- @return integer
+function M.active_count(category)
+	local cat = _categories[category]
+	if not cat then return 0 end
+	if _disabled_groups[category] then return 0 end
+
+	-- A category with no declared sections cannot be counted section by section;
+	-- its gate is the only switch it has, and the gate is on.
+	local order = cat.sections_order or {}
+	if #order == 0 then return cat.count or 0 end
+
+	local total = 0
+	for _, name in ipairs(order) do
+		if M.is_section_checked(category, name) then
+			local section = (cat.sections or {})[name]
+			total = total + ((section and section.count) or 0)
+		end
+	end
+	return total
+end
+
 --- Flips one section.
 --- @param category string
 --- @param section string
@@ -832,6 +900,11 @@ end
 function M.set_all_sections(category, enabled)
 	local cat = _categories[category]
 	if not cat then return end
+	-- Enabling lifts the category gate too. Without this the row could set every
+	-- section on and change nothing visible, because the gate above them was
+	-- still shut — and the user had to find and click a second control to make
+	-- the first one mean anything. Both reference drivers lift it here.
+	if enabled then _disabled_groups[category] = nil end
 	for name in pairs(cat.sections or {}) do
 		local key = section_key(category, name)
 		if enabled then

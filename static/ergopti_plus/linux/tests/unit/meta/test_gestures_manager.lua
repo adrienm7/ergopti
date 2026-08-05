@@ -120,10 +120,16 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(all.tap_4 ~= nil)
   end)
 
-  helpers.it("reset_defaults restores defaults", function()
+  helpers.it("reset_defaults returns every slot to unbound", function()
+    -- This asserted `ws_prev`, which was the shipped default until 2026-08-05.
+    -- Linux now ships no bindings at all: the touchpad is read WITHOUT a grab
+    -- (grabbing it kills the cursor), evdev is broadcast, and every desktop that
+    -- claims 3- and 4-finger swipes — GNOME 47+, KWin, Hyprland, cosmic-comp —
+    -- would fire its action alongside ours on a fresh install.
     M.set_action("swipe_3_left", "vol_up")
     M.reset_defaults()
-    helpers.assert_eq(M.get_action("swipe_3_left"), "ws_prev")
+    helpers.assert_eq(M.get_action("swipe_3_left"), "none",
+      "reset must return the slot to unbound, not to a binding the user never chose")
   end)
 
   helpers.it("keeps parameterized action values isolated per gesture binding", function()
@@ -484,13 +490,35 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_eq(nkeys, nunion, "DEFAULT_GESTURES key-space must equal single + axis")
   end)
 
-  helpers.it("keeps the Linux-specific default action values", function()
-    -- The KEY-SPACE is derived, but the VALUES stay Linux-specific. Lock a few
-    -- so the override table cannot silently regress to all-"none".
-    helpers.assert_eq(M.DEFAULT_GESTURES.tap_3, "left_click_toggle", "tap_3 default preserved")
-    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_3_left, "ws_prev", "swipe_3_left default preserved")
-    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_4_up, "brightness_up", "swipe_4_up default preserved")
-    helpers.assert_eq(M.DEFAULT_GESTURES.tap_2, "none", "an unmapped slot defaults to none")
+  helpers.it("ships no binding at all — every slot arrives unbound", function()
+    -- This locked three specific default VALUES so the table "cannot silently
+    -- regress to all-none". All-none is now the deliberate answer, so the
+    -- assertion is inverted — and made stronger: it covers all 39 slots rather
+    -- than three, so a default reintroduced anywhere is caught, not just in the
+    -- three that happened to be named.
+    --
+    -- Why none: the touchpad is read WITHOUT a grab, because grabbing it takes
+    -- the pointer from the compositor and leaves a dead cursor. evdev is
+    -- broadcast, so the desktop acts on the same gesture — GNOME 47+, KWin,
+    -- Hyprland and cosmic-comp all claim 3- and 4-finger swipes, and two-finger
+    -- motion is scrolling everywhere. A shipped binding means two things happen
+    -- for one gesture, on a fresh install, with nothing to explain it.
+    local bound = {}
+    for slot, action in pairs(M.DEFAULT_GESTURES) do
+      if action ~= "none" then bound[#bound + 1] = slot .. "=" .. tostring(action) end
+    end
+    helpers.assert_eq(#bound, 0,
+      "Linux ships no gesture bindings; found: " .. table.concat(bound, ", "))
+  end)
+
+  helpers.it("still offers every slot the other two drivers offer", function()
+    -- The half that must NOT change with the above. Parity is about the slots
+    -- existing and being configurable, not about what they arrive bound to, and
+    -- an empty default table must never be mistaken for an empty key-space.
+    for _, slot in ipairs({ "tap_2", "tap_5", "swipe_2_left", "swipe_5_right_down", "swipe_5_horiz" }) do
+      helpers.assert_eq(M.DEFAULT_GESTURES[slot], "none",
+        slot .. " must be present and unbound, not absent")
+    end
   end)
 
   helpers.it("does not hardcode the slot arrays (they are derived at load)", function()
