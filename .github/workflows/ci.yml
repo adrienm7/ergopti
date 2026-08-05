@@ -780,6 +780,25 @@ jobs:
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
         timeout-minutes: 4
 
+      # touchpad_finder reads capability bits out of a printed bitmap, and that
+      # rests on one thing the text cannot confirm: that the words are 64 bits
+      # wide, most significant first, with leading zero words omitted. Its unit
+      # tests use a fixture written by hand, so they prove the parser is
+      # self-consistent and nothing about the format the kernel actually emits.
+      #
+      # Here the device is declared through uinput, the KERNEL formats the
+      # bitmaps, and the parser has to agree with a text it did not see written.
+      # The same step settles the finger-count claim the whole "grey what this
+      # hardware cannot serve" design rests on: input_mt_init_slots() advertises
+      # QUINTTAP only at five slots, so a five-slot device must read back as five.
+      - name: A virtual touchpad, described by the kernel and read back
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo modprobe uinput || true
+          sudo chmod 0666 /dev/uinput
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
+        timeout-minutes: 4
+
 
   # ─────────────────────────────────────────────────
   # 4.1b) Linux install, per distribution family
