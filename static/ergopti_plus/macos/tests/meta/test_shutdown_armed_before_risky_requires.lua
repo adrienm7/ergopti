@@ -24,9 +24,15 @@ local helpers = require("tests.helpers")
 helpers.describe("boot: the shutdown teardown is armed before the risky requires", function()
 
 	helpers.it("hs.shutdownCallback is assigned before platform.remap is required", function()
-		local src = helpers.read_driver_source("hs.shutdownCallback")
+		-- read_driver_unit, not read_driver_source: the latter concatenates EVERY
+		-- file carrying the symbol, and this compares two byte offsets. Four files
+		-- mention hs.shutdownCallback; two of them carry `"platform.remap"` without
+		-- the assignment, so whichever the scan reached first decided the verdict
+		-- and the same commit produced a green run and a red one. The assignment is
+		-- unique to the boot file, which is the only file this ordering is about.
+		local src, err = helpers.read_driver_unit("hs.shutdownCallback = function")
 		helpers.assert_true(type(src) == "string" and src ~= "",
-			"init.lua must be readable or this asserts nothing")
+			"the boot file must be readable or this asserts nothing: " .. tostring(err))
 
 		local armed = src:find("hs.shutdownCallback = function", 1, true)
 
