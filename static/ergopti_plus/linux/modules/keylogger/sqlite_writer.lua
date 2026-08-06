@@ -511,6 +511,99 @@ function M.upsert_app_day(device_id, date, app, fields)
 	return _exec(sql)
 end
 
+--- Upserts the per-app-day character-class breakdown.
+---
+--- The five counts are summed because a flush lands every few seconds and the
+--- day's composition is their total. The first and last typed minute are not:
+--- they are a MIN and a MAX, taken in SQL so a late flush cannot move the first
+--- keystroke of the morning forward.
+--- @param row table { date, app, letter, digit, punct, space, other,
+---        first_typed_min?, last_typed_min? }
+function M.upsert_chars_class(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local function quoted_or_null(value)
+		if type(value) ~= "string" or value == "" then return "NULL" end
+		return "'" .. _sql_escape(value) .. "'"
+	end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_chars_class "
+		.. "(device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%s,%s) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "letter = letter + excluded.letter, digit = digit + excluded.digit, "
+		.. "punct = punct + excluded.punct, space = space + excluded.space, "
+		.. "other = other + excluded.other, "
+		.. "first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), "
+		.. "COALESCE(excluded.first_typed_min, first_typed_min)), "
+		.. "last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), "
+		.. "COALESCE(excluded.last_typed_min, last_typed_min));",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.letter) or 0), math.floor(tonumber(row.digit) or 0),
+		math.floor(tonumber(row.punct) or 0), math.floor(tonumber(row.space) or 0),
+		math.floor(tonumber(row.other) or 0),
+		quoted_or_null(row.first_typed_min), quoted_or_null(row.last_typed_min))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day error analysis.
+---
+--- `cascade_max_len` is a MAX and everything else a sum, for the same reason:
+--- the longest correction of the day does not get longer by being flushed twice.
+--- @param row table { date, app, bs_total, cascade_count, cascade_max_len,
+---        recovery_sum_ms, recovery_count }
+function M.upsert_errors(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_errors "
+		.. "(device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "bs_total = bs_total + excluded.bs_total, "
+		.. "cascade_count = cascade_count + excluded.cascade_count, "
+		.. "cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len), "
+		.. "recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms, "
+		.. "recovery_count = recovery_count + excluded.recovery_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.bs_total) or 0),
+		math.floor(tonumber(row.cascade_count) or 0),
+		math.floor(tonumber(row.cascade_max_len) or 0),
+		math.floor(tonumber(row.recovery_sum_ms) or 0),
+		math.floor(tonumber(row.recovery_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one hour of the activity histogram.
+--- @param row table { date, app, hour, c, e, em, es }
+function M.upsert_hourly(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
+		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(tostring(row.hour or "")),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
+		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one five-minute slot of the fine-grained activity histogram.
+--- @param row table { date, app, slot, c, e, es }
+function M.upsert_hourly_min5(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
+		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(tostring(row.slot or "")),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
+		math.floor(tonumber(row.es) or 0))
+	return _exec(sql)
+end
+
 -- Every n-gram family the shared schema declares, and the only names this
 -- writer will target. A whitelist rather than a formatted parameter: the table
 -- name cannot be escaped as a value, so an unchecked caller is an injection —

@@ -289,4 +289,108 @@ function M.timer_scheduler()
 	return fake
 end
 
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 7/ The Persistence Writer ===========
+-- =============================================
+-- =============================================
+
+--- An in-memory stand-in for the keylogger's SQLite writer.
+---
+--- Every export answers plausibly and records what it was handed, so a caller
+--- can assert on what would have been persisted without a database — and, more
+--- to the point, without a hand-written stub that omits whichever method was
+--- added last.
+---
+--- That omission is not hypothetical. Four separate test files each carried
+--- their own literal table of writer methods; adding four functions to the
+--- writer broke all four at the CALL, which reads as a bug in the code under
+--- test rather than in the double. `test_fakes_match_adapters.lua` covers this
+--- one now, so the next method added to the writer fails one parity check
+--- instead of scattering nil-call errors across the suite.
+---
+--- @param opts table|nil { available = boolean } — false to model a machine
+---        with no sqlite3, which is the common case in CI.
+--- @return table
+function M.sqlite_writer(opts)
+	opts = opts or {}
+	local available = opts.available ~= false
+	local fake = {
+		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
+		app_days = {}, ngrams = {}, scancodes = {},
+		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
+		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
+	}
+
+	function fake.is_available() return available end
+	function fake.open_db(path) fake.path = path ; return available end
+	function fake.close_db() fake.path = nil ; return true end
+	function fake.get_db_path() return fake.path end
+	function fake.get_revision() return fake.revision end
+	function fake.bump_rev() fake.revision = fake.revision + 1 ; return true end
+	function fake.register_device(device_id, name, os_name, os_version, signature)
+		fake.devices[#fake.devices + 1] = {
+			device_id = device_id, name = name, os_name = os_name,
+			os_version = os_version, signature = signature,
+		}
+		return true
+	end
+
+	--- Appends every entry of `rows` to `target`, tagged with the device.
+	local function collect(target)
+		return function(device_id, rows)
+			for _, row in ipairs(rows or {}) do
+				target[#target + 1] = { device_id = device_id, row = row }
+			end
+			return true
+		end
+	end
+	fake.insert_typing_events = collect(fake.typing)
+	fake.insert_hotstring_events = collect(fake.hotstrings)
+	fake.insert_shortcut_events = collect(fake.shortcuts)
+	fake.insert_app_switch_events = collect(fake.app_switches)
+
+	function fake.upsert_app_day(device_id, date, app, fields)
+		fake.app_days[#fake.app_days + 1] =
+			{ device_id = device_id, date = date, app = app, fields = fields }
+		return true
+	end
+	function fake.upsert_ngrams(device_id, date, app, ngrams, table_name)
+		fake.ngrams[#fake.ngrams + 1] = {
+			device_id = device_id, date = date, app = app, ngrams = ngrams,
+			-- Defaulted the way the writer defaults it, so a caller that omits the
+			-- name is recorded as having written the table it really would have.
+			table_name = table_name or "ngram_chars",
+		}
+		return true
+	end
+	function fake.upsert_scancodes(device_id, date, app, scancodes)
+		fake.scancodes[#fake.scancodes + 1] =
+			{ device_id = device_id, date = date, app = app, scancodes = scancodes }
+		return true
+	end
+
+	--- Records a single per-app-day aggregate row.
+	local function collect_row(target)
+		return function(device_id, row)
+			target[#target + 1] = { device_id = device_id, row = row }
+			return true
+		end
+	end
+	fake.upsert_chars_class = collect_row(fake.chars_class)
+	fake.upsert_errors = collect_row(fake.errors)
+	fake.upsert_hourly = collect_row(fake.hourly)
+	fake.upsert_hourly_min5 = collect_row(fake.hourly_min5)
+
+	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
+	function fake.query_rows() return {} end
+	function fake.get_meta(key) return fake.meta[key] end
+	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
+
+	return fake
+end
+
 return M

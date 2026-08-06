@@ -5,6 +5,7 @@
 --- JSON export, file flush, session lifecycle, edge cases.
 
 local helpers   = require("tests.helpers")
+local Fakes     = helpers.load_module("tests.fakes")
 local keylogger = helpers.load_module("modules.keylogger.keylogger")
 
 helpers.describe("keylogger", function()
@@ -267,6 +268,12 @@ helpers.describe("keylogger", function()
 		  return true
 		end,
       }
+      -- Layered over the shared double rather than replacing it: the overrides
+      -- above are what this test asserts on, and everything else the writer
+      -- exports is inherited. Written out by hand, this table went stale the
+      -- moment the writer grew a method, and the failure surfaced as a nil call
+      -- inside the code under test.
+      setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
       local writer_name = "modules.keylogger.sqlite_writer"
       local logger_name = "modules.keylogger.keylogger"
       local previous_writer = package.loaded[writer_name]
