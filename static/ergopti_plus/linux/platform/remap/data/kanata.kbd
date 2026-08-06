@@ -56,7 +56,15 @@
     _           C-up        up          down        C-down      f2                      M-S-left    C-left      left        right       C-right     M-S-right
     _           S-A-up      A-up        A-down      S-A-down    _            _          M-up        home        M-left      M-right     end         _
     _                                   _           _                        _                      _           _                       _
-    _           _           _           _           _           _                       _           _           _
+    ;; The wheel, while navigation is held: volume instead of scroll. This row
+    ;; was transparent, so the layer that remaps the whole keyboard left the one
+    ;; input the hand is already on doing exactly what it does unmodified.
+    ;;
+    ;; Only the vertical pair is claimed. Horizontal scroll and the five buttons
+    ;; stay transparent because a held layer that swallows the click the user is
+    ;; about to make is worse than one that does less: a dead middle-click has no
+    ;; visible cause.
+    volu        vold        _           _           _           _                       _           _           _
 )
 
 ;; ==================================
