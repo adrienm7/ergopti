@@ -783,6 +783,50 @@ local function persisted_manifest()
 	return fresh
 end
 
+--- Drops the cached projection so the next read rebuilds from the database.
+---
+--- The dashboard's reset control asks for exactly this: it clears the filters
+--- and expects the next payload to be a clean rebuild. Linux answered nothing
+--- at all, so the button reset the page and left the backend serving the same
+--- cached manifest it had before — the one visible symptom being that a reset
+--- changed nothing.
+function M.clear_cache()
+	_manifest_cache = { revision = nil, manifest = nil }
+	Logger.info(LOG, "Dashboard cache cleared at the user's request.")
+	return true
+end
+
+--- Records the category and score a user assigned to an application.
+---
+--- The category is a column on agg_app_day and the dashboard groups by it, so
+--- an unhandled edit is a control that appears to work and silently discards
+--- what the user typed into it.
+--- @param app_name string
+--- @param category string
+--- @param score number|nil Productivity score, as the shared page defines it.
+--- @return boolean Whether it was persisted.
+function M.set_app_category(app_name, category, score)
+	if type(app_name) ~= "string" or app_name == "" then
+		Logger.error(LOG, "set_app_category(): an application name is required.")
+		return false
+	end
+	if type(category) ~= "string" or category == "" then
+		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
+		return false
+	end
+	if not (SqliteWriter and SqliteWriter.is_available()) then
+		Logger.warn(LOG, "set_app_category(): no database — '%s' stays uncategorised.", app_name)
+		return false
+	end
+	local ok = SqliteWriter.set_app_category(_device_id, app_name, category, tonumber(score) or 0)
+	-- The cached manifest still holds the old category, and the page re-reads
+	-- immediately after the edit. Without this the user sees their change
+	-- reverted and tries again.
+	if ok then M.clear_cache() end
+	Logger.debug(LOG, "Category for '%s': %s (score %s).", app_name, category, tostring(score))
+	return ok == true
+end
+
 local function empty_ngrams()
 	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}, sc_kb = {} }
 end

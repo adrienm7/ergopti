@@ -62,6 +62,14 @@ function M.on_message(payload, state)
 		return _build_initial_payload(state, action == "ready")
 	end
 
+	-- These four are not sent by the shared page today. They are kept because
+	-- each calls a keylogger function that exists and does what its name says,
+	-- and because the bridge is also the daemon's programmatic entry point —
+	-- unlike `app_detail`, which was removed: it called `get_app_detail`, a
+	-- function that has never existed on this driver, behind a
+	-- `type(…) == "function"` guard that turned the missing function into a
+	-- silent nil. The guard read as defensive while making the branch
+	-- permanently unreachable and wrong.
 	if action == "reset" then
 		if state.keylogger and type(state.keylogger.reset_session) == "function" then
 			pcall(state.keylogger.reset_session)
@@ -91,16 +99,32 @@ function M.on_message(payload, state)
 		return { suppressed = false }
 	end
 
-	if action == "app_detail" and payload.app_id then
-		-- Return deeper stats for a specific app.
-		if state.keylogger and type(state.keylogger.get_app_detail) == "function" then
-			local detail = state.keylogger.get_app_detail(payload.app_id)
-			return detail
+	-- The category editor. This is the one control on the page that writes
+	-- anything, and it was unhandled: the user picked a category, the modal
+	-- closed, and the choice went nowhere. `category` is a real column on
+	-- agg_app_day and the dashboard groups by it, so the effect was a control
+	-- that looked like it worked and silently discarded its input.
+	if action == "edit" then
+		local app_name = tostring(payload.app or "")
+		local category = tostring(payload.cat or "")
+		if state.keylogger and type(state.keylogger.set_app_category) == "function" then
+			local ok = state.keylogger.set_app_category(app_name, category, tonumber(payload.score) or 0)
+			return { saved = ok, payload = _build_initial_payload(state, false) }
 		end
-		return nil
+		Logger.error(LOG, "Category edit for '%s' arrived but the keylogger cannot store it.", app_name)
+		return { saved = false }
 	end
 
-	Logger.debug(LOG, "Unknown action: %s", tostring(action))
+	-- macOS answers this with a native chooser listing the known applications.
+	-- Linux has no equivalent modal, and saying so is the honest answer: the
+	-- page can fall back to its own list. Returning nil would be indistinguishable
+	-- from a handler that crashed.
+	if action == "pick" then
+		Logger.info(LOG, "Application picker requested; this driver has no native chooser.")
+		return { supported = false, apps = _build_initial_payload(state, false).metrics_manifest }
+	end
+
+	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
 	return nil
 end
 
