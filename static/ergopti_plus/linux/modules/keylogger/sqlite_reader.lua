@@ -183,6 +183,31 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+       MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
+       SUM(hold_count) AS hold_count
+FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.kc_hold = entry.kc_hold or {}
+		entry.kc_hold[tostring(row.keycode)] = {
+			sum_ms = row.sum_ms or 0, count = row.count or 0,
+			-- MAX, not SUM: the longest hold of the day is a record across devices.
+			max_ms = row.max_ms or 0,
+			tap_count = row.tap_count or 0, hold_count = row.hold_count or 0,
+		}
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, layout, SUM(count) AS count
+FROM agg_app_day_layouts%s GROUP BY date, app, layout;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.layouts = entry.layouts or {}
+		entry.layouts[row.layout] = (entry.layouts[row.layout] or 0) + (row.count or 0)
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
 SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
 FROM agg_app_day_titles%s GROUP BY date, app, title;
 ]], where))) do

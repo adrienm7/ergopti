@@ -47,6 +47,7 @@ local M = {}
 local Logger = require("logger.shim")
 local EvdevReader = require("adapters.evdev_reader")
 local EvdevCodes = require("infra.evdev_codes")
+local Monotonic = require("infra.monotonic")
 local InputEvent = require("infra.input_event")
 
 local LOG = "adapters.keyboard_hook"
@@ -64,6 +65,7 @@ local LOG = "adapters.keyboard_hook"
 local _on_char      = nil   -- function(char_string, evdev_scancode)
 local _on_key       = nil   -- function(key_name_string)
 local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil)
+local _on_hold      = nil   -- function(evdev_scancode, held_ms)
 
 -- Cached foreground window context (updated via refreshContext).
 local _context  = { appId = "", windowTitle = "" }
@@ -103,6 +105,16 @@ local _ctrl_held  = false
 local _alt_held   = false
 local _altgr_held = false
 local _meta_held  = false
+
+-- When each key went down, by evdev code. Cleared on release, so a key still
+-- held when a flush lands is simply not reported until it comes up.
+local _pressed_at = {}
+
+-- Beyond this, a "hold" is not a hold. A release can arrive after a suspend, a
+-- lost descriptor or a lid close, and a single reading of several hours would
+-- dominate every average it entered for the rest of the day. Ten seconds is far
+-- longer than any deliberate hold and far shorter than any of those accidents.
+local MAX_PLAUSIBLE_HOLD_MS = 10000
 
 -- How many periodic ticks pass between device checks. The daemon ticks four
 -- times a second and the check re-reads /proc/bus/input/devices, so every tick
@@ -225,7 +237,29 @@ local function _dispatch_event(ev)
 	-- CapsLock is neither a modifier this driver tracks nor a character.
 	if ev.code == EvdevCodes.KEY_CAPSLOCK then return end
 
-	-- Releases carry no meaning past modifier tracking.
+	-- How long the key was held, measured here because this is the only place a
+	-- release is seen at all.
+	--
+	-- The line below used to say releases carry no meaning past modifier
+	-- tracking, and for the text path that is true. It is not true for the
+	-- metrics: on a keyboard whose whole design is tap-hold, how long a key was
+	-- held is the difference between the two things it can mean, and
+	-- agg_app_day_kc_hold was empty because nothing measured it.
+	if ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
+		_pressed_at[ev.code] = Monotonic.now_ms()
+	elseif ev.value == InputEvent.VALUE_UP and ev.code > 0 then
+		local down_at = _pressed_at[ev.code]
+		_pressed_at[ev.code] = nil
+		if down_at and _on_hold then
+			-- Clamped, because a release can arrive after a suspend, a lost
+			-- descriptor or a lid close, and one such reading would dominate every
+			-- average it entered for the rest of the day.
+			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
+			pcall(_on_hold, ev.code, held_ms)
+		end
+	end
+
+	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
 
 	-- The layout-independent physical identity, for the hardware heatmap. It must
@@ -496,6 +530,7 @@ function M.start(opts)
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
+	if type(options.onHold) == "function" then _on_hold = options.onHold end
 	if type(options.onClick) == "function" then _on_click = options.onClick end
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true

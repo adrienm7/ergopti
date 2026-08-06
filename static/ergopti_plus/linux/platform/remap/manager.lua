@@ -218,6 +218,38 @@ local function _load_tap_hold_config(user_toml_path)
 	return keys
 end
 
+--- The tap/hold threshold the layout actually uses, in milliseconds.
+---
+--- Read from the loaded configuration rather than restated, so the metrics call
+--- something a hold exactly when kanata does. Returns nil when the keys
+--- disagree or nothing could be read — the caller then declines to split taps
+--- from holds rather than splitting them on a number nobody chose.
+--- @return number|nil
+function M.tap_hold_threshold_ms()
+	local keys = _load_tap_hold_config()
+	local seen, value = 0, nil
+	for _, entry in pairs(keys or {}) do
+		local seconds = tonumber(entry.time_activation_seconds)
+		if seconds and seconds > 0 then
+			local ms = math.floor(seconds * 1000 + 0.5)
+			if value == nil then
+				value, seen = ms, 1
+			elseif ms == value then
+				seen = seen + 1
+			else
+				-- Two keys with different thresholds is a legitimate configuration,
+				-- and it means there is no single answer to "was that a hold". Saying
+				-- so beats picking one and being wrong for every other key.
+				Logger.debug(LOG,
+					"Tap-hold thresholds differ across keys — the metrics will not split taps from holds.")
+				return nil
+			end
+		end
+	end
+	if seen == 0 then return nil end
+	return value
+end
+
 --- Test accessor: runs the tap-hold config loader in isolation, bypassing the
 --- template gate in generate_kbd(), so the suite can exercise the user-file
 --- fallback/fail-fast logging without a resolvable kanata.kbd template. The path

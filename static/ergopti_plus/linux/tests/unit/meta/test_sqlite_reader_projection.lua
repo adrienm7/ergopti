@@ -279,7 +279,8 @@ helpers.describe("sqlite reader: the daily aggregate tables", function()
 			"agg_app_day", "agg_app_day_chars_class", "agg_app_day_errors",
 			"agg_app_day_hourly", "agg_app_day_hourly_min5",
 			"agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
-			"agg_app_day_ergo", "agg_app_day_titles",
+			"agg_app_day_ergo", "agg_app_day_titles", "agg_app_day_layouts",
+			"agg_app_day_kc_hold",
 		}) do
 			helpers.assert_true(queried(statements, table_name),
 				"'" .. table_name .. "' was never queried — the walk now fills it and "
