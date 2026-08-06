@@ -35,6 +35,7 @@
 _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global PersonalInformationHotstrings, DYN_HOTSTRINGS_DEFAULT_DELAY, SpaceAroundSymbols
+	global PERSONAL_INFO_TAGS, PERSONAL_INFO_TAG_ORDER
 
 
 
@@ -65,26 +66,27 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	; ======================================================
 
 	if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
-		CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["bic"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["social_security_number"], Map(
-			"FinalResult", True))
-		CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
-			"FinalResult",
-			True))
+		; The single-field @-tags (@bic, @cb, @cc, @iban, @rib, @ss, @tel, @tél).
+		; Both the tag set and the field each one names come from
+		; PERSONAL_INFO_TAGS (infra/personal_info_preview.ahk), which the
+		; preview reads too — eight hand-written call sites here and a second copy
+		; of the same map over there is exactly how a tag comes to expand one field
+		; and preview another. PERSONAL_INFO_TAG_ORDER drives the loop because a
+		; Map does not enumerate in insertion order and registration order is the
+		; engine's last collision tie-break.
+		for _, InfoTag in PERSONAL_INFO_TAG_ORDER {
+			if !PERSONAL_INFO_TAGS.Has(InfoTag) {
+				LoggerWarn("hotstrings", "Personal-info tag '@{1}' is listed in the registration order but absent from the tag map -- skipped.", InfoTag)
+				continue
+			}
+			InfoTagField := PERSONAL_INFO_TAGS[InfoTag]
+			if !PersonalInformation.Has(InfoTagField) {
+				LoggerWarn("hotstrings", "Personal-info tag '@{1}' names the unknown field '{2}' -- skipped.", InfoTag, InfoTagField)
+				continue
+			}
+			CreateHotstring("*", "@" . InfoTag . ScriptInformation["MagicKey"],
+				PersonalInformation[InfoTagField], Map("FinalResult", True))
+		}
 
 		; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
 		; Declared global at the top of RegisterAllHotstrings — re-init it on every run.

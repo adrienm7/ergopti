@@ -91,6 +91,11 @@ local HOTSTRING_CHAIN_OFFSET_SEC = 0.05
 -- bookkeeping and fine for a rare overflow.
 local PROVIDER_CACHE_MAX = 1024
 
+-- Width of the placeholder a row falls back to when the personal-info field
+-- classification cannot be reached at all. Fixed rather than the value's own
+-- length: how long a secret is, is itself a hint about which one it is.
+local UNCLASSIFIED_PREVIEW_BULLETS = 8
+
 -- Canonical LLM defaults, owned by modules/llm; used to seed bridge-local flags.
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
@@ -117,8 +122,13 @@ local last_shown_hotstring = nil
 ---
 --- The rule: both columns are secret. The replacement IS the IBAN and the
 --- trigger is a fragment of it, so redacting one and keeping the other still
---- leaks — the row is withheld whole. The tooltip is unaffected: showing users
---- their own data on their own screen is the feature.
+--- leaks — the row is withheld whole.
+---
+--- This is NOT the same rule as the tooltip's. The screen shows a declared
+--- secret partially masked (last four characters, so the user can still confirm
+--- WHICH value is about to be typed); the persisted row shows nothing at all,
+--- because a log outlives the moment and is read by tools, not by the person who
+--- owns the value. Neither rule touches what gets TYPED.
 --- @param match table|nil A preview match, or the last_shown_hotstring record.
 --- @return boolean True when the row may be persisted.
 local function may_persist_preview(match)
@@ -406,6 +416,37 @@ end
 -- ====================================
 -- ====================================
 
+--- What a preview ROW may show for a match's replacement.
+---
+--- Only values built from personal_info.toml carry a `field`, and only those are
+--- ever masked: an ordinary hotstring has no field, is not in the declaration,
+--- and passes through untouched. Note that this candidate-level gate is the
+--- OPPOSITE default from the shared masker, which masks a nil field — deliberately
+--- so, because there "no field" means provenance was lost on the way to the
+--- bubble, while here it means the row was never personal-info to begin with.
+---
+--- DISPLAY ONLY. `m.repl` and `m.plain_repl` stay in clear and the expander reads
+--- the registry entry through an entirely different call, so a masked row cannot
+--- change what gets typed — which is the failure that matters most, because
+--- typing a row of bullets into a bank form is silent, corrupts real data, and
+--- looks exactly like the feature working.
+--- @param m table A preview match record.
+--- @return string What the row may render.
+local function masked_for_preview(m)
+	local value = m.plain_repl
+	if type(value) ~= "string" or m.field == nil then return value end
+
+	local ok, Fields = pcall(require, "infra.personal_info_fields")
+	if not ok or type(Fields) ~= "table" or type(Fields.for_preview) ~= "function" then
+		-- Fail closed. A match that declared itself a personal-info value and a
+		-- classifier that cannot be reached is the one combination where showing
+		-- the value is the wrong guess.
+		Logger.error(LOG, "Field classification unavailable — withholding a personal-info preview.")
+		return ("•"):rep(UNCLASSIFIED_PREVIEW_BULLETS)
+	end
+	return Fields.for_preview(value, m.field)
+end
+
 --- Refreshes the preview tooltip from the current buffer content.
 ---
 --- Decision tree:
@@ -452,7 +493,7 @@ function M.update_preview(buf)
 	-- Collect all matching candidates: provider match first, then star, then
 	-- autocorrect. Both star and autocorrect are kept when both match the same
 	-- buffer so the stacked tooltip can show all options simultaneously.
-	local matches = {}   -- array of { repl, plain_repl, input, type, group, is_private }
+	local matches = {}   -- array of { repl, plain_repl, input, type, group, is_private, field }
 
 	-- Custom preview providers take precedence over the static mapping lookup.
 	for _, provider in ipairs(_state.preview_providers) do
@@ -560,6 +601,12 @@ function M.update_preview(buf)
 							-- Carried so the DEBUG sink below can honour the same
 							-- privacy contract the expander applies (acc7946fc).
 							is_private = mapping.is_private,
+							-- The personal_info.toml field the replacement was built
+							-- from, when it has one. Without it the row cannot ask the
+							-- shared declaration anything, so an IBAN would reach the
+							-- screen in full and a phone number would be bulleted —
+							-- both wrong, in opposite directions.
+							field      = mapping.field,
 						}
 					end
 				end
@@ -612,6 +659,8 @@ function M.update_preview(buf)
 							has_magic  = mapping.has_magic,
 							-- Same privacy contract as the star bucket above.
 							is_private = mapping.is_private,
+							-- Same provenance as the star bucket above.
+							field      = mapping.field,
 						}
 					end
 				end
@@ -718,7 +767,11 @@ function M.update_preview(buf)
 					min_timeout = row_timeout
 				end
 				rows[#rows + 1] = {
-					text          = m.plain_repl,
+					-- Masked when the value is a declared secret, in full otherwise.
+					-- Which fields are secrets, and how much of one stays visible, is
+					-- _shared/modules/personal_info/fields.toml — read at runtime, so
+					-- this driver holds no opinion of its own about it.
+					text          = masked_for_preview(m),
 					tint          = tooltip.tint(tint_key),
 					-- Providers are validated by the magic key, exactly like a star
 					-- trigger: both shipped ones fire from the interceptor on the
@@ -734,9 +787,18 @@ function M.update_preview(buf)
 			-- mapping's replacement AND its trigger are both secrets, and DEBUG is
 			-- the driver's default level, so this line would otherwise write
 			-- personal_info.toml content (phone, IBAN, SSN, card) into the 14-day log
-			-- on every preview keystroke. The preview TOOLTIP still renders the value
-			-- — showing the user their own data on their own screen is the feature —
-			-- it is only the persisted sink that must withhold it.
+			-- on every preview keystroke.
+			--
+			-- This used to add that the TOOLTIP still renders the value in full,
+			-- because the user is looking at their own screen. That stopped being
+			-- true on 2026-08-05: shoulder-surfing and screen sharing mean the screen
+			-- is not only theirs, and the bubble's job — confirming WHICH value is
+			-- about to be typed — needs the last four characters, not all of them. So
+			-- the row above is masked for a declared secret. The two decisions are
+			-- separate and both stand: the LOG withholds the row whole (trigger
+			-- included, since a private trigger is a fragment of the secret), while
+			-- the SCREEN shows a partial reveal. What is TYPED is unaffected by
+			-- either.
 			if m.is_private then
 				Logger.debug(LOG, "Hotstring preview: private mapping matched (content withheld) [%s].", m.type)
 			else
@@ -814,9 +876,9 @@ function M.update_preview(buf)
 			-- Withheld entirely for a private mapping, exactly as expander.lua
 			-- withholds log_hotstring: both columns are secret — the replacement IS
 			-- the IBAN and the trigger is a fragment of it — so redacting one and
-			-- keeping the other still leaks. The DEBUG line sixty lines above
-			-- already says "it is only the persisted sink that must withhold it";
-			-- these two ARE that sink, and they were writing the value verbatim.
+			-- keeping the other still leaks. The DEBUG line sixty lines above names
+			-- the persisted sink that must withhold the row whole; these two ARE
+			-- that sink, and they were writing the value verbatim.
 			-- docs/PROJECT_MEMORY.md records the same class shipping once before.
 			if may_persist_preview(primary_match) then
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
