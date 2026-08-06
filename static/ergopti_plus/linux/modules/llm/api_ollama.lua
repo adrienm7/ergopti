@@ -55,6 +55,17 @@ else
 	-- Fallback: minimal encoder for Ollama payloads.
 	json_encode = function(tbl)
 		if type(tbl) ~= "table" then return tostring(tbl) end
+		-- Arrays first. The payload now carries the stop-sequence list, and
+		-- encoding an array as an object gives Ollama {"1":"…","2":"…"} — which it
+		-- rejects, so the whole request fails on a machine where only the primary
+		-- encoder was missing. A fallback that turns one absent module into a
+		-- dead feature is worse than no fallback.
+		local count = #tbl
+		if count > 0 then
+			local items = {}
+			for index = 1, count do items[index] = json_encode(tbl[index]) end
+			return "[" .. table.concat(items, ",") .. "]"
+		end
 		local parts = {}
 		for k, v in pairs(tbl) do
 			local val
@@ -71,6 +82,72 @@ else
 		end
 		return "{" .. table.concat(parts, ",") .. "}"
 	end
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2.1) Shared inference constants =
+-- =========================================
+
+--- Reads a shared JSON file from the cross-driver tree.
+--- @param relative string Path under _shared/.
+--- @return table|nil
+local function read_shared_json(relative)
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	if not ok_paths or not Paths then return nil end
+	local root = Paths.shared_root()
+	if not root then return nil end
+	local handle = io.open(root .. "/" .. relative, "r")
+	if not handle then return nil end
+	local body = handle:read("*a")
+	handle:close()
+	local ok_bridge, Bridge = pcall(require, "infra.llm_bridge")
+	if not ok_bridge or not Bridge or not Bridge.json_decode then return nil end
+	local ok, parsed = pcall(Bridge.json_decode, body)
+	if not ok or type(parsed) ~= "table" then return nil end
+	return parsed
+end
+
+-- How long Ollama keeps the model resident after a request. Without it Ollama
+-- applies its own default of five minutes, so a user who pauses for longer pays
+-- the full model load on their next keystroke — several seconds on a prediction
+-- path budgeted in hundreds of milliseconds. The other two drivers have always
+-- sent it; this one did not, and the difference was invisible except as "the
+-- Linux predictions are sometimes very slow".
+local OLLAMA_KEEP_ALIVE = (function()
+	local defaults = read_shared_json("modules/llm/defaults.json")
+	local value = defaults and defaults.llm_ollama_keep_alive
+	if type(value) == "string" and value ~= "" then return value end
+	Logger.warn(LOG, "defaults.json llm_ollama_keep_alive unreadable — Ollama will apply its own default.")
+	return nil
+end)()
+
+-- Where a completion must stop. Shared with every other backend through
+-- inference.json, which exists precisely so the per-file literals cannot drift.
+-- Sending none of them lets the model run past the answer into the next turn of
+-- the prompt template, and the user sees the scaffolding of their own prompt
+-- offered back as a prediction.
+local STOP_SEQUENCES = (function()
+	local inference = read_shared_json("modules/llm/inference.json")
+	local sequences = inference and inference.stop_sequences
+	if type(sequences) ~= "table" then
+		Logger.warn(LOG, "inference.json stop_sequences unreadable — completions will not be cut short.")
+		return {}
+	end
+	return sequences
+end)()
+
+--- The stop list for one request mode.
+--- @param line_mode boolean|nil True for single-line completion.
+--- @return table|nil
+local function stop_for(line_mode)
+	local key = line_mode and "line" or "batch"
+	local list = STOP_SEQUENCES[key]
+	if type(list) == "table" and #list > 0 then return list end
+	return nil
 end
 
 
@@ -101,6 +178,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		model = model,
 		messages = messages,
 		stream = stream,
+		keep_alive = OLLAMA_KEEP_ALIVE,
 	}
 	if type(options.temperature) == "number" then
 		payload.options = payload.options or {}
@@ -109,6 +187,11 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	if type(options.max_tokens) == "number" then
 		payload.options = payload.options or {}
 		payload.options.num_predict = options.max_tokens
+	end
+	local stop = stop_for(options.line_mode)
+	if stop then
+		payload.options = payload.options or {}
+		payload.options.stop = stop
 	end
 
 	local json_body = json_encode(payload)
