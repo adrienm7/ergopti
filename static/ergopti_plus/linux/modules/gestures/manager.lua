@@ -168,6 +168,27 @@ M.ACTION_PARAMETER_SPECS = load_action_parameter_specs()
 --- The KEY-SPACE is untouched and comes from the shared TOML — all 36 single
 --- slots and 3 axis slots are offered and configurable, exactly as on the other
 --- two drivers. What differs is only which of them arrive pre-bound.
+-- Where a gesture assignment is stored in the user's config.toml.
+--
+-- `[gestures]`, not `[linux.gestures]`. The driver-namespaced form was this
+-- driver answering a question the shared manifest had already answered: the
+-- manifest declares `gestures.swipe_3_up` and every feature under it, and a
+-- second key space meant those features could never be declared for Linux
+-- without the declaration being false. Two vocabularies for one setting is the
+-- same defect as two defaults for one setting, and this repository has a gate
+-- for the second and had nothing for the first.
+--
+-- The old section is still READ, once, and migrated — see load_user_config. A
+-- rename that silently drops a user's bindings is worse than the divergence it
+-- fixes.
+local CONFIG_SECTION = "gestures"
+local CONFIG_SECTION_PARAMS = "gesture_parameters"
+
+-- What the section was called before 2026-08-06. Read on load so an existing
+-- installation keeps its gestures, and never written.
+local LEGACY_SECTION = "linux.gestures"
+local LEGACY_SECTION_PARAMS = "linux.action_parameters"
+
 local DEFAULT_ACTIONS = {}
 
 --- Default gesture-to-action mapping. The key-space is the union of the derived
@@ -542,7 +563,7 @@ function M.set_action(slot, action_name)
 			tostring(action_name), tostring(slot))
 	end
 	_actions[slot] = action_name
-	M._persist_updates({ { section = "linux.gestures", key = slot, value = action_name } })
+	M._persist_updates({ { section = CONFIG_SECTION, key = slot, value = action_name } })
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
 end
 
@@ -587,7 +608,7 @@ function M.set_action_parameter(binding, action_name, value)
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	_action_params[key] = value
-	M._persist_updates({ { section = "linux.action_parameters", key = key, value = value } })
+	M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } })
 	return true
 end
 
@@ -617,7 +638,7 @@ function M.reset_defaults()
 	local updates = {}
 	for k, v in pairs(M.DEFAULT_GESTURES) do
 		_actions[k] = v
-		updates[#updates + 1] = { section = "linux.gestures", key = k, value = v }
+		updates[#updates + 1] = { section = CONFIG_SECTION, key = k, value = v }
 	end
 	M._persist_updates(updates)
 	Logger.info(LOG, "Gestures reset to defaults.")
@@ -629,7 +650,7 @@ function M.disable_all_actions()
 	local updates = {}
 	for slot in pairs(M.DEFAULT_GESTURES) do
 		_actions[slot] = "none"
-		updates[#updates + 1] = { section = "linux.gestures", key = slot, value = "none" }
+		updates[#updates + 1] = { section = CONFIG_SECTION, key = slot, value = "none" }
 	end
 	M._persist_updates(updates)
 	Logger.info(LOG, "Every gesture binding was set to none.")
@@ -842,19 +863,51 @@ local function load_user_config(path)
 	local content = fh:read("*a")
 	fh:close()
 	local ok, config = pcall(TomlCodec.decode, content)
-	local linux = ok and type(config) == "table" and config.linux or nil
-	if type(linux) ~= "table" then return end
-	if type(linux.gestures) == "table" then
-		for slot, action in pairs(linux.gestures) do
-			if M.DEFAULT_GESTURES[slot] and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action]) then _actions[slot] = action end
+	if not ok or type(config) ~= "table" then return end
+
+	--- Applies one section's slot→action pairs.
+	--- @param section table|nil
+	local function apply_actions(section)
+		if type(section) ~= "table" then return end
+		for slot, action in pairs(section) do
+			if M.DEFAULT_GESTURES[slot]
+				and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action])
+			then
+				_actions[slot] = action
+			end
 		end
 	end
-	if type(linux.action_parameters) == "table" then
-		for key, value in pairs(linux.action_parameters) do
+
+	--- Applies one section's parameter overrides.
+	--- @param section table|nil
+	local function apply_params(section)
+		if type(section) ~= "table" then return end
+		for key, value in pairs(section) do
 			local binding, action = M.split_action_parameter_key(key)
-			if binding and action and M.validate_action_parameter(action, value) then _action_params[key] = value end
+			if binding and action and M.validate_action_parameter(action, value) then
+				_action_params[key] = value
+			end
 		end
 	end
+
+	-- The legacy `[linux.gestures]` section FIRST, then the canonical one over
+	-- it. Order matters: a user who has already written a binding under the new
+	-- name after the migration must not have it overwritten by whatever the old
+	-- section still says. A rename that silently drops a user's bindings is worse
+	-- than the divergence it fixes.
+	local legacy = type(config.linux) == "table" and config.linux or nil
+	if legacy then
+		apply_actions(legacy.gestures)
+		apply_params(legacy.action_parameters)
+		if type(legacy.gestures) == "table" and next(legacy.gestures) ~= nil then
+			Logger.info(LOG,
+				"Gestures read from the legacy [%s] section — they will be rewritten under [%s] on the next change.",
+				LEGACY_SECTION, CONFIG_SECTION)
+		end
+	end
+
+	apply_actions(config[CONFIG_SECTION])
+	apply_params(config[CONFIG_SECTION_PARAMS])
 end
 
 --- Initialises the gestures module.

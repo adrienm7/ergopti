@@ -46,7 +46,7 @@ M.sections = {
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
-	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs" }, subsections = { "modes", "sensitivities" } },
+	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
 }
@@ -380,37 +380,37 @@ M.features = {
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "gestures.enabled", id = "enabled", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs" },
+		path = "gestures.enabled", id = "enabled", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "tab_next", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "tab_next", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "word_prev", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "word_prev", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "word_next", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "word_next", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "tab_prev", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "tab_prev", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs" },
+		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "left_click_toggle", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs" },
+		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "left_click_toggle", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "app_window_previous", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs" },
+		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "app_window_previous", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "gestures.space_wrap", id = "space_wrap", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.circular_spaces", platforms = { "hs" },

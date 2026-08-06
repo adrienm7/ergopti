@@ -184,8 +184,17 @@ helpers.describe("modules/gestures/manager.lua", function()
 		helpers.assert_true(out ~= nil, "the user TOML must be writable")
 		local decoded = TomlCodec.decode(out:read("*a"))
 		out:close()
-		helpers.assert_eq(decoded.linux.gestures.tap_3, "open_url")
-		helpers.assert_eq(decoded.linux.action_parameters.tap_3__open_url, "https://saved.example/path")
+		-- `[gestures]`, not `[linux.gestures]`. The driver-namespaced form was this
+		-- driver answering a question the shared manifest had already answered:
+		-- the manifest declares `gestures.swipe_3_up` and every feature under it,
+		-- and a second key space meant those features could never be declared for
+		-- Linux without the declaration being false.
+		helpers.assert_eq(decoded.gestures.tap_3, "open_url")
+		helpers.assert_eq(decoded.gesture_parameters.tap_3__open_url, "https://saved.example/path")
+		-- The legacy block this fixture starts with is LEFT in the file. A writer
+		-- that deleted sections it did not write would eat unrelated
+		-- configuration, and leaving it costs nothing: the reader applies the new
+		-- section last, so the stale copy can never win.
 		M.reset_defaults()
 		pcall(os.remove, tmp)
 		M.init({ persist = false })
@@ -448,3 +457,62 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
 end)
+
+
+
+
+-- =========================================================================
+-- 8. The rename does not lose an existing user's bindings
+-- =========================================================================
+
+helpers.describe("gestures: a config written before the rename", function()
+
+	local M = helpers.load_module("modules.gestures.manager")
+
+	helpers.it("still applies its bindings", function()
+		local tmp = os.tmpname()
+		local fh = assert(io.open(tmp, "w"))
+		fh:write([[
+[linux.gestures]
+tap_3 = "open_url"
+]])
+		fh:close()
+
+		M.init({ persist = true, config_path = tmp })
+		local action = M.get_action("tap_3")
+		M.reset_defaults()
+		pcall(os.remove, tmp)
+		M.init({ persist = false })
+
+		helpers.assert_eq(action, "open_url",
+			"a rename that silently drops a user's bindings is worse than the "
+				.. "divergence it fixes — every gesture they configured would come "
+				.. "back as 'none' with nothing saying why")
+	end)
+
+	helpers.it("lets the new section win when both are present", function()
+		local tmp = os.tmpname()
+		local fh = assert(io.open(tmp, "w"))
+		fh:write([[
+[linux.gestures]
+tap_3 = "open_url"
+
+[gestures]
+tap_3 = "none"
+]])
+		fh:close()
+
+		M.init({ persist = true, config_path = tmp })
+		local action = M.get_action("tap_3")
+		M.reset_defaults()
+		pcall(os.remove, tmp)
+		M.init({ persist = false })
+
+		helpers.assert_eq(action, "none",
+			"once a change has been written under the new name, whatever the old "
+				.. "section still says is stale — reading it last would undo the "
+				.. "user's most recent choice on every start")
+	end)
+
+end)
+
