@@ -3,11 +3,12 @@
 --- ==============================================================================
 --- MODULE: Aggregate Walker (Linux)
 --- DESCRIPTION:
---- One pass over a buffered character stream, producing every derived table the
+--- One pass over a buffered character stream, producing the derived tables the
 --- dashboard reads: the nine n-gram families, the character-class breakdown, the
---- error analysis, and the hour-by-hour and five-minute activity histograms. It
---- uses the driver-agnostic accumulators in
---- _shared/lua/keylogger/aggregator_helpers.lua.
+--- error analysis, the hour-by-hour and five-minute activity histograms, the
+--- burst and session records, and the cumulative pause buckets behind the
+--- "ignore pauses longer than…" control. It uses the driver-agnostic
+--- accumulators in _shared/lua/keylogger/aggregator_helpers.lua.
 ---
 --- WHAT WAS THERE BEFORE:
 --- One n-gram family and nothing else. This driver counted single characters, so
@@ -72,6 +73,12 @@ local BACKSPACE_MARKER = "[BS]"
 -- N separate corrections — the shared constant, so the three drivers agree on
 -- what counts as having to go back and fix a whole word.
 local CASCADE_MIN_BS = Helpers.CASCADE_MIN_BS
+
+-- Beyond this gap the user stopped and started again: a new burst below, and a
+-- new typing session at the coarser threshold. Both come from the shared canon
+-- so the three drivers cut their bursts in the same places.
+local BURST_GAP_MS = Timings.ms("keylogger", "burst_gap_ms")
+local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
 
 -- Minutes per slot in the fine-grained activity histogram. The schema names the
 -- column "min5" and the dashboard labels its axis in five-minute steps; this is
@@ -186,6 +193,45 @@ function M.walk(events, date_str, app, batch, clock)
 		backspace_run = 0
 	end
 
+	-- The burst and session currently open, or nil between them. A burst is a
+	-- run of keystrokes with no real gap; a session is the coarser version of
+	-- the same idea. Neither can be credited until it ENDS, because its length
+	-- and its speed are only known then.
+	local burst, session = nil, nil
+	-- Two maps rather than one: the dashboard divides the total time by the
+	-- number of keystrokes credited to get a mean delay, and a single map would
+	-- give it only the numerator.
+	local buckets = Helpers.gc(batch.app_buckets, app_day_key, { time = {}, credited = {} })
+
+	--- Adds one keystroke to the open burst, or opens a new one.
+	--- @param delay number Milliseconds since the previous keystroke.
+	local function extend_burst(delay)
+		if not burst or delay > BURST_GAP_MS then
+			Helpers.finalize_burst(batch, date_str, app, burst)
+			burst = { char_count = 1, sum_delays = 0, sum_delays_sq = 0, max_delay = 0 }
+			return
+		end
+		burst.char_count = burst.char_count + 1
+		burst.sum_delays = burst.sum_delays + delay
+		-- The sum of squares is kept so the dashboard can compute a standard
+		-- deviation without storing every delay: rhythm is as interesting as
+		-- speed, and a burst of 200 characters would otherwise cost 200 rows.
+		burst.sum_delays_sq = burst.sum_delays_sq + (delay * delay)
+		if delay > burst.max_delay then burst.max_delay = delay end
+	end
+
+	--- Adds one keystroke to the open session, or opens a new one.
+	--- @param delay number Milliseconds since the previous keystroke.
+	local function extend_session(delay)
+		if not session or delay > SESSION_GAP_MS then
+			Helpers.finalize_session(batch, date_str, app, session)
+			session = { char_count = 1, total_ms = 0 }
+			return
+		end
+		session.char_count = session.char_count + 1
+		session.total_ms = session.total_ms + delay
+	end
+
 	--- Credits one keystroke to its hour and its five-minute slot.
 	--- @param index number Position in the stream, to look the timestamp up.
 	local function bump_time_of_day(index)
@@ -264,6 +310,14 @@ function M.walk(events, date_str, app, batch, clock)
 			local class = class_of(char)
 			classes[class] = classes[class] + 1
 			bump_time_of_day(index)
+			extend_burst(delay)
+			extend_session(delay)
+			-- Cumulative, not exclusive: each threshold answers "how much time is
+			-- left if I ignore pauses longer than this", so a 200 ms gap belongs to
+			-- every bucket at or above 200 ms. The dashboard dropdown reads one
+			-- bucket and expects a total, not a slice.
+			Helpers.bucket_add(buckets.time, delay, delay)
+			Helpers.bucket_add(buckets.credited, delay, 1)
 
 			if delay >= MAX_KEYSTROKE_DELAY_MS then
 				-- Long enough that the next keystroke is a new movement, not the
@@ -304,6 +358,11 @@ function M.walk(events, date_str, app, batch, clock)
 	-- has typed the next character yet.
 	flush_word()
 	close_correction(nil)
+	-- A burst or session still open at the flush boundary is credited now rather
+	-- than dropped. Persisting runs every few seconds, so "still open" is the
+	-- common case: discarding it would lose almost every burst the user makes.
+	Helpers.finalize_burst(batch, date_str, app, burst)
+	Helpers.finalize_session(batch, date_str, app, session)
 	return batch
 end
 
@@ -372,13 +431,40 @@ end
 --- maps, because the writer upserts a row at a time and the key it needs is
 --- already inside each row.
 --- @param batch table
---- @return table { chars_class = {row…}, errors = {row…}, hourly = {row…}, hourly_min5 = {row…} }
+--- @return table One array per aggregate table, keyed by the batch sub-table name.
 function M.daily_rows(batch)
-	local out = { chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {} }
+	local out = {
+		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
+		bursts = {}, sessions = {}, app_buckets = {},
+	}
 	if type(batch) ~= "table" then return out end
 	for name, rows in pairs(out) do
-		for _, row in pairs(batch[name] or {}) do
-			rows[#rows + 1] = row
+		if name ~= "app_buckets" then
+			for _, row in pairs(batch[name] or {}) do
+				rows[#rows + 1] = row
+			end
+		end
+	end
+
+	-- The pause buckets accumulate as threshold-to-total maps per app-day, which
+	-- is the shape the shared accumulator writes. The schema stores one row per
+	-- threshold, so the maps are unrolled here rather than in the writer — the
+	-- writer's job is one row at a time.
+	for key, maps in pairs(batch.app_buckets or {}) do
+		local date_str, app = key:match("^([^\1]*)\1(.*)$")
+		if date_str and app then
+			for threshold, time_sum in pairs(maps.time or {}) do
+				out.app_buckets[#out.app_buckets + 1] = {
+					date = date_str, app = app,
+					bucket_ms = tonumber(threshold) or 0,
+					time_sum = time_sum,
+					-- The denominator of the mean the dashboard shows. Carried rather
+					-- than inferred: dividing by a keystroke count that includes the
+					-- pauses this bucket excludes gives a number that is wrong in the
+					-- flattering direction, and plausible enough to be believed.
+					credited = (maps.credited or {})[threshold] or 0,
+				}
+			end
 		end
 	end
 	return out

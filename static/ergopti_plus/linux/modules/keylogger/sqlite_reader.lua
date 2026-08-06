@@ -186,6 +186,77 @@ FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot;
 		}
 	end
 
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
+       SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
+       SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
+FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		local key = tostring(row.bucket_ms)
+		entry.time_buckets[key] = (entry.time_buckets[key] or 0) + (row.time_sum or 0)
+		entry.credited_buckets[key] = (entry.credited_buckets[key] or 0) + (row.credited or 0)
+		entry.hs_input_time_buckets[key] = (entry.hs_input_time_buckets[key] or 0) + (row.hs_in_t or 0)
+		entry.hs_input_credited_buckets[key] = (entry.hs_input_credited_buckets[key] or 0) + (row.hs_in_c or 0)
+		entry.llm_input_time_buckets[key] = (entry.llm_input_time_buckets[key] or 0) + (row.llm_in_t or 0)
+		entry.llm_input_credited_buckets[key] = (entry.llm_input_credited_buckets[key] or 0) + (row.llm_in_c or 0)
+	end
+
+	-- Grouped by the histogram blob as well as by app-day, so two devices'
+	-- distinct blobs each come back as their own row and are merged below.
+	-- Collapsing them in SQL would take one arbitrarily and discard the other.
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
+       MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
+       SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
+       length_buckets_json
+FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.burst_count_total = (entry.burst_count_total or 0) + (row.count_total or 0)
+		entry.burst_max_cpm = math.max(entry.burst_max_cpm or 0, row.max_cpm or 0)
+		entry.burst_max_chars = math.max(entry.burst_max_chars or 0, row.max_chars or 0)
+		entry.burst_inter_delay_count = (entry.burst_inter_delay_count or 0) + (row.inter_count or 0)
+		entry.burst_inter_delay_sum = (entry.burst_inter_delay_sum or 0) + (row.inter_sum or 0)
+		entry.burst_inter_delay_sumsq = (entry.burst_inter_delay_sumsq or 0) + (row.inter_sumsq or 0)
+		entry.burst_length_buckets = entry.burst_length_buckets or {}
+		if ok_json and type(row.length_buckets_json) == "string" then
+			local decoded_ok, buckets = pcall(Json.decode, row.length_buckets_json)
+			if decoded_ok and type(buckets) == "table" then
+				for label, count in pairs(buckets) do
+					entry.burst_length_buckets[label] =
+						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0)
+				end
+			end
+		end
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
+FROM agg_app_day_session%s;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.session_count_total = (entry.session_count_total or 0) + (row.count_total or 0)
+		-- The longest session of the day is a record across devices, not a sum:
+		-- adding two machines' longest stretches would invent one nobody sat through.
+		if (row.longest_ms or 0) > (entry.session_longest_ms or 0) then
+			entry.session_longest_ms = row.longest_ms
+		end
+		if (row.longest_chars or 0) > (entry.session_longest_chars or 0) then
+			entry.session_longest_chars = row.longest_chars
+		end
+		entry.session_total_active_ms = (entry.session_total_active_ms or 0) + (row.total_active_ms or 0)
+		entry.session_durations = entry.session_durations or {}
+		if ok_json and type(row.durations_json) == "string" then
+			local decoded_ok, durations = pcall(Json.decode, row.durations_json)
+			if decoded_ok and type(durations) == "table" then
+				for _, duration in ipairs(durations) do
+					entry.session_durations[#entry.session_durations + 1] = duration
+				end
+			end
+		end
+	end
+
 	return manifest
 end
 

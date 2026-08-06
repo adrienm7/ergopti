@@ -1161,6 +1161,9 @@ function M.flush()
 			for _, row in ipairs(daily.errors) do SqliteWriter.upsert_errors(_device_id, row) end
 			for _, row in ipairs(daily.hourly) do SqliteWriter.upsert_hourly(_device_id, row) end
 			for _, row in ipairs(daily.hourly_min5) do SqliteWriter.upsert_hourly_min5(_device_id, row) end
+			for _, row in ipairs(daily.app_buckets) do SqliteWriter.upsert_app_bucket(_device_id, row) end
+			for _, row in ipairs(daily.bursts) do SqliteWriter.upsert_burst(_device_id, row) end
+			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
 		end
 		if #_pending_app_switch_events > 0 then
 			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end

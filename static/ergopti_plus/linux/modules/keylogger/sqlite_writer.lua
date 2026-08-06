@@ -37,6 +37,12 @@ local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
 
+-- How many session durations one application-day keeps. Read from the shared
+-- accumulator rather than restated, because the walk caps the array it hands
+-- over with the same number and two independent caps would disagree the day
+-- either is tuned.
+local SESSION_DURATIONS_CAP = require("keylogger.aggregator_helpers").SESSION_DURATIONS_CAP
+
 local LOG = "modules.keylogger.sqlite_writer"
 
 
@@ -601,6 +607,109 @@ function M.upsert_hourly_min5(device_id, row)
 		_sql_escape(tostring(row.slot or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
 		math.floor(tonumber(row.es) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one pause-threshold bucket for an application-day.
+---
+--- The buckets are cumulative: a row for 5000 ms holds every delay at or below
+--- five seconds, so the dashboard's "ignore pauses longer than…" control reads
+--- one row and gets a total rather than a slice.
+--- @param row table { date, app, bucket_ms, time_sum, credited }
+function M.upsert_app_bucket(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
+		.. "time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.bucket_ms) or 0),
+		math.floor(tonumber(row.time_sum) or 0),
+		math.floor(tonumber(row.credited) or 0))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day burst record.
+---
+--- `max_cpm` and `max_chars` are records and take a MAX; the counts and the
+--- moment sums add. The length histogram is a JSON object merged in SQL, since
+--- each flush only knows about the bursts it saw.
+--- @param row table { date, app, count_total, max_cpm, max_chars, length_buckets,
+---        inter_count, inter_sum, inter_sumsq }
+function M.upsert_burst(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local parts = {}
+	for label, count in pairs(row.length_buckets or {}) do
+		if type(count) == "number" and count > 0 then
+			parts[#parts + 1] = string.format('"%s":%d',
+				tostring(label):gsub('"', '\\"'), math.floor(count))
+		end
+	end
+	local buckets_json = "{" .. table.concat(parts, ",") .. "}"
+	local sql = string.format(
+		"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, "
+		.. "length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) "
+		.. "VALUES ('%s','%s','%s',%d,%f,%d,'%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "count_total = count_total + excluded.count_total, "
+		.. "max_cpm = MAX(max_cpm, excluded.max_cpm), "
+		.. "max_chars = MAX(max_chars, excluded.max_chars), "
+		-- Merged key by key rather than replaced: each flush sees only its own
+		-- bursts, so overwriting would leave the histogram describing the last
+		-- few seconds of the day.
+		.. "length_buckets_json = (SELECT json_group_object(k, v) FROM ("
+		.. "SELECT key AS k, SUM(value) AS v FROM ("
+		.. "SELECT key, value FROM json_each(length_buckets_json) "
+		.. "UNION ALL SELECT key, value FROM json_each(excluded.length_buckets_json)"
+		.. ") GROUP BY key)), "
+		.. "inter_delay_count = inter_delay_count + excluded.inter_delay_count, "
+		.. "inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, "
+		.. "inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.count_total) or 0),
+		tonumber(row.max_cpm) or 0,
+		math.floor(tonumber(row.max_chars) or 0),
+		_sql_escape(buckets_json),
+		math.floor(tonumber(row.inter_count) or 0),
+		math.floor(tonumber(row.inter_sum) or 0),
+		math.floor(tonumber(row.inter_sumsq) or 0))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day typing-session record.
+---
+--- The durations array is capped by the walk before it gets here, and truncated
+--- again in SQL: a day of short sessions would otherwise grow one JSON array
+--- without bound, and the dashboard only plots a sample of them.
+--- @param row table { date, app, count_total, longest_ms, longest_chars,
+---        total_active_ms, durations }
+function M.upsert_session(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local parts = {}
+	for _, duration in ipairs(row.durations or {}) do
+		parts[#parts + 1] = string.format("%d", math.floor(tonumber(duration) or 0))
+	end
+	local durations_json = "[" .. table.concat(parts, ",") .. "]"
+	local sql = string.format(
+		"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, "
+		.. "longest_chars, total_active_ms, durations_json) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,'%s') "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "count_total = count_total + excluded.count_total, "
+		.. "longest_ms = MAX(longest_ms, excluded.longest_ms), "
+		.. "longest_chars = MAX(longest_chars, excluded.longest_chars), "
+		.. "total_active_ms = total_active_ms + excluded.total_active_ms, "
+		.. "durations_json = (SELECT json_group_array(d) FROM ("
+		.. "SELECT value AS d FROM json_each(durations_json) "
+		.. "UNION ALL SELECT value FROM json_each(excluded.durations_json) "
+		.. "LIMIT " .. SESSION_DURATIONS_CAP .. "));",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.count_total) or 0),
+		math.floor(tonumber(row.longest_ms) or 0),
+		math.floor(tonumber(row.longest_chars) or 0),
+		math.floor(tonumber(row.total_active_ms) or 0),
+		_sql_escape(durations_json))
 	return _exec(sql)
 end
 

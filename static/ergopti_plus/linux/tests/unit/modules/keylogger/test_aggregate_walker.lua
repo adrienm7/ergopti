@@ -487,3 +487,127 @@ helpers.describe("aggregate walker: when the typing happened", function()
 
 end)
 
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 8/ Bursts, sessions and pause buckets ===================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("aggregate walker: runs of typing", function()
+
+	local BURST_GAP_MS = Timings.ms("keylogger", "burst_gap_ms")
+	local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
+
+	helpers.it("counts an uninterrupted run as one burst", function()
+		local batch = Walker.walk(typed("bonjour tout le monde", 90), "2026-08-06", "app")
+		local row = batch.bursts["2026-08-06\1app"]
+		helpers.assert_not_nil(row, "the burst panel had no rows at all before this")
+		helpers.assert_eq(row.count_total, 1)
+		helpers.assert_eq(row.max_chars, 21)
+	end)
+
+	helpers.it("starts a new burst after a real gap", function()
+		local batch = Walker.walk({
+			key("a", 80), key("b", 80),
+			key("c", BURST_GAP_MS + 500),
+			key("d", 80),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.bursts["2026-08-06\1app"].count_total, 2,
+			"a burst is a run with no real gap in it; merging across one would "
+				.. "report a single long fluent stretch the user never had")
+	end)
+
+	helpers.it("credits a burst still open when the stream ends", function()
+		local batch = Walker.walk(typed("abc", 80), "2026-08-06", "app")
+		helpers.assert_eq(batch.bursts["2026-08-06\1app"].count_total, 1,
+			"persisting runs every few seconds, so a burst in progress at the "
+				.. "boundary is the common case — dropping it would lose nearly every "
+				.. "burst the user makes")
+	end)
+
+	helpers.it("keeps the squared delays so rhythm is recoverable", function()
+		local batch = Walker.walk({ key("a", 0), key("b", 100), key("c", 200) },
+			"2026-08-06", "app")
+		local row = batch.bursts["2026-08-06\1app"]
+		helpers.assert_eq(row.inter_sum, 300)
+		helpers.assert_eq(row.inter_sumsq, 100 * 100 + 200 * 200,
+			"the sum of squares is how a standard deviation is computed without "
+				.. "storing every delay; a 200-character burst would otherwise cost "
+				.. "200 rows to say the same thing")
+	end)
+
+	helpers.it("records one session for a continuous stretch", function()
+		local batch = Walker.walk(typed("bonjour", 90), "2026-08-06", "app")
+		local row = batch.sessions["2026-08-06\1app"]
+		helpers.assert_not_nil(row, "the session panel was empty too")
+		helpers.assert_eq(row.count_total, 1)
+		helpers.assert_eq(row.longest_chars, 7)
+	end)
+
+	helpers.it("splits sessions at the coarser threshold, not the burst one", function()
+		local batch = Walker.walk({
+			key("a", 80), key("b", 80),
+			key("c", BURST_GAP_MS + 500),
+			key("d", 80),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.sessions["2026-08-06\1app"].count_total, 1,
+			"a pause long enough to break a burst is a pause within one session — "
+				.. "the two thresholds measure different things, and using one for "
+				.. "both would make the session count a duplicate of the burst count")
+
+		local long = Walker.walk({
+			key("a", 80),
+			key("b", SESSION_GAP_MS + 1000),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(long.sessions["2026-08-06\1app"].count_total, 2)
+	end)
+
+end)
+
+
+
+
+helpers.describe("aggregate walker: the pause buckets", function()
+
+	helpers.it("credits a delay to every threshold at or above it", function()
+		local batch = Walker.walk({ key("a", 0), key("b", 1500) }, "2026-08-06", "app")
+		local maps = batch.app_buckets["2026-08-06\1app"]
+		helpers.assert_not_nil(maps, "the dropdown behind this had nothing to read")
+		helpers.assert_eq(maps.time["1000"] or 0, 0,
+			"a 1500 ms gap is longer than the 1 s threshold, so that bucket excludes it")
+		helpers.assert_eq(maps.time["2000"], 1500,
+			"and every threshold above it includes the whole delay: the control asks "
+				.. "how much time is left once pauses over N are ignored, which is a "
+				.. "total rather than a slice")
+		helpers.assert_eq(maps.time["60000"], 1500)
+	end)
+
+	helpers.it("counts the keystrokes each bucket credits", function()
+		local batch = Walker.walk({ key("a", 0), key("b", 200), key("c", 300) },
+			"2026-08-06", "app")
+		local maps = batch.app_buckets["2026-08-06\1app"]
+		helpers.assert_eq(maps.credited["1000"], 3,
+			"the dashboard divides the bucket's time by this to get a mean delay. "
+				.. "Dividing by a keystroke count that includes the pauses the bucket "
+				.. "excludes gives a number wrong in the flattering direction, and "
+				.. "plausible enough to be believed.")
+	end)
+
+	helpers.it("unrolls one row per threshold for the writer", function()
+		local batch = Walker.walk(typed("ab", 100), "2026-08-06", "app")
+		local rows = Walker.daily_rows(batch).app_buckets
+		helpers.assert_true(#rows > 1,
+			"the schema keys these by (device, date, app, bucket_ms), so a single "
+				.. "row per app-day would collapse all eight thresholds onto one")
+		for _, row in ipairs(rows) do
+			helpers.assert_true(row.bucket_ms > 0,
+				"a threshold of zero would upsert every bucket onto the same key")
+			helpers.assert_eq(row.app, "app")
+		end
+	end)
+
+end)
+

@@ -278,6 +278,7 @@ helpers.describe("sqlite reader: the daily aggregate tables", function()
 		for _, table_name in ipairs({
 			"agg_app_day", "agg_app_day_chars_class", "agg_app_day_errors",
 			"agg_app_day_hourly", "agg_app_day_hourly_min5",
+			"agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
 		}) do
 			helpers.assert_true(queried(statements, table_name),
 				"'" .. table_name .. "' was never queried — the walk now fills it and "
@@ -348,6 +349,88 @@ helpers.describe("sqlite reader: the daily aggregate tables", function()
 		helpers.assert_eq(entry.hourly_min5["10:05"].c, 40,
 			"the two histograms are separate panels keyed differently, and reading "
 				.. "the fine one into the coarse map would silently halve the timeline")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Runs and thresholds ==================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: bursts, sessions and pause buckets", function()
+
+	helpers.it("keys the pause buckets by threshold", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_buckets", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","bucket_ms":2000,'
+					.. '"time_sum":45000,"credited":300,"hs_in_t":0,"hs_in_c":0,'
+					.. '"llm_in_t":0,"llm_in_c":0}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.time_buckets["2000"], 45000,
+			"the dropdown reads one threshold; keyed by anything else it finds "
+				.. "nothing and shows the unfiltered total instead, which is the one "
+				.. "number the control exists to avoid")
+		helpers.assert_eq(entry.credited_buckets["2000"], 300)
+	end)
+
+	helpers.it("merges two devices' burst histograms instead of picking one", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_burst", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","count_total":10,"max_cpm":420.5,'
+					.. '"max_chars":88,"inter_count":9,"inter_sum":900,"inter_sumsq":90000,'
+					.. '"length_buckets_json":"{\\"20\\":3}"},'
+					.. '{"date":"2026-08-06","app":"code","count_total":4,"max_cpm":380,'
+					.. '"max_chars":40,"inter_count":3,"inter_sum":300,"inter_sumsq":30000,'
+					.. '"length_buckets_json":"{\\"20\\":2,\\"50\\":1}"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.burst_count_total, 14)
+		helpers.assert_eq(entry.burst_max_chars, 88,
+			"the longest burst of the day is a record, not a sum: adding two "
+				.. "machines' records would invent one nobody typed")
+		helpers.assert_eq(entry.burst_length_buckets["20"], 5,
+			"the histograms are merged key by key. Taking one row's blob would "
+				.. "silently discard the other machine's bursts while the totals "
+				.. "beside it stayed right, which is the hardest kind of wrong to spot.")
+	end)
+
+	helpers.it("accumulates session durations across rows", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_session", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","count_total":2,"longest_ms":600000,'
+					.. '"longest_chars":2000,"total_active_ms":900000,'
+					.. '"durations_json":"[600000,300000]"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.session_count_total, 2)
+		helpers.assert_eq(entry.session_longest_ms, 600000)
+		helpers.assert_eq(#entry.session_durations, 2,
+			"the durations are what the distribution plot is drawn from; an empty "
+				.. "array renders an axis and no bars")
 	end)
 
 end)
