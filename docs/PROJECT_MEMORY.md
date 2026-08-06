@@ -127,7 +127,66 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-git-stash-in-this-checkout-pops-a-stranger](#project-git-stash-in-this-checkout-pops-a-stranger) — `git stash push` can fail with "could not write index" and the reflex `git stash pop` then merges someone else's parked stash into your tree; never reach for stash here to get a clean tree
 - [project-drift-guard-needs-a-clean-tree](#project-drift-guard-needs-a-clean-tree) — `test-drift-guard-covers-every-output.cjs` fails whenever a generated file is modified-but-uncommitted, by design, and takes over two minutes
 
+- [project-linux-a-field-must-be-named-at-every-boundary](#project-linux-a-field-must-be-named-at-every-boundary) — On the Linux driver the same defect recurred nine times in one session: a value is computed correctly and lost at a boundary that DROPS what it does not name — an allow-list, a projection, a code-to-table map, a JSON envelope. Nothing errors, and the symptom is always a panel of zeroes
 - [project-python-slice-replace-can-shred-a-file](#project-python-slice-replace-can-shred-a-file) — A `str.replace` whose needle came from two `index()` calls silently becomes `replace("", …)` when the bounds invert, inserting the payload between every character; the original is recoverable because it is interleaved, not lost
+
+
+
+
+### project-linux-a-field-must-be-named-at-every-boundary
+
+**What kept happening.** Nine separate defects in one session on the Linux
+driver had one shape. A value is computed correctly, and then lost at a
+boundary that silently drops whatever it does not name by hand:
+
+- `sqlite_writer.upsert_app_day` has an `allowed` set. A field absent from it is
+  dropped without a word. The three LLM counters, then `hs_suggested` and
+  `llm_suggested`, each spent their existence incremented in memory and
+  forgotten at every restart.
+- `keylogger.get_app_stats()` is a projection the flush reads. A field the
+  accumulator increments and this does not copy is lost between the two. Same
+  two counters, same session, second boundary — fixing the first was not enough
+  and the symptom did not change.
+- `sqlite_reader` built an n-gram envelope with thirteen codes and filled one,
+  because its query named a single table.
+- `hotstring_engine.load_mappings` has a bucket whitelist; `is_private` and
+  `field` were absent, so the privacy flag never reached the preview.
+- The dashboard bridges answered actions no page sends and none of the two it
+  does.
+- The healthcheck bridge answered a shape of its own invention; the page reads
+  sixteen named fields and found none.
+
+**Why it is hard to see.** Every one of these is a green test away from being
+caught and none of them errors. The failing surface is a panel of zeroes or a
+blank window, which reads as "this feature is unused" or "this driver has
+nothing to report" — the two most plausible wrong conclusions available.
+
+**What to do.** When adding a value that must reach the database or a page,
+grep the whole path for a place that ENUMERATES fields, and add it to every one.
+Then test the join, not the units: the walk and the writer were each correct in
+isolation while the flush called neither. See
+[[project-linux-writing-a-table-nobody-reads]].
+
+
+
+### project-linux-writing-a-table-nobody-reads
+
+A table that is written and never read fails identically to a table that is
+never written: a blank panel. Both halves have to land in the same change, or
+the second half looks like the first half not working.
+
+The Linux driver wrote 8 of the schema's 25 tables. Adding the walk that fills
+the other n-gram families changed nothing visible until the reader was taught to
+query them — and the delay columns were written as literal zeroes by the writer
+AND dropped by the reader's merge, so "which sequences cost you the most" ranked
+a column of zeroes while looking entirely functional.
+
+The same rule applies to adapters. `adapters/notifier.lua` was DELETED under
+ADR-008 for having no callers: the file made the port matrix answer "does Linux
+notify?" affirmatively by inspection while the practical answer was no. When it
+was reinstated, the caller landed in the same commit and got its own assertion,
+because the port matrix gate only checks presence.
+
 
 ## Working conventions & feedback
 
