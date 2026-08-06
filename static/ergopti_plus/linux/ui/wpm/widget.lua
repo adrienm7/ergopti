@@ -49,11 +49,86 @@ local COLOR_KEY_FOR_SOURCE = {
 	hotstring = "bg_manual",
 }
 
+-- Populated from DEFAULTS below, once they are read. Declared here because the
+-- rest of the module reads it, and initialised there because the shipped answer
+-- is the manifest's to give.
 local _state = {
 	running        = false,
-	use_source_colors = true,
+	use_source_colors = false,
 	last_frame     = nil,
 }
+
+-- Where the two user choices are kept, and the shape of that keeping: only a
+-- CHANGE from the shipped default is stored. Persisting the default too would
+-- freeze today's default for anyone who had already run the driver — a later
+-- change to what ships would reach new installs and nobody else. The metrics
+-- toggles and the dynamic-hotstring families are stored the same way for the
+-- same reason.
+--
+-- Nothing was stored at all until now. A user who turned the widget on found it
+-- gone after the next restart, with the menu row unticked and no sign that
+-- anything had been forgotten — which reads as a control that does not work
+-- rather than one whose answer is not kept.
+local PREF_PREFIX = "wpm_widget."
+
+-- The shipped answers, read from the shared manifest rather than restated.
+--
+-- The colour mode used to be a literal `true` here while the manifest ships
+-- `false` for the same setting on Windows: two drivers disagreeing about what a
+-- fresh install looks like, with nothing anywhere saying which was intended.
+-- The manifest is the single source for a default; a driver that writes its own
+-- is not configurable, it is merely coincidentally similar.
+local Manifest = require("infra.manifest_reader")
+
+--- The manifest's answer for one of the two settings.
+--- @param path string Feature path.
+--- @param fallback boolean Used only when the manifest cannot be read at all.
+--- @return boolean
+local function shipped(path, fallback)
+	local ok, value = pcall(Manifest.default_for, path)
+	if not ok or type(value) ~= "boolean" then
+		Logger.warn(LOG, "No manifest default for '%s' — using %s.", path, tostring(fallback))
+		return fallback
+	end
+	return value
+end
+
+local DEFAULTS = {
+	visible = shipped("metrics.wpm_widget_visible", false),
+	source_colors = shipped("metrics.wpm_widget_colors", false),
+}
+
+_state.use_source_colors = DEFAULTS.source_colors
+
+--- Reads a persisted boolean, falling back to the shipped default.
+--- @param key string Suffix under PREF_PREFIX.
+--- @return boolean
+local function stored_bool(key)
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then return DEFAULTS[key] end
+	local value = Storage.get(PREF_PREFIX .. key, nil)
+	-- Only a real boolean overrides the default. `value == true` collapses every
+	-- other stored shape to false — a string from a hand-edited store, a number
+	-- from a foreign writer — which would silently turn a setting off because its
+	-- value was unrecognisable.
+	if type(value) ~= "boolean" then return DEFAULTS[key] end
+	return value
+end
+
+--- Writes a boolean, or clears the entry when it returns to the default.
+--- @param key string Suffix under PREF_PREFIX.
+--- @param value boolean
+local function store_bool(key, value)
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or not Storage then return end
+	if value == DEFAULTS[key] then
+		-- Back to the default means back to no entry, so the default stays live
+		-- for this user rather than being pinned at the moment they toggled.
+		Storage.delete(PREF_PREFIX .. key)
+		return
+	end
+	Storage.set(PREF_PREFIX .. key, value)
+end
 
 
 
@@ -179,6 +254,21 @@ end
 --- its own timer is a second clock to stop on shutdown and a second thing to
 --- leak.
 --- @return boolean True when the widget can draw.
+--- Applies the persisted choices and shows the widget if it was left on.
+---
+--- Called by the daemon at boot, before the first tick. Separate from `start`
+--- because `start` is also what the menu row calls, and a menu click must not
+--- re-read storage — the user just told it what they want.
+--- @return boolean True when the widget is running after this call.
+function M.restore()
+	_state.use_source_colors = stored_bool("source_colors")
+	local visible = stored_bool("visible")
+	Logger.info(LOG, "Restored: visible=%s, source colours=%s.",
+		tostring(visible), tostring(_state.use_source_colors))
+	if not visible then return false end
+	return M.start()
+end
+
 function M.start()
 	if _state.running then
 		Logger.debug(LOG, "start(): already running.")
@@ -189,6 +279,7 @@ function M.start()
 		return false
 	end
 	_state.running = true
+	store_bool("visible", true)
 	Logger.info(LOG, "WPM widget started.")
 	return true
 end
@@ -198,6 +289,7 @@ function M.stop()
 	if not _state.running then return end
 	_state.running = false
 	_state.last_frame = nil
+	store_bool("visible", false)
 	local ok, Renderer = pcall(require, "adapters.graphics_renderer")
 	if ok and type(Renderer.hide) == "function" then pcall(Renderer.hide) end
 	Logger.info(LOG, "WPM widget stopped.")
@@ -207,6 +299,7 @@ end
 --- @param enabled boolean
 function M.set_use_source_colors(enabled)
 	_state.use_source_colors = enabled and true or false
+	store_bool("source_colors", _state.use_source_colors)
 	Logger.debug(LOG, "Source colours: %s.", tostring(_state.use_source_colors))
 end
 
@@ -247,9 +340,17 @@ function M.tick(stats, now)
 end
 
 --- Clears module state. Tests only.
+--- Test seam: the shipped answers, so a test cannot restate them and drift.
+--- @return table
+function M._defaults()
+	local copy = {}
+	for key, value in pairs(DEFAULTS) do copy[key] = value end
+	return copy
+end
+
 function M._reset()
 	_state.running = false
-	_state.use_source_colors = true
+	_state.use_source_colors = DEFAULTS.source_colors
 	_state.last_frame = nil
 end
 

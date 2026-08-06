@@ -295,6 +295,12 @@ M.features = {
 	{
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" },
 	},
+	{
+		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "linux" },
+	},
+	{
+		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" },
+	},
 }
 
 M.unavailable = {
@@ -404,16 +410,10 @@ M.unavailable = {
 		path = "metrics.metrics_disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.wpm_widget_visible", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.wpm_widget_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },
