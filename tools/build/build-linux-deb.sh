@@ -51,12 +51,14 @@ mkdir -p "$DEB_ROOT/usr/lib/systemd/user"
 # 3. Copy driver files
 # ----------------------------------------------------------------------
 echo "Copying driver files..."
-cp -r "$BUILD_DIR"/linux/*.lua "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/modules "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/adapters "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/infra "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/ui "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/vendor "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+# The whole driver tree, not a list of directories to remember. The list this
+# replaced named *.lua, modules, adapters, infra, ui and vendor — so it silently
+# dropped _generated (without which the daemon refuses to start) and platform
+# (the kanata remap config), while vendor had already stopped existing in the
+# bundle. Every line also ended in `2>/dev/null || true`, so none of that made a
+# sound. Tests are the one thing a system package has no use for.
+cp -r "$BUILD_DIR/linux/." "$DEB_ROOT/usr/lib/ergopti/"
+rm -rf "$DEB_ROOT/usr/lib/ergopti/tests" "$DEB_ROOT/usr/lib/ergopti/__pycache__"
 
 # Copy shared modules (from _shared/lua in the assembled bundle)
 if [ -d "$BUILD_DIR/_shared/lua" ]; then

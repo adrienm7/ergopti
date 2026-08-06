@@ -132,6 +132,54 @@ for (const pkg of PACKAGERS) {
 	}
 }
 
+// ─── 4b. Every runtime directory of the driver reaches the package ──────────
+//
+// ROOT CAUSE ENCODED: the .deb and .rpm staged the driver with a hand-written
+// list — `*.lua modules adapters infra ui vendor` — and each line ended in
+// `2>/dev/null || true`. So `_generated/` and `platform/` were never copied and
+// nothing said a word: `vendor/` had already stopped existing in the bundle,
+// and the missing manifest killed the daemon on its first line
+// ("cannot load generated manifest"), which is where CI finally caught it after
+// the packages had been structurally "validated" for months.
+//
+// The list is derived from the source tree, so a directory added tomorrow is
+// covered the day it appears rather than the day someone remembers it.
+const DRIVER_SRC = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
+// Not runtime: tests are dead weight in a system package, __pycache__ is a
+// build artefact, bin/ is superseded by the generated /usr/bin wrapper, and
+// vendor/ is excluded from the bundle before a packager ever sees it.
+const NON_RUNTIME_DIRS = new Set(['tests', '__pycache__', 'bin', 'vendor']);
+
+const runtimeDirs = fs.readdirSync(DRIVER_SRC, { withFileTypes: true })
+	.filter((d) => d.isDirectory() && !NON_RUNTIME_DIRS.has(d.name))
+	.map((d) => d.name);
+
+if (runtimeDirs.length === 0) {
+	errors.push('the driver source tree yielded no runtime directory — this scan is broken, not the tree.');
+}
+
+for (const pkg of PACKAGERS) {
+	const src = read(pkg.rel);
+	// Copying the tree wholesale is the shape that cannot rot; naming
+	// directories one by one is allowed only if the naming is complete.
+	const copiesWholeTree = /linux\/\.["']?\s/.test(src) || src.includes('linux/."');
+	if (copiesWholeTree) continue;
+
+	for (const dir of runtimeDirs) {
+		// The DIRECTORY as a copy source, not a path INTO it. Both packagers
+		// copy `linux/_generated/config_template.toml` — one file — so a plain
+		// substring test reported _generated as covered while the other three
+		// files in it were being dropped. That is the very bug this catches.
+		const copiesDir = new RegExp(`linux/${dir}(?=["'\\s])`).test(src);
+		if (!copiesDir) {
+			errors.push(
+				`${pkg.rel} (${pkg.label}): stages the driver by name but never copies '${dir}/' — ` +
+				`either copy the tree wholesale, or add it. The daemon reads every runtime directory.`
+			);
+		}
+	}
+}
+
 // ─── 5. Every packaged unit must launch the daemon with a user-facing surface ──
 //
 // ROOT CAUSE ENCODED: opts.tray defaults to false and the whole tray/menu block

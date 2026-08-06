@@ -59,12 +59,10 @@ mkdir -p "$INSTALL_ROOT/usr/lib/systemd/user"
 # 3. Copy driver files
 # ----------------------------------------------------------------------
 echo "Copying driver files..."
-cp -r "$BUILD_DIR"/linux/*.lua "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/modules "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/adapters "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/infra "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/ui "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/linux/vendor "$INSTALL_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+# The whole driver tree — see build-linux-deb.sh for why the per-directory list
+# this replaced was a bug: it dropped _generated and platform, and said nothing.
+cp -r "$BUILD_DIR/linux/." "$INSTALL_ROOT/usr/lib/ergopti/"
+rm -rf "$INSTALL_ROOT/usr/lib/ergopti/tests" "$INSTALL_ROOT/usr/lib/ergopti/__pycache__"
 
 # Copy shared modules (from _shared/lua in the assembled bundle)
 if [ -d "$BUILD_DIR/_shared/lua" ]; then
