@@ -41,6 +41,7 @@ local PAIRS = {
 	{ adapter = "adapters.storage",         make = function() return Fakes.storage() end },
 	{ adapter = "adapters.clipboard",       make = function() return Fakes.clipboard() end },
 	{ adapter = "adapters.timer_scheduler", make = function() return Fakes.timer_scheduler() end },
+	{ adapter = "adapters.notifier",        make = function() return Fakes.notifier() end },
 	-- Not under adapters/, but the same relationship and the same failure mode:
 	-- four test files each carried their own literal table of writer methods, and
 	-- adding four functions to the writer broke all four at the call site.

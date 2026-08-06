@@ -45,6 +45,7 @@ graph TD
         LINUX_http_client["HttpClient.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
+        LINUX_notifier["Notifier.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
@@ -125,6 +126,7 @@ graph TD
     P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_HttpClient -->|implements| LINUX_http_client
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
+    P_Notifier -->|implements| LINUX_notifier
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_Storage -->|implements| LINUX_storage
