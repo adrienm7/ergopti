@@ -63,6 +63,25 @@ local LOG_EXT       = ".log"
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
 
+--- How many days of rolled files are kept. From the shared registry, which the
+--- other two drivers already read for the same purpose — this driver rolled a
+--- new pair of files every day and deleted none, so the directory grew without
+--- bound for the life of the install. Read lazily, because this module is
+--- loaded before the timing registry on some start-up paths and a logger that
+--- cannot load is worse than one that keeps too much.
+local _retention_days = nil
+
+--- @return number|nil Days to keep, or nil when the registry is unreadable.
+local function retention_days()
+	if _retention_days ~= nil then return _retention_days end
+	local ok, Timings = pcall(require, "infra.timings")
+	if not ok or not Timings then return nil end
+	local ok_value, value = pcall(Timings.count, "logger", "retention_days")
+	if not ok_value or type(value) ~= "number" or value <= 0 then return nil end
+	_retention_days = value
+	return _retention_days
+end
+
 --- POSIX single-quote escape: close, insert an escaped quote, reopen.
 --- Identical to `adapters/shell_runner.lua`'s QUOTE_ESCAPE; pinned by
 --- `tests/unit/meta/test_logger_sink.lua` so the two cannot drift.
@@ -176,10 +195,39 @@ local function open_handles(date)
 	_errors_handle = io.open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
 end
 
+--- Deletes rolled files older than the retention window.
+---
+--- Called at install and again on each rollover. Install is the one that
+--- matters: a daemon started in the morning and stopped at night never crosses
+--- midnight, so a purge that only ran on rollover would never run at all on the
+--- most common usage pattern.
+---
+--- Both prefixes are swept explicitly. The errors prefix happens to begin with
+--- the main one today, so one sweep would reach both — but that is a property
+--- of two constants that are free to change independently, and relying on it
+--- would make renaming one silently stop purging the other.
+---
+--- Uses `find -mtime` rather than parsing the date out of each name: the daemon
+--- may have been off for a month, and a purge that only understands "yesterday"
+--- leaves everything older untouched.
+local function purge_old()
+	local days = retention_days()
+	if not days or not _dir then return end
+	local quoted = M.shell_quote(_dir)
+	for _, prefix in ipairs({ MAIN_PREFIX, ERRORS_PREFIX }) do
+		os.execute(string.format(
+			"find %s -maxdepth 1 -type f -name %s -mtime +%d -delete 2>/dev/null",
+			quoted, M.shell_quote(prefix .. "*" .. LOG_EXT), math.floor(days)))
+	end
+end
+
 --- Ensures the open handles belong to the current date.
 local function rollover_if_needed()
 	local now = today()
-	if now ~= _date then open_handles(now) end
+	if now ~= _date then
+		open_handles(now)
+		purge_old()
+	end
 end
 
 
@@ -248,6 +296,10 @@ function M.install(logger, opts)
 			-- Directory exists but the file will not open (permissions, full disk).
 			_stdout_only = true
 		end
+		-- After the handles are open, so today's pair is never a candidate. This
+		-- driver rolled a new pair every day and deleted none, so the directory
+		-- grew for the life of the install.
+		purge_old()
 	else
 		_stdout_only = true
 	end

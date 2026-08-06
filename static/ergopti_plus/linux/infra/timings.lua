@@ -110,6 +110,19 @@ function M.ms(section, key)
 	return v
 end
 
+--- Same lookup as `M.ms` for a registry entry that is NOT a duration.
+---
+--- A few keys in the shared registry are plain counts — days of log retention,
+--- ring-buffer entries. Reading them through `M.ms` works and reads as a lie at
+--- the call site, which is how a number in days ends up divided by a thousand
+--- by someone who trusted the accessor's name.
+--- @param section string The TOML section name.
+--- @param key string The key within that section.
+--- @return number The raw value.
+function M.count(section, key)
+	return M.ms(section, key)
+end
+
 --- Same lookup as `M.ms` but converted to seconds.
 --- @param section string The TOML section name.
 --- @param key string The key within that section.

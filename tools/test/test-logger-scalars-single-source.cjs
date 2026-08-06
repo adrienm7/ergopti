@@ -133,6 +133,32 @@ check(
 	registry.logger.retention_days,
 	'declared twice in this file — both must match'
 );
+// Linux reads the registry directly rather than declaring a default, so there
+// is no literal to pin. What must be checked is that it purges at all: it
+// rolled a new pair of files every day and deleted none, so the directory grew
+// for the life of the install. A gate over the other two drivers' copies of a
+// number cannot see a driver that ignores the number entirely.
+{
+	const sink = read('linux/infra/logger_sink.lua');
+	// Matches the lookup by its arguments, not by one spelling of the call: it
+	// travels through pcall, so `Timings.count("logger", "retention_days")` and
+	// `pcall(Timings.count, "logger", "retention_days")` are both correct and only
+	// one of them has the parentheses.
+	if (!/Timings\.count/.test(sink) || !/["']logger["'][\s\S]{0,24}["']retention_days["']/.test(sink)) {
+		errors.push(
+			'linux/infra/logger_sink.lua: the retention window is not read ' +
+				'from the shared registry — either it purges on a number of its own, which is ' +
+				'what this gate exists to prevent, or it does not purge at all.'
+		);
+	}
+	if (!/-mtime/.test(sink)) {
+		errors.push(
+			'linux/infra/logger_sink.lua: no age-based purge found. ' +
+				'Rolling a file per day and deleting none grows the log directory without ' +
+				'bound, and nothing else in this driver would ever notice.'
+		);
+	}
+}
 
 // ── ring_buffer_size ────────────────────────────────────────────────────────
 
