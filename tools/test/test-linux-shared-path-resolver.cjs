@@ -79,9 +79,24 @@ if (files.length < 40) {
 	errors.push(`walked only ${files.length} Linux .lua file(s) — the scan is broken and would report nothing`);
 }
 
-// A hardcoded hop to the shared tree: any ".." step immediately followed by
-// "_shared" in a string literal.
-const HARDCODED = /\.\.[/\\](?:\.\.[/\\])*_shared/;
+// A hardcoded hop to the shared tree comes in TWO spellings, and this guard
+// only ever knew the first:
+//
+//   1. `"../_shared"`     — walk up with ".." and name the tree.
+//   2. `root .. "/_shared/…"` — strip N path components off debug.getinfo with a
+//      pattern like `s:match("^(.*)/[^/]+/[^/]+/[^/]+$")`, then append the tree.
+//
+// Both encode the checkout's depth as a fact. The second is the one that
+// mattered: infra/timings.lua, infra/wpm_constants.lua,
+// infra/personal_info_fields.lua and modules/gestures/manager.lua all used it,
+// none was exempt, and none was ever reported — this guard printed "All 99
+// Linux module(s) reach _shared through infra/paths.lua" while four did not.
+// On an installed package the driver sits flat in /usr/lib/ergopti, so three
+// levels up is /usr, and the daemon died on its first timing lookup.
+const HARDCODED = [
+	{ re: /\.\.[/\\](?:\.\.[/\\])*_shared/, why: 'counting ".." steps' },
+	{ re: /["'][/\\]_shared[/\\]/,          why: 'appending "/_shared/…" to a derived root' }
+];
 
 for (const abs of files) {
 	const rel = path.relative(DRIVER, abs).split(path.sep).join('/');
@@ -89,11 +104,13 @@ for (const abs of files) {
 	const lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/);
 	lines.forEach((line, i) => {
 		if (/^\s*--/.test(line)) return; // prose may cite the old path
-		if (!HARDCODED.test(line)) return;
+		const hit = HARDCODED.find((h) => h.re.test(line));
+		if (!hit) return;
 		errors.push(
-			`${rel}:${i + 1}: derives the shared tree by counting ".." — require("infra.paths") and ` +
+			`${rel}:${i + 1}: derives the shared tree by ${hit.why} — require("infra.paths") and ` +
 				'call Paths.shared(…). A per-file depth cannot be verified, and a wrong one degrades ' +
-				'silently: this is how the language menu came to offer 2 locales of 21.'
+				'silently: this is how the language menu came to offer 2 locales of 21, and how every ' +
+				'installed package came to read its timings from /usr/_shared.'
 		);
 	});
 }

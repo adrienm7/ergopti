@@ -37,6 +37,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local TomlCodec = require("toml_codec")
@@ -76,24 +77,18 @@ local _now_sec = Monotonic.now_sec
 -- under [slots]. This driver derives SINGLE_SLOTS / AXIS_SLOTS and the
 -- DEFAULT_GESTURES key-space from that file at load time so the two drivers can
 -- never drift. Only the default action VALUES below stay Linux-specific.
-local ACTIONS_TOML_REL_PATH = "/_shared/modules/actions/actions.toml"
+local ACTIONS_TOML_REL_PATH = "modules/actions/actions.toml"
 local UTF8_BOM = "\239\187\191"
 
---- Resolves the absolute path to the shared gesture actions TOML from this
---- module's own location (…/linux/modules/gestures/manager.lua → …/_shared/…).
+--- Resolves the absolute path to the shared gesture actions TOML.
+---
+--- Through infra.paths, not by counting four path components up from this file.
+--- The component count is the checkout layout written down: a system package
+--- stages the driver flat under /usr/lib/ergopti, so four levels up leaves the
+--- install entirely and every gesture silently falls back to its default.
 --- @return string The absolute path, or "" when it cannot be resolved.
 local function resolve_actions_toml_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if src and src.source then
-		local s = src.source
-		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-		s = s:gsub("\\", "/")
-		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
-		if root then
-			return root .. ACTIONS_TOML_REL_PATH
-		end
-	end
-	return ""
+	return Paths.shared(ACTIONS_TOML_REL_PATH) or ""
 end
 
 --- Reads the ordered [slots].single / [slots].axis lists from the shared actions

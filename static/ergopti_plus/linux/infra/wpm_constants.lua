@@ -27,6 +27,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Codec  = require("toml_codec")
+local Paths  = require("infra.paths")
 
 local LOG = "infra.wpm_constants"
 
@@ -52,17 +53,14 @@ local _constants = nil
 -- =========================================
 -- =========================================
 
---- Resolves the canon's absolute path by walking up from this file.
+--- Resolves the canon's absolute path through infra.paths.
+---
+--- Counting path components — three levels up, then "/_shared/…" — assumes the
+--- checkout layout. A system package puts the driver flat in /usr/lib/ergopti,
+--- where three up is /usr and nothing is found.
 --- @return string|nil
 local function resolve_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if not (src and src.source) then return nil end
-	local s = src.source
-	if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-	s = s:gsub("\\", "/")
-	local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")
-	if not root then return nil end
-	return root .. "/_shared/modules/wpm_widget/constants.toml"
+	return Paths.shared("modules/wpm_widget/constants.toml")
 end
 
 --- Loads and validates the canon, once.
