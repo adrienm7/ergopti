@@ -112,6 +112,11 @@ local RepeatKey         = require("modules.hotstrings.repeat_key")
 -- leaves every binding the user made doing nothing with no sign why.
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
+-- Battery, network, lock and suspend, for the metrics.
+local system_metrics = nil
+local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keylogger.system_metrics")
+if ok_sysmetrics then system_metrics = sysmetrics_mod end
+
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = nil
 local ok_wpm, wpm_mod = pcall(require, "ui.wpm.widget")
@@ -1478,6 +1483,13 @@ local function main()
 		-- the only interval this loop can be sure of.
 		if tick_count % FLUSH_EVERY_TICKS == 0 then
 			pcall(keylogger.flush)
+		end
+
+		-- The machine's own state. The sampler decides for itself whether enough
+		-- time has passed, so calling it every tick costs a comparison — putting
+		-- the interval here as well would be a second place to change it.
+		if system_metrics then
+			pcall(system_metrics.sample, math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
 		end
 
 		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it

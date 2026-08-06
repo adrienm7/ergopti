@@ -739,6 +739,47 @@ function M.upsert_title(device_id, row)
 	return _exec(sql)
 end
 
+--- Upserts the machine's own state for a day.
+---
+--- Every duration sums; the battery bounds are a MIN and a MAX. Sent as the
+--- running total rather than as a delta, and the row REPLACES rather than adds,
+--- because the sampler holds one accumulating day in memory — adding would
+--- count every earlier minute again on each flush.
+--- @param row table The accumulated day from system_metrics.
+function M.upsert_system_day(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.date) ~= "string" or row.date == "" then return end
+	local function number_or_null(value)
+		local n = tonumber(value)
+		if not n then return "NULL" end
+		return string.format("%d", math.floor(n))
+	end
+	local sql = string.format(
+		"INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, "
+		.. "battery_sum, battery_count, battery_min, battery_max, audio_muted_ms, "
+		.. "locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) "
+		.. "VALUES ('%s','%s',%d,%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date) DO UPDATE SET "
+		.. "wifi_changes = excluded.wifi_changes, space_switches = excluded.space_switches, "
+		.. "battery_sum = excluded.battery_sum, battery_count = excluded.battery_count, "
+		.. "battery_min = excluded.battery_min, battery_max = excluded.battery_max, "
+		.. "audio_muted_ms = excluded.audio_muted_ms, locked_ms = excluded.locked_ms, "
+		.. "sleep_ms = excluded.sleep_ms, awake_ms = excluded.awake_ms, "
+		.. "passive_count = excluded.passive_count, night_wake_count = excluded.night_wake_count;",
+		_sql_escape(device_id), _sql_escape(row.date),
+		math.floor(tonumber(row.wifi_changes) or 0),
+		math.floor(tonumber(row.space_switches) or 0),
+		number_or_null(row.battery_sum), number_or_null(row.battery_count),
+		number_or_null(row.battery_min), number_or_null(row.battery_max),
+		math.floor(tonumber(row.audio_muted_ms) or 0),
+		math.floor(tonumber(row.locked_ms) or 0),
+		math.floor(tonumber(row.sleep_ms) or 0),
+		math.floor(tonumber(row.awake_ms) or 0),
+		math.floor(tonumber(row.passive_count) or 0),
+		math.floor(tonumber(row.night_wake_count) or 0))
+	return _exec(sql)
+end
+
 --- Upserts one key's hold statistics for an application-day.
 ---
 --- The tap and hold counts are what make this table worth having on a keyboard

@@ -87,6 +87,12 @@ local TextCipher = require("modules.keylogger.text_cipher")
 -- logs is asking for when they tick it.
 local TextMigration = require("modules.keylogger.text_migration")
 local MigrationPlan = require("keylogger.text_migration")
+-- Battery, network, lock and suspend. Optional: a machine with none of the
+-- tools it reads simply reports nothing, and the typing path must not care.
+local SystemMetrics = nil
+local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keylogger.system_metrics")
+if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
+
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
 local AggregateWalker = require("modules.keylogger.aggregate_walker")
 
@@ -1373,6 +1379,13 @@ function M.flush()
 			for _, row in ipairs(daily.ergo) do SqliteWriter.upsert_ergo(_device_id, row) end
 			for _, row in ipairs(daily.layouts) do SqliteWriter.upsert_layout(_device_id, row) end
 		end
+		-- The machine's own state, which the dashboard puts beside the typing to
+		-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
+		if SystemMetrics then
+			local day = SystemMetrics.current()
+			if day then SqliteWriter.upsert_system_day(_device_id, day) end
+		end
+
 		if #_pending_app_switch_events > 0 then
 			-- Counted BEFORE the raw events are handed over, because that call
 			-- clears the buffer. The aggregate is derived from the same rows and
