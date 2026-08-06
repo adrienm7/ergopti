@@ -57,6 +57,19 @@ local function with_recorder(chars)
 	layout._set_table_for_test(layout_table)
 	package.loaded["adapters.keyboard_layout"] = layout
 
+	-- The stub has to still be in force when the injector reads it, and on CI it
+	-- has not always been: this file has gone red as a block, under LuaJIT only,
+	-- on a commit that also went green — nine assertions failing at once because
+	-- the setup silently lost, not because nine behaviours changed. Asserting the
+	-- setup here names the cause on the spot instead of leaving that to be
+	-- reconstructed from a wall of downstream failures.
+	if (chars or "") ~= "" then
+		helpers.assert_true(layout.is_ready(),
+			"the stub layout was installed and then lost before the test ran — "
+				.. "adapters.keyboard_layout.refresh() clears the table when no keymap "
+				.. "is available, which is every CI runner")
+	end
+
 	local injector = helpers.load_module("modules.hotstrings.injector")
 	local channel, events = recorder()
 	injector._set_uinput(channel)
