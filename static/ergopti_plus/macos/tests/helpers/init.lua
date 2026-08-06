@@ -306,20 +306,31 @@ local function production_sources()
 		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
 	end
 
-	local bodies = {}
+	-- Collect the PATHS first and sort them, because neither `find` nor `dir /b /s`
+	-- promises an order: it follows the filesystem, so a fresh CI runner returns a
+	-- different one from the last. Every source invariant built on this list was
+	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
+	-- red or green depending on which file the scan happened to reach first.
+	local paths = {}
 	local pipe = io.popen(command, "r")
-	if not pipe then return bodies end
+	if not pipe then return {} end
 	for path in pipe:lines() do
 		local normalized = path:gsub("\\", "/")
 		if not normalized:find("/tests/", 1, true) then
-			local fh = io.open(path, "r")
-			if fh then
-				bodies[#bodies + 1] = fh:read("*a")
-				fh:close()
-			end
+			paths[#paths + 1] = path
 		end
 	end
 	pipe:close()
+	table.sort(paths)
+
+	local bodies = {}
+	for _, path in ipairs(paths) do
+		local fh = io.open(path, "r")
+		if fh then
+			bodies[#bodies + 1] = fh:read("*a")
+			fh:close()
+		end
+	end
 
 	-- An empty result means the scan itself failed (no popen, wrong root). Do not
 	-- cache that: a cached emptiness would make every later call return nil and
@@ -350,6 +361,44 @@ function M.read_driver_source(symbol)
 	end
 	if #parts == 0 then return nil end
 	return table.concat(parts, "\n")
+end
+
+--- The ONE production file containing `symbol`, for invariants about ORDER.
+---
+--- read_driver_source concatenates every matching file, which is right for
+--- "does this appear anywhere" and wrong for "does A appear before B": byte
+--- offsets across unrelated files answer a question nobody asked. The boot
+--- guard compared `hs.shutdownCallback = function` against `"platform.remap"`
+--- that way; both live in init.lua, but two OTHER files carry the second marker
+--- alone, so whichever the scan reached first decided the verdict.
+---
+--- Sorting the scan made that deterministic. It did not make it meaningful —
+--- init.lua happens to sort first, so the guard would have passed for a reason
+--- unrelated to what it asserts. Ordering is a property of one translation
+--- unit, and this returns one or fails.
+---
+--- Still no path is named: the caller gives a symbol, not a file, so the
+--- implementation can move.
+--- @param symbol string A string unique to the file being asked for.
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_driver_unit(symbol)
+	if type(symbol) ~= "string" or symbol == "" then
+		return nil, "read_driver_unit() needs a symbol to look for"
+	end
+	local matches = {}
+	for _, body in ipairs(production_sources()) do
+		if body:find(symbol, 1, true) then matches[#matches + 1] = body end
+	end
+	if #matches == 0 then
+		return nil, string.format("no production file contains %q", symbol)
+	end
+	if #matches > 1 then
+		return nil, string.format(
+			"%d production files contain %q — an ordering invariant needs a symbol "
+				.. "unique to one file, or it compares offsets across unrelated sources",
+			#matches, symbol)
+	end
+	return matches[1]
 end
 
 
