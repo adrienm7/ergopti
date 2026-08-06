@@ -35,10 +35,27 @@ SKIP_DEPS=false
 # can be re-run after a kernel update without reinstalling the driver.
 SETUP_PERMS_ONLY=false
 
-# Script's own directory — the linux driver root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# The drivers root is one level above the linux driver.
-DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+
+# This script runs from TWO layouts, and assuming one of them was a bug:
+#
+#   CHECKOUT  static/ergopti_plus/linux/install.sh — the script sits INSIDE the
+#             driver, and _shared is its parent's child.
+#   TARBALL   <unpacked>/install.sh — build-linux-driver.sh copies it to the
+#             bundle ROOT, beside linux/ and _shared/.
+#
+# It only ever computed the checkout's shape, so on the release tarball — the
+# download the notes send every distribution the .deb and .rpm do not cover —
+# SRC_SHARED pointed one level above the unpack directory and the install died
+# with "cp: cannot stat '.../_shared/.'". Probing is what tells them apart;
+# counting levels cannot.
+if [ -d "${SCRIPT_DIR}/linux" ] && [ -d "${SCRIPT_DIR}/_shared" ]; then
+	SRC_DRIVER="${SCRIPT_DIR}/linux"
+	DRIVERS_ROOT="${SCRIPT_DIR}"
+else
+	SRC_DRIVER="${SCRIPT_DIR}"
+	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+fi
 
 ERGOPTI_VERSION="$(
 	node -p "require('$(cd "${SCRIPT_DIR}/../../.." && pwd -P)/package.json').version" 2>/dev/null \
@@ -459,8 +476,10 @@ install -d "${DEST_SHARED}"
 install -d "${BIN_DIR}"
 install -d "${CONFIG_DIR}"
 
-# Copy driver Lua sources.
-cp -r "${SCRIPT_DIR}/." "${LIB_DIR}/linux/"
+# Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
+# this script sits BESIDE the driver rather than inside it, so SCRIPT_DIR would
+# nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
+cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 
 # Copy default hotstring TOMLs so the user has something to start with.
@@ -566,7 +585,7 @@ if $INSTALL_SERVICE; then
 	# Only the ExecStart differs between install roots, so that one line is
 	# rewritten and everything else is taken verbatim.
 	sed "s|^ExecStart=.*|ExecStart=${BIN_DIR}/ergopti-hotstrings --tray|" \
-		"${SCRIPT_DIR}/ergopti-hotstrings.service" \
+		"${SRC_DRIVER}/ergopti-hotstrings.service" \
 		> "${SYSTEMD_DIR}/ergopti-hotstrings.service"
 
 	# kanata key-remapping daemon (tap-hold + layer switching)

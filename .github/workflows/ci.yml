@@ -1528,11 +1528,21 @@ jobs:
       - name: The bundled shared data tree resolves and opens
         # The AppImage is relocatable, so its root is wherever it was unpacked —
         # which is the point of checking it here rather than assuming a prefix.
+        #
+        # Run through the image's OWN luajit, not the runner's. There is no
+        # luajit on this runner at all, which is the situation an AppImage
+        # exists for: if the bundled interpreter is missing or unusable, that is
+        # a defect in the package and this step is where it should surface.
         run: |
           set -euo pipefail
           root="$(pwd)/squashfs-root/usr/lib/ergopti"
+          luajit_bin="$(pwd)/squashfs-root/usr/bin/luajit"
+          if [ ! -x "$luajit_bin" ]; then
+              echo "::error::the AppImage bundles no runnable luajit at usr/bin/luajit — it would depend on the target having one."
+              exit 1
+          fi
           export LUA_PATH="$root/?.lua;$root/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+          "$luajit_bin" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
   # ─────────────────────────────────────────────────
