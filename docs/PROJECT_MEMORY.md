@@ -3734,3 +3734,67 @@ s = s.replace(old, new)
 - Escaping a Lua pattern through a Python heredoc is its own trap: a Lua `"([^/\]+)"` is four backslashes in a non-raw Python literal and two in a raw one. When a `replace` reports zero occurrences, print `repr()` of the real line before guessing again.
 
 Related: [[project-git-stash-in-this-checkout-pops-a-stranger]].
+
+
+
+
+### project-a-path-resolver-must-know-every-layout-that-ships
+
+_The Linux driver resolved `_shared` as a sibling only, which is the checkout and the tarball — and wrong for every system package we build_
+
+<sub>slug: `project_a_path_resolver_must_know_every_layout_that_ships`</sub>
+
+`infra/paths.lua` probed exactly one candidate, `<driver root>/../_shared`. That is correct for the checkout (`static/ergopti_plus/{linux,_shared}`) and for the release tarball, which unpacks the two side by side — so every developer, every test and every CI run agreed it worked. The `.deb`, the `.rpm` and the `PKGBUILD` stage the driver flat into `/usr/lib/ergopti` and nest the shared tree **inside** it, because a sibling would land at `/usr/lib/_shared`, which no package may own. On an installed package the probe therefore addressed `/usr/lib/_shared/data/locales/en.json` and `shared_root()` returned nil.
+
+**Why it survived so long:** the generated wrapper exports `LUA_PATH` over the shared Lua tree, so `require` kept working. The daemon started, logged normally, and only the **data** reads failed — locales, keycode tables, hotstring packs, tooltip config, defaults. A `--help` smoke test passes in that state, which is why one had never caught it.
+
+**How to apply:**
+
+- When a resolver takes a layout as given, enumerate the layouts that actually ship before trusting it. Here there were two, and only one was in the code.
+- `require` working proves nothing about data reads. A wrapper's `LUA_PATH` covers the first and not the second, so a package can boot and be functionally empty.
+- Test a path resolver by placing the resolver **file** where the layout puts it and loading it from there — that is what an install does. Stubbing `io.open` tests the branch, not the layout.
+- A package smoke test must open a data file, not only exit 0 from `--help`.
+
+Related: [[project-fixed-field-lists-drop-flags]], [[project-a-green-probe-can-mean-redundant-guards]].
+
+
+
+
+### project-release-notes-are-not-joined-to-the-assets
+
+_The Linux release table linked `kanata.kbd` for months; no job ever uploaded it, and the site's Linux button resolved through that same name_
+
+<sub>slug: `project_release_notes_are_not_joined_to_the_assets`</sub>
+
+The release body is a literal heredoc in `finalize-release`; the attached files come from whatever `find release-assets -type f` returns. Nothing compared the two, so a row could name a file no job produced. `kanata.kbd` did, and every published release carried a 404.
+
+It was worse than a dead row. `Platforms.svelte`, `Hero.svelte` and `StickyCta.svelte` each resolve the Linux call-to-action through `ui.release?.url('kanata.kbd')`, and `getGitHubRelease.js` looks assets up by exact name — so the button rendered as `href="#"` on three pages. The drift ran in the other direction too: `ergopti-plus-linux.tar.gz`, the only asset containing the driver, was uploaded and mentioned nowhere in the notes.
+
+**How to apply:**
+
+- Two hand-maintained lists that must agree need a gate joining them, derived from the source on both sides. A hardcoded expected list rots exactly like the thing it guards.
+- The join key here is the **basename**: upload entries are build-tree paths, note links are release-asset names, and the release attaches by filename.
+- Deleting the offending row is not always the fix. The site asked for that asset by name, so removing the row would have left the button dead — the fix was to attach the file.
+
+Related: [[project-gate-scripts-must-be-wired]], [[feedback-local-gate-mirrors-ci]].
+
+
+
+
+### project-the-drift-guard-crashes-on-this-windows-box
+
+_`test-drift-guard-covers-every-output.cjs` intermittently dies with `errno -4094` on a `config_template.toml` and leaves that file dirty — an environment fault, not drift_
+
+<sub>slug: `project_the_drift_guard_crashes_on_this_windows_box`</sub>
+
+The guard proves it can detect drift by perturbing each generated output in turn and restoring it. On this machine the `open` intermittently fails with `UNKNOWN` / `errno: -4094` — Windows file locking, most likely a scanner watching files that are rewritten in a tight loop. When it dies mid-perturbation it leaves one `_generated/config_template.toml` modified, so the **next** run opens by reporting real-looking drift in a different driver each time.
+
+Seen twice on 2026-08-06: first reported as `features manifest no-drift` inside `npm run verify`, which passed when run alone; then three consecutive runs of the drift guard each blaming a different driver's `config_template.toml`.
+
+**How to apply:**
+
+- Before believing a drift report, run `npm run gen` and check `git status --porcelain | grep _generated`. If regenerating from a clean tree produces no diff, there is no drift — the guard damaged the file itself.
+- `npm run gen` restores whatever the crash left behind; it is the recovery step, not just the fix.
+- Do not chase this as a code defect. CI runs on Linux and exercises the guard properly; this is a local-environment fault only.
+
+Related: [[project-drift-guard-needs-a-clean-tree]], [[project-drift-guard-precondition-not-a-flake]].
