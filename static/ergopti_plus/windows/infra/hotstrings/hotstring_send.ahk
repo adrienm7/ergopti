@@ -308,10 +308,23 @@ ActivateHotstrings() {
 										FiredReplacement := PendingMatch.HasOwnProp("Replacement") ? PendingMatch.Replacement : PendingMatch.Trigger
 										FiredCategory := PendingMatch.HasOwnProp("Category") ? PendingMatch.Category : ""
 										FiredSection := PendingMatch.HasOwnProp("Section") ? PendingMatch.Section : ""
-										try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection)
+										; Third of the three fire paths, reaching the same sink —
+										; the privacy flag has to travel here too, or a personal
+										; expansion committed by a punctuation key leaks while the
+										; other two paths are clean.
+										FiredIsPrivate := PendingMatch.HasOwnProp("IsPrivate") && PendingMatch.IsPrivate
+										try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection, FiredIsPrivate)
 								}
 						} catch as CommitErr {
-								try LoggerError("Hotstrings", "ActivateHotstrings: committing '{1}' failed: {2}", PendingMatch.Trigger, CommitErr.Message)
+								; ERROR is severity 40 — ABOVE the default INFO level — so unlike the
+								; DEBUG sites this line reaches the rotating log with no user action
+								; at all. The flag is read here rather than reused from the `if Fired`
+								; block above because this catch runs on the path where the dispatch
+								; THREW: Fired was never assigned, so that block never executed.
+								CommitIsPrivate := PendingMatch.HasOwnProp("IsPrivate") && PendingMatch.IsPrivate
+								try LoggerError("Hotstrings", "ActivateHotstrings: committing '{1}' failed: {2}",
+										CommitIsPrivate ? PersonalInfoRedactForLog(PendingMatch.Trigger) : PendingMatch.Trigger,
+										CommitErr.Message)
 						}
 				}
 				SendNewResult("{BackSpace}", False)

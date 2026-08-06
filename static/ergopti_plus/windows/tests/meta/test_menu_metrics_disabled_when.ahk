@@ -132,14 +132,19 @@ Test("menu-metrics-disabled-when: menubar_colors depends_on is now load-bearing 
 ; Every AHK dynamic handler must call the shared resolver with its own id
 ; instead of re-deriving the dependency graph inline — the drift MG-1 closes.
 _MMDW_HandlersCallResolver() {
+	; The handlers this driver still writes. The three privacy filters left this
+	; list on 2026-08-06: their manifest rows became `type = "check"`, so the
+	; SHARED renderer builds them and calls the same resolver while doing it.
+	;
+	; The invariant is unchanged — greying comes from the manifest through the
+	; shared resolver, never from a condition re-derived here — and section 4
+	; below asserts it for the migrated rows. Keeping them in this list would
+	; have made a row built by MORE shared code look like a regression.
 	Handlers := Map(
 		"_MET_ShowTyping",      "show_typing",
 		"_MET_ShortcutTyping",  "shortcut_typing",
 		"_MET_ShowApps",        "show_apps",
 		"_MET_ShortcutApps",    "shortcut_apps",
-		"_MET_FilterPrivate",   "filter_private",
-		"_MET_FilterSecure",    "filter_secure",
-		"_MET_FilterSysauth",   "filter_sysauth",
 		"_MET_ExcludeApps",     "exclude_apps",
 		"_MET_WpmWidget",       "wpm_widget",
 		"_MET_WpmWidgetColors", "widget_colors",
@@ -245,3 +250,53 @@ _MMDW_ManifestTomlSourceExcludesAhk() {
 		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare platforms = ["hs"] — without it, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
 }
 Test("menu-metrics-disabled-when: manifest.toml SOURCE excludes ahk from the metrics toggle, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceExcludesAhk)
+
+
+
+
+; ==============================================================================
+; ==============================================================================
+; ======= 4/ The rows the shared renderer builds now ===========================
+; ==============================================================================
+; ==============================================================================
+
+; The three privacy filters are declared `type = "check"`, which means the row —
+; label, checkmark and greying — is materialised by MenuRenderer_Build from the
+; manifest, on all three drivers, from one declaration.
+;
+; WHAT THIS FORBIDS. Two things, and the second is the one that bites: a row that
+; loses its declaration silently returns to being hand-built and drifts again;
+; and a row that is declared AND still has a handler here is drawn TWICE, which
+; looks like a duplicate menu entry and nothing else reports it.
+_MMDW_MigratedRowsAreDeclarative() {
+	; id -> the handler this driver used to build it with. Spelled out rather
+	; than derived from the id, because a derivation that stops matching would
+	; assert the absence of a function that never existed under that name.
+	Migrated := Map(
+		"filter_private", "_MET_FilterPrivate",
+		"filter_secure",  "_MET_FilterSecure",
+		"filter_sysauth", "_MET_FilterSysauth",
+	)
+
+	Rows := _MMDW_LoadMetricsMenu()
+	for Id, OldHandler in Migrated {
+		Found := false
+		for Entry in Rows {
+			if (Entry is Map) and Entry.Has("id") and Entry["id"] == Id {
+				Found := true
+				Assert(Entry.Has("type") and Entry["type"] == "check",
+					"'" . Id . "' must be declared type=check so the shared renderer builds its row — a row that loses the declaration goes back to being hand-built on three drivers and drifts again")
+				Assert(Entry.Has("i18n") and Entry["i18n"] != "",
+					"'" . Id . "' must carry its i18n key: the renderer has no other source for the label")
+			}
+		}
+		Assert(Found, "metrics_menu must still declare '" . Id . "'")
+
+		; And no handler may remain: the renderer draws the row, so a second
+		; builder here draws it twice — which looks like a duplicate menu entry
+		; and nothing else reports it.
+		Assert(_DriverFuncBodyOrEmpty(OldHandler) == "",
+			OldHandler . "() still exists — the shared renderer builds '" . Id . "' now, so this handler would draw it a second time")
+	}
+}
+Test("menu-metrics-disabled-when: the migrated privacy rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)

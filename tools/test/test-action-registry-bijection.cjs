@@ -42,7 +42,30 @@ const REGISTRY = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
 
 // Frozen on 2026-08-01. Windows and macOS at zero: a new action declared for
 // either without a handler must fail on the first one.
-const BASELINE = { ahk: 0, hs: 0, linux: 39 };
+//
+// linux 39 → 28 → 17 on 2026-08-06, in two steps worth telling apart.
+//
+// Ten of the first eleven were not missing CODE: the shared registry described
+// the chord for AutoHotkey and Hammerspoon and simply had no `emit_linux`
+// column, so the generator emitted no row and the action fell through to
+// "Unknown action" at DEBUG. Filling the column in
+// _shared/modules/actions/actions.toml wired all ten at once, which is what a
+// single source is for — and is why a driver-shaped gap is worth checking in the
+// DATA before it is checked in the driver. (The parity test caught the tail of
+// it in the same commit: two of those chords named letter keys the combo
+// emitter's keysym table did not carry, so they would have parsed and pressed
+// nothing.)
+//
+// The next eleven were real handlers: the driver's own windows and files —
+// open_metrics_typing, open_config, open_today_log and their siblings — all
+// declared platform = "all" and all reaching the same silent DEBUG branch. The
+// picker had been offering them as bindable on Linux the whole time.
+//
+// 17 → 11: the six screenshot actions. No single binary takes a screenshot on
+// every Linux desktop, so each is a cascade — Wayland candidates FIRST, because
+// the X11 tools talk to nothing under Wayland and exit zero, which would make a
+// cascade ordered the other way "succeed" while capturing nothing.
+const BASELINE = { ahk: 0, hs: 0, linux: 11 };
 
 // Floors on the declared count per driver — a manifest walk that collapses
 // would report nothing unresolved and pass having compared nothing.
@@ -160,6 +183,17 @@ for (const drv of DRIVERS) {
 				'error at bind time and none at fire time. Wire it up, or restrict its platform. Do NOT ' +
 				`raise the baseline.\n      unresolved: ${unresolved.slice(0, 8).map((a) => a.id).join(', ')}` +
 				`${unresolved.length > 8 ? `, +${unresolved.length - 8} more` : ''}`
+		);
+	}
+	// A ratchet that only ever catches a rise lets the gap re-open silently after
+	// it has been closed: someone deletes a handler, the count returns to the old
+	// baseline, and the gate is green about a regression. Lowering it is the
+	// second half of the mechanism, and it has to be enforced or it is a comment.
+	if (unresolved.length < BASELINE[drv.key]) {
+		errors.push(
+			`${drv.key}: only ${unresolved.length} unresolved action(s) remain (baseline ` +
+				`${BASELINE[drv.key]}). Lower BASELINE.${drv.key} to ${unresolved.length} in this file — a ` +
+				'baseline left above the real count is headroom for the next regression to hide in.'
 		);
 	}
 }

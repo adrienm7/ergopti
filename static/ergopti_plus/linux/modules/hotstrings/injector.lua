@@ -444,4 +444,85 @@ function M.inject(backspace_count, replacement_text, is_private)
 	Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
 end
 
+--- Types several values separated by a real Tab KEYSTROKE.
+---
+--- WHY NOT JUST inject() WITH "\t" IN THE TEXT: the text path resolves every
+--- character against the session's XKB layout, and U+0009 is a control code no
+--- layout maps — so the whole replacement would fail the plan and fall through
+--- to the CLIPBOARD, which pastes a literal tab character. In a form that
+--- inserts whitespace instead of moving to the next field, which is the one
+--- thing a multi-field expansion exists to do. macOS reached the same
+--- conclusion: its personal_info expansion fires `keyStroke tab` between parts
+--- rather than embedding one.
+---
+--- The Tab goes BETWEEN values and never after the last, so the caret ends in
+--- the field the user is looking at. Windows and macOS both settled there.
+--- @param backspace_count integer Characters to erase before typing.
+--- @param values table Array of strings, in the order they are typed.
+--- @param is_private boolean|nil True when the values are PII and must not be logged.
+function M.inject_fields(backspace_count, values, is_private)
+	if type(backspace_count) ~= "number" or type(values) ~= "table" then
+		Logger.error(LOG, "inject_fields(): invalid arguments — bc is %s, values is %s.",
+			type(backspace_count), type(values))
+		return
+	end
+	if #values == 0 then
+		Logger.error(LOG, "inject_fields(): no values — the trigger would be erased for nothing.")
+		return
+	end
+
+	-- One value is the ordinary case and needs no Tab at all; routing it through
+	-- inject() keeps a single implementation of the modifier neutralisation, the
+	-- two-phase timing and the clipboard fallback.
+	if #values == 1 then
+		M.inject(backspace_count, values[1], is_private)
+		return
+	end
+
+	if is_private then
+		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
+			backspace_count, #values)
+	else
+		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
+	end
+
+	local ok, err = pcall(function()
+		-- Same reason as inject(): under a grab the application already believes
+		-- the physically-held modifiers are down, so an injected "e" arrives as "E".
+		local held = held_text_modifiers()
+		for _, mod in ipairs(held) do
+			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_UP)
+		end
+
+		if backspace_count > 0 then
+			send_backspaces(backspace_count)
+			sleep_ms(INTER_PHASE_DELAY_MS)
+		end
+
+		for index, value in ipairs(values) do
+			send_text(value, is_private)
+			if index < #values then
+				_uinput.emit(EvdevCodes.KEY_TAB, EVDEV_VALUE_DOWN)
+				_uinput.emit(EvdevCodes.KEY_TAB, EVDEV_VALUE_UP)
+				-- The focus change a Tab causes is asynchronous in most toolkits;
+				-- typing into the old field because the new one has not been given
+				-- focus yet is the failure this delay buys off. Same constant the
+				-- backspace phase uses, for the same reason.
+				sleep_ms(INTER_PHASE_DELAY_MS)
+			end
+		end
+
+		for i = #held, 1, -1 do
+			_uinput.emit(MODIFIER_CODES[held[i]], EVDEV_VALUE_DOWN)
+		end
+	end)
+
+	if not ok then
+		Logger.error(LOG, "inject_fields(): unexpected error — %s.", tostring(err))
+		return
+	end
+
+	Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
+end
+
 return M

@@ -151,6 +151,18 @@ function M.is_masked(field)
 	return entry.masked ~= false
 end
 
+--- What a LOG LINE may keep of a value.
+---
+--- Distinct from `for_preview` on purpose: the bubble reveals a head and a tail
+--- so the user recognises their own value on their own screen, and a log has no
+--- such reader — it is written to disk, rotated, and replicated to the user's
+--- other machines. Length is preserved, content is not.
+--- @param value string The full value, as it would be typed.
+--- @return string
+function M.for_log(value)
+	return Mask.redact_for_log(value, declaration().policy)
+end
+
 --- Drops the cached declaration. Tests only — the file cannot change at runtime.
 function M._reset()
 	_declaration = nil

@@ -696,6 +696,22 @@ local function main()
 		if tooltip_preview and not result then
 			local ok_preview, err_preview = pcall(function()
 				local candidates = engine:candidates(PREVIEW_MAX_CANDIDATES)
+				-- The @-family's SECOND candidate source. `engine:candidates()` reads
+				-- the static matcher's buckets, and no @-tag has ever been in them:
+				-- the single-letter tags live in the dynamic engine and the
+				-- multi-letter combos are resolved at fire time and registered
+				-- nowhere. So the whole family expanded correctly and previewed
+				-- nothing — the identical gap Windows had, closed the identical way.
+				--
+				-- Prepended, not appended: this row is the one the magic key will
+				-- actually deliver (the static matcher has nothing for "@…"), and the
+				-- bubble renders the first row undimmed.
+				if dyn_hotstrings and type(dyn_hotstrings.preview_candidates) == "function" then
+					local extra = dyn_hotstrings.preview_candidates(engine:current_buffer())
+					for index = #extra, 1, -1 do
+						table.insert(candidates, 1, extra[index])
+					end
+				end
 				if #candidates == 0 then
 					tooltip_preview.hide()
 					-- Nothing is on offer any more, so the next distinct offer counts
@@ -748,9 +764,18 @@ local function main()
 				end)
 				if ok_dh2 and expanded then
 					if dynamic_event then
+						-- The seventh argument is not optional, whatever its default
+						-- says. The STATIC path a hundred lines up has always passed
+						-- `result.is_private`; this one never did, so every @-tag
+						-- expansion — the single-letter ones included, which have
+						-- existed since this driver shipped — wrote its resolved value
+						-- into the keylogger's per-character synthetic record in full.
+						-- For "@i★" that is the user's IBAN, one entry per character,
+						-- persisted and replicated. Windows redacts the equivalent
+						-- record and macOS skips it; Linux was writing it.
 						keylogger.record_hotstring(app_id, dynamic_event.trigger,
 							dynamic_event.replacement, now_ms, dynamic_event.h_type,
-							dynamic_event.backspace_count)
+							dynamic_event.backspace_count, dynamic_event.is_private)
 					end
 					-- Dynamic expansion consumed the trigger — reset the engine
 					-- buffer so the expansion text doesn't trigger further matches.
@@ -1153,6 +1178,20 @@ local function main()
 				local log_dir = LoggerSink.log_dir()
 				Logger.info(LOG, "Opening log folder: %s", log_dir)
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
+			end,
+			-- The two rows the shared manifest has always declared for this platform
+			-- and that this driver never built: they are translated in all 21
+			-- locales and present on the other two drivers. Both paths come from
+			-- the sink that writes them, so neither can name a file nobody fills.
+			on_open_today_log = function()
+				local path = LoggerSink.main_log_path()
+				Logger.info(LOG, "Opening today's log: %s", path)
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+			end,
+			on_open_error_log = function()
+				local path = LoggerSink.errors_log_path()
+				Logger.info(LOG, "Opening the errors log: %s", path)
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
 			end,
 			on_healthcheck = function()
 				if webview_manager then

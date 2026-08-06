@@ -50,9 +50,6 @@ BuildMetricsMenu() {
 		"shortcut_typing",    (M, C) => _MET_ShortcutTyping(M, C, _MET_STATE_GETTERS),
 		"show_apps",          (M, C) => _MET_ShowApps(M, C, _MET_STATE_GETTERS),
 		"shortcut_apps",      (M, C) => _MET_ShortcutApps(M, C, _MET_STATE_GETTERS),
-		"filter_private",     (M, C) => _MET_FilterPrivate(M, C, _MET_STATE_GETTERS),
-		"filter_secure",      (M, C) => _MET_FilterSecure(M, C, _MET_STATE_GETTERS),
-		"filter_sysauth",     (M, C) => _MET_FilterSysauth(M, C, _MET_STATE_GETTERS),
 		"exclude_apps",       (M, C) => _MET_ExcludeApps(M, C, _MET_STATE_GETTERS),
 		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
@@ -61,7 +58,17 @@ BuildMetricsMenu() {
 		"encryption",         (M, C) => _MET_Encryption(M, C, _MET_STATE_GETTERS),
 	)
 
-	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
+	; The three privacy filters left DynHandlers on 2026-08-06: their manifest
+	; rows are `type = "check"`, so the renderer builds them from the
+	; declaration and this file supplies only the behaviour. One row shape for
+	; three drivers, which is what the manifest was for.
+	Commands := Map(
+		"filter_private",  ToggleFilterPrivate,
+		"filter_secure",   ToggleFilterSecureField,
+		"filter_sysauth",  ToggleFilterSystemAuth,
+	)
+
+	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", "", Commands, _MET_STATE_GETTERS)
 	; Metrics toggle uses a dedicated fn (confirm/security-warning dialogs +
 	; MetricsShortcuts.enabled + MS_SaveToIni) rather than the generic
 	; ToggleCategoryAllFeatures used by manifest-only menus — same pattern
@@ -106,35 +113,8 @@ _MET_ShortcutApps(M, _Cat, Getters) {
 		M.Disable(Label)
 }
 
-; Dynamic handler: Filter private browsing toggle.
-_MET_FilterPrivate(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_private")
-	RegisterMenuItem(M, Label, ToggleFilterPrivate)
-	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_private", Getters)
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_private", Getters)
-		M.Disable(Label)
-}
 
-; Dynamic handler: Filter secure field toggle.
-_MET_FilterSecure(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_secure")
-	RegisterMenuItem(M, Label, ToggleFilterSecureField)
-	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_secure", Getters)
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_secure", Getters)
-		M.Disable(Label)
-}
 
-; Dynamic handler: Filter system auth toggle.
-_MET_FilterSysauth(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_sysauth")
-	RegisterMenuItem(M, Label, ToggleFilterSystemAuth)
-	if MenuRenderer_ResolveCheckedWhen("metrics_menu", "filter_sysauth", Getters)
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_sysauth", Getters)
-		M.Disable(Label)
-}
 
 ; Dynamic handler: At-rest encryption toggle.
 _MET_Encryption(M, _Cat, Getters) {

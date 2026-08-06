@@ -50,6 +50,12 @@ local TINT_FAMILY = {
 -- them.
 local PERSONAL_CATEGORY = "personal"
 
+-- U+21E5 RIGHTWARDS ARROW TO BAR, between two fields of a multi-field @-combo
+-- row. The expansion fires a real Tab keystroke there, which is invisible in a
+-- bubble, so the glyph stands in for it — the same character macOS and Windows
+-- show in the same place.
+local FIELD_SEPARATOR = " \226\135\165 "
+
 -- The key shown at the right of a row that a terminator validates. The magic key
 -- is read live for the rows it validates, because the user can change it.
 local TERMINATOR_LABEL = "↵"
@@ -243,7 +249,15 @@ end
 --- @return string
 local function masked_for_preview(candidate)
 	local value = candidate.replacement
-	if type(value) ~= "string" or candidate.field == nil then return value end
+	-- A multi-field row (an @-combo) carries parallel `parts` and `fields` arrays
+	-- instead of one value and one field name. Each part must be masked against
+	-- ITS OWN classification — an IBAN hidden, the phone number beside it shown —
+	-- so joining first and masking after would force one verdict on the row.
+	local parts  = candidate.parts
+	local fields = candidate.fields
+	local is_multi = type(parts) == "table" and type(fields) == "table" and #parts > 0
+
+	if not is_multi and (type(value) ~= "string" or candidate.field == nil) then return value end
 
 	local ok, Fields = pcall(require, "infra.personal_info_fields")
 	if not ok or type(Fields.for_preview) ~= "function" then
@@ -252,6 +266,14 @@ local function masked_for_preview(candidate)
 		-- the value is the wrong guess.
 		Logger.error(LOG, "Field classification unavailable — withholding a personal-info preview.")
 		return ("•"):rep(8)
+	end
+
+	if is_multi then
+		local shown = {}
+		for index, part in ipairs(parts) do
+			shown[index] = Fields.for_preview(part, fields[index])
+		end
+		return table.concat(shown, FIELD_SEPARATOR)
 	end
 	return Fields.for_preview(value, candidate.field)
 end

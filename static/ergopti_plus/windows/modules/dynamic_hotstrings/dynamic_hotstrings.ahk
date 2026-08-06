@@ -102,7 +102,9 @@ _DynHS_RegisterAll() {
 	MK := ScriptInformation["MagicKey"]
 	; The dynamic hotstrings (dates + phone/SSN/IBAN prefixes) share one activation
 	; delay gate so they fire only when the trigger was typed within the configured
-	; window. Resolve it once and reuse the options Map for every registration below.
+	; window. Resolve it once and reuse the options Map across the date registrations;
+	; section 2.1 builds a second Map that adds the privacy marker, because a date is
+	; not a secret and the user's IBAN is.
 	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay())
 	if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
 		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
@@ -129,6 +131,15 @@ _DynHS_RegisterAll() {
 	Ssn    := PersonalInformation["social_security_number"] ; e.g. "1 99 99 99 999 999 99"
 	Iban   := PersonalInformation["iban"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
 
+	; Same activation gate as the dates above, plus the privacy marker. These
+	; registrations are the sibling class of the @-family leak and are worse in
+	; one respect: their REPLACEMENT is a callable, which the fire-log funnel
+	; already blanks, but their TRIGGER is literally the first digits of the
+	; phone number / SSN / IBAN. A row reading trigger="FR7630006" is the secret,
+	; in the field nobody thought to look at.
+	_DynPrivateOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
+		"IsPrivate", True)
+
 	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
 	SsnRaw  := StrReplace(Ssn,  " ", "")
 	IbanRaw := StrReplace(Iban, " ", "")
@@ -137,18 +148,18 @@ _DynHS_RegisterAll() {
 		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 		MK := ScriptInformation["MagicKey"]
 		if StrLen(Phone) >= 2 {
-			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
+			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 4 {
-			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
+			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 6 {
-			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynOpts)
+			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynPrivateOpts)
 		}
 		if StrLen(FPhone) >= 5 {
-			CreateHotstring("*C", SubStr(FPhone, 1, 5), (*) => FPhone, _DynOpts)
+			CreateHotstring("*C", SubStr(FPhone, 1, 5), (*) => FPhone, _DynPrivateOpts)
 		}
 	}
 
@@ -158,9 +169,9 @@ _DynHS_RegisterAll() {
 		if StrLen(SsnRaw) >= 5 {
 			SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
 			SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
-			CreateHotstring("*C", SsnRawPrefix,  (*) => SsnRaw, _DynOpts)
+			CreateHotstring("*C", SsnRawPrefix,  (*) => SsnRaw, _DynPrivateOpts)
 			if SsnSpacedPfx != SsnRawPrefix {
-				CreateHotstring("*C", SsnSpacedPfx, (*) => Ssn, _DynOpts)
+				CreateHotstring("*C", SsnSpacedPfx, (*) => Ssn, _DynPrivateOpts)
 			}
 		}
 	}
@@ -173,9 +184,9 @@ _DynHS_RegisterAll() {
 			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
 			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
 			; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
-			CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynOpts)
+			CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynPrivateOpts)
 			if IbanSpacedPfx != IbanRawPrefix {
-				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynOpts)
+				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynPrivateOpts)
 			}
 		}
 	}

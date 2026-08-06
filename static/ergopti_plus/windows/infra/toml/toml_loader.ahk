@@ -450,16 +450,16 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				; resolved section/source value when the entry has no `priority` key.
 				EntryPriority := _ParseEntryPriority(Line, ResolvedPriority)
 
-				Options := Map(
-						"TimeActivationSeconds", TimeActivationSeconds,
-						"FinalResult", FinalResult,
-						"Category", CategoryName,
-						"Section", SectionName,
-						"Priority", EntryPriority,
-				)
-				if ExtraOptions.Has("OnlyText") {
-						Options["OnlyText"] := ExtraOptions["OnlyText"]
-				}
+				; The caller's options first, the per-entry values on top. Naming the
+				; single key worth forwarding is what let the cache path silently drop
+				; IsPrivate; this path is the one the cache reproduces 1:1, so the two
+				; forward the same way or the fallback quietly means something else.
+				Options := ExtraOptions.Clone()
+				Options["TimeActivationSeconds"] := TimeActivationSeconds
+				Options["FinalResult"] := FinalResult
+				Options["Category"] := CategoryName
+				Options["Section"] := SectionName
+				Options["Priority"] := EntryPriority
 
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				Loaded += 1

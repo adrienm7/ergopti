@@ -54,6 +54,13 @@ global _TriggerSet := Map()
 ; whenever it would overflow so memory and lookup cost stay bounded.
 global _PrefixBuffer := ""
 
+; Set when a PRIVATE expansion has written its resolved value into the buffers.
+; After a star fire the watcher takes the engine's buffer verbatim, so
+; _PrefixBuffer then holds the IBAN itself rather than the six characters the
+; user typed — and the render that follows needs no further keystroke to print
+; it. The diagnostic lines consult this through _PrefixLogSafe.
+global _PrefixPrivateResidue := false
+
 ; Reference to the running InputHook (kept global so the GC does not collect
 ; it and so that the watcher can be reset / stopped at shutdown).
 global _PrefixInputHook := 0
@@ -108,6 +115,32 @@ global _PREFIX_RENDER_DEBOUNCE_MS := 150
 global HSE_FIRE_LOG_DEFER_MS := 90
 global _HSE_FireLogQueue := []
 global _HSE_FireLogScheduled := false
+
+; What a diagnostic line may print of a keystroke buffer.
+;
+; The buffers are ordinarily the user's own typing and printing them is the
+; whole point of the DEBUG trace — a hotstring that fails to match is diagnosed
+; from exactly these two strings. What they must never print is the value a
+; private expansion put INTO them, which is not typed by the user at all.
+;
+; The residue is cleared lazily rather than at the fire site because neither a
+; word terminator nor a backspace empties the engine's buffer (it deliberately
+; keeps terminators so a trigger may contain one), so there is no single later
+; event that means « the replacement is gone from both buffers ». Asking the
+; buffers themselves is the only answer that cannot be wrong in the unsafe
+; direction.
+; @param Text {String} The buffer about to be interpolated into a log line.
+; @return {String} Text, or a length-preserving redaction of it.
+_PrefixLogSafe(Text) {
+	global _PrefixPrivateResidue, _PrefixBuffer, HSE_Buffer
+	if !_PrefixPrivateResidue
+		return Text
+	if (_PrefixBuffer == "" and HSE_Buffer == "") {
+		_PrefixPrivateResidue := false
+		return Text
+	}
+	return PersonalInfoRedactForLog(Text)
+}
 
 ; The preview boundary set. NOT a cached copy any more: it delegates to the
 ; matcher's own derivation so the tooltip and the engine cannot answer the
@@ -449,7 +482,13 @@ PrefixWatcherSuppress(YesNo) {
 ; KL_LogHotstring work (buffer flush, JSONL append, WPM pushes) runs later, off
 ; the keystroke path, via _HSE_DrainFireLog. Called from _OnPrefixChar on every
 ; fire in place of a synchronous KL_LogHotstring.
-_HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section) {
+;
+; ``IsPrivate`` travels ON the record rather than being applied here: the drain
+; is what reaches the sink, and the sink owns the redaction because it is the
+; sink that writes the replacement TWICE (once as a field, once inside the
+; ``tag`` marker). Redacting at the enqueue would also destroy the exact strings
+; the sink measures net_saved_chars and the WPM pushes from.
+_HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section, IsPrivate := false) {
 	global _HSE_FireLogQueue, _HSE_FireLogScheduled, HSE_FIRE_LOG_DEFER_MS
 	; Dynamic hotstrings (@dt, @date, the phone/SSN/IBAN prefixes…) store a
 	; CALLABLE in Spec.Replacement and resolve it at fire time. HSE_DispatchMatch
@@ -463,7 +502,8 @@ _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section) {
 	if HasMethod(Replacement)
 		Replacement := ""
 	_HSE_FireLogQueue.Push({ Trigger: Trigger, Replacement: Replacement,
-		HType: HType, Category: Category, Section: Section })
+		HType: HType, Category: Category, Section: Section,
+		IsPrivate: IsPrivate ? true : false })
 	if !_HSE_FireLogScheduled {
 		_HSE_FireLogScheduled := true
 		; Negative period = run once after the delay. The delay exceeds the
@@ -486,9 +526,14 @@ _HSE_DrainFireLog() {
 		; The drain is the last stop before the metrics pipeline, so a failure
 		; must at least name itself instead of silently dropping the record.
 		try {
-			KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section)
+			KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section, Rec.IsPrivate)
 		} catch as Err {
-			try LoggerError("PrefixWatcher", "Fire-log drain failed for trigger '{1}': {2}.", Rec.Trigger, Err.Message)
+			; The failure line names the trigger so the dropped record is
+			; identifiable — but a private trigger is itself a fragment of the
+			; secret ("@iban★" says which secret followed), and this log rotates
+			; alongside the one the redaction exists to protect.
+			Named := Rec.IsPrivate ? PersonalInfoRedactForLog(Rec.Trigger) : Rec.Trigger
+			try LoggerError("PrefixWatcher", "Fire-log drain failed for trigger '{1}': {2}.", Named, Err.Message)
 		}
 	}
 }
@@ -672,6 +717,7 @@ _OnPrefixCharProfiled(IH, Char) {
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex, HSE_Buffer
+	global _PrefixPrivateResidue
 	; No hotstring preview tooltip and no expansion dispatch while the script is
 	; paused or the Hotstrings master gate is off — this watcher uses its OWN
 	; InputHook, so the HookDispatcher guard does not cover it.
@@ -757,8 +803,14 @@ _OnPrefixChar(IH, Char) {
 		; transaction is now gated on a contention probe rather than allowed to
 		; retry for #ClipboardTimeout with the keyboard hook starved behind it.
 		Critical("On")
+		; Char is printed raw and the two buffers are not. Nothing here knows yet
+		; whether this keystroke completes a private trigger — HSE_FeedChar has not
+		; run, so there is no match and no flag to read — and pretending otherwise
+		; would be a guard that only looks like one. What IS known is the other
+		; direction: a private expansion that already fired put its resolved value
+		; into both buffers, and that is what _PrefixLogSafe withholds.
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixBuffer, HSE_Buffer, _PrefixWatcherSuppressed, HSE_Suppressed)
+			LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
 		; Feed HSE — when HSE_FeedChar reports a match, fire the
 		; expansion right here. HSE_LastEndChar is the authoritative end
 		; character: empty for star (immediate) triggers, the just-typed
@@ -775,6 +827,13 @@ _OnPrefixChar(IH, Char) {
 		; letter of the current word. This replaces the now-removed [[repeat]]
 		; TOML entries and fires at the lowest priority (only on no-match).
 		if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+			; The @-combo resolver first: it is the more specific of the two
+			; fallbacks (it requires a leading "@" and letters that all alias a
+			; personal_info field), so letting the repeat fallback see @nn★ before
+			; it would double the "n" instead of expanding two fields.
+			HSEMatch := HSE_TryPersonalInfoCombo(ScriptInformation["MagicKey"])
+		}
+		if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
 			HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
 		}
 		if (HSEMatch != "") {
@@ -786,8 +845,21 @@ _OnPrefixChar(IH, Char) {
 			; E-circumflex deadkey and ellipsis guards refuse in the wrong context), and
 			; the time-activation / mixed-case gates bail too. HSE_DispatchMatch reports
 			; which happened so we do not log an expansion the user never saw.
+			; A personal-info mapping carries the user's IBAN / card / SSN in its
+			; replacement AND a fragment of it in its trigger. The flag rides the
+			; Spec from registration so this path never has to recognise the value.
+			; Read BEFORE the profiler line below, not after it: the profiler logs at
+			; WARNING, which is ABOVE the default INFO level, so its detail reaches
+			; the driver's rotating log with no user action at all — unlike the DEBUG
+			; sites, which at least need the user to switch the level on.
+			HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
 			_HseFired := HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
-			HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick, HSEMatch.Trigger)
+			; The trigger is the profiler's only context here, and a slow-dispatch
+			; warning without it cannot be attributed to a mapping — so it is
+			; redacted, not dropped. The redaction preserves length, which is the
+			; part that actually correlates with dispatch cost.
+			HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick,
+				HotstringIsPrivate ? PersonalInfoRedactForLog(HSEMatch.Trigger) : HSEMatch.Trigger)
 			; Log the fired hotstring. ``h_type`` is taken from the
 			; preceding suggestion when available (richest categorisation —
 			; "autocorrection", "personal", …) and falls back to a basic
@@ -810,7 +882,13 @@ _OnPrefixChar(IH, Char) {
 			; metrics/WPM pipeline as one — it inflated the hotstring counters and the
 			; per-section stats with expansions that never appeared on screen.
 			if _HseFired
-				_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection)
+				_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection, HotstringIsPrivate)
+			; From here on the two keystroke buffers may hold the resolved value:
+			; the engine already applied the expansion to HSE_Buffer, and the sync
+			; below copies it into the watcher's. Raised for BOTH fire shapes — the
+			; end-char branch wipes the preview buffer but leaves the engine's.
+			if (_HseFired and HotstringIsPrivate)
+				_PrefixPrivateResidue := true
 			; The same rule the metrics pipeline above already follows, applied to
 			; the buffer: a match that did not FIRE changed nothing on screen. The
 			; trigger characters and the just-typed char are all still there, so
@@ -1132,7 +1210,7 @@ _PrefixAppendTypedChar(Char) {
 		_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
 	}
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
+		LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixLogSafe(_PrefixBuffer), _PrefixIndex.Count)
 	_PrefixScheduleRender()
 }
 
@@ -1164,6 +1242,28 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
 	}
 }
 
+; Whether a near-miss record must be withheld whole rather than written.
+;
+; The near-miss row is PERSISTED — it reaches today.log, the metrics store and
+; every replicated device — and it carries both columns, so the rule is the one
+; the suggested/dismissed pair already follows: a private mapping is withheld
+; entirely, because redacting the trigger while keeping the replacement (which
+; IS the IBAN) leaks anyway.
+;
+; HONEST SCOPE: this guard is defence in depth, not a fix for a demonstrated
+; leak. Today _TriggerSet is built only by _AddTriggerToIndex from the TOML /
+; cache pipeline, which sets no IsPrivate property, while the personal-info
+; family is registered imperatively and reaches the preview through the PROVIDER
+; — a separate candidate source that never enters _TriggerSet. So no private
+; entry can arrive here as the code stands. The guard exists because that is one
+; registration change away, every sibling sink already reads the flag, and this
+; is the only one of them that had no privacy concept at all.
+; @param Entry {Object} A _TriggerSet entry.
+; @return {Boolean} True when the row must not be written.
+_NearMissIsWithheld(Entry) {
+	return (IsObject(Entry) and Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? true : false
+}
+
 ; Checks whether the typed buffer (at word boundary) is a known trigger
 ; typed manually (manual_typed_known_trigger) or within edit distance 1
 ; of a known trigger (hotstring_near_miss).
@@ -1188,6 +1288,8 @@ _CheckNearMiss(Buf) {
 	; Exact match → user typed a known trigger without using the expansion
 	if _TriggerSet.Has(key) {
 		Entry := _TriggerSet[key]
+		if _NearMissIsWithheld(Entry)
+			return
 		try KL_LogHotstringNearMiss("manual_typed_known_trigger",
 			Entry.Trigger, Entry.Output, Entry.Category)
 		return
@@ -1199,6 +1301,8 @@ _CheckNearMiss(Buf) {
 		if (Abs(tLen - BufLen) > 1)
 			continue
 		if (_EditDistance1(key, trig)) {
+			if _NearMissIsWithheld(Entry)
+				return
 			try KL_LogHotstringNearMiss("hotstring_near_miss",
 				Entry.Trigger, Entry.Output, Entry.Category)
 			; Only report the first near-miss per reset to avoid spam
@@ -1455,8 +1559,11 @@ _LookupAndRender() {
 	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
 	PrefixSnapshot := _PrefixBuffer
 	Len := StrLen(PrefixSnapshot)
+	; This render is scheduled by the post-fire buffer sync, so it prints the
+	; resolved replacement without the user typing anything further — the one
+	; DEBUG site that fires on the expansion itself rather than on a keystroke.
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", PrefixSnapshot, Len, _PrefixIndex.Count)
+		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", _PrefixLogSafe(PrefixSnapshot), Len, _PrefixIndex.Count)
 	; Short buffers are only skipped when they have no entry in the index.
 	; A 1-char buffer may validly match a magic-key trigger body (e.g. "c"
 	; is the body of "c★"), so we let the lookup below decide — the early
@@ -1470,13 +1577,13 @@ _LookupAndRender() {
 	Candidates := _PrefixCollectCandidates()
 	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", PrefixSnapshot)
+			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", _PrefixLogSafe(PrefixSnapshot))
 		TooltipHide("LookupNoMatch", true)
 		_NotifySuggestionDismissed()
 		return
 	}
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", PrefixSnapshot, Candidates.Length)
+		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", _PrefixLogSafe(PrefixSnapshot), Candidates.Length)
 
 	; Lay the candidates out per group as the user requested:
 	; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
@@ -1506,8 +1613,14 @@ _LookupAndRender() {
 		; and treating it as one is what let a mid-word "tt" be advertised as a
 		; word-initial trigger the engine then refused.
 		if !_PreviewEngineWouldFire(Entry.Trigger) {
+			; The candidate list is the union of the index and the provider, and only
+			; the provider's rows are personal — so this line prints a private trigger
+			; exactly when the @-family bubble declines to render. Redacted rather
+			; than dropped: the reason a candidate was skipped is the whole point of
+			; the trace, and the length is what identifies which one it was.
 			if LoggerIsDebugEnabled()
-				LoggerDebug("PrefixWatcher", "DBG candidate '{1}' skipped — the engine would not fire it here.", Entry.Trigger)
+				LoggerDebug("PrefixWatcher", "DBG candidate '{1}' skipped — the engine would not fire it here.",
+					(Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? PersonalInfoRedactForLog(Entry.Trigger) : Entry.Trigger)
 			continue
 		}
 		Color := (Cfg.Color != "") ? Cfg.Color : ""

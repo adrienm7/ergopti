@@ -254,8 +254,22 @@ end
 --- how much of each one may appear on screen — and only the letter that produced
 --- a part knows which personal_info.toml field it is. Losing that here is what
 --- would put an IBAN on screen in full.
+--- ALL OR NOTHING. A letter that aliases nothing, or that aliases a field the
+--- user left blank, declines the WHOLE combo rather than being skipped.
+---
+--- This used to skip. The failure it caused is silent and personal: typing "@npz"
+--- with a stray "z" expanded as "@np", so the values landed one form field short
+--- of where the user was aiming and every later box held the wrong thing — a
+--- surname in the address line, and no error anywhere. Nothing happening is
+--- merely visibly wrong, which the user corrects in a second.
+---
+--- Aligned deliberately with Linux (`manager.resolve_combo`) and Windows
+--- (`HSE_TryPersonalInfoCombo`), which both refuse. Three drivers answering the
+--- same question differently is the divergence the shared corpus exists to end,
+--- and this one changes what gets TYPED, not only what is shown.
 --- @param combo string Sequence of typed letters.
---- @return table values List of strings resolved from the letters.
+--- @return table values List of strings resolved from the letters; empty when
+---   any letter of the combo cannot be resolved.
 --- @return table fields Matching personal_info.toml field names, same indices.
 local function resolve_combo(combo)
 	local parts  = {}
@@ -265,10 +279,10 @@ local function resolve_combo(combo)
 	for i = 1, #combo do
 		local letter = combo:sub(i, i)
 		local key    = _letters[letter]
-		if key and _info[key] then
-			table.insert(parts, _info[key])
-			table.insert(fields, key)
-		end
+		local value  = key and _info[key] or nil
+		if type(value) ~= "string" or value == "" then return {}, {} end
+		table.insert(parts, value)
+		table.insert(fields, key)
 	end
 	return parts, fields
 end
@@ -574,6 +588,25 @@ end
 --- Retrieves the current personal info table.
 --- @return table The info table.
 function M.get_info()         return _info    end
+
+--- Seeds the two lookup tables and resolves a combo. TESTS ONLY.
+---
+--- `resolve_combo` is a local, and the all-or-nothing rule it enforces decides
+--- what gets TYPED into a user's form — so it needs a behavioural test rather
+--- than a source-grep pinning its current spelling. Linux exposes `_reset` for
+--- the same reason and the same audience.
+--- @param info table The [info] table to resolve against.
+--- @param letters table The [letters] alias map.
+--- @param combo string The letters typed after "@".
+--- @return table values, table fields
+function M._resolve_combo_for_test(info, letters, combo)
+	local prev_info, prev_letters = _info, _letters
+	_info, _letters = info or {}, letters or {}
+	local ok, values, fields = pcall(resolve_combo, combo)
+	_info, _letters = prev_info, prev_letters
+	if not ok then error(values, 0) end
+	return values, fields
+end
 
 --- Retrieves the configured trigger character.
 --- @return string The trigger character.

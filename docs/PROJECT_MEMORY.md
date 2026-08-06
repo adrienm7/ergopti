@@ -129,6 +129,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 
 - [project-linux-a-field-must-be-named-at-every-boundary](#project-linux-a-field-must-be-named-at-every-boundary) — On the Linux driver the same defect recurred nine times in one session: a value is computed correctly and lost at a boundary that DROPS what it does not name — an allow-list, a projection, a code-to-table map, a JSON envelope. Nothing errors, and the symptom is always a panel of zeroes
 - [project-python-slice-replace-can-shred-a-file](#project-python-slice-replace-can-shred-a-file) — A `str.replace` whose needle came from two `index()` calls silently becomes `replace("", …)` when the bounds invert, inserting the payload between every character; the original is recoverable because it is interleaved, not lost
+- [project-a-driver-that-types-also-types-into-its-own-keylogger](#project-a-driver-that-types-also-types-into-its-own-keylogger) — Whether the driver's own keylogger sees an expansion depends on WHICH sender emitted it: SendEvent is observed, SendInput is not, and no comment in the tree says so
+- [project-an-enumeration-is-not-a-feature](#project-an-enumeration-is-not-a-feature) — Every hand-written list in this repo has been found short; the fix is to derive the list, and where derivation would explode, to resolve at use time instead
 - [project-the-preview-index-is-file-driven-only](#project-the-preview-index-is-file-driven-only) — The Windows preview tooltip reads _PrefixIndex, whose single writer has three FILE-driven callers; a trigger registered imperatively by CreateHotstring can never be previewed, and inserting it into the index is erased by the next rebuild
 
 
@@ -235,6 +237,223 @@ one will fire. Resolving the tag by its letters would have previewed a name and 
 phone number for a trigger that types today's date.
 
 Related: [[feedback-regression-tests]].
+
+
+
+
+### project-a-driver-that-types-also-types-into-its-own-keylogger
+
+_Whether the driver's own keylogger sees an expansion depends on WHICH sender
+emitted it — and the answer was measured, not read_
+
+<sub>slug: `project_a_driver_that_types_also_types_into_its_own_keylogger`</sub>
+
+**Measure this before reasoning about it.** Windows expands a hotstring by
+SENDING characters, and its keylogger observes keystrokes with a pass-through
+`InputHook`. Everyone — three independent reviewers and the author of this entry
+— concluded from that pairing that the hook sees every expansion. It does not.
+Arming an `InputHook` exactly as `HookDispatcher` arms the driver's own (`"V L0"`,
+`KeyOpt("{All}", "N")`) and injecting four characters by each route gives:
+
+| sender | observed |
+| --- | --- |
+| `SendInput` (plain or `{Text}`) | **0 / 4** |
+| `SendEvent` | **4 / 4**, with key codes |
+
+`hotstring_send.ahk` says so itself, in a comment nobody had connected to the
+privacy question: `SendInput` is chosen there *because* the hook "processes
+SendEvent characters as physical input". Which sender runs is decided by
+`hotstring_builder.ahk` from the Spec's `FinalResult` flag — set, and the send
+goes through `SendFinalResult` → `SendInput` → unobserved.
+
+The whole `@` personal-info family registers `FinalResult: True`, so **its
+expansions never reach the typing row.** Two rounds of fixing were aimed there
+before anyone measured. The trigger-log sites, which are direct writes and depend
+on no hook at all, were real the whole time.
+
+The general rule: a comment describing a mechanism is not evidence about which
+branch of it your code takes. Probing cost one 46-line script and five minutes.
+
+The two-sink structure below is still worth knowing, because `SendNewResult`
+(`SendEvent`) is a live path for other categories:
+
+1. the `hotstring` row written by `KL_LogHotstring`, and
+2. the `typing` row, whose `text` and `events` columns are
+   `Keylogger.buffer_text` / `Keylogger.buffer_events`, filled character by
+   character by `KL_Hook_OnChar`.
+
+`KL_LogHotstring` calls `KL_FlushBuffer` **before** writing its own row, so one
+call published the plaintext and then the redaction of the same value. A fix
+applied only at sink 1 changes nothing an attacker with the log would see.
+
+The trap that makes this survive review: the synthetic branch in
+`KL_Hook_OnChar` *looks* like a guard. It sets `meta["s"] := 1` and
+`meta["st"]`, and the two lines that persist the CONTENT sit outside it. A tag
+answering **where** a character came from was read as an answer to **whether it
+may be persisted**. The same shape recurs anywhere a "source" marker sits next
+to a persistence call.
+
+Rules that fall out of it, all three drivers:
+
+- Any privacy flag a feature holds must reach the **synthetic-input recorder**,
+  not just the feature's own log row — `KL_MarkSynthetic(source, is_private)`,
+  Linux `append_synthetic_events(…, is_private)`, macOS `notify_synthetic`.
+- The substitution is **length-preserving** (`PersonalInfoRedactForLog`, one
+  `PI_MASK_FALLBACK_CHAR` per UTF-16 unit). Every consumer downstream counts
+  characters — `net_saved_chars`, one WPM push per character, one event per
+  keystroke — so dropping the text would trade a privacy bug for a metrics bug.
+- Bracket markers (`[BS]`, `[ENTER]`, the whole `KLHOOK_SPECIAL` set) are
+  **exempt**: they carry no content and rewriting them desynchronises the
+  walker's deletion accounting. Linux states the same exemption for `[BS]`.
+- The privacy latch is released with the **last** held level, never the first —
+  `synth_active` is a depth counter precisely because fires overlap, and a public
+  fire finishing first must not un-redact an inner private one still typing.
+
+Two sibling sinks the same review turned up, both reachable without the user
+doing anything: `HotPath_LogIfSlow` logs at **WARNING**, which is above the
+default INFO level, so any profiler detail built from a trigger or a buffer
+reaches `<ConfigDir>/autohotkey/logs/` with 14-day retention and no opt-in —
+unlike the DEBUG sites, which at least need the level switched on. And after a
+star fire the preview watcher takes the engine's buffer verbatim
+(`_PrefixBuffer := HSE_Buffer`), so the "buffer" a diagnostic prints is the
+resolved value, not the six characters the user typed.
+
+**Severity is not a safeguard until you check the default.** On Windows the
+ranking is real — `LoggerError` and `HotPath_LogIfSlow` sit above the default
+INFO, so those lines are written with no opt-in, while a `LoggerDebug` needs the
+level switched on. On the Lua side there is no such distinction: the shared
+logger's default minimum is **10, debug included**. Two lines were printing a
+resolved `@`-tag value in full on that assumption — `_shared/lua/dynamic_hotstrings`
+`match_buffer` at DEBUG (code BOTH Lua drivers run) and the Linux
+`manager.lua` "Dynamic expansion" line at INFO. For `@i★` that is the user's
+IBAN, written on every expansion, with nothing enabled. macOS had no equivalent
+line; Windows already redacted its own. Linux was strictly worse than a bug
+already fixed twice elsewhere — the same shape this file records for the typing
+row.
+
+Finally, a redacted value is **not an identifier**. `KL_Roi_OnHotstring` stores
+its trigger as a key of `trigger_last_use` and `KL_Roi_HalflifeTick` writes that
+key back out, so keying on the redaction merged `@cb★`, `@cc★` and `@ss★` onto
+one entry of four bullets. Where a redaction would become a key, skip the keying
+and keep the counter.
+
+Related: [[project-the-preview-index-is-file-driven-only]],
+[[project-an-enumeration-is-not-a-feature]], [[feedback-regression-tests]].
+
+
+
+
+### project-an-enumeration-is-not-a-feature
+
+_Every hand-written list in this repo has been found short. Derive the list; where
+deriving would explode, resolve at use time instead_
+
+<sub>slug: `project_an_enumeration_is_not_a_feature`</sub>
+
+The same defect keeps surfacing under different names, and it is always a list a
+human wrote and no one re-checked:
+
+- the Linux packagers copied an enumerated set of directories, and `_generated/`
+  was not in it — so every `.deb` and `.rpm` shipped a driver that fell back to a
+  two-locale table;
+- `install.sh` derived the shared tree by counting `..` steps, which is a fixed
+  list of one layout, and could not install its own release tarball;
+- `test-linux-shared-path-resolver.cjs` matched one spelling of the bug it
+  guarded and reported green over the other;
+- the Windows `@`-combos came from thirty-one `CreateHotstringComboAuto` calls
+  out of a space of 28 561 at length four. `@npdt` and `@nt` were simply not
+  among them: the letters resolved, the values existed, the key did nothing, and
+  nothing logged;
+- a privacy scan written for this repo used a fixed three-line window after each
+  sink and hid four persisted rows whose `"trigger"` key sat on line four.
+
+Two remedies, in order of preference:
+
+1. **Derive the list and record only the judgement.**
+   `test-personal-info-log-sinks-are-judged.cjs` walks the driver for every
+   logging/persistence call that mentions a trigger, and each site must either
+   redact in place or carry a written verdict. A new sink fails the gate the day
+   it is added; a verdict that matches no site fails too, so the ledger cannot
+   outlive the code. The list is machine-made, the reasoning is human.
+2. **Where enumerating would explode, resolve at use time.**
+   `HSE_TryPersonalInfoCombo` expands `@<letters>★` by walking the letters when
+   the key is pressed, so all 28 561 combinations work at flat memory cost —
+   which is also what macOS already did (`resolve_combo`, `personal_info.lua`).
+   Pre-registration bought an O(1) lookup and paid for it with a list that could
+   only ever be a sample.
+
+The tell that you are looking at one of these: the code path fails **silently and
+partially**. Everything about the mechanism works; one member is missing; nothing
+reports it. When a user says "X works but Y doesn't" and X and Y differ only in
+degree, look for the list before looking for the logic.
+
+**Where the same feature exists three times, ask each driver the same question.**
+Chasing the Windows `@`-combo list found three more defects nobody had reported,
+each in a different driver, all in the same family:
+
+- Linux had **no** multi-letter combos at all — `if #letter == 1` in its
+  registration loop. Not a short list: no list. The two drivers that worked did
+  so by resolving at fire time, and Linux was the one still registering.
+- Linux never passed `is_private` to `keylogger.record_hotstring`, though its
+  static-hotstring path a hundred lines away always had. Every `@`-tag expansion
+  wrote its resolved value into the per-character synthetic record.
+- macOS's `resolve_combo` **skipped** letters it could not resolve, so `@npz`
+  expanded as `@np` and every value landed one form field short. Linux and
+  Windows both decline the whole combo; macOS now does too.
+
+The last one is the instructive shape: it changes what gets **typed**, not what
+is displayed, so no amount of shared preview corpus could have caught it. A
+cross-driver corpus proves the three agree about OUTPUT it can observe; behaviour
+it cannot observe still needs the same question asked three times, by hand.
+
+**A `git checkout <file>` to undo a scratch edit discards the whole file's
+working-tree state.** Doing that mid-session cost every uncommitted change to
+`manager.lua`. Back the file up and `cp` it back; the tests are what proved the
+reconstruction was complete, which is a second reason to write them first.
+
+**`menu_manifest.json` is GENERATED. Never hand-edit it.** Its source is
+`_shared/modules/features/manifest.toml`, and `npm run gen` — which `npm run
+test:js` also triggers — rebuilds it. A hand-edit therefore survives until the
+next suite run and then vanishes, which is worse than failing: the drivers had
+already been changed to match the edited JSON, so three menus were left with
+declarations that no longer existed and rows that nothing built. The tests
+caught it (an empty Debug submenu), but only after a full round of work went to
+the wrong file.
+
+Related: `build-domain.cjs` compares every generated output against **HEAD**, so
+a legitimate change to a generator SOURCE leaves `npm run gen` red until the
+regenerated file is committed. That red is not a defect — check the diff, and
+expect it to clear on commit.
+
+**Check the DATA before you check the driver.** The shared action catalogue
+declared 79 actions for Linux and the driver answered 40. Of the first eleven
+closed, ten needed no code at all: the row carried `emit_ahk_*` and `emit_hs_*`
+and simply had no `emit_linux` column, so the generator emitted nothing and the
+chord fell through to `Logger.debug("Unknown action")`. Filling one column in
+`_shared/modules/actions/actions.toml` wired all ten. A gap that looks like
+"this driver is behind" is worth looking for in the shared table first — that is
+what a single source is for, and it is also where the cheapest fix lives.
+
+Two things that make this class of gap invisible while it exists:
+
+- **The picker offers whatever is DECLARED.** So the user binds the action, the
+  assignment is stored, the chord fires, and nothing happens — no error at bind
+  time and none at fire time. `test-action-registry-bijection.cjs` is the gate;
+  it now also fails when the count falls BELOW its baseline, because a ratchet
+  that only catches a rise lets a closed gap re-open silently.
+- **A cascade of `elseif` has no length.** The `open_*` and screenshot handlers
+  are tables keyed by action id precisely so a gate can compare their key set
+  against the catalogue. Quote the keys (`["open_config"] = …`): every gate in
+  this repo resolves "does this driver handle it" by grepping for the quoted id.
+
+On Linux specifically: no single binary takes a screenshot on every desktop, so
+each capture action is a cascade — and the **Wayland candidates must come
+first**, because under Wayland the X11 tools talk to nothing and exit ZERO. A
+cascade ordered the other way reports success and captures nothing, on exactly
+the desktops this driver targets.
+
+Related: [[project-a-driver-that-types-also-types-into-its-own-keylogger]],
+[[feedback-regression-tests]].
 
 
 ## Working conventions & feedback

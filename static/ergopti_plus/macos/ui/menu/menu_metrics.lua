@@ -265,52 +265,37 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_filter_private(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.filter_private"),
-			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_private", STATE_GETTERS),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_private", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_private_filter_enabled) == "function" then
-					pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
-				end
-				save_prefs(); updateMenu()
-			end,
-		})
+	--- Flips the private filter. The ROW is built by the shared renderer from
+	--- the manifest (`type = "check"`); this is only what the row DOES.
+	local function cmd_filter_private()
+		state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
+		local Keylogger = require("modules.keylogger")
+		if type(Keylogger.set_private_filter_enabled) == "function" then
+			pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
+		end
+		save_prefs(); updateMenu()
 	end
 
-	local function dyn_filter_secure(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.filter_secure"),
-			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_secure", STATE_GETTERS),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_secure", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_secure_field_filter_enabled) == "function" then
-					pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
-				end
-				save_prefs(); updateMenu()
-			end,
-		})
+	--- Flips the secure filter. The ROW is built by the shared renderer from
+	--- the manifest (`type = "check"`); this is only what the row DOES.
+	local function cmd_filter_secure()
+		state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
+		local Keylogger = require("modules.keylogger")
+		if type(Keylogger.set_secure_field_filter_enabled) == "function" then
+			pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
+		end
+		save_prefs(); updateMenu()
 	end
 
-	local function dyn_filter_sysauth(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.filter_sysauth"),
-			checked  = ManifestMenu.resolve_checked_when("metrics_menu", "filter_sysauth", STATE_GETTERS),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_sysauth", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_system_auth_filter_enabled) == "function" then
-					pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
-				end
-				save_prefs(); updateMenu()
-			end,
-		})
+	--- Flips the sysauth filter. The ROW is built by the shared renderer from
+	--- the manifest (`type = "check"`); this is only what the row DOES.
+	local function cmd_filter_sysauth()
+		state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
+		local Keylogger = require("modules.keylogger")
+		if type(Keylogger.set_system_auth_filter_enabled) == "function" then
+			pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
+		end
+		save_prefs(); updateMenu()
 	end
 
 	local function dyn_exclude_apps(items, _ctx)
@@ -489,9 +474,6 @@ function M.build(ctx)
 		shortcut_typing  = dyn_shortcut_typing,
 		show_apps        = dyn_show_apps,
 		shortcut_apps    = dyn_shortcut_apps,
-		filter_private   = dyn_filter_private,
-		filter_secure    = dyn_filter_secure,
-		filter_sysauth   = dyn_filter_sysauth,
 		exclude_apps     = dyn_exclude_apps,
 		wpm_menubar      = dyn_wpm_menubar,
 		menubar_colors   = dyn_menubar_colors,
@@ -502,7 +484,18 @@ function M.build(ctx)
 		encryption       = dyn_encryption,
 	}
 
-	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, ctx)
+	-- The declarative rows read their state and their behaviour off the
+	-- context. A copy, so the caller's ctx is untouched.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.state_getters = STATE_GETTERS
+	render_ctx.commands = {
+		["filter_private"] = cmd_filter_private,
+		["filter_secure"]  = cmd_filter_secure,
+		["filter_sysauth"] = cmd_filter_sysauth,
+	}
+
+	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx)
 
 	return {
 		title   = i18n.get("menu.metrics.title"),

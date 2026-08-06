@@ -2950,22 +2950,31 @@ platforms = ["hs"]
 id = "---"
 
 [[menu.debug_menu]]
+type = "list"
 id = "log_level"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_logs"
+i18n = "menu.debug.open_logs"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_today_log"
+i18n = "menu.debug.open_today_log"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_error_log"
+i18n = "menu.debug.open_error_log"
 
 [[menu.debug_menu]]
 id = "---"
 
 [[menu.debug_menu]]
+type = "command"
 id = "healthcheck"
+i18n = "menu.debug.healthcheck"
 
 [[menu.shortcuts_menu]]
 type = "toggle"
@@ -3185,20 +3194,23 @@ type = "section_header"
 i18n = "menu.metrics.privacy_header"
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_private"
+i18n = "menu.metrics.filter_private"
 checked_when = ["metrics_filter_private"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_secure"
+i18n = "menu.metrics.filter_secure"
 checked_when = ["metrics_filter_secure"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_sysauth"
+i18n = "menu.metrics.filter_sysauth"
 checked_when = ["metrics_filter_sysauth"]
 disabled_when = ["keylogger_enabled"]
 

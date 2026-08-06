@@ -228,22 +228,31 @@
 			"id": "---"
 		},
 		{
+			"type": "list",
 			"id": "log_level"
 		},
 		{
-			"id": "open_logs"
+			"type": "command",
+			"id": "open_logs",
+			"i18n": "menu.debug.open_logs"
 		},
 		{
-			"id": "open_today_log"
+			"type": "command",
+			"id": "open_today_log",
+			"i18n": "menu.debug.open_today_log"
 		},
 		{
-			"id": "open_error_log"
+			"type": "command",
+			"id": "open_error_log",
+			"i18n": "menu.debug.open_error_log"
 		},
 		{
 			"id": "---"
 		},
 		{
-			"id": "healthcheck"
+			"type": "command",
+			"id": "healthcheck",
+			"i18n": "menu.debug.healthcheck"
 		}
 	],
 	"shortcuts_menu": [
@@ -484,8 +493,9 @@
 			"i18n": "menu.metrics.privacy_header"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "filter_private",
+			"i18n": "menu.metrics.filter_private",
 			"checked_when": [
 				"metrics_filter_private"
 			],
@@ -494,8 +504,9 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "filter_secure",
+			"i18n": "menu.metrics.filter_secure",
 			"checked_when": [
 				"metrics_filter_secure"
 			],
@@ -504,8 +515,9 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "filter_sysauth",
+			"i18n": "menu.metrics.filter_sysauth",
 			"checked_when": [
 				"metrics_filter_sysauth"
 			],

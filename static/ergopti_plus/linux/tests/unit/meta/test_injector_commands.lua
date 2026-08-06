@@ -310,3 +310,86 @@ helpers.describe("injector: modifiers the user is holding", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 5/ Multi-field injection (the @-combos) =================
+-- =================================================================
+-- =================================================================
+
+--- KEY_TAB and KEY_LEFTSHIFT in input-event-codes.h. Spelled here rather than
+--- required so a renumbering of the shared table cannot make this test agree
+--- with itself while the driver emits something else. KEY_LEFTSHIFT is declared
+--- again because the one above is local to the previous describe block.
+local KEY_TAB       = 15
+local KEY_LEFTSHIFT = 42
+
+helpers.describe("linux injector: several fields, one Tab between each", function()
+
+	helpers.it("fires a real Tab keystroke BETWEEN values and none after the last", function()
+		local injector, events, code_of = with_recorder("ab", {})
+		injector.inject_fields(0, { "a", "b" })
+		helpers.assert_eq(table.concat(events, " "), string.format(
+			"%d:1 %d:0 %d:1 %d:0 %d:1 %d:0",
+			code_of["a"], code_of["a"], KEY_TAB, KEY_TAB, code_of["b"], code_of["b"]),
+			"the Tab has to be a KEYSTROKE, not a '\t' in the text: U+0009 is a control "
+				.. "code no XKB layout maps, so a tab inside the string fails the layout plan "
+				.. "and the whole replacement falls through to the CLIPBOARD, which pastes "
+				.. "whitespace instead of moving to the next field")
+	end)
+
+	helpers.it("three fields take two Tabs, not three", function()
+		local injector, events, code_of = with_recorder("abc", {})
+		injector.inject_fields(0, { "a", "b", "c" })
+		local tabs = 0
+		for _, event in ipairs(events) do
+			if event == string.format("%d:1", KEY_TAB) then tabs = tabs + 1 end
+		end
+		helpers.assert_eq(tabs, 2,
+			"a trailing Tab would leave the caret in the field AFTER the last value, "
+				.. "which is not where the user is looking — macOS fires its tab only while "
+				.. "`i < #parts` and Windows dropped its trailing one for the same reason")
+		helpers.assert_true(events[#events] == string.format("%d:0", code_of["c"]),
+			"and the last event must be the last character's release, not a Tab")
+	end)
+
+	helpers.it("a single value emits no Tab at all", function()
+		local injector, events, code_of = with_recorder("a", {})
+		injector.inject_fields(0, { "a" })
+		helpers.assert_eq(table.concat(events, " "),
+			string.format("%d:1 %d:0", code_of["a"], code_of["a"]),
+			"one field is the ordinary case and must be indistinguishable from inject()")
+	end)
+
+	helpers.it("erases the trigger first, exactly like inject()", function()
+		local injector, events, code_of = with_recorder("ab", {})
+		injector.inject_fields(3, { "a", "b" })
+		helpers.assert_eq(table.concat(events, " "), string.format(
+			"14:1 14:0 14:1 14:0 14:1 14:0 %d:1 %d:0 %d:1 %d:0 %d:1 %d:0",
+			code_of["a"], code_of["a"], KEY_TAB, KEY_TAB, code_of["b"], code_of["b"]),
+			"the three backspaces erase '@np' plus the trigger before anything is typed")
+	end)
+
+	helpers.it("releases a held modifier around the whole multi-field burst", function()
+		local injector, events, code_of = with_recorder("ab", { "shift" })
+		injector.inject_fields(0, { "a", "b" })
+		helpers.assert_eq(table.concat(events, " "), string.format(
+			"%d:0 %d:1 %d:0 %d:1 %d:0 %d:1 %d:0 %d:1",
+			KEY_LEFTSHIFT, code_of["a"], code_of["a"], KEY_TAB, KEY_TAB,
+			code_of["b"], code_of["b"], KEY_LEFTSHIFT),
+			"Shift-Tab moves focus BACKWARDS, so a held Shift left down would walk the "
+				.. "form the wrong way and drop each value in the wrong box")
+	end)
+
+	helpers.it("an empty value list emits nothing rather than erasing for nothing", function()
+		local injector, events = with_recorder("a", {})
+		injector.inject_fields(4, {})
+		helpers.assert_eq(#events, 0,
+			"with no values there is nothing to type, and erasing four characters first "
+				.. "would delete the user's trigger and put nothing back")
+	end)
+
+end)

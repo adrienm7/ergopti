@@ -28,7 +28,8 @@
 ;    this to suggest pruning stale triggers.
 ;
 ; INTEGRATION:
-; KL_Roi_OnHotstring(trigger, net_saved) is called from KL_LogHotstring.
+; KL_Roi_OnHotstring(trigger, net_saved, is_private) is called from
+; KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk).
 ; KL_Roi_OnWord(word) is called from KL_Hook_OnChar when a word boundary
 ; (space, punctuation) is detected, passing the completed word.
 ; ==============================================================================
@@ -140,15 +141,27 @@ KL_Roi_RequireInit(func_name) {
 ; =======================================
 ; =======================================
 
-; Called from KL_LogHotstring in keylogger.ahk after the event is logged.
-KL_Roi_OnHotstring(trigger, net_saved) {
+; Called from KL_LogHotstring after the event is logged.
+;
+; ``is_private`` says that ``trigger`` has already been redacted by the caller —
+; not that the saving should be dropped. The savings accumulate either way (the
+; user saved those keystrokes), but the half-life map is skipped: its keys are
+; triggers, and a redaction is not a trigger. Keying on it would merge every
+; private mapping of the same length into a single entry whose "last use" is
+; whichever of them fired most recently, and then emit that merged key in a
+; trigger_halflife row.
+; @param trigger {String} The fired trigger, redacted when is_private.
+; @param net_saved {Integer} Characters saved by this expansion.
+; @param is_private {Boolean} True when the mapping is the user's personal data.
+KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 	if !KL_Roi_RequireInit("KL_Roi_OnHotstring")
 		return
 		if (net_saved <= 0)
 				return
 		KLRoi.session_saved_chars += net_saved
 		KLRoi.session_fired_count += 1
-		KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
+		if !is_private
+				KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
 
 		; Emit a periodic roi_snapshot so the dashboard can plot savings over time
 		; without aggregating over the entire hotstring table.

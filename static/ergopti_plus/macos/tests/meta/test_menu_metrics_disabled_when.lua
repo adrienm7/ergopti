@@ -53,6 +53,20 @@ local function read_source(selector)
 	return src
 end
 
+--- The shared menu manifest, parsed.
+---
+--- Read through the renderer's own loader rather than by opening the JSON here:
+--- the path differs between a checkout and an installed bundle, and a second
+--- resolver would be a second thing to get wrong.
+--- @return table
+local function load_manifest()
+	local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+	local root = type(ManifestMenu.get_root) == "function" and ManifestMenu.get_root() or nil
+	helpers.assert_true(type(root) == "table",
+		"the shared manifest must load — a test that cannot read it would agree with any driver")
+	return root
+end
+
 
 
 --- =========================================
@@ -139,12 +153,44 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- ===== 3/ macOS driver delegates (MG-1) =====
 	--- ============================================
 
-	helpers.it("menu_metrics.lua resolves every canonical item's greying via the shared resolver", function()
+	helpers.it("every canonical item's greying is resolved by the shared resolver", function()
 		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local manifest = load_manifest()
 		for _, c in ipairs(CANON) do
+			-- TWO ways to satisfy the invariant, and the invariant is what matters:
+			-- the greying must come from the shared resolver reading the manifest,
+			-- never from a condition re-derived in this driver.
+			--
+			--   1. the driver calls the resolver itself, for a row it still builds;
+			--   2. the row is declared `type = "check"`, and the SHARED renderer
+			--      calls the same resolver while materialising it.
+			--
+			-- The second is the direction this menu is moving in: the three privacy
+			-- filters left this file entirely on 2026-08-06 and the row is now built
+			-- once for all three drivers. Asserting only on (1) would have made that
+			-- migration look like a regression while the resolver was in fact being
+			-- called by more shared code than before.
 			local needle = 'ManifestMenu.resolve_disabled_when("metrics_menu", "' .. c.id .. '", STATE_GETTERS)'
-			helpers.assert_true(src:find(needle, 1, true) ~= nil,
-				"menu_metrics.lua must resolve '" .. c.id .. "' greying via ManifestMenu.resolve_disabled_when — not a hardcoded condition")
+			local resolved_here = src:find(needle, 1, true) ~= nil
+
+			local declared_check = false
+			for _, entry in ipairs(manifest.metrics_menu or {}) do
+				if type(entry) == "table" and entry.id == c.id and entry.type == "check" then
+					declared_check = true
+				end
+			end
+
+			helpers.assert_true(resolved_here or declared_check,
+				"'" .. c.id .. "' greying must come from the shared resolver: either this "
+					.. "file calls ManifestMenu.resolve_disabled_when for it, or the manifest "
+					.. "declares it type=check so the shared renderer does. A hardcoded "
+					.. "condition here is what neither allows")
+
+			-- And the two must not BOTH be true: a row the renderer builds and the
+			-- driver also builds appears twice.
+			helpers.assert_true(not (resolved_here and declared_check),
+				"'" .. c.id .. "' is declared type=check AND still resolved in this file — "
+					.. "the renderer builds that row now, so a handler here draws it a second time")
 		end
 	end)
 

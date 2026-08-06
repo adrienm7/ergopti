@@ -58,6 +58,11 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
 		Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
 		Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
+		; Marks a mapping whose trigger AND replacement are the user's own secrets
+		; (the personal-info @ family, the phone / SSN / IBAN prefixes). It travels
+		; ON the Spec because the fire happens far from here and the metrics sink
+		; cannot look the answer up again — see _MakeHotstringMeta.
+		IsPrivate := (IsSet(options) and options.Has("IsPrivate")) ? options["IsPrivate"] : False
 		; An explicit Priority (passed by the hand loader) always wins; otherwise resolve
 		; the override cascade from Category/Section. The IsSet(options) guard MUST be here
 		; — passing the unset ``options`` variable into the helper would throw UnsetError.
@@ -74,8 +79,8 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
-				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
-				_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
+				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+				_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate)
 		)
 }
 
@@ -111,7 +116,13 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; an AHK v2 default-parameter expression cannot reference. Both callers
 ; (CreateHotstring / CreateCaseSensitiveHotstrings) always pass the resolved
 ; value, so this default only guards a hypothetical third caller.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10) {
+;
+; ``IsPrivate`` rides on the Spec rather than being recomputed at the sink: the
+; fire paths see a matched Spec and a typed buffer, never the personal_info
+; field the value came from, so a sink that tried to decide for itself would be
+; guessing from the text. HSE_Register copies every Meta field onto the Spec, so
+; the flag reaches HSEMatch.IsPrivate at each of the three fire paths.
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false) {
 		static _NextSeq := 0
 		_NextSeq += 1
 		return {
@@ -126,6 +137,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				Category: Category,
 				Section: Section,
 				Priority: Priority,
+				IsPrivate: IsPrivate ? true : false,
 				Seq: _NextSeq
 		}
 }
@@ -134,18 +146,18 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 ; ``BackSpaceSeq`` / ``PrevCharKey`` once at registration time and closes
 ; over both plus the positional option booleans. Each call produces a fresh
 ; closure with its own captures — safe to call in a loop over variants.
-_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "") {
+_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false) {
 		BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
 		AbbreviationLen := StrLen(Abbreviation)
 		PrevCharKey := SubStr(Abbreviation, -2, 1)
 		return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
-				TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section)
+				TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section, IsPrivate)
 }
 
 ; Hot path — runs on every hotstring firing. ``BackSpaceSeq`` and
 ; ``PrevCharKey`` are pre-computed at registration time so this function
 ; does zero allocation / string work before dispatching the three sends.
-_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0, Trigger := "", Category := "", Section := "") {
+_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0, Trigger := "", Category := "", Section := "", IsPrivate := false) {
 		if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
 				return
 		}
@@ -187,7 +199,11 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the prefix-watcher suppression so it covers the OS message-loop flush.
-		try KL_MarkSynthetic("hotstring")
+		;
+		; IsPrivate travels with it: the sends below are observed by the
+		; keylogger's InputHook character by character, so without the flag the
+		; typing row keeps the replacement this path redacts from the fire row.
+		try KL_MarkSynthetic("hotstring", IsPrivate)
 
 		try {
 				isNotepad := false
@@ -237,9 +253,9 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		if (EndChar != "") and (Trigger != "") and (Category != "") {
 				repl_str := HasMethod(Replacement) ? "" : Replacement
 				if IsSet(_HSE_QueueFireLog) {
-						try _HSE_QueueFireLog(Trigger, repl_str, "endchar", Category, Section)
+						try _HSE_QueueFireLog(Trigger, repl_str, "endchar", Category, Section, IsPrivate)
 				} else if IsSet(KL_LogHotstring) {
-						try KL_LogHotstring(Trigger, repl_str, "endchar", "", Category, Section)
+						try KL_LogHotstring(Trigger, repl_str, "endchar", "", Category, Section, IsPrivate)
 				} else if IsSet(WPMWidget_Push) {
 						repl_len := HasMethod(Replacement) ? 1 : StrLen(repl_str)
 						Loop repl_len
@@ -298,6 +314,11 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
 		Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
 		Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
+		; Same privacy marker CreateHotstring reads. Honoured here too so a personal
+		; value registered through the cased family cannot escape the contract just
+		; because it took the other factory — that asymmetry is how one of these two
+		; entry points ends up leaking while the other is patched.
+		IsPrivate := (IsSet(options) and options.Has("IsPrivate")) ? options["IsPrivate"] : False
 		; An explicit Priority (passed by the hand loader) always wins; otherwise resolve
 		; the override cascade from Category/Section. The IsSet(options) guard MUST be here
 		; — passing the unset ``options`` variable into the helper would throw UnsetError.
@@ -342,13 +363,13 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				; Drop the "C" flag so any-case typing matches the single registered spec.
 				ConformFlags := StrReplace(Flags, "C")
 				ConformMeta := _MakeHotstringMeta(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
-						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
+						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
-						Rec ? _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
+						Rec ? _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
 						ConformMeta
 				)
 				return
@@ -374,8 +395,8 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		RegisterVariant := (Abbr, Repl) => _RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags "C"), Abbr,
 				Rec ? (FlagsPortion Abbr) : "",
-				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
-				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
+				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate)
 		)
 
 		RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)

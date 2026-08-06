@@ -354,6 +354,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/webview_utils.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
+#Include modules/keylogger/keylogger_hotstring_log.ahk
 #Include modules/keylogger/keylogger_walker.ahk
 #Include modules/keylogger/keylogger_hook.ahk
 #Include modules/keylogger/keylogger_watchers.ahk

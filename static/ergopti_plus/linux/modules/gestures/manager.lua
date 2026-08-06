@@ -376,11 +376,130 @@ local function workspace_switch_command(delta, fallback_keys)
 		.. " || xdotool key " .. fallback_keys
 end
 
+--- The webview window each `open_*` action raises, by action id.
+---
+--- Data rather than branches so the set can be compared against the shared
+--- catalogue by a gate: a table has a length, a chain of `elseif` does not.
+local OPEN_WINDOW = {
+	["open_metrics_typing"]    = "metrics_typing",
+	["open_metrics_apps"]      = "metrics_apps",
+	["open_hotstrings_editor"] = "hotstring_editor",
+	["open_paths_editor"]      = "hotstrings_config_window",
+}
+
+--- The user-editable file each `open_*` action reveals, as a path resolver.
+---
+--- Resolvers rather than strings: the paths depend on $XDG_CONFIG_HOME and on
+--- today's date, and freezing them at load would open yesterday's log after
+--- midnight and the wrong directory under a changed environment.
+local OPEN_PATH = {
+	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
+	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
+	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
+	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
+	["open_logs_folder"]        = function() return require("infra.logger_sink").log_dir() end,
+	["open_today_log"]          = function() return require("infra.logger_sink").main_log_path() end,
+	["open_error_log"]          = function() return require("infra.logger_sink").errors_log_path() end,
+}
+
+--- The screenshot command for each capture action, one shell cascade per id.
+---
+--- WHY A CASCADE AND NOT ONE TOOL: there is no screenshot binary every Linux
+--- desktop has. GNOME ships gnome-screenshot, KDE spectacle, wlroots
+--- compositors grim + slurp, and X11 sessions usually have maim or scrot. Under
+--- Wayland the X11 tools talk to nothing and exit ZERO, which is why the Wayland
+--- candidates come first: a cascade ordered the other way would "succeed" and
+--- capture nothing on exactly the desktops this driver targets.
+---
+--- `%s` is replaced with the destination path for the SAVE variants; the
+--- clipboard variants take no path.
+local SCREENSHOT_COMMANDS = {
+	["screenshot_fullscreen_clipboard"] =
+		"grim - | wl-copy || gnome-screenshot -c || spectacle -bnc || maim | xclip -selection clipboard -t image/png",
+	["screenshot_fullscreen_save"] =
+		"grim %s || gnome-screenshot -f %s || spectacle -bno %s || maim %s",
+	["screenshot_region_clipboard"] =
+		"grim -g \"$(slurp)\" - | wl-copy || gnome-screenshot -ac || spectacle -bnrc || maim -s | xclip -selection clipboard -t image/png",
+	["screenshot_region_save"] =
+		"grim -g \"$(slurp)\" %s || gnome-screenshot -af %s || spectacle -bnro %s || maim -s %s",
+	["screenshot_window_clipboard"] =
+		"gnome-screenshot -wc || spectacle -bnac || maim -i \"$(xdotool getactivewindow)\" | xclip -selection clipboard -t image/png",
+	["screenshot_window_save"] =
+		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
+}
+
+--- Where a saved screenshot lands, and under what name.
+---
+--- $XDG_PICTURES_DIR when the user's desktop declares one, the conventional
+--- ~/Pictures otherwise. The stamp is second-resolution so two captures in the
+--- same minute do not overwrite each other — the failure would be silent, and
+--- the file the user wanted is the one that disappeared.
+--- @param kind string Short tag: "full", "reg" or "win".
+--- @return string An absolute path.
+local function screenshot_path(kind)
+	local dir = os.getenv("XDG_PICTURES_DIR")
+	if not dir or dir == "" then
+		local ok, Paths = pcall(require, "infra.config_paths")
+		dir = (ok and Paths.home() or ".") .. "/Pictures"
+	end
+	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
+end
+
+--- The tag each save action stamps into its filename.
+local SCREENSHOT_KIND = {
+	["screenshot_fullscreen_save"] = "full",
+	["screenshot_region_save"]     = "reg",
+	["screenshot_window_save"]     = "win",
+}
+
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
 
 	local function _run(cmd)
 		pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
+	end
+
+	--- Raises one of the driver's own windows, or reveals one of its files.
+	--- @param name string The action id.
+	--- @return boolean True when this action was handled here.
+	local function _open_driver_surface(name)
+		local window = OPEN_WINDOW[name]
+		if window then
+			local ok, Webview = pcall(require, "ui.webview_manager")
+			if not ok or type(Webview.show) ~= "function" then
+				-- Loud, because the user asked for a window and none appeared. A
+				-- headless daemon (no GTK, no display) is the ordinary reason and it
+				-- is worth naming rather than leaving the chord looking dead.
+				Logger.error(LOG, "No webview manager — '%s' cannot open its window.", name)
+				return true
+			end
+			pcall(Webview.show, window)
+			return true
+		end
+
+		local resolver = OPEN_PATH[name]
+		if not resolver then return false end
+		local ok_paths, Paths = pcall(require, "infra.config_paths")
+		if not ok_paths then
+			Logger.error(LOG, "Cannot resolve paths — '%s' has nothing to open.", name)
+			return true
+		end
+		local ok_path, target = pcall(resolver, Paths)
+		if not ok_path or type(target) ~= "string" or target == "" then
+			Logger.error(LOG, "'%s' resolved to no path — nothing opened.", name)
+			return true
+		end
+		-- xdg-open on a file that does not exist fails silently, so say so here
+		-- instead: a personal_*.toml the user has never created is the common case
+		-- and "nothing happened" is not a usable answer.
+		local probe = io.open(target, "r")
+		if probe then
+			probe:close()
+		elseif not target:match("/$") then
+			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
+		end
+		_run("xdg-open " .. shell_quote(target))
+		return true
 	end
 
 	local modifier_command = MODIFIER_ACTION_COMMANDS[action_name]
@@ -415,6 +534,28 @@ local function _execute_action(action_name, go_next, binding)
 		Logger.debug(LOG, "uinput unavailable for '%s' — falling back to xdotool (X11 only).",
 			emit_combo)
 		_run("xdotool key " .. emit_combo)
+		return
+	end
+
+	-- The driver's own windows and files. These are declared platform = "all" in
+	-- the shared catalogue, so the picker has always offered them as bindable on
+	-- Linux — and binding one stored the assignment, fired on the chord, and hit
+	-- the "Unknown action" branch at DEBUG. No error at bind time, none at fire
+	-- time; the user concludes the shortcut feature is broken.
+	if _open_driver_surface(action_name) then return end
+
+	-- Screenshots, likewise declared for every platform and implemented on none
+	-- of Linux until now.
+	local shot = SCREENSHOT_COMMANDS[action_name]
+	if shot then
+		local kind = SCREENSHOT_KIND[action_name]
+		if kind then
+			-- Quoted once and substituted everywhere: the same path goes to each
+			-- candidate in the cascade, and a path with a space in it must survive
+			-- all four of them.
+			shot = shot:gsub("%%s", (shell_quote(screenshot_path(kind)):gsub("%%", "%%%%")))
+		end
+		_run(shot)
 		return
 	end
 

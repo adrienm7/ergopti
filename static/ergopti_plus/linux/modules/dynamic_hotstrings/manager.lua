@@ -39,6 +39,26 @@ local DYNAMIC_GROUP = "dynamichotstrings"
 -- are, which is everything that is not one of these three.
 local DATE_RULE_COUNT = 3
 
+-- U+21E5 RIGHTWARDS ARROW TO BAR, between two fields of a multi-field preview
+-- row. The expansion types a real Tab keystroke there (the values land in
+-- consecutive form fields) and a literal tab is invisible in a bubble, so the
+-- glyph stands in for it. macOS shows the same character in the same place
+-- (personal_info.lua) and so does Windows (PI_PREVIEW_FIELD_SEPARATOR); a row
+-- that read differently on two machines is not the same check.
+local PREVIEW_FIELD_SEPARATOR = " \226\135\165 "
+
+-- The category a personal-information preview row resolves its colour, delay and
+-- "show the bubble" toggle through. These rows carry the user's own data, so they
+-- wear the personal colour on all three drivers — ui/tooltip/preview.lua keys its
+-- PERSONAL_CATEGORY tint on exactly this string.
+local PERSONAL_PREVIEW_GROUP = "personal"
+
+-- The engine section every @-tag rule is registered under. Named because three
+-- separate decisions read it — the per-family switch, the preview gate and the
+-- privacy flag on a fired expansion — and a literal repeated at three sites is a
+-- literal that can be corrected at two of them.
+local PERSONAL_SECTION = "personal_info"
+
 
 -- =========================================
 -- =========================================
@@ -132,7 +152,7 @@ function M.init(opts)
 			local value = _info[field]
 			Engine.add_rule(
 				"@" .. letter,                      -- suffix: "@p"
-				"personal_info",                     -- section
+				PERSONAL_SECTION,                    -- section
 				function() return value end          -- resolver
 			)
 			_rules_count = _rules_count + 1
@@ -153,6 +173,76 @@ function M.init(opts)
 		_rules_count, _trigger_char, info_field_count)
 end
 
+--- The personal_info fields an @-tag expands to, in the order they are typed.
+---
+--- THE SINGLE SOURCE for what "@np" means: the fire path and the preview bubble
+--- both call this, so the two cannot answer differently. Windows learned that the
+--- expensive way — its bubble and its engine each had their own idea of which
+--- combos existed, and the bubble stayed silent for a family that expanded fine.
+---
+--- Multi-letter combos are NOT registered as rules. With thirteen alias letters
+--- the space is 169 combinations at length two and 28 561 at length four, so
+--- pre-registering is not an option and a hand-written selection of them is worse
+--- than none (Windows shipped thirty-one and was missing @npdt and @nt). Resolving
+--- at use time makes every combination work at flat cost, and makes the ORDER
+--- significant for free: @np and @pn walk the same letters in different sequence.
+---
+--- An unknown letter, or a letter aliasing a field the user left blank, declines
+--- the WHOLE tag rather than skipping that field. A partial expansion in a form
+--- shifts every later value up by one box, which is silently wrong; nothing
+--- happening is merely visibly wrong. Note this differs from macOS's
+--- `resolve_combo`, which skips what it cannot resolve — see PROJECT_MEMORY.
+--- @param tag string The tag WITHOUT its leading "@" and without the trigger.
+--- @return table Array of personal_info field names; empty when the tag resolves to none.
+function M.resolve_combo(tag)
+	local fields = {}
+	if type(tag) ~= "string" or tag == "" then return fields end
+
+	-- Lower-cased because the single-letter rules are registered lower-cased and
+	-- typing "@NP" must mean what "@np" means.
+	for index = 1, #tag do
+		local letter = tag:sub(index, index):lower()
+		local field = _letters[letter]
+		if not field then return {} end
+		local value = _info[field]
+		if type(value) ~= "string" or value == "" then return {} end
+		fields[#fields + 1] = field
+	end
+	return fields
+end
+
+--- The values an @-tag expands to, in order.
+--- @param tag string The tag without its "@" and without the trigger.
+--- @return table Array of strings; empty when the tag resolves to nothing.
+function M.resolve_combo_values(tag)
+	local values = {}
+	for _, field in ipairs(M.resolve_combo(tag)) do
+		values[#values + 1] = _info[field]
+	end
+	return values
+end
+
+--- The @-tag the buffer ends with, or "" when it does not end with one.
+---
+--- Walks backwards over letters to the "@" rather than matching a pattern: Lua's
+--- `%a` class is byte-oriented and would stop at the first byte of an accented
+--- letter, and an accented alias is a thing a user can put in [letters].
+--- @param buffer string The typing buffer, WITHOUT the trigger character.
+--- @return string The tag without its "@", or "".
+function M.trailing_tag(buffer)
+	if type(buffer) ~= "string" or buffer == "" then return "" end
+	local at = buffer:find("@[^@]*$")
+	if not at then return "" end
+	local tag = buffer:sub(at + 1)
+	-- "@" with nothing after it is not a tag yet.
+	if tag == "" then return "" end
+	-- Anything that is not a letter ends the tag — and since a separator can only
+	-- appear INSIDE what we just cut, its presence means the "@" belongs to an
+	-- earlier word (an email address, most often) rather than to a tag.
+	if tag:find("[%s%p%d]") then return "" end
+	return tag
+end
+
 --- Returns true when the module has been initialised and has active rules.
 --- @return boolean
 function M.is_enabled()
@@ -171,6 +261,58 @@ end
 -- ======= 4/ Match & Inject ===============
 -- =========================================
 -- =========================================
+
+--- Expands a multi-letter @-combo, the fallback when no registered rule matched.
+---
+--- Gated on the SAME switch as the single-letter tags: a combo is a concatenation
+--- of the very fields those tags expand to, so a user who turned the personal-info
+--- family off has turned this off too. Reading the switch here rather than at
+--- registration is what makes the toggle live — there is nothing registered to
+--- remove when it flips.
+--- @param prefix string The buffer without the trigger character.
+--- @param trigger string The trigger character that fired.
+--- @return boolean fired
+--- @return table|nil event Canonical event details when it fired.
+local function _fire_combo(prefix, trigger)
+	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return false end
+
+	local tag = M.trailing_tag(prefix)
+	if tag == "" then return false end
+
+	local values = M.resolve_combo_values(tag)
+	-- A single-letter tag that resolves here is one the registered rule already
+	-- declined — its section is off, or the engine holds no rule for it — so
+	-- expanding it now would route around a decision that was already taken.
+	if #values < 2 then return false end
+
+	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
+	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
+		Logger.warn(LOG, "Injector not available — @-combo dropped: '@%s'.", tag)
+		return false
+	end
+
+	-- "@" + the letters + the trigger: everything the user typed for this.
+	local backspace_count = #tag + 2
+	-- is_private is not optional: every value here comes out of personal_info.toml,
+	-- so the payload is the user's own data by construction.
+	injector.inject_fields(backspace_count, values, true)
+
+	local total = 0
+	for _, value in ipairs(values) do total = total + #value end
+	Logger.info(LOG, "@-combo expansion: '@%s' → %d field(s), %d char(s) (content withheld).",
+		tag, #values, total)
+
+	return true, {
+		trigger = "@" .. tag .. trigger,
+		-- The LOGICAL text: values only, no tab. A Tab moves focus and inserts
+		-- nothing on screen, so this is what the buffer and the keylogger's record
+		-- must hold — the same split macOS documents at its own injection seam.
+		replacement = table.concat(values),
+		h_type = "dynamic",
+		backspace_count = backspace_count,
+		is_private = true,
+	}
+end
 
 --- Called by the daemon on every character. Checks the current typing buffer
 --- against the shared engine and injects when a rule matches.
@@ -199,7 +341,12 @@ function M.on_trigger(buffer, trigger)
 	if prefix == "" then return false end
 
 	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled)
-	if not match then return false end
+	if not match then
+		-- Nothing registered claimed the sequence. Only now try the multi-letter
+		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
+		-- letters AND is the short-date rule, and the registration is what decides.
+		return _fire_combo(prefix, t)
+	end
 
 	-- Inject: erase the suffix + trigger, type the result.
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
@@ -209,17 +356,86 @@ function M.on_trigger(buffer, trigger)
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if ok_inj and injector and type(injector.inject) == "function" then
 		injector.inject(backspace_count, match.result)
-		Logger.info(LOG, "Dynamic expansion: '%s' → '%s'.", match.rule.suffix, match.result)
+		-- `match.result` is the RESOLVED value: for "@i★" it is the user's IBAN,
+		-- for "@t★" their phone number. This line used to print it in full, at
+		-- INFO, with the shared logger's default level at 10 — so it reached the
+		-- driver's log unconditionally, no opt-in, on every expansion. Windows
+		-- redacts the equivalent site and macOS has no such line at all; Linux was
+		-- the only driver still writing it.
+		--
+		-- Redacted rather than dropped: the length is what tells you WHICH field
+		-- expanded when a rule misfires, and it is the only diagnostic this line
+		-- carried that is worth keeping. The date rules take the same path, and
+		-- a date is not a secret — but the group cannot be told apart here without
+		-- re-deriving what the resolver already decided, and printing a date is
+		-- not worth a branch that could get the answer wrong.
+		Logger.info(LOG, "Dynamic expansion: '%s' → %d char(s) (content withheld).",
+			match.rule.suffix, #match.result)
 		return true, {
 			trigger = match.rule.suffix .. t,
 			replacement = match.result,
 			h_type = "dynamic",
 			backspace_count = backspace_count,
+			-- The SECTION decides, and it is the only thing here that can: the
+			-- resolver has already run and its output is just a string. Everything
+			-- registered under "personal_info" resolves a field of the user's own
+			-- personal_info.toml; the three date rules resolve a date, which is not
+			-- a secret and must stay legible in the metrics.
+			is_private = (match.rule.section == PERSONAL_SECTION),
 		}
 	end
 
 	Logger.warn(LOG, "Injector not available — expansion dropped: '%s'.", match.rule.suffix)
 	return false
+end
+
+--- Preview rows for the @-family, in the shape `engine:candidates()` returns.
+---
+--- WHY THE BUBBLE NEEDED A SECOND SOURCE: the daemon builds its preview from
+--- `engine:candidates()`, which reads the static hotstring matcher's buckets. The
+--- @-tags live in a DIFFERENT engine (the dynamic one) and the multi-letter
+--- combos are not registered anywhere at all, so no key beginning with "@" could
+--- ever appear there. The whole family expanded correctly and previewed nothing —
+--- the same gap Windows had, for the same reason, and fixed the same way.
+---
+--- `parts` and `fields` are parallel arrays rather than one joined string: each
+--- value has to be masked against ITS OWN classification, so an IBAN is hidden
+--- while the phone number beside it is not. Joining first would force one verdict
+--- on the whole row.
+--- @param buffer string The typing buffer, WITHOUT the trigger character.
+--- @return table Array of candidate records; empty when nothing is offered.
+function M.preview_candidates(buffer)
+	local rows = {}
+	if not _enabled then return rows end
+	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
+
+	local tag = M.trailing_tag(buffer)
+	if tag == "" then return rows end
+
+	local fields = M.resolve_combo(tag)
+	if #fields == 0 then return rows end
+
+	-- A single-letter tag is a registered rule and reaches the bubble through the
+	-- ordinary path; offering it here too would draw the same row twice.
+	if #fields < 2 then return rows end
+
+	local parts = {}
+	for index, field in ipairs(fields) do parts[index] = _info[field] end
+
+	rows[#rows + 1] = {
+		trigger  = "@" .. tag .. _trigger_char,
+		-- `replacement` is what a consumer that knows nothing about `parts` would
+		-- show. It stays UNMASKED here for the same reason the fire path holds the
+		-- real values: masking is the display layer's job, and doing it twice or in
+		-- the wrong place is how a masked value once reached an injector.
+		replacement = table.concat(parts, PREVIEW_FIELD_SEPARATOR),
+		parts    = parts,
+		fields   = fields,
+		group    = PERSONAL_PREVIEW_GROUP,
+		section  = PERSONAL_SECTION,
+		fires    = true,
+	}
+	return rows
 end
 
 --- Returns the preview string for the current buffer (tooltip display).

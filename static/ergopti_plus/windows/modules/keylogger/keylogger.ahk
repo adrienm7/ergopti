@@ -154,6 +154,14 @@ class Keylogger {
     ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
     static synth_active     := 0      ; depth counter — overlapping fires each hold their own level
     static synth_type       := "none"
+    ; True while ANY held level of the burst is expanding the user's own personal
+    ; data (an IBAN, a card number, an SSN). The hook records a placeholder per
+    ; character instead of the character itself — see KL_Hook_RecordedChar. It is
+    ; a latch, not a per-level value: with two fires overlapping, the cheapest
+    ; correct answer is the conservative one, because redacting a public
+    ; character costs an n-gram and leaking a private one costs the secret. It
+    ; is released with the LAST level (KL_ClearSynthetic), never before.
+    static synth_private    := false
     ; Set to true by KL_Stop() before the final flush so the suspend guard in
     ; KL_AppendLog and KL_IngestOnce is bypassed during shutdown (quit-while-paused
     ; would otherwise silently discard the buffered metrics).
@@ -194,11 +202,23 @@ class Keylogger {
 ; expansion, LLM acceptance) are stamped synthetic in their per-keystroke meta.
 ; `source` is "hotstring" or "llm". Always pair with a deferred KL_ClearSynthetic
 ; so the flag can never leak onto subsequent manual typing.
-KL_MarkSynthetic(source) {
+;
+; `is_private` is what stops the driver from dictating the user's IBAN to its own
+; keylogger. The expansion is typed by us but OBSERVED by our InputHook like any
+; other keystroke — that is the whole reason this function exists — so the
+; per-character typing row carries the replacement verbatim unless the fire says
+; otherwise. Linux takes the same argument through the same door
+; (`append_synthetic_events(…, is_private)`).
+; @param source {String} "hotstring", "llm" or "case-transform".
+; @param is_private {Boolean} True when the burst about to be typed is the user's
+;     personal data.
+KL_MarkSynthetic(source, is_private := false) {
     local _c := Critical("On")
     try {
         Keylogger.synth_active += 1
         Keylogger.synth_type := source
+        if is_private
+            Keylogger.synth_private := true
     } finally {
         Critical(_c)
     }
@@ -210,9 +230,14 @@ KL_ClearSynthetic(*) {
     local _c := Critical("On")
     try {
         Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
-        ; Only reset the type label once every held level is released.
-        if !Keylogger.synth_active
+        ; Only reset the type label once every held level is released. The
+        ; privacy latch is released on the same condition and never earlier: an
+        ; outer public fire finishing first must not un-redact the inner private
+        ; one that is still typing.
+        if !Keylogger.synth_active {
             Keylogger.synth_type := "none"
+            Keylogger.synth_private := false
+        }
     } finally {
         Critical(_c)
     }
@@ -760,38 +785,11 @@ KL_LogSystemEvent(action, metadata := unset) {
     KL_AppendLog(e)
 }
 
-; Logs a hotstring expansion event. Mirrors hammerspoon/modules/keylogger/init.lua:1148
-; (M.log_hotstring) byte-for-byte:
-;   - flushes the typing buffer FIRST so the fire is ordered after the
-;     trigger characters that produced it,
-;   - auto-computes ``net_saved_chars`` from StrLen so callers do not have
-;     to (HS does the same with utf8.len),
-;   - falls back to the session app when the caller omits ``app_name``,
-;   - emits the same ``tag`` marker (`<hotstring>…</hotstring>`) HS writes.
-KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", category := "", section := "") {
-    LoggerDebug("WPMWidget", "KL_LogHotstring: trigger='{1}' cat='{2}' sec='{3}' init={4}", trigger, category, section, Keylogger.initialized)
-    if !Keylogger.initialized
-        return
-    KL_FlushBuffer()
-    app := (app_name != "") ? app_name : Keylogger.session_app
-    net_saved := StrLen(replacement) - StrLen(trigger)
-    KL_AppendLog(Map(
-        "type",            "hotstring",
-        "app",             app,
-        "trigger",         trigger,
-        "replacement",     replacement,
-        "h_type",          h_type,
-        "net_saved_chars", net_saved,
-        "tag",             "<hotstring>" . replacement . "</hotstring>"
-    ))
-    Keylogger.last_flush_time := A_TickCount
-    try KL_Roi_OnHotstring(trigger, net_saved)
-    ; Feed the real-time WPM widget — pass the TOML category so the widget
-    ; can resolve the correct color and skip coloring for neutral groups.
-    repl_len := StrLen(replacement)
-    Loop repl_len
-        try WPMWidget_Push(true, false, false, category, section)
-}
+; KL_LogHotstring — the FIRED-hotstring row — lives in
+; modules/keylogger/keylogger_hotstring_log.ahk. It was split out so the
+; headless test suite can drive it against a recording KL_AppendLog: it is the
+; one row that can carry the user's personal data, and this file installs OS
+; hooks at load, so nothing here is includable from a test.
 
 ; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.
 ; The call site (prefix watcher) drives suggested/dismissed pairing — there

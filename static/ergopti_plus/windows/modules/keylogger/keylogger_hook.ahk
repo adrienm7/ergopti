@@ -329,6 +329,36 @@ KL_Hook_NoteActivity(already_called := false) {
 ; ======================================
 ; ======================================
 
+; What the typing row is allowed to KEEP of a captured token.
+;
+; This InputHook observes the driver's OWN auto-typed output — that is why
+; KL_MarkSynthetic exists — so an @iban★ expansion arrives here character by
+; character, exactly like manual typing, roughly 90 ms before the redacted
+; hotstring row is written. Stamping those characters s=1 said WHERE they came
+; from and still persisted WHAT they were, into the same file, one row earlier.
+;
+; Length-preserving on purpose: the row's own arithmetic (WPM char counts, the
+; walker's per-event alignment with ``events``) is StrLen-based, and Linux's
+; recorded_char() makes exactly this trade for exactly this reason.
+;
+; Bracket markers ([BS], [ENTER], …) are returned untouched. They are the closed
+; KLHOOK_SPECIAL token set, they carry no content of the secret, and rewriting
+; them would desynchronise the walker's deletion accounting — the same exemption
+; Linux states for [BS].
+; @param token {String} The character, or the bracket marker, about to be recorded.
+; @return {String} The token, or a length-preserving redaction of it.
+KL_Hook_RecordedChar(token) {
+		; One boolean read on the ordinary keystroke path — nothing else runs
+		; unless the driver is mid-expansion of the user's own data.
+		if !Keylogger.synth_private
+				return token
+		if (Type(token) != "String" or token == "")
+				return token
+		if (SubStr(token, 1, 1) == "[" and SubStr(token, -1) == "]")
+				return token
+		return PersonalInfoRedactForLog(token)
+}
+
 KL_Hook_OnChar(ih, c) {
 		; The keylogger records nothing while the script is paused — its InputHook is
 		; separate from HookDispatcher, so it needs its own guard.
@@ -382,8 +412,14 @@ KL_Hook_OnChar(ih, c) {
 						meta["st"] := Keylogger.synth_type
 				}
 
-				Keylogger.buffer_events.Push([c, delay, meta])
-				Keylogger.buffer_text .= c
+				; The meta above says the character was auto-typed; it never said
+				; the character itself may be persisted. Both sinks below take the
+				; RECORDED form, because both are written verbatim into the typing
+				; row (``events`` and ``text``) and redacting one of them leaves the
+				; secret in the other column.
+				recorded := KL_Hook_RecordedChar(c)
+				Keylogger.buffer_events.Push([recorded, delay, meta])
+				Keylogger.buffer_text .= recorded
 				if !Keylogger.synth_active {
 						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
 						try KL_Roi_OnChar(c)
@@ -476,7 +512,11 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 						meta["st"] := Keylogger.synth_type
 				}
 
-				Keylogger.buffer_events.Push([bracket, delay, meta])
+				; Same funnel as OnChar. A bracket marker survives it unchanged (it
+				; carries no content), but routing it through the one helper is what
+				; keeps the answer to « may this be persisted? » in a single place
+				; rather than re-decided per call site.
+				Keylogger.buffer_events.Push([KL_Hook_RecordedChar(bracket), delay, meta])
 				if !Keylogger.synth_active {
 						try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
 				} else {

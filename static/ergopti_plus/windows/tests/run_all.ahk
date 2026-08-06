@@ -234,6 +234,11 @@ InstallSendNoOps()
 #Include unit/test_personal_info_mask_vectors.ahk
 #Include unit/test_personal_info_tags_single_source.ahk
 #Include unit/test_preview_provider_at_triggers.ahk
+; The fire-time @-combo resolver that replaced the hand-written list of
+; thirty-one registrations. It lives in hotstring_engine_main.ahk (loaded above)
+; and reads only globals, so the tests drive the REAL function against fixture
+; personal-info maps rather than asserting on its source.
+#Include unit/test_personal_info_combo_resolver.ahk
 #Include unit/test_master_gates.ahk
 #Include unit/test_domain_registry.ahk
 #Include unit/test_domain_expander.ahk
@@ -404,6 +409,29 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 ; is armed by a timer from KL_Init, which the runner never calls.
 #Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
+; keylogger_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
+; can carry the user's personal data. It was split out of keylogger.ahk (which
+; installs OS hooks at load and can never be included here) precisely so this
+; runner can drive the REAL function against the recording KL_AppendLog /
+; KL_Roi_OnHotstring / WPMWidget_Push stubs in test_stubs.ahk. Asserting on a
+; test-built copy of the row would have passed against the leaking code.
+#Include ../modules/keylogger/keylogger_hotstring_log.ahk
+; keylogger_hook.ahk holds the OTHER sink that can carry the user's personal
+; data: the per-keystroke typing buffer. The InputHook observes the driver's own
+; auto-typed expansions, so an @iban★ fire reaches KL_Hook_OnChar character by
+; character ~90 ms before the redacted hotstring row is written. The file is
+; class + function definitions only (the InputHook is created inside
+; KL_Hook_Start, which the runner never calls), so the real callbacks can be
+; driven headless and the buffer they fill read straight back — the previous
+; test asserted only on KL_LogHotstring's row and missed this one entirely.
+#Include ../modules/keylogger/keylogger_hook.ahk
+#Include unit/test_hotstring_fire_log_privacy.ahk
+#Include unit/test_synthetic_typing_row_privacy.ahk
+; The near-miss row — the third persisted sink, and the one that had no privacy
+; concept at all. _CheckNearMiss lives in hotstring_inputhook.ahk, which the
+; prefix-watcher shim above already loads, so these drive the REAL function
+; against the recording KL_AppendLog stub rather than a copy of its row.
+#Include unit/test_near_miss_row_privacy.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk

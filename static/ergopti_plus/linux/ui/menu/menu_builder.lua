@@ -1458,23 +1458,11 @@ local function _manifest_metrics_rows(ctx, k)
 			items[#items + 1] = row("show_apps", i18n_safe("menu.metrics.show_apps"), false,
 				open_window("metrics_apps"))
 		end,
-		filter_private = function(items)
-			items[#items + 1] = row("filter_private", i18n_safe("menu.metrics.filter_private"),
-				ManifestMenu.resolve_checked_when("metrics_menu", "filter_private", getters),
-				toggle("private_filter_enabled", k.set_private_filter_enabled))
-		end,
-		filter_secure = function(items)
-			-- Was hardcoded French here, shown to every locale. The key exists in all
-			-- 21 catalogues and always did; nothing was reading it.
-			items[#items + 1] = row("filter_secure", i18n_safe("menu.metrics.filter_secure"),
-				ManifestMenu.resolve_checked_when("metrics_menu", "filter_secure", getters),
-				toggle("secure_filter_enabled", k.set_secure_filter_enabled))
-		end,
-		filter_sysauth = function(items)
-			items[#items + 1] = row("filter_sysauth", i18n_safe("menu.metrics.filter_sysauth"),
-				ManifestMenu.resolve_checked_when("metrics_menu", "filter_sysauth", getters),
-				toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled))
-		end,
+		-- The three privacy filters are gone from this table on purpose: their
+		-- manifest rows are `type = "check"` now, so the SHARED renderer builds
+		-- them from the declaration and this driver supplies only the behaviour,
+		-- through `ctx.commands` below. Three fewer rows built here, and the tick
+		-- is the tray's own check item instead of a " ✓" glued to the title.
 		encryption = function(items)
 			-- Read from state rather than resolved: unlike the three filters above,
 			-- this manifest row declares no checked_when. Every driver therefore
@@ -1486,7 +1474,24 @@ local function _manifest_metrics_rows(ctx, k)
 		end,
 	}
 
-	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, ctx)
+	-- The declarative rows read their state and their behaviour off the context:
+	-- `state_getters` answers the manifest's checked_when / disabled_when keys,
+	-- `commands` answers its `command` (defaulting to the row id). Passing them
+	-- on a COPY of ctx keeps the caller's table untouched — the same ctx is
+	-- handed to every other submenu builder in this file.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.state_getters = getters
+	-- Bracketed keys on purpose: the bijection gate resolves "does this driver
+	-- handle the row" by looking for the quoted id, and a bare key is invisible
+	-- to it — which would report three declared rows as unhandled while they work.
+	render_ctx.commands = {
+		["filter_private"] = toggle("private_filter_enabled", k.set_private_filter_enabled),
+		["filter_secure"]  = toggle("secure_filter_enabled", k.set_secure_filter_enabled),
+		["filter_sysauth"] = toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled),
+	}
+
+	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx)
 end
 
 --- Builds the metrics submenu, with the rows the manifest describes rendered by
@@ -2338,36 +2343,74 @@ local function _build_quit(ctx)
 end
 
 --- Builds the debug submenu.
+--- The log levels the debug submenu offers, in increasing severity.
+---
+--- Not translated: DEBUG / INFO / WARNING / ERROR are the tokens the logger
+--- itself prints and the user greps for, so a localised menu label would name
+--- something that appears nowhere in the file it filters.
+local DEBUG_LOG_LEVELS = { "DEBUG", "INFO", "WARNING", "ERROR" }
+
+--- Builds the debug submenu from the shared manifest.
+---
+--- WHAT THIS REPLACED. Three rows written out by hand, while the manifest
+--- declared five for this platform: `open_today_log` and `open_error_log` were
+--- described in `debug_menu`, translated in all 21 locales, offered on Windows
+--- and macOS, and simply absent here. Nothing reported it, because a driver that
+--- does not read a manifest section cannot notice a row it does not build.
+---
+--- Windows and macOS each have their OWN reader for this same section
+--- (`infra/menu_manifest.ahk`, `ui/menu/builder.lua`) and key on `id` alone, so
+--- typing the rows costs them nothing and buys this driver the shared renderer.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
 local function _build_debug(ctx)
-	local log_levels = { "DEBUG", "INFO", "WARNING", "ERROR" }
-	local level_items = {}
-	for _, lvl in ipairs(log_levels) do
-		level_items[#level_items + 1] = {
-			title = lvl,
-			fn = function()
-				if ctx.on_set_log_level then ctx.on_set_log_level(lvl) end
-			end,
-		}
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the debug submenu loses its declared rows.")
+		return { title = i18n_safe("menu.debug.title"), menu = {} }
 	end
 
-	return { title = i18n_safe("menu.debug.title"), menu = {
-		{
-			title = i18n_safe("menu.debug.log_level"),
-			menu = level_items,
-		},
-		{
-			title = i18n_safe("menu.debug.open_logs"),
-			fn = function()
-				if ctx.on_open_logs then ctx.on_open_logs() end
-			end,
-		},
-		{
-			title = i18n_safe("menu.debug.healthcheck"),
-			fn = function()
-				if ctx.on_healthcheck then ctx.on_healthcheck() end
-			end,
-		},
-	}}
+	--- Calls one of the context's optional callbacks, saying so when it is absent.
+	--- @param name string The ctx field to invoke.
+	--- @return function
+	local function call_ctx(name)
+		return function()
+			if type(ctx[name]) ~= "function" then
+				Logger.error(LOG, "Debug menu: ctx.%s is absent — the row does nothing.", name)
+				return
+			end
+			ctx[name]()
+		end
+	end
+
+	-- Bracketed key on purpose: it is what makes the id greppable, and the
+	-- coverage gate that pairs every declared `list` with a provider resolves
+	-- them by exactly that spelling.
+	local providers = {
+		["log_level"] = function()
+			local rows = {}
+			for _, level in ipairs(DEBUG_LOG_LEVELS) do
+				rows[#rows + 1] = {
+					label  = level,
+					action = function()
+						if type(ctx.on_set_log_level) == "function" then ctx.on_set_log_level(level) end
+					end,
+				}
+			end
+			return { { label = i18n_safe("menu.debug.log_level"), items = rows } }
+		end,
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["open_logs"]      = call_ctx("on_open_logs"),
+		["open_today_log"] = call_ctx("on_open_today_log"),
+		["open_error_log"] = call_ctx("on_open_error_log"),
+		["healthcheck"]    = call_ctx("on_healthcheck"),
+	}
+
+	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)
+	return { title = i18n_safe("menu.debug.title"), menu = rows }
 end
 
 
