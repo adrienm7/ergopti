@@ -95,7 +95,12 @@ const OPENS_SUBMENU = {
 	// having to repeat it — the same reason tap_holds_menu's children do not each
 	// carry "Windows only".
 	kanata: 'kanata_menu',
-	updates: 'updates_menu'
+	updates: 'updates_menu',
+	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
+	// top-level row has existed on all three drivers since the feature shipped
+	// and each built the submenu beneath it by hand, so the section and its six
+	// subsections described capabilities with no rows behind them.
+	llm: 'llm_menu'
 };
 
 const errors = [];
@@ -466,7 +471,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // `list` providers. Routing a menu through the renderer and moving its rows out of the
 // driver are two different things, and only the second one moves the bypass
 // ratchet — this number counts the first.
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 7 };
+const RENDERED_THROUGH_SHARED = { hs: 4, linux: 8 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

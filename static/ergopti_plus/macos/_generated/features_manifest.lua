@@ -31,7 +31,7 @@ M.sections = {
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs" }, subsections = {  } },
-	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -296,25 +296,25 @@ M.features = {
 		path = "llm.display.streaming_multi", id = "streaming_multi", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.streaming_multi", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.generation.context_length", id = "context_length", section = "llm.generation", default = 500, type = "number", description_key = "menu.llm.generation.context_length", platforms = { "ahk", "hs" },
+		path = "llm.generation.context_length", id = "context_length", section = "llm.generation", default = 500, type = "number", description_key = "menu.llm.generation.context_length", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.min_words", id = "min_words", section = "llm.generation", default = 3, type = "number", description_key = "menu.llm.generation.min_words", platforms = { "ahk", "hs" },
+		path = "llm.generation.min_words", id = "min_words", section = "llm.generation", default = 3, type = "number", description_key = "menu.llm.generation.min_words", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.max_words", id = "max_words", section = "llm.generation", default = 15, type = "number", description_key = "menu.llm.generation.max_words", platforms = { "ahk", "hs" },
+		path = "llm.generation.max_words", id = "max_words", section = "llm.generation", default = 15, type = "number", description_key = "menu.llm.generation.max_words", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.temperature", id = "temperature", section = "llm.generation", default = 0.1, type = "number", description_key = "menu.llm.generation.temperature", platforms = { "ahk", "hs" },
+		path = "llm.generation.temperature", id = "temperature", section = "llm.generation", default = 0.1, type = "number", description_key = "menu.llm.generation.temperature", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.auto_raise_temp", id = "auto_raise_temp", section = "llm.generation", default = true, type = "boolean", description_key = "menu.llm.generation.auto_raise_temp", platforms = { "ahk", "hs" },
+		path = "llm.generation.auto_raise_temp", id = "auto_raise_temp", section = "llm.generation", default = true, type = "boolean", description_key = "menu.llm.generation.auto_raise_temp", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.reset_on_nav", id = "reset_on_nav", section = "llm.generation", default = true, type = "boolean", description_key = "menu.llm.generation.reset_on_nav", platforms = { "ahk", "hs" },
+		path = "llm.generation.reset_on_nav", id = "reset_on_nav", section = "llm.generation", default = true, type = "boolean", description_key = "menu.llm.generation.reset_on_nav", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.generation.sequential_mode", id = "sequential_mode", section = "llm.generation", default = false, type = "boolean", description_key = "menu.llm.generation.sequential_mode", platforms = { "ahk", "hs" },
+		path = "llm.generation.sequential_mode", id = "sequential_mode", section = "llm.generation", default = false, type = "boolean", description_key = "menu.llm.generation.sequential_mode", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.models.selected", id = "selected", section = "llm.models", default = "mlx", type = "string", description_key = "menu.llm.models.selected", platforms = { "ahk", "hs", "linux" },

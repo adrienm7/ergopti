@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "ليس على Linux: يفتح هذا الصف ملف الاختصارات الشخصية. لدى macOS وWindows ملف كهذا؛ أما مشغّل Linux فاختصاراته مفاتيح تبديل وتحويلات للنص المحدد، دون أي ملف على القرص لتحريره.",
 	"platform_reason.libinput_reader_is_linux_only": "قراءة libinput — على لينكس فقط",
 	"metrics_apps.chart_time_series": "الوقت",
-	"metrics_apps.edit_category_hint": "تعديل الفئة"
+	"metrics_apps.edit_category_hint": "تعديل الفئة",
+	"menu.llm.generation.temperature": "درجة الحرارة",
+	"menu.llm.generation.context_length": "طول السياق"
 }

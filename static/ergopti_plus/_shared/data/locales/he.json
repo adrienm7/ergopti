@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
 	"metrics_apps.chart_time_series": "זמן",
-	"metrics_apps.edit_category_hint": "עריכת קטגוריה"
+	"metrics_apps.edit_category_hint": "עריכת קטגוריה",
+	"menu.llm.generation.temperature": "טמפרטורה",
+	"menu.llm.generation.context_length": "אורך ההקשר"
 }

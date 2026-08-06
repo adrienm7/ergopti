@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Não em Linux: esta linha abre o ficheiro de atalhos pessoais. macOS e Windows têm um; os atalhos do controlador Linux são interruptores e transformações da seleção, sem qualquer ficheiro para editar.",
 	"platform_reason.libinput_reader_is_linux_only": "Leitura libinput — apenas no Linux",
 	"metrics_apps.chart_time_series": "Tempo",
-	"metrics_apps.edit_category_hint": "Editar categoria"
+	"metrics_apps.edit_category_hint": "Editar categoria",
+	"menu.llm.generation.temperature": "Temperatura",
+	"menu.llm.generation.context_length": "Comprimento do contexto"
 }

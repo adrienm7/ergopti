@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Inte på Linux: raden öppnar filen med personliga genvägar. macOS och Windows har var sin; Linux-drivrutinens genvägar är växlar och markeringsomvandlingar, utan någon fil att redigera.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-läsning — endast på Linux",
 	"metrics_apps.chart_time_series": "Tid",
-	"metrics_apps.edit_category_hint": "Redigera kategori"
+	"metrics_apps.edit_category_hint": "Redigera kategori",
+	"menu.llm.generation.temperature": "Temperatur",
+	"menu.llm.generation.context_length": "Kontextlängd"
 }

@@ -255,6 +255,15 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 
+[llm.generation]
+context_length = 500
+min_words = 3
+max_words = 15
+temperature = 0.1
+auto_raise_temp = true
+reset_on_nav = true
+sequential_mode = false
+
 [llm.models]
 selected = "ollama"
 ollama = "Qwen3.5-0.8B"

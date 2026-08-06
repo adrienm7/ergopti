@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Niet op Linux: deze rij opent het bestand met persoonlijke sneltoetsen. macOS en Windows hebben er elk een; de sneltoetsen van de Linux-driver zijn schakelaars en selectiebewerkingen, zonder bestand om te bewerken.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-lezen — alleen op Linux",
 	"metrics_apps.chart_time_series": "Tijd",
-	"metrics_apps.edit_category_hint": "Categorie bewerken"
+	"metrics_apps.edit_category_hint": "Categorie bewerken",
+	"menu.llm.generation.temperature": "Temperatuur",
+	"menu.llm.generation.context_length": "Contextlengte"
 }

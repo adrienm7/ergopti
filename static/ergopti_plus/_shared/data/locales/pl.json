@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nie w Linuksie: ten wiersz otwiera plik skrótów osobistych. macOS i Windows taki plik mają; skróty sterownika linuksowego to przełączniki i przekształcenia zaznaczenia, bez pliku do edycji.",
 	"platform_reason.libinput_reader_is_linux_only": "Odczyt libinput — tylko w systemie Linux",
 	"metrics_apps.chart_time_series": "Czas",
-	"metrics_apps.edit_category_hint": "Edytuj kategorię"
+	"metrics_apps.edit_category_hint": "Edytuj kategorię",
+	"menu.llm.generation.temperature": "Temperatura",
+	"menu.llm.generation.context_length": "Długość kontekstu"
 }

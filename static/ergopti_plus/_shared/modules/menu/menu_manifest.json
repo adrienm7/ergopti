@@ -166,6 +166,19 @@
 			]
 		}
 	],
+	"llm_menu": [
+		{
+			"type": "list",
+			"id": "llm_models"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "llm_generation"
+		}
+	],
 	"updates_menu": [
 		{
 			"type": "list",

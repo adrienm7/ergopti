@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 읽기 — Linux 전용",
 	"metrics_apps.chart_time_series": "시간",
-	"metrics_apps.edit_category_hint": "카테고리 편집"
+	"metrics_apps.edit_category_hint": "카테고리 편집",
+	"menu.llm.generation.temperature": "온도",
+	"menu.llm.generation.context_length": "컨텍스트 길이"
 }
