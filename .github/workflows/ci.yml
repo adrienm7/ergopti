@@ -1163,6 +1163,14 @@ jobs:
           echo "RPM: $built ($(du -h "$built" | cut -f1))"
           rpm -qip "$built"
           rpm -qlp "$built" | head -20
+          cp "$built" build/linux/ergopti-smoke.rpm
+
+      - name: Upload the .rpm for the install-and-launch job
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-linux-rpm
+          retention-days: 1
+          path: build/linux/ergopti-smoke.rpm
 
   # ─────────────────────────────────────────────────
   # 4.5) Build the AppImage, for real
@@ -1221,27 +1229,30 @@ jobs:
               exit 1
           fi
           echo "AppImage: $built ($(du -h "$built" | cut -f1))"
+          mv "$built" build/linux/ergopti-smoke.AppImage
+
+      - name: Upload the AppImage for the install-and-launch job
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-linux-appimage
+          retention-days: 1
+          path: build/linux/ergopti-smoke.AppImage
 
   # ─────────────────────────────────────────────────
-  # 4.6) Validate the Flatpak structure
+  # 4.6) Build the Flatpak bundle, for real
   # ─────────────────────────────────────────────────
-  # STRUCTURE ONLY, AND SAID SO PLAINLY. A real flatpak-builder run here would
-  # have to install flatpak and flatpak-builder, pull org.freedesktop.Platform
-  # and .Sdk //24.08 from Flathub — well over a gigabyte — and then compile
-  # LuaJIT from git inside the sandbox; flatpak-builder also needs unprivileged
-  # user namespaces, which Ubuntu restricts through AppArmor by default on the
-  # runner image. That is not a build a stock runner completes reliably, and a
-  # release must not hang on a Flathub mirror.
+  # This job used to run --skip-flatpak and validate the manifest without ever
+  # building it, on the reasoning that a stock runner could not: flatpak-builder
+  # needs unprivileged user namespaces, which Ubuntu 24.04 restricts through
+  # AppArmor on the runner image, and the build pulls the freedesktop runtime and
+  # SDK from Flathub before compiling LuaJIT from git inside the sandbox.
   #
-  # So this job runs the packager with --skip-flatpak. What it PROVES: the
-  # manifest, the payload, the wrapper, the desktop entry and the AppStream
-  # metadata are all generated, the driver and the shared data tree are staged
-  # where the manifest installs them, and the three generated files agree on the
-  # app id. What it does NOT prove: that the bundle builds. No .flatpak is
-  # produced and none is attached to the release — the notes send Flatpak users
-  # to the script instead of to an asset that does not exist.
+  # The namespace restriction is one sysctl. The Flathub pull is slow, not
+  # impossible. So the bundle is built here, because "we validated the manifest"
+  # is exactly the claim the .deb and .rpm jobs were making right up until the
+  # first real install found a package that could not start.
   build-flatpak:
-    name: 'Linux · Flatpak structure'
+    name: 'Linux · Flatpak package'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
 
@@ -1253,11 +1264,36 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Install flatpak and lift the namespace restriction
+        # flatpak-builder sandboxes each build step with bubblewrap, which needs
+        # an unprivileged user namespace. Ubuntu 24.04 denies that by default
+        # through AppArmor, and the failure surfaces as an opaque bwrap error
+        # rather than as a permission decision — hence setting it explicitly, and
+        # tolerating a kernel that has no such knob.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
+              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
+          flatpak --version
+          flatpak-builder --version
+
+      - name: Add Flathub and pull the runtime
+        # The one genuinely slow step: the runtime and SDK are a large download.
+        # A failure here is a real failure — better a red job naming a Flathub
+        # outage than a green one that quietly built nothing.
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+          flatpak list --user
+
       - name: Assemble Linux driver bundle
         run: bash tools/build/build-linux-driver.sh --skip-smoke
 
-      - name: Generate and validate the Flatpak structure
-        run: bash tools/build/build-linux-flatpak.sh --skip-flatpak
+      - name: Build the Flatpak
+        run: bash tools/build/build-linux-flatpak.sh
 
       - name: The staged payload carries the driver and the shared data tree
         # The packager checks its own manifest; this checks the payload, which is
@@ -1278,6 +1314,26 @@ jobs:
           done
           exit $fail
 
+      - name: A .flatpak bundle was actually produced
+        # The packager exits 0 with only the manifest staged when flatpak-builder
+        # is absent. Demanding the file is what stops that reading as a build.
+        run: |
+          set -euo pipefail
+          built=$(find build/linux -maxdepth 1 -name '*.flatpak' -type f | head -1)
+          if [ -z "$built" ]; then
+              echo "::error::build-linux-flatpak.sh staged a manifest but produced no bundle."
+              exit 1
+          fi
+          echo "Flatpak: $built ($(du -h "$built" | cut -f1))"
+          mv "$built" build/linux/ergopti-smoke.flatpak
+
+      - name: Upload the bundle for the install-and-launch job
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-linux-flatpak
+          retention-days: 1
+          path: build/linux/ergopti-smoke.flatpak
+
   # ─────────────────────────────────────────────────
   # 4.7) Install the .deb and launch what it installed
   # ─────────────────────────────────────────────────
@@ -1296,6 +1352,8 @@ jobs:
     needs: [build-deb]
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download the .deb built above
         uses: actions/download-artifact@v4
         with:
@@ -1349,101 +1407,23 @@ jobs:
           /usr/bin/ergopti --help
 
       - name: The installed shared data tree resolves and opens
-        # --help on its own would be a false green. It proves `require` works,
-        # which the wrapper's LUA_PATH sees to, and proves nothing about the DATA
-        # tree — infra/paths.lua resolves that separately, by probing the disk.
-        # An installed package nests _shared INSIDE the driver root; a resolver
-        # that only knew the checkout's sibling layout returned nil there and
-        # silently took out every locale, keycode table, hotstring pack, tooltip
-        # config and defaults file while the daemon still started and still
-        # printed its usage. So: assert the resolved root, then read through it.
-        timeout-minutes: 3
+        # --help returns before doing any work, so it proves the require graph
+        # and nothing about the DATA tree — which is where the defect that
+        # motivated this whole job actually lived. The check is a tracked file
+        # rather than a heredoc because five formats run it.
+        #
+        # LUA_PATH is replayed from the INSTALLED wrapper rather than re-typed,
+        # so this cannot pass against a path the wrapper does not set.
         run: |
           set -euo pipefail
-          # Replayed from the INSTALLED wrapper rather than re-typed, so this
-          # check cannot pass against a LUA_PATH the wrapper does not set.
           eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
           if [ -z "${LUA_PATH:-}" ]; then
               echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
               exit 1
           fi
           echo "LUA_PATH from the installed wrapper: $LUA_PATH"
-
-          cat > "$RUNNER_TEMP/installed_layout_check.lua" << 'LUA_EOF'
-          -- Runs against a real .deb install, through the wrapper's own LUA_PATH.
-          -- Indented with spaces rather than tabs because it lives inside a YAML
-          -- block scalar.
-
-          -- The daemon installs this before its first shared require; mirror it so
-          -- a module that expects utf8 under LuaJIT is not the thing that fails.
-          local ok_compat, compat = pcall(require, "compat.utf8")
-          if ok_compat then pcall(compat.install) end
-
-          local EXPECTED_ROOT = "/usr/lib/ergopti/_shared"
-
-          local Paths = require("infra.paths")
-          local root = Paths.shared_root()
-          if not root then
-              print("FAIL: infra.paths could not resolve the shared tree from the installed driver.")
-              os.exit(1)
-          end
-          print("shared_root() -> " .. root)
-          if root ~= EXPECTED_ROOT then
-              print("FAIL: expected " .. EXPECTED_ROOT .. " — the packaged layout moved.")
-              os.exit(1)
-          end
-
-          -- One file from each tree the driver reads, because they are copied by
-          -- four separate stanzas in the packager and any one of them can be lost.
-          local REQUIRED = {
-              "data/locales/en.json",
-              "data/locales/fr.json",
-              "data/keycodes/evdev.json",
-              "modules/llm/defaults.json",
-              "modules/timings/constants.toml",
-          }
-          local missing = 0
-          for _, rel in ipairs(REQUIRED) do
-              local abs = Paths.shared(rel)
-              local fh = abs and io.open(abs, "r")
-              if fh then
-                  fh:close()
-                  print("OK   " .. abs)
-              else
-                  print("FAIL " .. tostring(abs))
-                  missing = missing + 1
-              end
-          end
-          if missing > 0 then
-              print("FAIL: " .. missing .. " shared data file(s) unreadable from the installed package.")
-              os.exit(1)
-          end
-
-          -- The symptom the resolver defect actually produced: the language menu
-          -- offered 2 rows out of the 21 locales that ship, because the scan ran
-          -- against a directory that did not exist and the {"en","fr"} fallback
-          -- took over. Nothing failed; the menu simply had two rows.
-          local MIN_LOCALES = 10
-          local ok_i18n, i18n = pcall(require, "infra.i18n")
-          if not ok_i18n then
-              print("FAIL: infra.i18n could not be loaded: " .. tostring(i18n))
-              os.exit(1)
-          end
-          local ok_list, locales = pcall(i18n.list_locales)
-          if not ok_list or type(locales) ~= "table" then
-              print("FAIL: i18n.list_locales() raised: " .. tostring(locales))
-              os.exit(1)
-          end
-          print("locales discovered: " .. #locales)
-          if #locales < MIN_LOCALES then
-              print("FAIL: only " .. #locales .. " locale(s) — the fallback list took over, so the shared tree is not being read.")
-              os.exit(1)
-          end
-
-          print("Installed layout OK.")
-          LUA_EOF
-
-          luajit "$RUNNER_TEMP/installed_layout_check.lua"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              /usr/lib/ergopti/_shared
 
   # ─────────────────────────────────────────────────
   # 4.8) Gate: Linux driver fully green
@@ -1453,6 +1433,241 @@ jobs:
   # and a job added to one but not the other runs and gates nothing. That is
   # exactly what build-deb and build-rpm were: no job listed them, so a broken
   # package still shipped a release. Anything added to section 4 goes in BOTH.
+  # ─────────────────────────────────────────────────
+  # 4.8) Install the .rpm and launch what it installed
+  # ─────────────────────────────────────────────────
+  # In a Fedora container, because ubuntu-latest cannot install an .rpm and a
+  # conversion through alien would be testing alien. dnf resolves the same
+  # dependencies a Fedora user's would.
+  smoke-rpm-install:
+    name: 'Linux · install the .rpm and launch it'
+    runs-on: ubuntu-latest
+    needs: [build-rpm]
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Tools the job itself needs
+        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
+        # so letting dnf resolve it from the package is what proves that
+        # declaration is right. Pre-installing it would hide a wrong Requires.
+        # git is for actions/checkout, findutils for the `find` below.
+        run: dnf install -y git findutils
+
+      - uses: actions/checkout@v4
+
+      - name: Download the .rpm built above
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-linux-rpm
+          path: pkg
+
+      - name: Install it the way a user would
+        run: |
+          set -euo pipefail
+          rpm=$(find pkg -name '*.rpm' -type f | head -1)
+          if [ -z "$rpm" ]; then
+              echo "::error::the ci-linux-rpm artifact contains no .rpm."
+              exit 1
+          fi
+          dnf install -y "./$rpm"
+          rpm -q ergopti
+
+      - name: Launch the installed binary
+        run: /usr/bin/ergopti --help
+
+      - name: The installed shared data tree resolves and opens
+        run: |
+          set -euo pipefail
+          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
+          if [ -z "${LUA_PATH:-}" ]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
+              exit 1
+          fi
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              /usr/lib/ergopti/_shared
+
+  # ─────────────────────────────────────────────────
+  # 4.9) Run the AppImage
+  # ─────────────────────────────────────────────────
+  # An AppImage is not installed; running it IS the install. It mounts itself
+  # with FUSE, which this runner does not have, so it is unpacked with the
+  # --appimage-extract escape hatch the format provides for exactly this.
+  # AppRun is then the same entry point a user's double-click reaches.
+  smoke-appimage-run:
+    name: 'Linux · run the AppImage'
+    runs-on: ubuntu-latest
+    needs: [build-appimage]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the AppImage built above
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-linux-appimage
+          path: pkg
+
+      - name: Unpack it (no FUSE on this runner)
+        run: |
+          set -euo pipefail
+          img=$(find pkg -name '*.AppImage' -type f | head -1)
+          if [ -z "$img" ]; then
+              echo "::error::the ci-linux-appimage artifact contains no .AppImage."
+              exit 1
+          fi
+          chmod +x "$img"
+          "./$img" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+
+      - name: Launch it
+        # Explicitly --help: AppRun appends --tray when given no arguments, and
+        # there is no display here for a tray to appear in.
+        run: ./squashfs-root/AppRun --help
+
+      - name: The bundled shared data tree resolves and opens
+        # The AppImage is relocatable, so its root is wherever it was unpacked —
+        # which is the point of checking it here rather than assuming a prefix.
+        run: |
+          set -euo pipefail
+          root="$(pwd)/squashfs-root/usr/lib/ergopti"
+          export LUA_PATH="$root/?.lua;$root/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
+  # ─────────────────────────────────────────────────
+  # 4.10) Install the Flatpak and launch it
+  # ─────────────────────────────────────────────────
+  # The sandboxed path. `flatpak run` is what a user's launcher invokes, and it
+  # is the only one of the five that executes inside the confinement the
+  # manifest declares — so a permission the driver needs and the manifest forgot
+  # shows up here rather than on a user's machine.
+  smoke-flatpak-run:
+    name: 'Linux · install the Flatpak and launch it'
+    runs-on: ubuntu-latest
+    needs: [build-flatpak]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak and lift the namespace restriction
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y flatpak
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
+              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
+
+      - name: Download the bundle built above
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-linux-flatpak
+          path: pkg
+
+      - name: Install it the way a user would
+        run: |
+          set -euo pipefail
+          bundle=$(find pkg -name '*.flatpak' -type f | head -1)
+          if [ -z "$bundle" ]; then
+              echo "::error::the ci-linux-flatpak artifact contains no bundle."
+              exit 1
+          fi
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08
+          flatpak install --user -y --bundle "$bundle"
+          flatpak list --user --app
+
+      - name: Launch it
+        run: flatpak run --user org.ergopti.Ergopti --help
+
+      - name: The sandboxed shared data tree resolves and opens
+        # Run INSIDE the sandbox with --command, so this reads /app exactly as
+        # the daemon does. The check script is bound in read-only from the
+        # checkout because the package deliberately ships no tests.
+        run: |
+          set -euo pipefail
+          check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
+          flatpak run --user \
+              --filesystem="$check_dir:ro" \
+              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
+              --command=luajit org.ergopti.Ergopti \
+              "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
+
+  # ─────────────────────────────────────────────────
+  # 4.11) Install the tarball with install.sh and launch it
+  # ─────────────────────────────────────────────────
+  # The no-root path the release notes point every other distribution at. It is
+  # the only format whose installer is our own script rather than a package
+  # manager, so it is the only one where a broken install.sh is invisible
+  # everywhere else. --no-deps because the runner has what it needs and the
+  # dependency install is the distro matrix's job, not this one's.
+  smoke-tarball-install:
+    name: 'Linux · install the tarball and launch it'
+    runs-on: ubuntu-latest
+    needs: [e2e-linux]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
+
+      - name: Assemble and pack the bundle exactly as the release does
+        run: |
+          set -euo pipefail
+          bash tools/build/build-linux-driver.sh --skip-smoke
+          tar -czf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" \
+              -C build/linux linux _shared bin install.sh kanata.kbd
+          tar -tzf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" | wc -l
+
+      - name: Unpack and install it the way a user would
+        # --no-deps because package installs are the distro matrix's job, and
+        # --no-service because a runner has no user session bus for a
+        # systemd --user unit to register with. The permission setup DOES run:
+        # it is the half every packaged format leaves to install.sh, so skipping
+        # it would leave the one script nobody else exercises unexercised.
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar -xzf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" -C "$RUNNER_TEMP/unpacked"
+          cd "$RUNNER_TEMP/unpacked"
+          test -f install.sh
+          bash install.sh --no-deps --no-service || {
+              echo "::error::install.sh failed on a clean unpack of the release tarball."
+              exit 1
+          }
+
+      - name: Launch what it installed
+        run: |
+          set -euo pipefail
+          launcher="$HOME/.local/bin/ergopti-hotstrings"
+          if [ ! -x "$launcher" ]; then
+              echo "::error::install.sh left no executable launcher at $launcher"
+              ls -la "$HOME/.local/bin" || true
+              exit 1
+          fi
+          "$launcher" --help
+
+      - name: The installed shared data tree resolves and opens
+        run: |
+          set -euo pipefail
+          root="$HOME/.local/lib/ergopti"
+          if [ ! -d "$root/linux" ]; then
+              echo "::error::no driver tree at $root/linux — install.sh moved its install root."
+              ls -la "$root" || true
+              exit 1
+          fi
+          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
   linux-ok:
     name: 'Linux · ✅ all green'
     runs-on: ubuntu-latest
@@ -1465,37 +1680,43 @@ jobs:
       - build-appimage
       - build-flatpak
       - smoke-deb-install
+      - smoke-rpm-install
+      - smoke-appimage-run
+      - smoke-flatpak-run
+      - smoke-tarball-install
     if: always()
 
     steps:
       - name: Assert all Linux jobs passed
+        # The verdict is derived from `needs` itself. It used to name every
+        # dependency THREE times — once in needs, once in the loop, once in the
+        # summary — and a job added to the first list but not the second ran
+        # without gating anything, which is how the packaging jobs sat outside
+        # this gate while looking like part of it. One list now, and it is the
+        # one GitHub actually schedules from.
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          failed=0
-          for job_result in "${{ needs.test-linux.result }}" \
-                            "${{ needs.install-linux-distros.result }}" \
-                            "${{ needs.e2e-linux.result }}" \
-                            "${{ needs.build-deb.result }}" \
-                            "${{ needs.build-rpm.result }}" \
-                            "${{ needs.build-appimage.result }}" \
-                            "${{ needs.build-flatpak.result }}" \
-                            "${{ needs.smoke-deb-install.result }}"; do
-              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
-                  failed=1
-              fi
-          done
-          echo "  test-linux            : ${{ needs.test-linux.result }}"
-          echo "  install-linux-distros : ${{ needs.install-linux-distros.result }}"
-          echo "  e2e-linux             : ${{ needs.e2e-linux.result }}"
-          echo "  build-deb             : ${{ needs.build-deb.result }}"
-          echo "  build-rpm             : ${{ needs.build-rpm.result }}"
-          echo "  build-appimage        : ${{ needs.build-appimage.result }}"
-          echo "  build-flatpak         : ${{ needs.build-flatpak.result }}"
-          echo "  smoke-deb-install     : ${{ needs.smoke-deb-install.result }}"
-          if [[ $failed -eq 1 ]]; then
-              echo "Linux driver: one or more jobs failed."
+          set -euo pipefail
+          total=$(echo "$NEEDS" | jq -r 'length')
+          if [ "$total" -lt 2 ]; then
+              echo "::error::linux-ok read $total dependency result(s) — this gate is asserting nothing."
               exit 1
           fi
-          echo "Linux driver: all jobs passed (or skipped)."
+
+          failed=0
+          while read -r job result; do
+              printf '  %-24s: %s\n' "$job" "$result"
+              case "$result" in
+                  failure|cancelled) failed=1 ;;
+              esac
+          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
+
+          if [ "$failed" -eq 1 ]; then
+              echo "Linux driver: one or more of the $total jobs failed."
+              exit 1
+          fi
+          echo "Linux driver: all $total job(s) passed (or skipped)."
 
   # =============================================================
   # =============================================================
@@ -2024,18 +2245,25 @@ jobs:
           (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
           sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
           test -x /usr/local/bin/appimagetool
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
+              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
 
-      - name: Build the .deb, the .rpm and the AppImage
-        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild and
-        # appimagetool respectively, which is how three packagers stayed
-        # unexercised while CI reported them green. The AppImage picks up the
-        # luajit installed above and bundles it.
+      - name: Build the .deb, the .rpm, the AppImage and the Flatpak
+        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild,
+        # appimagetool and flatpak-builder respectively, which is how four
+        # packagers stayed unexercised while CI reported them green. The AppImage
+        # picks up the luajit installed above and bundles it; the Flatpak
+        # compiles its own inside the sandbox.
         shell: bash
         run: |
           set -euo pipefail
           bash tools/build/build-linux-deb.sh
           bash tools/build/build-linux-rpm.sh
           bash tools/build/build-linux-appimage.sh
+          bash tools/build/build-linux-flatpak.sh
 
       - name: Rename the packages to their stable asset names
         # Each packager names its output after the version in package.json, which
@@ -2060,6 +2288,8 @@ jobs:
               mv "$found" "$target"
               echo "  $kind -> $target ($(du -h "$target" | cut -f1))"
           }
+          rename_one "$(find build/linux -maxdepth 1 -name '*.flatpak' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-x86_64.flatpak "Flatpak"
           rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
           rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
@@ -2083,6 +2313,7 @@ jobs:
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
             build/linux/ErgoptiPlus-linux-x86_64.AppImage
+            build/linux/ErgoptiPlus-linux-x86_64.flatpak
 
   # ============================================================
   # ============================================================
@@ -2256,6 +2487,7 @@ jobs:
           | [ErgoptiPlus-linux-amd64.deb](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-amd64.deb) | Driver package for Debian, Ubuntu and Mint |
           | [ErgoptiPlus-linux-noarch.rpm](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-noarch.rpm) | Driver package for Fedora, RHEL and openSUSE |
           | [ErgoptiPlus-linux-x86_64.AppImage](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.AppImage) | Portable driver — any distribution, no root required |
+          | [ErgoptiPlus-linux-x86_64.flatpak](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.flatpak) | Sandboxed driver, for a distribution-agnostic install |
           | [ergopti-plus-linux.tar.gz](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ergopti-plus-linux.tar.gz) | Driver bundle with \`install.sh\`, installs under your home directory |
           | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
           | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata configuration, for a Kanata-based remap |
@@ -2264,17 +2496,18 @@ jobs:
           - Debian, Ubuntu, Mint, Pop!_OS, elementary → \`ErgoptiPlus-linux-amd64.deb\`
           - Fedora, RHEL, CentOS, openSUSE, Mageia → \`ErgoptiPlus-linux-noarch.rpm\`
           - Arch, Manjaro, EndeavourOS → build it from \`tools/build/PKGBUILD\` in the repository; no Arch package is attached to this release
-          - Flatpak → build it from \`tools/build/build-linux-flatpak.sh\` in the repository; CI validates that manifest on every push but does not publish a \`.flatpak\` bundle
+          - Flatpak → \`ErgoptiPlus-linux-x86_64.flatpak\`, installed with \`flatpak install --bundle\`. It requests \`--device=all\`, which is the only permission that reaches \`/dev/input\` and \`/dev/uinput\`; the sandbox still cannot grant access your user does not have on the host, so the udev rule in step 2 is required either way
           - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-linux-x86_64.AppImage\` or \`ergopti-plus-linux.tar.gz\`
 
-          > **Alpha.** The Linux driver has never been validated on real hardware. CI proves it installs and starts; everything past that point is unproven.
+          > **Alpha.** The Linux driver has never been validated on real hardware. Every asset above is installed and launched in CI, and the installed layout is checked from inside it — but a runner has no keyboard to grab, no /dev/uinput to write and no display, so capture, injection, the tray and the settings windows are all unproven.
 
           **Installation — app:**
           1. Install the package for your distribution:
           \`\`\`bash
-          sudo apt install ./ErgoptiPlus-linux-amd64.deb     # Debian, Ubuntu, Mint
-          sudo dnf install ./ErgoptiPlus-linux-noarch.rpm    # Fedora, RHEL, openSUSE
-          chmod +x ErgoptiPlus-linux-x86_64.AppImage         # anywhere else, then run it
+          sudo apt install ./ErgoptiPlus-linux-amd64.deb       # Debian, Ubuntu, Mint
+          sudo dnf install ./ErgoptiPlus-linux-noarch.rpm      # Fedora, RHEL, openSUSE
+          flatpak install --bundle ./ErgoptiPlus-linux-x86_64.flatpak   # sandboxed
+          chmod +x ErgoptiPlus-linux-x86_64.AppImage           # anywhere else, then run it
           \`\`\`
           2. Give the daemon access to the keyboard. It reads \`/dev/input/event*\` and writes \`/dev/uinput\`, and a normal user is refused both until a udev rule and the \`input\` and \`uinput\` group memberships exist. Unpack \`ergopti-plus-linux.tar.gz\` and run:
           \`\`\`bash
