@@ -484,36 +484,62 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "healthcheck")
     end)
-    helpers.it("'ready' returns full health status", function()
+    -- These cases used to assert a `modules` table of this bridge's own
+    -- invention. The shared page reads `version, sys, uptime_sec, warn_count,
+    -- err_count, ports_validated, failed_adapters, last_error, recent_issues,
+    -- pause_state, keylogger, llm, layout, hotstrings, logs, config` and found
+    -- none of them, so the window rendered empty while both sides reported
+    -- success. The assertion is now the shared contract itself, which is
+    -- strictly more than the old shape checked: sixteen named fields instead of
+    -- five invented ones.
+    local Snapshot = helpers.load_module("healthcheck.snapshot")
+
+    helpers.it("'ready' answers in the shape the shared page reads", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.modules) == "table")
-      helpers.assert_eq(result.modules.engine.status, "ok")
-      helpers.assert_eq(result.modules.keylogger.status, "ok")
-      helpers.assert_eq(result.modules.keylogger.keystrokes, 42)
-      helpers.assert_eq(result.modules.config.status, "ok")
-      helpers.assert_eq(result.modules.config.mapping_count, 50)
-      helpers.assert_eq(result.modules.config.parse_errors, 2)
-      helpers.assert_eq(result.modules.llm.status, "ok")
-      helpers.assert_eq(result.modules.llm.model, "codellama")
-      helpers.assert_eq(result.modules.layout.layout, "qwerty")
+      local ok, missing = Snapshot.validate_snapshot(result)
+      helpers.assert_true(ok,
+        "the snapshot is missing " .. table.concat(missing or {}, ", ")
+          .. " — the page reads these by name and renders nothing for the ones "
+          .. "it cannot find, which looks like a daemon with no diagnostics "
+          .. "rather than two halves speaking different languages")
     end)
-    helpers.it("'refresh' returns same data", function()
+
+    helpers.it("carries the live figures it was given", function()
+      local result = handler.on_message("ready", state)
+      helpers.assert_eq(result.keylogger.events_session, 42,
+        "the keystroke count must survive the reshape")
+      helpers.assert_eq(result.llm.model, "codellama")
+      helpers.assert_eq(result.hotstrings.personal_count, 50,
+        "the mapping count moved from modules.config to hotstrings, which is "
+          .. "where the page looks for it")
+      helpers.assert_eq(result.layout.ergopti_base, "qwerty")
+    end)
+
+    helpers.it("'refresh' answers in the same shape", function()
       local result = handler.on_message("refresh", state)
-      helpers.assert_eq(result.modules.engine.status, "ok")
+      helpers.assert_true((Snapshot.validate_snapshot(result)),
+        "a refresh that answers a different shape is a window that empties "
+          .. "itself the first time the user asks it to update")
     end)
-    helpers.it("reports missing modules correctly", function()
-      local empty = {}
-      local result = handler.on_message("ready", empty)
-      helpers.assert_eq(result.modules.engine.status, "missing")
-      helpers.assert_eq(result.modules.keylogger.status, "missing")
-      helpers.assert_eq(result.modules.llm.status, "missing")
+
+    helpers.it("still answers the contract with nothing wired at all", function()
+      local result = handler.on_message("ready", {})
+      local ok, missing = Snapshot.validate_snapshot(result)
+      helpers.assert_true(ok,
+        "an unwired daemon is exactly when this window is read, so it must not "
+          .. "be the case that answers only arrive when nothing is wrong: "
+          .. table.concat(missing or {}, ", "))
+      helpers.assert_true(#result.failed_adapters > 0,
+        "and it must SAY that nothing is wired, rather than reporting an empty "
+          .. "failure list that reads as a clean bill of health")
     end)
-    helpers.it("reports disabled LLM correctly", function()
-      local st = build_mock_state()
-      st.llm.is_enabled = function() return false end
-      local result = handler.on_message("ready", st)
-      helpers.assert_eq(result.modules.llm.status, "disabled")
+
+    helpers.it("names the parts that are wired and the parts that are not", function()
+      local result = handler.on_message("ready", state)
+      helpers.assert_true(#result.loaded_adapters > 0,
+        "a report listing no loaded parts on a fully wired daemon is the empty "
+          .. "window in a different disguise")
     end)
   end)
 
