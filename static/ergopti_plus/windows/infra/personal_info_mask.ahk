@@ -1,16 +1,23 @@
 ﻿; infra/personal_info_mask.ahk
 
 ; ==============================================================================
-; MODULE: Personal-Info Preview Masking
+; MODULE: Personal-Info Masking
 ; DESCRIPTION:
-; Turns a personal_info value into what the preview bubble may show. The AHK
-; port of _shared/lua/personal_info/mask.lua — AutoHotkey cannot require the
-; shared Lua, so the ALGORITHM is re-implemented here while the POLICY (which
-; fields are secrets, how much of one stays visible) is read at runtime from
-; _shared/modules/personal_info/fields.toml. The two halves are pinned together
-; by _shared/modules/personal_info/preview_vectors.toml, which every driver's
-; suite replays byte for byte; tests/unit/test_personal_info_mask_vectors.ahk is
-; this driver's consumer of that corpus.
+; Turns a personal_info value into what a NON-TYPING sink may carry — the
+; preview bubble on screen (Section 3) and a persisted metrics record
+; (Section 4). The AHK port of _shared/lua/personal_info/mask.lua — AutoHotkey
+; cannot require the shared Lua, so the ALGORITHM is re-implemented here while
+; the POLICY (which fields are secrets, how much of one stays visible) is read
+; at runtime from _shared/modules/personal_info/fields.toml. The two halves are
+; pinned together by _shared/modules/personal_info/preview_vectors.toml, which
+; every driver's suite replays byte for byte;
+; tests/unit/test_personal_info_mask_vectors.ahk is this driver's consumer of
+; that corpus.
+;
+; The two sinks get DIFFERENT answers on purpose: a bubble is read by the person
+; the value belongs to, so it may reveal a head and a tail; a log is ingested,
+; replicated to every other device and kept for fourteen days, so it may reveal
+; nothing at all.
 ;
 ; FEATURES & RATIONALE:
 ; 1. No private list of secret fields. A driver that keeps its own copy and a
@@ -18,10 +25,10 @@
 ;    second silently reveals the value — which is why the shared declaration
 ;    writes `masked` out both ways, and why nothing here hardcodes which field
 ;    is which.
-; 2. Display only. Nothing in this file touches what gets TYPED: the expansion
-;    is always the complete value, and a preview row is a separate string built
-;    for the tooltip. If this module is ever reached from an injection path the
-;    bug is the call site, not the mask.
+; 2. Never on the typing path. Nothing in this file touches what gets TYPED: the
+;    expansion is always the complete value, and a preview row (or a log field)
+;    is a separate string built for that sink. If this module is ever reached
+;    from an injection path the bug is the call site, not the mask.
 ; 3. Fail CLOSED. An unreadable declaration, a malformed policy, an unknown
 ;    field and a lost field name all mask instead of revealing. Absence is never
 ;    permission — the opposite default reveals whatever a future edit forgets to
@@ -264,9 +271,51 @@ PersonalInfoMaskIsMasked(Field) {
 
 
 
+; ========================================
+; ========================================
+; ======= 4/ Redaction for the log =======
+; ========================================
+; ========================================
+
+; What a PERSISTED record may keep of a private value.
+;
+; The preview mask above reveals a head and a tail so the user can recognise
+; their own value on their own screen. A log has no such reader: today.log is
+; ingested into the metrics store, replicated to every other device and kept for
+; fourteen days, so the only safe answer there is that none of the content
+; survives.
+;
+; The LENGTH does survive — one placeholder per position — because the metrics
+; arithmetic downstream is computed from it (net_saved_chars, one WPM push per
+; character) and dropping it would trade a privacy bug for a metrics bug. The
+; Linux driver's recorded_char() makes exactly this trade, one placeholder per
+; character, and says so at length; this is the same contract on the same data.
+;
+; Counted in UTF-16 code units (StrLen), NOT in characters: the record's own
+; arithmetic is StrLen-based, so a redaction that shortened an astral pair to a
+; single placeholder would leave the row internally inconsistent.
+; @param Value The complete value, as it would be typed.
+; @return A run of PI_MASK_FALLBACK_CHAR of identical StrLen; the input
+;   unchanged when it is not a non-empty string.
+PersonalInfoRedactForLog(Value) {
+	global PI_MASK_FALLBACK_CHAR
+	if (Type(Value) != "String" or Value == "") {
+		return Value
+	}
+	Out := ""
+	Loop StrLen(Value) {
+		Out .= PI_MASK_FALLBACK_CHAR
+	}
+	return Out
+}
+
+
+
+
+
 ; =========================================
 ; =========================================
-; ======= 4/ The shared declaration =======
+; ======= 5/ The shared declaration =======
 ; =========================================
 ; =========================================
 

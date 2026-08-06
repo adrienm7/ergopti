@@ -231,6 +231,14 @@ global HSE_LastEndChar := ""
 ; disabled — typed <x>★ sequences fall through unchanged.
 global HSE_RepeatEnabled := true
 
+; When false the engine-level @-combo resolver (HSE_TryPersonalInfoCombo) is
+; disabled — typed @<letters>★ sequences fall through unchanged. Mirrors
+; HSE_RepeatEnabled: the resolver runs on the keystroke path, so the feature
+; toggle is cached in a global rather than re-read out of the nested Features
+; Map on every magic-key press. Set from the registration pass, which is also
+; what re-runs on a live rebuild.
+global HSE_PersonalInfoCombosEnabled := true
+
 ; Set to true by HSE_FindMatchAtEnd when a NNBSP/NBSP was stripped from the
 ; buffer before matching a typographic end-char (``:`` / `` ; ``). The
 ; dispatcher reads this to add +1 to the BackSpace count so the NNBSP is
@@ -853,6 +861,105 @@ HSE_TryRepeatKey(MagicKey) {
 				Replacement: RepeatChar . RepeatChar,
 				OnlyText:    true,
 				FinalResult: false
+		}
+}
+
+
+; Resolve @<letters>★ to the concatenation of the personal_info fields those
+; letters alias, at FIRE time rather than at registration time.
+;
+; WHY THIS EXISTS: the combos used to be pre-registered, and a pre-registered
+; combo is an enumeration. pattern_max_length is 1 — "increasing it expands
+; memory exponentially", and with thirteen alias letters it does: 169 registrations
+; at length two, 2 197 at three, 28 561 at four. So every multi-letter combo came
+; from a hand-written list of thirty-one calls, and that list was missing @npdt,
+; @nt, and most of the other 28 000. The user typed @npdt, nothing happened, and
+; nothing anywhere said why: the tag resolved letter by letter, the value existed,
+; and the only thing absent was a line in a list.
+;
+; Resolving instead of enumerating costs ONE registration-free code path, makes
+; every combination work — including orders nobody thought to list — and keeps
+; the memory flat. Order is significant for free: @npd and @dpn walk the same
+; letters in different sequence and concatenate their fields in that sequence.
+;
+; PRIORITY: this is a fallback, reached only when no registered trigger claimed
+; the sequence, so the literal tags (@iban★, @tel★) and the dates (@dt★) still
+; win — @dt spells two valid alias letters AND is the short-date trigger, and the
+; registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
+; more specific of the two: @nn★ must expand two fields, not double an "n".
+;
+; SINGLE SOURCE: the tag walk and the letters→fields resolution are the preview's
+; own helpers, not a second copy. The bubble and the expansion answering the same
+; question differently is the exact failure the provider module was written to end.
+;
+; @param MagicKey {String} The user's magic key, i.e. the trigger's last character.
+; @return A transient Spec compatible with HSE_DispatchMatch, or "" when the
+;   buffer does not end with a resolvable @-combo.
+HSE_TryPersonalInfoCombo(MagicKey) {
+		global HSE_Buffer, HSE_Suppressed, HSE_RebuildInProgress
+		global HSE_PersonalInfoCombosEnabled, PersonalInformation, PI_PREVIEW_CATEGORY
+		; Same live-rebuild fence as HSE_TryRepeatKey: while the registry is being
+		; rewritten the matcher answers "" for every sequence, which means "cannot
+		; answer now", not "nothing claims this". Expanding here during that window
+		; would beat a registered tag that is about to come back.
+		if (HSE_RebuildInProgress or HSE_Suppressed or !HSE_PersonalInfoCombosEnabled) {
+				return ""
+		}
+		MkLen := StrLen(MagicKey)
+		BufLen := StrLen(HSE_Buffer)
+		if (MkLen == 0 or BufLen <= MkLen) {
+				return ""
+		}
+		if (SubStr(HSE_Buffer, -MkLen) !== MagicKey) {
+				return ""
+		}
+		; The tag walker reads a buffer that ENDS at the tag, so hand it the buffer
+		; with the magic key removed.
+		Body := SubStr(HSE_Buffer, 1, BufLen - MkLen)
+		Tag := _PIPreviewTrailingTag(Body)
+		if (Tag == "") {
+				return ""
+		}
+		Fields := _PIPreviewFieldsForTag(Tag)
+		if (Fields.Length == 0) {
+				return ""
+		}
+		; A Tab between fields: the values land in consecutive form fields, which is
+		; what a multi-field combo is for.
+		Replacement := ""
+		for Index, Field in Fields {
+				; An alias pointing at a field the user has not filled in must decline
+				; the whole combo rather than expand a shorter one — a partial expansion
+				; is silently wrong in a form, where the remaining fields shift up.
+				if (!IsSet(PersonalInformation) or !PersonalInformation.Has(Field)) {
+						return ""
+				}
+				Value := PersonalInformation[Field]
+				if (Value == "") {
+						return ""
+				}
+				if (Index > 1) {
+						Replacement .= "{Tab}"
+				}
+				Replacement .= SendEscapeLiteral(Value)
+		}
+		TriggerStr := "@" . Tag . MagicKey
+		; IsPrivate is not optional here: every field this resolver can reach comes
+		; from personal_info.toml, so the replacement is by construction the user's
+		; own data and must not reach the metrics row or the fire trace.
+		; FinalResult routes the send through SendFinalResult (SendInput), which is
+		; what every other @ registration uses — measured, it is the path the
+		; keylogger's InputHook does not observe.
+		return {
+				Trigger:     TriggerStr,
+				Length:      StrLen(TriggerStr),
+				Star:        true,
+				InWord:      true,
+				Replacement: Replacement,
+				OnlyText:    false,
+				FinalResult: true,
+				IsPrivate:   true,
+				Category:    IsSet(PI_PREVIEW_CATEGORY) ? PI_PREVIEW_CATEGORY : "personal"
 		}
 }
 

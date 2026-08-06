@@ -471,7 +471,14 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // `list` providers. Routing a menu through the renderer and moving its rows out of the
 // driver are two different things, and only the second one moves the bypass
 // ratchet — this number counts the first.
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 8 };
+// linux raised 8 → 9 on 2026-08-06: the debug submenu. It had never read the
+// manifest at all — it wrote out three rows while the manifest declared five for
+// this platform, so `open_today_log` and `open_error_log` were described, offered
+// on the other two drivers and translated in all 21 locales, and simply absent
+// here. A driver that does not READ a manifest section cannot notice a row it
+// fails to build, which is why "is this menu on the renderer" is worth counting
+// separately from "how many of its rows the renderer materialises".
+const RENDERED_THROUGH_SHARED = { hs: 4, linux: 9 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

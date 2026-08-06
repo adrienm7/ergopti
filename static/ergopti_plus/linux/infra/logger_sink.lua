@@ -149,6 +149,24 @@ local function today()
 	return os.date("%Y-%m-%d")
 end
 
+--- Absolute path of the file the driver is writing to right now.
+---
+--- Exposed because the "open today's log" action needs it and the three pieces
+--- that compose it — the directory, the prefix and the extension — are locals.
+--- A caller that rebuilt the name from its own copy of "ErgoptiPlus_" would open
+--- the wrong file the day either constant changed, and would do it silently:
+--- xdg-open on a missing path fails without telling anyone.
+--- @return string
+function M.main_log_path()
+	return M.log_dir() .. "/" .. MAIN_PREFIX .. today() .. LOG_EXT
+end
+
+--- Absolute path of today's errors-only mirror.
+--- @return string
+function M.errors_log_path()
+	return M.log_dir() .. "/" .. ERRORS_PREFIX .. today() .. LOG_EXT
+end
+
 --- Creates the log directory if it is missing.
 --- @param dir string Absolute directory path.
 --- @return boolean True when the directory exists afterwards.

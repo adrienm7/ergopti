@@ -178,6 +178,7 @@
 		"test:llm-privacy-defaults-cross-driver": "node ./tools/test/test-llm-privacy-defaults-cross-driver.cjs",
 		"test:text-crypto-envelope-parity": "node ./tools/test/test-text-crypto-envelope-parity.cjs",
 		"test:metrics-privacy-single-source": "node ./tools/test/test-metrics-privacy-single-source.cjs",
+		"test:personal-info-log-sinks-are-judged": "node ./tools/test/test-personal-info-log-sinks-are-judged.cjs",
 		"test:launcher-single-instance": "node ./tools/test/test-launcher-single-instance.cjs",
 		"test:menu-manifest": "node ./tools/test/test-menu-manifest.cjs",
 		"test:locale-catalogue-complete": "node ./tools/test/test-locale-catalogue-complete.cjs",

@@ -20,11 +20,15 @@
 ; would come back intermittently and look like a race.
 ;
 ; FEATURES & RATIONALE:
-; 1. The ENGINE decides what exists. A tag is previewed only when the engine
-;    actually holds a Spec for "@<tag><magic key>", so the bubble can never
-;    promise a combo that is not registered — @npx resolves letter by letter but
-;    only @n and @np are registered, and a tooltip offering an expansion that
-;    will not fire is worse than no tooltip.
+; 1. The ENGINE decides what exists — and it now answers in two ways. A
+;    registered Spec still wins where there is one. Where there is not, the
+;    engine resolves @<letters><magic key> at fire time
+;    (HSE_TryPersonalInfoCombo), so a tag whose letters all alias a filled-in
+;    field WILL expand and must be previewed. This module used to require a Spec
+;    and return nothing otherwise, which was correct while the multi-letter
+;    combos came from a hand-written list of thirty-one registrations; once every
+;    combination fires, that same check became the bubble refusing to preview
+;    expansions that work.
 ; 2. The ENGINE decides what it is. The rendering branch is chosen from the
 ;    Spec's replacement, not from the tag: "@dt" spells two valid letter aliases
 ;    AND is the short-date trigger, and only the Spec knows which one the engine
@@ -217,6 +221,7 @@ _PIPreviewMaskedText(Fields) {
 ; @return Array of preview rows — empty when nothing is offered.
 PersonalInfoPreviewProvider(Buffer) {
 	global ScriptInformation, PI_PREVIEW_CATEGORY, PI_PREVIEW_DYNAMIC_CATEGORY
+	global HSE_PersonalInfoCombosEnabled
 	Rows := []
 	if (Type(Buffer) != "String" or Buffer == "") {
 		return Rows
@@ -230,10 +235,41 @@ PersonalInfoPreviewProvider(Buffer) {
 	}
 
 	; The engine's own answer to "does this exist", through the same by-trigger
-	; indexes the matcher probes. No Spec means no promise: the letters of a tag
-	; can resolve when the combo was never registered.
-	Spec := _PreviewSpecForTrigger("@" . Tag . ScriptInformation["MagicKey"])
+	; indexes the matcher probes. A registered Spec still wins: the literal tags
+	; and the dates are registered, and "@dt" spells two valid alias letters AND
+	; is the short-date trigger — only the registration knows which one fires.
+	Trigger := "@" . Tag . ScriptInformation["MagicKey"]
+	Spec := _PreviewSpecForTrigger(Trigger)
 	if !IsObject(Spec) {
+		; Not registered — but no longer "not offered". The engine resolves any
+		; @<letters>★ at fire time (HSE_TryPersonalInfoCombo), so a tag whose
+		; letters all alias a filled-in field WILL expand, and staying silent here
+		; would be the bubble refusing to preview an expansion that works. This
+		; check is deliberately the resolver's own precondition rather than a
+		; re-derivation of it: the fields list below decides both.
+		if (!IsSet(HSE_PersonalInfoCombosEnabled) or !HSE_PersonalInfoCombosEnabled) {
+			return Rows
+		}
+		Fields := _PIPreviewFieldsForTag(Tag)
+		if (Fields.Length == 0) {
+			return Rows
+		}
+		Text := _PIPreviewMaskedText(Fields)
+		if (Text == "") {
+			return Rows
+		}
+		; No Spec means no engine-supplied ranking, so the row carries the values
+		; the resolver's transient Spec will carry: a star trigger of this length,
+		; default priority, and the personal category's own activation window.
+		Rows.Push({ Trigger:    Trigger,
+		            Output:     Text,
+		            Category:   PI_PREVIEW_CATEGORY,
+		            Section:    "",
+		            Length:     StrLen(Trigger),
+		            Priority:   "",
+		            GroupOrder: 0,
+		            Seq:        0,
+		            Delay:      0 })
 		return Rows
 	}
 

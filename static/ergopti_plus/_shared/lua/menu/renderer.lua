@@ -462,6 +462,61 @@ function M.new(deps)
 					end
 				end
 
+			elseif t == "check" or t == "command" then
+				-- The declarative row: everything about it is in the manifest, and
+				-- the driver supplies only a NAMED behaviour.
+				--
+				-- WHY THIS TYPE EXISTS. Every other type that carries behaviour —
+				-- "action", "dynamic" — hands the manifest key to a driver function
+				-- that builds the row itself. That is why 639 rows lived outside this
+				-- file: the manifest described the SLOT and three drivers each wrote
+				-- the row. And they wrote it differently — Linux appended " ✓" to the
+				-- title while its own tray adapter has supported a native GTK check
+				-- item all along, so the same setting looked like a tick on one OS
+				-- and a checkbox on the others.
+				--
+				-- Here the row is built ONCE, from `i18n`, `checked_when` and
+				-- `disabled_when`, and the driver registers `ctx.commands[id]` — one
+				-- function per BEHAVIOUR rather than one builder per row. A row that
+				-- reads the same on three drivers is the point; a shared renderer that
+				-- cannot build a checkbox was never going to deliver it.
+				local row_id   = type(item.id) == "string" and item.id or ""
+				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
+				local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
+				local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
+				-- `command` defaults to the id, because the two are the same name in
+				-- every case so far and repeating it is a second thing to get wrong.
+				local cmd_id = type(item.command) == "string" and item.command or row_id
+				local fn     = commands[cmd_id]
+
+				if row_id == "" or i18n_key == "" then
+					Logger.warn(LOG, "'%s' item missing id or i18n in '%s' — skipped.", t, manifest_key)
+					goto continue
+				end
+				if type(fn) ~= "function" then
+					-- Same class as the "action" branch: a declared row whose command
+					-- the driver never registered renders one item short, permanently
+					-- and undetected.
+					Logger.warn(LOG, "No command '%s' registered for '%s.%s' — item skipped.",
+						tostring(cmd_id), manifest_key, row_id)
+					goto continue
+				end
+
+				flush_sep()
+				local built = {
+					title    = i18n.get(i18n_key),
+					fn       = fn,
+					disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
+				}
+				-- Only "check" carries a tick. A "command" is a plain action row, and
+				-- giving it `checked = false` would draw an empty checkbox next to a
+				-- row that toggles nothing.
+				if t == "check" then
+					built.checked = R.resolve_checked_when(manifest_key, row_id, getters)
+				end
+				table.insert(result, built)
+				item_count = item_count + 1
+
 			elseif t == "dynamic" then
 				local dyn_id = type(item.id) == "string" and item.id or ""
 				if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then

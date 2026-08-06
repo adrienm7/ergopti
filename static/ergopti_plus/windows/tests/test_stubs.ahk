@@ -550,26 +550,24 @@ UninstallHotstringHooks() {
 
 ; ── Active-app cache simulators — bypass WinGet* calls so the
 ; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
+;
+; These write to the REAL KLHook class (modules/keylogger/keylogger_hook.ahk is
+; included by the runner so the typing-row privacy test can drive its callbacks).
+; The old `if !IsSet(KLHook) KLHook := {}` fallback is gone and must stay gone:
+; assigning to the name makes AHK treat KLHook as a global variable, and the
+; class declaration then fails to load with "conflicts with an existing global
+; variable" — a parse error, so the whole suite dies before test one.
 SimulateNotepadActive() {
-    global KLHook
-    if !IsSet(KLHook)
-        KLHook := {}
     KLHook.prev_app := "notepad.exe"
     KLHook.prev_title := "Untitled - Notepad"
 }
 
 SimulateRegularApp() {
-    global KLHook
-    if !IsSet(KLHook)
-        KLHook := {}
     KLHook.prev_app := "test.exe"
     KLHook.prev_title := "Test App"
 }
 
 SimulateMicrosoftOffice() {
-    global KLHook
-    if !IsSet(KLHook)
-        KLHook := {}
     KLHook.prev_app := "WINWORD.EXE"
     KLHook.prev_title := "Document - Word"
 }
@@ -698,9 +696,64 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
         h_type: h_type, app_name: app_name })
 }
 
+; ── The persisted-row sink and the counters KL_LogHotstring drives ────────────
+; modules/keylogger/keylogger_hotstring_log.ahk is included by the runner (the
+; rest of keylogger.ahk installs OS hooks at load and cannot be), so these four
+; are what stands between it and the disk. Recording rather than no-op: the
+; privacy contract is about the CONTENT of the row that reaches KL_AppendLog, so
+; a test has to be able to read that row back — asserting on a copy of the row
+; built by the test itself would pass against the leaking code.
+global _Stub_AppendLogRows := []      ; recorded KL_AppendLog entries (Map each)
+global _Stub_RoiHotstringCalls := []  ; recorded KL_Roi_OnHotstring calls
+global _Stub_WpmPushCalls := []       ; recorded WPMWidget_Push calls
+global _Stub_FlushBufferCalls := 0    ; how many times the typing buffer was flushed
+
+KL_AppendLog(entry) {
+    global _Stub_AppendLogRows
+    _Stub_AppendLogRows.Push(entry)
+}
+
+KL_FlushBuffer() {
+    global _Stub_FlushBufferCalls
+    _Stub_FlushBufferCalls += 1
+}
+
+; Records is_private too: the production accumulator keys its half-life map on
+; the trigger, so a stub narrower than the real signature would hide whether the
+; caller ever told it which triggers must not be keyed.
+KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
+    global _Stub_RoiHotstringCalls
+    _Stub_RoiHotstringCalls.Push({ trigger: trigger, net_saved: net_saved,
+        is_private: is_private ? true : false })
+}
+
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+    global _Stub_WpmPushCalls
+    _Stub_WpmPushCalls.Push({ is_hs: is_hs, is_ai: is_ai, is_ac: is_ac,
+        category: category, section: section })
+}
+
 class Keylogger {
     static synth_active := 0
     static synth_type   := "none"
+    ; The privacy latch KL_Hook_RecordedChar reads before it lets an auto-typed
+    ; character into the typing buffer.
+    static synth_private := false
+    ; The typing buffer itself. These two fields ARE the persisted typing row's
+    ; "text" and "events" — KL_FlushBuffer snapshots them into the entry without
+    ; transforming either — so a test that drives the real KL_Hook_OnChar can
+    ; read back exactly what would reach today.log.
+    static buffer_events  := []
+    static buffer_text    := ""
+    static rich_chunks    := []
+    static last_time      := 0
+    static session_clicks := 0
+    static session_scrolls := 0
+    static mouse_distance := 0
+    static session_title  := ""
+    static session_url    := ""
+    static session_layout := ""
+    static session_field_role := ""
     ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keylogger/keylogger_sql.ahk)
     ; when that pure builder module is exercised directly from unit tests.
     static _device_id_lit := "'test-device'"
@@ -714,14 +767,20 @@ class Keylogger {
     static initialized    := false
     static by_device_dir  := ""
     static data_sql_path  := ""
+    ; Read by KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk):
+    ; the app the row is attributed to, and the flush bookkeeping it updates.
+    static session_app    := "test.exe"
+    static last_flush_time := 0
 }
 
 ; Synthetic keystroke tagging. In production this lives in keylogger.ahk.
 ; The test stub mirrors the depth-counter logic so test_suppress_refcount.ahk
 ; can verify the refcounting behaviour.
-KL_MarkSynthetic(source) {
+KL_MarkSynthetic(source, is_private := false) {
     Keylogger.synth_active += 1
     Keylogger.synth_type := source
+    if is_private
+        Keylogger.synth_private := true
 }
 
 ; Clears the synthetic-keystroke flag after a hotstring burst. In production
@@ -729,8 +788,10 @@ KL_MarkSynthetic(source) {
 ; signature matches the real function so SetTimer can pass it directly.
 KL_ClearSynthetic(*) {
     Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
-    if !Keylogger.synth_active
+    if !Keylogger.synth_active {
         Keylogger.synth_type := "none"
+        Keylogger.synth_private := false
+    }
 }
 
 ; Atomic file write — in production lives in keylogger.ahk (not included by

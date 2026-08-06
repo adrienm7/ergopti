@@ -1,30 +1,59 @@
 ﻿; tests/meta/test_personal_combo_letters_guard.ahk
 
 ; ==============================================================================
-; MODULE: Personal-info auto-combo guards the user-editable letters Map
+; MODULE: Personal-info combos guard the user-editable letters Map
 ; DESCRIPTION:
-; CreateHotstringComboAuto builds fixed combos ("mm", "npdmmt", ...) that require
-; the letters {m,n,p,a,d,t} to exist in PersonalInformationHotstrings. That Map is
-; user-editable (personal_info.toml [letters]); removing a letter made the raw
-; index throw UnsetItemError on the boot-critical registration thread, which the
-; fatal-before-ready error net escalates to ExitApp(1) -- a persistent boot brick.
-; The sibling Generate() already guards with .Has(); this asserts the auto variant
-; does too, before its first raw index (F10, audit 2026-07-20).
+; The [letters] section of personal_info.toml is user-editable, and so is the
+; field list it points into. Indexing either one raw throws UnsetItemError, and
+; the combo path runs on the boot-critical registration thread where the
+; fatal-before-ready error net escalates that to ExitApp(1) — a persistent boot
+; brick from deleting one line of one's own config.
+;
+; WHY IT NO LONGER NAMES CreateHotstringComboAuto:
+; that function was a hand-written list of thirty-one combos and is gone; every
+; multi-letter combo is now resolved at fire time. The failure mode did not go
+; with it — it MOVED, from the boot thread to the keystroke thread, where an
+; UnsetItemError is thrown inside the InputHook callback. So the guard follows
+; the code rather than being deleted with the function it used to name.
+;
+; Behavioural coverage of the same contract (an unknown letter or a blank field
+; declines the combo instead of throwing) lives in
+; tests/unit/test_personal_info_combo_resolver.ahk. What this file adds is that
+; the guard cannot be removed while the tests keep passing on fixtures that
+; happen to be complete.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_PCLG_AutoComboGuardsMissingLetter() {
-	Body := _DriverFuncBody("CreateHotstringComboAuto")
+; The letters→fields resolver, shared by the bubble and the expansion.
+_PCLG_TagResolverGuardsMissingLetter() {
+	Body := _DriverFuncBody("_PIPreviewFieldsForTag")
 	Assert(Body != "",
-		"CreateHotstringComboAuto must exist in modules/hotstrings/hotstrings_text_expansion.ahk")
-	HasGuard := InStr(Body, "PersonalInformationHotstrings.Has(")
-	FirstIndex := InStr(Body, "PersonalInformationHotstrings[")
+		"infra/personal_info_preview.ahk must define _PIPreviewFieldsForTag(Tag) — it is what turns @<letters> into a field list for BOTH the bubble and the fire-time resolver")
+	HasGuard := InStr(Body, "PersonalInformationLetters.Has(")
+	FirstIndex := InStr(Body, "PersonalInformationLetters[")
 	Assert(HasGuard > 0,
-		"CreateHotstringComboAuto must guard the user-editable letters Map with .Has() before indexing")
+		"_PIPreviewFieldsForTag must guard the user-editable letters Map with .Has() before indexing it")
 	Assert(FirstIndex > 0,
-		"CreateHotstringComboAuto must still index the letters Map to build the combo value")
+		"and must still index it to build the field list")
 	Assert(HasGuard < FirstIndex,
-		"the .Has() guard must precede the first raw PersonalInformationHotstrings[...] index")
+		"the .Has() guard must precede the first raw PersonalInformationLetters[...] index")
 }
-Test("personal-info auto-combos: missing letter skipped, never a boot-killing throw", _PCLG_AutoComboGuardsMissingLetter)
+Test("personal-info combos: the letters Map is guarded before it is indexed", _PCLG_TagResolverGuardsMissingLetter)
+
+
+; The fields Map, on the path that now runs per keystroke rather than at boot.
+_PCLG_ResolverGuardsMissingField() {
+	Body := _DriverFuncBody("HSE_TryPersonalInfoCombo")
+	Assert(Body != "",
+		"infra/hotstrings/hotstring_engine_main.ahk must define HSE_TryPersonalInfoCombo(MagicKey)")
+	HasGuard := InStr(Body, "PersonalInformation.Has(")
+	FirstIndex := InStr(Body, "PersonalInformation[")
+	Assert(HasGuard > 0,
+		"HSE_TryPersonalInfoCombo must guard PersonalInformation with .Has() before indexing: a letter can alias a field the user has not filled in, and this runs inside the InputHook callback where the throw is not merely a failed expansion")
+	Assert(FirstIndex > 0,
+		"and must still index it to build the replacement")
+	Assert(HasGuard < FirstIndex,
+		"the .Has() guard must precede the first raw PersonalInformation[...] index")
+}
+Test("personal-info combos: the fields Map is guarded on the keystroke path", _PCLG_ResolverGuardsMissingField)

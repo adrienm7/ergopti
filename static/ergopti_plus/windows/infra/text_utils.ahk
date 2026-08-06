@@ -65,3 +65,48 @@ UriDecode(s) {
 	}
 	return StrGet(Buf, ByteLen, "UTF-8")
 }
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 2/ Escaping a literal for the Send engine =======
+; =========================================================
+; =========================================================
+
+; Escape a literal string so Send() types it verbatim.
+;
+; WHY IT LIVES HERE: an email address of "^a" is a real value a user can put in
+; personal_info.toml, and Send() reads "^" as Ctrl. The escaping was written
+; inside RegisterAllHotstrings, where only the boot-time registration could
+; reach it; the fire-time @-combo resolver needs exactly the same transform on
+; exactly the same values, and a second copy of it is a second thing to get
+; wrong. Pure string in, pure string out, so a unit test can hold it directly.
+;
+; ORDER MATTERS: braces are escaped in ONE pass, character by character, before
+; anything else. A sequential StrReplace would feed the "}" it just emitted for
+; "{" into the next pass and turn "{" into "{{{}}}". The remaining escapes emit
+; no braces of their own, so they are safe to apply in sequence afterwards.
+; @param Text {String} The literal to type.
+; @return {String} The same text with every Send metacharacter neutralised.
+SendEscapeLiteral(Text) {
+	Escaped := ""
+	loop parse, Text {
+		Ch := A_LoopField
+		if (Ch == "{")
+			Escaped .= "{{}"
+		else if (Ch == "}")
+			Escaped .= "{}}"
+		else
+			Escaped .= Ch
+	}
+	; Asc-form for ^ and ~ because "{^}" is not a valid Send key name.
+	Escaped := StrReplace(Escaped, "^", "{Asc 94}")
+	Escaped := StrReplace(Escaped, "~", "{Asc 126}")
+	Escaped := StrReplace(Escaped, "+", "{+}")
+	Escaped := StrReplace(Escaped, "!", "{!}")
+	Escaped := StrReplace(Escaped, "#", "{#}")
+	return Escaped
+}

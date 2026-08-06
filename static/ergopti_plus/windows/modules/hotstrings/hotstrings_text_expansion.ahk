@@ -35,7 +35,7 @@
 _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global PersonalInformationHotstrings, DYN_HOTSTRINGS_DEFAULT_DELAY, SpaceAroundSymbols
-	global PERSONAL_INFO_TAGS, PERSONAL_INFO_TAG_ORDER
+	global PERSONAL_INFO_TAGS, PERSONAL_INFO_TAG_ORDER, HSE_PersonalInfoCombosEnabled
 
 
 
@@ -84,8 +84,13 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 				LoggerWarn("hotstrings", "Personal-info tag '@{1}' names the unknown field '{2}' -- skipped.", InfoTag, InfoTagField)
 				continue
 			}
+			; IsPrivate is what keeps the resolved value — an IBAN, a card number,
+			; a social-security number — out of the metrics row the fire writes and
+			; out of the debug fire-trace. Without it the expansion is recorded
+			; verbatim, twice per row, into a log that is replicated to every other
+			; device and kept for fourteen days.
 			CreateHotstring("*", "@" . InfoTag . ScriptInformation["MagicKey"],
-				PersonalInformation[InfoTagField], Map("FinalResult", True))
+				PersonalInformation[InfoTagField], Map("FinalResult", True).Set("IsPrivate", True))
 		}
 
 		; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
@@ -114,27 +119,12 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 				Generate(keys, hotstrings, "", A_Index)
 		}
 
-		; In case email is "^a" we want to send raw string and not Ctrl + A
+		; In case email is "^a" we want to send raw string and not Ctrl + A.
+		; The transform itself is SendEscapeLiteral (infra/text_utils.ahk): the
+		; fire-time @-combo resolver needs the same escaping on the same values, and
+		; a nested copy here would be a second implementation to keep in step.
 		EscapeSpecialChars(text) {
-			; Escape braces atomically so the '{' -> '{{}'  expansion does not feed a
-			; '}' into a later StrReplace pass (which would corrupt '{' into '{{{}}}')
-			escaped := ""
-			loop parse, text {
-				c := A_LoopField
-				if (c == "{")
-					escaped .= "{{}"
-				else if (c == "}")
-					escaped .= "{}}"
-				else
-					escaped .= c
-			}
-			; The remaining escapes do not emit '{' or '}' so sequential StrReplace is safe
-			escaped := StrReplace(escaped, "^", "{Asc 94}")
-			escaped := StrReplace(escaped, "~", "{Asc 126}")
-			escaped := StrReplace(escaped, "+", "{+}")
-			escaped := StrReplace(escaped, "!", "{!}")
-			escaped := StrReplace(escaped, "#", "{#}")
-			return escaped
+			return SendEscapeLiteral(text)
 		}
 
 		Generate(keys, hotstrings, combo, len) {
@@ -159,61 +149,37 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			}
 		}
 
+		; Every combo concatenates one or more personal_info fields, so the whole
+		; generated family is private for the same reason the single-field tags are.
 		CreateHotstringCombo(combo, value) {
 			CreateHotstring("*", "@" combo "" . ScriptInformation["MagicKey"], value, Map("OnlyText", False).Set(
-				"FinalResult", True))
+				"FinalResult", True).Set("IsPrivate", True))
 		}
 
-		; Generate manually longer shortcuts, as increasing PatternMaxLength expands memory exponentially
-		CreateHotstringComboAuto(Combo) {
-			global PersonalInformationHotstrings
-			Value := ""
-			loop StrLen(Combo) {
-				ComboLetter := SubStr(Combo, A_Index, 1)
-				; The letters Map is user-editable (personal_info.toml [letters]); a
-				; missing alias must skip this optional convenience combo, not throw an
-				; UnsetItemError on the boot-critical registration thread. Mirror the
-				; Generate() guard and fail loud in the log (fail-soft, §5.3)
-				if !PersonalInformationHotstrings.Has(ComboLetter) {
-					LoggerWarn("hotstrings", "CreateHotstringComboAuto: letter '{1}' absent from personal-info map -- skipping combo '@{2}'.", ComboLetter, Combo)
-					return
-				}
-				Value := Value . EscapeSpecialChars(PersonalInformationHotstrings[ComboLetter]) . "{Tab}"
-			}
-			CreateHotstring("*", "@" . Combo . ScriptInformation["MagicKey"], Value, Map("OnlyText", False).Set(
-				"FinalResult", True))
-		}
-		CreateHotstringComboAuto("mm")
-		CreateHotstringComboAuto("mnp")
-		CreateHotstringComboAuto("mpn")
-		CreateHotstringComboAuto("np")
-		CreateHotstringComboAuto("npam")
-		CreateHotstringComboAuto("npamm")
-		CreateHotstringComboAuto("npd")
-		CreateHotstringComboAuto("npdm")
-		CreateHotstringComboAuto("npdmm")
-		CreateHotstringComboAuto("npdmmt")
-		CreateHotstringComboAuto("npdmt")
-		CreateHotstringComboAuto("npm")
-		CreateHotstringComboAuto("npmd")
-		CreateHotstringComboAuto("npmm")
-		CreateHotstringComboAuto("npmmd")
-		CreateHotstringComboAuto("npmt")
-		CreateHotstringComboAuto("npt")
-		CreateHotstringComboAuto("nptm")
-		CreateHotstringComboAuto("nptmm")
-		CreateHotstringComboAuto("pn")
-		CreateHotstringComboAuto("pnam")
-		CreateHotstringComboAuto("pnamm")
-		CreateHotstringComboAuto("pnd")
-		CreateHotstringComboAuto("pndm")
-		CreateHotstringComboAuto("pndmm")
-		CreateHotstringComboAuto("pnm")
-		CreateHotstringComboAuto("pnmm")
-		CreateHotstringComboAuto("pntm")
-		CreateHotstringComboAuto("pntmd")
-		CreateHotstringComboAuto("pntmm")
-		CreateHotstringComboAuto("pntmmd")
+		; Every combo LONGER than pattern_max_length is resolved at fire time by
+		; HSE_TryPersonalInfoCombo instead of being registered here.
+		;
+		; This replaced a hand-written list of thirty-one CreateHotstringComboAuto
+		; calls. With thirteen alias letters the space is 169 combos at length two,
+		; 2 197 at three and 28 561 at four, so the list could only ever be a
+		; sample — and it was missing @npdt and @nt, which is how this surfaced:
+		; the letters resolved, the values existed, and the only thing absent was a
+		; line in a list. Nothing logged, nothing failed, the key just did nothing.
+		;
+		; Two behaviours changed with it, both toward the other drivers:
+		;   - No trailing Tab. The hand-listed combos appended one after the LAST
+		;     field; Generate() below never did, and neither does macOS
+		;     (modules/dynamic_hotstrings/personal_info.lua fires its tab only while
+		;     `i < #parts`). The bubble never showed one either, so preview and fire
+		;     now agree where they used to differ by a keystroke.
+		;   - An unknown letter declines the whole combo instead of skipping it, so
+		;     a typo cannot silently type a partial identity into a form.
+		HSE_PersonalInfoCombosEnabled := true
+	} else {
+		; Fail closed rather than leaving the resolver armed from a previous run:
+		; live rebuilds re-enter this function, and a toggle that only ever turns ON
+		; is a feature the user cannot switch off.
+		HSE_PersonalInfoCombosEnabled := false
 	}
 	try BootProfile_Mark("HS sub: @-personal-info combos registered")
 

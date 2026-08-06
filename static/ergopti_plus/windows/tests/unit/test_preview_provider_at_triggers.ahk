@@ -169,25 +169,66 @@ Test("hotstrings: the shortest @ combo produces a preview candidate (at-triggers
 	_PIPP_SingleLetterComboIsPreviewed)
 
 
-; The tooltip must never promise an expansion that will not fire. A combo
-; resolves letter by letter, so @npn spells three known aliases while only @n
-; and @np are registered — the engine is the authority on what exists.
-_PIPP_UnregisteredComboIsNotPreviewed() {
-	global HSE_Buffer, HSE_StartIsWordBoundary
+; The tooltip must never promise an expansion that will not fire, and it must
+; never withhold one that will. The boundary MOVED when the multi-letter combos
+; stopped being pre-registered: this used to assert that @npn produced no row
+; because only @n and @np were registered, and that was right while a
+; hand-written list decided what existed. HSE_TryPersonalInfoCombo now resolves
+; any @<letters>★ at fire time, so @npn fires — and a bubble that stayed silent
+; would be the tooltip lying in the other direction.
+;
+; The INVARIANT is unchanged and is what these two tests assert: preview and fire
+; answer the same question. So both are asked, of the same tag, in the same test.
+_PIPP_ResolvableComboIsPreviewedAndFires() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
 	Saved := _PIPP_Setup()
 	try {
+		MK := ScriptInformation["MagicKey"]
 		_PIPP_RegisterAtTriggers()
 		HSE_Buffer := "@npn"
 		HSE_StartIsWordBoundary := true
 
-		AssertEqual(0, _PrefixCollectCandidates().Length,
-			"@npn spells three valid letter aliases but is not a registered trigger, so it must produce no row. A tooltip offering an expansion the magic key will not deliver is worse than no tooltip")
+		Row := _PIPP_CandidateFor(_PrefixCollectCandidates(), "@npn" . MK)
+		Assert(IsObject(Row),
+			"@npn spells three valid letter aliases, so the fire-time resolver expands it — and a tag that expands must be previewed, or the bubble is silent about an expansion the magic key will deliver")
+
+		; The other half: the same tag, asked of the engine.
+		HSE_Buffer := "@npn" . MK
+		Assert(IsObject(HSE_TryPersonalInfoCombo(MK)),
+			"and the engine must actually hold it — if this fails, the bubble above is promising an expansion that will not fire, which is the thing this test has always existed to forbid")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: an @ combo the engine does not hold is not previewed (at-triggers-have-no-preview-candidate-source)",
-	_PIPP_UnregisteredComboIsNotPreviewed)
+Test("hotstrings: a resolvable @ combo is both previewed and fired (at-triggers-have-no-preview-candidate-source)",
+	_PIPP_ResolvableComboIsPreviewedAndFires)
+
+
+; The forbidding half, on the tag that genuinely cannot fire. "z" aliases no
+; field, so neither the resolver nor any registration can expand @npz — and the
+; bubble must stay silent. Without this case the test above would pass against a
+; provider that offered a row for every string starting with "@".
+_PIPP_UnresolvableComboIsNotPreviewed() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
+	Saved := _PIPP_Setup()
+	try {
+		MK := ScriptInformation["MagicKey"]
+		_PIPP_RegisterAtTriggers()
+		HSE_Buffer := "@npz"
+		HSE_StartIsWordBoundary := true
+
+		AssertEqual(0, _PrefixCollectCandidates().Length,
+			"'z' aliases no personal_info field, so @npz can never expand and must produce no row. A tooltip offering an expansion the magic key will not deliver is worse than no tooltip")
+
+		HSE_Buffer := "@npz" . MK
+		Assert(!IsObject(HSE_TryPersonalInfoCombo(MK)),
+			"and the engine must decline it too — the two have to agree in this direction as well")
+	} finally {
+		_PIPP_Teardown(Saved)
+	}
+}
+Test("hotstrings: an @ combo that cannot resolve is previewed by nobody (at-triggers-have-no-preview-candidate-source)",
+	_PIPP_UnresolvableComboIsNotPreviewed)
 
 
 ; @dt spells two valid letter aliases (d, t) AND is the short-date trigger. Only

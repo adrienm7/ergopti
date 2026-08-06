@@ -165,7 +165,19 @@ function M.match_buffer(buffer, group_name, is_section_enabled_fn)
 			if #suf > 0 and buffer:sub(-(#suf)) == suf then
 				local ok, result = pcall(rule.resolver)
 				if ok and type(result) == "string" and result ~= "" then
-					Logger.debug(LOG, "Buffer match: suffix='%s' → result='%s'.", suf, result)
+					-- `result` is whatever the resolver produced, and the resolvers
+					-- registered against this engine include every @-tag: for "@i" it
+					-- is the user's IBAN. This printed it in full — and DEBUG is not
+					-- the safeguard it looks like here, because the shared logger's
+					-- default minimum level is 10, i.e. debug included. So the value
+					-- reached the log on every expansion, on every driver using this
+					-- engine, with nothing switched on.
+					--
+					-- The length is kept because it is the diagnostic that matters
+					-- when a rule misfires (which field answered), and it is what the
+					-- other two drivers keep at their equivalent sites.
+					Logger.debug(LOG, "Buffer match: suffix='%s' → %d char(s) (content withheld).",
+						suf, #result)
 					return { rule = rule, result = result }
 				end
 			end

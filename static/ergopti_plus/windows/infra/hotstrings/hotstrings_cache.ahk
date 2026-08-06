@@ -397,7 +397,7 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 	Section := Parts.Length >= 2 ? Parts[2] : ""
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	MagicKey := ScriptInformation["MagicKey"]
-	HasOnlyText := IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText")
+	HasExtras := IsSet(ExtraOptions) and (ExtraOptions is Map)
 	; The section/file/source-resolved priority the caller passes is the cascade
 	; fallback applied to any entry without its own `priority = N`. When the caller
 	; omits it (older call sites) fall back to the common default so an entry never
@@ -405,10 +405,21 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 	BasePriority := (ResolvedPriority != "") ? ResolvedPriority : HSE_PRIORITY_COMMON
 	for Row in RowList {
 		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : BasePriority
-		Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", Row[4], "IsRepeat", Row[5],
-			"Category", Category, "Section", Section, "Priority", EntryPriority)
-		if HasOnlyText
-			Opts["OnlyText"] := ExtraOptions["OnlyText"]
+		; Start from the caller's options and let the per-row values win, rather
+		; than naming the one key worth forwarding. The enumerated version copied
+		; OnlyText and nothing else, so IsPrivate — an option whose whole job is to
+		; keep an IBAN out of a 14-day log — would have been dropped silently by
+		; any section that ever round-tripped through the cache. Nothing routes the
+		; @ family through here today, which is precisely why the omission would
+		; have been found late; copying wholesale means the next option added
+		; cannot repeat it.
+		Opts := HasExtras ? ExtraOptions.Clone() : Map()
+		Opts["TimeActivationSeconds"] := TimeAct
+		Opts["FinalResult"] := Row[4]
+		Opts["IsRepeat"] := Row[5]
+		Opts["Category"] := Category
+		Opts["Section"] := Section
+		Opts["Priority"] := EntryPriority
 		Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
 		; The REPLACEMENT carries the marker too, and the preview index already
 		; substitutes it on both sides (hotstring_registry). Substituting only the

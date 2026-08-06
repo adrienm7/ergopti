@@ -274,6 +274,7 @@ emit_ahk_key = "t"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "t"
 emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+t"
 
 [sg_actions.tab_close]
 platform = "all"
@@ -281,6 +282,7 @@ emit_ahk_key = "w"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "w"
 emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+w"
 
 [sg_actions.tab_prev]
 platform = "all"
@@ -442,6 +444,7 @@ emit_ahk_key = "Up"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "up"
 emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Up"
 
 [sg_actions.para_next]
 platform = "all"
@@ -449,6 +452,7 @@ emit_ahk_key = "Down"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "down"
 emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Down"
 
 [sg_actions.doc_start]
 platform = "all"
@@ -508,6 +512,7 @@ emit_ahk_key = "Up"
 emit_ahk_mods = ["shift"]
 emit_hs_key = "up"
 emit_hs_mods = ["shift"]
+emit_linux = "shift+Up"
 
 [sg_actions.sel_down]
 platform = "all"
@@ -515,6 +520,7 @@ emit_ahk_key = "Down"
 emit_ahk_mods = ["shift"]
 emit_hs_key = "down"
 emit_hs_mods = ["shift"]
+emit_linux = "shift+Down"
 
 [sg_actions.sel_left]
 platform = "all"
@@ -522,6 +528,7 @@ emit_ahk_key = "Left"
 emit_ahk_mods = ["shift"]
 emit_hs_key = "left"
 emit_hs_mods = ["shift"]
+emit_linux = "shift+Left"
 
 [sg_actions.sel_right]
 platform = "all"
@@ -529,6 +536,7 @@ emit_ahk_key = "Right"
 emit_ahk_mods = ["shift"]
 emit_hs_key = "right"
 emit_hs_mods = ["shift"]
+emit_linux = "shift+Right"
 
 [sg_actions.sel_word_prev]
 platform = "all"
@@ -536,6 +544,7 @@ emit_ahk_key = "Left"
 emit_ahk_mods = ["ctrl", "shift"]
 emit_hs_key = "left"
 emit_hs_mods = ["shift", "alt"]
+emit_linux = "ctrl+shift+Left"
 
 [sg_actions.sel_word_next]
 platform = "all"
@@ -543,6 +552,7 @@ emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl", "shift"]
 emit_hs_key = "right"
 emit_hs_mods = ["shift", "alt"]
+emit_linux = "ctrl+shift+Right"
 
 # --- Médias ---
 

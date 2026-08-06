@@ -97,10 +97,39 @@ const MEASURE = process.argv.includes('--measure');
 // Linux-only gesture rows moved from `dynamic` to `list` — the slot list alone is
 // thirty-odd rows with a nested action picker each, all of which the renderer now
 // materialises from data.
+// linux 120 → 115 on 2026-08-06. Two migrations, and only one of them was about
+// row counts:
+//   - the three metrics privacy filters became `type = "check"`, a NEW
+//     declarative type in the shared renderer. Until it existed, every type that
+//     carried behaviour handed the manifest key back to a driver function that
+//     built the row itself — which is the whole reason this number was 639
+//     across the three drivers. A shared renderer that could not build a
+//     checkbox was never going to centralise a menu.
+//   - the debug submenu moved onto the manifest and gained the two rows this
+//     driver had never built.
+//
+// ── The `check` type, and why all three fell in one commit ──
+//
+// windows 220 → 217, macos 301 → 298, linux 120 → 115 on 2026-08-06.
+//
+// The three privacy filters are ONE manifest declaration now, and each driver's
+// renderer materialises it: `type = "check"` carries the label key, the
+// checked_when predicate and the disabled_when predicate, and the driver
+// registers only a named command. Both renderers gained the type in the same
+// change — _shared/lua/menu/renderer.lua and windows/infra/manifest_menu.ahk —
+// because a shared declaration that only one renderer understands is a row that
+// disappears on the other two.
+//
+// This is the lever the rest of the migration turns on. Until it existed, EVERY
+// manifest type that carried behaviour ("action", "dynamic") handed the id back
+// to a driver function that built the row itself, so routing a menu through the
+// renderer moved nothing and the honest count stayed near 639. A `list` provider
+// was the only thing that had ever moved it, and a list cannot express a single
+// checkbox.
 const BASELINE = {
-	windows: 220,
-	macos: 301,
-	linux: 120
+	windows: 217,
+	macos: 298,
+	linux: 115
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

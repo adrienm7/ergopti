@@ -125,12 +125,22 @@ _MR_Get(Obj, Key, Default := "") {
 ;   both drivers finally be compared.
 ;
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "") {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "") {
 	if (GroupBuilders == "") {
 		GroupBuilders := Map()
 	}
 	if (ListProviders == "") {
 		ListProviders := Map()
+	}
+	; The two the declarative "check" / "command" types read. Optional so every
+	; existing caller keeps working unchanged: a menu with no declarative row
+	; passes neither, and the branch that needs them says so when one is missing
+	; rather than rendering a row with no behaviour.
+	if (Commands == "") {
+		Commands := Map()
+	}
+	if (StateGetters == "") {
+		StateGetters := Map()
 	}
 
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
@@ -208,6 +218,44 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 				; Same class of drift as the action and dynamic branches: a list
 				; entry with no provider is a whole menu section that vanishes
 				try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+			}
+
+		} else if (ItemType == "check" or ItemType == "command") {
+			; The declarative row: the manifest carries its label, its checkmark
+			; predicate and its greying predicate, and the driver supplies only a
+			; NAMED behaviour through Commands.
+			;
+			; Every other type that carries behaviour hands the id back to a driver
+			; function that builds the row itself, which is why 639 rows across the
+			; three drivers lived outside their renderers. Here the row is built
+			; ONCE, in each driver's renderer, from one shared declaration — so the
+			; same setting cannot render as a tick on one OS and a checkbox on
+			; another. The Lua renderer implements the identical two types.
+			Id := _MR_Get(Item, "id")
+			I18nKey := _MR_Get(Item, "i18n")
+			CmdId := _MR_Get(Item, "command")
+			if (CmdId == "") {
+				CmdId := Id
+			}
+			if (Id == "" or I18nKey == "") {
+				try LoggerWarn("MenuRenderer", "'{1}' item missing id or i18n in '{2}' — skipped.", ItemType, ManifestKey)
+			} else if !(Commands is Map and Commands.Has(CmdId)) {
+				; Same class of drift as the action branch: a declared row whose
+				; command nobody registered renders one item short, permanently.
+				try LoggerWarn("MenuRenderer", "No command '{1}' for '{2}.{3}' — skipped.", CmdId, ManifestKey, Id)
+			} else {
+				Row := Map("label", t(I18nKey), "action", Commands[CmdId])
+				if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+					Row["disabled"] := true
+				}
+				; Only "check" carries a tick. Giving a plain command row
+				; checked := false would draw an empty box beside a row that
+				; toggles nothing.
+				if (ItemType == "check") {
+					Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
+				}
+				_MR_RenderRows(Result, [Row], Id, 1)
+				ItemCount++
 			}
 
 		} else if ItemType == "dynamic" {

@@ -75,8 +75,13 @@ local KEYSYM_TO_CODE = {
 	F4        = 62,  -- KEY_F4
 	F11       = 87,  -- KEY_F11
 
-	-- The one letter the catalogue uses, in ctrl+v.
+	-- The letters the catalogue uses: ctrl+v to paste, ctrl+t to open a tab and
+	-- ctrl+w to close one. Added as the catalogue gained an emit_linux column for
+	-- the two tab actions — the parity test caught them the same commit, which is
+	-- what a table checked against the generated rows is for.
+	t         = 20,  -- KEY_T
 	v         = 47,  -- KEY_V
+	w         = 17,  -- KEY_W
 }
 
 -- Which names are modifiers. A combo presses its modifiers first and releases

@@ -125,6 +125,47 @@ for (const driver of DRIVERS) {
 	}
 }
 
+// ─── 2b. The multi-field separator ───────────────────────────────────────────
+//
+// A row that concatenates several personal_info fields shows a glyph where the
+// expansion fires a real Tab keystroke — a literal tab is invisible in a bubble.
+// The three drivers each write their own producer, so "the same glyph" is a claim
+// about three separate literals and nothing was checking it. Getting it wrong is
+// not cosmetic: the separator is how a user tells "surname then forename" from a
+// single field whose value happens to contain a space.
+//
+// U+21E5 RIGHTWARDS ARROW TO BAR, with one space either side. Spelled as a
+// codepoint rather than pasted so the check cannot pass on a look-alike.
+const SEPARATOR = ' ' + String.fromCodePoint(0x21E5) + ' ';
+const SEPARATOR_PRODUCERS = [
+	{ label: 'linux', rel: 'static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua' },
+	{ label: 'linux-bubble', rel: 'static/ergopti_plus/linux/ui/tooltip/preview.lua' },
+	{ label: 'macos', rel: 'static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua' },
+	{ label: 'windows', rel: 'static/ergopti_plus/windows/infra/personal_info_preview.ahk' }
+];
+
+for (const producer of SEPARATOR_PRODUCERS) {
+	const file = path.join(ROOT, producer.rel.split('/').join(path.sep));
+	if (!fs.existsSync(file)) {
+		errors.push(`${producer.label}: ${producer.rel} is missing — this check cannot answer, which is not the same as passing.`);
+		continue;
+	}
+	const body = fs.readFileSync(file, 'utf8');
+	// Either the literal glyph, or the escape each language spells it with:
+	// Lua writes the UTF-8 bytes, AutoHotkey uses Chr(0x21E5).
+	const hasGlyph = body.includes(SEPARATOR)
+		|| body.includes('\\226\\135\\165')
+		|| body.includes('Chr(0x21E5)');
+	if (!hasGlyph) {
+		errors.push(
+			`${producer.label} (${producer.rel}) no longer writes the U+21E5 field separator. ` +
+			'A multi-field preview row has to read the same on all three drivers — without the ' +
+			'glyph a user cannot tell two concatenated fields from one value containing a space.'
+		);
+	}
+}
+notes.push(`separator: U+21E5 present in ${SEPARATOR_PRODUCERS.length} producer(s)`);
+
 // ─── 3. The ratchet ──────────────────────────────────────────────────────────
 for (const label of unwired) {
 	if (!NOT_YET_WIRED.includes(label)) {

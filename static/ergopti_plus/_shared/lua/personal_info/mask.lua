@@ -169,4 +169,43 @@ function M.mask_field(value, field, declaration)
 	return M.mask(value, declaration.policy)
 end
 
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Redaction for the log ========
+-- =========================================
+-- =========================================
+
+--- What a LOG LINE may keep of a private value.
+---
+--- The masking above reveals a head and a tail so the user can recognise their
+--- own value on their own screen. A log has no such reader: it is written to
+--- disk, rotated, and on this project replicated to the user's other machines.
+--- So the only safe answer there is that none of the content survives.
+---
+--- The LENGTH does survive — one mask character per character — because the
+--- arithmetic downstream is computed from it and dropping it would trade a
+--- privacy bug for a metrics bug. This is the same contract as the Linux
+--- keylogger's `recorded_char` and the Windows `PersonalInfoRedactForLog`; it
+--- lives here so the three drivers cannot answer it differently.
+---
+--- @param value string The complete value, as it would be typed.
+--- @param policy table|nil From fields.toml [policy]; only `mask_char` is read.
+--- @return string A run of mask characters of the same length; the input
+---   unchanged when it is not a non-empty string.
+function M.redact_for_log(value, policy)
+	if type(value) ~= "string" or value == "" then return value end
+	-- Fail closed on a missing policy exactly as M.mask does: a broken policy
+	-- must not become a reason to print the value.
+	local mask_char = (type(policy) == "table" and type(policy.mask_char) == "string"
+		and policy.mask_char ~= "") and policy.mask_char or "\226\128\162"  -- U+2022
+	local out = {}
+	for index = 1, #characters(value) do
+		out[index] = mask_char
+	end
+	return table.concat(out)
+end
+
 return M

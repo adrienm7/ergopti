@@ -83,7 +83,10 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 		} else {
 				HSE_Suppress(true)
 		}
-		try KL_MarkSynthetic("hotstring")
+		; The privacy flag rides along: the keylogger's InputHook observes the
+		; characters this callback is about to type, and without it they land in
+		; the typing row verbatim.
+		try KL_MarkSynthetic("hotstring", Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
 		try {
 				Effect := (Spec.Callback)(EndChar)
 				; A falsy Effect means the callback declined to expand — leave the buffer
@@ -228,7 +231,12 @@ HSE_DispatchMatch(Spec, EndChar) {
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the suppression below so it covers the OS message-loop flush window.
-		try KL_MarkSynthetic("hotstring")
+		;
+		; The second argument is not bookkeeping: the burst below is typed through
+		; the OS, the keylogger's own InputHook sees every character of it, and the
+		; typing row it writes is a SECOND sink for the same secret the fire row
+		; already redacts.
+		try KL_MarkSynthetic("hotstring", Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
 		try {
 				if _ALTGR_KANA_FIXUP {
 						; SendInput (not SendEvent) — non-blocking injection that does not
@@ -326,10 +334,23 @@ HSE_DispatchMatch(Spec, EndChar) {
 				; "abcd"->"acd") can be read straight off the log. Debug-gated so normal
 				; typing stays silent; enable via tray Debug -> Log level -> DEBUG.
 				if LoggerIsDebugEnabled() {
-						try LoggerDebug("HSEFire",
-								"FIRE trig='{1}' end='{2}' bs={3} branch={4} conform={5} burst='{6}'.",
-								Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
-								IsConform ? 1 : 0, SentBurst)
+						; The burst IS the replacement (plus the erase sequence), and the
+						; trigger is a fragment of the same secret, so a private mapping
+						; withholds both. DEBUG is exactly the level a user is asked to
+						; switch on when reporting a bug, and this log rotates alongside
+						; the metrics store the redaction exists to protect — so the shape
+						; of the fire is traced and none of its content is.
+						if (Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate) {
+								try LoggerDebug("HSEFire",
+										"FIRE private mapping bs={1} branch={2} conform={3} burst={4} char(s) (trigger and content withheld).",
+										BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
+										IsConform ? 1 : 0, StrLen(SentBurst))
+						} else {
+								try LoggerDebug("HSEFire",
+										"FIRE trig='{1}' end='{2}' bs={3} branch={4} conform={5} burst='{6}'.",
+										Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
+										IsConform ? 1 : 0, SentBurst)
+						}
 				}
 
 				; Mirror the post-expansion screen state into the buffer so the

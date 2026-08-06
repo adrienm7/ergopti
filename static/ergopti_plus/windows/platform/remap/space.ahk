@@ -187,6 +187,10 @@ _SpaceTap() {
 						: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
 				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 				HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+				; Carried through for the same reason the prefix-watcher path carries
+				; it: this sibling reaches the same metrics sink, and a fix applied to
+				; only one of the three fire paths leaks from the other two.
+				HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
 				; Queue the metrics record instead of writing it here. This runs under
 				; Critical("On") on the keystroke thread, BEFORE the post-expansion
 				; suppress release, and KL_LogHotstring is a buffer flush plus a JSONL
@@ -195,7 +199,7 @@ _SpaceTap() {
 				; was moved off KL_LogHotstring onto this queue for exactly that reason;
 				; this sibling kept the synchronous call.
 				if IsSet(_HSE_QueueFireLog)
-						try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection)
+						try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection, HotstringIsPrivate)
 				UpdateLastSentCharacter(" ")
 				Critical(PrevCrit ? PrevCrit : "Off")
 				return

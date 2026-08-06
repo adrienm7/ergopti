@@ -55,6 +55,7 @@ end
 
 
 
+
 -- =================================================================
 -- =================================================================
 -- ======= 1/ The shared vectors ===================================
@@ -83,6 +84,7 @@ helpers.describe("preview masking: the cross-driver corpus", function()
 	end)
 
 end)
+
 
 
 
@@ -120,6 +122,7 @@ helpers.describe("preview masking: what happens when it cannot decide", function
 	end)
 
 end)
+
 
 
 
@@ -197,6 +200,7 @@ end)
 
 
 
+
 -- =================================================================
 -- =================================================================
 -- ======= 4/ The cross-driver corpus ==============================
@@ -268,6 +272,98 @@ helpers.describe("preview masking: the shared cross-driver vectors", function()
 		helpers.assert_true(no_field >= 1,
 			"a vector with no field at all — the case that must mask rather than "
 				.. "assume public — is missing")
+	end)
+
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 4/ A multi-field row masks each part separately =======
+-- ===============================================================
+-- ===============================================================
+
+--- The @-combo rows carry parallel `parts` and `fields` arrays instead of one
+--- value and one field name, because a combo mixes classifications: "@ti" is a
+--- phone number (declared public) followed by an IBAN (declared secret). Masking
+--- the joined string would force ONE verdict on the row, and whichever verdict
+--- won would be wrong for the other half — either the IBAN on screen, or a phone
+--- number the user cannot read back to check it is the right one.
+---
+--- Reached through build_rows rather than by calling the internal masker, so what
+--- is pinned is what the renderer receives.
+helpers.describe("preview: a multi-field @-combo row", function()
+
+	local Preview = helpers.load_module("ui.tooltip.preview")
+
+	--- The single row build_rows produces for one candidate.
+	local function row_for(candidate)
+		local rows = Preview.build_rows({ candidate }, {})
+		helpers.assert_eq(#rows, 1, "one candidate makes one row")
+		return rows[1]
+	end
+
+	helpers.it("hides the secret part and shows the public one, in the same row", function()
+		local row = row_for({
+			trigger     = "@ti\\",
+			replacement = "0606060606 ⇥ FR7630006000011234567890189",
+			parts       = { "0606060606", "FR7630006000011234567890189" },
+			fields      = { "phone_number", "iban" },
+			group       = "personal",
+			fires       = true,
+		})
+		helpers.assert_contains(row.text, "0606060606",
+			"phone_number is declared masked = false — hiding it helps nobody and "
+				.. "removes the only way the user can tell which number is about to be typed")
+		helpers.assert_true(not row.text:find("7630006000011234567890189", 1, true),
+			"while the IBAN in the SAME row must be hidden: one verdict for the whole "
+				.. "row is wrong whichever way it falls")
+		helpers.assert_contains(row.text, "•",
+			"and the hiding is the shared mask character, not an empty string")
+	end)
+
+	helpers.it("keeps the two parts separated by the tab glyph", function()
+		local row = row_for({
+			trigger     = "@np\\",
+			replacement = "Dupont ⇥ Marie",
+			parts       = { "Dupont", "Marie" },
+			fields      = { "last_name", "first_name" },
+			group       = "personal",
+			fires       = true,
+		})
+		helpers.assert_contains(row.text, "⇥",
+			"the expansion fires a real Tab keystroke between fields, which is invisible "
+				.. "in a bubble — U+21E5 stands in for it, the same glyph macOS and Windows show")
+		helpers.assert_contains(row.text, "Dupont", "first part")
+		helpers.assert_contains(row.text, "Marie", "second part")
+	end)
+
+	helpers.it("still masks an ordinary single-field row", function()
+		local row = row_for({
+			trigger     = "@i\\",
+			replacement = "FR7630006000011234567890189",
+			field       = "iban",
+			group       = "personal",
+			fires       = true,
+		})
+		helpers.assert_true(not row.text:find("7630006000011234567890189", 1, true),
+			"the single-field path must keep working — a new branch for combos that "
+				.. "shadowed the old one would unmask every @-tag row")
+	end)
+
+	helpers.it("leaves a row that declares no field at all untouched", function()
+		local row = row_for({
+			trigger     = "pex\\",
+			replacement = "par exemple",
+			group       = "magickey",
+			fires       = true,
+		})
+		helpers.assert_contains(row.text, "par exemple",
+			"an ordinary hotstring has no field, is in no declaration, and must pass "
+				.. "through — masking everything protects nothing and hides the feature")
 	end)
 
 end)
