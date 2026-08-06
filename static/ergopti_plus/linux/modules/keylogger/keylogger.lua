@@ -38,6 +38,10 @@ local PrivateWindow = require("keylogger.private_window")
 local SharedMetrics    = require("keylogger.metrics")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
+
+-- For converting os.time()'s seconds to the millisecond scale the monotonic
+-- clock reports in, so the two can be subtracted.
+local MS_PER_SECOND = 1000
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
 local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
@@ -61,7 +65,7 @@ local TextCipher = require("modules.keylogger.text_cipher")
 local TextMigration = require("modules.keylogger.text_migration")
 local MigrationPlan = require("keylogger.text_migration")
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
-local NgramWalker = require("modules.keylogger.ngram_walker")
+local AggregateWalker = require("modules.keylogger.aggregate_walker")
 
 local LOG = "modules.keylogger.keylogger"
 
@@ -436,7 +440,7 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		M.record_app_key(resolved_app, ch, timestamp_ms)
 		local pending = _pending_typing_events[resolved_app]
 		if not pending then
-			pending = { text = {}, events = {}, last_key_at = nil }
+			pending = { text = {}, events = {}, times = {}, last_key_at = nil }
 			_pending_typing_events[resolved_app] = pending
 		end
 		local delay = 0
@@ -454,6 +458,12 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		local meta = {}
 		if type(scancode) == "number" and scancode > 0 then meta.sk = math.floor(scancode) end
 		pending.events[#pending.events + 1] = { ch, delay, meta }
+		-- Kept alongside the event rather than inside it: the three-element shape
+		-- is the portable events_json contract the macOS and Windows projectors
+		-- parse, and a fourth element would have to be understood by both. The
+		-- hour a keystroke belongs to is only derivable from an absolute stamp —
+		-- the delays are capped, so summing them drifts across every real pause.
+		pending.times[#pending.events] = timestamp_ms
 	end
 end
 
@@ -511,7 +521,7 @@ end
 local function ensure_pending(app_id)
 	local pending = _pending_typing_events[app_id]
 	if pending then return pending end
-	pending = { text = {}, events = {}, last_key_at = nil }
+	pending = { text = {}, events = {}, times = {}, last_key_at = nil }
 	_pending_typing_events[app_id] = pending
 	return pending
 end
@@ -546,8 +556,13 @@ end
 --- @param is_private boolean|nil True when `text` is PII and must be redacted.
 local function append_synthetic_events(app_id, text, source, deletes, is_private)
 	local pending = ensure_pending(app_id)
+	-- An expansion fires within a keystroke of its trigger, so it belongs in the
+	-- same minute. Taking the trigger's stamp keeps the two together without
+	-- reading a clock from a function that has never needed one.
+	local at = pending.last_key_at
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
 		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
 		add_synthetic_ngram(_app_stats[app_id], "[BS]", source)
 	end
 	if type(text) ~= "string" or text == "" then return end
@@ -559,12 +574,14 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 		-- and losing the length is the right way round.
 		local blob = recorded_char(text, is_private)
 		pending.events[#pending.events + 1] = { blob, 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
 		add_synthetic_ngram(_app_stats[app_id], blob, source)
 		return
 	end
 	for _, codepoint in utf8.codes(text) do
 		local char = recorded_char(utf8.char(codepoint), is_private)
 		pending.events[#pending.events + 1] = { char, 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
 		add_synthetic_ngram(_app_stats[app_id], char, source)
 	end
 end
@@ -1093,6 +1110,11 @@ function M.flush()
 		-- because a sequence is only knowable in context — a bigram needs the
 		-- character before it, and a long pause has to be able to un-make one.
 		local ngram_batch = nil
+		-- Keystrokes are stamped on the monotonic clock, which says nothing about
+		-- the time of day; the activity histogram is entirely about the time of
+		-- day. Taking both readings at the same instant gives the offset between
+		-- them, and the offset is what makes an uptime figure into an hour.
+		local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
 		for app_id, pending in pairs(_pending_typing_events) do
 			if #pending.events > 0 then
 				local total_time_ms = 0
@@ -1103,8 +1125,9 @@ function M.flush()
 					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 					events_json = _to_json(pending.events),
 				}
-				local ok_walk, walked = pcall(NgramWalker.walk,
-					pending.events, date, dashboard_app_name(app_id), ngram_batch)
+				local ok_walk, walked = pcall(AggregateWalker.walk,
+					pending.events, date, dashboard_app_name(app_id), ngram_batch,
+					{ times = pending.times, wall_offset_ms = wall_offset_ms })
 				if ok_walk then
 					ngram_batch = walked
 				else
@@ -1129,10 +1152,15 @@ function M.flush()
 			_pending_shortcut_events = {}
 		end
 		if ngram_batch then
-			for _, group in ipairs(NgramWalker.batches_for_writer(ngram_batch)) do
+			for _, group in ipairs(AggregateWalker.batches_for_writer(ngram_batch)) do
 				SqliteWriter.upsert_ngrams(_device_id, group.date, group.app,
 					group.ngrams, group.table_name)
 			end
+			local daily = AggregateWalker.daily_rows(ngram_batch)
+			for _, row in ipairs(daily.chars_class) do SqliteWriter.upsert_chars_class(_device_id, row) end
+			for _, row in ipairs(daily.errors) do SqliteWriter.upsert_errors(_device_id, row) end
+			for _, row in ipairs(daily.hourly) do SqliteWriter.upsert_hourly(_device_id, row) end
+			for _, row in ipairs(daily.hourly_min5) do SqliteWriter.upsert_hourly_min5(_device_id, row) end
 		end
 		if #_pending_app_switch_events > 0 then
 			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end

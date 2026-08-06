@@ -1,4 +1,4 @@
---- tests/unit/modules/keylogger/test_ngram_walker.lua
+--- tests/unit/modules/keylogger/test_aggregate_walker.lua
 
 --- ==============================================================================
 --- MODULE: Nine N-gram Families, Not One
@@ -29,7 +29,9 @@
 
 local helpers = require("tests.helpers")
 
-local Walker = helpers.load_module("modules.keylogger.ngram_walker")
+local Fakes = helpers.load_module("tests.fakes")
+
+local Walker = helpers.load_module("modules.keylogger.aggregate_walker")
 local Timings = helpers.load_module("infra.timings")
 
 local PAUSE_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
@@ -243,22 +245,15 @@ helpers.describe("ngram walker: a real flush writes every family", function()
 		local writer_name = "modules.keylogger.sqlite_writer"
 		local logger_name = "modules.keylogger.keylogger"
 		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
-		package.loaded[writer_name] = {
-			open_db = function() return true end,
-			register_device = function() return true end,
-			is_available = function() return true end,
-			bump_rev = function() return true end,
-			insert_typing_events = function() return true end,
-			insert_hotstring_events = function() return true end,
-			insert_shortcut_events = function() return true end,
-			insert_app_switch_events = function() return true end,
-			upsert_app_day = function() return true end,
-			upsert_scancodes = function() return true end,
-			upsert_ngrams = function(_device, _date, _app, ngrams, table_name)
-				calls[#calls + 1] = { table_name = table_name or "ngram_chars", ngrams = ngrams }
-				return true
-			end,
-		}
+		-- The shared double, with the one method this case reads about recorded in
+		-- a shape it can assert on. A hand-written table here would go stale the
+		-- next time the writer grows a method.
+		local writer = Fakes.sqlite_writer()
+		writer.upsert_ngrams = function(_device, _date, _app, ngrams, table_name)
+			calls[#calls + 1] = { table_name = table_name or "ngram_chars", ngrams = ngrams }
+			return true
+		end
+		package.loaded[writer_name] = writer
 		package.loaded[logger_name] = nil
 
 		local ok, err = pcall(function()
@@ -296,3 +291,199 @@ helpers.describe("ngram walker: a real flush writes every family", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 5/ The character composition ============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("aggregate walker: what the day was made of", function()
+
+	helpers.it("sorts characters into the five classes", function()
+		local batch = Walker.walk(typed("ab 12 ,."), "2026-08-06", "app")
+		local row = batch.chars_class["2026-08-06\1app"]
+		helpers.assert_not_nil(row, "the breakdown row must exist")
+		helpers.assert_eq(row.letter, 2)
+		helpers.assert_eq(row.digit, 2)
+		helpers.assert_eq(row.space, 2)
+		helpers.assert_eq(row.punct, 2)
+	end)
+
+	helpers.it("counts an accented letter as a letter", function()
+		local batch = Walker.walk(typed("éàü"), "2026-08-06", "app")
+		local row = batch.chars_class["2026-08-06\1app"]
+		helpers.assert_eq(row.letter, 3,
+			"these arrive as multi-byte sequences that the ASCII class pattern does "
+				.. "not match. Filing them under 'other' would make the breakdown "
+				.. "meaningless for a French corpus, which is most of this one.")
+		helpers.assert_eq(row.other, 0)
+	end)
+
+	helpers.it("does not count an expansion as something the user typed", function()
+		local batch = Walker.walk({
+			key("a", 100),
+			key("b", 0, "hotstring"), key("c", 0, "hotstring"),
+		}, "2026-08-06", "app")
+		local row = batch.chars_class["2026-08-06\1app"]
+		helpers.assert_eq(row.letter, 1,
+			"the composition breakdown answers what the USER typed. Counting the "
+				.. "driver's own output would make the profile drift towards whatever "
+				.. "the expansions happen to contain.")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ The error analysis ===================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("aggregate walker: corrections", function()
+
+	helpers.it("counts manual backspaces", function()
+		local batch = Walker.walk({
+			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("b", 100),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 2)
+	end)
+
+	helpers.it("does not count the deletions a hotstring makes to erase its trigger", function()
+		local batch = Walker.walk({
+			key("b", 100), key("t", 100), key("w", 100),
+			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
+			key("b", 0, "hotstring"),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0,
+			"those deletions are the driver erasing its own trigger. Counting them "
+				.. "would make the measured error rate rise with every expansion — the "
+				.. "feature would look like it makes the user worse.")
+	end)
+
+	helpers.it("counts a run of three or more as one cascade", function()
+		local batch = Walker.walk({
+			key("a", 100),
+			key("[BS]", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
+			key("b", 100),
+		}, "2026-08-06", "app")
+		local row = batch.errors["2026-08-06\1app"]
+		helpers.assert_eq(row.cascade_count, 1,
+			"four deletions in a row are one correction, not four")
+		helpers.assert_eq(row.cascade_max_len, 4)
+	end)
+
+	helpers.it("does not call a single backspace a cascade", function()
+		local batch = Walker.walk({
+			key("a", 100), key("[BS]", 100), key("b", 100),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 0,
+			"fixing one character is ordinary typing; if that counted, the cascade "
+				.. "figure would just be the backspace count again")
+	end)
+
+	helpers.it("closes a cascade that is still open when the stream ends", function()
+		local batch = Walker.walk({
+			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 1,
+			"a flush lands between keystrokes, so a correction still in progress at "
+				.. "the boundary is the normal case rather than an edge one")
+	end)
+
+	helpers.it("measures how quickly the user resumed", function()
+		local batch = Walker.walk({
+			key("a", 100), key("[BS]", 100), key("b", 250),
+		}, "2026-08-06", "app")
+		local row = batch.errors["2026-08-06\1app"]
+		helpers.assert_eq(row.recovery_count, 1)
+		helpers.assert_eq(row.recovery_sum_ms, 250)
+	end)
+
+	helpers.it("does not call a coffee break recovery time", function()
+		local batch = Walker.walk({
+			key("a", 100), key("[BS]", 100), key("b", PAUSE_MS + 60000),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].recovery_count, 0,
+			"past the pause threshold the user stopped typing rather than thought "
+				.. "about the fix, and folding that in would report a lunch break as "
+				.. "the cost of a typo")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 7/ The time of day ======================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("aggregate walker: when the typing happened", function()
+
+	--- A clock that puts every keystroke on one chosen wall-clock instant.
+	---
+	--- The walk adds the offset to a monotonic stamp, so making the stamps 1..N
+	--- and the offset absolute lands them all in the same second — which is what
+	--- lets the expected hour be computed here rather than guessed.
+	--- \1param count number How many events the stream holds.
+	--- \1param at number Epoch seconds every keystroke should land on.
+	--- \1return table
+	local function clock_at(count, at)
+		local times = {}
+		for index = 1, count do times[index] = index end
+		return { times = times, wall_offset_ms = at * 1000 }
+	end
+
+	helpers.it("credits each keystroke to its hour and its five-minute slot", function()
+		local events = typed("abcd")
+		-- Read back through the same os.date the walk uses, so a machine in any
+		-- time zone agrees with itself.
+		local at = os.time({ year = 2026, month = 8, day = 6, hour = 10, min = 7, sec = 0 })
+		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
+
+		local hour = os.date("%H", at)
+		local minute = tonumber(os.date("%M", at))
+		local slot = string.format("%s:%02d", hour, math.floor(minute / 5) * 5)
+
+		local hourly = batch.hourly["2026-08-06\1app\1" .. hour]
+		helpers.assert_not_nil(hourly, "the activity timeline had no rows at all before this")
+		helpers.assert_eq(hourly.c, 4)
+
+		local min5 = batch.hourly_min5["2026-08-06\1app\1" .. slot]
+		helpers.assert_not_nil(min5, "and neither did its fine-grained version")
+		helpers.assert_eq(min5.c, 4)
+		helpers.assert_eq(min5.slot, slot,
+			"the slot is floored to a five-minute step, so 10:07 belongs to 10:05")
+	end)
+
+	helpers.it("records the first and last minute the user typed", function()
+		local events = typed("ab")
+		local at = os.time({ year = 2026, month = 8, day = 6, hour = 14, min = 32, sec = 0 })
+		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
+		local row = batch.chars_class["2026-08-06\1app"]
+		local expected = os.date("%H:%M", at)
+		helpers.assert_eq(row.first_typed_min, expected)
+		helpers.assert_eq(row.last_typed_min, expected)
+	end)
+
+	helpers.it("skips the time-of-day tables rather than guessing when it has no clock", function()
+		local batch = Walker.walk(typed("abc"), "2026-08-06", "app")
+		helpers.assert_true(next(batch.hourly) == nil,
+			"a keystroke with no timestamp has no hour. Defaulting to the flush time "
+				.. "would pile a whole session onto whichever minute the daemon "
+				.. "happened to persist in, and the histogram would show bursts the "
+				.. "user never typed.")
+		helpers.assert_true(next(batch.hourly_min5) == nil)
+	end)
+
+end)
+

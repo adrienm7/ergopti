@@ -127,6 +127,65 @@ FROM agg_app_day%s GROUP BY date, app;
 		entry.app_time_ms = row.app_time_ms or 0
 		entry.category = row.category or "Unknown"
 	end
+
+	-- The per-app-day aggregates. Field names match the macOS projection exactly,
+	-- because the dashboard that reads them is the same one.
+	local where = filters(start_date, end_date, apps)
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
+       SUM(space) AS space, SUM(other) AS other,
+       MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
+FROM agg_app_day_chars_class%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.char_letter = row.letter or 0
+		entry.char_digit = row.digit or 0
+		entry.char_punct = row.punct or 0
+		entry.char_space = row.space or 0
+		entry.char_other = row.other or 0
+		-- MIN and MAX rather than the last row's value: several devices sync into
+		-- one database, and the earliest keystroke of the day is the earliest
+		-- across all of them.
+		entry.first_typed_min = row.first_min
+		entry.last_typed_min = row.last_min
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
+       MAX(cascade_max_len) AS cascade_max_len,
+       SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
+FROM agg_app_day_errors%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.bs_total = row.bs_total or 0
+		entry.cascade_count_total = row.cascade_count or 0
+		entry.cascade_max_len = row.cascade_max_len or 0
+		entry.recovery_time_sum_ms = row.recovery_sum or 0
+		entry.recovery_time_count = row.recovery_count or 0
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
+FROM agg_app_day_hourly%s GROUP BY date, app, hour;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.hourly[row.hour] = {
+			c = row.c or 0, e = row.e or 0, em = row.em or 0, es = row.es or 0,
+			e_buckets = {},
+		}
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es
+FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.hourly_min5[row.slot] = {
+			c = row.c or 0, e = row.e or 0, es = row.es or 0, e_buckets = {},
+		}
+	end
+
 	return manifest
 end
 

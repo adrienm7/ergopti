@@ -1,13 +1,14 @@
---- tests/unit/meta/test_sqlite_reader_ngram_families.lua
+--- tests/unit/meta/test_sqlite_reader_projection.lua
 
 --- ==============================================================================
---- MODULE: The Reader Asks For All Nine Families
+--- MODULE: The Reader Asks For Everything The Walk Writes
 --- DESCRIPTION:
---- That the dashboard projection queries every n-gram table the schema declares,
---- and carries the delay and error columns out of each one.
+--- That the dashboard projection queries every n-gram table and every per-app-day
+--- aggregate the schema declares, carries the delay and error columns out of
+--- each, and lands the rows under the keys the dashboard reads.
 ---
 --- THE DEFECT THIS PINS:
---- The reader named exactly one table. It built an envelope with thirteen codes
+--- The reader named exactly one n-gram table and no aggregate table at all. It built an envelope with thirteen codes
 --- in it and filled one, handing back permanently empty maps for the other
 --- eight — so the word lists, the pair lists and every panel keyed on a sequence
 --- longer than a single character rendered blank no matter what the database
@@ -257,3 +258,97 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ The per-app-day aggregates ===========================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: the daily aggregate tables", function()
+
+	helpers.it("queries all four, not only the totals row", function()
+		local statements = with_stubbed_sqlite(function() return "" end, function(reader)
+			reader.read_manifest("/tmp/probe.sqlite", "2026-08-01", "2026-08-06", nil)
+		end)
+
+		for _, table_name in ipairs({
+			"agg_app_day", "agg_app_day_chars_class", "agg_app_day_errors",
+			"agg_app_day_hourly", "agg_app_day_hourly_min5",
+		}) do
+			helpers.assert_true(queried(statements, table_name),
+				"'" .. table_name .. "' was never queried — the walk now fills it and "
+					.. "nobody reads it, which from the outside is the same blank panel "
+					.. "as never having filled it")
+		end
+	end)
+
+	helpers.it("projects the character breakdown onto the manifest entry", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_chars_class", 1, true) then
+				return '[{"date":"2026-08-06","app":"firefox","letter":120,"digit":8,'
+					.. '"punct":15,"space":30,"other":2,'
+					.. '"first_min":"09:12","last_min":"18:40"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"] and manifest["2026-08-06"].firefox
+		helpers.assert_not_nil(entry, "the entry must exist even with no totals row")
+		helpers.assert_eq(entry.char_letter, 120)
+		helpers.assert_eq(entry.first_typed_min, "09:12",
+			"the earliest keystroke of the day is what the heatmap labels its axis "
+				.. "with, and it was never read on this driver")
+	end)
+
+	helpers.it("projects the error analysis under the names the dashboard expects", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_errors", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","bs_total":42,'
+					.. '"cascade_count":5,"cascade_max_len":11,'
+					.. '"recovery_sum":3200,"recovery_count":16}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.bs_total, 42)
+		helpers.assert_eq(entry.cascade_count_total, 5,
+			"the dashboard reads cascade_count_total, not cascade_count — the same "
+				.. "number under the wrong key renders as zero, which is worse than "
+				.. "missing because it looks like an answer")
+		helpers.assert_eq(entry.recovery_time_sum_ms, 3200)
+	end)
+
+	helpers.it("keys the activity histogram by hour and by slot", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_hourly_min5", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","slot":"10:05","c":40,"e":1,"es":0}]'
+			end
+			if sql:find("FROM agg_app_day_hourly", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","hour":"10","c":180,"e":4,"em":2,"es":1}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.hourly["10"].c, 180)
+		helpers.assert_eq(entry.hourly_min5["10:05"].c, 40,
+			"the two histograms are separate panels keyed differently, and reading "
+				.. "the fine one into the coarse map would silently halve the timeline")
+	end)
+
+end)
+

@@ -38,6 +38,8 @@
 
 local helpers = require("tests.helpers")
 
+local Fakes = helpers.load_module("tests.fakes")
+
 local IBAN   = "FR76 3000 4000 5000"
 local BULLET = "\226\128\162"  -- U+2022, the character macOS substitutes too
 
@@ -72,6 +74,10 @@ local function flush_expansion(is_private)
 		upsert_ngrams = function() return true end,
 		upsert_scancodes = function() return true end,
 	}
+	-- Everything this test does not override comes from the shared double, so a
+	-- method added to the writer does not surface here as a nil call inside the
+	-- code under test.
+	setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
 
 	local writer_name = "modules.keylogger.sqlite_writer"
 	local logger_name = "modules.keylogger.keylogger"
@@ -193,6 +199,7 @@ helpers.describe("private mapping: the synthetic character record", function()
 			upsert_ngrams = function() return true end,
 			upsert_scancodes = function() return true end,
 		}
+		setmetatable(package.loaded[writer_name], { __index = Fakes.sqlite_writer() })
 		package.loaded[logger_name] = nil
 
 		local ok, err = pcall(function()
