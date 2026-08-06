@@ -668,6 +668,23 @@ local function _slot_for_gesture(fingers, direction, tap)
 	return string.format("swipe_%d_%s", math.min(fingers, 5), direction)
 end
 
+--- Runs one action by name, whatever asked for it.
+---
+--- Exposed because the gesture manager owns the action catalogue, the labels and
+--- the execution, and the configurable keyboard shortcuts bind the same
+--- catalogue. A second executor there would be a second implementation of
+--- "select the word", drifting from this one the first time either is touched.
+--- @param action_name string From M.get_action_names().
+--- @param binding string|nil What asked for it, for the logs and the parameters.
+--- @return boolean True when a name was given at all.
+function M.execute_action(action_name, binding)
+	if type(action_name) ~= "string" or action_name == "" or action_name == "none" then
+		return false
+	end
+	_execute_action(action_name, nil, binding)
+	return true
+end
+
 --- Runs the action bound to a gesture the decoder has already classified.
 ---
 --- Separate from process_frame, which does its own classification from a list of

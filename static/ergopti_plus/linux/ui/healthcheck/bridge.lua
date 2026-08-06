@@ -187,12 +187,18 @@ local function collect_layout(state)
 		caps = NOT_AVAILABLE,
 		prefix_latch = "clean",
 	}
+	-- `held_modifiers`, not `held_text_modifiers`. The latter answers a different
+	-- question and answers it as an ARRAY of names, so indexing it by name gives
+	-- nil for every modifier — which renders as "off" for all of them and reads
+	-- as a report rather than as a failed read.
 	local ok, hook = pcall(require, "adapters.keyboard_hook")
-	if ok and type(hook.held_text_modifiers) == "function" then
-		local ok_held, held = pcall(hook.held_text_modifiers)
+	if ok and type(hook.held_modifiers) == "function" then
+		local ok_held, held = pcall(hook.held_modifiers)
 		if ok_held and type(held) == "table" then
 			layout_state.shift = held.shift and "active" or "off"
 			layout_state.altgr = held.altgr and "active" or "off"
+			layout_state.ctrl = held.ctrl and "active" or "off"
+			layout_state.meta = held.meta and "active" or "off"
 		end
 	end
 	-- Whether a typable keymap resolved at all. This is the single most useful
