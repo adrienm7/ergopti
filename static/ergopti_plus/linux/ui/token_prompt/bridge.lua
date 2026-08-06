@@ -2,8 +2,24 @@
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Token / Prompt Settings
---- Handles JS->Lua messages from _shared/ui/token_prompt/.
+--- DESCRIPTION:
+--- Handles JS→Lua messages from _shared/ui/token_prompt/.
 --- Bridge name: "token_bridge"
+---
+--- TWO OF ITS FOUR BRANCHES HAVE NO SENDER (checked 2026-08-06).
+--- The shared page is a GitHub-token form: it creates the bridge and sends a
+--- token, and it has never sent `save_settings` or `test_prompt`. Those two
+--- branches were written for an LLM settings window that does not exist, so
+--- from a user's point of view this window does not save any setting — the
+--- controls for temperature and context length live in the tray menu instead.
+---
+--- They are kept rather than deleted because the engine functions behind them
+--- are real API used elsewhere, and because the branches become correct the day
+--- a page sends those messages. What is NOT acceptable is the previous state:
+--- three of the four setters did not exist at all, and every call was skipped
+--- by a `type(…) == "function"` guard — so if a page HAD sent a save, one field
+--- in four would have applied and the window would have reported success.
+--- `tests/unit/modules/llm/test_token_prompt_setters.lua` pins the contract now.
 --- ==============================================================================
 
 local M = {}
