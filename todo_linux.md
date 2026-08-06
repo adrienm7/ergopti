@@ -781,33 +781,48 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 
 ### 13.2 — Reste à faire, par ordre de rentabilité
 
-- [ ] **La requête Ollama ne porte ni `keep_alive` ni séquences d arrêt.** Les deux
+- [x] **La requête Ollama ne porte ni `keep_alive` ni séquences d arrêt.** Les deux
       valeurs sont dans `_shared/modules/llm/inference.json`, déjà chargé.
-- [ ] **Un changement de disposition n atteint jamais l injecteur.** Câbler
+- [x] **Un changement de disposition n atteint jamais l injecteur.** Câbler
       `on_layout_change` sur `adapters/keyboard_layout.lua M.refresh()`.
-- [ ] **Les paramètres de prompt sont des littéraux** alors que les deux modules
+- [x] **Les paramètres de prompt sont des littéraux** alors que les deux modules
       partagés sont déjà chargés.
-- [ ] **Le bouton de remise à zéro des tableaux de bord ne fait rien**, et
+- [x] **Le bouton de remise à zéro des tableaux de bord ne fait rien**, et
       `metrics_apps` appelle une fonction qui n existe pas.
 - [ ] **La couche navigation laisse la molette transparente** (`volu`/`vold` sur
       `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK).
-- [ ] **« Démarrer kanata » peut lancer une seconde instance** à côté de celle que
+- [x] **« Démarrer kanata » peut lancer une seconde instance** à côté de celle que
       systemd gère : `is_running()` ne teste que le processus qu il a lancé lui-même.
-- [ ] **Un `tap_hold.toml` utilisateur remplace les défauts partagés en bloc** au
+- [x] **Un `tap_hold.toml` utilisateur remplace les défauts partagés en bloc** au
       lieu de fusionner touche par touche.
-- [ ] **Le cycle de vie des suggestions n est jamais enregistré** — le KPI de taux
+- [x] **Le cycle de vie des suggestions n est jamais enregistré** — le KPI de taux
       d acceptation lit 0 %.
-- [ ] **Les fichiers de log tournent chaque jour et ne sont jamais purgés.**
+- [x] **Les fichiers de log tournent chaque jour et ne sont jamais purgés.**
 - [ ] **Aucune surface de notification** : le port `Notifier` n a pas d adaptateur
       Linux. Les chaînes existent déjà dans les 21 locales.
-- [ ] **La fenêtre de diagnostic s ouvre vide** : `_shared/lua/healthcheck/snapshot
+- [x] **La fenêtre de diagnostic s ouvre vide** : `_shared/lua/healthcheck/snapshot
       .lua` n est lié que par macOS.
 - [ ] **Activer `[sections.llm]` pour `linux`** dans le manifeste partagé, puis
       écrire les lecteurs et setters. Débloque le sous-menu LLM à 8 lignes.
 
-### 13.3 — Le gros morceau : le walker de frappes
+### 13.3 — Le walker de frappes (livré le 2026-08-06)
 
-- [ ] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
+> Ce qui a été écrit : les neuf familles de n-grammes avec leurs colonnes de
+> délai et d erreur, la composition en classes de caractères, l analyse
+> d erreurs (retours arrière, cascades, temps de reprise), les deux frises
+> horaires, les rafales, les sessions, les paliers de pause cumulatifs et les
+> transitions entre applications — écrits ET relus, parce qu une table écrite
+> que personne ne lit est le même panneau vide qu une table jamais écrite.
+>
+> Ce qui reste hors de portée aujourd hui, et pourquoi : `agg_app_day_kc_hold`
+> demande les durées d appui, or la boucle de capture jette les relâchements ;
+> `agg_app_day_ergo` demande une table doigt→code propre à evdev que ce driver
+> n a pas ; `agg_app_day_titles` demande les titres de fenêtre, que ce driver ne
+> lit pas ; `agg_system_day` est un sous-système entier (wifi, batterie,
+> verrouillage, veille).
+
+
+- [x] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
       se déclare « ZERO driver dependencies », nomme déjà les neuf tables n-grammes
       manquantes et les finaliseurs de rafale et de session — et n est requis que
       par macOS. Linux écrit 8 tables sur 25.
