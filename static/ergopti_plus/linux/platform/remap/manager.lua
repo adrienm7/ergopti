@@ -355,8 +355,14 @@ end
 function M.start()
 	_resolve_paths()
 
-	if M.is_running() then
+	if M.owns_process() then
 		Logger.debug(LOG, "start(): kanata already running (pid=%d).", _kanata_pid)
+		return true
+	end
+	if M.is_running() then
+		-- Started by systemd or by hand. Starting another would put two daemons
+		-- on the same keyboard, each grabbing and re-emitting it.
+		Logger.info(LOG, "start(): kanata is already running under another supervisor — not starting a second.")
 		return true
 	end
 
@@ -406,9 +412,19 @@ function M.start()
 	return true
 end
 
---- Stops the kanata daemon. Safe to call when not running.
+--- Stops the kanata daemon, if this module is the one that started it.
+---
+--- A foreign instance is left alone. Most installs run kanata under systemd,
+--- and killing that one either has it restarted underneath us — so the menu
+--- reports "stopped" while the remap stays live — or leaves the user's session
+--- unmapped by a service they never asked this daemon to manage.
 function M.stop()
-	if not M.is_running() then return end
+	if not M.owns_process() then
+		if M.is_running() then
+			Logger.info(LOG, "Kanata is running but was started elsewhere — leaving it alone.")
+		end
+		return
+	end
 
 	os.execute(string.format("kill %d 2>/dev/null", _kanata_pid))
 	Logger.info(LOG, "Kanata stopped (pid=%d).", _kanata_pid)
@@ -418,18 +434,55 @@ end
 --- Restarts kanata: regenerates the .kbd, stops any running instance, starts fresh.
 --- @return boolean True if kanata is running after this call.
 function M.restart()
-	Logger.info(LOG, "Restarting kanata…")
+	Logger.start(LOG, "Restarting kanata…")
+	-- Written first, so the new config is on disk whichever branch follows.
+	if not M.write_kbd() then
+		Logger.error(LOG, "Restart aborted: the configuration could not be written.")
+		return false
+	end
+
+	if M.is_running() and not M.owns_process() then
+		-- Killing a supervised process is not a restart: systemd brings it back
+		-- with the config it already had, and the menu would report success while
+		-- nothing changed. Saying so is the only honest answer available here.
+		Logger.warn(LOG,
+			"Kanata is supervised elsewhere — the new configuration is written, but "
+				.. "its own supervisor has to reload it (systemctl --user restart kanata).")
+		return false
+	end
+
 	M.stop()
-	if not M.write_kbd() then return false end
-	return M.start()
+	local started = M.start()
+	if started then Logger.success(LOG, "Kanata restarted.") end
+	return started
 end
 
---- Returns true when kanata is running.
+--- Whether the process this module started is still alive.
+---
+--- Distinct from `is_running`, and the distinction is what makes stop() safe:
+--- only a process we spawned may be killed.
+--- @return boolean
+function M.owns_process()
+	if not _kanata_pid then return false end
+	-- Signal 0 tests for existence without delivering anything.
+	local ok = os.execute(string.format("kill -0 %d 2>/dev/null", _kanata_pid))
+	return (ok == true or ok == 0)
+end
+
+--- Whether ANY kanata is running, whoever started it.
+---
+--- This used to answer only for the process this module had spawned. Most
+--- installs run kanata under systemd, so on those machines the answer was
+--- always false and "Start kanata" launched a SECOND instance beside the
+--- service. Two kanatas grab the same keyboard and both re-emit it: every
+--- keystroke arrives twice, or the second grab fails and the remap silently
+--- stops applying. Neither points at the menu item that caused it.
 --- @return boolean
 function M.is_running()
-	if not _kanata_pid then return false end
-	-- Check the PID is still alive (send signal 0).
-	local ok = os.execute(string.format("kill -0 %d 2>/dev/null", _kanata_pid))
+	if M.owns_process() then return true end
+	-- `-x` matches the executable name exactly, so a `kanata-something` or an
+	-- editor holding kanata.kbd open is not mistaken for the daemon.
+	local ok = os.execute("pgrep -x kanata >/dev/null 2>&1")
 	return (ok == true or ok == 0)
 end
 

@@ -138,6 +138,13 @@ local function full_context()
 		},
 		kanata = {
 			is_running = function() return false end,
+			-- Distinct from is_running: one asks whether ANY kanata is up, the
+			-- other whether this daemon started it. The menu reads the cheap one
+			-- because answering the first truthfully costs a subprocess, and a
+			-- double missing it makes the whole submenu render empty — the
+			-- provider raises and the renderer skips it, which looks from here
+			-- like a menu bug rather than a stale stub.
+			owns_process = function() return false end,
 			start      = noop,
 			stop       = noop,
 			restart    = noop,

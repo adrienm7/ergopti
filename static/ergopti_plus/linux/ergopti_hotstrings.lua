@@ -1107,7 +1107,17 @@ local function main()
 		end
 
 		rebuild_tray_menu = function()
-			local ok_build, items = pcall(menu_builder.build, _build_menu_ctx())
+			local ctx = _build_menu_ctx()
+			-- Probed here rather than inside the builder. Answering truthfully means
+			-- asking the system whether ANY kanata is running — including one under
+			-- systemd — and that is a subprocess. Building a menu must not spawn
+			-- one, so the daemon does it at the moment it decides to rebuild and
+			-- hands the answer over as state.
+			if kanata then
+				local ok_state, running = pcall(kanata.is_running)
+				ctx.kanata_running = ok_state and running or false
+			end
+			local ok_build, items = pcall(menu_builder.build, ctx)
 			if not ok_build then
 				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
 				return
