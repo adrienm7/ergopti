@@ -210,8 +210,100 @@ same time** — they compete for the same event taps.
 
 The daemon lives in [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/)
 (entry: `ergopti_hotstrings.lua`, launcher: `bin/ergopti-hotstrings`) and pairs
-with [kanata](https://github.com/jtroo/kanata) for tap-holds. Read the header of
-the entry file before running — the driver is untested on real hardware.
+with [kanata](https://github.com/jtroo/kanata) for tap-holds.
+
+**Runtime — LuaJIT.** The test suite runs on any Lua (`npm run test:linux` probes
+`luajit`, then `lua5.4`, then `lua`), but the daemon binds `/dev/uinput`,
+`nanosleep` and `libayatana-appindicator` through FFI, so LuaJIT is what actually
+runs it.
+
+**1. Dependencies**
+
+```bash
+bash static/ergopti_plus/linux/install.sh             # deps, kanata, files, permissions, autostart
+bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the package installs
+```
+
+| Package                            | Without it                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `luajit`                           | the launcher refuses to start                                                  |
+| `libnotify` (`notify-send`)        | the launcher refuses to start                                                  |
+| `libxkbcommon-tools` (`xkbcli`)    | the output layout cannot be read, so every replacement is pasted via the clipboard instead of typed |
+| `libayatana-appindicator3`         | `--tray` has nothing to host the icon in                                       |
+| `kanata`                           | no tap-hold and no layers; hotstrings still work                               |
+| `lua-luv`                          | no inotify — the loop falls back to an FFI sleep and file watching to `stat()` polling |
+| `lua-posix`                        | no `SIGTERM`/`SIGHUP` handlers, and no `stat()` polling to fall back on        |
+| `lua-lgi`                          | no typing-speed pill and no WebKit2GTK windows                                 |
+| `lua-filesystem`                   | existence checks fall back from `stat()` to opening the path                   |
+| `lua-http`                         | nothing today — installed, required by no module                               |
+
+`install.sh` installs every row except `libayatana-appindicator3`, whose package
+name the tray adapter prints for your distribution the first time `--tray` cannot
+bind it. Every Lua library is loaded through `pcall(require, …)`, so a bare box
+starts and silently does less rather than failing.
+
+**2. Permissions** — this is where people get stuck
+
+The daemon reads `/dev/input/eventN` and writes `/dev/uinput`, and a normal user
+may do neither. `install.sh` handles it; re-run just that part (after a kernel
+update, say) with:
+
+```bash
+bash static/ergopti_plus/linux/install.sh --setup-perms
+```
+
+It adds you to **both** `input` and `uinput`, drops `uinput` into
+`/etc/modules-load.d/`, and writes `/etc/udev/rules.d/99-ergopti-uinput.rules`:
+
+```udev
+KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"
+```
+
+`static_node=uinput` is **not** optional: `/dev/uinput` does not exist until the
+module is loaded, so a rule without it matches nothing on a fresh boot and the
+permissions look as though they were never applied. Log out and back in
+afterwards — group membership is only read at session start. Note that `input`
+grants read access to every keystroke of the session; that is what a hotstring
+engine needs, and it is why `uaccess` is deliberately not used here.
+
+**3. Run it from the clone**
+
+```bash
+cd static/ergopti_plus/linux
+luajit ergopti_hotstrings.lua --dry-run    # log matches, inject nothing
+luajit ergopti_hotstrings.lua --tray       # the real thing, with a tray icon
+```
+
+`bin/ergopti-hotstrings` does the same after exporting `LUA_PATH`, but it prefers
+an installed tree if `/usr/lib/ergopti` exists — call the entry file directly
+when iterating on a checkout. With no `~/.config/ergopti/hotstrings/`, the daemon
+falls back to the TOML definitions bundled in `_shared/modules/hotstrings/`.
+
+| Flag                       | Effect                                                                     |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `--config <path>`          | TOML file or directory (default `~/.config/ergopti/hotstrings/`)           |
+| `--device <path>`          | evdev device to listen on; auto-detected when omitted                      |
+| `--layout qwerty\|azerty`  | INPUT layout, keycode → character (default: `$XKBLAYOUT`)                  |
+| `--keymap <path>`          | OUTPUT keymap dump, for a session whose layout cannot be probed            |
+| `--tray`                   | system tray icon                                                           |
+| `--no-grab`                | observe instead of grabbing — physical keys then interleave with an expansion and can scramble it |
+| `--dry-run`                | log matches without injecting                                              |
+| `--help`, `-h`             | usage                                                                      |
+
+`--verbose` / `-v` is accepted but does **not** raise the log level: it is only
+forwarded into the tray context, and the level is settable from the tray menu
+alone.
+
+**4. Before trusting it on your own keyboard**
+
+The driver is alpha and has never been validated on real hardware.
+[`HARDWARE.md`](static/ergopti_plus/linux/HARDWARE.md) is the checklist for
+everything CI cannot answer — capture under X11 and Wayland, the keymap dump, the
+grab, the tray — and most of it is scripted:
+
+```bash
+bash static/ergopti_plus/linux/tests/hardware/validate.sh
+```
 
 ### Tests and quality gates
 

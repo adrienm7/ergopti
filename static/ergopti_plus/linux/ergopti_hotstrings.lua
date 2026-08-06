@@ -25,7 +25,10 @@
 ---                       unnecessary — the layout is read from the server.
 ---   --tray             Enable the tray icon (needs libayatana-appindicator).
 ---   --dry-run          Log matches without injecting any keystrokes.
----   --verbose          Enable debug-level logging.
+---   --verbose          Forwarded into the tray context only. It does NOT raise
+---                      the log level: the sole Logger.set_level call is the
+---                      tray menu's callback, so the level is settable from the
+---                      menu alone.
 ---   --help             Print usage and exit.
 ---
 --- FEATURES & RATIONALE:
@@ -311,7 +314,8 @@ local function print_usage()
 	print("                      expansion is being typed, which can scramble it.")
 	print("                      Use only if the grab misbehaves on your hardware.")
 	print("  --dry-run           Log matches without injecting.")
-	print("  --verbose           Enable debug messages.")
+	print("  --verbose           Accepted, but does NOT raise the log level.")
+	print("                      Debug output is enabled from the tray menu only.")
 	print("  --help              Show this message.")
 end
 
