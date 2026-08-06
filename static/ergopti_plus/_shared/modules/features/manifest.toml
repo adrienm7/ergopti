@@ -2878,6 +2878,26 @@ platforms = ["linux"]
 # driver. Restricted to linux while it is the only driver rendering this tree:
 # declaring a row for a driver that hand-builds its menu would promise a row
 # nothing draws, which is the failure this file exists to prevent.
+#
+# WHY macOS AND WINDOWS ARE NOT SIMPLY MOVED ONTO IT (investigated 2026-08-06):
+# The macOS LLM menu is 7 578 lines across 21 files, and almost all of it is
+# MLX model management — HuggingFace downloads, a local inference server,
+# per-model state — for an engine that exists only on Apple Silicon and already
+# carries its own restriction below. There is no manifest description of that;
+# it is an application, not a menu.
+#
+# The small overlapping part does not port either, and the reason is a platform
+# constraint rather than an omission. macOS sets the temperature through a
+# free-text numeric dialog (`generic_numeric_prompt`, bounds 0.0–1.0); the Linux
+# tray has no text input at all, which is why it offers presets. Declaring one
+# shared row would force one of those shapes onto the other, and on macOS that
+# means REMOVING the free-text entry — a downgrade dressed as convergence.
+#
+# What IS shared is the SETTING, and it already is: `llm.generation.temperature`
+# and `llm.generation.context_length` are declared for all three drivers, with
+# one default. The control differs because the platforms differ, and that is
+# what per-platform rows are for. Moving macOS onto this tree is worth doing the
+# day its menu is decomposed; it is not a projection job.
 
 [[menu.llm_menu]]
 type = "list"
