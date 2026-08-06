@@ -677,6 +677,27 @@ function M.upsert_burst(device_id, row)
 	return _exec(sql)
 end
 
+--- Sets an application's category across every day it appears on.
+---
+--- Applied to every row rather than today's: a category is a property of the
+--- application, not of a day. Writing only today would leave the dashboard's
+--- own history grouped under whatever the application was called before, and
+--- the user would have to re-categorise it once per day they wanted to look at.
+--- @param app_name string
+--- @param category string
+--- @param score number Productivity score.
+function M.set_app_category(device_id, app_name, category, score)
+	if not M.is_available() then return false end
+	if type(app_name) ~= "string" or app_name == "" then return false end
+	if type(category) ~= "string" or category == "" then return false end
+	local sql = string.format(
+		"UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';",
+		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name))
+	local ok = _exec(sql)
+	if ok then M.set_meta("app_score." .. app_name, tostring(math.floor(tonumber(score) or 0))) end
+	return ok
+end
+
 --- Upserts one application-to-application transition count for a day.
 ---
 --- The pair is the key, not just the destination: the panel this feeds asks
