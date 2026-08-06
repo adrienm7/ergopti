@@ -278,6 +278,13 @@ helpers.describe("ngram walker: a real flush writes every family", function()
 		package.loaded[logger_name] = prev_logger
 		helpers.assert_true(ok, "the flush must complete: " .. tostring(err))
 
+		-- Anchored before the loop: with no calls at all the loop below runs zero
+		-- times and every later assertion still reports "family missing", which
+		-- is a true statement about a test that never observed anything.
+		helpers.assert_true(#calls > 0,
+			"the flush reached the writer zero times — nothing below can distinguish "
+				.. "a missing family from a walk that never ran")
+
 		local seen = {}
 		for _, call in ipairs(calls) do seen[call.table_name] = true end
 		helpers.assert_true(seen.ngram_chars, "the family that already worked must keep working")

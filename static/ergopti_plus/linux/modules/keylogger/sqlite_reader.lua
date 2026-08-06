@@ -17,6 +17,26 @@ local LOG = "modules.keylogger.sqlite_reader"
 
 local EMPTY_NGRAMS = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb" }
 
+-- Which table backs each code the dashboard asks for. Only "c" was ever read
+-- here: the other eight codes were handed back as permanently empty maps, so
+-- the word lists, the pair lists and every panel keyed on a sequence longer
+-- than one character rendered blank whatever the database held.
+local NGRAM_TYPE_TABLE = {
+	c    = "ngram_chars",
+	bg   = "ngram_bigrams",
+	tg   = "ngram_trigrams",
+	qg   = "ngram_quadgrams",
+	pg   = "ngram_pentagrams",
+	hx   = "ngram_hexagrams",
+	hp   = "ngram_heptagrams",
+	w    = "ngram_words",
+	w_bg = "ngram_word_bigrams",
+}
+
+-- Read in a fixed order so a failure is reproducible and the SQL a test greps
+-- for is the SQL that runs. `pairs` over the map above would do neither.
+local NGRAM_CODES = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "w_bg" }
+
 local function sql_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "''") .. "'"
 end
@@ -126,10 +146,15 @@ local function source_count(esrc_json, source)
 	return tonumber(raw) or 0
 end
 
-local function merge_ngram(target, token, count, esrc_json)
+local function merge_ngram(target, token, count, esrc_json, total_delay, error_count)
 	if type(token) ~= "string" or token == "" then return end
 	local item = target[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 	item.c = item.c + (tonumber(count) or 0)
+	-- The delay total and the error count are what turn a frequency list into a
+	-- cost ranking. Both were dropped on the floor here while the writer stored
+	-- them, so the dashboard sorted "your most expensive sequences" by zero.
+	item.t = item.t + (tonumber(total_delay) or 0)
+	item.e = item.e + (tonumber(error_count) or 0)
 	item.hs = item.hs + source_count(esrc_json, "hotstring")
 	item.llm = item.llm + source_count(esrc_json, "llm")
 	item.o = item.o + source_count(esrc_json, "other")
@@ -141,10 +166,14 @@ end
 --- are additive across dates and devices, just like the token count itself.
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
-	local rows = read_rows(sqlite_path, string.format(
-		"SELECT token, c, esrc_json FROM ngram_chars%s;",
-		filters(start_date, end_date, apps)))
-	for _, row in ipairs(rows) do merge_ngram(out.c, row.token, row.c, row.esrc_json) end
+	local where = filters(start_date, end_date, apps)
+	for _, code in ipairs(NGRAM_CODES) do
+		local rows = read_rows(sqlite_path, string.format(
+			"SELECT token, c, td, e, esrc_json FROM %s%s;", NGRAM_TYPE_TABLE[code], where))
+		for _, row in ipairs(rows) do
+			merge_ngram(out[code], row.token, row.c, row.esrc_json, row.td, row.e)
+		end
+	end
 	local sc_rows = read_rows(sqlite_path, string.format(
 		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
 		filters(start_date, end_date, apps)))
@@ -159,12 +188,15 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
-	local rows = read_rows(sqlite_path, string.format(
-		"SELECT app, token, c, esrc_json FROM ngram_chars%s;",
-		filters(today, today, apps)))
-	for _, row in ipairs(rows) do
-		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
-		merge_ngram(today_by_app[row.app].c, row.token, row.c, row.esrc_json)
+	local today_where = filters(today, today, apps)
+	for _, code in ipairs(NGRAM_CODES) do
+		local rows = read_rows(sqlite_path, string.format(
+			"SELECT app, token, c, td, e, esrc_json FROM %s%s;",
+			NGRAM_TYPE_TABLE[code], today_where))
+		for _, row in ipairs(rows) do
+			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
+			merge_ngram(today_by_app[row.app][code], row.token, row.c, row.esrc_json, row.td, row.e)
+		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(
 		"SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",

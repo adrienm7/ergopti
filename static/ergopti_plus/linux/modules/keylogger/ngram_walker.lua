@@ -200,7 +200,17 @@ function M.batches_for_writer(batch)
 					bucket = { date = date_str, app = app, ngrams = {} }
 					grouped[date_str .. "\1" .. app] = bucket
 				end
-				bucket.ngrams[token] = { c = item.c, sources = item.esrc }
+				-- The delay total travels with the count. Without it every token
+				-- reads as free, and "which sequences cost you the most" — the
+				-- question the same-finger analysis exists to answer — ranks a
+				-- column of zeroes.
+				bucket.ngrams[token] = {
+					c       = item.c,
+					td      = item.td,
+					cd      = item.cd,
+					e       = item.e,
+					sources = item.esrc,
+				}
 			end
 		end
 		for _, bucket in pairs(grouped) do

@@ -547,8 +547,15 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 
 	local parts = {}
 	for token, value in pairs(ngrams) do
-		local count = type(value) == "table" and value.c or value
-		local sources = type(value) == "table" and value.sources or nil
+		local is_row  = type(value) == "table"
+		local count   = is_row and value.c or value
+		local sources = is_row and value.sources or nil
+		-- Total delay, delay sample count and error count. Hardcoded to zero
+		-- until 2026-08-06, which made every token read as free: the panel that
+		-- ranks sequences by what they cost ranked a column of zeroes.
+		local total_delay  = is_row and tonumber(value.td) or 0
+		local delay_count  = is_row and tonumber(value.cd) or 0
+		local error_count  = is_row and tonumber(value.e) or 0
 		if type(count) == "number" and count > 0 then
 			local source_parts = {}
 			for source, source_count in pairs(sources or {}) do
@@ -559,12 +566,15 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 			end
 			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
 			parts[#parts + 1] = string.format(
-				"('%s','%s','%s','%s',%d,0,0,0,'%s')",
+				"('%s','%s','%s','%s',%d,%d,%d,%d,'%s')",
 				_sql_escape(device_id),
 				_sql_escape(date),
 				_sql_escape(app),
 				_sql_escape(token),
 				math.floor(count),
+				math.floor(total_delay or 0),
+				math.floor(delay_count or 0),
+				math.floor(error_count or 0),
 				_sql_escape(source_json)
 			)
 		end
@@ -576,6 +586,12 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 		.. "VALUES %s "
 		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
 		.. "c = c + excluded.c, "
+		-- Summed, not replaced: the mean delay for a token is td/cd across the
+		-- whole day, and a flush lands every few seconds. Overwriting would
+		-- leave the average describing the last handful of keystrokes.
+		.. "td = td + excluded.td, "
+		.. "cd = cd + excluded.cd, "
+		.. "e = e + excluded.e, "
 		.. "esrc_json = json_object("
 		.. "'hotstring', COALESCE(json_extract(esrc_json, '$.hotstring'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.hotstring'), 0), "
 		.. "'llm', COALESCE(json_extract(esrc_json, '$.llm'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.llm'), 0), "
