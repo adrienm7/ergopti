@@ -688,8 +688,14 @@ function M.on_app_focus(app_id, timestamp_ms)
 		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
 		previous.focus_time_ms = previous.focus_time_ms + elapsed
 		_pending_app_switch_events[#_pending_app_switch_events + 1] = {
+			-- The instant is UTC and the day is local, which is the convention every
+			-- other table here follows: a timestamp has to be comparable across
+			-- machines, and a "day" is the user's day. Both were UTC until
+			-- 2026-08-06, so for anyone east of Greenwich an evening application
+			-- switch was filed under tomorrow while the keystrokes either side of it
+			-- were filed under today.
 			ts = os.date("!%Y-%m-%d %H:%M:%S"),
-			date = os.date("!%Y-%m-%d"),
+			date = os.date("%Y-%m-%d"),
 			prev_app = dashboard_app_name(_focused_app_id),
 			next_app = dashboard_app_name(app_id),
 			duration_ms = elapsed,
@@ -1166,8 +1172,22 @@ function M.flush()
 			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
 		end
 		if #_pending_app_switch_events > 0 then
+			-- Counted BEFORE the raw events are handed over, because that call
+			-- clears the buffer. The aggregate is derived from the same rows and
+			-- deriving it afterwards would count an empty list every time.
+			local transitions = {}
+			for _, event in ipairs(_pending_app_switch_events) do
+				local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
+				local row = transitions[key]
+				if not row then
+					row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
+					transitions[key] = row
+				end
+				row.count = row.count + 1
+			end
 			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end
 			_pending_app_switch_events = {}
+			for _, row in pairs(transitions) do SqliteWriter.upsert_switch_to(_device_id, row) end
 		end
 
 		-- 2. Upsert only new per-app daily aggregate values.
