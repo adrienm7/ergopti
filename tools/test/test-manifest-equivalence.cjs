@@ -40,6 +40,14 @@ const HS_MANIFEST = path.join(
 	REPO_ROOT,
 	'static/ergopti_plus/macos/_generated/features_manifest.lua'
 );
+// Read only for the divergence check below. This gate compared two drivers
+// because for most of its life there were two generated manifests; a third
+// arrived and the comparison did not widen, so a default that differs ONLY on
+// Linux read as a stale per-platform entry.
+const LINUX_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/linux/_generated/features_manifest.lua'
+);
 const FIXTURE_CONFIG = shared('tests/fixtures/test_config.toml');
 
 // =====================================================================
@@ -649,6 +657,13 @@ function buildPerPlatformPaths(src) {
 
 const ahkFeatures = parseAhkCrossFeatures(ahkSrc);
 const luaFeatures = parseLuaCrossFeatures(luaSrc);
+// Absent on a checkout that has not generated the Linux manifest; the
+// divergence check then behaves exactly as it did before this file knew about
+// a third driver, rather than failing for a missing file it does not otherwise
+// need.
+const linuxFeatures = fs.existsSync(LINUX_MANIFEST)
+	? parseLuaCrossFeatures(fs.readFileSync(LINUX_MANIFEST, 'utf8'))
+	: new Map();
 const fixtureToml = parseTomlFixture(fixtureSrc);
 
 test(
@@ -712,12 +727,26 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 	if (PER_PLATFORM_PATHS.has(featurePath)) {
 		// Intentional per-platform divergence — verify it is actually different
 		// so stale entries in PER_PLATFORM_PATHS are caught too.
+		//
+		// Across all THREE drivers, not two. The rule being enforced is "a
+		// per-platform default must actually differ somewhere", and a feature
+		// whose only exception is Linux satisfies it while looking identical from
+		// Windows and macOS. Comparing two of three read that as stale and failed
+		// a correct declaration.
 		const ahkDefault = serialiseDefault(parseDefaultValue(ahkInfo.defaultRaw, 'ahk'));
 		const luaDefault = serialiseDefault(parseDefaultValue(luaInfo.defaultRaw, 'lua'));
+		const linuxInfo = linuxFeatures.get(featurePath);
+		const linuxDefault = linuxInfo
+			? serialiseDefault(parseDefaultValue(linuxInfo.defaultRaw, 'lua'))
+			: null;
+		const differs =
+			ahkDefault !== luaDefault ||
+			(linuxDefault !== null && (linuxDefault !== ahkDefault || linuxDefault !== luaDefault));
 		test(
 			`Default for "${featurePath}" correctly diverges per platform (default_per_platform)`,
-			ahkDefault !== luaDefault,
-			`Expected AHK and HS to differ for a default_per_platform feature — both are "${ahkDefault}"`
+			differs,
+			`Expected at least two drivers to differ for a default_per_platform feature — ` +
+				`AHK "${ahkDefault}", HS "${luaDefault}", Linux "${linuxDefault ?? '(not declared)'}"`
 		);
 		continue;
 	}
