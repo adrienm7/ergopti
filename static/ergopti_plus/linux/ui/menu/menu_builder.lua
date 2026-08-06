@@ -1735,7 +1735,16 @@ local function _build_kanata(ctx)
 
 	local providers = {
 		["kanata_actions"] = function()
-			local running = km and km.is_running() or false
+			-- Taken from the context, not probed here. Answering truthfully now
+			-- means asking the system whether ANY kanata is running, which is a
+			-- subprocess — and building a menu must not spawn one. The daemon
+			-- computes it when it decides to rebuild; `owns_process` is the
+			-- cheap fallback when nobody supplied it, and it can only
+			-- under-report, which greys a row rather than inventing a state.
+			local running = ctx.kanata_running
+			if running == nil then
+				running = km and km.owns_process() or false
+			end
 			return {
 				{ label = i18n_safe("menu.kanata.generate_kbd"), action = call("write_kbd") },
 				{ label = i18n_safe("menu.kanata.start"),   action = call("start"),   checked = running },
