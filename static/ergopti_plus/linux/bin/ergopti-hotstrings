@@ -29,17 +29,21 @@ _has() {
 	command -v "$1" >/dev/null 2>&1
 }
 
+# WHY ydotool IS NOT IN THIS LIST.
+# It used to be, as a hard failure — on machines where install.sh had just
+# refused to install it. The daemon writes struct input_event to its own
+# /dev/uinput device (modules/hotstrings/injector.lua); ydotool assumed a US
+# layout, needed a root daemon and forked once per event, which is what made the
+# keyboard grab unaffordable. Its only surviving mentions are the unwired
+# shell-outs in adapters/text_sender.lua, which no daemon path requires and whose
+# failures its own shell_run already swallows — so not even a warning is
+# warranted here: it would fire on every launch of every correct install, for
+# code that cannot run.
 _check_deps() {
 	local missing=()
 
 	if ! _has luajit; then
 		missing+=("luajit")
-	fi
-
-	if ! _has ydotool; then
-		# ydotool is required for Wayland/X11-agnostic keystroke injection;
-		# without it the text_sender adapter cannot emit characters.
-		missing+=("ydotool")
 	fi
 
 	if ! _has notify-send; then
@@ -65,14 +69,17 @@ _check_deps() {
 _install_deps() {
 	echo "Installation des dépendances requises…"
 
+	# Same list as _check_deps, and for the same reason ydotool is absent from
+	# both: installing a package the driver stopped using only teaches the user
+	# that it is still needed.
 	if _has apt-get; then
 		sudo apt-get update -qq
-		sudo apt-get install -y luajit ydotool libnotify-bin
+		sudo apt-get install -y luajit libnotify-bin
 	elif _has dnf; then
-		# luajit package name differs on Fedora/RHEL; ydotool may need a copr.
-		sudo dnf install -y luajit ydotool libnotify
+		# luajit package name differs on Fedora/RHEL.
+		sudo dnf install -y luajit libnotify
 	elif _has pacman; then
-		sudo pacman -Sy --noconfirm luajit ydotool libnotify
+		sudo pacman -Sy --noconfirm luajit libnotify
 	else
 		echo "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis)." >&2
 		exit 1
@@ -106,7 +113,14 @@ else
 fi
 
 DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
-SHARED_LUA="${ERGOPTI_ROOT}/shared/lua"
+# _shared, with the underscore. The tree is static/ergopti_plus/_shared in a
+# checkout and ${INSTALL_ROOT}/_shared once installed, and both install.sh and
+# the package builder spell it that way. This line said "shared" for a long time
+# and nobody noticed, because the daemon rebuilds package.path from its own
+# location on startup (ergopti_hotstrings.lua) — so the exported LUA_PATH was
+# never the entry that resolved a shared module, and a directory that does not
+# exist simply never matched.
+SHARED_LUA="${ERGOPTI_ROOT}/_shared/lua"
 
 if [ ! -d "${DRIVER_ROOT}" ]; then
 	echo "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}" >&2
