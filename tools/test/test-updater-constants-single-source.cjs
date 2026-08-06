@@ -200,8 +200,25 @@ for (const drv of LUA_DRIVERS) {
 // already single-sourced in defaults.json, so these files must agree with it.
 // Enumerated as a class rather than pinned per file: any new packaging recipe
 // under tools/build/ is covered the moment it is added.
+//
+// A GitHub URL in a packaging recipe is one of two things, and the rule differs:
+//   IDENTITY  — Homepage, source=, the release feed. Answers "which project is
+//               this?" and must be ours. That is what nizos/ergopti got wrong.
+//   DEPENDENCY — a third-party source the package BUILDS FROM. Legitimately not
+//               ours, but never implicit: an unrestricted rule here would have
+//               let the original bug back in under a different fork name.
+// So dependencies are allowed only when declared below, with the reason. The
+// declaration is itself checked for staleness — an exemption nobody uses is how
+// an allow-list quietly becomes blanket permission.
+const THIRD_PARTY_SOURCES = new Map([
+	["LuaJIT/LuaJIT",
+		"build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream"]
+]);
+
 const PACKAGING_DIR = path.join(ROOT, "tools", "build");
 const GITHUB_URL_RE = /github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?=["'\s)#]|$)/g;
+
+const thirdPartySeen = new Set();
 
 let packagingFilesScanned = 0;
 let packagingUrlsChecked  = 0;
@@ -217,12 +234,31 @@ for (const entry of fs.readdirSync(PACKAGING_DIR, { withFileTypes: true })) {
 
 	for (const m of src.matchAll(GITHUB_URL_RE)) {
 		packagingUrlsChecked++;
-		if (m[1] !== owner || m[2] !== repo) {
-			fail(
-				`tools/build/${entry.name}: github.com/${m[1]}/${m[2]} does not match ` +
-				`defaults.json github.owner/repo (${owner}/${repo})`
-			);
+		const slug = `${m[1]}/${m[2]}`;
+		if (m[1] === owner && m[2] === repo) continue;
+		if (THIRD_PARTY_SOURCES.has(slug)) {
+			thirdPartySeen.add(slug);
+			continue;
 		}
+		fail(
+			`tools/build/${entry.name}: github.com/${slug} does not match ` +
+			`defaults.json github.owner/repo (${owner}/${repo}). If it identifies ` +
+			`this project, point it at ${owner}/${repo}; if it is a third-party ` +
+			`dependency the package builds from, declare it in THIRD_PARTY_SOURCES ` +
+			`with the reason.`
+		);
+	}
+}
+
+// A declared exemption that no recipe uses any more must be deleted, not left
+// standing: the next third-party URL that happens to match it would be waved
+// through on the strength of a reason that no longer applies anywhere.
+for (const [slug, reason] of THIRD_PARTY_SOURCES) {
+	if (!thirdPartySeen.has(slug)) {
+		fail(
+			`THIRD_PARTY_SOURCES declares github.com/${slug} but no recipe under ` +
+			`tools/build/ references it — remove the stale exemption (${reason})`
+		);
 	}
 }
 
