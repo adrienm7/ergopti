@@ -739,6 +739,53 @@ function M.upsert_title(device_id, row)
 	return _exec(sql)
 end
 
+--- Upserts one key's hold statistics for an application-day.
+---
+--- The tap and hold counts are what make this table worth having on a keyboard
+--- whose whole design is dual-role keys: the average alone cannot say whether a
+--- key is being used both ways or neither.
+--- @param row table { date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count }
+function M.upsert_kc_hold(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local keycode = tonumber(row.keycode)
+	if not keycode then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, "
+		.. "max_ms, tap_count, hold_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET "
+		.. "sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count, "
+		-- A record, not a sum: the longest hold of the day does not get longer by
+		-- being flushed twice.
+		.. "max_ms = MAX(max_ms, excluded.max_ms), "
+		.. "tap_count = tap_count + excluded.tap_count, "
+		.. "hold_count = hold_count + excluded.hold_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(keycode),
+		math.floor(tonumber(row.sum_ms) or 0), math.floor(tonumber(row.count) or 0),
+		math.floor(tonumber(row.max_ms) or 0),
+		math.floor(tonumber(row.tap_count) or 0), math.floor(tonumber(row.hold_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts how many keystrokes an application-day saw under one layout.
+---
+--- One row per (app, layout) rather than a single "current layout" column: a
+--- day spent switching between two of them is two rows, and a column would have
+--- to pick one and call the rest of the day a lie.
+--- @param row table { date, app, layout, count }
+function M.upsert_layout(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.layout) ~= "string" or row.layout == "" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) "
+		.. "VALUES ('%s','%s','%s','%s',%d) "
+		.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET "
+		.. "count = count + excluded.count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(row.layout), math.floor(tonumber(row.count) or 0))
+	return _exec(sql)
+end
+
 --- Upserts the per-app-day ergonomic record.
 ---
 --- The two streak columns are records and take a MAX; the focus latency sums.

@@ -42,6 +42,29 @@ local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 -- For converting os.time()'s seconds to the millisecond scale the monotonic
 -- clock reports in, so the two can be subtracted.
 local MS_PER_SECOND = 1000
+
+-- Past this, a press was a HOLD rather than a tap. Read from the tap-hold
+-- configuration the remap daemon actually runs, so this driver calls something
+-- a hold exactly when kanata does — a number of its own here would let the
+-- dashboard call a tap what the keyboard treated as a hold.
+--
+-- nil when the keys disagree or nothing could be read, and the split is then
+-- declined rather than made on a number nobody chose. The duration, the count
+-- and the maximum are still recorded: those need no threshold.
+local _tap_hold_threshold_ms = nil
+local _tap_hold_threshold_read = false
+
+--- @return number|nil
+local function tap_hold_threshold_ms()
+	if _tap_hold_threshold_read then return _tap_hold_threshold_ms end
+	_tap_hold_threshold_read = true
+	local ok, Remap = pcall(require, "platform.remap.manager")
+	if ok and type(Remap.tap_hold_threshold_ms) == "function" then
+		local ok_value, value = pcall(Remap.tap_hold_threshold_ms)
+		if ok_value and type(value) == "number" then _tap_hold_threshold_ms = value end
+	end
+	return _tap_hold_threshold_ms
+end
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
 local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
@@ -118,6 +141,7 @@ local _current_title = nil
 local _title_since = nil
 
 local _flushed_app_titles = {}
+local _flushed_app_holds = {}
 local _flushed_app_ngrams = {}
 local _flushed_app_scancodes = {}
 local _flushed_app_sources = {}
@@ -330,6 +354,10 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		llm_input_chars  = 0,
 		physical_scancodes = {},
 		ngram_sources      = {},
+		-- evdev code → { sum_ms, count, max_ms, tap_count, hold_count }. On a
+		-- keyboard whose whole design is tap-hold, how long a key was held is the
+		-- difference between the two things it can mean.
+		kc_hold            = {},
 		-- title → { c, ms }. The dashboard's apps panel groups a day's work by
 		-- window, which is the difference between "four hours in the editor" and
 		-- "four hours in three files"; this driver had nothing to group by.
@@ -991,6 +1019,41 @@ function M.is_password_app(app_id)
 	return false
 end
 
+--- Records how long one key was held.
+---
+--- The threshold between a tap and a hold is the shared tap-hold activation
+--- time, so this driver's idea of the difference is the same one kanata acts
+--- on. A second number here would let the dashboard call something a tap that
+--- the keyboard treated as a hold.
+--- @param app_id string|nil
+--- @param scancode number evdev code.
+--- @param held_ms number
+function M.record_hold(app_id, scancode, held_ms)
+	if not may_record() then return end
+	if type(app_id) ~= "string" or app_id == "" then return end
+	local code = tonumber(scancode)
+	local duration = tonumber(held_ms)
+	if not code or not duration or code <= 0 or duration < 0 then return end
+
+	local app = ensure_app_stats(app_id, nil)
+	local row = app.kc_hold[code]
+	if not row then
+		row = { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+		app.kc_hold[code] = row
+	end
+	row.sum_ms = row.sum_ms + duration
+	row.count = row.count + 1
+	if duration > row.max_ms then row.max_ms = duration end
+	local threshold = tap_hold_threshold_ms()
+	if threshold then
+		if duration >= threshold then
+			row.hold_count = row.hold_count + 1
+		else
+			row.tap_count = row.tap_count + 1
+		end
+	end
+end
+
 --- Records that the focused window's title changed.
 ---
 --- Gated by exactly the filters a keystroke is: a private window, a secure
@@ -1308,6 +1371,7 @@ function M.flush()
 			for _, row in ipairs(daily.bursts) do SqliteWriter.upsert_burst(_device_id, row) end
 			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
 			for _, row in ipairs(daily.ergo) do SqliteWriter.upsert_ergo(_device_id, row) end
+			for _, row in ipairs(daily.layouts) do SqliteWriter.upsert_layout(_device_id, row) end
 		end
 		if #_pending_app_switch_events > 0 then
 			-- Counted BEFORE the raw events are handed over, because that call
@@ -1369,6 +1433,31 @@ function M.flush()
 			end
 			if changed then SqliteWriter.upsert_app_day(_device_id, date, app_name, delta) end
 			_flushed_app_totals[app_id] = current
+
+			-- Hold durations, as deltas: the row sums on conflict.
+			local flushed_holds = _flushed_app_holds[app_id] or {}
+			for code, row in pairs((_app_stats[app_id] or {}).kc_hold or {}) do
+				local before = flushed_holds[code]
+					or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+				local delta_count = math.max(0, row.count - before.count)
+				if delta_count > 0 then
+					SqliteWriter.upsert_kc_hold(_device_id, {
+						date = date, app = app_name, keycode = code,
+						sum_ms = math.max(0, row.sum_ms - before.sum_ms),
+						count = delta_count,
+						-- The longest hold is a record, not a delta: sending the running
+						-- maximum is right because the column takes a MAX on conflict.
+						max_ms = row.max_ms,
+						tap_count = math.max(0, row.tap_count - before.tap_count),
+						hold_count = math.max(0, row.hold_count - before.hold_count),
+					})
+				end
+				flushed_holds[code] = {
+					sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
+					tap_count = row.tap_count, hold_count = row.hold_count,
+				}
+			end
+			_flushed_app_holds[app_id] = flushed_holds
 
 			-- Window titles, as deltas like everything else on this table: the rows
 			-- add on conflict, so writing the cumulative counters again would count
@@ -1503,6 +1592,7 @@ function M.reset_session()
 	_focused_app_started_at = nil
 	_flushed_app_totals     = {}
 	_flushed_app_titles     = {}
+	_flushed_app_holds      = {}
 	_flushed_app_ngrams     = {}
 	_flushed_app_scancodes  = {}
 	_flushed_app_sources    = {}

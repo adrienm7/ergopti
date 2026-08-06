@@ -236,6 +236,28 @@ function M.walk(events, date_str, app, batch, clock)
 		backspace_run = 0
 	end
 
+	-- Which layout the keystrokes of this flush were resolved through. One row
+	-- per (app, layout), so a day spent switching between two of them reads as
+	-- two rows rather than as one average of nothing.
+	--
+	-- Recorded per FLUSH rather than per keystroke: the layout is a property of
+	-- the hook, it changes only when the user asks it to from the menu, and a
+	-- flush lands every few seconds. Asking once per keystroke would be a module
+	-- lookup on the hot path to learn a value that almost never differs.
+	local active_layout = nil
+	do
+		local ok_hook, Hook = pcall(require, "adapters.keyboard_hook")
+		if ok_hook and type(Hook.get_layout) == "function" then
+			local ok_get, name = pcall(Hook.get_layout)
+			if ok_get and type(name) == "string" and name ~= "" then active_layout = name end
+		end
+	end
+	local layouts = active_layout
+		and Helpers.gc(batch.layouts, app_day_key .. SEPARATOR .. active_layout, {
+			date = date_str, app = app, layout = active_layout, count = 0,
+		})
+		or nil
+
 	local ergo = Helpers.gc(batch.ergo, app_day_key, {
 		date = date_str, app = app,
 		same_finger_streak_max = 0, same_hand_streak_max = 0,
@@ -408,6 +430,7 @@ function M.walk(events, date_str, app, batch, clock)
 			extend_burst(delay)
 			extend_session(delay)
 			bump_streaks(char)
+			if layouts then layouts.count = layouts.count + 1 end
 			-- Cumulative, not exclusive: each threshold answers "how much time is
 			-- left if I ignore pauses longer than this", so a 200 ms gap belongs to
 			-- every bucket at or above 200 ms. The dashboard dropdown reads one
@@ -531,7 +554,7 @@ end
 function M.daily_rows(batch)
 	local out = {
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
-		bursts = {}, sessions = {}, app_buckets = {}, ergo = {},
+		bursts = {}, sessions = {}, app_buckets = {}, ergo = {}, layouts = {},
 	}
 	if type(batch) ~= "table" then return out end
 	for name, rows in pairs(out) do

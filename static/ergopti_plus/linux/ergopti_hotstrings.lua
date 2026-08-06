@@ -1000,6 +1000,11 @@ local function main()
 		onKey   = on_control,
 		onClick = on_click,
 		onPhysical = on_physical,
+		-- How long each key was held. The release is seen only inside the hook,
+		-- which is why the measurement lives there and the accounting here.
+		onHold = function(scancode, held_ms)
+			keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
+		end,
 		onEmitRaw  = injector.emit_key,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
