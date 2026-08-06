@@ -263,9 +263,9 @@
 			"id": "keyboard_slots",
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.no_keyboard_slot_binding_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "group",

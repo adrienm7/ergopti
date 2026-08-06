@@ -1674,8 +1674,58 @@ local function _build_shortcuts(ctx)
 		end,
 	}
 
+	-- The manifest's `keyboard_slots` row, which this driver could not answer
+	-- until it had a chord capture and somewhere to store an assignment. One
+	-- submenu per modifier group, each listing every key in the shared catalogue
+	-- with whatever the user has bound to it — the same shape the gesture slots
+	-- use, for the same reason: the slot space is fixed and the assignment is the
+	-- user's, so a static entry cannot enumerate the rows.
+	local providers = {}
+	providers["keyboard_slots"] = function()
+		local ok_kbd, Keyboard = pcall(require, "modules.shortcuts.keyboard_shortcuts")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_kbd or not ok_gestures then
+			Logger.error(LOG, "Keyboard slots unavailable — the shortcuts submenu loses its bindings.")
+			return {}
+		end
+
+		-- The action catalogue is the gestures manager's, and the labels with it.
+		-- A second list here would drift from the one the gestures draw, and the
+		-- user would see the same action named two ways in one menu.
+		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
+
+		local out = {}
+		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
+			local rows = {}
+			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
+				local bound = Keyboard.get_action(slot)
+				local choices = {}
+				for _, option in ipairs(action_names) do
+					choices[#choices + 1] = {
+						label   = Gestures.get_action_label(option),
+						-- `checked` rather than a "✓" glued to the label: the tray draws
+						-- its own mark, and the glued form puts one platform's
+						-- convention inside a string twenty other languages also read.
+						checked = option == bound,
+						action  = function()
+							Keyboard.set_action(slot, option)
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					}
+				end
+				rows[#rows + 1] = {
+					label = Keyboard.get_slot_label(slot)
+						.. " → " .. Gestures.get_action_label(bound),
+					items = choices,
+				}
+			end
+			out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
+		end
+		return out
+	end
+
 	local manifest_rows = ManifestMenu
-		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, ctx)
+		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, ctx, providers)
 		or {}
 	if #manifest_rows > 0 then
 		items[#items + 1] = { title = "-" }
