@@ -182,6 +182,10 @@ end
 -- Whether to auto-inject predictions (false = just show tooltip).
 local _auto_inject = true
 
+-- How many tokens a completion may run to, once the user has said. nil means
+-- the shared default; see set_max_tokens for why this one is not persisted.
+local _max_tokens = nil
+
 
 -- =========================================
 -- =========================================
@@ -516,6 +520,31 @@ function M.get_triggers()
 	return _triggers
 end
 
+--- Replaces the sequences that start a prediction.
+---
+--- Refuses an empty list rather than storing it. A prediction engine with no
+--- trigger never predicts, and the window offering the field gives no sign that
+--- clearing it turns the feature off — the user would read it as broken.
+--- @param triggers table Array of strings.
+--- @return boolean
+function M.set_triggers(triggers)
+	if type(triggers) ~= "table" then
+		Logger.error(LOG, "set_triggers(): a list is required — triggers unchanged.")
+		return false
+	end
+	local accepted = {}
+	for _, trigger in ipairs(triggers) do
+		if type(trigger) == "string" and trigger ~= "" then accepted[#accepted + 1] = trigger end
+	end
+	if #accepted == 0 then
+		Logger.error(LOG, "set_triggers(): no usable trigger in the list — triggers unchanged.")
+		return false
+	end
+	_triggers = accepted
+	Logger.info(LOG, "Triggers: %d configured.", #_triggers)
+	return true
+end
+
 --- Delegates to profiles for model management (menu + bridge compatibility).
 --- @return table Array of model name strings.
 function M.get_models()
@@ -556,13 +585,44 @@ end
 --- Returns the configured max tokens (delegates to PromptBuilder or defaults).
 --- @return number
 function M.get_max_tokens()
-	return (PromptBuilder and PromptBuilder.DEFAULT_MAX_TOKENS) or 150
+	return _max_tokens or PromptBuilder.DEFAULT_MAX_TOKENS
+end
+
+--- Sets how many tokens a completion may run to.
+---
+--- Held in memory rather than persisted, unlike the temperature and the context
+--- length: the manifest declares those two as features and says nothing about
+--- this one, and storing a value the manifest does not describe would put a key
+--- in the user's config that nothing can explain or reset.
+--- @param value number
+--- @return boolean
+function M.set_max_tokens(value)
+	local tokens = tonumber(value)
+	if not tokens or tokens < 1 then
+		Logger.error(LOG, "set_max_tokens(): %s is not a token budget — refused.", tostring(value))
+		return false
+	end
+	_max_tokens = math.floor(tokens)
+	Logger.info(LOG, "Max tokens: %d.", _max_tokens)
+	return true
 end
 
 --- Returns the configured temperature (from the shared bridge).
 --- @return number
 function M.get_temperature()
-	return (HttpBridge and HttpBridge.DEFAULT_TEMPERATURE) or 0.1
+	return Settings.get("temperature") or HttpBridge.DEFAULT_TEMPERATURE
+end
+
+--- Sets the temperature the next request will use.
+---
+--- This had no implementation while `ui/token_prompt/bridge.lua` already called
+--- it — behind a `type(…) == "function"` guard, so a user saving their settings
+--- had the value silently discarded while the context length beside it applied.
+--- The guard reads as defensive and makes the branch permanently dead.
+--- @param value number
+--- @return boolean Whether it was accepted.
+function M.set_temperature(value)
+	return Settings.set("temperature", tonumber(value))
 end
 
 --- Returns the configured max context chars.
