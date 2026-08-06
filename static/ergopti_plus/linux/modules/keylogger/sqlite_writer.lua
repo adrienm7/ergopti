@@ -486,6 +486,11 @@ function M.upsert_app_day(device_id, date, app, fields)
 		chars = true, time_ms = true, app_time_ms = true,
 		hs_chars = true, hs_triggers = true, hs_input_chars = true,
 		llm_chars = true, llm_triggers = true, llm_input_chars = true,
+		-- How many suggestions were OFFERED, as against the triggers above, which
+		-- count the ones taken. The acceptance rate is the ratio of the two, and
+		-- with the denominator never written it read as zero on a driver whose
+		-- suggestions were being accepted all day.
+		hs_suggested = true, llm_suggested = true,
 	}
 	local sets = {}
 	for k, v in pairs(fields) do
@@ -497,8 +502,8 @@ function M.upsert_app_day(device_id, date, app, fields)
 	if #sets == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d) "
+		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars, hs_suggested, llm_suggested) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d) "
 		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET %s;",
 		_sql_escape(device_id),
 		_sql_escape(date),
@@ -512,6 +517,8 @@ function M.upsert_app_day(device_id, date, app, fields)
 		tonumber(fields.llm_chars) or 0,
 		tonumber(fields.llm_triggers) or 0,
 		tonumber(fields.llm_input_chars) or 0,
+		tonumber(fields.hs_suggested) or 0,
+		tonumber(fields.llm_suggested) or 0,
 		table.concat(sets, ", ")
 	)
 	return _exec(sql)
