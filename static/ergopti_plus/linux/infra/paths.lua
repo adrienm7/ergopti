@@ -32,12 +32,19 @@
 --- 2. Fails loudly: shared_root() returns nil when the tree is not found, and
 ---    shared() logs which path it looked for — a missing shared tree is a broken
 ---    install, not something to paper over with a fallback that half-works.
+--- 3. Layout-tolerant, not layout-guessing: the two layouts that actually ship
+---    are both probed, in a fixed order, and nothing else is. See shared_root().
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
 local LOG = "paths"
+
+-- The file a candidate directory must carry to BE the shared tree. Probing a
+-- file rather than the directory keeps a stale empty `_shared/` left by a
+-- partial install from resolving and then failing at every subsequent read.
+local SHARED_PROBE_FILE = "data/locales/en.json"
 
 
 
@@ -63,21 +70,43 @@ local _shared_root = nil
 
 --- Absolute path to the _shared tree, or nil when it cannot be found.
 ---
---- `_shared` is a SIBLING of the driver directory — one level up, never two.
---- The check is for a file that must exist rather than for the directory alone,
---- because a stale empty `_shared/` left by a partial install would otherwise
---- resolve and then fail at every read.
+--- TWO LAYOUTS SHIP, AND BOTH ARE REAL:
+---
+---   * SIBLING — `<driver root>/../_shared`. The checkout
+---     (static/ergopti_plus/{linux,_shared}) and the release tarball, which
+---     unpacks `linux/` and `_shared/` next to each other.
+---
+---   * CHILD — `<driver root>/_shared`. The system packages. build-linux-deb.sh,
+---     build-linux-rpm.sh and PKGBUILD all stage the driver flat into
+---     /usr/lib/ergopti and nest the shared tree inside it, because a sibling
+---     would put it at /usr/lib/_shared — a directory no package may own.
+---
+--- Resolving the sibling ONLY is the defect this ordering replaced. On an
+--- installed .deb the probe addressed /usr/lib/_shared/data/locales/en.json and
+--- shared_root() returned nil — taking with it every locale, keycode table,
+--- hotstring pack, tooltip config and defaults file the driver reads. The
+--- wrapper's LUA_PATH hides how broad that is: it rescues `require`, so the
+--- daemon starts and only the DATA reads fail.
+---
+--- The sibling is probed first because it is the layout every developer, test
+--- and CI run uses, so the common case still costs a single io.open.
 --- @return string|nil Absolute path with no trailing slash.
 function M.shared_root()
 	if _shared_root ~= nil then return _shared_root end
-	local candidate = _driver_root .. "/../_shared"
-	local probe = io.open(candidate .. "/data/locales/en.json", "r")
-	if probe then
-		probe:close()
-		_shared_root = candidate
-		return _shared_root
+	local sibling = _driver_root .. "/../_shared"
+	local child   = _driver_root .. "/_shared"
+	for _, candidate in ipairs({ sibling, child }) do
+		local probe = io.open(candidate .. "/" .. SHARED_PROBE_FILE, "r")
+		if probe then
+			probe:close()
+			_shared_root = candidate
+			return _shared_root
+		end
 	end
-	Logger.error(LOG, "Shared tree not found at %s — the install is incomplete.", candidate)
+	-- Both candidates are named because the next reader's first question is which
+	-- layout was assumed, and a message carrying one path answers half of it.
+	Logger.error(LOG, "Shared tree not found: neither %s nor %s carries %s — the install is incomplete.",
+		sibling, child, SHARED_PROBE_FILE)
 	return nil
 end
 
