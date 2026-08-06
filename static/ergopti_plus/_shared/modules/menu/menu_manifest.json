@@ -647,8 +647,14 @@
 			"i18n": "menu.hotstrings.params"
 		},
 		{
-			"type": "dynamic",
-			"id": "hotstring_bulk_actions"
+			"type": "command",
+			"id": "hotstrings_enable_all",
+			"i18n": "menu.hotstrings.enable_all"
+		},
+		{
+			"type": "command",
+			"id": "hotstrings_disable_all",
+			"i18n": "menu.hotstrings.disable_all"
 		},
 		{
 			"type": "---"

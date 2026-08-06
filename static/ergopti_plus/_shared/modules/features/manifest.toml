@@ -3314,8 +3314,14 @@ id = "hotstrings_params"
 i18n = "menu.hotstrings.params"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
-id = "hotstring_bulk_actions"
+type = "command"
+id = "hotstrings_enable_all"
+i18n = "menu.hotstrings.enable_all"
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "hotstrings_disable_all"
+i18n = "menu.hotstrings.disable_all"
 
 [[menu.hotstrings_menu]]
 type = "---"

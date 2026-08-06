@@ -74,7 +74,11 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // exists on Linux, where ui/wpm is absent and the keylogger exposes no
 // disabled-apps setter. A row declared for a driver that cannot draw it is not a
 // gap in the driver; it is the manifest making a promise on the driver's behalf.
-const BASELINE = { ahk: 0, hs: 5, linux: 0 };
+// hs 5 → 4 on 2026-08-06: `hotstring_bulk_actions` was one row that expanded
+// to two, and macOS had no handler for the id at all — it built its bulk rows
+// by hand in builder.lua and the manifest's promise went unanswered. Splitting
+// it into two `command` rows is what let the declaration and the driver meet.
+const BASELINE = { ahk: 0, hs: 4, linux: 0 };
 
 // WHY LINUX IS ZERO AND macOS IS NOT, AND WHAT THE FIVE ARE.
 // Linux reached zero by wiring every row: its metrics and hotstrings submenus

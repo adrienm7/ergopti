@@ -130,7 +130,6 @@ initMenu() {
 		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
-		"hotstring_bulk_actions",        (M, C) => _HS_BulkActions(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
 	)
 
@@ -141,11 +140,19 @@ initMenu() {
 		"word_expanders", (*) => _HS_WordExpanderRows(),
 	)
 
+	; The two bulk rows were ONE `dynamic` row that expanded to two, so the
+	; manifest described neither. They are two `command` rows now — which is
+	; also how macOS got them: it had no handler for the old id at all.
+	_HotCommands := Map(
+		"hotstrings_enable_all",  ToggleAllHotstringsOn,
+		"hotstrings_disable_all", ToggleAllHotstringsOff,
+	)
+
 	_HotGroupBuilders := Map(
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders)
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"

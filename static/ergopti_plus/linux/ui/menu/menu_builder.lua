@@ -815,10 +815,6 @@ local function _manifest_hotstring_rows(ctx, config)
 	}
 
 	local handlers = {
-		["hotstring_bulk_actions"] = function(items)
-			items[#items + 1] = { title = i18n_safe("menu.hotstrings.enable_all"),  fn = set_all(true) }
-			items[#items + 1] = { title = i18n_safe("menu.hotstrings.disable_all"), fn = set_all(false) }
-		end,
 		["hotstring_categories_standard"] = function(items) append_class(items, "standard") end,
 		["hotstring_categories_dynamic"] = function(items)
 			-- Its own handler, not append_class. This driver's group list comes from
@@ -1088,7 +1084,16 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
-	return ManifestMenu.build("hotstrings_menu", "Hotstrings", handlers, group_builders, ctx)
+	-- The two bulk rows are `type = "command"` now: one declaration each, built
+	-- by the shared renderer, so this driver supplies only the behaviour.
+	local hs_ctx = {}
+	for key, value in pairs(ctx) do hs_ctx[key] = value end
+	hs_ctx.commands = {
+		["hotstrings_enable_all"]  = set_all(true),
+		["hotstrings_disable_all"] = set_all(false),
+	}
+
+	return ManifestMenu.build("hotstrings_menu", "Hotstrings", handlers, group_builders, hs_ctx)
 end
 
 --- Builds the hotstrings submenu: the manifest's rows, then this driver's own.

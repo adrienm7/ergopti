@@ -133,10 +133,15 @@ const MEASURE = process.argv.includes('--measure');
 // delimiters with their delete sub-row, the add button. It is `type = "list"`
 // now and each driver answers with the same {label, action, checked, items}
 // data, which the renderer materialises.
+//
+// windows 206 → 204, linux 109 → 107: the two whole-tree bulk rows. They were
+// ONE `dynamic` row that expanded to two, so the manifest described neither and
+// macOS — which had no handler for that id at all — rendered nothing. They are
+// two `command` rows now.
 const BASELINE = {
-	windows: 206,
+	windows: 204,
 	macos: 289,
-	linux: 109
+	linux: 107
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
