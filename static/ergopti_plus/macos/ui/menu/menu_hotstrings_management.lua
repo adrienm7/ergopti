@@ -132,10 +132,10 @@ function M.build_management(ctx)
 		ctx.save_prefs()
 		ctx.updateMenu()
 	end
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, fn = not paused and function() bulk_set_terminators(true)  end or nil }
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, fn = not paused and function() bulk_set_terminators(false) end or nil }
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, fn = not paused and reset_terminators or nil }
-	exp_sub[#exp_sub + 1] = { title = "-" }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() bulk_set_terminators(true)  end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() bulk_set_terminators(false) end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, action = not paused and reset_terminators or nil }
+	exp_sub[#exp_sub + 1] = { separator = true }
 
 	-- Built-in terminators (non-custom), with consume indicator. The shared
 	-- catalogue order IS the menu order; { type = "separator" } entries become
@@ -144,7 +144,7 @@ function M.build_management(ctx)
 	for _, def in ipairs(defs) do
 		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
-				exp_sub[#exp_sub + 1] = { title = "-" }
+				exp_sub[#exp_sub + 1] = { separator = true }
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
 
@@ -155,10 +155,10 @@ function M.build_management(ctx)
 				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
-					title    = ctx.applyTriggerChar(lbl),
+					label    = ctx.applyTriggerChar(lbl),
 					checked  = enabled_t or nil,
 					disabled = paused or nil,
-					fn       = not paused and (function(k, l) return function()
+					action       = not paused and (function(k, l) return function()
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
@@ -177,7 +177,7 @@ function M.build_management(ctx)
 	end
 
 	-- Custom terminators + add button, grouped together at the bottom
-	exp_sub[#exp_sub + 1] = { title = "-" }
+	exp_sub[#exp_sub + 1] = { separator = true }
 
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
@@ -187,9 +187,9 @@ function M.build_management(ctx)
 
 		local ct_sub = {
 			{
-				title    = i18n.get("menu.hotstrings.delete_expander"),
+				label    = i18n.get("menu.hotstrings.delete_expander"),
 				disabled = paused or nil,
-				fn       = not paused and (function(k) return function()
+				action       = not paused and (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -212,18 +212,18 @@ function M.build_management(ctx)
 		}
 
 		exp_sub[#exp_sub + 1] = {
-			title    = ct_lbl,
+			label    = ct_lbl,
 			checked  = enabled_t or nil,
-			menu     = ct_sub,
+			items     = ct_sub,
 			disabled = paused or nil,
 		}
 		::continue_ct::
 	end
 
 	exp_sub[#exp_sub + 1] = {
-		title    = i18n.get("menu.hotstrings.add_custom"),
+		label    = i18n.get("menu.hotstrings.add_custom"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
@@ -281,7 +281,7 @@ function M.build_management(ctx)
 		end or nil,
 	}
 
-	exp_item = { title = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, menu = exp_sub }
+	exp_item = { label = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, items = exp_sub }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
@@ -494,7 +494,7 @@ function M.build_management(ctx)
 	-- renderer scan keys on — so the assignment alone made a separator read as a
 	-- hand-built row. The name is better this way regardless.
 	local rows = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
-		["word_expanders"]   = function(items) if exp_item then items[#items + 1] = exp_item end end,
+
 		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
 		["magic_key_config"] = function(items) items[#items + 1] = magic_key_item end,
 		-- Declared in the manifest since 2026-08-05, and rendered here by id
@@ -509,7 +509,16 @@ function M.build_management(ctx)
 		-- as a row macOS never wired — and Linux, reading the same manifest, drew
 		-- nothing. It now has the feature too, so the restriction is gone.
 		["repeat_key"]       = function(items) items[#items + 1] = repeat_item end,
-	}, nil, ctx)
+	}, nil, ctx, {
+		-- word_expanders is `type = "list"` in the manifest now, so the shared
+		-- renderer materialises every row of the submenu from this data instead of
+		-- this driver assembling the hs.menubar shape itself. Same provider shape
+		-- as the other two drivers answer with.
+		["word_expanders"] = function()
+			if not exp_item then return {} end
+			return { exp_item }
+		end,
+	})
 
 	return { title = i18n.get("menu.hotstrings.params"), menu = rows }
 end

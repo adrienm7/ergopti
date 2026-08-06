@@ -126,10 +126,17 @@ const MEASURE = process.argv.includes('--measure');
 // renderer moved nothing and the honest count stayed near 639. A `list` provider
 // was the only thing that had ever moved it, and a list cannot express a single
 // checkbox.
+//
+// windows 217 → 206, macos 298 → 289, linux 115 → 109 on 2026-08-06: the
+// word-expanders submenu. Each driver rebuilt the same twenty-odd rows in its
+// own row API — the bulk actions, the catalogue in catalogue order, the custom
+// delimiters with their delete sub-row, the add button. It is `type = "list"`
+// now and each driver answers with the same {label, action, checked, items}
+// data, which the renderer materialises.
 const BASELINE = {
-	windows: 217,
-	macos: 298,
-	linux: 115
+	windows: 206,
+	macos: 289,
+	linux: 109
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
