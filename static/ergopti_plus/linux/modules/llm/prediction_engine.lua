@@ -32,13 +32,15 @@ local LOG = "modules.llm.prediction_engine"
 -- Shared LLM canonicals: Ollama port/host/temperature/context live once in
 -- _shared (mirrored from defaults.json) and max_tokens in prompt_builder, so the
 -- Linux engine never re-types a value that could drift from macOS/Windows.
-local HttpBridge = nil
-local ok_bridge, bridge_mod = pcall(require, "infra.llm_bridge")
-if ok_bridge then HttpBridge = bridge_mod end
-
-local PromptBuilder = nil
-local ok_pb, pb_mod = pcall(require, "llm.prompt_builder")
-if ok_pb then PromptBuilder = pb_mod end
+-- Hard requires, for the same reason the parser below is one. Every value this
+-- engine takes from them is either a user setting or a privacy posture, and a
+-- pcall that leaves the module nil turns each of those into a literal written
+-- beside it — a temperature the user did not choose, a context length they did
+-- not set, and, worst, `nil and X` for the two filters, which is falsy. The
+-- password-field filter therefore failed OPEN: one unloadable module and the
+-- text around the caret went to the model from a password field.
+local HttpBridge = require("infra.llm_bridge")
+local PromptBuilder = require("llm.prompt_builder")
 
 local ProfileSelector = nil
 local ok_ps, ps_mod = pcall(require, "llm.profile_selector")
@@ -52,10 +54,8 @@ local Parser = require("llm.parser")
 
 -- Canonical privacy posture, from defaults.json via the shared bridge. Never
 -- re-typed: the same two keys drive Windows and macOS.
-local _secure_field_filter_enabled =
-	(HttpBridge and HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS)
-local _url_bar_filter_enabled =
-	(HttpBridge and HttpBridge.DEFAULT_DISABLE_URL_BARS)
+local _secure_field_filter_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS
+local _url_bar_filter_enabled = HttpBridge.DEFAULT_DISABLE_URL_BARS
 
 
 -- =========================================
@@ -153,7 +153,7 @@ local _triggers = { "//", ";;", "--" }
 -- Maximum characters of context to send to the LLM. Single-sourced from the
 -- shared canonical (defaults.json llm_context_length via linux_bridge) so all
 -- three drivers send the same window; was a divergent 2000 here.
-local _max_context_chars = (HttpBridge and HttpBridge.DEFAULT_CONTEXT_LENGTH) or 500
+local _max_context_chars = HttpBridge.DEFAULT_CONTEXT_LENGTH
 
 -- Whether to auto-inject predictions (false = just show tooltip).
 local _auto_inject = true
@@ -190,7 +190,7 @@ function M.init(opts)
 	-- the menu toggle and daemon restart use the same source of truth.
 	local profiles = _get_profiles()
 	if profiles then
-		profiles.init({ port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT })
+		profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT })
 		if type(profiles.is_enabled) == "function" then
 			_enabled = profiles.is_enabled()
 		end
@@ -281,7 +281,7 @@ function M.predict(context, output_context)
 	-- Prefer the profiles' resolved URL; fall back to the shared bridge's canonical
 	-- host/port builder (never a re-typed localhost:11434 literal).
 	local base_url = (profiles and profiles.get_base_url())
-		or (HttpBridge and HttpBridge.resolve_base_url())
+		or HttpBridge.resolve_base_url()
 		or ""
 
 	-- Build the messages payload.
@@ -307,8 +307,13 @@ function M.predict(context, output_context)
 			stream      = true,
 			-- Canonical temperature (defaults.json llm_temperature) and max_tokens
 			-- (prompt_builder.DEFAULT_MAX_TOKENS) — were divergent 0.3 / 200 here.
-			temperature = (HttpBridge and HttpBridge.DEFAULT_TEMPERATURE) or 0.1,
-			max_tokens  = (PromptBuilder and PromptBuilder.DEFAULT_MAX_TOKENS) or 150,
+			temperature = HttpBridge.DEFAULT_TEMPERATURE,
+			max_tokens  = PromptBuilder.DEFAULT_MAX_TOKENS,
+			-- This driver has one prediction mode: a continuation injected at the
+			-- caret, inline. A newline in it would break the line the user is
+			-- writing, so the stop list is the one that cuts there — the same
+			-- choice macOS makes for a non-batch, non-advanced request.
+			line_mode   = true,
 		},
 		-- on_chunk: inject each delta immediately, minus any thinking block.
 		-- The filter is stateful and withholds a partial tag, so a <think> split
