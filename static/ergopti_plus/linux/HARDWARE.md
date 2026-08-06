@@ -2,11 +2,30 @@
 
 Everything CI cannot check, with the command to run and the answer to expect.
 
-CI covers one real kernel path: `tests/hardware/run_uinput_roundtrip.lua` creates
-a virtual keyboard, grabs it, writes events and reads them back, which pins the
-ioctl numbers, the struct layout and the capability bits. It runs headless on a
-GitHub runner, so it says nothing about a display server, a compositor, a panel,
-a keyboard layout or a real user's session. That is what this file is for.
+## What CI already proves, so this file does not ask for it
+
+Keep this boundary current. A checklist that re-asks for something CI now
+answers gets skipped as busywork, and the skipping does not stop at that item.
+
+- **One real kernel path.** `tests/hardware/run_uinput_roundtrip.lua` creates a
+  virtual keyboard, grabs it, writes events and reads them back — pinning the
+  ioctl numbers, the struct layout and the capability bits.
+- **The unit suite on five distributions' own LuaJIT**, in containers: Debian,
+  Fedora, Arch, Alpine, openSUSE.
+- **Every package format built, installed and launched.** `.deb` via apt, `.rpm`
+  in a Fedora container, the AppImage unpacked and run through its own bundled
+  interpreter, the Flatpak through `flatpak run` inside its sandbox, and the
+  tarball through `install.sh` on a clean unpack.
+- **That an installed package can read its own data.** Each of those five runs
+  `tests/hardware/installed_layout_check.lua` against the install: the shared
+  tree resolves to the path that format is supposed to use, one file from each
+  stanza the packagers copy separately opens, and the locale scan returns more
+  than the two-entry fallback. `--help` alone would pass with every data read
+  broken, which is the state every package this project ever built was in.
+
+What none of it touches: there is no keyboard to grab, no `/dev/uinput` to
+write, no display server, no compositor, no panel, no keyboard layout and no
+user session on a runner. That is what the sections below are for.
 
 Work top to bottom: a failure early on makes the later results meaningless.
 
@@ -232,15 +251,23 @@ log to show a fresh `Display server: wayland` line.
 
 ## 12. Install, per distribution family
 
+CI installs and launches all five formats on every push, and runs `install.sh`
+in containers for the five distribution families — so what is left here is the
+half a container cannot show: that the daemon comes up in a REAL session, with a
+display server, a panel and a keyboard, and keeps working after a reboot.
+
 On each of Ubuntu/Debian, Fedora, Arch, Alpine, and one immutable
 (Silverblue/Kinoite/SteamOS):
 
 ```bash
 bash install.sh
-ergopti-hotstrings --verbose
+ergopti-hotstrings --verbose      # raises the log level for this run
 ```
 
-**Expect** no hard abort, and section 1 to pass. On Alpine there is no systemd —
+**Expect** no hard abort, and section 1 to pass. Reboot and confirm it is still
+running: the udev rule and the group memberships are the part that only a real
+boot exercises, and `static_node=uinput` exists precisely because `/dev/uinput`
+does not exist before the module loads. On Alpine there is no systemd —
 the XDG autostart entry is what starts it, so check `~/.config/autostart/`.
 
 On an immutable distribution, `/usr` is read-only: everything lands in
