@@ -835,6 +835,30 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       → Taille : **large**. C est le seul item de l audit qui ne se fait pas en une
         soirée, et il débloque plus que tous les autres réunis.
 
+### 13.5 — Parité livrée le 2026-08-06 (suite)
+
+- [x] **Widget MPM : jamais tické, et rien de persisté.** `tick` n avait aucun
+      appelant, donc toute la surface était inerte sur tous les bureaux —
+      troisième module de ce driver trouvé complet et non câblé, après la bulle de
+      prévisualisation et le rapporteur de crash. Et ses deux réglages ne
+      survivaient pas au redémarrage. Les défauts viennent maintenant du manifeste
+      partagé, ce qui a révélé un désaccord réel : Windows livre la pastille
+      neutre, Linux colorée par origine de frappe. Consigné en
+      `default_per_platform` plutôt que tranché.
+- [x] **Slots clavier configurables (P2).** Le hook rapportait toute frappe
+      modifiée comme la chaîne « shortcut » sans dire laquelle. Deux choses
+      étaient bloquées dessus : `keylogger.record_shortcut` n avait aucun appelant
+      — donc toute action qui ne tape pas de texte était absente des métriques — et
+      `keyboard_slots` était restreint aux deux autres drivers. Les deux sont
+      levées. Un slot exige ses modificateurs EXACTEMENT ; AltGr est exclu, parce
+      qu il sélectionne un niveau de disposition et sert à taper « @ » en français.
+      Rien n est lié par défaut : la correspondance se fait dans ce daemon et pas
+      dans le noyau, donc un accord lié atteint aussi l application au premier plan.
+- [x] **Garde : tout `list` déclaré pour une plateforme doit avoir un
+      fournisseur.** Un `list` sans fournisseur est ignoré avec un avertissement —
+      le sous-menu perd une section entière, rien n échoue, et ça ne se voit qu en
+      comparant deux plateformes côte à côte.
+
 ### 13.4 — Bloqués sur autre chose
 
 - [ ] **Tout comportement LLM interactif est bloqué sur un transport HTTP
