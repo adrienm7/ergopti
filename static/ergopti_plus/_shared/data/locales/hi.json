@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux पर नहीं: यह पंक्ति व्यक्तिगत शॉर्टकट फ़ाइल खोलती है। macOS और Windows दोनों के पास ऐसी फ़ाइल है; Linux ड्राइवर के शॉर्टकट टॉगल और चयन-रूपांतरण हैं, संपादित करने योग्य कोई फ़ाइल नहीं।",
 	"platform_reason.libinput_reader_is_linux_only": "libinput पठन — केवल Linux",
 	"metrics_apps.chart_time_series": "समय",
-	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें"
+	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें",
+	"menu.llm.generation.temperature": "तापमान",
+	"menu.llm.generation.context_length": "संदर्भ की लंबाई"
 }

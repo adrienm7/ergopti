@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "No en Linux: esta fila abre el archivo de atajos personales. macOS y Windows tienen uno; los atajos del controlador de Linux son interruptores y transformaciones de la selección, sin ningún archivo que editar.",
 	"platform_reason.libinput_reader_is_linux_only": "Lectura de libinput — solo en Linux",
 	"metrics_apps.chart_time_series": "Tiempo",
-	"metrics_apps.edit_category_hint": "Editar categoría"
+	"metrics_apps.edit_category_hint": "Editar categoría",
+	"menu.llm.generation.temperature": "Temperatura",
+	"menu.llm.generation.context_length": "Longitud del contexto"
 }

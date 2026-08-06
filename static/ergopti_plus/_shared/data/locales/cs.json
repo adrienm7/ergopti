@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ne na Linuxu: tento řádek otevírá soubor osobních zkratek. macOS a Windows takový soubor mají; zkratky linuxového ovladače jsou přepínače a transformace výběru, bez souboru na disku, který by šlo upravit.",
 	"platform_reason.libinput_reader_is_linux_only": "Čtení libinput — pouze v Linuxu",
 	"metrics_apps.chart_time_series": "Čas",
-	"metrics_apps.edit_category_hint": "Změnit kategorii"
+	"metrics_apps.edit_category_hint": "Změnit kategorii",
+	"menu.llm.generation.temperature": "Teplota",
+	"menu.llm.generation.context_length": "Délka kontextu"
 }

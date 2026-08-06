@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Not on Linux: this row opens the personal shortcuts file. macOS and Windows each have one; the Linux driver's shortcuts are toggles and selection transforms, with nothing on disk to edit.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput reading — Linux only",
 	"metrics_apps.chart_time_series": "Time",
-	"metrics_apps.edit_category_hint": "Edit category"
+	"metrics_apps.edit_category_hint": "Edit category",
+	"menu.llm.generation.temperature": "Temperature",
+	"menu.llm.generation.context_length": "Context length"
 }

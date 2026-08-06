@@ -52,6 +52,11 @@ if ok_ps then ProfileSelector = ps_mod end
 -- thinking text, which is a correctness bug, not a missing nicety.
 local Parser = require("llm.parser")
 
+-- The two generation values the user can change. Hard require for the same
+-- reason as the two above: every value it holds is a setting, and a module that
+-- silently fails to load turns each into a literal written beside it.
+local Settings = require("modules.llm.settings")
+
 -- Canonical privacy posture, from defaults.json via the shared bridge. Never
 -- re-typed: the same two keys drive Windows and macOS.
 local _secure_field_filter_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS
@@ -153,7 +158,26 @@ local _triggers = { "//", ";;", "--" }
 -- Maximum characters of context to send to the LLM. Single-sourced from the
 -- shared canonical (defaults.json llm_context_length via linux_bridge) so all
 -- three drivers send the same window; was a divergent 2000 here.
-local _max_context_chars = HttpBridge.DEFAULT_CONTEXT_LENGTH
+-- Read through the settings module on every use rather than captured here: the
+-- user can change it from the menu while the daemon runs, and a value captured
+-- at load would keep the old one until a restart.
+local _max_context_chars = nil
+
+--- How much of what the user has written the model sees.
+---
+--- Declared BELOW `_max_context_chars`, deliberately: a function written above
+--- the local it reads does not capture it — it binds the nil global, and the
+--- read then silently answers nothing. Four bugs of that shape have been fixed
+--- in this driver, one of them earlier today.
+---
+--- Reads through the settings module rather than a value captured at load,
+--- because the user can change it from the menu while the daemon runs.
+--- @return number
+local function max_context_chars()
+	return _max_context_chars
+		or Settings.get("context_length")
+		or HttpBridge.DEFAULT_CONTEXT_LENGTH
+end
 
 -- Whether to auto-inject predictions (false = just show tooltip).
 local _auto_inject = true
@@ -197,7 +221,7 @@ function M.init(opts)
 	end
 
 	Logger.success(LOG, "Prediction engine initialised (triggers=%d, max_context=%d, auto_inject=%s).",
-		#_triggers, _max_context_chars, tostring(_auto_inject))
+		#_triggers, max_context_chars(), tostring(_auto_inject))
 end
 
 
@@ -307,7 +331,11 @@ function M.predict(context, output_context)
 			stream      = true,
 			-- Canonical temperature (defaults.json llm_temperature) and max_tokens
 			-- (prompt_builder.DEFAULT_MAX_TOKENS) — were divergent 0.3 / 200 here.
-			temperature = HttpBridge.DEFAULT_TEMPERATURE,
+			-- The user's setting, not the shipped constant. These two were read
+			-- straight from the canonical defaults, which made them constants
+			-- wearing the shape of settings: the manifest declares both as
+			-- features and there was no way to change either.
+			temperature = Settings.get("temperature") or HttpBridge.DEFAULT_TEMPERATURE,
 			max_tokens  = PromptBuilder.DEFAULT_MAX_TOKENS,
 			-- This driver has one prediction mode: a continuation injected at the
 			-- caret, inline. A newline in it would break the line the user is
@@ -428,9 +456,10 @@ end
 --- @param context string The full typing buffer (may be long).
 --- @return string Truncated context suitable for the LLM.
 function _build_user_context(context)
-	if #context <= _max_context_chars then return context end
-	-- Keep the last _max_context_chars characters (most relevant).
-	return context:sub(-_max_context_chars)
+	local limit = max_context_chars()
+	if #context <= limit then return context end
+	-- Keep the last `limit` characters, which are the ones nearest the caret.
+	return context:sub(-limit)
 end
 
 
@@ -539,7 +568,7 @@ end
 --- Returns the configured max context chars.
 --- @return number
 function M.get_max_context()
-	return _max_context_chars
+	return max_context_chars()
 end
 
 --- Sets the max context chars for the LLM window.

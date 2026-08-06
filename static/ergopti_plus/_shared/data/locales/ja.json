@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux では利用不可：この行は個人用ショートカットのファイルを開きます。macOS と Windows にはそのファイルがありますが、Linux ドライバーのショートカットはトグルと選択テキストの変換で、編集すべきファイルは存在しません。",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 読み取り — Linux のみ",
 	"metrics_apps.chart_time_series": "時間",
-	"metrics_apps.edit_category_hint": "カテゴリを編集"
+	"metrics_apps.edit_category_hint": "カテゴリを編集",
+	"menu.llm.generation.temperature": "温度",
+	"menu.llm.generation.context_length": "コンテキスト長"
 }

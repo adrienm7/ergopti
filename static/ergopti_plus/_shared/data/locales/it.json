@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Non su Linux: questa riga apre il file delle scorciatoie personali. macOS e Windows ne hanno uno; le scorciatoie del driver Linux sono interruttori e trasformazioni della selezione, senza alcun file da modificare.",
 	"platform_reason.libinput_reader_is_linux_only": "Lettura libinput — solo su Linux",
 	"metrics_apps.chart_time_series": "Tempo",
-	"metrics_apps.edit_category_hint": "Modifica categoria"
+	"metrics_apps.edit_category_hint": "Modifica categoria",
+	"menu.llm.generation.temperature": "Temperatura",
+	"menu.llm.generation.context_length": "Lunghezza del contesto"
 }

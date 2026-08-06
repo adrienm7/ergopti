@@ -1180,6 +1180,9 @@ local function _build_llm(ctx)
 	local items = {}
 	local enabled = llm.is_enabled and llm.is_enabled() or false
 
+	-- The master toggle stays with the caller: the renderer skips `toggle` rows
+	-- by contract, because whether a category is on is driver state rather than
+	-- manifest data. Everything below it is the manifest's, in its order.
 	items[#items + 1] = {
 		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
 		fn = function()
@@ -1187,20 +1190,71 @@ local function _build_llm(ctx)
 		end,
 	}
 
-	if type(llm.get_models) == "function" then
+	local providers = {}
+
+	-- The models this machine actually has. A `list`, because the rows are
+	-- whatever Ollama reports and no static entry can enumerate them.
+	providers["llm_models"] = function()
+		if type(llm.get_models) ~= "function" then return {} end
 		local models = llm.get_models()
-		if type(models) == "table" then
-			for _, model in ipairs(models) do
-				local is_current = (llm.get_current_model and llm.get_current_model() == model)
-				items[#items + 1] = {
-					title = model .. (is_current and " ✓" or ""),
-					fn = function()
-						if llm.set_model then llm.set_model(model) end
+		if type(models) ~= "table" then return {} end
+		local current = llm.get_current_model and llm.get_current_model() or nil
+		local rows = {}
+		for _, model in ipairs(models) do
+			rows[#rows + 1] = {
+				label = model,
+				-- `checked`, not a "✓" glued to the label: the tray draws its own
+				-- mark, and the glued form puts one platform's convention inside a
+				-- string twenty other languages also read.
+				checked = model == current,
+				action = function()
+					if llm.set_model then llm.set_model(model) end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		return rows
+	end
+
+	-- Temperature and context length. The manifest has declared both as features
+	-- for as long as it has existed and this driver read them from the canonical
+	-- defaults with no way to change either — constants wearing the shape of
+	-- settings.
+	providers["llm_generation"] = function()
+		local ok_settings, Settings = pcall(require, "modules.llm.settings")
+		if not ok_settings then
+			Logger.error(LOG, "LLM settings unavailable — the generation rows cannot be built.")
+			return {}
+		end
+		local rows = {}
+		for _, setting in ipairs({
+			{ name = "temperature", key = "menu.llm.generation.temperature" },
+			{ name = "context_length", key = "menu.llm.generation.context_length" },
+		}) do
+			local current = Settings.get(setting.name)
+			local choices = {}
+			for _, value in ipairs(Settings.presets(setting.name)) do
+				choices[#choices + 1] = {
+					label = tostring(value),
+					checked = current == value,
+					action = function()
+						Settings.set(setting.name, value)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				}
 			end
+			rows[#rows + 1] = {
+				label = i18n_safe(setting.key) .. " — " .. tostring(current),
+				items = choices,
+			}
 		end
+		return rows
 	end
+
+	local rendered = ManifestMenu
+		and ManifestMenu.build("llm_menu", "LLM", nil, nil, ctx, providers)
+		or {}
+	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
 	return { title = i18n_safe("menu.llm.title"), menu = items }
 end

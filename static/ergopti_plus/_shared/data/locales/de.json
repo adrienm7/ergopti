@@ -2409,5 +2409,7 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nicht unter Linux: diese Zeile öffnet die Datei mit persönlichen Kürzeln. macOS und Windows haben eine solche Datei; die Kürzel des Linux-Treibers sind Schalter und Auswahl-Umwandlungen, ohne Datei zum Bearbeiten.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-Lesen — nur unter Linux",
 	"metrics_apps.chart_time_series": "Zeit",
-	"metrics_apps.edit_category_hint": "Kategorie ändern"
+	"metrics_apps.edit_category_hint": "Kategorie ändern",
+	"menu.llm.generation.temperature": "Temperatur",
+	"menu.llm.generation.context_length": "Kontextlänge"
 }

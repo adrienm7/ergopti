@@ -144,8 +144,12 @@ description_key = "menu.llm.display"
 platforms = ["ahk", "hs"]
 
 [sections.llm.generation]
+# Linux joined on 2026-08-06, when the two settings below gained a control. It
+# read both from the shared canonical defaults and had no way to change either,
+# so they were constants wearing the shape of settings — and declaring a
+# capability with no control is what ADR-008 removed a notifier for.
 description_key = "menu.llm.generation"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.models]
 description_key = "menu.llm.models"
@@ -2859,6 +2863,32 @@ id = "debug"
 type = "list"
 id = "kanata_actions"
 platforms = ["linux"]
+
+# The LLM submenu.
+#
+# It did not exist. `llm` has been a top-level row on all three drivers since
+# the feature shipped, and each driver built the submenu beneath it by hand —
+# so `[sections.llm]` and its six subsections described capabilities with no
+# manifest rows behind them, and there was nowhere to declare a control without
+# also writing it three times.
+#
+# Every row here is a `list`. The contents are the models the machine actually
+# has and the values the user has chosen, which no static entry can enumerate,
+# and a `list` is what puts them in the shared renderer instead of in each
+# driver. Restricted to linux while it is the only driver rendering this tree:
+# declaring a row for a driver that hand-builds its menu would promise a row
+# nothing draws, which is the failure this file exists to prevent.
+
+[[menu.llm_menu]]
+type = "list"
+id = "llm_models"
+
+[[menu.llm_menu]]
+type = "---"
+
+[[menu.llm_menu]]
+type = "list"
+id = "llm_generation"
 
 # The updates submenu — Linux is the only driver with an in-app updater surface
 # at top level; the other two carry theirs under "about". Same reasoning as the
