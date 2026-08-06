@@ -579,6 +579,16 @@ function M.start(opts)
 end
 
 --- Stops the keyboard hook. Safe to call when not running.
+--- Which layout the hook is currently reading keycodes through.
+---
+--- The setter below had no getter, so nothing could report or verify what it
+--- had applied — including the setter's own tests, which had to drive a key
+--- through the resolver to find out.
+--- @return string
+function M.get_layout()
+	return _layout
+end
+
 --- Changes which layout the hook reads keycodes through, while it runs.
 ---
 --- Without this the tray's layout submenu could only log its own intention: the

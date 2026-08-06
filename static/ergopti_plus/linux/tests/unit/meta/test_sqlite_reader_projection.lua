@@ -279,6 +279,7 @@ helpers.describe("sqlite reader: the daily aggregate tables", function()
 			"agg_app_day", "agg_app_day_chars_class", "agg_app_day_errors",
 			"agg_app_day_hourly", "agg_app_day_hourly_min5",
 			"agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
+			"agg_app_day_ergo",
 		}) do
 			helpers.assert_true(queried(statements, table_name),
 				"'" .. table_name .. "' was never queried — the walk now fills it and "
@@ -431,6 +432,32 @@ helpers.describe("sqlite reader: bursts, sessions and pause buckets", function()
 		helpers.assert_eq(#entry.session_durations, 2,
 			"the durations are what the distribution plot is drawn from; an empty "
 				.. "array renders an axis and no bars")
+	end)
+
+end)
+
+
+
+
+helpers.describe("sqlite reader: the ergonomics record", function()
+
+	helpers.it("takes the longest streak rather than the sum", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_ergo", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","f_max":4,"h_max":9,'
+					.. '"ar_count":0,"focus_sum":0,"focus_count":0}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.same_finger_streak_max, 4,
+			"the longest same-finger run of the day is a record; adding two "
+				.. "machines' records would invent a streak nobody typed")
+		helpers.assert_eq(entry.same_hand_streak_max, 9)
 	end)
 
 end)

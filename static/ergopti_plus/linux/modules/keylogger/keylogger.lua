@@ -1245,6 +1245,7 @@ function M.flush()
 			for _, row in ipairs(daily.app_buckets) do SqliteWriter.upsert_app_bucket(_device_id, row) end
 			for _, row in ipairs(daily.bursts) do SqliteWriter.upsert_burst(_device_id, row) end
 			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
+			for _, row in ipairs(daily.ergo) do SqliteWriter.upsert_ergo(_device_id, row) end
 		end
 		if #_pending_app_switch_events > 0 then
 			-- Counted BEFORE the raw events are handed over, because that call

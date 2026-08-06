@@ -611,3 +611,132 @@ helpers.describe("aggregate walker: the pause buckets", function()
 
 end)
 
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 9/ Same finger, same hand ===============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("aggregate walker: the streaks the layout exists to reduce", function()
+
+	local FingerMap = helpers.load_module("keylogger.finger_map")
+
+	--- Whether the shared keycode catalogue could be read at all.
+	---
+	--- Every case below is meaningless without it, and a suite that quietly
+	--- passes when its fixture is missing is the failure mode this repository has
+	--- a ratchet for. So it is asserted once, loudly, rather than skipped.
+	--- \1return table
+	local function require_catalogue()
+		local Paths = helpers.load_module("infra.paths")
+		local root = Paths.shared_root()
+		helpers.assert_not_nil(root, "the shared tree must be findable")
+		local handle = io.open(root .. "/data/keycodes/azerty.json", "r")
+		helpers.assert_not_nil(handle, "the shared keycode catalogue must exist")
+		local body = handle:read("*a")
+		handle:close()
+		local Json = helpers.load_module("json")
+		FingerMap._reset()
+		local lookup = FingerMap.load("qwerty", function() return body end, Json.decode, "x")
+		helpers.assert_not_nil(lookup, "the catalogue must decode into a finger lookup")
+		return lookup
+	end
+
+	--- Two characters the catalogue says share a finger, and two that do not.
+	--- Derived from the catalogue rather than named, so a change to the layout
+	--- data cannot leave this test asserting something the product denies.
+	--- \1param lookup table
+	--- \1return string a, string b, string other
+	local function pick_pair(lookup)
+		local by_finger = {}
+		for char, entry in pairs(lookup) do
+			if char:match("^%l$") then
+				by_finger[entry.finger] = by_finger[entry.finger] or {}
+				local list = by_finger[entry.finger]
+				list[#list + 1] = char
+			end
+		end
+		for finger, chars in pairs(by_finger) do
+			if #chars >= 2 then
+				table.sort(chars)
+				for other_char, entry in pairs(lookup) do
+					if other_char:match("^%l$") and entry.finger ~= finger then
+						return chars[1], chars[2], other_char
+					end
+				end
+			end
+		end
+		return nil, nil, nil
+	end
+
+	helpers.it("counts two characters typed by one finger as a run", function()
+		local lookup = require_catalogue()
+		local first, second, other = pick_pair(lookup)
+		helpers.assert_not_nil(first,
+			"the catalogue must describe at least one finger with two keys, or "
+				.. "there is nothing here to measure")
+
+		local batch = Walker.walk(typed(first .. second, 90), "2026-08-06", "app")
+		local row = batch.ergo["2026-08-06\1app"]
+		helpers.assert_not_nil(row, "the ergonomics panel had no rows at all before this")
+		helpers.assert_true(row.same_finger_streak_max >= 2,
+			"'how often does one finger have to move twice in a row' is the whole "
+				.. "argument for an alternative layout, and this driver could not "
+				.. "answer it — the panel the layout exists to justify was empty")
+		helpers.assert_true(other ~= nil)
+	end)
+
+	helpers.it("does not call two different fingers a run", function()
+		local lookup = require_catalogue()
+		local first, _, other = pick_pair(lookup)
+		local batch = Walker.walk(typed(first .. other, 90), "2026-08-06", "app")
+		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
+			"a maximum of one means no run happened; seeding the counter at two "
+				.. "would report every isolated keystroke as a same-finger event")
+	end)
+
+	helpers.it("breaks the run on a correction", function()
+		local lookup = require_catalogue()
+		local first, second = pick_pair(lookup)
+		local batch = Walker.walk({
+			key(first, 90), key("[BS]", 90), key(second, 90),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
+			"what follows a backspace continues from a different character than it "
+				.. "appears to, so those two keystrokes were never consecutive under "
+				.. "one finger")
+	end)
+
+	helpers.it("does not let an expansion extend a run", function()
+		local lookup = require_catalogue()
+		local first, second = pick_pair(lookup)
+		local batch = Walker.walk({
+			key(first, 90), key(second, 0, "hotstring"),
+		}, "2026-08-06", "app")
+		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
+			"counting the driver's own output would make the layout look worse the "
+				.. "more it types for the user, which is backwards")
+	end)
+
+	helpers.it("breaks the run on a character the catalogue does not describe", function()
+		local batch = Walker.walk(typed("\194\1691\194\1692", 90), "2026-08-06", "app")
+		local row = batch.ergo["2026-08-06\1app"]
+		helpers.assert_true(row.same_finger_streak_max <= 1,
+			"guessing a finger for a character the layout data does not cover would "
+				.. "inflate the one number the whole argument rests on")
+	end)
+
+	helpers.it("hands the row to the writer", function()
+		local batch = Walker.walk(typed("abc", 90), "2026-08-06", "app")
+		local rows = Walker.daily_rows(batch).ergo
+		helpers.assert_eq(#rows, 1,
+			"a table computed and never emitted is the same blank panel as one "
+				.. "never computed — this driver has shipped that three times")
+		helpers.assert_eq(rows[1].app, "app")
+	end)
+
+end)
+
