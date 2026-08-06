@@ -534,7 +534,9 @@ end
 --- @param trigger string The sequence to monitor.
 --- @param replacement string The resulting expansion string.
 --- @param opts table Optional flags: is_word, auto_expand, is_case_sensitive,
----   final_result, is_private (trigger and replacement are secrets — never logged).
+---   final_result, is_private (trigger and replacement are secrets — never logged),
+---   field (the personal_info.toml field the replacement came from, so the preview
+---   can ask the shared declaration how much of it may be shown).
 function M.add(trigger, replacement, opts)
 	if not require_state("add") then return end
 	if type(trigger) ~= "string" or trigger == "" then
@@ -575,6 +577,12 @@ function M.add(trigger, replacement, opts)
 	-- to suppress the keylogger call and the plaintext DEBUG line that would
 	-- otherwise copy both into the 14-day log and the exported metrics store
 	local is_private        = opts.is_private         == true
+	-- The personal_info.toml field this replacement was built from, when it has
+	-- one. The preview asks the shared declaration BY NAME how much of a value may
+	-- appear on screen, so a mapping that arrives without it is masked whole —
+	-- safe, but wrong for the fields the declaration marks public. Generated
+	-- aliases inherit it, like the section above.
+	local field             = type(opts.field) == "string" and opts.field or nil
 	-- Owning section name (e.g. "comma_j"), threaded through so mapping_fires can
 	-- look up a per-section delay override. Generated aliases inherit it.
 	local section           = type(opts.section) == "string" and opts.section or nil
@@ -634,6 +642,7 @@ function M.add(trigger, replacement, opts)
 			plain_repl   = plain_r,
 			is_word      = is_word,
 			is_private   = is_private,
+			field        = field,
 			section      = section,
 			auto         = a,
 			priority     = priority,

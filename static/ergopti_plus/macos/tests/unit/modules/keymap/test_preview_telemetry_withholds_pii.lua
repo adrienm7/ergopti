@@ -4,12 +4,9 @@
 --- MODULE: Regression — the preview's PERSISTED telemetry must withhold PII too
 --- DESCRIPTION:
 --- The second forgotten sibling. `test_preview_never_logs_pii.lua` closed the
---- DEBUG line in `update_preview`, and the comment it left behind states the
---- invariant exactly:
----
----   "The preview TOOLTIP still renders the value — showing the user their own
----    data on their own screen is the feature — it is only the persisted sink
----    that must withhold it."
+--- DEBUG line in `update_preview`, and the comment it left behind stated the
+--- invariant this file is about: it is the PERSISTED sink that must withhold the
+--- row.
 ---
 --- Sixty lines below that comment sat the persisted sink, writing the value
 --- verbatim. `log_hotstring_suggested` fires the moment a preview appears and
@@ -47,9 +44,11 @@
 --- the record outlives the match it came from.
 ---
 --- WHAT IS DELIBERATELY NOT ASSERTED:
---- That the tooltip hides the value. It must not — the user is looking at their
---- own screen at data they are about to type. Only what is written to disk is
---- in question.
+--- What the tooltip shows. That is a different decision with a different answer
+--- and its own test — `test_preview_masks_secrets.lua`: since 2026-08-05 the
+--- bubble PARTIALLY masks a declared secret, revealing the last four characters
+--- so the user can still confirm which value is about to be typed. This file is
+--- only about what is written to disk, where nothing at all may be kept.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

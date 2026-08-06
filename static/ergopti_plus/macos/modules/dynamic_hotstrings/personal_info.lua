@@ -26,6 +26,13 @@ if not ok_editor then ui_editor = nil end
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 
+-- The shared personal-info field classification, used ONLY by the preview
+-- provider below. Optional-require rather than a hard dependency so a driver
+-- shipped without the shared tree still expands correctly — the provider then
+-- withholds instead, which is the safe direction.
+local ok_fields, personal_info_fields = pcall(require, "infra.personal_info_fields")
+if not ok_fields then personal_info_fields = nil end
+
 
 
 
@@ -56,6 +63,11 @@ local ManifestReader = require("infra.manifest_reader")
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
 local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
+
+-- Width of the placeholder a preview part falls back to when the shared field
+-- classification cannot be reached. Fixed rather than the value's own length:
+-- how long a secret is, is itself a hint about which one it is.
+local UNCLASSIFIED_PREVIEW_BULLETS = 8
 
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
@@ -236,20 +248,49 @@ end
 -- ====================================
 
 --- Resolves accumulated letters into actual mapped strings.
+---
+--- Returns the field NAMES alongside the values, in the same order. The values
+--- alone are what gets typed, but the preview has to ask the shared declaration
+--- how much of each one may appear on screen — and only the letter that produced
+--- a part knows which personal_info.toml field it is. Losing that here is what
+--- would put an IBAN on screen in full.
 --- @param combo string Sequence of typed letters.
---- @return table List of strings resolved from the letters.
+--- @return table values List of strings resolved from the letters.
+--- @return table fields Matching personal_info.toml field names, same indices.
 local function resolve_combo(combo)
-	local parts = {}
-	if type(combo) ~= "string" then return parts end
-	
+	local parts  = {}
+	local fields = {}
+	if type(combo) ~= "string" then return parts, fields end
+
 	for i = 1, #combo do
 		local letter = combo:sub(i, i)
 		local key    = _letters[letter]
 		if key and _info[key] then
 			table.insert(parts, _info[key])
+			table.insert(fields, key)
 		end
 	end
-	return parts
+	return parts, fields
+end
+
+--- What the preview bubble may show for one resolved part.
+---
+--- DISPLAY ONLY: do_expand() calls resolve_combo() and injects the values it
+--- returns, never this. A mask that reached the injector would type bullets into
+--- whatever form the user was filling in.
+--- @param value string The resolved value.
+--- @param field string|nil The personal_info.toml field it came from.
+--- @return string
+local function masked_for_preview(value, field)
+	if type(value) ~= "string" then return value end
+	if not personal_info_fields or type(personal_info_fields.for_preview) ~= "function" then
+		-- Fail closed. Every value this provider resolves comes straight out of
+		-- personal_info.toml, so an unreachable classifier is precisely the case
+		-- where showing the value is the wrong guess.
+		Logger.error(LOG, "Field classification unavailable — withholding a personal-info preview.")
+		return ("•"):rep(UNCLASSIFIED_PREVIEW_BULLETS)
+	end
+	return personal_info_fields.for_preview(value, field)
 end
 
 --- Performs the actual injection of the requested data.
@@ -634,9 +675,17 @@ function M.start(base_dir, keymap_module, info_toml_path)
 			
 			local match = buf:match("@([a-z]+)$")
 			if match then
-				local parts = resolve_combo(match)
+				local parts, fields = resolve_combo(match)
 				if #parts > 0 then
-					return table.concat(parts, " ⇥ ")
+					-- Masked part by part, not row by row: one @-combo can resolve to
+					-- several fields at once (`@ip★` is an IBAN AND a first name), and
+					-- they are not classified alike. Masking the joined string would
+					-- have no field to ask about and would have to hide all of it.
+					local shown = {}
+					for index, value in ipairs(parts) do
+						shown[index] = masked_for_preview(value, fields[index])
+					end
+					return table.concat(shown, " ⇥ ")
 				end
 			end
 			return nil

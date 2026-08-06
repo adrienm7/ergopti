@@ -679,6 +679,25 @@ KL_LogLlmSuggested(app_name, count) {
     _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
 }
 
+; The hotstring preview's own telemetry pair, from modules/keylogger/keylogger.ahk.
+; The prefix watcher calls both inside a ``try``, so before these existed the
+; calls simply failed and no test could observe whether the sink was reached —
+; which is exactly what a privacy guard on that sink has to assert.
+global _Stub_HotstringSuggestedCalls := []   ; recorded KL_LogHotstringSuggested calls
+global _Stub_HotstringDismissedCalls := []   ; recorded KL_LogHotstringDismissed calls
+
+KL_LogHotstringSuggested(trigger, replacement, h_type := "unknown", app_name := "") {
+    global _Stub_HotstringSuggestedCalls
+    _Stub_HotstringSuggestedCalls.Push({ trigger: trigger, replacement: replacement,
+        h_type: h_type, app_name: app_name })
+}
+
+KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := "") {
+    global _Stub_HotstringDismissedCalls
+    _Stub_HotstringDismissedCalls.Push({ trigger: trigger, replacement: replacement,
+        h_type: h_type, app_name: app_name })
+}
+
 class Keylogger {
     static synth_active := 0
     static synth_type   := "none"

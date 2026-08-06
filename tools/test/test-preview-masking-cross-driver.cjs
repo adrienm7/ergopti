@@ -50,14 +50,22 @@ const DRIVERS = [
 	{ label: 'windows', testsRel: 'static/ergopti_plus/windows/tests', exts: ['.ahk'] }
 ];
 
-// Drivers that do NOT yet render the bubble from the corpus. Lower this — and
-// the list — as each one lands. It must never grow.
+// Drivers that do NOT yet render the bubble from the corpus. It must never grow,
+// and an entry must be removed the moment its driver lands.
 //
-// macOS and Windows both need the same thing first, and it is not a call to a
-// mask function: their preview candidates carry no personal_info field name, so
-// there is nothing to ask the declaration about. Linux threads that provenance
-// through, which is why it could be wired up at all.
-const NOT_YET_WIRED = ['macos', 'windows'];
+// Empty since all three arrived. What each one cost is worth recording, because
+// "wire up the mask function" was wrong for both of the last two:
+//   macOS  — the provenance had to be threaded through four seams first (the
+//            rules engine's shared opts table, the registry's entry
+//            constructor, both match records, then the row builder) before any
+//            display change was anything but inert.
+//   Windows— the preview never appeared at all for the @ family: the tooltip is
+//            driven by an index built only from TOML files, and @ triggers are
+//            registered imperatively at boot, so they were invisible to it. That
+//            needed a second candidate source, not a masking call. And AHK
+//            cannot require the shared Lua, so the algorithm is a real port held
+//            to the corpus rather than a binding.
+const NOT_YET_WIRED = [];
 
 const errors = [];
 const notes = [];

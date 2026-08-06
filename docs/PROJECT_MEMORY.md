@@ -129,6 +129,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 
 - [project-linux-a-field-must-be-named-at-every-boundary](#project-linux-a-field-must-be-named-at-every-boundary) — On the Linux driver the same defect recurred nine times in one session: a value is computed correctly and lost at a boundary that DROPS what it does not name — an allow-list, a projection, a code-to-table map, a JSON envelope. Nothing errors, and the symptom is always a panel of zeroes
 - [project-python-slice-replace-can-shred-a-file](#project-python-slice-replace-can-shred-a-file) — A `str.replace` whose needle came from two `index()` calls silently becomes `replace("", …)` when the bounds invert, inserting the payload between every character; the original is recoverable because it is interleaved, not lost
+- [project-the-preview-index-is-file-driven-only](#project-the-preview-index-is-file-driven-only) — The Windows preview tooltip reads _PrefixIndex, whose single writer has three FILE-driven callers; a trigger registered imperatively by CreateHotstring can never be previewed, and inserting it into the index is erased by the next rebuild
 
 
 
@@ -186,6 +187,54 @@ ADR-008 for having no callers: the file made the port matrix answer "does Linux
 notify?" affirmatively by inspection while the practical answer was no. When it
 was reinstated, the caller landed in the same commit and got its own assertion,
 because the port matrix gate only checks presence.
+
+
+### project-the-preview-index-is-file-driven-only
+
+_A trigger created by CreateHotstring can never appear in the Windows preview bubble — the index has one writer and all three of its callers read files_
+
+<sub>slug: `project_the_preview_index_is_file_driven_only`</sub>
+
+On Windows the hotstring preview resolves its candidates from `_PrefixIndex` and
+from nothing else. That Map has exactly one writer, `_AddTriggerToIndex`,
+reachable from three callers — the bundled category TOML scan, its in-memory
+cache equivalent, and the extension-pack scan. **All three are file-driven**, and
+the six-name list they iterate (`_PREFIX_WATCHER_CATEGORIES`) has no entry for
+anything registered in code.
+
+So every trigger created imperatively at boot by `CreateHotstring` is invisible
+to the preview while expanding perfectly. The whole `@` family — the
+personal-information tags and letter combos, and the three dates — fired and
+showed no tooltip at all, with nothing logged beyond a DEBUG line reading
+`no prefix match for '@n'`. The symptom looks like a filter or a toggle and is
+neither: it is a **missing candidate source**.
+
+**Do not fix it by inserting into the index at registration time.**
+`HotstringPrefixWatcherRebuildIndex` builds a fresh `Map()` and swaps it in, so
+any such entry is erased by the first live section toggle, personal save or
+boot-tail warm-up — the bug then returns intermittently and reads as a race. Do
+not add them to `_TriggerSet` either: it feeds `_CheckNearMiss`, which forwards
+`Entry.Output` to the analytics log, so that route writes raw IBAN / SSN / card
+values into the 14-day keylogger.
+
+The route that works is a **preview provider** —
+`HotstringPrefixWatcherRegisterPreviewProvider(Fn)`, consulted by
+`_PrefixCollectFromProviders` after the index probe. macOS has had the same
+concept (`register_preview_provider`) since the personal-info work; Linux still
+has the gap. Two rules the collector enforces rather than each provider: a
+provider row whose trigger the index already answered for is DROPPED (the index
+row carries the real category, section and priority of the mapping that will
+fire), and every provider row is stamped `IsPrivate` unconditionally so the
+preview telemetry withholds it — a provider exists to resolve values the driver
+holds precisely because they are the user's own.
+
+One more thing the provider must ask, and it is not obvious: **the engine decides
+what a tag IS, not the tag itself.** `@dt` spells two valid personal-info letter
+aliases and is also the short-date trigger; only the engine's Spec knows which
+one will fire. Resolving the tag by its letters would have previewed a name and a
+phone number for a trigger that types today's date.
+
+Related: [[feedback-regression-tests]].
 
 
 ## Working conventions & feedback

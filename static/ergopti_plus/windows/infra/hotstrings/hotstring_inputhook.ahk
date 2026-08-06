@@ -26,6 +26,21 @@
 ; each entry is { Trigger, Output, Category, Section, Length }.
 global _PrefixIndex := Map()
 
+; Candidate sources for triggers the prefix index cannot hold. _PrefixIndex is
+; built exclusively from FILES — the bundled category TOMLs, their in-memory
+; cache and the extension packs — so a trigger created imperatively by
+; CreateHotstring at boot has no key in it and can never be previewed. The whole
+; @ family is registered that way (personal-info tags and combos, the three
+; dates), which is why none of it produced a tooltip while every one of those
+; triggers expanded normally.
+;
+; A provider takes the ENGINE's buffer and returns an Array of rows shaped like
+; index entries. Registering the triggers into _PrefixIndex instead is NOT an
+; option: HotstringPrefixWatcherRebuildIndex builds a fresh Map and swaps it in,
+; so anything inserted outside that loop is erased by the next live section
+; toggle, personal save or boot-tail warm-up.
+global _PrefixPreviewProviders := []
+
 ; Flat set of all known trigger strings (lower-cased) → entry object.
 ; Used by the near-miss detector in _ResetPrefixBuffer so it can check
 ; exact trigger equality and Levenshtein-1 neighbours without re-walking
@@ -337,17 +352,39 @@ _OnMouseClickReset(*) {
 ; reason other than a fire (buffer reset, prefix lost, word terminator,
 ; mouse click). The fire path uses the silent-clear variant below so the
 ; suggestion is not double-counted as both fired and dismissed.
-_NotifySuggestionShown(Trigger, Output, Category) {
+_NotifySuggestionShown(Trigger, Output, Category, IsPrivate := false) {
 	global _KLLastShownSuggestion
 	Prev := _KLLastShownSuggestion
 	if (IsObject(Prev) and Prev.Trigger == Trigger and Prev.Output == Output) {
 		return
 	}
 	if IsObject(Prev) {
-		try KL_LogHotstringDismissed(Prev.Trigger, Prev.Output, Prev.Category)
+		_KLEmitSuggestionDismissed(Prev)
 	}
-	_KLLastShownSuggestion := { Trigger: Trigger, Output: Output, Category: Category }
+	; The flag travels ON the record: the dismissal fires from a different
+	; function, long after this one returned, so it cannot look the answer up
+	; again.
+	_KLLastShownSuggestion := { Trigger: Trigger, Output: Output, Category: Category,
+	                            IsPrivate: IsPrivate ? true : false }
+	; A private mapping is withheld WHOLE, exactly as macOS withholds it: both
+	; columns are secrets — the replacement IS the IBAN and the trigger is a
+	; fragment of it — so redacting one and keeping the other still leaks. The
+	; state machine above still ran, so a non-private suggestion this one
+	; replaces is still paired with its dismissal.
+	if IsPrivate {
+		return
+	}
 	try KL_LogHotstringSuggested(Trigger, Output, Category)
+}
+
+; Emit the dismissal for a previously-shown suggestion — unless it was private,
+; in which case the suggested/dismissed pair is withheld whole and writing only
+; the second half would put the value in the log by the back door.
+_KLEmitSuggestionDismissed(Rec) {
+	if (Rec.HasOwnProp("IsPrivate") and Rec.IsPrivate) {
+		return
+	}
+	try KL_LogHotstringDismissed(Rec.Trigger, Rec.Output, Rec.Category)
 }
 
 _NotifySuggestionDismissed() {
@@ -357,7 +394,7 @@ _NotifySuggestionDismissed() {
 		return
 	}
 	_KLLastShownSuggestion := ""
-	try KL_LogHotstringDismissed(Prev.Trigger, Prev.Output, Prev.Category)
+	_KLEmitSuggestionDismissed(Prev)
 }
 
 ; Silent clear — used by the fire path so a single user action emits
@@ -548,6 +585,28 @@ HotstringPrefixWatcherRebuildIndex() {
 	; A just-disabled section may still have a tooltip on screen — hide it so the
 	; preview cannot outlive the expansion it was advertising.
 	TooltipHide("LiveToggleRebuild", true)
+}
+
+; Register a preview candidate source for triggers the file-driven index cannot
+; hold — see _PrefixPreviewProviders. Idempotent by identity so a module that is
+; loaded twice does not offer its rows twice.
+; @param Fn A callable taking the engine buffer and returning an Array of rows.
+; @return true when the provider was added.
+HotstringPrefixWatcherRegisterPreviewProvider(Fn) {
+	global _PrefixPreviewProviders
+	if !HasMethod(Fn) {
+		try LoggerError("PrefixWatcher", "RegisterPreviewProvider: the argument is not callable — the provider is ignored and its triggers stay unpreviewable.")
+		return false
+	}
+	for _, Existing in _PrefixPreviewProviders {
+		if (Existing == Fn) {
+			try LoggerDebug("PrefixWatcher", "Preview provider already registered — duplicate ignored.")
+			return false
+		}
+	}
+	_PrefixPreviewProviders.Push(Fn)
+	try LoggerDebug("PrefixWatcher", "Preview provider registered ({1} total).", _PrefixPreviewProviders.Length)
+	return true
 }
 
 ; Stop the InputHook and clear the index. Useful when the user disables the
@@ -1315,24 +1374,81 @@ _PrefixSortCandidates(Candidates) {
 _PrefixCollectCandidates() {
 	global _PrefixIndex, HSE_Buffer, HSE_MaxStarTriggerLen, HSE_MaxEndTriggerLen
 	Candidates := []
-	if (!IsSet(HSE_Buffer) or HSE_Buffer == "" or !IsSet(_PrefixIndex) or _PrefixIndex.Count == 0)
+	if (!IsSet(HSE_Buffer) or HSE_Buffer == "")
 		return Candidates
-	MaxKeyLen := IsSet(HSE_MaxStarTriggerLen) ? HSE_MaxStarTriggerLen : 0
-	if (IsSet(HSE_MaxEndTriggerLen) and HSE_MaxEndTriggerLen > MaxKeyLen)
-		MaxKeyLen := HSE_MaxEndTriggerLen
-	if (MaxKeyLen < 1)
-		return Candidates
-	; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
-	; ``ct`` from ``CT`` — the index registers each case variant separately with
-	; its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
-	Loop Min(StrLen(HSE_Buffer), MaxKeyLen) {
-		Suffix := SubStr(HSE_Buffer, -A_Index)
-		if !_PrefixIndex.Has(Suffix)
-			continue
-		for _, Entry in _PrefixIndex[Suffix]
-			Candidates.Push(Entry)
+	; An empty index is not an empty candidate set any more: the providers below
+	; answer for triggers the index structurally cannot hold, so returning early
+	; here would silence them for the whole window between boot and the deferred
+	; index build — and permanently on a build that failed.
+	if (IsSet(_PrefixIndex) and _PrefixIndex.Count > 0) {
+		MaxKeyLen := IsSet(HSE_MaxStarTriggerLen) ? HSE_MaxStarTriggerLen : 0
+		if (IsSet(HSE_MaxEndTriggerLen) and HSE_MaxEndTriggerLen > MaxKeyLen)
+			MaxKeyLen := HSE_MaxEndTriggerLen
+		; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
+		; ``ct`` from ``CT`` — the index registers each case variant separately with
+		; its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
+		if (MaxKeyLen >= 1) {
+			Loop Min(StrLen(HSE_Buffer), MaxKeyLen) {
+				Suffix := SubStr(HSE_Buffer, -A_Index)
+				if !_PrefixIndex.Has(Suffix)
+					continue
+				for _, Entry in _PrefixIndex[Suffix]
+					Candidates.Push(Entry)
+			}
+		}
 	}
+	_PrefixCollectFromProviders(HSE_Buffer, Candidates)
+	if (Candidates.Length == 0)
+		return Candidates
 	return _PrefixSortCandidates(Candidates)
+}
+
+; Append every registered provider's rows to the candidate set.
+;
+; Runs AFTER the index probe so a provider can never shadow a trigger the index
+; already answered for: the index row carries the real category, section and
+; priority of the mapping that will fire, and two rows for one trigger would
+; show the user the same expansion twice, the second one dimmed.
+;
+; A throwing provider costs its own rows and nothing else — the preview is a
+; hint, and one broken source must not empty the bubble for the others.
+; @param Buffer The engine's buffer, the same string the suffix probe read.
+; @param Candidates The array to append to, already holding the index rows.
+_PrefixCollectFromProviders(Buffer, Candidates) {
+	global _PrefixPreviewProviders
+	if (!IsSet(_PrefixPreviewProviders) or _PrefixPreviewProviders.Length == 0)
+		return
+	Seen := Map()
+	for _, Entry in Candidates
+		Seen[StrLower(Entry.Trigger)] := true
+	for _, Provider in _PrefixPreviewProviders {
+		Rows := ""
+		try {
+			Rows := Provider.Call(Buffer)
+		} catch as Err {
+			try LoggerError("PrefixWatcher", "A preview provider failed: {1}. Its rows are dropped for this render.", Err.Message)
+			continue
+		}
+		if !(Rows is Array)
+			continue
+		for _, Row in Rows {
+			if (!IsObject(Row) or !Row.HasOwnProp("Trigger") or !Row.HasOwnProp("Output"))
+				continue
+			Key := StrLower(Row.Trigger)
+			if Seen.Has(Key)
+				continue
+			Seen[Key] := true
+			; Stamped HERE and unconditionally, not left to each provider. A
+			; provider exists to resolve values the driver holds precisely because
+			; they are the user's own, and one that forgot the flag would write the
+			; phone / IBAN / SSN / card into the 14-day keylogger on every preview
+			; keystroke. macOS makes the same call for the same reason. The bubble
+			; still SHOWS the value — putting the user's data on the user's own
+			; screen is the feature; it is only the persisted sink that withholds it.
+			Row.IsPrivate := true
+			Candidates.Push(Row)
+		}
+	}
 }
 
 _LookupAndRender() {
@@ -1402,7 +1518,12 @@ _LookupAndRender() {
 		; HS INFINITE_TOOLTIP_SEC convention. Each row carries its own delay
 		; so rows with distinct delays activate the dequeue path in TooltipShow,
 		; which removes each row individually as its deadline passes.
-		ExpansionDelay := (Cfg.Delay != "") ? Cfg.Delay : 0
+		; A provider row carries the ENGINE's own activation window for its
+		; trigger, which is the window the bubble has to match. Index rows have no
+		; such field and keep the category's resolved delay.
+		ExpansionDelay := Entry.HasOwnProp("Delay")
+			? Entry.Delay
+			: ((Cfg.Delay != "") ? Cfg.Delay : 0)
 		TooltipDuration := ExpansionDelay
 		; Only triggers whose LAST chars ARE the magic key qualify as star
 		; triggers — a trigger containing MK in its body (but not as a suffix)
@@ -1418,7 +1539,8 @@ _LookupAndRender() {
 		Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
 		          ColorHex: Color, DurationSec: TooltipDuration,
 		          Trigger: Entry.Trigger, Category: Entry.Category,
-		          IsDimmed: Bucket.Length > 0 }
+		          IsDimmed: Bucket.Length > 0,
+		          IsPrivate: (Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? true : false }
 		Bucket.Push(Item)
 	}
 	Items := []
@@ -1435,12 +1557,21 @@ _LookupAndRender() {
 		_NotifySuggestionDismissed()
 		return
 	}
-	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
+	if LoggerIsDebugEnabled() {
+		; A private row's TEXT is the user's own IBAN, card number or SSN, and
+		; DEBUG is exactly the level a user is asked to switch on when reporting a
+		; bug — so the count is logged and the content is not. The bubble itself is
+		; unaffected: showing the user their own data on their own screen is the
+		; whole feature.
+		if Items[1].IsPrivate
+			LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first is a private mapping (content withheld).", Items.Length)
+		else
+			LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
+	}
 	TooltipShow(Items)
 	if IsSet(LLM_Bridge_ScheduleAfterHotstring)
 		try LLM_Bridge_ScheduleAfterHotstring(Items)
 	; Log the suggestion based on the first (top) item only.
 	Primary := Items[1]
-	_NotifySuggestionShown(Primary.Trigger, Primary.Text, Primary.Category)
+	_NotifySuggestionShown(Primary.Trigger, Primary.Text, Primary.Category, Primary.IsPrivate)
 }

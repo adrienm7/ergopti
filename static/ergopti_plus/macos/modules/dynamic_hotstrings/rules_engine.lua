@@ -191,7 +191,28 @@ local function register_prefix_entries()
 	-- out: the trigger prefix is itself a fragment of the secret (the first 5
 	-- digits of the SSN, the first 6 chars of the IBAN), so redacting only the
 	-- replacement would still leak
-	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true, is_private = true }
+	local base_opts = { is_word = false, auto_expand = true, is_case_sensitive = true, is_private = true }
+
+	--- Copies the shared flags and names the personal_info.toml field the value
+	--- came from.
+	---
+	--- Per call, never once into a shared table: this function registers FOUR
+	--- different fields, and the phone number and its spaced variant are both
+	--- registered from the same block — so a single `base_opts.field = …` would
+	--- tag every mapping as whichever name was written last. Both phone fields are
+	--- declared public today, which is exactly what would make that mistake
+	--- invisible until one of them was reclassified and the bubble started
+	--- revealing it.
+	--- @param field string The personal_info.toml field name.
+	--- @param overrides table|nil Flags that differ from the shared base.
+	--- @return table
+	local function opts_for(field, overrides)
+		local out = {}
+		for key, value in pairs(base_opts) do out[key] = value end
+		for key, value in pairs(overrides or {}) do out[key] = value end
+		out.field = field
+		return out
+	end
 
 	local phone  = type(_personal_data.phone_number) == "string" and _personal_data.phone_number or tostring(_personal_data.phone_number or "")
 	local fphone = type(_personal_data.phone_number_clean) == "string" and _personal_data.phone_number_clean or tostring(_personal_data.phone_number_clean or "")
@@ -216,19 +237,23 @@ local function register_prefix_entries()
 
 	-- Register phone prefixes
 	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
+		-- Two DIFFERENT fields in one block: every entry below expands to the raw
+		-- number except the last, which expands to the spaced variant.
+		local phone_opts  = opts_for("phone_number")
+		local fphone_opts = opts_for("phone_number_clean")
 		if #phone >= 2 then
-			_km.add(phone:sub(1, 2) .. _trigger, phone, opts)
-			_km.add("+33" .. phone:sub(1, 2), "+33" .. phone, opts)
+			_km.add(phone:sub(1, 2) .. _trigger, phone, phone_opts)
+			_km.add("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
 		end
 		if #phone >= 4 then
-			_km.add(phone:sub(1, 4), phone, opts)
-			_km.add("+33" .. phone:sub(2, 4), "+33" .. phone, opts)
+			_km.add(phone:sub(1, 4), phone, phone_opts)
+			_km.add("+33" .. phone:sub(2, 4), "+33" .. phone, phone_opts)
 		end
 		if #phone >= 6 then
-			_km.add(phone:sub(2, 5), phone, opts)
+			_km.add(phone:sub(2, 5), phone, phone_opts)
 		end
 		if #fphone >= 5 then
-			_km.add(fphone:sub(1, 5), fphone, opts)
+			_km.add(fphone:sub(1, 5), fphone, fphone_opts)
 		end
 	end
 
@@ -237,9 +262,10 @@ local function register_prefix_entries()
 		if #ssn_raw >= 5 then
 			local ssn_raw_pfx    = ssn_raw:sub(1, 5)
 			local ssn_spaced_pfx = SharedEngine.spaced_prefix(ssn, 5)
-			_km.add(ssn_raw_pfx, ssn_raw, opts)
+			local ssn_opts       = opts_for("social_security_number")
+			_km.add(ssn_raw_pfx, ssn_raw, ssn_opts)
 			if ssn_spaced_pfx ~= ssn_raw_pfx then
-				_km.add(ssn_spaced_pfx, ssn, opts)
+				_km.add(ssn_spaced_pfx, ssn, ssn_opts)
 			end
 		end
 	end
@@ -250,9 +276,9 @@ local function register_prefix_entries()
 		if #iban_raw >= 6 then
 			local iban_raw_pfx    = iban_raw:sub(1, 6)
 			local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
-			-- is_private for the same reason as `opts` above: the IBAN and its
+			-- is_private for the same reason as `base_opts` above: the IBAN and its
 			-- 6-char prefix trigger are both secret
-			local opts_ci = { is_word = false, auto_expand = true, is_case_sensitive = false, is_private = true }
+			local opts_ci = opts_for("iban", { is_case_sensitive = false })
 			_km.add(iban_raw_pfx,    iban:gsub("%s+", ""), opts_ci)
 			if iban_spaced_pfx ~= iban_raw_pfx then
 				_km.add(iban_spaced_pfx, iban, opts_ci)
