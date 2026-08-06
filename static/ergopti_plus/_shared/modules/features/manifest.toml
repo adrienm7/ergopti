@@ -1100,7 +1100,7 @@ description_key = "menu.metrics.metrics_disabled_apps"
 
 [[features.metrics]]
 id = "wpm_widget_visible"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_visible"
@@ -1121,8 +1121,14 @@ description_key = "menu.metrics.wpm_widget_y"
 
 [[features.metrics]]
 id = "wpm_widget_colors"
-platforms = ["ahk"]
-default = false
+platforms = ["ahk", "linux"]
+# The two drivers disagree, and the disagreement is recorded here rather than
+# resolved. Windows ships the pill neutral; Linux has shipped it coloured by
+# keystroke origin since its widget existed. Picking one is a product decision
+# about what a fresh install looks like, not something to settle inside a
+# refactor — and silently flipping Linux would change what every existing user
+# sees on their next start, for no reason they could find.
+default_per_platform = { ahk = false, linux = true }
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
 

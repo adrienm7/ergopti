@@ -737,7 +737,7 @@ M.unavailable = {
 		path = "metrics.metrics_disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.wpm_widget_visible", section = "metrics", reason_key = "", platforms = { "ahk" },
+		path = "metrics.wpm_widget_visible", section = "metrics", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
@@ -746,7 +746,7 @@ M.unavailable = {
 		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.wpm_widget_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
+		path = "metrics.wpm_widget_colors", section = "metrics", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },

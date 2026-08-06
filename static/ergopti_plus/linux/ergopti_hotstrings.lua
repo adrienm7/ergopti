@@ -107,6 +107,11 @@ local MagicKey          = require("modules.hotstrings.magic_key")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
+-- The typing-speed pill (optional — needs a graphics renderer and a display).
+local wpm_widget = nil
+local ok_wpm, wpm_mod = pcall(require, "ui.wpm.widget")
+if ok_wpm then wpm_widget = wpm_mod end
+
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
@@ -1241,6 +1246,15 @@ local function main()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
 
+	-- 8.10b') Put the WPM widget back the way the user left it. Its visibility and
+	-- colour mode were not stored at all until now, so a user who turned it on
+	-- found it gone after the next restart with the menu row unticked — which
+	-- reads as a control that does not work rather than one whose answer is not
+	-- kept.
+	if wpm_widget and type(wpm_widget.restore) == "function" then
+		pcall(wpm_widget.restore)
+	end
+
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
 		gestures.init({ enabled = false, persist = true })
@@ -1430,6 +1444,18 @@ local function main()
 		-- the only interval this loop can be sure of.
 		if tick_count % FLUSH_EVERY_TICKS == 0 then
 			pcall(keylogger.flush)
+		end
+
+		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it
+		-- computes the frame, picks the colour from the keystroke source, throttles
+		-- redraws to what a user could actually see — and `tick` had no caller
+		-- anywhere in the driver, so the whole surface was inert on every desktop.
+		-- The same shape the preview bubble had.
+		--
+		-- Driven from here rather than from its own timer: a widget with a private
+		-- clock is a second thing to stop on shutdown and a second thing to leak.
+		if wpm_widget then
+			pcall(wpm_widget.tick, keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
 		end
 	end
 
