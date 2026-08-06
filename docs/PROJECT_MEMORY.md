@@ -411,6 +411,41 @@ working-tree state.** Doing that mid-session cost every uncommitted change to
 `manager.lua`. Back the file up and `cp` it back; the tests are what proved the
 reconstruction was complete, which is a second reason to write them first.
 
+**Migrating a menu row to `_shared`: the recipe.** The count that matters is
+`test-menu-rows-outside-renderer.cjs`, and only two things ever lower it —
+a `list` provider, and (since 2026-08-06) the declarative `check` / `command`
+types. Routing a menu through `ManifestMenu.build` moves nothing, because
+`dynamic` hands the id straight back to a driver function that builds the row.
+
+For ONE row with a label, a tick and a behaviour:
+
+1. `_shared/modules/features/manifest.toml` → `type = "check"` (or `"command"`
+   for no tick), plus `i18n`, and keep `checked_when` / `disabled_when`.
+2. `npm run build:menu`.
+3. Each driver deletes its row-builder and registers the behaviour by name:
+   Lua as `ctx.commands["id"]` plus `ctx.state_getters`, AutoHotkey as the
+   `Commands` / `StateGetters` arguments of `MenuRenderer_Build`.
+
+For a REPEATED row (a catalogue, a slot list, a submenu of N entries): make it
+`type = "list"` and have each driver return `{label, action, checked, items,
+disabled, separator}` data. Both renderers accept that exact shape.
+
+Two things that will bite:
+
+- **Quote the keys.** `["open_config"] = …`, not `open_config = …`. Every gate
+  in this repo resolves "does this driver handle it" by grepping for the quoted
+  id, so a bare key reports a working row as unhandled.
+- **A migration touches all three drivers or it breaks two of them.** The
+  manifest is shared: change a type and the renderer stops looking for the old
+  handler everywhere at once. The `check` types were added to
+  `_shared/lua/menu/renderer.lua` and `windows/infra/manifest_menu.ahk` in the
+  same change for exactly this reason.
+
+Expect tests that pin the OLD shape to fail — a canonical-order list, a
+"handler X must exist" guard. Retarget them at the invariant (the row is built
+by the shared resolver, from either side) rather than deleting them; the
+migration otherwise reads as a regression while the code is in fact more shared.
+
 **`menu_manifest.json` is GENERATED. Never hand-edit it.** Its source is
 `_shared/modules/features/manifest.toml`, and `npm run gen` — which `npm run
 test:js` also triggers — rebuilds it. A hand-edit therefore survives until the
