@@ -1896,77 +1896,77 @@ description_key = "menu.gestures.swipe_2_left"
 
 [[features.gestures]]
 id = "swipe_5_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"
 
 [[features.gestures]]
 id = "swipe_5_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_down"
 
 [[features.gestures]]
 id = "swipe_5_left"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left"
 
 [[features.gestures]]
 id = "swipe_5_right"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right"
 
 [[features.gestures]]
 id = "swipe_2_right"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right"
 
 [[features.gestures]]
 id = "swipe_2_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_up"
 
 [[features.gestures]]
 id = "swipe_2_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_down"
 
 [[features.gestures]]
 id = "swipe_2_left_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_down"
 
 [[features.gestures]]
 id = "swipe_2_left_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_up"
 
 [[features.gestures]]
 id = "swipe_2_right_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_down"
 
 [[features.gestures]]
 id = "swipe_2_right_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_up"
@@ -1981,28 +1981,28 @@ description_key = "menu.gestures.swipe_2_diag"
 # --- 3-finger diagonals + horiz aggregator ---
 [[features.gestures]]
 id = "swipe_3_left_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_down"
 
 [[features.gestures]]
 id = "swipe_3_left_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_up"
 
 [[features.gestures]]
 id = "swipe_3_right_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_down"
 
 [[features.gestures]]
 id = "swipe_3_right_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_up"
@@ -2024,28 +2024,28 @@ description_key = "menu.gestures.swipe_3_horiz"
 # --- 4-finger diagonals + horiz aggregator ---
 [[features.gestures]]
 id = "swipe_4_left_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_down"
 
 [[features.gestures]]
 id = "swipe_4_left_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_up"
 
 [[features.gestures]]
 id = "swipe_4_right_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_down"
 
 [[features.gestures]]
 id = "swipe_4_right_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_up"
@@ -2067,28 +2067,28 @@ description_key = "menu.gestures.swipe_4_horiz"
 # --- 5-finger diagonals + horiz aggregator ---
 [[features.gestures]]
 id = "swipe_5_left_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_down"
 
 [[features.gestures]]
 id = "swipe_5_left_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_up"
 
 [[features.gestures]]
 id = "swipe_5_right_down"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_down"
 
 [[features.gestures]]
 id = "swipe_5_right_up"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_up"
@@ -2110,14 +2110,14 @@ description_key = "menu.gestures.swipe_5_horiz"
 # --- Taps ---
 [[features.gestures]]
 id = "tap_2"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_2"
 
 [[features.gestures]]
 id = "tap_5"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_5"

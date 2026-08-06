@@ -419,52 +419,52 @@ M.features = {
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "arrow_up", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs" },
 	},
 	{
-		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs" },
+		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs" },
+		path = "gestures.swipe_5_down", id = "swipe_5_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_left", id = "swipe_5_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left", platforms = { "hs" },
+		path = "gestures.swipe_5_left", id = "swipe_5_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_right", id = "swipe_5_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right", platforms = { "hs" },
+		path = "gestures.swipe_5_right", id = "swipe_5_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_right", id = "swipe_2_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right", platforms = { "hs" },
+		path = "gestures.swipe_2_right", id = "swipe_2_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_up", id = "swipe_2_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_up", platforms = { "hs" },
+		path = "gestures.swipe_2_up", id = "swipe_2_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_down", id = "swipe_2_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_down", platforms = { "hs" },
+		path = "gestures.swipe_2_down", id = "swipe_2_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left_down", platforms = { "hs" },
+		path = "gestures.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left_up", platforms = { "hs" },
+		path = "gestures.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right_down", platforms = { "hs" },
+		path = "gestures.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right_up", platforms = { "hs" },
+		path = "gestures.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_right_up", platforms = { "hs", "linux" },
 	},
 	{
 		path = "gestures.swipe_2_diag", id = "swipe_2_diag", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_diag", platforms = { "hs" },
 	},
 	{
-		path = "gestures.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left_down", platforms = { "hs" },
+		path = "gestures.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left_up", platforms = { "hs" },
+		path = "gestures.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right_down", platforms = { "hs" },
+		path = "gestures.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right_up", platforms = { "hs" },
+		path = "gestures.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right_up", platforms = { "hs", "linux" },
 	},
 	{
 		path = "gestures.swipe_3_diag", id = "swipe_3_diag", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_diag", platforms = { "hs" },
@@ -473,16 +473,16 @@ M.features = {
 		path = "gestures.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures", default = "words", type = "action", description_key = "menu.gestures.swipe_3_horiz", platforms = { "hs" },
 	},
 	{
-		path = "gestures.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left_down", platforms = { "hs" },
+		path = "gestures.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left_up", platforms = { "hs" },
+		path = "gestures.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right_down", platforms = { "hs" },
+		path = "gestures.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right_up", platforms = { "hs" },
+		path = "gestures.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right_up", platforms = { "hs", "linux" },
 	},
 	{
 		path = "gestures.swipe_4_diag", id = "swipe_4_diag", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_diag", platforms = { "hs" },
@@ -491,16 +491,16 @@ M.features = {
 		path = "gestures.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures", default = "spaces", type = "action", description_key = "menu.gestures.swipe_4_horiz", platforms = { "hs" },
 	},
 	{
-		path = "gestures.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left_down", platforms = { "hs" },
+		path = "gestures.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left_up", platforms = { "hs" },
+		path = "gestures.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_left_up", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right_down", platforms = { "hs" },
+		path = "gestures.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right_down", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right_up", platforms = { "hs" },
+		path = "gestures.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_right_up", platforms = { "hs", "linux" },
 	},
 	{
 		path = "gestures.swipe_5_diag", id = "swipe_5_diag", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_diag", platforms = { "hs" },
@@ -509,10 +509,10 @@ M.features = {
 		path = "gestures.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures", default = "windows", type = "action", description_key = "menu.gestures.swipe_5_horiz", platforms = { "hs" },
 	},
 	{
-		path = "gestures.tap_2", id = "tap_2", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_2", platforms = { "hs" },
+		path = "gestures.tap_2", id = "tap_2", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_2", platforms = { "hs", "linux" },
 	},
 	{
-		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs" },
+		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs", "linux" },
 	},
 	{
 		path = "gestures.modes.swipe_2_left", id = "swipe_2_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left", platforms = { "hs" }, enum_values = { "x1", "incremental" },
