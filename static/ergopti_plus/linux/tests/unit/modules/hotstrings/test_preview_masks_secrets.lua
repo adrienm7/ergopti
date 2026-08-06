@@ -193,3 +193,81 @@ helpers.describe("preview masking: display only", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ The cross-driver corpus ==============================
+-- =================================================================
+-- =================================================================
+
+--- The bubble must read identically on all three drivers, and that is a claim
+--- about output, not about intent — macOS and Linux render it in Lua, Windows in
+--- AutoHotkey. _shared/modules/personal_info/preview_vectors.toml is where the
+--- answer lives; this driver proves it satisfies it, and the other two are held
+--- to the same file rather than to a description of it.
+---
+--- A value that reads differently on two machines is not cosmetic: the bubble
+--- exists so a user can confirm WHICH of their values is about to be typed, and
+--- a reveal on one platform and a blank on another are not the same check.
+helpers.describe("preview masking: the shared cross-driver vectors", function()
+
+	local Paths = require("infra.paths")
+	local Reader = require("toml_codec")
+	local Fields = helpers.load_module("infra.personal_info_fields")
+
+	--- Reads the vector file through the same resolver the driver uses.
+	--- @return table Array of { field, input, preview, why }.
+	local function load_vectors()
+		local path = Paths.shared("modules/personal_info/preview_vectors.toml")
+		helpers.assert_not_nil(path, "the shared tree must resolve or this asserts nothing")
+		local handle = io.open(path, "r")
+		helpers.assert_not_nil(handle, "preview_vectors.toml must be readable: " .. tostring(path))
+		local body = handle:read("*a")
+		handle:close()
+		local ok, parsed = pcall(Reader.decode, body)
+		helpers.assert_true(ok and type(parsed) == "table",
+			"preview_vectors.toml must parse: " .. tostring(parsed))
+		return parsed.vectors or {}
+	end
+
+	helpers.it("renders every shared vector exactly", function()
+		local vectors = load_vectors()
+		-- A floor, because a corpus that silently loads zero rows is a test that
+		-- asserts nothing while reporting success.
+		helpers.assert_true(#vectors >= 15,
+			"the shared corpus must carry its vectors — got " .. #vectors)
+
+		for _, v in ipairs(vectors) do
+			local got = Fields.for_preview(v.input, v.field)
+			helpers.assert_eq(got, v.preview, string.format(
+				"field=%s input=%s%s", tostring(v.field), tostring(v.input),
+				v.why and ("  (" .. v.why .. ")") or ""))
+		end
+	end)
+
+	helpers.it("covers both masked and public fields, and the missing-field case", function()
+		local vectors = load_vectors()
+		local masked, public, no_field = 0, 0, 0
+		for _, v in ipairs(vectors) do
+			if v.field == nil then
+				no_field = no_field + 1
+			elseif v.preview == v.input then
+				public = public + 1
+			else
+				masked = masked + 1
+			end
+		end
+		-- Each arm separately: a corpus of nothing but IBANs would pass the
+		-- assertion above while proving nothing about the fields declared public,
+		-- and it is the public ones a wrong port is most likely to get wrong.
+		helpers.assert_true(masked >= 6, "vectors that must be masked: " .. masked)
+		helpers.assert_true(public >= 4, "vectors that must be shown in full: " .. public)
+		helpers.assert_true(no_field >= 1,
+			"a vector with no field at all — the case that must mask rather than "
+				.. "assume public — is missing")
+	end)
+
+end)
