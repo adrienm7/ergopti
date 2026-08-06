@@ -569,10 +569,10 @@ local function _manifest_hotstring_rows(ctx, config)
 	if not ok_term then Terminators = nil end
 
 	local params_handlers = {
-		["word_expanders"] = function(items)
+		["word_expanders"] = function()
 			if not Terminators then
 				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
-				return
+				return {}
 			end
 
 			--- The CATALOGUE delimiter keys — the user's own are excluded.
@@ -607,15 +607,15 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The bulk rows first. A user turning delimiters off does it wholesale —
 			-- the point of the feature is "expand only on the key I chose" — and
 			-- clicking through twenty rows to get there is not an interface.
-			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.check_all"),   fn = set_all(true) }
-			sub[#sub + 1] = { title = i18n_safe("menu.hotstrings.uncheck_all"), fn = set_all(false) }
+			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.check_all"),   action = set_all(true) }
+			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.uncheck_all"), action = set_all(false) }
 			-- The way back. Both other drivers put it beside the two bulk rows, and
 			-- without it a user who clicked "Tout décocher" had no route to the
 			-- shipped set short of editing storage by hand — 15 of the 25 catalogue
 			-- delimiters ship disabled, so "check all" is not that route either.
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.global.reset_defaults"),
-				fn    = function()
+				label = i18n_safe("menu.global.reset_defaults"),
+				action    = function()
 					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 						if def.key and not def.custom then
 							Terminators.set_terminator_enabled(def.key, def.default_enabled ~= false)
@@ -624,11 +624,11 @@ local function _manifest_hotstring_rows(ctx, config)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end,
 			}
-			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = { separator = true }
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.type == "separator" then
-					sub[#sub + 1] = { title = "-" }
+					sub[#sub + 1] = { separator = true }
 				elseif def.key then
 					local key = def.key
 					-- The live magic key, not the ★ the catalogue was written with.
@@ -646,17 +646,17 @@ local function _manifest_hotstring_rows(ctx, config)
 						label = label .. " " .. i18n_safe("menu.hotstrings.consumed_suffix")
 					end
 					sub[#sub + 1] = {
-						title   = label,
+						label   = label,
 						checked = Terminators.is_terminator_enabled(key) and true or false,
-						fn      = function()
+						action      = function()
 							Terminators.set_terminator_enabled(key, not Terminators.is_terminator_enabled(key))
 							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
 					}
 					if def.custom then
 						sub[#sub + 1] = {
-							title = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
-							fn    = function()
+							label = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
+							action    = function()
 								Terminators.remove_custom_terminator(key)
 								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 							end,
@@ -665,9 +665,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
-			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = { separator = true }
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.add_delimiter"),
+				label = i18n_safe("menu.hotstrings.add_delimiter"),
 				-- Asked here, natively, rather than delegated to the settings window.
 				-- The delegation was justified in the daemon by "this driver's only
 				-- text field is the settings window" — but the window it opened did
@@ -675,7 +675,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- "delete" sub-row below was unreachable by construction. The text
 				-- field it claimed not to have is prompt_text, in this same file,
 				-- and the magic-key row two handlers down already uses it.
-				fn = function()
+				action = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
 						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
@@ -706,7 +706,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 			}
 
-			items[#items + 1] = { title = i18n_safe("menu.hotstrings.word_expanders"), menu = sub }
+			return { { label = i18n_safe("menu.hotstrings.word_expanders"), items = sub } }
 		end,
 		["magic_key_config"] = function(items)
 			-- The row the manifest restricted to Windows and macOS until 2026-08-04,
@@ -1073,9 +1073,18 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
+	-- word_expanders left params_handlers: its manifest row is `type = "list"`
+	-- now, so the shared renderer materialises every row of the submenu from the
+	-- data the provider returns rather than this driver assembling the menu.
+	local params_providers = {
+		["word_expanders"] = params_handlers["word_expanders"],
+	}
+	params_handlers["word_expanders"] = nil
+
 	local group_builders = {
 		["hotstrings_params"] = function(c)
-			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams", params_handlers, nil, c)
+			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
+				params_handlers, nil, c, params_providers)
 		end,
 	}
 

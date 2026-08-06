@@ -132,14 +132,20 @@ initMenu() {
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 		"hotstring_bulk_actions",        (M, C) => _HS_BulkActions(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
-		"word_expanders",                (M, C) => _HS_WordExpanders(M, C),
+	)
+
+	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
+	; now, so the renderer materialises every row of the submenu from the data
+	; the provider returns instead of the driver building a Menu object.
+	_HotListProviders := Map(
+		"word_expanders", (*) => _HS_WordExpanderRows(),
 	)
 
 	_HotGroupBuilders := Map(
-		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers),
+		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"

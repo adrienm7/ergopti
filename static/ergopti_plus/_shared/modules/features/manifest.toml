@@ -3373,7 +3373,7 @@ type = "dynamic"
 id = "hotstring_extensions"
 
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "list"
 id = "word_expanders"
 
 [[menu.hotstrings_params_group]]

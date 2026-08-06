@@ -68,8 +68,20 @@ Test("hs_config: removed delimiter-editor locale keys are not referenced (config
 ; Positive cross-check: delimiter management still lives in the tray submenu, so
 ; this guard also fails if the feature was deleted instead of de-duplicated.
 _CWND_TraySubmenuStillOwnsDelimiters() {
-	Body := _DriverFuncBody("_HS_BuildDelimiterSubMenu")
+	; Renamed on 2026-08-06 when the submenu became a manifest `list` provider:
+	; it returns ROWS now instead of assembling a Menu, so the shared renderer
+	; materialises them. The invariant is unchanged and is the reason this test
+	; exists — the tray is the single owner of delimiter management, and the
+	; config window must not grow a second editor for it.
+	Body := _DriverFuncBody("_HS_WordExpanderRows")
 	Assert(Body != "",
-		"_HS_BuildDelimiterSubMenu must exist — the tray submenu is the single owner of delimiter management")
+		"_HS_WordExpanderRows must exist — the tray submenu is the single owner of delimiter management")
+	; The rows it returns are what proves it still MANAGES them rather than
+	; merely listing them: without these the feature could have been deleted and
+	; the symbol kept.
+	for _, Needle in ["_HS_DelimSetAll", "_HS_DelimReset", "_HS_DelimAddCustom", "_HS_DelimRemoveCustom"] {
+		Assert(InStr(Body, Needle) > 0,
+			"_HS_WordExpanderRows must still offer '" . Needle . "' — delimiter management moved to the renderer's row shape, it was not removed")
+	}
 }
 Test("hs_config: tray submenu still owns delimiter management (config-window-duplicate-delimiter-editor)", _CWND_TraySubmenuStillOwnsDelimiters)

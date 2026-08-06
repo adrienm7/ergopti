@@ -192,71 +192,71 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	RebuildHotstringsLive()
 }
 
-; Dynamic handler: word-expanders sub-menu, mirroring the terminators sub-menu.
-; Built-ins are declared inline (manifest access is not available from tray context);
-; custom ones are any chars in the effective string that are not in the built-in list.
-_HS_WordExpanders(M, _Cat) {
-	Sub := _HS_BuildDelimiterSubMenu()
-	M.Add(t("menu.hotstrings.word_expanders"), Sub)
-}
-
-; Build the delimiter sub-menu fresh each time so checkbox states are always current.
-_HS_BuildDelimiterSubMenu() {
+; List provider: the word-expanders sub-menu, as ROWS.
+;
+; Returns data rather than a Menu so the shared renderer materialises every row.
+; The three drivers each rebuilt this submenu with the same logic and their own
+; row API; the manifest declares it `type = "list"` now and each one answers with
+; the same {label, action, checked, items} shape.
+_HS_WordExpanderRows() {
 	global HSE_Terminators
 	Current      := HotstringsGetWordDelimiters()
 	Consumed     := HotstringsGetConsumedDelimiters()
 	Defs         := HSE_Terminators.all()
 	BuiltinChars := HSE_TerminatorBuiltinChars()
 
-	Sub := Menu()
+	Rows := []
 
 	; ── Bulk actions ─────────────────────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.hotstrings.check_all"),      (*) => _HS_DelimSetAll(true))
-	RegisterMenuItem(Sub, t("menu.hotstrings.uncheck_all"),    (*) => _HS_DelimSetAll(false))
-	RegisterMenuItem(Sub, t("menu.global.reset_defaults"),     (*) => _HS_DelimReset())
-	Sub.Add()
+	; A user turning delimiters off does it wholesale — the point of the feature
+	; is "expand only on the key I chose" — and the reset is the way back, since
+	; most of the catalogue ships disabled and "check all" is not that route.
+	Rows.Push(Map("label", t("menu.hotstrings.check_all"),   "action", (*) => _HS_DelimSetAll(true)))
+	Rows.Push(Map("label", t("menu.hotstrings.uncheck_all"), "action", (*) => _HS_DelimSetAll(false)))
+	Rows.Push(Map("label", t("menu.global.reset_defaults"),  "action", (*) => _HS_DelimReset()))
+	Rows.Push(Map("separator", true))
 
-	; ── Built-in catalogue entries — rendered in catalogue order with the same
-	;    separators as the macOS word-expander menu (single shared source). ──
+	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
 		if (D.Has("type") and D["type"] == "separator") {
-			Sub.Add()  ; "-" divider
+			Rows.Push(Map("separator", true))
 			continue
 		}
 		Chars := D["chars"]
 		Lbl   := D["label"]
-		; The "(consumed)" suffix reflects the actual consumed set — on Windows
-		; consumption is opt-in via consumed_delimiters, not the catalogue flag.
+		; A consumed delimiter is swallowed by the expansion, an unconsumed one is
+		; typed after it. The difference shows only in the output, so the row has
+		; to say which it is. On Windows consumption is opt-in via
+		; consumed_delimiters rather than the catalogue flag.
 		if HSE_TerminatorAnyCharIn(Chars, Consumed)
 			Lbl .= " " . t("menu.hotstrings.consumed_suffix")
-		; Actionable toggle — route through the dispatcher so AHK 2.0 never
-		; silently drops the click (see infra/menu_dispatcher.ahk).
-		RegisterMenuItem(Sub, Lbl, ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars))
-		if HSE_TerminatorEntryEnabled(Chars, Current)
-			Sub.Check(Lbl)
+		Rows.Push(Map(
+			"label",   Lbl,
+			"action",  ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars),
+			"checked", HSE_TerminatorEntryEnabled(Chars, Current) ? true : false))
 	}
-	Sub.Add()
+	Rows.Push(Map("separator", true))
 
-	; ── Custom delimiters (chars in the active string not owned by any built-in
-	;    catalogue entry). Structural CR/LF belong to the "enter" entry. ──
+	; ── Custom delimiters: chars in the active string that no catalogue entry
+	;    owns. Structural CR/LF belong to the "enter" entry. ──
 	Loop Parse, Current {
 		Ch := A_LoopField
 		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch))
 			continue
-		IsConsumed  := InStr(Consumed, Ch) > 0
-		ConsumedSfx := IsConsumed ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
-		Lbl   := Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx
-		CtSub := Menu()
-		RegisterMenuItem(CtSub, t("menu.hotstrings.delete_delimiter"), ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))
-		Sub.Add(Lbl, CtSub)
-		; Custom delimiters are always active — they are present in the string
-		Sub.Check(Lbl)
+		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
+		Rows.Push(Map(
+			"label", Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx,
+			; Always ticked: a custom delimiter exists only while it is in the
+			; active string, so its presence IS its enabled state.
+			"checked", true,
+			"items", [Map(
+				"label",  t("menu.hotstrings.delete_delimiter"),
+				"action", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))]))
 	}
 
-	; ── Add custom delimiter button ───────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.hotstrings.add_delimiter"), (*) => _HS_DelimAddCustom())
+	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))
 
-	return Sub
+	return [Map("label", t("menu.hotstrings.word_expanders"), "items", Rows)]
 }
 
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
