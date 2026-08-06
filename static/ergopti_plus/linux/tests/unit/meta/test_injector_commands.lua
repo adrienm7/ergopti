@@ -40,10 +40,21 @@ local function recorder()
 	}, events
 end
 
---- Loads the injector with a recorder and a layout that can type `chars`.
+--- Loads the injector with a recorder, a layout that can type `chars`, and a
+--- declared set of physically-held modifiers.
+---
+--- The hook is stubbed for the same reason the layout and the channel are: the
+--- injector ASKS it what the user is holding, and wraps the whole injection in a
+--- release/restore pair for each one. Leaving that to whatever an earlier test
+--- file left behind is what made this file go red as a block on CI — every case
+--- got a spurious `42:0 … 42:1` (KEY_LEFTSHIFT) around its events, so a test
+--- expecting six saw eight and a test expecting none saw two. It reproduced only
+--- when the run order happened to put a hook-touching file first, which is why
+--- one commit produced both a green job and a red one.
 --- @param chars string Characters the stub layout knows, keycodes from 200 up.
+--- @param held table|nil Modifiers the user is holding, e.g. { "shift" }.
 --- @return table injector, table events, table code_of
-local function with_recorder(chars)
+local function with_recorder(chars, held)
 	local layout_table, code_of = {}, {}
 	local code = 200
 	for i = 1, #(chars or "") do
@@ -57,18 +68,19 @@ local function with_recorder(chars)
 	layout._set_table_for_test(layout_table)
 	package.loaded["adapters.keyboard_layout"] = layout
 
-	-- The stub has to still be in force when the injector reads it, and on CI it
-	-- has not always been: this file has gone red as a block, under LuaJIT only,
-	-- on a commit that also went green — nine assertions failing at once because
-	-- the setup silently lost, not because nine behaviours changed. Asserting the
-	-- setup here names the cause on the spot instead of leaving that to be
-	-- reconstructed from a wall of downstream failures.
+	-- Asserted rather than assumed: refresh() clears the table whenever no keymap
+	-- is available, which is every CI runner, so a lost stub is a real way for
+	-- this to go wrong and it should say so where it happens.
 	if (chars or "") ~= "" then
 		helpers.assert_true(layout.is_ready(),
-			"the stub layout was installed and then lost before the test ran — "
-				.. "adapters.keyboard_layout.refresh() clears the table when no keymap "
-				.. "is available, which is every CI runner")
+			"the stub layout was installed and then lost before the test ran")
 	end
+
+	-- The injector requires this lazily and asks it what the user is holding.
+	-- Declaring the answer is what makes these cases independent of run order.
+	package.loaded["adapters.keyboard_hook"] = {
+		held_text_modifiers = function() return held or {} end,
+	}
 
 	local injector = helpers.load_module("modules.hotstrings.injector")
 	local channel, events = recorder()
@@ -246,6 +258,55 @@ helpers.describe("injector: replacement text is data, not a command", function()
 		helpers.assert_eq(#events, 10, "five characters, ten events")
 		helpers.assert_eq(events[3], code_of["'"] .. ":1",
 			"the quote that used to need the close-escape-reopen idiom is a keystroke")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Modifiers the user is physically holding =============
+-- =================================================================
+-- =================================================================
+
+--- Every case above declares an empty held set, which is the honest default and
+--- what makes them independent of run order. This block covers the other half —
+--- the release/restore wrap itself, which had no test at all, and whose absence
+--- is why an ambient "Shift is down" leaking in from another file surfaced as
+--- nine unrelated assertion failures rather than as one clear one.
+helpers.describe("injector: modifiers the user is holding", function()
+
+	local KEY_LEFTSHIFT = 42
+
+	helpers.it("releases a held modifier before typing and restores it after", function()
+		local injector, events, code_of = with_recorder("e", { "shift" })
+		injector.inject(0, "e")
+		helpers.assert_eq(table.concat(events, " "), string.format(
+			"%d:0 %d:1 %d:0 %d:1", KEY_LEFTSHIFT, code_of["e"], code_of["e"], KEY_LEFTSHIFT),
+			"under a grab the application has already seen the Shift press, so an "
+				.. "injected 'e' would arrive as 'E' unless it is released first — and "
+				.. "the user who is still holding it must keep holding it afterwards")
+	end)
+
+	helpers.it("emits no modifier events when nothing is held", function()
+		local injector, events, code_of = with_recorder("e", {})
+		injector.inject(0, "e")
+		helpers.assert_eq(table.concat(events, " "),
+			string.format("%d:1 %d:0", code_of["e"], code_of["e"]),
+			"a release/restore pair around an injection nobody asked for is two "
+				.. "spurious keystrokes, and Shift is the one that changes what the "
+				.. "next character means")
+	end)
+
+	helpers.it("wraps the erase phase too, not only the typing", function()
+		local injector, events = with_recorder("", { "shift" })
+		injector.inject(2, "")
+		helpers.assert_eq(table.concat(events, " "),
+			string.format("%d:0 14:1 14:0 14:1 14:0 %d:1", KEY_LEFTSHIFT, KEY_LEFTSHIFT),
+			"Shift-Backspace is a different edit in many applications, so the "
+				.. "release has to come before the first backspace")
 	end)
 
 end)

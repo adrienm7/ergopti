@@ -228,11 +228,40 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 		config._set_overrides_for_test(nil)
 	end)
 
-	helpers.it("rejects a field it does not own", function()
+	-- This asserted that "priority" was REJECTED, and it was stale twice over.
+	--
+	-- The contract changed deliberately on 2026-08-05: the settings window has a
+	-- priority field per category and per section, the bridge forwards it, and
+	-- this guard used to refuse it — so the control logged an ERROR and did
+	-- nothing while the window showed no sign. priority is overridable now.
+	--
+	-- The test stayed green anyway, because set_override returns save_overrides(),
+	-- so `false` means EITHER "not an overridable field" OR "the write failed".
+	-- On a machine with no writable config directory the save fails and the old
+	-- assertion passed for a reason that had nothing to do with the field name;
+	-- on CI, where the save works, it started failing at random depending on
+	-- which tests had run before it. Asserting the EFFECT instead of the return
+	-- value removes the ambiguity entirely.
+	helpers.it("accepts the fields it owns and ignores the ones it does not", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
-		helpers.assert_eq(config.set_override("rolls", nil, "priority", 5), false,
-			"priority is resolved by the loader from a different cascade entirely; "
-				.. "accepting it here would write a key nothing reads")
+		config._set_overrides_for_test(nil)
+
+		-- Read back through get_user_override, not resolve(): resolve answers the
+		-- delay/colour/tooltip cascade and does not carry priority at all, which
+		-- the loader reads on its own. Asking the wrong accessor would fail an
+		-- overridable field for looking absent where it was never meant to appear.
+		config.set_override("rolls", nil, "priority", 5)
+		helpers.assert_eq(config.get_user_override("rolls", nil).priority, 5,
+			"priority is overridable: the settings window offers it per category "
+				.. "and per section, the bridge forwards it, and a value it accepts "
+				.. "must actually land in the override store")
+
+		config.set_override("rolls", nil, "nonsense", 42)
+		helpers.assert_true(config.get_user_override("rolls", nil).nonsense == nil,
+			"a field nothing reads must not be written — and this has to be checked "
+				.. "as an effect, because the return value cannot distinguish a "
+				.. "refused field from a failed save")
+
 		config._set_overrides_for_test(nil)
 	end)
 
