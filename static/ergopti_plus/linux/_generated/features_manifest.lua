@@ -29,10 +29,10 @@ M.sections = {
 	["hotstrings.magic_key"] = { description_key = "menu.hotstrings.magic_key", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.dynamic"] = { description_key = "menu.hotstrings.dynamic", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
+	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs" }, subsections = {  } },
-	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -272,6 +272,15 @@ M.features = {
 		path = "hotstrings.personal.test", id = "test", section = "hotstrings.personal", default = { enabled = true, time_activation_seconds = 0.75 }, type = "feature", description_key = "menu.hotstrings.personal.test", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "llm.models.selected", id = "selected", section = "llm.models", default = "ollama", type = "string", description_key = "menu.llm.models.selected", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "Qwen3.5-0.8B", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "metrics.enabled", id = "enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -300,9 +309,6 @@ M.unavailable = {
 	},
 	{
 		path = "hotstrings.expansion_delay", section = "hotstrings", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "llm.enabled", section = "llm", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },
@@ -342,12 +348,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.generation.sequential_mode", section = "llm.generation", reason_key = "", platforms = { "ahk", "hs" },
-	},
-	{
-		path = "llm.models.selected", section = "llm.models", reason_key = "", platforms = { "ahk", "hs" },
-	},
-	{
-		path = "llm.models.ollama", section = "llm.models", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "llm.models.mlx", section = "llm.models", reason_key = "platform_reason.llm_mlx_is_apple_silicon", platforms = { "hs" },

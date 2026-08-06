@@ -136,7 +136,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.llm]
 description_key = "menu.llm"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["display", "generation", "models", "profiles", "trigger", "navigation"]
 
 [sections.llm.display]
@@ -149,7 +149,7 @@ platforms = ["ahk", "hs"]
 
 [sections.llm.models]
 description_key = "menu.llm.models"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.profiles]
 description_key = "menu.llm.profiles"
@@ -906,13 +906,17 @@ description_key = "menu.llm.generation.sequential_mode"
 
 [[features.llm.models]]
 id = "selected"
-default_per_platform = { ahk = "ollama", hs = "mlx" }
+# Linux has one backend and it is Ollama — see the MLX restriction below, which
+# is the same fact stated from the other side. Declaring the default here rather
+# than letting the driver pick one is what keeps the menu tick and the request
+# payload agreeing about which backend is in use.
+default_per_platform = { ahk = "ollama", hs = "mlx", linux = "ollama" }
 type = "string"
 description_key = "menu.llm.models.selected"
 
 [[features.llm.models]]
 id = "ollama"
-default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it" }
+default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it", linux = "Qwen3.5-0.8B" }
 type = "string"
 description_key = "menu.llm.models.ollama"
 

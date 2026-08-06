@@ -252,6 +252,13 @@ time_activation_seconds = 0.75
 enabled = true
 time_activation_seconds = 0.75
 
+[llm]
+enabled = false
+
+[llm.models]
+selected = "ollama"
+ollama = "Qwen3.5-0.8B"
+
 [metrics]
 enabled = true
 private_filter_enabled = true
