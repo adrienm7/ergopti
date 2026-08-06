@@ -871,6 +871,25 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       le sous-menu perd une section entière, rien n échoue, et ça ne se voit qu en
       comparant deux plateformes côte à côte.
 
+### 13.6 — Parité livrée le 2026-08-06 (fin de session)
+
+- [x] **`agg_app_day_ergo`, `agg_app_day_titles`, `agg_app_day_layouts`,
+      `agg_app_day_kc_hold`, `agg_system_day`.** Les cinq tables déclarées « hors
+      de portée » l étaient pour de mauvaises raisons dans quatre cas sur cinq :
+      le catalogue partagé porte le caractère en plus du keycode macOS, le titre
+      de fenêtre arrivait déjà au daemon, la disposition avait gagné son getter le
+      matin même, et le relâchement passe par le hook avant le early-return qui
+      le jette. La cinquième demandait un sous-système : il est écrit.
+- [x] **Espace de clés des gestes migré sur le manifeste.** Onze features
+      déclarables pour Linux. L ancienne section est lue une fois puis réécrite.
+- [x] **Arbre `llm_menu` partagé.** `llm` était une ligne de premier niveau sur
+      les trois drivers depuis toujours, et chacun construisait le sous-menu à la
+      main — donc `[sections.llm]` et ses six sous-sections décrivaient des
+      capacités sans aucune ligne de manifeste derrière. Linux le rend.
+      → **Reste** : faire passer macOS et Windows sur le même arbre.
+- [x] **Température et longueur de contexte : de constantes à réglages.** Elles
+      étaient lues depuis les défauts canoniques sans moyen d en changer.
+
 ### 13.4 — Bloqués sur autre chose
 
 - [ ] **Tout comportement LLM interactif est bloqué sur un transport HTTP
