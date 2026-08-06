@@ -352,7 +352,7 @@ function M.sqlite_writer(opts)
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
-		titles = {}, layouts = {}, kc_hold = {},
+		titles = {}, layouts = {}, kc_hold = {}, system_days = {},
 		categories = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
@@ -424,6 +424,7 @@ function M.sqlite_writer(opts)
 	fake.upsert_title = collect_row(fake.titles)
 	fake.upsert_layout = collect_row(fake.layouts)
 	fake.upsert_kc_hold = collect_row(fake.kc_hold)
+	fake.upsert_system_day = collect_row(fake.system_days)
 
 	function fake.set_app_category(device_id, app_name, category, score)
 		fake.categories[#fake.categories + 1] = {

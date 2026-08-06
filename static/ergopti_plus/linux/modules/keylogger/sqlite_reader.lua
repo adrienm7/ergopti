@@ -311,6 +311,51 @@ FROM agg_app_day_session%s;
 	return manifest
 end
 
+--- Reads the machine's own state for a range.
+---
+--- Separate from the manifest, which is keyed by (date, app): this table has no
+--- application, and folding it into an app-keyed structure would make the
+--- dashboard pick one arbitrarily and attribute the machine's battery to it.
+--- @param sqlite_path string
+--- @param start_date string|nil
+--- @param end_date string|nil
+--- @return table date → row
+function M.read_system_days(sqlite_path, start_date, end_date)
+	local out = {}
+	local clauses = {}
+	if valid_date(start_date) then clauses[#clauses + 1] = "date >= " .. sql_quote(start_date) end
+	if valid_date(end_date) then clauses[#clauses + 1] = "date <= " .. sql_quote(end_date) end
+	local where = #clauses > 0 and (" WHERE " .. table.concat(clauses, " AND ")) or ""
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, SUM(wifi_changes) AS wifi_changes, SUM(space_switches) AS space_switches,
+       SUM(battery_sum) AS battery_sum, SUM(battery_count) AS battery_count,
+       MIN(battery_min) AS battery_min, MAX(battery_max) AS battery_max,
+       SUM(audio_muted_ms) AS audio_muted_ms, SUM(locked_ms) AS locked_ms,
+       SUM(sleep_ms) AS sleep_ms, SUM(awake_ms) AS awake_ms,
+       SUM(passive_count) AS passive_count, SUM(night_wake_count) AS night_wake_count
+FROM agg_system_day%s GROUP BY date;
+]], where))) do
+		out[row.date] = {
+			wifi_changes = row.wifi_changes or 0,
+			space_switches = row.space_switches or 0,
+			battery_sum = row.battery_sum or 0,
+			battery_count = row.battery_count or 0,
+			-- MIN and MAX across devices, not the last row's: the lowest charge of
+			-- the day is the lowest on whichever machine reached it.
+			battery_min = row.battery_min,
+			battery_max = row.battery_max,
+			audio_muted_ms = row.audio_muted_ms or 0,
+			locked_ms = row.locked_ms or 0,
+			sleep_ms = row.sleep_ms or 0,
+			awake_ms = row.awake_ms or 0,
+			passive_count = row.passive_count or 0,
+			night_wake_count = row.night_wake_count or 0,
+		}
+	end
+	return out
+end
+
 local function empty_ngrams()
 	local out = {}
 	for _, code in ipairs(EMPTY_NGRAMS) do out[code] = {} end
