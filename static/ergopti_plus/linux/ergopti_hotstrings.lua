@@ -1396,6 +1396,13 @@ local function main()
 			-- The title was previously received and discarded, which is why the
 			-- driver had no private-browsing filter at all.
 			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
+			-- The title itself, which was received and discarded. The apps dashboard
+			-- groups a day by window — the difference between "four hours in the
+			-- editor" and "four hours across three files" — and this driver had
+			-- nothing to group by. Handed over AFTER the private-window verdict, so
+			-- a title that marks an incognito session is judged before it is stored.
+			keylogger.set_window_title(_cached_app_id, windowTitle,
+				math.floor(Monotonic.now_ms()))
 			-- And the secure-field verdict, likewise. adapters/secure_field_detector
 			-- was written, tested and never called: `refresh()` had no caller
 			-- anywhere in the driver, so `isSecureField()` answered false forever and
