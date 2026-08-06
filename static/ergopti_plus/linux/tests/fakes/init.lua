@@ -352,6 +352,7 @@ function M.sqlite_writer(opts)
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
+		titles = {},
 		categories = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
@@ -420,6 +421,7 @@ function M.sqlite_writer(opts)
 	fake.upsert_session = collect_row(fake.sessions)
 	fake.upsert_switch_to = collect_row(fake.switches_to)
 	fake.upsert_ergo = collect_row(fake.ergo)
+	fake.upsert_title = collect_row(fake.titles)
 
 	function fake.set_app_category(device_id, app_name, category, score)
 		fake.categories[#fake.categories + 1] = {

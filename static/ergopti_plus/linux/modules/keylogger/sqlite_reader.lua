@@ -183,6 +183,15 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
+FROM agg_app_day_titles%s GROUP BY date, app, title;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.titles = entry.titles or {}
+		entry.titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
 SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
 FROM agg_app_day_hourly%s GROUP BY date, app, hour;
 ]], where))) do

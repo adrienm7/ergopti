@@ -104,6 +104,20 @@ local _pending_hotstring_events = {}
 -- pairs, everything an extension registers — was absent from the metrics.
 local _pending_shortcut_events = {}
 local _pending_app_switch_events = {}
+-- The window title currently focused, and when it became so. Held rather than
+-- asked for at flush, because a flush lands between keystrokes and the title by
+-- then may already be the next one.
+--
+-- Declared HERE, in the state section, and not beside the setter three hundred
+-- lines below: a `local` written after a function that reads it is not captured
+-- — the function binds the nil GLOBAL instead, and the read silently does
+-- nothing. record_app_key reads this, and the first version of it declared the
+-- variable next to its setter. Three bugs of exactly that shape have already
+-- been fixed in this driver.
+local _current_title = nil
+local _title_since = nil
+
+local _flushed_app_titles = {}
 local _flushed_app_ngrams = {}
 local _flushed_app_scancodes = {}
 local _flushed_app_sources = {}
@@ -316,6 +330,10 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		llm_input_chars  = 0,
 		physical_scancodes = {},
 		ngram_sources      = {},
+		-- title → { c, ms }. The dashboard's apps panel groups a day's work by
+		-- window, which is the difference between "four hours in the editor" and
+		-- "four hours in three files"; this driver had nothing to group by.
+		titles             = {},
 	}
 	_app_stats[app_id] = app
 	return app
@@ -493,6 +511,12 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	app.last_key_at = timestamp_ms
 
 	app.keystroke_count = app.keystroke_count + 1
+	-- Against the window it was typed into, not the application. Both are useful
+	-- and only one of them was recorded.
+	if _current_title then
+		local title_row = app.titles[_current_title]
+		if title_row then title_row.c = title_row.c + 1 end
+	end
 	if type(ch) == "string" and ch ~= "" then
 		app.ngrams[ch] = (app.ngrams[ch] or 0) + 1
 	end
@@ -967,6 +991,44 @@ function M.is_password_app(app_id)
 	return false
 end
 
+--- Records that the focused window's title changed.
+---
+--- Gated by exactly the filters a keystroke is: a private window, a secure
+--- field, a disabled application or metrics being off all mean this title is
+--- not recorded. A title is often MORE revealing than the keystrokes — a browser
+--- tab names the page — so a weaker gate here would leak past every filter the
+--- user set on the text itself.
+--- @param app_id string|nil
+--- @param title string|nil
+--- @param timestamp_ms number|nil
+function M.set_window_title(app_id, title, timestamp_ms)
+	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
+
+	-- Close the previous title's interval first, whatever happens next: the time
+	-- already spent under it was earned before whatever is being switched to.
+	if _current_title and type(_title_since) == "number" and type(app_id) == "string" then
+		local app = _app_stats[app_id]
+		if app then
+			local row = app.titles[_current_title]
+			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+		end
+	end
+
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then
+		_current_title, _title_since = nil, nil
+		return
+	end
+	if type(title) ~= "string" or title == "" then
+		_current_title, _title_since = nil, nil
+		return
+	end
+
+	local app = ensure_app_stats(app_id, now)
+	app.titles[title] = app.titles[title] or { c = 0, ms = 0 }
+	_current_title = title
+	_title_since = now
+end
+
 --- Reports whether a window title marks a private/incognito browser session.
 --- @param title string|nil Focused window title.
 --- @return boolean
@@ -1307,6 +1369,24 @@ function M.flush()
 			end
 			if changed then SqliteWriter.upsert_app_day(_device_id, date, app_name, delta) end
 			_flushed_app_totals[app_id] = current
+
+			-- Window titles, as deltas like everything else on this table: the rows
+			-- add on conflict, so writing the cumulative counters again would count
+			-- every earlier keystroke once more per flush.
+			local flushed_titles = _flushed_app_titles[app_id] or {}
+			for title, row in pairs((_app_stats[app_id] or {}).titles or {}) do
+				local before = flushed_titles[title] or { c = 0, ms = 0 }
+				local delta_c = math.max(0, (row.c or 0) - before.c)
+				local delta_ms = math.max(0, (row.ms or 0) - before.ms)
+				if delta_c > 0 or delta_ms > 0 then
+					SqliteWriter.upsert_title(_device_id, {
+						date = date, app = app_name, title = title,
+						c = delta_c, ms = delta_ms,
+					})
+				end
+				flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
+			end
+			_flushed_app_titles[app_id] = flushed_titles
 		end
 
 		-- 3. Persist per-app character n-grams and their synthetic provenance as
@@ -1422,6 +1502,7 @@ function M.reset_session()
 	_focused_app_id         = nil
 	_focused_app_started_at = nil
 	_flushed_app_totals     = {}
+	_flushed_app_titles     = {}
 	_flushed_app_ngrams     = {}
 	_flushed_app_scancodes  = {}
 	_flushed_app_sources    = {}

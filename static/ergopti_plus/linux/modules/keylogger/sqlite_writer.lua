@@ -705,6 +705,40 @@ function M.set_app_category(device_id, app_name, category, score)
 	return ok
 end
 
+-- How many window titles one application-day keeps. From the shared accumulator
+-- so the three drivers cap at the same place; the schema's own comment says the
+-- trimming belongs to the ingest pipeline, which is here.
+local TITLE_CAP_PER_APP_DAY =
+	require("keylogger.aggregator_helpers").TITLE_CAP_PER_APP_DAY
+
+--- Upserts one window title's counters for an application-day.
+---
+--- Trimmed after the insert rather than before: which titles survive depends on
+--- every title of the day, and the caller only knows the ones in this flush.
+--- Lowest (c + ms) first, so a window the user glanced at loses to one they
+--- worked in.
+--- @param row table { date, app, title, c, ms }
+function M.upsert_title(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.title) ~= "string" or row.title == "" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, title) DO UPDATE SET "
+		.. "c = c + excluded.c, ms = ms + excluded.ms; "
+		.. "DELETE FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
+		.. "AND app = '%s' AND title NOT IN ("
+		.. "SELECT title FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
+		.. "AND app = '%s' ORDER BY (c + ms) DESC LIMIT %d);",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(row.title),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.ms) or 0),
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(TITLE_CAP_PER_APP_DAY))
+	return _exec(sql)
+end
+
 --- Upserts the per-app-day ergonomic record.
 ---
 --- The two streak columns are records and take a MAX; the focus latency sums.
