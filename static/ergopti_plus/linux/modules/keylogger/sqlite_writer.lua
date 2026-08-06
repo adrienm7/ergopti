@@ -705,6 +705,33 @@ function M.set_app_category(device_id, app_name, category, score)
 	return ok
 end
 
+--- Upserts the per-app-day ergonomic record.
+---
+--- The two streak columns are records and take a MAX; the focus latency sums.
+--- A day's longest same-finger run does not get longer by being flushed twice.
+--- @param row table { date, app, same_finger_streak_max, same_hand_streak_max,
+---        auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count }
+function M.upsert_ergo(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, "
+		.. "same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, "
+		.. "focus_to_first_key_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max), "
+		.. "same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max), "
+		.. "auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count, "
+		.. "focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms, "
+		.. "focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.same_finger_streak_max) or 0),
+		math.floor(tonumber(row.same_hand_streak_max) or 0),
+		math.floor(tonumber(row.auto_repeat_count) or 0),
+		math.floor(tonumber(row.focus_to_first_key_sum_ms) or 0),
+		math.floor(tonumber(row.focus_to_first_key_count) or 0))
+	return _exec(sql)
+end
+
 --- Upserts one application-to-application transition count for a day.
 ---
 --- The pair is the key, not just the destination: the panel this feeds asks

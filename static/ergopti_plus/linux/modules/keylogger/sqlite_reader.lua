@@ -166,6 +166,23 @@ FROM agg_app_day_errors%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, MAX(same_finger_streak_max) AS f_max,
+       MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
+       SUM(focus_to_first_key_sum_ms) AS focus_sum,
+       SUM(focus_to_first_key_count) AS focus_count
+FROM agg_app_day_ergo%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		-- MAX, not SUM: the longest same-finger run of the day is a record. Adding
+		-- two devices' records would invent a streak nobody typed.
+		entry.same_finger_streak_max = row.f_max or 0
+		entry.same_hand_streak_max = row.h_max or 0
+		entry.auto_repeat_count = row.ar_count or 0
+		entry.focus_to_first_key_sum_ms = row.focus_sum or 0
+		entry.focus_to_first_key_count = row.focus_count or 0
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
 SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
 FROM agg_app_day_hourly%s GROUP BY date, app, hour;
 ]], where))) do

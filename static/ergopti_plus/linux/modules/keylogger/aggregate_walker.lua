@@ -94,6 +94,49 @@ local SEPARATOR = "\1"
 -- hour a keystroke belongs to.
 local MS_PER_SECOND = 1000
 
+-- Which finger types which character, from the shared keycode catalogue — the
+-- same file the typing heatmap is generated from. Loaded lazily and once: the
+-- walk asks per keystroke, and the catalogue is seventy-odd rows.
+--
+-- Keyed by CHARACTER rather than by keycode because that is the only key the
+-- three drivers share. The catalogue's own key is a macOS virtual keycode, and
+-- evdev numbers nothing the same way, so a keycode lookup would need a
+-- hand-written Linux table — a third answer to a question the catalogue already
+-- answers.
+local FingerMap = require("keylogger.finger_map")
+
+--- Reads a file whole.
+--- @param path string
+--- @return string|nil
+local function read_file(path)
+	local handle = io.open(path, "r")
+	if not handle then return nil end
+	local content = handle:read("*a")
+	handle:close()
+	return content
+end
+
+--- The finger lookup for the layout this driver is reading.
+--- @return table|nil
+local function finger_lookup()
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	if not ok_paths then return nil end
+	local path = Paths.shared("data/keycodes/azerty.json")
+	if not path then return nil end
+	local ok_json, Json = pcall(require, "json")
+	if not ok_json then return nil end
+	-- The physical base this driver reads through. Not the user's typing layout:
+	-- the question is which key on the board produced the character, and that is
+	-- what the hook resolved it against.
+	local layout = "qwerty"
+	local ok_hook, Hook = pcall(require, "adapters.keyboard_hook")
+	if ok_hook and type(Hook.get_layout) == "function" then
+		local ok_get, name = pcall(Hook.get_layout)
+		if ok_get and type(name) == "string" then layout = name end
+	end
+	return FingerMap.load(layout, read_file, Json.decode, path)
+end
+
 -- What separates words. Deliberately not a locale-aware rule: the dashboard
 -- compares word lists across languages, and a French-only definition of a word
 -- boundary would make two users' corpora incomparable.
@@ -193,6 +236,48 @@ function M.walk(events, date_str, app, batch, clock)
 		backspace_run = 0
 	end
 
+	local ergo = Helpers.gc(batch.ergo, app_day_key, {
+		date = date_str, app = app,
+		same_finger_streak_max = 0, same_hand_streak_max = 0,
+		auto_repeat_count = 0,
+		focus_to_first_key_sum_ms = 0, focus_to_first_key_count = 0,
+	})
+	local fingers = finger_lookup()
+	-- The run currently being counted. Both start at zero rather than one: a
+	-- streak of one is not a streak, and seeding at one would report every
+	-- isolated keystroke as a same-finger event.
+	local last_finger, finger_run = nil, 0
+	local last_hand, hand_run = nil, 0
+
+	--- Extends or restarts the two streaks for one character.
+	--- @param char string
+	local function bump_streaks(char)
+		if not fingers then return end
+		local finger = FingerMap.finger_of(fingers, char)
+		local hand = FingerMap.hand_of(fingers, char)
+		-- A character the catalogue does not know — punctuation on a layout it
+		-- does not describe, or an accented letter typed as a dead-key sequence —
+		-- BREAKS both runs rather than extending them. Guessing would inflate the
+		-- one number the whole layout argument rests on.
+		if finger == FingerMap.UNKNOWN then
+			last_finger, finger_run = nil, 0
+			last_hand, hand_run = nil, 0
+			return
+		end
+
+		if finger == last_finger then finger_run = finger_run + 1 else finger_run = 1 end
+		last_finger = finger
+		if finger_run > ergo.same_finger_streak_max then
+			ergo.same_finger_streak_max = finger_run
+		end
+
+		if hand == last_hand then hand_run = hand_run + 1 else hand_run = 1 end
+		last_hand = hand
+		if hand_run > ergo.same_hand_streak_max then
+			ergo.same_hand_streak_max = hand_run
+		end
+	end
+
 	-- The burst and session currently open, or nil between them. A burst is a
 	-- run of keystrokes with no real gap; a session is the coarser version of
 	-- the same idea. Neither can be credited until it ENDS, because its length
@@ -290,6 +375,11 @@ function M.walk(events, date_str, app, batch, clock)
 			-- abandoned rather than recorded — the user was not writing it.
 			run = {}
 			word = ""
+			-- A correction breaks the finger runs too: what follows continues from
+			-- a different character than it appears to, so the two keystrokes
+			-- either side of it were never consecutive under one finger.
+			last_finger, finger_run = nil, 0
+			last_hand, hand_run = nil, 0
 			-- A hotstring erases its own trigger, and those deletions are the
 			-- driver's work rather than the user's mistakes. Counting them would
 			-- make the measured error rate rise with every expansion.
@@ -305,6 +395,11 @@ function M.walk(events, date_str, app, batch, clock)
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, 0, false, source)
 			run = {}
 			word = ""
+			-- An expansion is not something the hands did, so it cannot extend a
+			-- same-finger run. Counting it would make the layout look worse the
+			-- more the driver types for the user, which is backwards.
+			last_finger, finger_run = nil, 0
+			last_hand, hand_run = nil, 0
 		else
 			close_correction(delay)
 			local class = class_of(char)
@@ -312,6 +407,7 @@ function M.walk(events, date_str, app, batch, clock)
 			bump_time_of_day(index)
 			extend_burst(delay)
 			extend_session(delay)
+			bump_streaks(char)
 			-- Cumulative, not exclusive: each threshold answers "how much time is
 			-- left if I ignore pauses longer than this", so a 200 ms gap belongs to
 			-- every bucket at or above 200 ms. The dashboard dropdown reads one
@@ -435,7 +531,7 @@ end
 function M.daily_rows(batch)
 	local out = {
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
-		bursts = {}, sessions = {}, app_buckets = {},
+		bursts = {}, sessions = {}, app_buckets = {}, ergo = {},
 	}
 	if type(batch) ~= "table" then return out end
 	for name, rows in pairs(out) do
