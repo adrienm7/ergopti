@@ -322,7 +322,7 @@ function M.sqlite_writer(opts)
 		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
-		app_buckets = {}, bursts = {}, sessions = {},
+		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
 
@@ -388,6 +388,7 @@ function M.sqlite_writer(opts)
 	fake.upsert_app_bucket = collect_row(fake.app_buckets)
 	fake.upsert_burst = collect_row(fake.bursts)
 	fake.upsert_session = collect_row(fake.sessions)
+	fake.upsert_switch_to = collect_row(fake.switches_to)
 
 	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
 	function fake.query_rows() return {} end

@@ -677,6 +677,25 @@ function M.upsert_burst(device_id, row)
 	return _exec(sql)
 end
 
+--- Upserts one application-to-application transition count for a day.
+---
+--- The pair is the key, not just the destination: the panel this feeds asks
+--- which application the user leaves to reach another, and a count keyed on the
+--- destination alone cannot answer that.
+--- @param row table { date, app_from, app_to, count }
+function M.upsert_switch_to(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) "
+		.. "VALUES ('%s','%s','%s','%s',%d) "
+		.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET "
+		.. "count = count + excluded.count;",
+		_sql_escape(device_id), _sql_escape(row.date),
+		_sql_escape(row.app_from), _sql_escape(row.app_to),
+		math.floor(tonumber(row.count) or 0))
+	return _exec(sql)
+end
+
 --- Upserts the per-app-day typing-session record.
 ---
 --- The durations array is capped by the walk before it gets here, and truncated
