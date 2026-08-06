@@ -233,8 +233,13 @@ platforms = ["ahk"]
 # would read "not coded yet", which is the one thing the restriction-reason model
 # forbids, and it would freeze that in twenty-one languages.
 [sections.gestures]
+# Linux joined on 2026-08-06, when its gesture assignments moved off a
+# driver-private `[linux.gestures]` key space and onto the one declared here.
+# Two vocabularies for one setting is the same defect as two defaults for one
+# setting: it made every feature below undeclarable for Linux without the
+# declaration being false.
 description_key = "menu.gestures"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["modes", "sensitivities"]
 
 [sections.gestures.modes]
@@ -1790,78 +1795,78 @@ description_key = "menu.shortcuts.keyboard.win_x"
 
 [[features.gestures]]
 id = "enabled"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 default = true
 type = "boolean"
 description_key = "menu.gestures.enabled"
 
 [[features.gestures]]
 id = "swipe_3_down"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "tab_close", hs = "tab_next" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
 
 [[features.gestures]]
 id = "swipe_3_left"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "tab_prev", hs = "word_prev" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_prev", hs = "word_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
 
 [[features.gestures]]
 id = "swipe_3_right"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "tab_next", hs = "word_next" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_next", hs = "word_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
 
 [[features.gestures]]
 id = "swipe_3_up"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "tab_new", hs = "tab_prev" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
 
 [[features.gestures]]
 id = "swipe_4_down"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "win_app_prev", hs = "none" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "win_app_prev", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_down"
 
 [[features.gestures]]
 id = "swipe_4_left"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "desktop_prev", hs = "none" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
 
 [[features.gestures]]
 id = "swipe_4_right"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "desktop_next", hs = "none" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
 
 [[features.gestures]]
 id = "swipe_4_up"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "win_app_next", hs = "none" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "win_app_next", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_up"
 
 [[features.gestures]]
 id = "tap_3"
-platforms = ["ahk", "hs"]
-default = "left_click_toggle"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "none" }
 type = "action"
 description_key = "menu.gestures.tap_3"
 
 [[features.gestures]]
 id = "tap_4"
-platforms = ["ahk", "hs"]
-default_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous" }
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous", linux = "none" }
 type = "action"
 description_key = "menu.gestures.tap_4"
 

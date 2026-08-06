@@ -267,3 +267,16 @@ system_auth_filter_enabled = true
 encrypt = false
 wpm_widget_visible = false
 wpm_widget_colors = true
+
+[gestures]
+enabled = true
+swipe_3_down = "none"
+swipe_3_left = "none"
+swipe_3_right = "none"
+swipe_3_up = "none"
+swipe_4_down = "none"
+swipe_4_left = "none"
+swipe_4_right = "none"
+swipe_4_up = "none"
+tap_3 = "none"
+tap_4 = "none"
