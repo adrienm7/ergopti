@@ -157,10 +157,24 @@ local function _load_tap_hold_config(user_toml_path)
 		defaults_path = ok_paths and Paths.shared("tap_hold/defaults.toml") or nil
 	end
 
-	-- Load order: user override → shared defaults. The user's tap_hold.toml, when
-	-- present, fully replaces the defaults (no per-key merge), mirroring the other
-	-- drivers' "generated per-driver file is the complete config" semantic.
+	-- Shared defaults first, then the user's file laid over them KEY BY KEY.
+	--
+	-- The user's file used to replace the defaults wholesale. That reads as
+	-- respectful of their intent and is the opposite: a file naming one key
+	-- silenced every other key the layout defines, so customising the tap action
+	-- of a single thumb key disabled tap-hold on the rest of the keyboard. And
+	-- every key added to the shared defaults afterwards never reached anyone who
+	-- had ever opened the file. macOS seeds per key for exactly this reason.
 	local keys = nil
+
+	if defaults_path then
+		local fh = io.open(defaults_path, "r")
+		if fh then
+			fh:close()
+			Logger.info(LOG, "Loading tap-hold config from defaults: %s", defaults_path)
+			keys = _load_keys_from_toml(defaults_path)
+		end
+	end
 
 	local user_toml = user_toml_path or _user_toml
 	if user_toml then
@@ -168,23 +182,31 @@ local function _load_tap_hold_config(user_toml_path)
 		if fh then
 			fh:close()
 			Logger.info(LOG, "Loading tap-hold config from user file: %s", user_toml)
-			keys = _load_keys_from_toml(user_toml)
+			local overrides = _load_keys_from_toml(user_toml)
 			-- The user file exists but produced no usable keys (malformed, or valid
 			-- TOML with no [tap_hold.keys.*] sections). Warn loudly before silently
 			-- falling back to the shared defaults, so a broken user override is
 			-- visible rather than masquerading as a deliberate "use defaults".
-			if not keys then
+			if not overrides then
 				Logger.warn(LOG, "User tap_hold.toml at '%s' is present but yielded no usable keys — ignoring it and falling back to shared defaults.", user_toml)
+			else
+				keys = keys or {}
+				local replaced, added = 0, 0
+				for key_id, override in pairs(overrides) do
+					local base = keys[key_id]
+					if base then replaced = replaced + 1 else added = added + 1 end
+					-- Field by field, not table by table: a user file that names a key
+					-- but only sets its tap action must keep the default hold modifier,
+					-- or a one-line edit turns a tap-hold key into a plain one.
+					local merged = {}
+					for field, value in pairs(base or {}) do merged[field] = value end
+					for field, value in pairs(override) do
+						if value ~= nil then merged[field] = value end
+					end
+					keys[key_id] = merged
+				end
+				Logger.info(LOG, "Tap-hold overrides applied: %d key(s) changed, %d added.", replaced, added)
 			end
-		end
-	end
-
-	if not keys and defaults_path then
-		local fh = io.open(defaults_path, "r")
-		if fh then
-			fh:close()
-			Logger.info(LOG, "Loading tap-hold config from defaults: %s", defaults_path)
-			keys = _load_keys_from_toml(defaults_path)
 		end
 	end
 
