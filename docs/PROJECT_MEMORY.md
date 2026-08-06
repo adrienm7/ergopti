@@ -3798,3 +3798,48 @@ Seen twice on 2026-08-06: first reported as `features manifest no-drift` inside 
 - Do not chase this as a code defect. CI runs on Linux and exercises the guard properly; this is a local-environment fault only.
 
 Related: [[project-drift-guard-needs-a-clean-tree]], [[project-drift-guard-precondition-not-a-flake]].
+
+
+
+
+### project-a-test-must-own-every-module-its-subject-asks
+
+_The injector tests stubbed the layout and the channel but not the hook the injector asks what the user is holding — so an earlier file's leftovers wrapped every injection in a spurious Shift release_
+
+<sub>slug: `project_a_test_must_own_every_module_its_subject_asks`</sub>
+
+`modules/hotstrings/injector.lua` releases every modifier the user is physically holding before typing, and restores them after — under a grab the application has already seen the Shift press, so an injected `e` would arrive as `E`. It learns what is held by lazily requiring `adapters.keyboard_hook`.
+
+`test_injector_commands.lua` controlled the layout (`_set_table_for_test`) and the uinput channel (`_set_uinput`) but never the hook, so it inherited whatever was left in `package.loaded`. When the run order put a hook-touching file first, every case got `42:0` (KEY_LEFTSHIFT up) prepended and `42:1` appended: a case expecting six events saw eight, a case expecting none saw two, and the whole file went red at once.
+
+**Why it looked like something else:** it reproduced only on some runs, so it read as a LuaJIT bug or a rolling-distro problem. The proof it was neither: commit `dcf2b5b79` produced a green `Linux · unit tests` job **and** a red one. Test discovery shells out to `find` (no `lfs` in CI), and `find` order depends on the filesystem of a fresh VM — so the module order, and therefore the pollution, varied run to run.
+
+**How to apply:**
+
+- List what the SUBJECT requires, not what the test happens to think about. Any module the subject asks a question of must be stubbed, or the test is measuring ambient state.
+- A whole file failing at once is a setup fault, not N behaviour changes. Read it that way before reading the assertions.
+- Reproduce order-dependence by poisoning `package.loaded` directly rather than by shuffling files: `package.loaded["adapters.keyboard_hook"] = { held_text_modifiers = function() return { "shift" } end }` reproduced all ten failures on the first try.
+- A behaviour nobody tests is a behaviour that will surface as somebody else's failure. The release/restore wrap had no test at all, which is exactly why it appeared as nine unrelated ones.
+
+Related: [[project-fixed-field-lists-drop-flags]], [[project-a-green-probe-can-mean-redundant-guards]].
+
+
+
+
+### project-a-boolean-return-that-means-two-things-hides-a-stale-test
+
+_`set_override` returns `save_overrides()`, so `false` means "field refused" OR "write failed" — a test asserting `false` passed for years on machines where the write failed_
+
+<sub>slug: `project_a_boolean_return_that_means_two_things_hides_a_stale_test`</sub>
+
+`hotstrings_config.set_override(cat, sec, field, value)` validates the field name, writes the override, then `return save_overrides()`. Two unrelated outcomes collapse into one `false`.
+
+A test asserted `set_override("rolls", nil, "priority", 5) == false`, with the reasoning that priority is resolved by the loader from a different cascade. That contract changed deliberately on 2026-08-05 — the settings window has a priority field per category and per section, the bridge forwards it, and the guard had been refusing it silently. The test should have gone red that day. It did not, because on a machine with no writable config directory `save_overrides()` fails and returns `false` for a completely unrelated reason. On CI, where the write succeeds, it failed at random.
+
+**How to apply:**
+
+- Assert the EFFECT, not a return value that conflates outcomes. Reading the override back through `get_user_override` cannot be satisfied by a failed save.
+- Ask the accessor that owns the field. `resolve()` answers the delay/colour/tooltip cascade and never carried `priority`; asserting against it would have failed a genuinely overridable field for being absent where it was never meant to appear.
+- When a guard changes a public contract, grep for tests asserting the OLD one in the same commit. A test that should have gone red and did not is a test that was passing for the wrong reason all along.
+
+Related: [[project-a-green-probe-can-mean-redundant-guards]], [[project-fixed-field-lists-drop-flags]].
