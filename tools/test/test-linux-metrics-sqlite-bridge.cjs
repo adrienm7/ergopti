@@ -23,7 +23,18 @@ const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 assert.match(reader, /SqliteCommand\.build/);
 assert.match(reader, /flags = \{ "-json" \}/);
 assert.match(reader, /FROM agg_app_day/);
-assert.match(reader, /FROM ngram_chars/);
+// The reader reaches its nine n-gram tables through a code-to-table map now,
+// so the contract is the map's coverage rather than one literal FROM clause.
+// Eight of these nine were handed to the dashboard as permanently empty maps
+// while the writer was filling them, and a blank panel looks identical whether
+// the rows were never written or never read.
+for (const table of [
+	'ngram_chars', 'ngram_bigrams', 'ngram_trigrams', 'ngram_quadgrams',
+	'ngram_pentagrams', 'ngram_hexagrams', 'ngram_heptagrams',
+	'ngram_words', 'ngram_word_bigrams',
+]) {
+	assert.ok(reader.includes(table), `reader must project ${table}`);
+}
 assert.match(bridge, /action == "range"/);
 assert.match(bridge, /get_range_payload/);
 assert.match(data, /window\.webkit\.messageHandlers\.metrics_typing_bridge\.postMessage\(\{ action: 'range', \.\.\.req \}\)/);
