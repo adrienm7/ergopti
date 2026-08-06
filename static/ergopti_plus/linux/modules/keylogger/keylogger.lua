@@ -309,6 +309,8 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		hs_chars         = 0,
 		hs_triggers      = 0,
 		hs_input_chars   = 0,
+		hs_suggested     = 0,
+		llm_suggested    = 0,
 		llm_chars        = 0,
 		llm_triggers     = 0,
 		llm_input_chars  = 0,
@@ -603,6 +605,28 @@ end
 ---   characters. Redacting only the replacement would still leak. macOS makes
 ---   the same split — `expander.lua` skips `log_hotstring` and forwards the flag
 ---   to `notify_synthetic`.
+--- Records that a suggestion was OFFERED to the user.
+---
+--- The counterpart of the trigger counters, which record the ones TAKEN. The
+--- acceptance rate is the ratio of the two, so with this never recorded the
+--- dashboard divided by nothing and reported 0% on a driver whose suggestions
+--- were being accepted all day — indistinguishable from a feature nobody uses,
+--- which is exactly the conclusion it invites.
+---
+--- Only the count is kept. What was offered is not: a suggestion the user did
+--- not take is the strongest signal in the database about what they were about
+--- to type, and it has none of the justification the accepted ones have.
+--- @param app_id string Application identifier.
+--- @param kind string "hotstring" or "llm".
+--- @param timestamp_ms number|nil
+function M.record_suggestion(app_id, kind, timestamp_ms)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	app[field] = (app[field] or 0) + 1
+	Logger.debug(LOG, "Suggestion offered (%s).", field)
+end
+
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
@@ -730,6 +754,13 @@ function M.get_app_stats()
 			llm_chars = stats.llm_chars or 0,
 			llm_triggers = stats.llm_triggers or 0,
 			llm_input_chars = stats.llm_input_chars or 0,
+			-- Named here as well as in the accumulator and the flush. This
+			-- projection is the boundary the flush reads, and a field the
+			-- accumulator increments but this does not copy is lost between the
+			-- two with nothing to show for it — which is precisely how the three
+			-- LLM counters above spent their existence.
+			hs_suggested = stats.hs_suggested or 0,
+			llm_suggested = stats.llm_suggested or 0,
 			physical_scancodes = physical_scancodes,
 		}
 	end
@@ -1258,6 +1289,12 @@ function M.flush()
 				llm_chars       = app_stats.llm_chars or 0,
 				llm_triggers    = app_stats.llm_triggers or 0,
 				llm_input_chars = app_stats.llm_input_chars or 0,
+				-- The denominators of the acceptance rate. Recorded in memory since
+				-- record_suggestion existed and never persisted, which is the same
+				-- shape the three LLM counters above had: a number the process knew
+				-- and forgot at every restart.
+				hs_suggested    = app_stats.hs_suggested or 0,
+				llm_suggested   = app_stats.llm_suggested or 0,
 			}
 			local previous = _flushed_app_totals[app_id] or {}
 			local delta = {}

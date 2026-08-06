@@ -483,6 +483,11 @@ local function main()
 	-- that shape have already been fixed in this file.
 	local _last_key_ms = nil
 
+	-- The suggestion currently on offer, so the same one is counted once rather
+	-- than once per keystroke while it stays on screen. Declared here for the
+	-- same reason as the line above: the closure that reads it is below.
+	local _last_offered = nil
+
 	-- 8.5) Define the character callback.
 	local function on_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
@@ -657,6 +662,9 @@ local function main()
 				local candidates = engine:candidates(PREVIEW_MAX_CANDIDATES)
 				if #candidates == 0 then
 					tooltip_preview.hide()
+					-- Nothing is on offer any more, so the next distinct offer counts
+					-- again even if it repeats the one before.
+					_last_offered = nil
 					return
 				end
 				-- "star" while the last character typed is the magic key, since that
@@ -664,6 +672,18 @@ local function main()
 				-- decides which of the four toggles gates the bubble.
 				local kind = (ch == MagicKey.get()) and "star" or "autocorrect"
 				tooltip_preview.show(candidates, kind)
+
+				-- Counted once per DISTINCT offer, not once per keystroke. The bubble
+				-- redraws on every character while the same candidate stays on top,
+				-- and counting each redraw would inflate the denominator without
+				-- bound — the acceptance rate would fall towards zero the longer the
+				-- user hesitated, which is backwards.
+				local top = candidates[1]
+				local offered = type(top) == "table" and (top.trigger or top.key or top.label) or tostring(top)
+				if offered and offered ~= _last_offered then
+					_last_offered = offered
+					keylogger.record_suggestion(app_id, "hotstring", now_ms)
+				end
 			end)
 			if not ok_preview then
 				Logger.error(LOG, "Preview failed for '%s': %s", tostring(ch), tostring(err_preview))
