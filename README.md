@@ -288,11 +288,8 @@ falls back to the TOML definitions bundled in `_shared/modules/hotstrings/`.
 | `--tray`                   | system tray icon                                                           |
 | `--no-grab`                | observe instead of grabbing — physical keys then interleave with an expansion and can scramble it |
 | `--dry-run`                | log matches without injecting                                              |
+| `--verbose`, `-v`          | log at debug level for that run                                            |
 | `--help`, `-h`             | usage                                                                      |
-
-`--verbose` / `-v` is accepted but does **not** raise the log level: it is only
-forwarded into the tray context, and the level is settable from the tray menu
-alone.
 
 **4. Before trusting it on your own keyboard**
 

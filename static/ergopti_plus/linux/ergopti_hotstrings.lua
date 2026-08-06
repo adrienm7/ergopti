@@ -25,10 +25,7 @@
 ---                       unnecessary — the layout is read from the server.
 ---   --tray             Enable the tray icon (needs libayatana-appindicator).
 ---   --dry-run          Log matches without injecting any keystrokes.
----   --verbose          Forwarded into the tray context only. It does NOT raise
----                      the log level: the sole Logger.set_level call is the
----                      tray menu's callback, so the level is settable from the
----                      menu alone.
+---   --verbose          Raise the log level to debug for this run.
 ---   --help             Print usage and exit.
 ---
 --- FEATURES & RATIONALE:
@@ -314,8 +311,7 @@ local function print_usage()
 	print("                      expansion is being typed, which can scramble it.")
 	print("                      Use only if the grab misbehaves on your hardware.")
 	print("  --dry-run           Log matches without injecting.")
-	print("  --verbose           Accepted, but does NOT raise the log level.")
-	print("                      Debug output is enabled from the tray menu only.")
+	print("  --verbose           Log at debug level for this run.")
 	print("  --help              Show this message.")
 end
 
@@ -419,6 +415,20 @@ local function main()
 	if opts.help then
 		print_usage()
 		os.exit(0)
+	end
+
+	-- Before the first log line, or the flag would miss the boot it was passed
+	-- to diagnose. --verbose used to be parsed, stored, forwarded into the tray
+	-- context and never acted on: the only Logger.set_level call in the whole
+	-- daemon was the tray menu's callback, so the one way to raise the level was
+	-- a menu that needs a running tray — which is exactly what someone debugging
+	-- a failed boot does not have.
+	if opts.verbose then
+		if Logger.set_level then
+			Logger.set_level("debug")
+		else
+			Logger.warn(LOG, "--verbose given, but this logger exposes no set_level.")
+		end
 	end
 
 	Logger.start(LOG, "Ergopti hotstrings daemon starting…")
