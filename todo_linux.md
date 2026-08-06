@@ -814,12 +814,15 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 > transitions entre applications — écrits ET relus, parce qu une table écrite
 > que personne ne lit est le même panneau vide qu une table jamais écrite.
 >
-> Ce qui reste hors de portée aujourd hui, et pourquoi : `agg_app_day_kc_hold`
-> demande les durées d appui, or la boucle de capture jette les relâchements ;
-> `agg_app_day_ergo` demande une table doigt→code propre à evdev que ce driver
-> n a pas ; `agg_app_day_titles` demande les titres de fenêtre, que ce driver ne
-> lit pas ; `agg_system_day` est un sous-système entier (wifi, batterie,
-> verrouillage, veille).
+> Livré depuis, le 2026-08-06 : `agg_app_day_ergo` (par caractère, pas par
+> keycode — le catalogue partagé porte les deux) et `agg_app_day_titles` (le
+> titre arrivait déjà, il était jeté).
+>
+> Ce qui reste hors de portée, et pourquoi : `agg_app_day_kc_hold` demande les
+> durées d appui, or la boucle de capture jette les relâchements ;
+> `agg_app_day_layouts` demande un changement de disposition en cours de session,
+> que rien ne surveille encore ; `agg_system_day` est un sous-système entier
+> (wifi, batterie, verrouillage, veille).
 
 
 - [x] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
@@ -854,6 +857,15 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       qu il sélectionne un niveau de disposition et sert à taper « @ » en français.
       Rien n est lié par défaut : la correspondance se fait dans ce daemon et pas
       dans le noyau, donc un accord lié atteint aussi l application au premier plan.
+- [x] **Analyse same-finger (`agg_app_day_ergo`).** « À quelle fréquence un doigt
+      doit-il bouger deux fois de suite » est tout l argument d une disposition
+      alternative, et ce driver ne pouvait pas y répondre. Clé par CARACTÈRE et
+      non par keycode : le catalogue partagé est indexé sur un keycode virtuel
+      macOS, evdev ne numérote rien pareil, et une table Linux écrite à la main
+      serait une troisième réponse à une question déjà tranchée.
+- [x] **Titres de fenêtre (`agg_app_day_titles`).** Le titre arrivait au daemon
+      et était jeté. Il passe exactement les filtres d une frappe — un titre est
+      souvent PLUS révélateur que le texte tapé dessous, un onglet nomme la page.
 - [x] **Garde : tout `list` déclaré pour une plateforme doit avoir un
       fournisseur.** Un `list` sans fournisseur est ignoré avec un avertissement —
       le sous-menu perd une section entière, rien n échoue, et ça ne se voit qu en
