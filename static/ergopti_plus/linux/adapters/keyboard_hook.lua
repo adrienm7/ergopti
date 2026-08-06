@@ -249,7 +249,18 @@ local function _dispatch_event(ev)
 	-- control event so the caller drops the buffer: the caret has almost
 	-- certainly moved, and what came before it no longer describes the line.
 	if _shortcut_modifier_held() then
-		if _on_key then pcall(_on_key, "shortcut") end
+		-- The chord's IDENTITY travels with the event. Reporting only "shortcut"
+		-- told the caller that the caret had probably moved and nothing else, so
+		-- the daemon could neither record which shortcut fired nor act on one —
+		-- `keylogger.record_shortcut` had no caller at all, and the configurable
+		-- slots had nothing to match against.
+		--
+		-- A second argument rather than a different event name: every existing
+		-- caller takes one parameter and ignores this, so the contract widens
+		-- without any of them changing.
+		if _on_key then
+			pcall(_on_key, "shortcut", { key = char, mods = M.held_modifiers() })
+		end
 		return
 	end
 
@@ -335,6 +346,27 @@ function M.held_text_modifiers()
 	if _shift_held then held[#held + 1] = "shift" end
 	if _altgr_held then held[#held + 1] = "altgr" end
 	return held
+end
+
+--- Every modifier currently held, keyed by name.
+---
+--- Distinct from `held_text_modifiers`, which answers a different question and
+--- answers it as an ARRAY: that one lists only the two modifiers that select a
+--- layout LEVEL, because its caller is resolving a character. This one is for
+--- matching a keyboard shortcut, where ctrl and meta are the whole point and a
+--- caller wants to ask `held.ctrl` rather than scan a list.
+---
+--- The two shapes are easy to confuse — indexing the array one by name yields
+--- nil for every modifier, which reads as "nothing is held" and is silent.
+--- @return table { shift?, ctrl?, alt?, altgr?, meta? } — true when held.
+function M.held_modifiers()
+	return {
+		shift = _shift_held or nil,
+		ctrl  = _ctrl_held or nil,
+		alt   = _alt_held or nil,
+		altgr = _altgr_held or nil,
+		meta  = _meta_held or nil,
+	}
 end
 
 --- Resolves the device the daemon should be reading right now.

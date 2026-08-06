@@ -107,6 +107,11 @@ local MagicKey          = require("modules.hotstrings.magic_key")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
+-- The user's own modifier chords. Hard require rather than optional: the module
+-- has no external dependency, and a shortcut layer that silently fails to load
+-- leaves every binding the user made doing nothing with no sign why.
+local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = nil
 local ok_wpm, wpm_mod = pcall(require, "ui.wpm.widget")
@@ -780,7 +785,24 @@ local function main()
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
-	local function on_control(key_name)
+	local function on_control(key_name, detail)
+		-- A modifier chord. Two things happen here that could not happen before,
+		-- because the hook reported the bare string "shortcut" and dropped which
+		-- key it was: the user's own binding runs, and the press is recorded.
+		--
+		-- Recorded whether or not anything is bound to it. The metrics question is
+		-- "what does this person press", and answering it only for the chords the
+		-- daemon happens to own would make the dashboard a picture of the driver's
+		-- configuration rather than of the user's habits.
+		if key_name == "shortcut" and type(detail) == "table" then
+			local chord = keyboard_shortcuts.chord_name(detail)
+			if chord then
+				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
+					math.floor(Monotonic.now_ms()))
+			end
+			pcall(keyboard_shortcuts.dispatch, detail)
+		end
+
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.
 		--
 		-- The arithmetic is off by one on purpose. Under a grab the Backspace was
