@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别",
 	"menu.llm.generation.temperature": "温度",
-	"menu.llm.generation.context_length": "上下文长度"
+	"menu.llm.generation.context_length": "上下文长度",
+	"numeric_prompt.window_title": "数值",
+	"numeric_prompt.save": "保存",
+	"numeric_prompt.cancel": "取消",
+	"numeric_prompt.not_a_number": "请输入数字。",
+	"numeric_prompt.out_of_range": "数值超出允许范围。",
+	"menu.llm.generation.custom_value": "其他数值…"
 }

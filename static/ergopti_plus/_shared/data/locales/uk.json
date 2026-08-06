@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Час",
 	"metrics_apps.edit_category_hint": "Змінити категорію",
 	"menu.llm.generation.temperature": "Температура",
-	"menu.llm.generation.context_length": "Довжина контексту"
+	"menu.llm.generation.context_length": "Довжина контексту",
+	"numeric_prompt.window_title": "Значення",
+	"numeric_prompt.save": "Зберегти",
+	"numeric_prompt.cancel": "Скасувати",
+	"numeric_prompt.not_a_number": "Введіть число.",
+	"numeric_prompt.out_of_range": "Значення поза допустимим діапазоном.",
+	"menu.llm.generation.custom_value": "Інше значення…"
 }

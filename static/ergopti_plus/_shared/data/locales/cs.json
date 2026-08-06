@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii",
 	"menu.llm.generation.temperature": "Teplota",
-	"menu.llm.generation.context_length": "Délka kontextu"
+	"menu.llm.generation.context_length": "Délka kontextu",
+	"numeric_prompt.window_title": "Hodnota",
+	"numeric_prompt.save": "Uložit",
+	"numeric_prompt.cancel": "Zrušit",
+	"numeric_prompt.not_a_number": "Zadejte číslo.",
+	"numeric_prompt.out_of_range": "Hodnota je mimo povolený rozsah.",
+	"menu.llm.generation.custom_value": "Jiná hodnota…"
 }

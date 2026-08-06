@@ -145,6 +145,7 @@ local BRIDGE_MODULES = {
 	paths_editor          = "ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
 	personal_toml_editor  = "ui.personal_info_editor.bridge_toml",
+	numeric_prompt        = "ui.numeric_prompt.bridge",
 	prompt_editor         = "ui.prompt_editor.bridge",
 	token_prompt          = "ui.token_prompt.bridge",
 }
@@ -486,6 +487,7 @@ local function _app_title(app_name)
 		onboarding              = "Setup Wizard",
 		paths_editor            = "Paths Editor",
 		personal_info_editor    = "Personal Info",
+		numeric_prompt          = "Valeur",
 		prompt_editor           = "Prompt Editor",
 		token_prompt            = "Token Settings",
 	}

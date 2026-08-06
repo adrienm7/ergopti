@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집",
 	"menu.llm.generation.temperature": "온도",
-	"menu.llm.generation.context_length": "컨텍스트 길이"
+	"menu.llm.generation.context_length": "컨텍스트 길이",
+	"numeric_prompt.window_title": "값",
+	"numeric_prompt.save": "저장",
+	"numeric_prompt.cancel": "취소",
+	"numeric_prompt.not_a_number": "숫자를 입력하세요.",
+	"numeric_prompt.out_of_range": "값이 허용 범위를 벗어났습니다.",
+	"menu.llm.generation.custom_value": "다른 값…"
 }

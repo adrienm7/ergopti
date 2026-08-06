@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",
 	"menu.llm.generation.temperature": "温度",
-	"menu.llm.generation.context_length": "コンテキスト長"
+	"menu.llm.generation.context_length": "コンテキスト長",
+	"numeric_prompt.window_title": "値",
+	"numeric_prompt.save": "保存",
+	"numeric_prompt.cancel": "キャンセル",
+	"numeric_prompt.not_a_number": "数値を入力してください。",
+	"numeric_prompt.out_of_range": "値が許容範囲外です。",
+	"menu.llm.generation.custom_value": "その他の値…"
 }

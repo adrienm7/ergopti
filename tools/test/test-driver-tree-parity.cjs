@@ -148,7 +148,21 @@ const BASELINE_SHARED = 26;
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
 // the programme drifting sideways — adding structure to one driver while the
 // shared count stands still.
-const BASELINE_UNION = 48;
+//
+//   48 → 49 on 2026-08-06 — ui/numeric_prompt, Linux only, and this is the
+//   exemption the message above names rather than a concession. macOS asks for
+//   a number with hs.dialog and Windows with InputBox: one call each, built
+//   into the toolkit. Linux has neither, so the only way for its tray to accept
+//   a typed value at all is a webview — the same shape of argument as
+//   platform/tray above, where Linux has to HOST an object the other two get
+//   from one call. A counterpart directory on macOS and Windows would be a
+//   folder wrapping a function they already have, which is the thing this
+//   ratchet exists to discourage in the other direction.
+//
+//   The alternative was to leave the gap: presets on Linux, free entry on
+//   macOS, for a setting the manifest declares once. That is convergence
+//   downwards wearing a clean ratchet.
+const BASELINE_UNION = 49;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

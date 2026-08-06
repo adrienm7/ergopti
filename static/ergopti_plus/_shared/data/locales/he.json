@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה",
 	"menu.llm.generation.temperature": "טמפרטורה",
-	"menu.llm.generation.context_length": "אורך ההקשר"
+	"menu.llm.generation.context_length": "אורך ההקשר",
+	"numeric_prompt.window_title": "ערך",
+	"numeric_prompt.save": "שמירה",
+	"numeric_prompt.cancel": "ביטול",
+	"numeric_prompt.not_a_number": "הזינו מספר.",
+	"numeric_prompt.out_of_range": "הערך מחוץ לטווח המותר.",
+	"menu.llm.generation.custom_value": "ערך אחר…"
 }
