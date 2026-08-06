@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",
-	"menu.llm.generation.context_length": "Contextlengte"
+	"menu.llm.generation.context_length": "Contextlengte",
+	"numeric_prompt.window_title": "Waarde",
+	"numeric_prompt.save": "Opslaan",
+	"numeric_prompt.cancel": "Annuleren",
+	"numeric_prompt.not_a_number": "Voer een getal in.",
+	"numeric_prompt.out_of_range": "De waarde valt buiten het toegestane bereik.",
+	"menu.llm.generation.custom_value": "Andere waarde…"
 }

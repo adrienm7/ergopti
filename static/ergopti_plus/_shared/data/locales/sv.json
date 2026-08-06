@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori",
 	"menu.llm.generation.temperature": "Temperatur",
-	"menu.llm.generation.context_length": "Kontextlängd"
+	"menu.llm.generation.context_length": "Kontextlängd",
+	"numeric_prompt.window_title": "Värde",
+	"numeric_prompt.save": "Spara",
+	"numeric_prompt.cancel": "Avbryt",
+	"numeric_prompt.not_a_number": "Ange ett tal.",
+	"numeric_prompt.out_of_range": "Värdet ligger utanför det tillåtna intervallet.",
+	"menu.llm.generation.custom_value": "Annat värde…"
 }

@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",
 	"menu.llm.generation.temperature": "Sıcaklık",
-	"menu.llm.generation.context_length": "Bağlam uzunluğu"
+	"menu.llm.generation.context_length": "Bağlam uzunluğu",
+	"numeric_prompt.window_title": "Değer",
+	"numeric_prompt.save": "Kaydet",
+	"numeric_prompt.cancel": "İptal",
+	"numeric_prompt.not_a_number": "Bir sayı girin.",
+	"numeric_prompt.out_of_range": "Değer kabul edilen aralığın dışında.",
+	"menu.llm.generation.custom_value": "Başka değer…"
 }

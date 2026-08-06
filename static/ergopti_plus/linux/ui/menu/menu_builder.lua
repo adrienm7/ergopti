@@ -1243,6 +1243,36 @@ local function _build_llm(ctx)
 					end,
 				}
 			end
+			-- Free entry beside the presets, so this driver can express any value
+			-- macOS's numeric dialog can. Closing the gap the other way — taking
+			-- the dialog off macOS and leaving only presets — would have removed a
+			-- capability, which is convergence downwards.
+			local bounds = Settings.bounds(setting.name)
+			if bounds then
+				choices[#choices + 1] = { separator = true }
+				choices[#choices + 1] = {
+					label = i18n_safe("menu.llm.generation.custom_value"),
+					action = function()
+						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+						if not ok_prompt then
+							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
+							return
+						end
+						Prompt.ask({
+							title = i18n_safe(setting.key),
+							hint = string.format("%s – %s", tostring(bounds.min), tostring(bounds.max)),
+							value = Settings.get(setting.name),
+							min = bounds.min,
+							max = bounds.max,
+							on_save = function(value)
+								Settings.set(setting.name, value)
+								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							end,
+						}, ctx.webview)
+					end,
+				}
+			end
+
 			rows[#rows + 1] = {
 				label = i18n_safe(setting.key) .. " — " .. tostring(current),
 				items = choices,

@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",
-	"menu.llm.generation.context_length": "Kontekstlengde"
+	"menu.llm.generation.context_length": "Kontekstlengde",
+	"numeric_prompt.window_title": "Verdi",
+	"numeric_prompt.save": "Lagre",
+	"numeric_prompt.cancel": "Avbryt",
+	"numeric_prompt.not_a_number": "Skriv inn et tall.",
+	"numeric_prompt.out_of_range": "Verdien er utenfor det tillatte området.",
+	"menu.llm.generation.custom_value": "Annen verdi…"
 }

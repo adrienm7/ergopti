@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "समय",
 	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें",
 	"menu.llm.generation.temperature": "तापमान",
-	"menu.llm.generation.context_length": "संदर्भ की लंबाई"
+	"menu.llm.generation.context_length": "संदर्भ की लंबाई",
+	"numeric_prompt.window_title": "मान",
+	"numeric_prompt.save": "सहेजें",
+	"numeric_prompt.cancel": "रद्द करें",
+	"numeric_prompt.not_a_number": "एक संख्या दर्ज करें।",
+	"numeric_prompt.out_of_range": "मान स्वीकृत सीमा से बाहर है।",
+	"menu.llm.generation.custom_value": "अन्य मान…"
 }

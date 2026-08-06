@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "الوقت",
 	"metrics_apps.edit_category_hint": "تعديل الفئة",
 	"menu.llm.generation.temperature": "درجة الحرارة",
-	"menu.llm.generation.context_length": "طول السياق"
+	"menu.llm.generation.context_length": "طول السياق",
+	"numeric_prompt.window_title": "قيمة",
+	"numeric_prompt.save": "حفظ",
+	"numeric_prompt.cancel": "إلغاء",
+	"numeric_prompt.not_a_number": "أدخل رقمًا.",
+	"numeric_prompt.out_of_range": "القيمة خارج النطاق المسموح.",
+	"menu.llm.generation.custom_value": "قيمة أخرى…"
 }

@@ -2411,5 +2411,11 @@
 	"metrics_apps.chart_time_series": "Czas",
 	"metrics_apps.edit_category_hint": "Edytuj kategorię",
 	"menu.llm.generation.temperature": "Temperatura",
-	"menu.llm.generation.context_length": "Długość kontekstu"
+	"menu.llm.generation.context_length": "Długość kontekstu",
+	"numeric_prompt.window_title": "Wartość",
+	"numeric_prompt.save": "Zapisz",
+	"numeric_prompt.cancel": "Anuluj",
+	"numeric_prompt.not_a_number": "Wprowadź liczbę.",
+	"numeric_prompt.out_of_range": "Wartość jest poza dozwolonym zakresem.",
+	"menu.llm.generation.custom_value": "Inna wartość…"
 }

@@ -82,7 +82,10 @@ const MACOS_MODULES = {
 // entry (app gone from the manifest) fails, so this cannot quietly rot.
 const MACOS_EXCLUSIONS = {
 	metrics_apps: 'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
-	metrics_typing: 'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux'
+	metrics_typing: 'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
+	numeric_prompt:
+		'no macOS host — hs.dialog asks for a number natively, so there is no window ' +
+		'to size. Linux has no native numeric dialog and needs a webview to ask at all'
 };
 
 // ── Windows: geometry literals that must equal the manifest value ────────────
@@ -142,7 +145,10 @@ const WINDOWS_APPS = {
 const WINDOWS_EXCLUSIONS = {
 	metrics_apps: 'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
 	metrics_typing: 'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
-	token_prompt: 'no Windows host — the token dialog is a native InputBox, which has no manifest geometry'
+	token_prompt: 'no Windows host — the token dialog is a native InputBox, which has no manifest geometry',
+	numeric_prompt:
+		'no Windows host — InputBox asks for a number natively, same reason as ' +
+		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
 };
 
 // ── Linux: the manager must resolve geometry generically, for every app ───────
