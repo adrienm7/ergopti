@@ -4,23 +4,23 @@
  * ==============================================================================
  * MODULE: Linux Package-Layout Guard
  * DESCRIPTION:
- * Regression guard for the Linux system-package (.deb/.rpm) runtime layout. Both
- * packagers install the driver into a single runtime root and generate a
- * /usr/bin launcher that boots the daemon from that same root (via the exec'd
- * entry script plus a LUA_PATH rooted at the shared tree). If the install
- * directory and the launcher's boot path ever diverge — one bumped without the
- * other — the installed package silently fails to start, exactly the class of
- * drift the macOS bundle-layout guard catches for the .app.
+ * Regression guard for the Linux packaging runtime layout, across all four
+ * formats: .deb, .rpm, AppImage and Flatpak. Each installs the driver into a
+ * runtime root and generates a launcher that boots the daemon from that same
+ * root (via the exec'd entry script plus a LUA_PATH rooted at the shared tree).
+ * If the install directory and the launcher's boot path ever diverge — one
+ * bumped without the other — the installed package silently fails to start,
+ * exactly the class of drift the macOS bundle-layout guard catches for the .app.
  *
  * ROOT CAUSE ENCODED:
  * The runtime root, the exec'd bundle entry, and the LUA_PATH shared root must
- * agree across build-linux-deb.sh and build-linux-rpm.sh: the driver installs at
- * /usr/lib/ergopti, the wrapper execs /usr/lib/ergopti/ergopti_hotstrings.lua and
- * puts /usr/lib/ergopti/_shared/lua on LUA_PATH, the launcher lands at
- * /usr/bin/ergopti, and the systemd unit's ExecStart points at that launcher.
- * This guard fails if either packager moves the install root without updating the
- * wrapper, re-introduces a legacy static/drivers prefix, or the two packagers
- * stop agreeing.
+ * agree WITHIN each packager. The prefix itself is per-format and legitimately
+ * differs (/usr/lib/ergopti for the system packages, /app/lib/ergopti for the
+ * Flatpak, a relocatable $HERE/usr/lib/ergopti for the AppImage), so each root
+ * is declared per entry and every check runs against that entry's own root.
+ * This guard fails if a packager moves its install root without updating its
+ * wrapper, re-introduces a legacy static/drivers prefix, ships a systemd unit it
+ * declared it would not, or points a launcher somewhere it staged nothing.
  * ==============================================================================
  */
 
@@ -33,20 +33,47 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 // Canonical runtime layout every Linux packager must agree on.
-const RUNTIME_ROOT = '/usr/lib/ergopti'; // driver root inside the package
-const BUNDLE_ENTRY = '/usr/lib/ergopti/ergopti_hotstrings.lua'; // what the wrapper execs
 const SHARED_LUA_EXPR = '$DRIVER_ROOT/_shared/lua'; // LUA_PATH shared root, relative to the driver root
-const WRAPPER_BIN = 'usr/bin/ergopti'; // generated launcher path (repo-relative to the package DESTDIR)
 const SERVICE_UNIT = 'usr/lib/systemd/user/ergopti-hotstrings.service'; // systemd user unit path
 const SERVICE_EXEC = 'ExecStart=/usr/bin/ergopti'; // the unit must boot via the wrapper
 
 // Pre-reorg prefix that must never reappear in a packager (mirror of the macOS guard).
 const LEGACY_PREFIXES = ['static/drivers'];
 
-// The two packagers that produce an installable artifact and stage the layout.
+// Every packager that produces an installable artifact and stages the layout.
+//
+// The install PREFIX is per-format and legitimately differs — an AppImage is
+// relocatable and only knows where it was mounted, a Flatpak owns /app — so the
+// invariant this guard enforces is not one literal path. It is that each
+// packager's wrapper agrees with its OWN payload: the tree is staged under the
+// declared root, DRIVER_ROOT names that same root, the entry point is exec'd
+// from under it, and the shared tree hangs off it. A packager whose wrapper
+// points somewhere it never staged anything is the failure being caught, and
+// pinning one prefix could only ever catch it for the two system packages.
+//
+// `systemdUnit` is declared rather than inferred: a .deb silently losing its
+// unit must fail here, while an AppImage has nowhere to install one.
 const PACKAGERS = [
-	{ label: '.deb', rel: 'tools/build/build-linux-deb.sh' },
-	{ label: '.rpm', rel: 'tools/build/build-linux-rpm.sh' }
+	{
+		label: '.deb', rel: 'tools/build/build-linux-deb.sh',
+		root: '/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: true
+	},
+	{
+		label: '.rpm', rel: 'tools/build/build-linux-rpm.sh',
+		root: '/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: true
+	},
+	{
+		// Relocatable: AppRun resolves $HERE at run time, so the root is an
+		// expression rather than an absolute path.
+		label: 'AppImage', rel: 'tools/build/build-linux-appimage.sh',
+		root: '$HERE/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: false
+	},
+	{
+		// Flatpak owns /app inside its sandbox; a user unit cannot be installed
+		// from inside one, so autostart is the portal's business, not ours.
+		label: 'Flatpak', rel: 'tools/build/build-linux-flatpak.sh',
+		root: '/app/lib/ergopti', wrapperBin: '/app/bin/ergopti', systemdUnit: false
+	}
 ];
 
 const errors = [];
@@ -55,39 +82,52 @@ for (const pkg of PACKAGERS) {
 	const src = read(pkg.rel);
 	const tag = `${pkg.rel} (${pkg.label})`;
 
-	// 1. The driver tree installs into the canonical runtime root.
-	if (!src.includes(RUNTIME_ROOT)) {
-		errors.push(`${tag}: must install the driver into ${RUNTIME_ROOT}.`);
+	// 1. The driver tree installs into this packager's declared runtime root.
+	if (!src.includes(pkg.root)) {
+		errors.push(`${tag}: must install the driver into ${pkg.root}.`);
 	}
 
 	// 2. The wrapper's DRIVER_ROOT is that same runtime root...
-	if (!src.includes(`DRIVER_ROOT="${RUNTIME_ROOT}"`)) {
-		errors.push(`${tag}: wrapper must set DRIVER_ROOT="${RUNTIME_ROOT}".`);
+	if (!src.includes(`DRIVER_ROOT="${pkg.root}"`)) {
+		errors.push(`${tag}: wrapper must set DRIVER_ROOT="${pkg.root}".`);
 	}
-	// ...it execs the bundle entry from under that root (install dir == boot dir)...
-	if (!src.includes(`exec luajit ${BUNDLE_ENTRY}`)) {
-		errors.push(`${tag}: wrapper must exec ${BUNDLE_ENTRY} (bundle entry under the driver root).`);
+	// ...it execs the bundle entry from under that root (install dir == boot dir).
+	// Either spelling counts: the absolute path, or $DRIVER_ROOT — which is the
+	// only form available to a relocatable image that learns its root at run time.
+	const entryLiteral = `${pkg.root}/ergopti_hotstrings.lua`;
+	const entryViaVar  = '$DRIVER_ROOT/ergopti_hotstrings.lua';
+	if (!src.includes(entryLiteral) && !src.includes(entryViaVar)) {
+		errors.push(`${tag}: wrapper must exec ${entryLiteral} (or the same path via $DRIVER_ROOT) — install dir must be boot dir.`);
 	}
 	// ...and it roots the shared Lua tree on LUA_PATH relative to that root.
+	// This one IS universal: it is written relative to DRIVER_ROOT, so every
+	// format spells it identically no matter where its prefix lands.
 	if (!src.includes(`SHARED_LUA="${SHARED_LUA_EXPR}"`)) {
 		errors.push(`${tag}: wrapper must set SHARED_LUA="${SHARED_LUA_EXPR}" for LUA_PATH resolution.`);
 	}
 
-	// 3. The launcher and the systemd unit land at the canonical paths and agree.
-	if (!src.includes(WRAPPER_BIN)) {
-		errors.push(`${tag}: must generate the launcher at /${WRAPPER_BIN}.`);
+	// 3. The launcher lands at this format's canonical path, and — for formats
+	//    that install one — the systemd unit boots through that launcher.
+	if (!src.includes(pkg.wrapperBin)) {
+		errors.push(`${tag}: must generate the launcher at ${pkg.wrapperBin}.`);
 	}
-	if (!src.includes(SERVICE_UNIT)) {
-		errors.push(`${tag}: must install the systemd user unit at /${SERVICE_UNIT}.`);
-	}
-	if (!src.includes(SERVICE_EXEC)) {
-		errors.push(`${tag}: systemd unit must boot via ${SERVICE_EXEC}.`);
+	if (pkg.systemdUnit) {
+		if (!src.includes(SERVICE_UNIT)) {
+			errors.push(`${tag}: must install the systemd user unit at /${SERVICE_UNIT}.`);
+		}
+		if (!src.includes(SERVICE_EXEC)) {
+			errors.push(`${tag}: systemd unit must boot via ${SERVICE_EXEC}.`);
+		}
+	} else if (src.includes(SERVICE_UNIT)) {
+		// Declared unit-less but shipping one anyway: the declaration is stale,
+		// and section 5's --tray enumeration would not be covering it.
+		errors.push(`${tag}: declared as shipping no systemd unit, but installs ${SERVICE_UNIT} — update PACKAGERS and UNIT_SOURCES.`);
 	}
 
 	// 4. No legacy pre-reorg prefix may reappear.
 	for (const legacy of LEGACY_PREFIXES) {
 		if (src.includes(legacy)) {
-			errors.push(`${tag}: still references the legacy '${legacy}' prefix — must be ${RUNTIME_ROOT}.`);
+			errors.push(`${tag}: still references the legacy '${legacy}' prefix — must be ${pkg.root}.`);
 		}
 	}
 }
@@ -364,6 +404,8 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] Linux .deb/.rpm install into /usr/lib/ergopti, boot the same bundle entry, ' +
+	`\x1b[32m[OK] All ${PACKAGERS.length} Linux packager(s) (` +
+	PACKAGERS.map((p) => p.label).join(', ') +
+	') boot the daemon from the same root they install it into, ' +
 	`and all ${daemonExecStartsFound} daemon ExecStart line(s) pass --tray.\x1b[0m`
 );
