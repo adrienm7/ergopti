@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Paths  = require("infra.paths")
 local LOG = "modules.shortcuts.manager"
 
 --- Records that the user fired a shortcut.
@@ -62,29 +63,20 @@ end
 -- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
 -- the single source of truth shared with the AHK and macOS drivers — never
 -- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
-local WRAP_SYMBOLS_REL_PATH = "/_shared/modules/wrap_symbols/wrap_symbols.json"
+local WRAP_SYMBOLS_REL_PATH = "modules/wrap_symbols/wrap_symbols.json"
 
 -- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
 local UTF8_BOM = "\239\187\191"
 
---- Resolves the absolute path to the shared wrap-symbols catalogue by walking up
---- from this file's location. manager.lua lives at
---- linux/modules/shortcuts/manager.lua, so the 4 trailing path segments are
---- stripped to reach static/ergopti_plus before descending into the shared tree.
---- Mirrors the debug.getinfo path walk in infra/locale.lua.
+--- Resolves the absolute path to the shared wrap-symbols catalogue.
+---
+--- Through infra.paths. Stripping four path segments off this file's own
+--- location described one layout only: an installed package stages the driver
+--- flat under /usr/lib/ergopti, where four up leaves the install entirely and
+--- every wrap pair is silently lost.
 --- @return string Absolute catalogue path, or "" when the location is unresolvable.
 local function resolve_wrap_symbols_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if src and src.source then
-		local s = src.source
-		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-		s = s:gsub("\\", "/")
-		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
-		if root then
-			return root .. WRAP_SYMBOLS_REL_PATH
-		end
-	end
-	return ""
+	return Paths.shared(WRAP_SYMBOLS_REL_PATH) or ""
 end
 
 --- Reads the shared wrap-symbols JSON and flattens its ordered groups into the

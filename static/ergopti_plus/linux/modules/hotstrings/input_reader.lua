@@ -35,6 +35,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
+local Paths  = require("infra.paths")
 
 local LOG = "modules.hotstrings.input_reader"
 
@@ -91,24 +92,16 @@ local function _load_shared_layouts()
 		return nil, "no JSON decoder available"
 	end
 
-	-- Resolve the _shared/ root explicitly: walk up from this file's location
-	-- (linux/modules/hotstrings/input_reader.lua) → three levels up gives the
-	-- repo root, then _shared/.  Passed to evdev.load so it never falls back to
-	-- the fragile debug.getinfo path (which breaks under LuaJIT).
+	-- Resolve the _shared/ root through infra.paths, which knows the two layouts
+	-- that ship. Stripping three path components off this file's own location
+	-- only ever described the checkout: an installed package stages the driver
+	-- flat under /usr/lib/ergopti, so three up is /usr and every keycode lookup
+	-- would have failed with no fallback to soften it.
+	-- evdev.load expects a trailing slash.
 	local function shared_root()
-		local src = debug and debug.getinfo and debug.getinfo(1, "S")
-		if src and src.source then
-			local s = src.source
-			if s:sub(1, 1) == "@" then s = s:sub(2) end
-			local dir = s:match("^(.*[/\\])") or ""
-			-- dir is .../linux/modules/hotstrings/ → walk up 3 levels
-			local root = dir:gsub("[/\\]$", "")
-			root = root:gsub("[/\\][^/\\]+[/\\][^/\\]+[/\\][^/\\]+$", "")
-			if root and root ~= dir then
-				return root .. "/_shared/"
-			end
-		end
-		return nil
+		local root = Paths.shared_root()
+		if not root then return nil end
+		return root .. "/"
 	end
 
 	return evdev.load(decode, nil, shared_root)

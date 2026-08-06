@@ -25,6 +25,7 @@
 
 local M = {}
 local Logger = require("logger.shim")
+local Paths  = require("infra.paths")
 local LOG    = "timings"
 
 -- Load the shared TOML reader (pcall-guarded so a missing module produces a
@@ -43,23 +44,17 @@ local MS_PER_SEC = 1000
 -- ==================================
 -- ==================================
 
---- Resolves the absolute path to _shared/modules/timings/constants.toml by
---- walking up from this file's own location (linux/infra/ → repo root → _shared/).
---- @return string Absolute path to the TOML file.
+--- Resolves the absolute path to _shared/modules/timings/constants.toml.
+---
+--- Through infra.paths, never by counting path components. This function used to
+--- strip three levels off its own location and append "/_shared/…", which encodes
+--- the checkout layout as a fact. On an installed package the driver sits flat in
+--- /usr/lib/ergopti, so three levels up is /usr and the file was looked for at
+--- /usr/_shared/… — the daemon died on its first M.ms() call with a missing
+--- [keylogger] section, having in reality read nothing at all.
+--- @return string|nil Absolute path to the TOML file, or nil when unresolvable.
 local function resolve_toml_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if src and src.source then
-		local s = src.source
-		-- Strip leading '@' (LuaJIT) or '=' (Lua 5.4 chunk marker)
-		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-		s = s:gsub("\\", "/")
-		-- s is .../ergopti_plus/linux/infra/timings.lua — walk up 3 levels to .../ergopti_plus/
-		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")  -- strips /linux/infra/timings.lua
-		if root then
-			return root .. "/_shared/modules/timings/constants.toml"
-		end
-	end
-	return nil
+	return Paths.shared("modules/timings/constants.toml")
 end
 
 --- Reads and parses the shared timings TOML. Fail-fast: a missing file or

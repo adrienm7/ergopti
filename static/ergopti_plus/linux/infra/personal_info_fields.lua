@@ -27,6 +27,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Reader = require("toml_codec")
 local Mask   = require("personal_info.mask")
+local Paths  = require("infra.paths")
 
 local LOG = "infra.personal_info_fields"
 
@@ -55,22 +56,18 @@ local _declaration = nil
 -- =========================================
 -- =========================================
 
---- Resolves the absolute path to the shared declaration.
+--- Resolves the absolute path to the shared declaration, through infra.paths.
 ---
---- Walks up from this file, exactly as infra/timings.lua does: this module is
---- read before the driver's package.path is necessarily complete, so it cannot
---- ask a path resolver that itself needs one.
+--- This used to count three path components up and append "/_shared/…", carrying
+--- a comment that infra.paths could not be used because package.path might not
+--- be complete yet. That was not true: this module already requires logger.shim,
+--- toml_codec and personal_info.mask — all from the shared tree — so the path is
+--- necessarily set, and infra.paths needs only the first of those three.
+--- Counting components encodes the checkout layout: on a system package the
+--- driver sits flat in /usr/lib/ergopti, three up is /usr, and nothing is found.
 --- @return string|nil
 local function resolve_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if not (src and src.source) then return nil end
-	local s = src.source
-	if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-	s = s:gsub("\\", "/")
-	-- .../ergopti_plus/linux/infra/personal_info_fields.lua → .../ergopti_plus/
-	local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")
-	if not root then return nil end
-	return root .. "/_shared/modules/personal_info/fields.toml"
+	return Paths.shared("modules/personal_info/fields.toml")
 end
 
 --- Loads the declaration, once.
