@@ -179,6 +179,35 @@ function M.shell_runner(opts)
 	return fake
 end
 
+--- A notifier that records what it was asked to show.
+---
+--- Never reaches a desktop. A test that posted a real notification would put a
+--- bubble on the maintainer's screen for every run and prove nothing about the
+--- code under test.
+--- @param opts table|nil { available = boolean }
+--- @return table
+function M.notifier(opts)
+	opts = opts or {}
+	local fake = { sent = {}, available = opts.available ~= false }
+
+	function fake.send(message, options)
+		options = type(options) == "table" and options or {}
+		fake.sent[#fake.sent + 1] = {
+			message = message,
+			title = options.title,
+			level = options.level or "info",
+		}
+	end
+
+	--- The last message shown, or nil.
+	--- @return table|nil
+	function fake.last()
+		return fake.sent[#fake.sent]
+	end
+
+	return fake
+end
+
 --- Key/value storage held in a table.
 --- @param opts table|nil { initial = table, writes_fail = boolean }
 --- @return table

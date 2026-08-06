@@ -107,6 +107,13 @@ local MagicKey          = require("modules.hotstrings.magic_key")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
+-- Desktop notifications (optional — needs notify-send and a session bus). The
+-- adapter degrades to a log line on a headless machine, so a missing one is not
+-- a reason to refuse to start.
+local notifier = nil
+local ok_notifier, notifier_mod = pcall(require, "adapters.notifier")
+if ok_notifier then notifier = notifier_mod end
+
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
@@ -1260,8 +1267,32 @@ local function main()
 	end
 
 	if updater then
+		-- The one release that has been notified, so a background check every few
+		-- hours does not re-announce the same version for as long as the user
+		-- leaves it uninstalled.
+		local _notified_tag = nil
+
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
+
+			-- Told to the user, not only to the log. The other two drivers have
+			-- notified here since the updater existed and the strings are already
+			-- translated into all twenty-one locales; this driver wrote a log line
+			-- nobody reads and left the news in the tray label.
+			--
+			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
+			-- a release tagged "v2.1%-rc1" would raise inside the notification and
+			-- take the menu rebuild below with it.
+			if notifier and ok_i18n and i18n_mod and release.tag ~= _notified_tag then
+				_notified_tag = release.tag
+				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
+				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
+				notifier.send(body, {
+					title = i18n_mod.get("updater.tray_new_version_title"),
+					level = "info",
+				})
+			end
+
 			-- Rebuild the tray menu so the update label changes.
 			if tray_menu and menu_builder then
 				if rebuild_tray_menu then rebuild_tray_menu() end

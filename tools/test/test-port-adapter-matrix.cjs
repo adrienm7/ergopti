@@ -54,7 +54,6 @@ const DECLARED_ABSENT = {
 		KeyState: 'deleted under ADR-008 — zero production callers',
 		MouseControl: 'deleted under ADR-008 — zero production callers; no gesture layer',
 		NetworkInfo: 'deleted under ADR-008 — zero production callers',
-		Notifier: 'deleted under ADR-008 — a notifier.lua nothing called made the tree answer "does Linux notify?" wrongly by inspection',
 		TooltipRenderer: 'not implemented — no hotstring preview and no LLM prediction preview (README feature table)',
 		WindowManager: 'deleted under ADR-008 — zero production callers'
 	},
