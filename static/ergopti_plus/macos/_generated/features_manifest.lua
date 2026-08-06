@@ -29,10 +29,10 @@ M.sections = {
 	["hotstrings.magic_key"] = { description_key = "menu.hotstrings.magic_key", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.dynamic"] = { description_key = "menu.hotstrings.dynamic", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
+	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs" }, subsections = {  } },
-	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -281,7 +281,7 @@ M.features = {
 		path = "hotstrings.personal.test", id = "test", section = "hotstrings.personal", default = { enabled = true, time_activation_seconds = 0.75 }, type = "feature", description_key = "menu.hotstrings.personal.test", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs" },
+		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs" },
@@ -317,10 +317,10 @@ M.features = {
 		path = "llm.generation.sequential_mode", id = "sequential_mode", section = "llm.generation", default = false, type = "boolean", description_key = "menu.llm.generation.sequential_mode", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.models.selected", id = "selected", section = "llm.models", default = "mlx", type = "string", description_key = "menu.llm.models.selected", platforms = { "ahk", "hs" },
+		path = "llm.models.selected", id = "selected", section = "llm.models", default = "mlx", type = "string", description_key = "menu.llm.models.selected", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "gemma-4-E2B-it", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs" },
+		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "gemma-4-E2B-it", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.models.mlx", id = "mlx", section = "llm.models", default = "Qwen3.5-2B", type = "string", description_key = "menu.llm.models.mlx", platforms = { "hs" },
