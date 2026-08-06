@@ -979,8 +979,38 @@ local function main()
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
 				layout        = opts.layout,
+				-- Applied live rather than logged. This used to say "restart daemon
+				-- to apply" and do nothing, so a user who picked azerty carried on
+				-- having their keys resolved through the qwerty table: every key the
+				-- two layouts disagree on was read as the wrong character, triggers
+				-- stopped matching, and the engine's model of the text drifted from
+				-- the document — all while the menu showed a tick beside azerty.
+				--
+				-- Two directions have to move together. The hook READS keycodes
+				-- through the layout; keyboard_layout WRITES characters back as
+				-- keystrokes. Changing one and not the other swaps which half is
+				-- wrong instead of fixing it.
 				on_layout_change = function(new_layout)
-					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
+					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
+					if not keyboard_hook.set_layout(new_layout) then
+						Logger.error(LOG, "Layout '%s' refused — nothing changed.", tostring(new_layout))
+						return
+					end
+					if not keyboard_layout.refresh(opts.keymap) then
+						Logger.warn(LOG, "Layout applied for reading; the keymap for typing is still unresolved.")
+					end
+					opts.layout = new_layout
+					if webview_manager and webview_manager.set_daemon_state then
+						webview_manager.set_daemon_state({
+							engine = engine, keylogger = keylogger,
+							config = hotstrings_config, llm = prediction_engine,
+							layout = new_layout,
+						})
+					end
+					-- So the tick moves to the row the user just chose. Without it the
+					-- menu still marks the old layout and the change reads as ignored.
+					if rebuild_tray_menu then rebuild_tray_menu() end
+					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
 				end,
 		keylogger     = keylogger,
 		llm           = prediction_engine,

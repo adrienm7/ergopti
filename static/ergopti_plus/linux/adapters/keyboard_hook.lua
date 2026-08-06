@@ -547,6 +547,36 @@ function M.start(opts)
 end
 
 --- Stops the keyboard hook. Safe to call when not running.
+--- Changes which layout the hook reads keycodes through, while it runs.
+---
+--- Without this the tray's layout submenu could only log its own intention: the
+--- name was read once in `start()` and never again, so a user who picked azerty
+--- kept having their keys resolved through the qwerty table until they restarted
+--- the daemon. Every key on the two layouts that differ was then read as the
+--- wrong character, so triggers stopped matching and the engine's model of the
+--- text diverged from the document — with the menu showing the layout they had
+--- chosen.
+--- @param layout string "qwerty" or "azerty".
+--- @return boolean Whether the layout was accepted.
+function M.set_layout(layout)
+	if type(layout) ~= "string" or layout == "" then
+		Logger.error(LOG, "set_layout(): a layout name is required — layout unchanged.")
+		return false
+	end
+	local reader = require("modules.hotstrings.input_reader")
+	local known = type(reader.get_layouts) == "function" and reader.get_layouts() or nil
+	if known and not known[layout] then
+		-- Named but unknown is worse than refused: `LAYOUTS[layout] or
+		-- LAYOUTS["qwerty"]` silently falls back, so the daemon would report the
+		-- change as applied and resolve every key through the other table.
+		Logger.error(LOG, "set_layout(): '%s' is not a layout this driver knows — layout unchanged.", layout)
+		return false
+	end
+	_layout = layout
+	Logger.info(LOG, "Layout: %s.", layout)
+	return true
+end
+
 function M.stop()
 	if not _running then return end
 	EvdevReader.close(EvdevReader.POINTER)
