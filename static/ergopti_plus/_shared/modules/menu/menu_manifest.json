@@ -1158,7 +1158,7 @@
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "disable_all",
 			"i18n": "menu.gestures.disable_all",
 			"platforms": [
@@ -1168,7 +1168,7 @@
 			]
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "restore_defaults",
 			"i18n": "menu.gestures.restore_defaults",
 			"platforms": [

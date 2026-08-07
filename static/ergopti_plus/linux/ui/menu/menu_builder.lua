@@ -2105,18 +2105,20 @@ local function _build_gestures(ctx)
 	-- its own result and passes it in, so a handler writing to an outer table
 	-- would emit its rows into a menu the renderer never returns — every gesture
 	-- row silently missing, with nothing failing.
-	local gesture_rows = {
-		["restore_defaults"] = function(out)
-			out[#out + 1] = {
-				title = i18n_safe("menu.gestures.restore_defaults"),
-				fn = function() ge.reset_defaults() end,
-			}
-		end,
-		["disable_all"] = function(out)
-			out[#out + 1] = {
-				title = i18n_safe("menu.gestures.disable_all"),
-				fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
-			}
+	local gesture_rows = {}
+
+	-- The two whole-tree actions are `command` rows since 2026-08-07: the renderer
+	-- builds each row and its label from the declaration, and this driver
+	-- registers only what the click does. All three drivers had been writing the
+	-- same two rows with the same two labels.
+	local gesture_commands = {
+		["restore_defaults"] = function() ge.reset_defaults() end,
+		["disable_all"] = function()
+			if type(ge.disable_all_actions) ~= "function" then
+				Logger.error(LOG, "Gestures expose no disable_all_actions — the row does nothing.")
+				return
+			end
+			ge.disable_all_actions()
 		end,
 	}
 
@@ -2248,7 +2250,13 @@ local function _build_gestures(ctx)
 	-- The master toggle stays with the caller: the renderer skips `toggle` rows by
 	-- contract, because the category gate is driver state rather than manifest
 	-- data. Everything below it is the manifest's, in the manifest's order.
-	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, ctx, providers)
+	-- The two whole-tree actions are `command` rows: the renderer builds each from
+	-- the declaration and this driver registers only the behaviour.
+	local gesture_ctx = {}
+	for key, value in pairs(ctx) do gesture_ctx[key] = value end
+	gesture_ctx.commands = gesture_commands
+
+	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, gesture_ctx, providers)
 	local menu = { master_toggle }
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
