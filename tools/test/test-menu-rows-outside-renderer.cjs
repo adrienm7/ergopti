@@ -174,17 +174,37 @@ const MEASURE = process.argv.includes('--measure');
 // macos 260 → 259: the gesture menu's four slot groups and its circular-spaces
 // toggle. The slot ids come from the manifest's OWN `gesture_slots` table, so
 // those rows were already manifest data being appended by hand.
+//
+// macos 259 → 227: the LLM model selector. Thirty-two rows, and the biggest
+// single file left on this driver. It used to hand over an hs.menubar tree that
+// an adapter rewrote into provider rows at EVERY menu build; it returns provider
+// rows directly now, and only the api-backend branch — which still builds a tree
+// of its own — is adapted. A conversion layer that covers everything is a layer
+// that never goes away.
 const BASELINE = {
 	windows: 196,
-	macos: 259,
+	macos: 227,
 	linux: 84
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
 // otherwise drive the outside-count to zero and pass while measuring nothing.
+//
+// macos lowered 260 → 220 on 2026-08-06, and the reason matters because it is
+// the second time a guard in this repository has been found measuring the OLD
+// shape of the thing it guards. The Lua predicates key on `title =`, which is
+// the hs.menubar field — and a row that MOVES to the renderer stops using it,
+// because provider data says `label =`. So every successful migration shrinks
+// this total by construction, and the floor eventually fires on progress.
+//
+// It is not raised back and it is not removed: it still catches a predicate that
+// stopped matching. It is set below the count a fully-migrated macOS would show
+// rather than just under today's, so it cannot fire on the next migration
+// either. If it ever fires again, check whether `title =` is still the field
+// this driver's rows use BEFORE assuming the tree shrank.
 const MIN_TOTAL = {
 	windows: 180,
-	macos: 260,
+	macos: 220,
 	linux: 80
 };
 

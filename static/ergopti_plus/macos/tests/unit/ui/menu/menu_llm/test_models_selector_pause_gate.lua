@@ -66,13 +66,23 @@ helpers.describe("M-16: models_selector rows disabled when paused", function()
 		helpers.assert_true(type(menu) == "table", "build must return a table")
 		helpers.assert_true(#menu > 0, "build must return at least one item")
 
-		-- Every item that has an fn and is not a separator must be disabled
+		-- Provider rows since 2026-08-06: {label, action, items} rather than
+		-- {title, fn, menu}, because the LLM model row is a manifest `list` slot
+		-- and the shared renderer materialises what this file returns. The gate
+		-- being checked is unchanged — an actionable row must be greyed while the
+		-- script is paused — so the assertion follows the field names rather than
+		-- being dropped with them.
+		local checked = 0
 		for i, item in ipairs(menu) do
-			if type(item.title) == "string" and item.title ~= "-" and type(item.fn) == "function" then
+			if type(item.label) == "string" and not item.separator and type(item.action) == "function" then
+				checked = checked + 1
 				helpers.assert_true(item.disabled == true,
-					string.format("row %d ('%s') must have disabled=true when paused", i, item.title))
+					string.format("row %d ('%s') must have disabled=true when paused", i, item.label))
 			end
 		end
+		helpers.assert_true(checked > 0,
+			"no actionable row was inspected — a loop that matches nothing agrees with any output, "
+				.. "which is exactly how a renamed field turns this test green over a broken gate")
 	end)
 
 	helpers.it("build({paused=false}) — rows are NOT disabled", function()
@@ -84,7 +94,7 @@ helpers.describe("M-16: models_selector rows disabled when paused", function()
 		-- At least one actionable row should be enabled
 		local found_enabled = false
 		for _, item in ipairs(menu) do
-			if type(item.title) == "string" and item.title ~= "-" and type(item.fn) == "function" then
+			if type(item.label) == "string" and not item.separator and type(item.action) == "function" then
 				if item.disabled ~= true then found_enabled = true end
 			end
 		end

@@ -626,10 +626,16 @@ function M.create(deps)
 
 				-- Held for the `llm_models` provider below rather than inserted here:
 				-- the manifest places this row, and did so for a slot nobody filled.
+				-- ApiPanel still hands over an hs.menubar tree; ModelsSelector returns
+				-- provider rows directly since 2026-08-06. Adapting only what needs it
+				-- keeps the conversion from becoming a permanent layer.
+				local model_items = (state.llm_backend == "api")
+						and MenuUtils.rows_from_menu(model_submenu)
+						or model_submenu
 				local model_row = {
 						label    = rich_model_title,
 						disabled = MenuLayout.row_disabled("model", is_disabled, paused),
-						items    = MenuUtils.rows_from_menu(model_submenu),
+						items    = model_items,
 				}
 
 				if info and info.emojis and info.emojis:find("🧠💭") then
