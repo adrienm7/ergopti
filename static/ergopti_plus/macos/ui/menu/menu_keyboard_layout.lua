@@ -464,10 +464,12 @@ function M.build(ctx)
 
 	-- The layouts macOS reports as active. A `list`, because the rows are
 	-- whatever the system has installed and no static entry can enumerate
-	-- them. Declared `dynamic:active_layouts` for this platform since the
-	-- manifest was written, and answered by nobody until now: the rows were
-	-- built here, in place, and the declaration named a slot this driver
-	-- never filled.
+	-- them, and because what this returns is provider DATA — `label`,
+	-- `checked`, `action` — which only the `list` branch of the renderer knows
+	-- how to materialise. It was declared `dynamic` until 2026-08-07 and passed
+	-- here as a list provider, so the renderer looked for a dynamic handler,
+	-- found none, and skipped the row: this menu showed no layouts at all, with
+	-- one warning in the log to say so.
 	local function active_layout_rows()
 		local rows = {}
 	if #records == 0 then
@@ -484,7 +486,7 @@ function M.build(ctx)
 			local target_localised = r.name
 			local target_kl_name   = r.id
 			rows[#rows + 1] = {
-				label   = title,
+				label   = row_label,
 				checked = r.selected or nil,
 				-- Greyed out when already selected — clicking the checked
 				-- row would be a no-op TIS call and confuse macOS' input
