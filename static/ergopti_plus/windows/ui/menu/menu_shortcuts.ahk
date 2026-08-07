@@ -163,40 +163,47 @@ _SC_EditAction(SubMenu, _Cat) {
 ; handed over through the renderer's `submenu` field.
 _SC_WrapSymbolRows() {
 	return [Map(
-		"label",   t("menu.shortcuts.wrap_symbols_title"),
-		"submenu", _WS_BuildSymbolsMenu())]
+		"label", t("menu.shortcuts.wrap_symbols_title"),
+		"items", _WS_BuildSymbolRows())]
 }
 
-; Build the full wrap-symbols menu (called by _SC_WrapSymbols and on every initMenu refresh).
-_WS_BuildSymbolsMenu() {
+; The wrap-symbols tree, as row DATA.
+;
+; The manifest called this row Windows-only until 2026-08-06 — and macOS and
+; Linux had both been drawing it all along, in a different place each. It became
+; one shared `list` row then, but the tree behind it was still a native Menu
+; handed over through the renderer's `submenu` field, so every level of it was
+; assembled here. Since 2026-08-07 the renderer builds all of it: nested groups
+; are `items`, and the driver supplies labels, ticks and callbacks.
+_WS_BuildSymbolRows() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
-	Sub := Menu()
+	Rows := []
 
 	; ── Global bulk actions ──────────────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_check_all"), (*) => _WS_MenuSetAll(true))
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_uncheck_all"), (*) => _WS_MenuSetAll(false))
-	RegisterMenuItem(Sub, t("menu.global.reset_defaults"), (*) => _WS_MenuReset())
-	Sub.Add()
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
+		"action", (*) => _WS_MenuSetAll(true)))
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
+		"action", (*) => _WS_MenuSetAll(false)))
+	Rows.Push(Map("label", t("menu.global.reset_defaults"),
+		"action", (*) => _WS_MenuReset()))
+	Rows.Push(Map("separator", true))
 
-	; ── Built-in symbols, one named nested sub-submenu per group ──────────────
-	; Each group from the shared catalogue becomes its own sub-submenu (titled by
-	; its i18n label) so the top-level list stays short. Every group sub-submenu
-	; carries its own « check all / uncheck all » so the user can flip a whole
-	; family at once. Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; ── Built-in symbols, one named nested group per family ──────────────────
+	; Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; Each group carries its own « check all / uncheck all » so a whole family can
+	; be flipped at once, and the parent row ticks when every symbol in it is on.
 	for _, Group in _WS_BUILTIN_GROUPS {
-		GroupMenu := Menu()
-		; Collect this group's opening chars for the per-group bulk actions.
+		GroupRows := []
 		GroupLefts := []
 		for _, Pair in Group["pairs"] {
 			GroupLefts.Push(Pair["left"])
 		}
-		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_check_all"),
-			((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts))
-		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_uncheck_all"),
-			((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts))
-		GroupMenu.Add()
-		; Track whether every symbol in the group is enabled so the parent item
-		; can show a checkmark when the whole family is on.
+		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
+			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts)))
+		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
+			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts)))
+		GroupRows.Push(Map("separator", true))
+
 		GroupAllOn := true
 		for _, Pair in Group["pairs"] {
 			L := Pair["left"]
@@ -204,41 +211,36 @@ _WS_BuildSymbolsMenu() {
 			; Display label: "( … )" for asymmetric, "@" for symmetric
 			Lbl := (L != R) ? (L . " … " . R) : L
 			Enabled := WrapSymbols_IsEnabled(L)
-			; Capture L in closure so the lambda references the right char
-			RegisterMenuItem(GroupMenu, Lbl, ((Ch) => (*) => _WS_MenuToggle(Ch))(L))
-			if Enabled {
-				GroupMenu.Check(Lbl)
-			} else {
+			; Capture L in the closure so the lambda references the right char
+			GroupRows.Push(Map("label", Lbl, "checked", Enabled,
+				"action", ((Ch) => (*) => _WS_MenuToggle(Ch))(L)))
+			if !Enabled {
 				GroupAllOn := false
 			}
 		}
 		GroupLabel := (Group["i18n"] != "") ? t(Group["i18n"]) : t("menu.shortcuts.wrap_symbols_title")
-		Sub.Add(GroupLabel, GroupMenu)
-		; Check the parent group item when all of its symbols are enabled.
-		if GroupAllOn {
-			Sub.Check(GroupLabel)
-		}
+		Rows.Push(Map("label", GroupLabel, "checked", GroupAllOn, "items", GroupRows))
 	}
 
 	; ── Custom symbols ───────────────────────────────────────────────────────
 	if (_WS_Custom.Length > 0) {
-		Sub.Add()
+		Rows.Push(Map("separator", true))
 		for Idx, Pair in _WS_Custom {
 			L := Pair["left"]
 			R := Pair["right"]
 			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
-			DelSub := Menu()
-			RegisterMenuItem(DelSub, t("button.delete"), ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
-			Sub.Add(Lbl, DelSub)
-			Sub.Check(Lbl)
+			Rows.Push(Map("label", Lbl, "checked", true, "items", [
+				Map("label", t("button.delete"), "action", ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
+			]))
 		}
 	}
 
 	; ── Add custom ───────────────────────────────────────────────────────────
-	Sub.Add()
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_add_custom"), (*) => _WS_MenuAddCustom())
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_add_custom"),
+		"action", (*) => _WS_MenuAddCustom()))
 
-	return Sub
+	return Rows
 }
 
 ; Toggle a built-in symbol and refresh the tray.
