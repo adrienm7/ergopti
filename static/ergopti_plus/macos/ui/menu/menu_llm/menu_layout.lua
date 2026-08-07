@@ -72,11 +72,26 @@ local FALLBACK_HEALTH_DOT = {
 	llm_navigation          = false,
 }
 
+--- Built-in fallback row ORDER — the order the two tables above cannot express.
+local FALLBACK_ROW_ORDER = {
+	"llm_backend",
+	"llm_model",
+	"llm_profile",
+	"llm_num_predictions",
+	"llm_trigger",
+	"llm_generation_settings",
+	"llm_display",
+	"llm_navigation",
+}
+
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil
 
 -- Map of row id -> health_dot (bool). nil until first load.
 local _dots = nil
+
+-- Ordered list of the row ids this driver renders. nil until first load.
+local _ids = nil
 
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
 --- restriction is visible everywhere.
@@ -99,12 +114,12 @@ end
 local function load_policy()
 	if _policy then return _policy end
 
-	local policy, dots = nil, nil
+	local policy, dots, ids = nil, nil, nil
 	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
 	if ok_menu and ManifestMenu and type(ManifestMenu.get_array) == "function" then
 		local rows = ManifestMenu.get_array(LLM_MENU_KEY)
 		if type(rows) == "table" then
-			policy, dots = {}, {}
+			policy, dots, ids = {}, {}, {}
 			for _, row in ipairs(rows) do
 				-- Only the rows this driver renders carry a greying policy: the
 				-- separator and Linux's two inline lists have no submenu to grey.
@@ -112,6 +127,7 @@ local function load_policy()
 					and row.type == "dynamic" and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
 					dots[row.id] = (row.health_dot == true)
+					ids[#ids + 1] = row.id
 				end
 			end
 		end
@@ -119,12 +135,15 @@ local function load_policy()
 
 	if not policy or next(policy) == nil then
 		Logger.warn(LOG, "menu_manifest.json 'llm_menu' unreadable/empty — using built-in fallback greying policy.")
-		policy, dots = {}, {}
+		policy, dots, ids = {}, {}, {}
 		for id, v in pairs(FALLBACK_GREYS_WHEN_OFF) do policy[id] = v end
 		for id, v in pairs(FALLBACK_HEALTH_DOT) do dots[id] = v end
+		-- Deliberately ordered, unlike the two tables above: this list decides
+		-- what the caller registers a handler for, and pairs() order is not.
+		ids = FALLBACK_ROW_ORDER
 	end
 
-	_policy, _dots = policy, dots
+	_policy, _dots, _ids = policy, dots, ids
 	return _policy
 end
 
@@ -142,6 +161,16 @@ function M.greys_when_off(id)
 	local v = p[id]
 	if v == nil then return true end
 	return v
+end
+
+--- The ids this driver's rows are declared with, in manifest order. The renderer
+--- places the rows; this is what the caller registers a handler for. Derived from
+--- the same read as the greying policy so the two can never disagree about which
+--- rows exist.
+--- @return table Ordered list of row ids.
+function M.row_ids()
+	load_policy()
+	return _ids
 end
 
 --- Whether the given row carries the backend-reachability dot (its ``health_dot``

@@ -190,9 +190,24 @@ const MEASURE = process.argv.includes('--measure');
 // metrics window for the same figures — and nothing described them, so no gate
 // could compare, reason about or find them. Declared with the reason attached,
 // which is what the manifest is for when a row really is driver-specific.
+//
+// macos 227 → 229, and this is the one direction the header above tells you not
+// to move. It is not two new hand-built rows: it is two rows that already
+// existed changing dialect. The IA menu's model and generation rows used to
+// reach the renderer as `list` provider rows (`label`/`items`), which this
+// predicate does not see; all eight of that menu's rows now reach it as
+// `dynamic` handler rows (`title`/`menu`), which it does.
+//
+// The trade was deliberate. Those two rows were the only ones the renderer
+// materialised, and their placement was the only thing shared — so macOS drew
+// the model row ninth while Windows drew it second, from one spec that claimed
+// to own the order. All eight rows are placed by the manifest now, in one
+// order, on both drivers. Two rows lost `list` materialisation; eight gained a
+// shared position. Whoever decomposes this menu further should win those two
+// back by making the rows themselves declarable, not by unpicking the order.
 const BASELINE = {
 	windows: 196,
-	macos: 227,
+	macos: 229,
 	linux: 75
 };
 
