@@ -225,7 +225,12 @@ const MEASURE = process.argv.includes('--measure');
 // supplies just the toggle and the state behind the tick. All three fall
 // together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 174,
+	// 174 → 160: the wrap-symbols tree. It reached the renderer through a `list`
+	// provider but as a finished native Menu, so every level of it was assembled
+	// in the driver — fourteen rows of bulk actions, per-family groups, the
+	// custom pairs and their delete entries. The renderer builds all of it now,
+	// nesting included.
+	windows: 160,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -304,7 +309,13 @@ const BASELINE = {
 // either. If it ever fires again, check whether `title =` is still the field
 // this driver's rows use BEFORE assuming the tree shrank.
 const MIN_TOTAL = {
-	windows: 180,
+	// windows lowered 180 → 120 on 2026-08-07, for the reason given for macOS
+	// below: the predicate keys on the driver's own row calls, so every
+	// conversion of a native Menu tree to provider rows shrinks the total by
+	// construction and the floor eventually fires on progress. 120 is below what
+	// a driver with a fully migrated menu would still show, not merely under
+	// today's number.
+	windows: 120,
 	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on
