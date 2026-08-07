@@ -217,20 +217,24 @@ function M.build(ctx)
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 
+		-- Provider data from here down: `label` / `action` / `items`, which the
+		-- renderer materialises. These rows used to be built in this driver's own
+		-- dialect and translated one by one on the way out, so the tree was still
+		-- assembled here and every row of it counted as built outside the renderer.
 		local modeSubmenu = {
 			{
-				title = i18n.get("menu.gestures.mode_single"),
+				label = i18n.get("menu.gestures.mode_single"),
 				checked = (currentMode == "x1") or nil,
-				fn = function()
+				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
 					ctx.save_prefs()
 					ctx.updateMenu()
 				end
 			},
 			{
-				title = i18n.get("menu.gestures.mode_incremental"),
+				label = i18n.get("menu.gestures.mode_incremental"),
 				checked = (currentMode == "incremental") or nil,
-				fn = function()
+				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
 					ctx.save_prefs()
 					ctx.updateMenu()
@@ -239,9 +243,9 @@ function M.build(ctx)
 		}
 
 		local sensSubmenu = {
-			{ title = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
-			{ title = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
-			{ title = "-" },
+			{ label = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
+			{ label = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
+			{ separator = true },
 		}
 		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
 		for _, s in ipairs(sensitivities) do
@@ -249,8 +253,9 @@ function M.build(ctx)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
 
 			table.insert(sensSubmenu, {
-				title = label,
-				checked = (currentSens == s) or nil,				fn = function()
+				label = label,
+				checked = (currentSens == s) or nil,
+				action = function()
 					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, s) end
 					ctx.save_prefs()
 					ctx.updateMenu()
@@ -263,8 +268,8 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local change_action_item = {
-			title = i18n.get("menu.gestures.change_action"),
-			fn    = (state.gestures and not paused) and function()
+			label  = i18n.get("menu.gestures.change_action"),
+			action = (state.gestures and not paused) and function()
 				hs.timer.doAfter(0.05, function() open_action_chooser(slot, names, current) end)
 			end or nil,
 			disabled = not state.gestures or paused or nil,
@@ -274,32 +279,23 @@ function M.build(ctx)
 		if slot:match("swipe") then
 			local swipeSubmenu = {
 				change_action_item,
-				{ title = "-" },
-				{ title = i18n.get("menu.gestures.mode_prefix") .. mode_display, menu = modeSubmenu },
-				{ title = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
+				{ separator = true },
+				{ label = i18n.get("menu.gestures.mode_prefix") .. mode_display, items = modeSubmenu },
+				{ label = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), items = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
 			}
 			return {
-				title    = slotLbl .. " : " .. actionLbl,
+				label    = slotLbl .. " : " .. actionLbl,
 				disabled = not state.gestures or paused or nil,
-				menu     = swipeSubmenu,
+				items    = swipeSubmenu,
 			}
 		end
 
 		-- Tap slots: only the action matters, open the chooser directly.
 		return {
-			title    = slotLbl .. " : " .. actionLbl,
+			label    = slotLbl .. " : " .. actionLbl,
 			disabled = not state.gestures or paused or nil,
-			menu     = { change_action_item },
+			items    = { change_action_item },
 		}
-	end
-
-	--- Generates a section of gesture items.
-	--- @param slots table List of slot identifiers.
-	--- @return table The section menu items.
-	local function section(slots)
-		local its = {}
-		for _, slot in ipairs(slots) do table.insert(its, slotItem(slot)) end
-		return its
 	end
 
 	-- Dynamic handlers — each appends its items to the list it receives.
@@ -354,7 +350,7 @@ function M.build(ctx)
 				and root.gesture_slots[tostring(finger_count)]) or {}
 			local rows = {}
 			for _, slot_id in ipairs(slots) do
-				rows[#rows + 1] = MenuUtils.as_provider_row(slotItem(slot_id))
+				rows[#rows + 1] = slotItem(slot_id)
 			end
 			return rows
 		end
