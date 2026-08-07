@@ -205,10 +205,16 @@ const MEASURE = process.argv.includes('--measure');
 // order, on both drivers. Two rows lost `list` materialisation; eight gained a
 // shared position. Whoever decomposes this menu further should win those two
 // back by making the rows themselves declarable, not by unpicking the order.
+//
+// linux 75 → 69: the seven selection operations — CapsWord, the three case
+// transforms, select word, select line, paste without formatting — reach the
+// renderer as provider data instead of being appended by the driver. They were
+// seven rows of a SHARED menu that no manifest described, so no gate could
+// compare them with what the other two drivers put in the same place.
 const BASELINE = {
 	windows: 196,
 	macos: 229,
-	linux: 75
+	linux: 69
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

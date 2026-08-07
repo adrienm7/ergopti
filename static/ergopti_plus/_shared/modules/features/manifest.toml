@@ -3220,6 +3220,37 @@ path = "shortcuts.wrap_text_if_selected"
 type = "list"
 id = "wrap_symbols_menu"
 
+# The selection operations this driver performs on the current X11 selection —
+# CapsWord, the three case transforms, select word, select line, paste without
+# formatting. Declared 2026-08-07; they were built by hand in
+# linux/ui/menu/menu_builder.lua and described nowhere, so no gate could see
+# seven rows of a shared menu.
+#
+# A `list` rather than seven `command` rows because the set is one block with one
+# provider behind it, and because a `list` is what carries the rows themselves
+# out of the driver.
+#
+# Restricted to linux, with the reason attached, because the same operations are
+# reached differently elsewhere: macOS binds them to ctrl chords and lists them
+# under `ctrl_shortcuts`, and Windows exposes its own combinations under
+# `modifier_combos`. Declaring one shared row would put a second copy of these
+# operations in two menus that already have them.
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_selection"
+platforms = ["linux"]
+reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
+
+[[menu.shortcuts_menu]]
+type = "list"
+id = "selection_operations"
+platforms = ["linux"]
+reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
+
+[[menu.shortcuts_menu]]
+type = "---"
+platforms = ["linux"]
+
 [[menu.shortcuts_menu]]
 type = "list"
 id = "keyboard_slots"

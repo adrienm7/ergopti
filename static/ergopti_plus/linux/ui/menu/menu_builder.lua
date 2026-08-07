@@ -1696,42 +1696,44 @@ local function _build_shortcuts(ctx)
 	}
 	items[#items + 1] = { title = "-" }
 
-	-- CapsWord toggle.
-	items[#items + 1] = {
-		title   = i18n_safe("sg_actions.caps_word"),
-		checked = caps_active,
-		fn = function()
-			sc.toggle_caps_word()
-			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
+	-- The seven operations this driver performs on the current selection. Held
+	-- for the `selection_operations` provider below rather than appended here:
+	-- they were seven rows of a SHARED menu that no manifest described, so no
+	-- gate could compare them with what the other two drivers offer, and the
+	-- renderer had nothing to place.
+	local selection_rows = {
+		{
+			label   = i18n_safe("sg_actions.caps_word"),
+			checked = caps_active,
+			action  = function()
+				sc.toggle_caps_word()
+				Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		},
+		{ separator = true },
 	}
-
-	-- Text transforms (operate on current X11 selection).
-	items[#items + 1] = { title = "-" }
 	for _, transform in ipairs({
 		{ key = "menu.shortcuts.to_uppercase", run = sc.transform_uppercase },
 		{ key = "menu.shortcuts.to_lowercase", run = sc.transform_lowercase },
 		{ key = "menu.shortcuts.to_titlecase", run = sc.transform_titlecase },
 	}) do
-		items[#items + 1] = { title = i18n_safe(transform.key), fn = function() transform.run() end }
+		selection_rows[#selection_rows + 1] = {
+			label  = i18n_safe(transform.key),
+			action = function() transform.run() end,
+		}
 	end
-
-	items[#items + 1] = { title = "-" }
-
-	-- Selection helpers.
-	items[#items + 1] = {
-		title = i18n_safe("menu.shortcuts.select_word"),
-		fn = function() sc.select_word() end,
-	}
-	items[#items + 1] = {
-		title = i18n_safe("sg_actions.select_line"),
-		fn = function() sc.select_line() end,
-	}
-	items[#items + 1] = {
-		title = i18n_safe("sg_actions.paste_plain"),
-		fn = function() sc.paste_plain() end,
-	}
+	selection_rows[#selection_rows + 1] = { separator = true }
+	for _, helper in ipairs({
+		{ key = "menu.shortcuts.select_word", run = sc.select_word },
+		{ key = "sg_actions.select_line",     run = sc.select_line },
+		{ key = "sg_actions.paste_plain",     run = sc.paste_plain },
+	}) do
+		selection_rows[#selection_rows + 1] = {
+			label  = i18n_safe(helper.key),
+			action = function() helper.run() end,
+		}
+	end
 
 	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
 	-- `pairs` would give the user a different order on every rebuild.
@@ -1821,6 +1823,10 @@ local function _build_shortcuts(ctx)
 	-- `list` row now, in the same position on all three drivers.
 	providers["wrap_symbols_menu"] = function()
 		return { { label = i18n_safe("menu.shortcuts.wrap_symbols"), items = wrap_items } }
+	end
+
+	providers["selection_operations"] = function()
+		return selection_rows
 	end
 
 	local manifest_rows = ManifestMenu
