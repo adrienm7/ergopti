@@ -3493,15 +3493,23 @@ reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
+# `check` since 2026-08-07: a checkbox whose label, tick and greying are all in
+# the declaration, so this driver supplies only the toggle and the state behind
+# the tick. It was `dynamic`, which hands the id back and had the driver build a
+# checkbox the renderer already knows how to draw.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "wpm_menubar"
+i18n = "menu.metrics.show_wpm_menubar"
+checked_when = ["metrics_menubar_wpm"]
 platforms = ["hs"]
 disabled_when = ["keylogger_enabled"]
 reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "menubar_colors"
+i18n = "menu.metrics.colors_by_source"
+checked_when = ["metrics_menubar_colors"]
 platforms = ["hs"]
 disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
 reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"

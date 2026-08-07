@@ -143,6 +143,10 @@ function M.build(ctx)
 		metrics_filter_private = function() return state.keylogger_private_filter_enabled end,
 		metrics_filter_secure  = function() return state.keylogger_secure_filter_enabled end,
 		metrics_filter_sysauth = function() return state.keylogger_system_auth_filter_enabled end,
+		-- The two menubar rows became `check` on 2026-08-07: the renderer reads
+		-- the tick through these instead of the handler setting it.
+		metrics_menubar_wpm    = function() return state.keylogger_menubar_wpm end,
+		metrics_menubar_colors = function() return state.keylogger_menubar_colors end,
 	}
 
 	local function dyn_show_typing(items, _ctx)
@@ -322,40 +326,34 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_wpm_menubar(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.show_wpm_menubar"),
-			checked  = state.keylogger_menubar_wpm,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_menubar", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
-				save_prefs()
-				local WpmMenubar = require("ui.wpm.wpm_menubar")
-				if type(WpmMenubar.set_use_source_colors) == "function" then
-					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
-				end
-				if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() else WpmMenubar.stop() end
-				updateMenu()
-			end,
-		})
+	-- `check` rows since 2026-08-07: the label, the tick and the greying are the
+	-- manifest's, so these supply only what the click does.
+	local function cmd_wpm_menubar()
+		state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
+		save_prefs()
+		local WpmMenubar = require("ui.wpm.wpm_menubar")
+		if type(WpmMenubar.set_use_source_colors) == "function" then
+			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+		end
+		if state.keylogger_menubar_wpm and not paused_now() then
+			WpmMenubar.start()
+		else
+			WpmMenubar.stop()
+		end
+		updateMenu()
 	end
 
-	local function dyn_menubar_colors(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.colors_by_source"),
-			checked  = state.keylogger_menubar_colors,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "menubar_colors", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_menubar_colors = not state.keylogger_menubar_colors
-				save_prefs()
-				local WpmMenubar = require("ui.wpm.wpm_menubar")
-				if type(WpmMenubar.set_use_source_colors) == "function" then
-					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
-				end
-				if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() end
-				updateMenu()
-			end,
-		})
+	local function cmd_menubar_colors()
+		state.keylogger_menubar_colors = not state.keylogger_menubar_colors
+		save_prefs()
+		local WpmMenubar = require("ui.wpm.wpm_menubar")
+		if type(WpmMenubar.set_use_source_colors) == "function" then
+			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+		end
+		-- Only restart when the readout is actually shown: colouring a menubar
+		-- item that is not there would start it as a side effect.
+		if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() end
+		updateMenu()
 	end
 
 	local function dyn_wpm_widget(items, _ctx)
@@ -475,8 +473,6 @@ function M.build(ctx)
 		show_apps        = dyn_show_apps,
 		shortcut_apps    = dyn_shortcut_apps,
 		exclude_apps     = dyn_exclude_apps,
-		wpm_menubar      = dyn_wpm_menubar,
-		menubar_colors   = dyn_menubar_colors,
 		wpm_widget       = dyn_wpm_widget,
 		widget_colors    = dyn_widget_colors,
 		include_realtime = dyn_include_realtime,
@@ -493,6 +489,8 @@ function M.build(ctx)
 		["filter_private"] = cmd_filter_private,
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
+		["wpm_menubar"]    = cmd_wpm_menubar,
+		["menubar_colors"] = cmd_menubar_colors,
 	}
 
 	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx)

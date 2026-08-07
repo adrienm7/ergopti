@@ -114,8 +114,17 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			if type(e) == "table" and e.id == "menubar_colors" then entry = e end
 		end
 		helpers.assert_true(entry ~= nil, "metrics_menu must declare a menubar_colors item")
-		helpers.assert_eq(entry.type, "dynamic",
-			"menubar_colors must be type=dynamic — type=feature is silently skipped by M.build (MG-2)")
+		-- The failure this guards is a type the renderer SKIPS: `feature` rows are
+		-- left to the caller, so declaring one here made the row vanish with
+		-- nothing to say so (MG-2). It was `dynamic` until 2026-08-07 and is
+		-- `check` now — the renderer builds the checkbox from the declaration
+		-- instead of the driver building one it already knows how to draw. Both
+		-- are rendered; `feature` and `toggle` are not.
+		local RENDERED_TYPES = { dynamic = true, check = true, command = true, list = true, action = true }
+		helpers.assert_true(RENDERED_TYPES[entry.type] == true,
+			"menubar_colors is type=" .. tostring(entry.type) .. ", which the renderer does not " ..
+			"materialise — `feature` and `toggle` are left to the caller, so the row disappears " ..
+			"with nothing reporting it (MG-2)")
 		helpers.assert_true(entry.depends_on == nil,
 			"menubar_colors must no longer carry the dead depends_on key — superseded by disabled_when")
 	end)
