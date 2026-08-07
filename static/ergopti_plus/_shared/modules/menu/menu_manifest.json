@@ -1059,7 +1059,7 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "magic_key_config"
 		},
 		{

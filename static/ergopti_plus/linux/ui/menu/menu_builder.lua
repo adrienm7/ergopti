@@ -708,15 +708,16 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			return { { label = i18n_safe("menu.hotstrings.word_expanders"), items = sub } }
 		end,
-		["magic_key_config"] = function(items)
+		["magic_key_config"] = function()
+			local rows = {}
 			-- The row the manifest restricted to Windows and macOS until 2026-08-04,
 			-- with a translated reason saying Linux had no way to change the key. That
 			-- was true and is the reason it is written here rather than the reason to
 			-- keep the row hidden: a declared gap closes by writing the feature.
 			local current = MagicKey.get()
-			items[#items + 1] = {
-				title = i18n_safe("menu.hotstrings.magic_key") .. " : " .. current,
-				fn    = function()
+			rows[#rows + 1] = {
+				label  = i18n_safe("menu.hotstrings.magic_key") .. " : " .. current,
+				action = function()
 					local chosen = prompt_text(
 						i18n_safe("dialog.magic_key.title"),
 						i18n_safe("dialog.magic_key.prompt"),
@@ -735,14 +736,15 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 			}
 			if MagicKey.is_customised() then
-				items[#items + 1] = {
-					title = "    " .. i18n_safe("menu.hotstrings.magic_key_reset"),
-					fn    = function()
+				rows[#rows + 1] = {
+					label  = "    " .. i18n_safe("menu.hotstrings.magic_key_reset"),
+					action = function()
 						MagicKey.reset()
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				}
 			end
+			return rows
 		end,
 		["delays_colors"] = function(items)
 			-- A submenu, not the single row this used to be. The old row opened the
@@ -1053,6 +1055,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	-- data the provider returns rather than this driver assembling the menu.
 	local params_providers = {
 		["word_expanders"] = params_handlers["word_expanders"],
+		["magic_key_config"] = params_handlers["magic_key_config"],
 		-- The four toggles the manifest has declared for this driver all along and
 		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
 		-- path while its set_enabled() had no caller, so they were fixed at their
@@ -1082,6 +1085,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 	params_handlers["word_expanders"] = nil
+	params_handlers["magic_key_config"] = nil
 
 	local group_builders = {
 		["hotstrings_params"] = function(c)

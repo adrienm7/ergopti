@@ -503,7 +503,6 @@ function M.build_management(ctx)
 	local rows = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
 
 		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
-		["magic_key_config"] = function(items) items[#items + 1] = magic_key_item end,
 	}, nil, params_ctx, {
 		-- word_expanders is `type = "list"` in the manifest now, so the shared
 		-- renderer materialises every row of the submenu from this data instead of
@@ -520,6 +519,12 @@ function M.build_management(ctx)
 		["preview_bubbles"] = function()
 			if not bubble_item then return {} end
 			return { MenuUtils.as_provider_row(bubble_item) }
+		end,
+		-- `list` since 2026-08-07, with the same reasoning: the magic-key row and
+		-- its reset were built three times from a declaration that named the slot.
+		["magic_key_config"] = function()
+			if not magic_key_item then return {} end
+			return { MenuUtils.as_provider_row(magic_key_item) }
 		end,
 	})
 

@@ -69,8 +69,14 @@ _HS_InvalidateCaches() {
 }
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
-_HS_MagicKeyConfig(M, _Cat) {
-	RegisterMenuItem(M, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+; List provider: the magic-key row. `type = "list"` since 2026-08-07, so this
+; returns row DATA and the renderer builds the item — the row was built three
+; times before that, once per driver, from a declaration that named only the slot.
+_HS_MagicKeyRows() {
+	return [Map(
+		"label",  t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"],
+		"action", MagicKeyEditor
+	)]
 }
 
 ; Dynamic handler: whole-tree bulk actions (force every hotstring section on/off).
