@@ -184,6 +184,18 @@ local function _build_header(ctx)
 	return { title = "Ergopti — v" .. v, fn = function() end, disabled = true }
 end
 
+--- Whether a manifest row is visible on this driver. A row with no ``platforms``
+--- restriction is visible everywhere.
+--- @param row table Manifest row.
+--- @return boolean
+local function _row_is_for_linux(row)
+	if type(row.platforms) ~= "table" then return true end
+	for _, p in ipairs(row.platforms) do
+		if p == "linux" then return true end
+	end
+	return false
+end
+
 --- Builds the layout selection submenu.
 local function _build_layouts(ctx)
 	local current = ctx.layout or "qwerty"
@@ -2698,37 +2710,80 @@ function M.build(ctx)
 	local ctx = type(ctx) == "table" and ctx or {}
 	local items = {}
 
-	-- Header (non-interactive).
+	-- Header (non-interactive). Not a manifest row: it is this driver's version
+	-- string, which no declaration can carry.
 	items[#items + 1] = _build_header(ctx)
 
-	-- ── Feature sections (mirroring macOS order) ──
-	items[#items + 1] = { title = "-" }
+	-- Every entry below, and the separators between them, in the order the
+	-- manifest declares — read rather than repeated here.
+	--
+	-- The order used to be written out in this function, and it had already
+	-- drifted: this driver put the debug submenu between "reload" and "quit"
+	-- while `top_level` declares it last, and nothing could see the difference
+	-- because the sequence existed only as a list of calls. Windows has read this
+	-- same array through its own loader all along.
+	local builders = {
+		["keyboard_layout"] = _build_layouts,
+		["hotstrings"]      = _build_hotstrings,
+		["llm"]             = _build_llm,
+		["metrics"]         = _build_metrics,
+		["shortcuts"]       = _build_shortcuts,
+		["kanata"]          = _build_kanata,
+		["gestures"]        = _build_gestures,
+		["apps"]            = _build_apps,
+		["updates"]         = _build_updates,
+		["global_actions"]  = _build_global_actions,
+		["language"]        = _build_language,
+		["config_folder"]   = _build_config_folder,
+		["setup_wizard"]    = _build_setup_wizard,
+		["about"]           = _build_about,
+		["reload"]          = _build_reload,
+		["quit"]            = _build_quit,
+		["debug"]           = _build_debug,
+	}
 
-	items[#items + 1] = _build_layouts(ctx)
-	items[#items + 1] = _build_hotstrings(ctx)
-	items[#items + 1] = _build_llm(ctx)
-	items[#items + 1] = _build_metrics(ctx)
-	items[#items + 1] = _build_shortcuts(ctx)
-	items[#items + 1] = _build_kanata(ctx)
-	items[#items + 1] = _build_gestures(ctx)
-	items[#items + 1] = _build_apps(ctx)
-	items[#items + 1] = _build_updates(ctx)
+	local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}
+	if #declared == 0 then
+		Logger.error(LOG, "The manifest declares no top-level row — the tray would be empty.")
+		return items
+	end
 
-	-- ── Separator before system-level actions ──
-	items[#items + 1] = { title = "-" }
+	-- Quit is held back and appended last, which is the ONE place this driver
+	-- departs from the declared order. Every other tray application on this
+	-- desktop puts it at the bottom (SNI/dbusmenu convention), and a user
+	-- reaching for the last entry expects Quit. The manifest still decides that
+	-- the row exists and what precedes it; only this one position is the
+	-- platform's, and tools/test/test-menu-top-level-parity.cjs records it as a
+	-- deliberate divergence rather than letting it pass unnoticed.
+	local quit_row = nil
 
-	items[#items + 1] = _build_global_actions(ctx)
-	items[#items + 1] = _build_language(ctx)
-	items[#items + 1] = _build_config_folder(ctx)
-	items[#items + 1] = _build_setup_wizard(ctx)
-	items[#items + 1] = _build_about(ctx)
-	items[#items + 1] = _build_reload(ctx)
+	for _, row in ipairs(declared) do
+		if type(row) == "table" then
+			local id = row.id
+			if id == "---" then
+				items[#items + 1] = { title = "-" }
+			elseif _row_is_for_linux(row) then
+				local build = builders[id]
+				if not build then
+					-- A declared row this driver has no builder for is a row the user
+					-- was promised and will not see. The bijection gate cannot catch it
+					-- here, because top_level rows carry no behaviour type.
+					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif id == "quit" then
+					quit_row = build(ctx)
+				else
+					items[#items + 1] = build(ctx)
+				end
+			end
+		end
+	end
 
-	items[#items + 1] = { title = "-" }
-	items[#items + 1] = _build_debug(ctx)
-
-	items[#items + 1] = { title = "-" }
-	items[#items + 1] = _build_quit(ctx)
+	if quit_row then
+		items[#items + 1] = { title = "-" }
+		items[#items + 1] = quit_row
+	else
+		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
+	end
 
 	return items
 end

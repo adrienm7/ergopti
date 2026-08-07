@@ -149,11 +149,19 @@ if (!buildBody) {
 	errors.push('could not find M.build(ctx) in the Linux menu builder — the parse below reads nothing');
 }
 
+// Read from the `builders` map that M.build dispatches through, not from a
+// sequence of calls. Until 2026-08-07 this driver appended one `_build_x(ctx)`
+// per entry in a fixed order, and that order had already drifted from the
+// manifest — the debug submenu sat between "reload" and "quit" while the
+// declaration puts it last. M.build reads the declared order now, so the ids it
+// can build are the keys of that map, and the ORDER is the manifest's by
+// construction rather than by comparison.
+const buildersBlock = (buildBody ? buildBody[1] : '').match(/local builders = \{([\s\S]*?)\n\t\}/);
 const linuxBuilt = [];
-for (const m of (buildBody ? buildBody[1] : '').matchAll(/_build_(\w+)\(ctx\)/g)) {
-	const name = m[1];
-	if (LINUX_NON_ROWS.has(name)) continue;
-	linuxBuilt.push(LINUX_BUILDER_ALIASES[name] || name);
+for (const m of (buildersBlock ? buildersBlock[1] : '').matchAll(/\["(\w+)"\]\s*=\s*_build_(\w+)/g)) {
+	const id = m[1];
+	if (LINUX_NON_ROWS.has(id)) continue;
+	linuxBuilt.push(LINUX_BUILDER_ALIASES[id] || id);
 }
 
 if (linuxBuilt.length < 10) {
@@ -195,8 +203,27 @@ if (undeclared.length > 0) {
 }
 
 // The order divergence is allowed but must stay declared.
+//
+// M.build follows the declared order and holds back exactly one row: Quit is
+// appended last, because every tray application on this desktop puts it there
+// (SNI/dbusmenu) and a user reaching for the bottom entry expects it. So the
+// order the tray shows is the declaration with that one rule applied, and this
+// is where the rule is modelled — reading it from the driver rather than
+// assuming it, so removing it there fails here instead of passing quietly.
+const HOLDS_QUIT_LAST = /quit_row = build\(ctx\)/.test(linuxSrc);
+if (!HOLDS_QUIT_LAST && KNOWN_ORDER_DIVERGENCES.linux) {
+	errors.push(
+		'a Linux order divergence is recorded, but menu_builder.lua no longer holds Quit back — ' +
+			'either it follows the declaration exactly now (remove the entry) or the rule was ' +
+			'renamed and this gate has stopped seeing it'
+	);
+}
+
 const declaredOrder = projections.linux.join(',');
-const builtOrder = linuxBuilt.join(',');
+const builtOrder = (HOLDS_QUIT_LAST
+	? [...linuxBuilt.filter((id) => id !== 'quit'), 'quit']
+	: linuxBuilt
+).join(',');
 if (declaredOrder === builtOrder && KNOWN_ORDER_DIVERGENCES.linux) {
 	errors.push(
 		'Linux now builds its top-level rows in exactly the manifest order, but an order divergence is ' +
