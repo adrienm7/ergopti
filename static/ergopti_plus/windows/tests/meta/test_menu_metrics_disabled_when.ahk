@@ -105,8 +105,18 @@ _MMDW_MenubarColorsLoadBearing() {
 	for Entry in _MMDW_LoadMetricsMenu() {
 		if !(Entry is Map) || !Entry.Has("id") || Entry["id"] != "menubar_colors"
 			continue
-		Assert(Entry["type"] == "dynamic",
-			"menubar_colors must be type=dynamic — type=feature is silently skipped by the macOS renderer (MG-2)")
+		; The failure this guards is a type the renderer SKIPS: a `feature` row is
+		; left to the caller, so declaring one made the item never render at all.
+		; It was `dynamic` until 2026-08-07 and is `check` now — the renderer
+		; builds the checkbox from the declaration rather than the driver building
+		; one it already knows how to draw. Both are rendered; `feature` and
+		; `toggle` are not, which is what this states instead of naming the single
+		; type that happened to satisfy it.
+		RenderedTypes := Map("dynamic", true, "check", true, "command", true, "list", true, "action", true)
+		Assert(RenderedTypes.Has(Entry["type"]),
+			"menubar_colors is type=" . Entry["type"] . ", which the renderer does not materialise — "
+			. "`feature` and `toggle` are left to the caller, so the row disappears with nothing "
+			. "reporting it (MG-2)")
 		Assert(!Entry.Has("depends_on"),
 			"menubar_colors must no longer carry the dead depends_on key — superseded by disabled_when")
 		Assert(Entry.Has("disabled_when"), "menubar_colors must declare disabled_when")
