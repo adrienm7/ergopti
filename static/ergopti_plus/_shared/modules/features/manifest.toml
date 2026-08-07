@@ -2997,13 +2997,22 @@ id = "updates_actions"
 platforms = ["linux"]
 
 [[menu.global_actions]]
+type = "command"
 id = "enable_all"
+i18n = "menu.global.enable_all"
 
 [[menu.global_actions]]
+type = "command"
 id = "disable_all"
+i18n = "menu.global.disable_all"
 
 [[menu.global_actions]]
+type = "---"
+
+[[menu.global_actions]]
+type = "command"
 id = "reset_defaults"
+i18n = "menu.global.reset_defaults"
 
 [[menu.debug_menu]]
 id = "window_spy"

@@ -181,10 +181,13 @@ const MEASURE = process.argv.includes('--measure');
 // rows directly now, and only the api-backend branch — which still builds a tree
 // of its own — is adapted. A conversion layer that covers everything is a layer
 // that never goes away.
+//
+// linux 84 → 81: the global-actions submenu, now three `command` rows and a
+// declared separator rather than four hand-written entries on each driver.
 const BASELINE = {
 	windows: 196,
 	macos: 227,
-	linux: 84
+	linux: 81
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
