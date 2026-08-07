@@ -782,39 +782,6 @@
 			]
 		},
 		{
-			"type": "command",
-			"id": "metrics_session_stats",
-			"i18n": "menu.metrics.session_stats",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.metrics_readouts_go_to_the_log_on_linux"
-		},
-		{
-			"type": "command",
-			"id": "metrics_current_wpm",
-			"i18n": "menu.metrics.current_wpm",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.metrics_readouts_go_to_the_log_on_linux"
-		},
-		{
-			"type": "command",
-			"id": "metrics_per_app_stats",
-			"i18n": "menu.metrics.per_app_stats",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.metrics_readouts_go_to_the_log_on_linux"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
-		},
-		{
 			"type": "check",
 			"id": "metrics_suspend",
 			"i18n": "menu.global.suspend",
@@ -824,7 +791,7 @@
 			"platforms": [
 				"linux"
 			],
-			"reason_key": "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+			"reason_key": "platform_reason.metrics_collection_is_in_process_on_linux"
 		},
 		{
 			"type": "command",
@@ -833,7 +800,7 @@
 			"platforms": [
 				"linux"
 			],
-			"reason_key": "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+			"reason_key": "platform_reason.metrics_collection_is_in_process_on_linux"
 		}
 	],
 	"layout_menu": [
