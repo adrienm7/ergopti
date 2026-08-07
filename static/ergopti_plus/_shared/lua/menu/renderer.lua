@@ -50,10 +50,19 @@ local LOG = "menu.renderer"
 
 -- How deep a list provider's rows may nest. A provider returning a table that
 -- contains itself would recurse until the stack gave out, taking the whole menu
--- with it; three levels is deeper than any menu the drivers draw. Kept equal to
--- windows/infra/manifest_menu.ahk's MR_MAX_LIST_DEPTH so a list that renders on
--- one driver cannot be silently truncated on another.
-local MAX_LIST_DEPTH = 3
+-- with it, so this is a runaway-recursion guard — NOT a statement about how deep
+-- a menu may legitimately be. Kept equal to windows/infra/manifest_menu.ahk's
+-- MR_MAX_LIST_DEPTH so a list that renders on one driver cannot be silently
+-- truncated on another.
+--
+-- Raised 3 → 8 on 2026-08-07. Three was documented as "deeper than any menu the
+-- drivers draw" and that was already false: the personal-extensions tree follows
+-- a folder the USER writes, so its depth is theirs to choose, and a single level
+-- of subfolder already reaches four — the personal row, the tree, a folder, its
+-- files. A cap sized for a hand-declared menu cannot bound a filesystem. Eight
+-- allows six levels of user nesting while staying far from any stack risk, and
+-- the scanner feeding it stops at sixteen regardless.
+local MAX_LIST_DEPTH = 8
 
 -- The master categories a driver falls back to when the manifest cannot be read
 -- at all. Declared here rather than inline so the two readers below cannot
@@ -268,6 +277,40 @@ function M.new(deps)
 		return true, result
 	end
 
+	--- Reports a row written in the DRIVER dialect, field by field.
+	---
+	--- `title`, `fn` and `menu` are what hs.menubar consumes; a provider hands over
+	--- `label`, `action` and `items`. The two shapes are deliberately different, and
+	--- the cost of writing the wrong one used to be paid in silence: a `title` is
+	--- not a label, so the row was dropped with a generic warning, and a `menu` was
+	--- simply never read, so the row appeared with its whole subtree missing and
+	--- nothing at all was logged.
+	---
+	--- Both happened, three times, in the days this menu moved onto the renderer —
+	--- the About submenu lost its version row and its channel picker, every macOS
+	--- hotstring category lost its sections, and the extension tree lost every file
+	--- row AND threw while sorting rows that no longer had the field it sorted on.
+	--- Each was invisible until someone opened the menu and looked. So drift now
+	--- names the field it found and the row it found it on.
+	--- @param row table The offending row.
+	--- @param list_id string The provider's id.
+	local function report_driver_dialect(row, list_id)
+		local named = tostring(row.label or row.title or "?")
+		if row.title ~= nil and row.label == nil then
+			Logger.error(LOG, "List '%s' row '%s' uses `title` — a provider row says `label`, so this row is dropped.",
+				tostring(list_id), named)
+		end
+		if row.menu ~= nil and row.items == nil and row.submenu == nil then
+			Logger.error(LOG, "List '%s' row '%s' hangs its subtree on `menu` — a provider row says `items` (or "
+				.. "`submenu` for a tree already built), so the row renders with nothing under it.",
+				tostring(list_id), named)
+		end
+		if row.fn ~= nil and row.action == nil then
+			Logger.error(LOG, "List '%s' row '%s' carries `fn` — a provider row says `action`, so the row does "
+				.. "nothing when clicked.", tostring(list_id), named)
+		end
+	end
+
 	--- Turns a list provider's row DATA into menu item tables.
 	---
 	--- This is the only place a provider's rows become menu rows, which is the
@@ -293,8 +336,10 @@ function M.new(deps)
 			elseif row.separator then
 				out[#out + 1] = { title = "-" }
 			elseif type(row.label) ~= "string" or row.label == "" then
+				report_driver_dialect(row, list_id)
 				Logger.warn(LOG, "List '%s' produced a row with no label — skipped.", tostring(list_id))
 			else
+				report_driver_dialect(row, list_id)
 				local entry = { title = row.label, disabled = row.disabled or nil }
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
 				if type(row.items) == "table" then
