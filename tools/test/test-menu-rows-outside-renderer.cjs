@@ -341,7 +341,13 @@ const BASELINE = {
 	// driver has to name: the same incompressible "one wrapper per entry" this
 	// file already carries for the other twelve. One row moved into the renderer
 	// and one wrapper appeared to hold it.
-	linux: 50
+	// 50 → 15: every top-level builder returns row DATA. Each ended with the same
+	// three fields — the row that hangs its submenu on the tray — written by hand
+	// once per submenu, twenty times over, and M.build renders the whole tray
+	// root now. The trees below them are handed over as `submenu` rather than
+	// re-described: the renderer caps nested rows at three levels and the
+	// hotstrings tree is already deeper.
+	linux: 15
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
@@ -394,7 +400,13 @@ const MIN_TOTAL = {
 	// every successful migration shrinks the total by construction and the floor
 	// eventually fires on progress. 30 is below what a driver with a fully
 	// migrated menu would still show, not merely under today's number.
-	linux: 30
+	// linux lowered 30 → 8 on 2026-08-07, same reason a fourth time: every
+	// top-level builder returns row data now, so the twenty parent rows that
+	// hung each submenu on the tray stopped using `title =` at once and the
+	// total fell to 15. 8 is under what a Linux driver whose menu is fully
+	// migrated would still show — the dialog titles the predicate counts because
+	// it cannot tell them from a row
+	linux: 8
 };
 
 const DRIVER_SPEC = {
