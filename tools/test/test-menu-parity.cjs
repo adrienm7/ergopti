@@ -437,8 +437,22 @@ for (const menuKey of MENU_KEYS) {
 //   37 → 36 on 2026-08-06 when wrap_symbols_menu stopped claiming to be
 //        Windows-only. macOS and Linux had both been drawing the picker the
 //        whole time, in a different position each; it is one shared row now.
-const UNREASONED_BASELINE = 36;
+// 36 → 0 on 2026-08-07. Every row narrower than the menu it sits in now says
+// why, in twenty-one languages, and two of the thirty-six turned out not to need
+// a reason at all: the metrics and gestures category toggles were restricted to
+// platforms that were not the only ones drawing them — Windows builds both, from
+// these very keys — so the honest fix was to widen the declaration rather than
+// to explain a divergence that did not exist.
+//
+// This is now a HARD ZERO, not a ratchet with room in it. A new row hidden from
+// a platform its menu is visible on fails this gate until it states its reason;
+// the user of that driver can otherwise not tell "not supported here" from
+// "forgotten".
+const UNREASONED_BASELINE = 0;
 
+if (process.argv.includes('--list-unreasoned')) {
+	for (const u of unreasoned) console.log('  ' + u);
+}
 if (unreasoned.length > UNREASONED_BASELINE) {
 	errors.push(
 		`${unreasoned.length} row(s) are hidden from a platform their menu is visible on, with no ` +
