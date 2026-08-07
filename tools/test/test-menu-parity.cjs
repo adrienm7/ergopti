@@ -543,7 +543,12 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // builder while the decoder already owned the list.
 // hs 11 → 12, linux 13 → 14 on 2026-08-07: the About submenu, which the three
 // drivers assembled independently and none declared.
-const RENDERED_THROUGH_SHARED = { hs: 12, linux: 14 };
+// hs 12 → 13 on 2026-08-07: the debug submenu. It iterated the manifest's own
+// debug_menu array and then wrote the label for each id by hand, in a chain of
+// `elseif` — so the declaration decided the order and this driver decided
+// everything else. Linux has rendered it since 2026-08-06 and Windows since this
+// morning; macOS was the last of the three to still spell it out.
+const RENDERED_THROUGH_SHARED = { hs: 13, linux: 14 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

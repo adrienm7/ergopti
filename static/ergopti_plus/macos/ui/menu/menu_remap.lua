@@ -385,8 +385,11 @@ end
 local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local items = {}
 
-	items[#items + 1] = { title = i18n.section("menu.karabiner.header_taps_holds"), disabled = true }
-	items[#items + 1] = { title = i18n.section("menu.karabiner.left_hand"),         disabled = true }
+	-- `label`, not `title`: these three go into the `karabiner_tap_holds` provider
+	-- array, and a row the renderer finds no label on is dropped — so all three
+	-- headers were missing and the two hands ran together in one undivided list.
+	items[#items + 1] = { label = i18n.section("menu.karabiner.header_taps_holds"), disabled = true }
+	items[#items + 1] = { label = i18n.section("menu.karabiner.left_hand"),         disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -394,7 +397,7 @@ local function build_tap_hold_items(karabiner, action_index, update_menu, enable
 		end
 	end
 
-	items[#items + 1] = { title = i18n.section("menu.karabiner.right_hand"), disabled = true }
+	items[#items + 1] = { label = i18n.section("menu.karabiner.right_hand"), disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if not LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(

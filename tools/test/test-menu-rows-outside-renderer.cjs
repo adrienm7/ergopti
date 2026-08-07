@@ -347,7 +347,13 @@ const BASELINE = {
 	// compared two nils, which threw as soon as one folder held two files. A bug
 	// fix, not a migration; the count moves because the rows finally speak the
 	// dialect they are read in. Same day, same shape, third occurrence.
-	macos: 49,
+	// 49 → 42: the debug submenu moved onto the renderer, and three blocks stopped
+	// speaking the driver's dialect inside a provider — the Karabiner tap/hold
+	// headers, the grouped action picker and the mod-combo category headers. The
+	// last three were BUGS, not merely bypasses: every grouped action and every
+	// header was dropped by the renderer, so the tap and hold pickers showed their
+	// two ungrouped « Spécial » entries and nothing else.
+	macos: 42,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -438,7 +444,14 @@ const MIN_TOTAL = {
 	// driver whose menu is fully migrated would still show — the renderer's own
 	// rows, the pickers other subsystems own, and the dialog titles the predicate
 	// counts because it cannot tell them from a row.
-	macos: 60,
+	// macos lowered 60 → 35 on 2026-08-07, fourth time and the same reason: the
+	// predicate keys on `title =`, so every builder that starts emitting provider
+	// data shrinks the total by construction and the floor fires on progress. The
+	// debug submenu and the Karabiner pickers took it to 54, six under the floor.
+	// 35 is under what a macOS driver whose menu is fully migrated would still
+	// show — the submenu wrappers and the dialog titles the predicate counts
+	// because it cannot tell them from a row.
+	macos: 35,
 	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
 	// for the reason given for macOS above: the predicate keys on `title =`, so
 	// every successful migration shrinks the total by construction and the floor
