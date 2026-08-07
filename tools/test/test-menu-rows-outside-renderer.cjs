@@ -286,11 +286,16 @@ const BASELINE = {
 	// stopped reading under two different names on the three drivers.
 	// 117 → 116, windows 175 → 174: the WPM-position reset. Its two neighbours
 	// stay `dynamic` because they mutate the live menu; this one sets nothing.
+	// 108 → 82: the rest of the IA menu's contents — the API entries and their
+	// model picker, the display panel, the backend switcher, the temperature
+	// rows, and the generation, navigation and prediction-count submenus. The
+	// PARENT rows stay the driver's: their labels carry a health dot, a model
+	// name, a count. What hung off them never needed to.
 	// 116 → 108: the IA trigger panel, the macOS twin of the Windows submenu
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 108,
+	macos: 82,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and

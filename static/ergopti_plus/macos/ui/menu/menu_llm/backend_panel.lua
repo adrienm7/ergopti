@@ -16,6 +16,7 @@ local M = {}
 
 local llm_mod  = require("modules.llm")
 local i18n     = require("infra.i18n")
+local ManifestMenu  = require("infra.manifest_menu")
 local Logger   = require("infra.logger")
 
 local LOG = "backend_panel"
@@ -92,18 +93,18 @@ function M.build(ctx)
 	elseif state.llm_backend == "api" then   backend_title_str = backend_title_str .. "API 🌐"
 	else                                     backend_title_str = backend_title_str .. i18n.get("menu.llm.backend_unknown") end
 
-	local backend_menu = {}
+	local rows = {}
 
 
 	-- =====================================================
 	-- ===== 1.1) MLX entry =====
 	-- =====================================================
 
-	table.insert(backend_menu, {
-		title    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
+	table.insert(rows, {
+		label    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
 		checked  = (state.llm_backend == "mlx"),
 		disabled = (not is_apple_silicon()) or paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			if state.llm_backend ~= "mlx" then
 				Logger.info(LOG, "Activating MLX backend…")
 				state.llm_backend = "mlx"
@@ -145,11 +146,11 @@ function M.build(ctx)
 	-- ===== 1.2) Ollama entry =====
 	-- =====================================================
 
-	table.insert(backend_menu, {
-		title    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
+	table.insert(rows, {
+		label    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
 		checked  = (state.llm_backend == "ollama"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			if state.llm_backend ~= "ollama" then
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				state.llm_backend = "ollama"
@@ -193,11 +194,11 @@ function M.build(ctx)
 	-- The actual entry CRUD (provider, URL, token, model) lives in api_panel.lua.
 	-- This entry only flips the backend so the prediction engine routes through
 	-- ApiRemote on the next request.
-	table.insert(backend_menu, {
-		title    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
+	table.insert(rows, {
+		label    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
 		checked  = (state.llm_backend == "api"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			if state.llm_backend ~= "api" then
 				Logger.info(LOG, "Activating remote API backend…")
 				state.llm_backend = "api"
@@ -223,7 +224,7 @@ function M.build(ctx)
 		end or nil
 	})
 
-	return backend_title_str, backend_menu
+	return backend_title_str, ManifestMenu.render_rows(rows, "llm_backend")
 end
 
 return M
