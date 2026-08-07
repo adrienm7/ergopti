@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Pas sous Linux : cette ligne ouvre le fichier de raccourcis personnels. macOS et Windows en ont un ; les raccourcis du pilote Linux sont des bascules et des transformations de la sélection, sans aucun fichier à éditer.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux uniquement : ce pilote inscrit ses métriques dans son propre journal plutôt que dans une fenêtre. macOS et Windows ouvrent une fenêtre de métriques pour les mêmes chiffres, la ligne ferait donc doublon avec ce que cette fenêtre affiche déjà.",
 	"platform_reason.libinput_reader_is_linux_only": "Lecture libinput — propre à Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Pas sous Linux : ces lignes règlent le moteur d'inférence, le profil, le déclencheur et la façon dont les prédictions s'affichent et se parcourent. Le pilote Linux dialogue avec un seul moteur local et n'offre aucune de ces surfaces ; chaque ligne ouvrirait donc un sous-menu vide.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Linux uniquement : ce pilote liste les modèles et les deux réglages de génération directement dans le menu. macOS et Windows placent les mêmes choix derrière une ligne de sous-menu, que leurs propres lignes ci-dessus déclarent.",
 	"metrics_apps.chart_time_series": "Temps",
 	"metrics_apps.edit_category_hint": "Modifier la catégorie",
 	"menu.llm.generation.temperature": "Température",

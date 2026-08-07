@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "不适用于 Linux：此行用于打开个人快捷键文件。macOS 和 Windows 各有一个；Linux 驱动的快捷键是开关和选区转换，磁盘上没有可编辑的文件。",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "仅限 Linux：该驱动把度量写入自己的日志，而不是显示在窗口中。macOS 和 Windows 会为同样的数据打开度量窗口，因此该项只会重复该窗口已经显示的内容。",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 读取 — 仅限 Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Linux 上没有：这些项设置推理后端、配置档、触发方式，以及预测的显示与浏览方式。Linux 驱动只与一个本地后端通信，不提供其中任何界面，因此每一项都只会打开空的子菜单。",
+	"platform_reason.llm_lists_are_inline_on_linux": "仅限 Linux：该驱动把模型和两项生成设置直接列在菜单里。macOS 和 Windows 把同样的选择放在一个子菜单项之下，由上面各自的项声明。",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别",
 	"menu.llm.generation.temperature": "温度",

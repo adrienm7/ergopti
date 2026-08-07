@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: рядок відкриває файл особистих скорочень. У macOS і Windows він є; скорочення драйвера Linux — це перемикачі та перетворення виділення, редагувати нічого.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Лише Linux: цей драйвер записує свої метрики до власного журналу, а не у вікно. macOS і Windows відкривають для тих самих чисел вікно метрик, тож рядок лише дублював би те, що це вікно вже показує.",
 	"platform_reason.libinput_reader_is_linux_only": "Читання libinput — лише в Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Не в Linux: ці рядки налаштовують рушій інференсу, профіль, тригер і те, як передбачення показуються та переглядаються. Драйвер Linux працює з одним локальним рушієм і не пропонує жодної з цих поверхонь, тож кожен рядок відкривав би порожнє підменю.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Лише Linux: цей драйвер перелічує моделі та два параметри генерації просто в меню. macOS і Windows кладуть ті самі варіанти за рядком підменю, який оголошують їхні власні рядки вище.",
 	"metrics_apps.chart_time_series": "Час",
 	"metrics_apps.edit_category_hint": "Змінити категорію",
 	"menu.llm.generation.temperature": "Температура",

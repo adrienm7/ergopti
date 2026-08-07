@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Niet op Linux: deze rij opent het bestand met persoonlijke sneltoetsen. macOS en Windows hebben er elk een; de sneltoetsen van de Linux-driver zijn schakelaars en selectiebewerkingen, zonder bestand om te bewerken.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Alleen Linux: deze driver schrijft zijn metingen naar zijn eigen log in plaats van naar een venster. macOS en Windows openen voor dezelfde cijfers een metingenvenster, dus de rij zou herhalen wat dat venster al toont.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-lezen — alleen op Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Niet op Linux: deze rijen stellen de inferentie-backend, het profiel, de trigger en de weergave en navigatie van voorspellingen in. De Linux-driver praat met één lokale backend en biedt geen van die schermen, dus elke rij zou een leeg submenu openen.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Alleen Linux: deze driver toont de modellen en de twee generatie-instellingen rechtstreeks in het menu. macOS en Windows zetten dezelfde keuzes achter een submenurij, die hun eigen rijen hierboven declareren.",
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",

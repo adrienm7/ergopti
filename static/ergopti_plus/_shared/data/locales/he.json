@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux בלבד: מנהל ההתקן הזה רושם את המדדים שלו ביומן שלו במקום בחלון. macOS ו-Windows פותחים חלון מדדים עבור אותם נתונים, ולכן השורה הזו רק תשכפל את מה שהחלון כבר מציג.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "לא ב-Linux: שורות אלה מגדירות את מנוע ההסקה, את הפרופיל, את הטריגר ואת אופן ההצגה והניווט של התחזיות. מנהל ההתקן של Linux מדבר עם מנוע מקומי אחד ואינו מציע אף אחד מהמשטחים האלה, ולכן כל שורה הייתה פותחת תפריט משנה ריק.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Linux בלבד: מנהל ההתקן הזה מציג את הדגמים ואת שתי הגדרות היצירה ישירות בתפריט. macOS ו-Windows מציבים את אותן האפשרויות מאחורי שורת תפריט משנה, שאותה מכריזות השורות שלהם למעלה.",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה",
 	"menu.llm.generation.temperature": "טמפרטורה",

@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Non su Linux: questa riga apre il file delle scorciatoie personali. macOS e Windows ne hanno uno; le scorciatoie del driver Linux sono interruttori e trasformazioni della selezione, senza alcun file da modificare.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Solo Linux: questo driver scrive le sue metriche nel proprio log anziché in una finestra. macOS e Windows aprono una finestra delle metriche con gli stessi dati, quindi la riga ripeterebbe ciò che quella finestra mostra già.",
 	"platform_reason.libinput_reader_is_linux_only": "Lettura libinput — solo su Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Non su Linux: queste righe configurano il backend di inferenza, il profilo, l'attivatore e il modo in cui le previsioni vengono mostrate e percorse. Il driver Linux parla con un solo backend locale e non offre nessuna di queste superfici, quindi ogni riga aprirebbe un sottomenu vuoto.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Solo Linux: questo driver elenca i modelli e le due impostazioni di generazione direttamente nel menu. macOS e Windows mettono le stesse scelte dietro una riga di sottomenu, dichiarata dalle loro righe qui sopra.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Modifica categoria",
 	"menu.llm.generation.temperature": "Temperatura",

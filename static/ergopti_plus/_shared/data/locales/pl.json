@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nie w Linuksie: ten wiersz otwiera plik skrótów osobistych. macOS i Windows taki plik mają; skróty sterownika linuksowego to przełączniki i przekształcenia zaznaczenia, bez pliku do edycji.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Tylko Linux: ten sterownik zapisuje swoje metryki do własnego dziennika zamiast do okna. macOS i Windows otwierają dla tych samych danych okno metryk, więc ten wiersz powtarzałby to, co okno już pokazuje.",
 	"platform_reason.libinput_reader_is_linux_only": "Odczyt libinput — tylko w systemie Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Nie w Linuksie: te wiersze konfigurują backend inferencji, profil, wyzwalacz oraz sposób wyświetlania i przeglądania predykcji. Sterownik linuksowy rozmawia z jednym lokalnym backendem i nie udostępnia żadnej z tych powierzchni, więc każdy wiersz otwierałby puste podmenu.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Tylko Linux: ten sterownik wypisuje modele i dwa ustawienia generowania wprost w menu. macOS i Windows umieszczają te same opcje za wierszem podmenu, deklarowanym przez ich własne wiersze powyżej.",
 	"metrics_apps.chart_time_series": "Czas",
 	"metrics_apps.edit_category_hint": "Edytuj kategorię",
 	"menu.llm.generation.temperature": "Temperatura",

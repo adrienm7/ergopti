@@ -103,7 +103,12 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // building that list in place.
 // hs 6 → 5: llm_models is answered — macOS places its model row through the
 // shared renderer now instead of inserting it in place.
-const BASELINE = { ahk: 1, hs: 5, linux: 0 };
+// ahk 1 → 0: `llm_models` and `llm_generation` were declared for every platform
+// while only Linux ever drew them, so Windows was promised two rows it has never
+// had. They say platforms = ["linux"] now, and the eight rows Windows DOES draw
+// are declared beside them — the IA menu's second shared description folded into
+// the manifest. Windows answers every row the manifest offers it.
+const BASELINE = { ahk: 0, hs: 5, linux: 0 };
 
 // The manifest types that name a behaviour the driver must register: `action`
 // and `dynamic` hand the id to a handler, `list` to a provider, `check` and
@@ -233,6 +238,18 @@ for (const { key, driver, ext } of PLATFORMS) {
 				'does nothing when clicked — and every manifest-reading gate still passes. ' +
 				`Wire it up, or drop the row. Do NOT raise the baseline.\n      unresolved: ${added.join(', ')}` +
 				`${unresolved.length > 6 ? `, +${unresolved.length - 6} more` : ''}`
+		);
+	}
+
+	// A ratchet that only stops the number rising lets a hard-won drop be given
+	// back for free: wire five rows today, unwire them next month, gate still
+	// green. Lowering the baseline is one line and it is the line that makes the
+	// gain permanent.
+	if (unresolved.length < BASELINE[key]) {
+		errors.push(
+			`${key}: only ${unresolved.length} unresolved row(s) remain, below the baseline of ` +
+				`${BASELINE[key]}. That is progress — lower BASELINE.${key} to ${unresolved.length} so it ` +
+				'cannot be silently given back.'
 		);
 	}
 }

@@ -253,15 +253,122 @@
 	],
 	"llm_menu": [
 		{
-			"type": "list",
-			"id": "llm_models"
+			"type": "dynamic",
+			"id": "llm_backend",
+			"i18n": "menu.llm.model_backend",
+			"disabled_when_off": false,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		},
 		{
-			"type": "---"
+			"type": "dynamic",
+			"id": "llm_model",
+			"i18n": "menu.llm.model_label",
+			"disabled_when_off": false,
+			"health_dot": true,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		},
 		{
 			"type": "list",
-			"id": "llm_generation"
+			"id": "llm_models",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.llm_lists_are_inline_on_linux"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_profile",
+			"i18n": "menu.profiles.profile_label_prefix",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_num_predictions",
+			"i18n": "menu.llm.num_predictions_label",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_trigger",
+			"i18n": "menu.llm.trigger_menu_title",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_generation_settings",
+			"i18n": "menu.llm.generation_menu_title",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+		},
+		{
+			"type": "list",
+			"id": "llm_generation",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.llm_lists_are_inline_on_linux"
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_display",
+			"i18n": "menu.llm.display_menu_title",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+		},
+		{
+			"type": "dynamic",
+			"id": "llm_navigation",
+			"i18n": "menu.llm.nav_menu_title",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		}
 	],
 	"updates_menu": [

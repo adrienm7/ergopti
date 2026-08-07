@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Not on Linux: this row opens the personal shortcuts file. macOS and Windows each have one; the Linux driver's shortcuts are toggles and selection transforms, with nothing on disk to edit.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux only: this driver reports its metrics into its own log rather than in a window. macOS and Windows open a metrics window for the same figures, so the row would duplicate what that window already shows.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput reading — Linux only",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Not on Linux: these rows configure the inference backend, the profile, the trigger and how predictions are displayed and navigated. The Linux driver talks to one local backend and offers none of those surfaces, so each row would open an empty submenu.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Linux only: this driver lists the models and the two generation settings straight in the menu. macOS and Windows put the same choices behind a submenu row, which their own rows above declare.",
 	"metrics_apps.chart_time_series": "Time",
 	"metrics_apps.edit_category_hint": "Edit category",
 	"menu.llm.generation.temperature": "Temperature",
