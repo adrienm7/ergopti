@@ -20,7 +20,6 @@ local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
-local MenuUtils      = require("ui.menu.menu_utils")
 local LOG               = "menu_hotstrings"
 
 
@@ -45,10 +44,10 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 	local paused = ctx.paused
 
 	return {
-		title    = label,
+		label    = label,
 		checked  = state[enabled_key] or nil,
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			state[enabled_key] = not state[enabled_key]
 			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
 				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
@@ -90,7 +89,7 @@ function M.build_management(ctx)
 		"set_preview_ai_enabled",
 		i18n.get("menu.hotstrings.notify_bubble_ai")))
 
-	table.insert(bubble_sub, { title = "-" })
+	table.insert(bubble_sub, { separator = true })
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_colored"),
@@ -98,7 +97,7 @@ function M.build_management(ctx)
 		"set_preview_colored_tooltips",
 		i18n.get("menu.hotstrings.notify_bubble_colored")))
 
-	bubble_item = { title = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, menu = bubble_sub }
+	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -288,7 +287,7 @@ function M.build_management(ctx)
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
-			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		-- Coerce + fail closed to default_val: state.expansion_delay (and per-key
 		-- delays) come straight from config.toml and can be a string (hand edit /
@@ -303,9 +302,9 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") is the surviving shared
 			-- key — its value already carries the leading space, so we don't add one.
-			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
+			label    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
@@ -344,7 +343,7 @@ function M.build_management(ctx)
 		local cur_val  = (type(resolved) == "table" and type(resolved.delay) == "number") and resolved.delay or nil
 		if type(cur_val) ~= "number" then
 			Logger.error(LOG, "make_category_delay_item(): no resolvable delay for category '%s'.", category)
-			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		local cur_ms     = math.floor(cur_val * 1000 + 0.5)
 		local has_over   = (type(resolved) == "table" and resolved.has_override) or false
@@ -353,9 +352,9 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") carries its own leading
 			-- space; show it while the user has set no override for this category.
-			title    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
+			label    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
@@ -400,9 +399,9 @@ function M.build_management(ctx)
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
 	table.insert(delay_menu, {
-		title    = i18n.get("menu.hotstrings.config_item"),
+		label    = i18n.get("menu.hotstrings.config_item"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
 			-- make_category_delay_item bakes the resolved delay and the
@@ -417,7 +416,7 @@ function M.build_management(ctx)
 			pcall(win.open)
 		end or nil,
 	})
-	table.insert(delay_menu, { title = "-" })
+	table.insert(delay_menu, { separator = true })
 	if def_delays then
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_autocompletion"), "dynamichotstrings", def_delays.dynamichotstrings, false))
@@ -430,19 +429,19 @@ function M.build_management(ctx)
 	-- (also tunable in the config window). Surface them here too, mirroring the
 	-- AHK tray, so the most-used per-category delays are one click away.
 	if def_delays then
-		table.insert(delay_menu, { title = "-" })
+		table.insert(delay_menu, { separator = true })
 		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_magic_key"), "STAR_TRIGGER", "magickey"))
 		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_autocorrection"), "autocorrection", "autocorrection"))
 	end
 
-	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
+	delays_item = { label = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, items = delay_menu }
 
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
 	local magic_key_item = ({
-		title    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char")),
+		label    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char")),
 		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
+		action       = not hs_paused and function()
 			if not hs_state then return end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
@@ -517,18 +516,18 @@ function M.build_management(ctx)
 		-- it from the data now.
 		["preview_bubbles"] = function()
 			if not bubble_item then return {} end
-			return { MenuUtils.as_provider_row(bubble_item) }
+			return { bubble_item }
 		end,
 		-- `list` since 2026-08-07, with the same reasoning: the magic-key row and
 		-- its reset were built three times from a declaration that named the slot.
 		["magic_key_config"] = function()
 			if not magic_key_item then return {} end
-			return { MenuUtils.as_provider_row(magic_key_item) }
+			return { magic_key_item }
 		end,
 		-- `list` since 2026-08-07, the last row of this group to move.
 		["delays_colors"] = function()
 			if not delays_item then return {} end
-			return { MenuUtils.as_provider_row(delays_item) }
+			return { delays_item }
 		end,
 	})
 
