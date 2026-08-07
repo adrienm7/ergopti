@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux’ta yok: bu satır kişisel kısayol dosyasını açar. macOS ve Windows’ta böyle bir dosya vardır; Linux sürücüsünün kısayolları ise anahtarlar ve seçim dönüşümleridir, düzenlenecek bir dosya yoktur.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Yalnızca Linux: bu sürücü ölçümlerini bir pencere yerine kendi günlüğüne yazar. macOS ve Windows aynı sayılar için bir ölçüm penceresi açar; bu nedenle satır, o pencerenin zaten gösterdiğini yinelemiş olurdu.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput okuma — yalnızca Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Linux'ta yok: bu satırlar çıkarım arka ucunu, profili, tetikleyiciyi ve tahminlerin nasıl gösterilip gezileceğini ayarlar. Linux sürücüsü tek bir yerel arka uçla konuşur ve bu yüzeylerin hiçbirini sunmaz; bu nedenle her satır boş bir alt menü açardı.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Yalnızca Linux: bu sürücü modelleri ve iki üretim ayarını doğrudan menüde listeler. macOS ve Windows aynı seçenekleri bir alt menü satırının arkasına koyar; bunu yukarıdaki kendi satırları bildirir.",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",
 	"menu.llm.generation.temperature": "Sıcaklık",

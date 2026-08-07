@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux では利用不可：この行は個人用ショートカットのファイルを開きます。macOS と Windows にはそのファイルがありますが、Linux ドライバーのショートカットはトグルと選択テキストの変換で、編集すべきファイルは存在しません。",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux のみ：このドライバーは計測値をウィンドウではなく自身のログに記録します。macOS と Windows は同じ数値を計測ウィンドウで開くため、この項目はそのウィンドウがすでに表示している内容を重複させるだけになります。",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 読み取り — Linux のみ",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Linux では非対応：これらの項目は推論バックエンド、プロファイル、トリガー、そして予測の表示と移動方法を設定します。Linux ドライバーは単一のローカルバックエンドとだけ通信し、これらの設定面をいずれも持たないため、各項目は空のサブメニューを開くだけになります。",
+	"platform_reason.llm_lists_are_inline_on_linux": "Linux のみ：このドライバーはモデルと 2 つの生成設定をメニューに直接並べます。macOS と Windows は同じ選択肢をサブメニュー項目の下に置き、それは上のそれぞれの項目が宣言しています。",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",
 	"menu.llm.generation.temperature": "温度",

@@ -49,7 +49,7 @@ Test("menu_main: LLM_Menu_Build guards the deps probe so the toggle always rende
 ; computes _disabled from the enabled flag and resolves each row's flag against the
 ; spec's disabled_when_off policy (`_row["disabled_when_off"] ? _disabled : false`).
 ; The per-row policy itself (backend/model stay usable, the rest grey) lives in
-; _shared/modules/llm/menu_layout.json and is asserted by test_llm_menu_layout_shared.
+; the menu manifest's llm_menu key and is asserted by test_llm_menu_layout_shared.
 _LMDG_BuildGreysRowsWhenOff() {
 	Seg := _DriverFuncBody("LLM_Menu_Build")
 	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")

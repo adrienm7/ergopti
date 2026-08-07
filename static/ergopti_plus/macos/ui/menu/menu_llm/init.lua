@@ -35,7 +35,7 @@ local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local ApiMlx           = require("modules.llm.api_mlx")
 local StartupCtrl      = require("ui.menu.menu_llm.startup_controller")
 local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
--- Shared cross-platform layout spec (_shared/modules/llm/menu_layout.json): the
+-- Shared cross-platform layout spec (the menu manifest's llm_menu key): the
 -- single source of truth for which rows grey out while the feature is OFF, consumed
 -- identically by the Windows renderer so the two menus can never drift again.
 local MenuLayout       = require("ui.menu.menu_llm.menu_layout")
@@ -479,7 +479,7 @@ function M.create(deps)
 
 				table.insert(main_menu, {
 						title    = backend_title,
-						disabled = MenuLayout.row_disabled("backend", is_disabled, paused),
+						disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
 						menu     = backend_menu
 				})
 
@@ -634,7 +634,7 @@ function M.create(deps)
 						or model_submenu
 				local model_row = {
 						label    = rich_model_title,
-						disabled = MenuLayout.row_disabled("model", is_disabled, paused),
+						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
 						items    = model_items,
 				}
 
@@ -645,14 +645,14 @@ function M.create(deps)
 				table.insert(main_menu, { title = "-" })
 
 				local profiles_item = profiles_mgr.get_menu_item()
-				profiles_item.disabled = MenuLayout.row_disabled("profile", is_disabled, paused)
+				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				table.insert(main_menu, profiles_item)
 
-				table.insert(main_menu, { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
+				table.insert(main_menu, { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
 						table.insert(main_menu, {
 								title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
-								disabled = MenuLayout.row_disabled("num_predictions", is_disabled, paused),
+								disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused),
 								fn       = function()
 										state.llm_num_predictions = llm_mod.DEFAULT_STATE.llm_num_predictions
 										if keymap and type(keymap.set_llm_num_predictions) == "function" then pcall(keymap.set_llm_num_predictions, state.llm_num_predictions) end
@@ -676,7 +676,7 @@ function M.create(deps)
 						apply_llm_shortcut = apply_llm_shortcut,
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("trigger", is_disabled, paused), menu = trigger_menu })
+				table.insert(main_menu, { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
 
 
 				-- ===== Generation settings submenu =====
@@ -725,7 +725,7 @@ function M.create(deps)
 
 				local generation_row = {
 						label    = i18n.get("menu.llm.generation_menu_title"),
-						disabled = MenuLayout.row_disabled("generation", is_disabled, paused),
+						disabled = MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused),
 						items    = MenuUtils.rows_from_menu(generation_menu),
 				}
 
@@ -757,7 +757,7 @@ function M.create(deps)
 						settings_mgr = settings_mgr,
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.display_menu_title"), disabled = MenuLayout.row_disabled("display", is_disabled, paused), menu = display_menu })
+				table.insert(main_menu, { title = i18n.get("menu.llm.display_menu_title"), disabled = MenuLayout.row_disabled("llm_display", is_disabled, paused), menu = display_menu })
 
 
 				-- ===== Navigation submenu =====
@@ -789,7 +789,7 @@ function M.create(deps)
 						menu     = settings_mgr.build_val_modifier_menu()
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("navigation", is_disabled, paused), menu = nav_menu_items })
+				table.insert(main_menu, { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = nav_menu_items })
 
 				return {
 						title   = i18n.get("menu.llm.title"),

@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: rækken åbner filen med personlige genveje. macOS og Windows har sådan en fil; Linux-driverens genveje er skift og markeringstransformationer, uden nogen fil på disken at redigere.",
 	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Kun Linux: denne driver skriver sine målinger i sin egen log i stedet for i et vindue. macOS og Windows åbner et målingsvindue med de samme tal, så rækken ville gentage det, vinduet allerede viser.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-læsning — kun på Linux",
+	"platform_reason.llm_configuration_surface_is_not_on_linux": "Ikke på Linux: disse rækker konfigurerer inferens-backend, profilen, udløseren og hvordan forudsigelser vises og gennemses. Linux-driveren taler med én lokal backend og tilbyder ingen af disse flader, så hver række ville åbne en tom undermenu.",
+	"platform_reason.llm_lists_are_inline_on_linux": "Kun Linux: denne driver viser modellerne og de to genereringsindstillinger direkte i menuen. macOS og Windows lægger de samme valg bag en undermenurække, som deres egne rækker ovenfor erklærer.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",

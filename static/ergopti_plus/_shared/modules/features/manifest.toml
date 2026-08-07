@@ -2947,12 +2947,23 @@ platforms = ["hs"]
 # manifest rows behind them, and there was nowhere to declare a control without
 # also writing it three times.
 #
-# Every row here is a `list`. The contents are the models the machine actually
-# has and the values the user has chosen, which no static entry can enumerate,
-# and a `list` is what puts them in the shared renderer instead of in each
-# driver. Restricted to linux while it is the only driver rendering this tree:
-# declaring a row for a driver that hand-builds its menu would promise a row
-# nothing draws, which is the failure this file exists to prevent.
+# The two `list` rows are Linux's. Their contents are the models the machine
+# actually has and the values the user has chosen, which no static entry can
+# enumerate, and a `list` is what puts them in the shared renderer instead of in
+# each driver. They say `platforms = ["linux"]` since 2026-08-07: the paragraph
+# below has claimed since the day it was written that they were "restricted to
+# linux", and they never carried the restriction — so the manifest promised
+# macOS and Windows two rows neither has ever drawn, which is precisely the
+# failure this file exists to prevent.
+#
+# The eight `dynamic` rows are what macOS and Windows draw. They lived in a
+# SECOND shared file (_shared/modules/llm/menu_layout.json) with its own reader
+# on each of those two drivers, so one menu had two shared descriptions and
+# neither mentioned the other. That file is retired; its row order, its
+# disabled-when-off policy and its health-dot flag are these rows' fields. They
+# stay `dynamic` because their submenus read Win32 and hs state — see the
+# investigation below, which this change does not overturn: what moves here is
+# the DESCRIPTION of the menu, not its rendering.
 #
 # WHY macOS AND WINDOWS ARE NOT SIMPLY MOVED ONTO IT (investigated 2026-08-06):
 # The macOS LLM menu is 7 578 lines across 21 files, and almost all of it is
@@ -2974,16 +2985,97 @@ platforms = ["hs"]
 # what per-platform rows are for. Moving macOS onto this tree is worth doing the
 # day its menu is decomposed; it is not a projection job.
 
+# `disabled_when_off` is the greying policy the retired spec owned: false means
+# the row stays usable while the feature is OFF, so the user can configure a
+# backend and a model before enabling anything. Everything else greys out.
+# `health_dot` marks the one row that carries the backend-reachability dot.
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_backend"
+i18n = "menu.llm.model_backend"
+disabled_when_off = false
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_model"
+i18n = "menu.llm.model_label"
+disabled_when_off = false
+health_dot = true
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
 [[menu.llm_menu]]
 type = "list"
 id = "llm_models"
+platforms = ["linux"]
+reason_key = "platform_reason.llm_lists_are_inline_on_linux"
 
 [[menu.llm_menu]]
 type = "---"
+platforms = ["linux"]
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_profile"
+i18n = "menu.profiles.profile_label_prefix"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_num_predictions"
+i18n = "menu.llm.num_predictions_label"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_trigger"
+i18n = "menu.llm.trigger_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_generation_settings"
+i18n = "menu.llm.generation_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
 [[menu.llm_menu]]
 type = "list"
 id = "llm_generation"
+platforms = ["linux"]
+reason_key = "platform_reason.llm_lists_are_inline_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_display"
+i18n = "menu.llm.display_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_navigation"
+i18n = "menu.llm.nav_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
 # The updates submenu — Linux is the only driver with an in-app updater surface
 # at top level; the other two carry theirs under "about". Same reasoning as the
