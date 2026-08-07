@@ -286,6 +286,10 @@ const BASELINE = {
 	// stopped reading under two different names on the three drivers.
 	// 117 → 116, windows 175 → 174: the WPM-position reset. Its two neighbours
 	// stay `dynamic` because they mutate the live menu; this one sets nothing.
+	// 82 → 65: the profile picker, with its per-profile edit/delete submenu. One
+	// line in it is NOT a row and must never be renamed: prompt_shortcut takes a
+	// `title` of its own, and the predicate counts it because it cannot tell a
+	// dialog from a row.
 	// 108 → 82: the rest of the IA menu's contents — the API entries and their
 	// model picker, the display panel, the backend switcher, the temperature
 	// rows, and the generation, navigation and prediction-count submenus. The
@@ -295,7 +299,7 @@ const BASELINE = {
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 82,
+	macos: 65,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -362,7 +366,13 @@ const MIN_TOTAL = {
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on
 	// progress.
-	macos: 100,
+	// macos lowered 100 → 60 on 2026-08-07, same reason a third time: the IA menu
+	// was this driver's biggest reservoir of hand-built rows and converting it
+	// took the total to 85, fifteen under the floor. 60 is under what a macOS
+	// driver whose menu is fully migrated would still show — the renderer's own
+	// rows, the pickers other subsystems own, and the dialog titles the predicate
+	// counts because it cannot tell them from a row.
+	macos: 60,
 	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
 	// for the reason given for macOS above: the predicate keys on `title =`, so
 	// every successful migration shrinks the total by construction and the floor
