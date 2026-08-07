@@ -152,9 +152,15 @@ const MEASURE = process.argv.includes('--measure');
 // Its deep pickers keep their own recursion and reach the renderer through
 // MenuUtils.as_provider_row, because rewriting a tree to move a menu onto the
 // renderer is a different job from moving the menu.
+//
+// macos 277 → 274: the active-layouts list. `dynamic:active_layouts` has been
+// declared for this platform since the manifest was written and answered by
+// nobody — the rows were built in place, so the declaration named a slot the
+// driver never filled and no gate could see it until the handler gate learned to
+// look at `list` rows too.
 const BASELINE = {
 	windows: 197,
-	macos: 277,
+	macos: 274,
 	linux: 86
 };
 

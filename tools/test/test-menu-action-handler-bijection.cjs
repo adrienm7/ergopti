@@ -98,7 +98,10 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // ratchet's own linux 2 → 124 did when ITS definition was corrected. Lower these
 // by wiring the rows or by putting those two menus on the renderer — never by
 // narrowing the filter again.
-const BASELINE = { ahk: 1, hs: 7, linux: 0 };
+// hs 7 → 6: active_layouts is answered now — macOS's keyboard-layout menu
+// renders the manifest's own rows through the shared renderer instead of
+// building that list in place.
+const BASELINE = { ahk: 1, hs: 6, linux: 0 };
 
 // The manifest types that name a behaviour the driver must register: `action`
 // and `dynamic` hand the id to a handler, `list` to a provider, `check` and

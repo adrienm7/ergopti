@@ -462,28 +462,35 @@ function M.build(ctx)
 		return clean_layout_name(id)
 	end
 
-	submenu[#submenu + 1] = { title = i18n.section("menu.layout.active_layouts"), disabled = true }
+	-- The layouts macOS reports as active. A `list`, because the rows are
+	-- whatever the system has installed and no static entry can enumerate
+	-- them. Declared `dynamic:active_layouts` for this platform since the
+	-- manifest was written, and answered by nobody until now: the rows were
+	-- built here, in place, and the declaration named a slot this driver
+	-- never filled.
+	local function active_layout_rows()
+		local rows = {}
 	if #records == 0 then
-		submenu[#submenu + 1] = {
-			title = i18n.get("menu.layout.open_prefs"),
-			fn    = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+		rows[#rows + 1] = {
+			label = i18n.get("menu.layout.open_prefs"),
+			action    = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
 		}
 	else
 		for _, r in ipairs(records) do
-			local title    = display_for_record(r)
+			local row_label = display_for_record(r)
 			-- Capture both the localised name (r.name, used by hs.keycodes.setLayout)
 			-- and the raw KeyboardLayout Name (r.id, used to resolve the stable TIS ID
 			-- for Ergopti variants). set_input_source tries them in order.
 			local target_localised = r.name
 			local target_kl_name   = r.id
-			submenu[#submenu + 1] = {
-				title   = title,
+			rows[#rows + 1] = {
+				label   = title,
 				checked = r.selected or nil,
 				-- Greyed out when already selected — clicking the checked
 				-- row would be a no-op TIS call and confuse macOS' input
 				-- source watchers when the menu refreshes mid-frame.
 				disabled = r.selected or nil,
-				fn       = function()
+				action       = function()
 					-- Defer the TIS call out of the menu-click frame so the
 					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
@@ -492,6 +499,28 @@ function M.build(ctx)
 					end)
 				end,
 			}
+		end
+	end
+
+		return rows
+	end
+
+	-- The manifest's own rows for this menu, rendered here rather than repeated:
+	-- the section header above the layout list, the separators around it, and the
+	-- `active_layouts` slot this driver had never answered. Everything this file
+	-- still appends by hand — the install/update block above and the pause/resume
+	-- pickers below — is macOS's own and stays until it is declared too.
+	do
+		local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+		if ok_mm and type(ManifestMenu.build) == "function" then
+			local rendered = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
+				["active_layouts"] = active_layout_rows,
+			})
+			for _, row in ipairs(rendered or {}) do submenu[#submenu + 1] = row end
+		else
+			-- Loud: the rows would simply be absent, and a layout list that
+			-- silently disappears reads as "macOS has no layouts installed".
+			Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
 		end
 	end
 

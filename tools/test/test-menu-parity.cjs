@@ -489,7 +489,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // destructive resets, the timings, then tap-holds and chords under headers of
 // their own — which is also the split the maintainer asked for: the two families
 // used to run together under one heading.
-const RENDERED_THROUGH_SHARED = { hs: 5, linux: 9 };
+// hs raised 5 → 6: the keyboard-layout menu. It renders the manifest's own
+// rows now — the section header, its separators, and the active-layouts list
+// that was declared for macOS and answered by nobody.
+const RENDERED_THROUGH_SHARED = { hs: 6, linux: 9 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
