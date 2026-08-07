@@ -28,7 +28,6 @@ local Labels      = require("menu.labels")
 
 
 local _ergopti_groups_cache    = nil
-local _debug_menu_cache        = nil
 local _top_level_tail_cache    = nil
 local _global_actions_cache    = nil
 
@@ -70,39 +69,6 @@ local function load_ergopti_groups()
 	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
 	_ergopti_groups_cache = groups
 	return groups
-end
-
-
---- Loads the debug_menu ordered array from the shared menu_manifest.json.
---- Filters out entries whose platforms list does not include "hs".
---- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
---- @return table Array of {id} entries in display order.
-local function load_debug_menu()
-	if _debug_menu_cache then return _debug_menu_cache end
-	local data = load_manifest()
-	if not data or type(data.debug_menu) ~= "table" then
-		Logger.error(LOG, "Failed to load debug_menu from manifest — debug submenu will be empty.")
-		return {}
-	end
-
-	local result = {}
-	for _, entry in ipairs(data.debug_menu) do
-		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
-		-- Filter by platform: skip entries that explicitly exclude "hs"
-		if type(entry.platforms) == "table" then
-			local for_hs = false
-			for _, p in ipairs(entry.platforms) do
-				if p == "hs" then for_hs = true; break end
-			end
-			if not for_hs then goto continue end
-		end
-		table.insert(result, { id = entry.id })
-		::continue::
-	end
-
-	Logger.debug(LOG, "Debug menu order loaded from manifest (%d item(s)).", #result)
-	_debug_menu_cache = result
-	return _debug_menu_cache
 end
 
 
@@ -186,9 +152,9 @@ end
 
 
 --- Invalidates locale-dependent caches — call after hot-reload or locale change.
---- Does NOT clear the manifest cache (_manifest_cache, _ergopti_groups_cache,
---- _debug_menu_cache): these are derived from a static file and are safe to
---- keep across toggles; only a full hs.reload() should reset them.
+--- Does NOT clear the manifest cache (_manifest_cache, _ergopti_groups_cache):
+--- these are derived from a static file and are safe to keep across toggles;
+--- only a full hs.reload() should reset them.
 function M.invalidate_cache()
 	-- Intentionally empty: manifest-derived caches are session-stable.
 	-- HotCounter's file-content cache is similarly preserved (see hotstring_counter.lua).
@@ -553,10 +519,11 @@ function M.generate(ctx, menu_mods, actions)
 		local is_active = (Logger_mod.current_level == lvl_num)
 		if is_active then active_level_name = lvl end
 		local lvl_capture = lvl
+		-- Provider rows: these are the `items` of the log-level list row below.
 		table.insert(log_level_items, {
-			title   = Labels.log_level_emoji(lvl) .. " " .. lvl,
+			label   = Labels.log_level_emoji(lvl) .. " " .. lvl,
 			checked = is_active,
-			fn      = function() actions.set_log_level(lvl_capture) end,
+			action  = function() actions.set_log_level(lvl_capture) end,
 		})
 	end
 	local healthcheck = require("ui.healthcheck")
@@ -580,14 +547,6 @@ function M.generate(ctx, menu_mods, actions)
 			-- one does. The chain of `elseif` that used to map id → label → action
 			-- was the manifest's own table written out a second time, in a third
 			-- language, and the separator before the reset was written out here too.
-			--
-			-- Pause owns the bindings axis for the whole pause window: pause_all()
-			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A global action taken in between is therefore either silently
-			-- discarded on resume, or — for « Tout activer » — binds every hotkey
-			-- immediately and breaks the « pause = tout éteint » invariant the
-			-- pause exists to guarantee. The per-feature toggles were gated for
-			-- exactly this; these three, which move ALL of them at once, were not.
 			local ok_ga, ManifestMenu = pcall(require, "infra.manifest_menu")
 			if ok_ga and type(ManifestMenu.build) == "function" then
 				local ga_ctx = {}
@@ -640,25 +599,40 @@ function M.generate(ctx, menu_mods, actions)
 		elseif id == "quit" then
 			table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), fn = actions.quit })
 		elseif id == "debug" then
+			-- The manifest declares every row of this submenu and the shared renderer
+			-- places them; this file supplies only what each one does.
+			--
+			-- It used to iterate the SAME array and then write the label for each id
+			-- by hand, in a chain of `elseif` — so the manifest decided the order and
+			-- this file decided everything else, in a second language. Linux has read
+			-- this section through the renderer since 2026-08-06 and Windows since
+			-- this morning; macOS was the last of the three.
 			local debug_items = {}
-			for _, dbg in ipairs(load_debug_menu()) do
-				local did = dbg.id
-				if did == "---" then
-					table.insert(debug_items, { title = "-" })
-				elseif did == "console" then
-					table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
-				elseif did == "log_level" then
-					local lbl = i18n.get("menu.debug.log_level") .. " : " .. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name
-					table.insert(debug_items, { title = lbl, menu = log_level_items })
-				elseif did == "open_logs" then
-					table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
-				elseif did == "open_today_log" then
-					table.insert(debug_items, { title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log })
-				elseif did == "open_error_log" then
-					table.insert(debug_items, { title = i18n.get("menu.debug.open_error_log"), fn = actions.open_error_log })
-				elseif did == "healthcheck" then
-					table.insert(debug_items, { title = i18n.get("menu.debug.healthcheck"), fn = function() healthcheck.show_window() end })
-				end
+			local ok_dbg, ManifestMenu = pcall(require, "infra.manifest_menu")
+			if ok_dbg and type(ManifestMenu.build) == "function" then
+				local dbg_ctx = {}
+				for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
+				dbg_ctx.commands = {
+					["console"]        = actions.open_console,
+					["open_logs"]      = actions.open_logs,
+					["open_today_log"] = actions.open_today_log,
+					["open_error_log"] = actions.open_error_log,
+					["healthcheck"]    = function() healthcheck.show_window() end,
+				}
+				-- The picker's own row carries the level currently set, which is why it
+				-- is a `list` and not a `command`: a declaration cannot spell a label
+				-- that changes with the state behind it.
+				debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {
+					["log_level"] = function()
+						return { {
+							label = i18n.get("menu.debug.log_level") .. " : "
+								.. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name,
+							items = log_level_items,
+						} }
+					end,
+				}) or {}
+			else
+				Logger.error(LOG, "Manifest renderer unavailable — the debug submenu is empty.")
 			end
 			table.insert(items, { title = i18n.get("menu.debug.title"), menu = debug_items })
 		end
