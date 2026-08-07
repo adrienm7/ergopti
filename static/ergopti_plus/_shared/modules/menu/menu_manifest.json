@@ -720,7 +720,7 @@
 			"reason_key": "platform_reason.category_toggle_is_drawn_by_the_caller"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "show_typing",
 			"i18n": "menu.metrics.show_typing",
 			"disabled_when": [
@@ -744,7 +744,7 @@
 			"type": "---"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
 			"disabled_when": [

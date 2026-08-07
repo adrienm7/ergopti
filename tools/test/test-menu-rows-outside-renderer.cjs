@@ -225,7 +225,7 @@ const MEASURE = process.argv.includes('--measure');
 // supplies just the toggle and the state behind the tick. All three fall
 // together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 178,
+	windows: 176,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -253,7 +253,9 @@ const BASELINE = {
 	// 122 → 120: the Ctrl and Cmd shortcut groups. The shared renderer's `group`
 	// branch materialises `items` now, the same way a `list` row's provider rows
 	// are, so a group builder hands over DATA instead of a finished tree.
-	macos: 120,
+	// 120 → 118, windows 178 → 176: the two metrics window buttons. A label, a
+	// greying rule and a click — declared `command` now, built once each.
+	macos: 118,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -305,7 +307,11 @@ const MIN_TOTAL = {
 	// progress. 120 is below what a driver with a fully migrated menu would still
 	// show — the submenu wrappers and the rows no declaration can carry — rather
 	// than merely under today's number.
-	macos: 120,
+	// macos lowered 120 → 100 on 2026-08-07, for the reason stated above it: the
+	// predicate keys on `title =`, so every conversion of a builder to provider
+	// data shrinks the total by construction and the floor eventually fires on
+	// progress.
+	macos: 100,
 	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
 	// for the reason given for macOS above: the predicate keys on `title =`, so
 	// every successful migration shrinks the total by construction and the floor

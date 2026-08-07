@@ -3461,8 +3461,11 @@ category = "Metrics"
 platforms = ["hs"]
 reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
 
+# `command` since 2026-08-07. These two are buttons: a label, a greying rule and
+# a click. `action` hands the id back, so all three drivers built the same row
+# three times from a declaration that already carried both.
 [[menu.metrics_menu]]
-type = "action"
+type = "command"
 id = "show_typing"
 i18n = "menu.metrics.show_typing"
 disabled_when = ["keylogger_enabled"]
@@ -3478,7 +3481,7 @@ reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 type = "---"
 
 [[menu.metrics_menu]]
-type = "action"
+type = "command"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
 disabled_when = ["keylogger_enabled"]

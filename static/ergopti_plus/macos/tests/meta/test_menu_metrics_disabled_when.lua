@@ -182,9 +182,14 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			local needle = 'ManifestMenu.resolve_disabled_when("metrics_menu", "' .. c.id .. '", STATE_GETTERS)'
 			local resolved_here = src:find(needle, 1, true) ~= nil
 
+			-- `check` AND `command`: the shared renderer resolves disabled_when for
+			-- both, so either declaration hands the greying to the resolver. The two
+			-- window buttons became `command` on 2026-08-07 and this list had named
+			-- only `check` — which would have read the migration as a regression.
 			local declared_check = false
 			for _, entry in ipairs(manifest.metrics_menu or {}) do
-				if type(entry) == "table" and entry.id == c.id and entry.type == "check" then
+				if type(entry) == "table" and entry.id == c.id
+					and (entry.type == "check" or entry.type == "command") then
 					declared_check = true
 				end
 			end
@@ -192,7 +197,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			helpers.assert_true(resolved_here or declared_check,
 				"'" .. c.id .. "' greying must come from the shared resolver: either this "
 					.. "file calls ManifestMenu.resolve_disabled_when for it, or the manifest "
-					.. "declares it type=check so the shared renderer does. A hardcoded "
+					.. "declares it type=check or type=command so the shared renderer does. A hardcoded "
 					.. "condition here is what neither allows")
 
 			-- And the two must not BOTH be true: a row the renderer builds and the
