@@ -408,6 +408,40 @@
 			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		}
 	],
+	"apps_menu": [
+		{
+			"type": "list",
+			"id": "apps_installed",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
+		},
+		{
+			"type": "command",
+			"id": "apps_per_app_config",
+			"i18n": "menu.apps.config_per_app",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
+			"type": "command",
+			"id": "apps_config_folder",
+			"i18n": "menu.global.config_folder",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
+		}
+	],
 	"language_menu": [
 		{
 			"type": "list",

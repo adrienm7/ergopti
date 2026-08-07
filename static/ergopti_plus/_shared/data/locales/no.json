@@ -2427,6 +2427,7 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Systemkurven til hver driver bærer radene på øverste nivå plattformen dens har: applikasjonsverktøyene på macOS og Linux, den innebygde oppdatereren på Linux, pausebryteren på Windows. De andre når det samme et annet sted, eller ikke i det hele tatt.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Raden finnes på alle drivere; bare noen får erklære den. Denne av/på-bryteren bygges av driveren selv, og Windows-rendereren tegner — i motsetning til den delte — også en erklært bryter, så å ta den med for den plattformen ville vist bryteren to ganger.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driveren tegner et flaggikon på hver språkrad, og en delt menyrad bærer en etikett, en hake, en handling og en undermeny — ikke et ikon. Å erklære raden der ville byttet bort flaggene mot en delt beskrivelse.",
+	"platform_reason.apps_menu_holds_what_each_platform_offers": "De to driverne som har denne menyen, legger ulike ting under samme tittel: macOS lister de medfølgende programmene den finner på disken og starter dem, mens Linux ikke leverer noen og bruker den til hotstring-innstillinger per program. Windows har ingen av delene.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",

@@ -2427,6 +2427,7 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS and Linux, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "The row is there on every driver; only some may declare it. This on/off switch is built by the driver itself, and the Windows renderer — unlike the shared one — also draws a declared toggle, so listing it for that platform would show the switch twice.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Not on Windows: that driver draws a flag icon on each locale row, and a shared menu row carries a label, a tick, an action and a submenu — not an icon. Declaring this row there would trade the flags away for a shared description.",
+	"platform_reason.apps_menu_holds_what_each_platform_offers": "The two drivers that have this menu put different things under the same title: macOS lists the bundled applications it finds on disk and launches them, while Linux ships no such bundles and uses it for per-application hotstring settings. Windows has neither.",
 	"metrics_apps.chart_time_series": "Time",
 	"metrics_apps.edit_category_hint": "Edit category",
 	"menu.llm.generation.temperature": "Temperature",

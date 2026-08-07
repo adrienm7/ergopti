@@ -24,6 +24,8 @@ local hs     = hs
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
+local MenuUtils = require("ui.menu.menu_utils")
+local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "menu_apps"
 
@@ -277,10 +279,22 @@ function M.build(ctx)
 		table.insert(rows, { title = i18n.get("menu.apps.no_apps"), disabled = true })
 	end
 
-	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)
+	-- The list the manifest declares for this driver. Its rows are the bundles
+	-- found on disk, which no static entry can enumerate — and Linux puts
+	-- something else entirely under the same title, which the declaration says
+	-- with its reason rather than leaving the two to be compared by hand.
+	local provider_rows = {}
+	for _, row in ipairs(rows) do
+		provider_rows[#provider_rows + 1] = MenuUtils.as_provider_row(row)
+	end
+	local rendered = ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, {
+		["apps_installed"] = function() return provider_rows end,
+	})
+
+	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rendered)
 	return {
 		title    = i18n.get("menu.apps.title"),
-		menu     = rows,
+		menu     = rendered,
 	}
 end
 

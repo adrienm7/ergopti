@@ -3118,6 +3118,38 @@ health_dot = false
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
+# The Applications submenu. Declared 2026-08-07; it had no description at all,
+# and the two drivers that have it put different things under the same title.
+#
+# macOS lists the bundled applications it finds on disk and launches them.
+# Linux has no such bundles: its Applications menu is where per-application
+# hotstring configuration lives, beside a shortcut to the config folder. Two
+# concepts, one title — so two declarations with the reason written, rather than
+# one row pretending the drivers agree.
+[[menu.apps_menu]]
+type = "list"
+id = "apps_installed"
+platforms = ["hs"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
+[[menu.apps_menu]]
+type = "command"
+id = "apps_per_app_config"
+i18n = "menu.apps.config_per_app"
+platforms = ["linux"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
+[[menu.apps_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.apps_menu]]
+type = "command"
+id = "apps_config_folder"
+i18n = "menu.global.config_folder"
+platforms = ["linux"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing
 # described the menu they were listing them into.

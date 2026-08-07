@@ -2427,6 +2427,7 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Zasobnik każdego sterownika niesie wiersze najwyższego poziomu, które ma jego platforma: narzędzia aplikacji na macOS i Linuksie, wbudowany aktualizator na Linuksie, przełącznik wstrzymania na Windows. Pozostałe docierają do tego samego gdzie indziej albo wcale.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Wiersz jest na każdym sterowniku; zadeklarować go mogą tylko niektóre. Ten przełącznik buduje sam sterownik, a mechanizm rysujący w Windows — inaczej niż wspólny — rysuje też przełącznik zadeklarowany, więc wypisanie go dla tej platformy pokazałoby przełącznik dwa razy.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Nie w Windows: ten sterownik rysuje ikonę flagi na każdym wierszu języka, a wspólny wiersz menu niesie etykietę, znacznik, akcję i podmenu — nie ikonę. Zadeklarowanie tego wiersza tam oznaczałoby wymianę flag na wspólny opis.",
+	"platform_reason.apps_menu_holds_what_each_platform_offers": "Dwa sterowniki, które mają to menu, umieszczają pod tym samym tytułem różne rzeczy: macOS wypisuje dołączone aplikacje znalezione na dysku i je uruchamia, a Linux żadnych nie dostarcza i używa go do ustawień hotstringów dla poszczególnych aplikacji. Windows nie ma ani jednego, ani drugiego.",
 	"metrics_apps.chart_time_series": "Czas",
 	"metrics_apps.edit_category_hint": "Edytuj kategorię",
 	"menu.llm.generation.temperature": "Temperatura",
