@@ -246,9 +246,9 @@ local function buildPersonalInfoItems(ctx, description)
 	description = ctx.applyTriggerChar(description)
 	return {
 		{
-			title   = description,
+			label   = description,
 			checked = ctx.state.personal_info or nil,
-			fn      = function()
+			action      = function()
 				ctx.state.personal_info = not ctx.state.personal_info
 				if ctx.state.personal_info then 
 					if type(ctx.personal_info.enable) == "function" then pcall(ctx.personal_info.enable) end
@@ -261,8 +261,8 @@ local function buildPersonalInfoItems(ctx, description)
 			end,
 		},
 		{
-			title = i18n.get("menu.shortcuts.edit_personal_info"),
-			fn    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
+			label = i18n.get("menu.shortcuts.edit_personal_info"),
+			action    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
 		},
 	}
 end
@@ -292,9 +292,9 @@ function M.build_groups(ctx, only, counts)
 		local base_label = groupLabel(ctx, name)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
-			title   = base_label .. " (" .. fmt_count(total) .. ")",
+			label   = base_label .. " (" .. fmt_count(total) .. ")",
 			checked = enabled or nil,
-			fn      = toggleGroupFn(ctx, name),
+			action      = toggleGroupFn(ctx, name),
 		}
 
 		if has_secs then
@@ -325,30 +325,30 @@ function M.build_groups(ctx, only, counts)
 			local toml_path = toml_path_for_group(ctx, name)
 			if toml_path then
 				sec_menu[#sec_menu + 1] = {
-					title = i18n.get("menu.hotstrings.open_file"),
-					fn    = function() open_toml_path(toml_path) end,
+					label = i18n.get("menu.hotstrings.open_file"),
+					action    = function() open_toml_path(toml_path) end,
 				}
-				sec_menu[#sec_menu + 1] = { title = "-" }
+				sec_menu[#sec_menu + 1] = { separator = true }
 			end
 			-- Section-level bulk actions for this category.
 			sec_menu[#sec_menu + 1] = {
-				title    = i18n.get("menu.hotstrings.enable_all"),
+				label    = i18n.get("menu.hotstrings.enable_all"),
 				disabled = ctx.paused or nil,
-				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
+				action       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
 			}
 			sec_menu[#sec_menu + 1] = {
-				title    = i18n.get("menu.hotstrings.disable_all"),
+				label    = i18n.get("menu.hotstrings.disable_all"),
 				disabled = ctx.paused or nil,
-				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
+				action       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
 			}
-			sec_menu[#sec_menu + 1] = { title = "-" }
+			sec_menu[#sec_menu + 1] = { separator = true }
 			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
 				if type(sec) == "table" then
 					if sec.name == "-" then
 						if not prev_was_sep then
-							sec_menu[#sec_menu + 1] = { title = "-" }
+							sec_menu[#sec_menu + 1] = { separator = true }
 							prev_was_sep = true
 						end
 					elseif name == "magic_key" and sec.name == "replace" then
@@ -373,9 +373,9 @@ function M.build_groups(ctx, only, counts)
 									   or tostring(sec.name):gsub("_", " ")
 						lbl = ctx.applyTriggerChar(lbl)
 						sec_menu[#sec_menu + 1] = {
-							title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
+							label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 							checked  = sec_on or nil,
-							fn       = (enabled and not ctx.paused)
+							action       = (enabled and not ctx.paused)
 									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
 							disabled = not enabled or ctx.paused or nil,
 						}
@@ -399,14 +399,14 @@ end
 function M.build_bulk_actions(ctx)
 	return {
 		{
-			title    = i18n.get("menu.hotstrings.enable_all"),
+			label    = i18n.get("menu.hotstrings.enable_all"),
 			disabled = ctx.paused or nil,
-			fn       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
+			action       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
 		},
 		{
-			title    = i18n.get("menu.hotstrings.disable_all"),
+			label    = i18n.get("menu.hotstrings.disable_all"),
 			disabled = ctx.paused or nil,
-			fn       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
+			action       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
 		},
 	}
 end
