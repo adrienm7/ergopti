@@ -3345,8 +3345,13 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.no_personal_shortcuts_file_on_linux"
 i18n = "menu.global.edit_shortcuts"
 
+# `list` since 2026-08-07: one row per installed extension that ships a shortcuts
+# menu, behind its own separator and header. All three drivers walked the same
+# extensions directory and built the same three shapes by hand, because `dynamic`
+# hands the id straight back. The submenu under each extension is still the
+# driver's — it is whatever that extension's own menu file declares.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "extensions_shortcuts"
 # One submenu per installed extension that ships shortcuts/menu.lua (menu.ahk on
 # Windows). All three drivers walk the extensions tree, load each file in a

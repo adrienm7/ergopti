@@ -611,7 +611,7 @@
 			"i18n": "menu.global.edit_shortcuts"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "extensions_shortcuts"
 		}
 	],
