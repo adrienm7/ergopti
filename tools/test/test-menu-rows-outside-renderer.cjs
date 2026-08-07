@@ -277,7 +277,15 @@ const BASELINE = {
 	// MenuRowFromManifest, and the three inserts by position that put the category
 	// toggle and the bulk actions on top went with it: the array is built in the
 	// order the user reads it.
-	windows: 52,
+	// 52 → 28: the personal-hotstrings submenu and the extension folder tree, the
+	// last two blocks on this driver still assembling menus by hand. The reason
+	// given for keeping them — their callbacks repaint a menu that is already open,
+	// and a full tray rebuild costs about a second — turned out not to be a reason
+	// at all: MenuRenderer_AppendRows fills a menu the CALLER owns, so the driver
+	// keeps the reference those callbacks need and the renderer still draws every
+	// row in it. The folder walk keeps its own recursion, because a user's
+	// directories have no depth the renderer may assume, and renders each level.
+	windows: 28,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -407,7 +415,13 @@ const MIN_TOTAL = {
 	// to 72, eight under the floor. 45 is under what a Windows driver whose menu is
 	// fully migrated would still show — the renderer's own Add calls, the tray
 	// root, and the rows whose callbacks repaint a menu that is already open.
-	windows: 45,
+	// windows lowered 45 → 25 on 2026-08-07, fourth time for this driver and the
+	// same reason each time: the predicate reads this driver's own row calls, so
+	// every conversion shrinks the total by construction. The personal tree and the
+	// extension folders took it to 47, two above the floor. 25 is under what a
+	// Windows driver whose menu is fully migrated would still show — the renderer's
+	// own Add calls and the tray root.
+	windows: 25,
 	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on
