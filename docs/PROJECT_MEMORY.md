@@ -461,6 +461,122 @@ Related: [[project-dynamic-places-list-materialises]],
 
 
 
+### project-the-wrong-dialect-is-invisible
+
+_A row written with `title`/`fn`/`menu` inside a provider is not a bug the suites
+can see. It is a menu that comes out short, and nothing says so_
+
+<sub>slug: `project_the_wrong_dialect_is_invisible`</sub>
+
+Five separate blocks lost rows to this in the two days the menus moved onto the
+shared renderer, and every one of them was found by opening the menu and noticing
+something missing:
+
+1. **menu_about** — the version header and the channel picker (`title`). Both
+   dropped; macOS showed no version and offered no way to switch channel.
+2. **menu_hotstrings** — `item.menu = sec_menu` four lines below the row it
+   belonged to. Every standard and Ergopti category rendered as a bare clickable
+   row: no « ouvrir le fichier », no bulk actions, no section toggles.
+3. **menu_hotstrings_custom** — `render_ext_tree` WROTE `title`/`menu` and READ
+   `file.title`/`file.menu` off nodes already converted to `label`/`items`. Every
+   extension file row was dropped, every folder rendered empty, and `table.sort`
+   compared two nils — so a folder with two files threw inside the provider and
+   took the whole hotstrings menu down.
+4. **menu_utils** — `build_action_picker` and `build_section_header` returned
+   `title`/`fn` while every caller fed them into an `items` array. The Karabiner
+   tap and hold pickers showed their two ungrouped « Spécial » entries and nothing
+   else: not one modifier, combo or layer-hold action was reachable.
+5. **the macOS tray root** — two component builders had already started returning
+   provider rows while `generate()` still handed its array to `hs.menubar`, so
+   « ⌨️ Karabiner » and « Disposition » reached the menu bar with no title and
+   their subtrees on a field it does not read.
+
+What made all five invisible: a `title` is not a label, so the row was dropped
+with a warning naming neither the row nor the field; and a `menu` was never read
+at all, so the row appeared with its whole subtree gone and NOTHING was logged.
+
+Both renderers now report the drift field by field, naming the row
+(`report_driver_dialect` / `_MR_ReportDriverDialect`). When you convert a block,
+read the WHOLE path afterwards — the row you converted, the rows it pushes into,
+and anything that READS those rows back.
+
+Related: [[project-dynamic-places-list-materialises]],
+[[project-a-caller-owned-menu-is-still-the-renderers-to-fill]].
+
+
+
+
+### project-a-caller-owned-menu-is-still-the-renderers-to-fill
+
+_"Its callbacks repaint the open menu" is not a reason to hand-build rows. The
+renderer fills a menu the CALLER owns_
+
+<sub>slug: `project_a_caller_owned_menu_is_still_the_renderers_to_fill`</sub>
+
+Two blocks were kept out of the renderer for years by reasons that turned out to
+be about the API rather than the menu:
+
+- **the personal-hotstrings submenu** (Windows): two callbacks repaint a menu
+  that is already open — choosing a default section renames the parent row and
+  moves the tick, and so does the close-on-add switch. A full `RebuildTrayMenu`
+  costs ~1094 ms, which no checkmark should pay.
+- **the personal-extensions folder tree**: it follows a directory the USER writes,
+  and the renderer caps a nested row ARRAY to stop a provider that returns itself.
+
+Both dissolve the same way. `MenuRenderer_AppendRows` (and `R.render_rows` on the
+Lua side) fill a menu the caller created and still holds, so the driver keeps the
+reference its callbacks need and the renderer still draws every row in it. And the
+depth cap counts nesting inside ONE array, so a walk that starts a fresh render at
+each level is never truncated — which is what a filesystem needs.
+
+The cap itself was raised 3 → 8 the same day, on both renderers. Three was
+documented as "deeper than any menu the drivers draw" and that was already false:
+one level of extension subfolder reaches four. A cap sized for a hand-declared
+menu cannot bound a filesystem; it exists to stop runaway recursion, nothing more.
+
+Related: [[project-the-wrong-dialect-is-invisible]],
+[[project-a-depth-cap-is-right-for-a-provider-and-wrong-for-a-filesystem]].
+
+
+
+
+### project-two-keys-for-one-row-is-two-menus
+
+_The same tray entry named by two translation keys reads as identical until a
+translator touches one_
+
+<sub>slug: `project_two_keys_for_one_row_is_two_menus`</sub>
+
+Four top-level entries existed TWICE in all twenty-one locale files: Windows read
+`category.gestures`, `category.shortcuts`, `category.tapholds`; macOS and Linux
+read `menu.gestures.title`, `menu.shortcuts.title`, `menu.tapholds.title`. The
+strings were identical, which is precisely why nothing looked wrong.
+`category.layout` was a fifth copy no driver read at all.
+
+The mirror-image failure was on the same menu: macOS spelled the Hotstrings entry
+out in its source (`"⚡ Hotstrings (N)"`) while `menu.hotstrings.title` is
+translated everywhere — « ⚡ ホットストリング » in Japanese — so that one entry
+stayed untranslated on that driver alone.
+
+Neither is visible from inside a driver; each is only a divergence when the three
+are read side by side, which is what nobody does.
+`tools/test/test-menu-titles-single-key.cjs` holds both directions now: every
+top-level title must be named by exactly one key on every driver that has the
+menu, and no key in the `menu.` namespace may duplicate another's string.
+
+The same class, one level down: the hotstring category submenu had three
+different orders on three drivers and macOS was missing its gate row entirely
+(it relied on the parent row toggling the group, which works and which nobody
+discovers). `tools/test/test-hotstring-category-submenu-order.cjs` compares the
+order in which each driver names the four shared label keys — the three builders
+are in three languages, but that ordering is comparable.
+
+Related: [[project-one-menu-two-shared-descriptions]],
+[[project-an-enumeration-is-not-a-feature]].
+
+
+
+
 ### project-an-enumeration-is-not-a-feature
 
 _Every hand-written list in this repo has been found short. Derive the list; where
@@ -4270,21 +4386,24 @@ Related: [[project-a-green-probe-can-mean-redundant-guards]], [[project-fixed-fi
 
 ### project-a-depth-cap-is-right-for-a-provider-and-wrong-for-a-filesystem
 
-_The shared renderer truncates nested rows past three levels; the personal-hotstrings tree mirrors the user's own folders, so it stays hand-built_
+_The renderer's nesting cap bounds ONE row array, not a menu. A walk that renders each level separately is never truncated by it_
 
 <sub>slug: `project_a_depth_cap_is_right_for_a_provider_and_wrong_for_a_filesystem`</sub>
 
-Both renderers cap nested list rows at three levels — `MAX_LIST_DEPTH` in `_shared/lua/menu/renderer.lua`, `MR_MAX_LIST_DEPTH` in `windows/infra/manifest_menu.ahk`. The cap exists so a provider returning a structure that contains itself cannot recurse until the stack gives out, and it is deliberately the same number on both so a list that renders on one driver cannot be silently truncated on the other.
+Both renderers cap nested list rows — `MAX_LIST_DEPTH` in `_shared/lua/menu/renderer.lua`, `MR_MAX_LIST_DEPTH` in `windows/infra/manifest_menu.ahk` — and the two are deliberately equal so a list that renders on one driver cannot be silently truncated on the other. The cap exists so a provider returning a structure that contains itself cannot recurse until the stack gives out. **That is all it is.** It is not a statement about how deep a menu may be.
 
-That reasoning holds for every tree whose shape the code decides. It does not hold for `_HS_RenderTree` in `windows/ui/menu/menu_hotstrings.ahk`, which walks the user's personal-hotstrings folders: two levels of subfolders already reach the cap, and the user who organises their hotstrings the most is the one whose folders would vanish. Truncation there is silent — one ERROR line in the log, no visible difference in the menu.
+This entry said the opposite until 2026-08-07, and both of its conclusions were wrong:
+
+- It said the cap (then 3) meant the personal-hotstrings folder tree had to stay hand-built. It did not: the cap counts nesting inside ONE array, and `_HS_RenderTree` starts a fresh render at each level, so every level is drawn by the renderer and no level is ever near the cap.
+- It said "do not raise the cap". The cap was raised 3 → 8 the same day, because 3 was justified as "deeper than any menu the drivers draw" and that claim was already false — one level of extension subfolder reaches four, and macOS was silently truncating it.
 
 **How to apply:**
 
-- Before converting a tree to row data, ask who decides its depth. Code → convert. The user's filesystem, an imported catalogue, anything unbounded → leave it native and write the reason where the next person will look.
-- Do not raise the cap to fit one case. It is a stack guard, and a number chosen to fit today's deepest tree stops being a guard.
-- The same question settles the other recurring one: a row whose callback repaints the OPEN menu (`_HS_PersonalRows`, the WPM widget toggles) cannot be declarative either, because the renderer rebuilds rather than repaints.
+- Before converting a tree, ask who decides its depth. Code → describe it as one nested array. The user's filesystem, an imported catalogue, anything unbounded → keep the walk's own recursion and render each level into its own menu. Both end up drawn by the renderer.
+- A cap sized to fit today's deepest tree stops being a guard. Size it for the stack, not for the menu.
+- The other half of the old entry was wrong too: a row whose callback repaints the OPEN menu can still be declarative. See [[project-a-caller-owned-menu-is-still-the-renderers-to-fill]] — the renderer fills a menu the caller owns and keeps.
 
-Related: [[project-dynamic-places-list-materialises]], [[project-one-menu-two-shared-descriptions]].
+Related: [[project-dynamic-places-list-materialises]], [[project-one-menu-two-shared-descriptions]], [[project-a-caller-owned-menu-is-still-the-renderers-to-fill]].
 
 
 
