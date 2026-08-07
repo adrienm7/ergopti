@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux’ta yok: bu satır sihirli tuşu değiştirir. macOS ve Windows bunun için bir iletişim kutusu açar; Linux sürücüsü tuşu yalnızca yapılandırmadan okur ve menüden değiştirme imkânı sunmaz.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux’ta yok: bu satırlar kullanıcının atadığı tuş bileşimlerini listeler. macOS ve Windows bir bileşimi yakalayıp saklayabilir; Linux sürücüsünde hiçbir atama yüzeyi yoktur, dolayısıyla liste her zaman boş olurdu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux’ta yok: bu satır kişisel kısayol dosyasını açar. macOS ve Windows’ta böyle bir dosya vardır; Linux sürücüsünün kısayolları ise anahtarlar ve seçim dönüşümleridir, düzenlenecek bir dosya yoktur.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Yalnızca Linux: bu sürücü ölçümlerini bir pencere yerine kendi günlüğüne yazar. macOS ve Windows aynı sayılar için bir ölçüm penceresi açar; bu nedenle satır, o pencerenin zaten gösterdiğini yinelemiş olurdu.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput okuma — yalnızca Linux",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",

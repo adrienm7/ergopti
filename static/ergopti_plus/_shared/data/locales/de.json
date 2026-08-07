@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Nicht unter Linux: diese Zeile ändert die Magic-Taste. macOS und Windows zeigen dafür einen Dialog; der Linux-Treiber liest die Taste nur aus der Konfiguration und kann sie im Menü nicht ändern.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Nicht unter Linux: diese Zeilen listen die vom Benutzer belegten Tastenkombinationen. macOS und Windows können eine Kombination erfassen und speichern; der Linux-Treiber hat überhaupt keine Belegungsoberfläche, die Liste bliebe also stets leer.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nicht unter Linux: diese Zeile öffnet die Datei mit persönlichen Kürzeln. macOS und Windows haben eine solche Datei; die Kürzel des Linux-Treibers sind Schalter und Auswahl-Umwandlungen, ohne Datei zum Bearbeiten.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Nur Linux: dieser Treiber schreibt seine Messwerte in sein eigenes Log statt in ein Fenster. macOS und Windows öffnen für dieselben Zahlen ein Messwerte-Fenster, sodass die Zeile nur wiederholen würde, was dieses Fenster bereits zeigt.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-Lesen — nur unter Linux",
 	"metrics_apps.chart_time_series": "Zeit",
 	"metrics_apps.edit_category_hint": "Kategorie ändern",

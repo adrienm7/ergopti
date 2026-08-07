@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux पर नहीं: यह पंक्ति मैजिक-की बदलती है। macOS और Windows इसके लिए एक संवाद खोलते हैं; Linux ड्राइवर कुंजी केवल कॉन्फ़िगरेशन से पढ़ता है और मेन्यू से बदलने का कोई तरीका नहीं देता।",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux पर नहीं: ये पंक्तियाँ उपयोगकर्ता द्वारा बाँधे गए कुंजी-संयोजन सूचीबद्ध करती हैं। macOS और Windows संयोजन पकड़कर सहेज सकते हैं; Linux ड्राइवर में स्लॉट बाँधने का कोई साधन ही नहीं है, इसलिए सूची हमेशा खाली रहेगी।",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux पर नहीं: यह पंक्ति व्यक्तिगत शॉर्टकट फ़ाइल खोलती है। macOS और Windows दोनों के पास ऐसी फ़ाइल है; Linux ड्राइवर के शॉर्टकट टॉगल और चयन-रूपांतरण हैं, संपादित करने योग्य कोई फ़ाइल नहीं।",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "केवल Linux: यह ड्राइवर अपने आँकड़े किसी विंडो के बजाय अपने ही लॉग में दर्ज करता है। macOS और Windows उन्हीं आँकड़ों के लिए एक मेट्रिक्स विंडो खोलते हैं, इसलिए यह पंक्ति वही दोहराएगी जो वह विंडो पहले से दिखाती है।",
 	"platform_reason.libinput_reader_is_linux_only": "libinput पठन — केवल Linux",
 	"metrics_apps.chart_time_series": "समय",
 	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें",

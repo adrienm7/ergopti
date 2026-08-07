@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "ليس على Linux: يغيّر هذا الصف المفتاح السحري. يعرض macOS وWindows مربع حوار لذلك؛ أما مشغّل Linux فيقرأ المفتاح من الإعدادات ولا يتيح تغييره من القائمة.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "ليس على Linux: تسرد هذه الصفوف تركيبات المفاتيح التي عيّنها المستخدم. يستطيع macOS وWindows التقاط تركيبة وحفظها؛ أما مشغّل Linux فلا يملك أي واجهة للتعيين، لذا ستبقى القائمة فارغة دائمًا.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "ليس على Linux: يفتح هذا الصف ملف الاختصارات الشخصية. لدى macOS وWindows ملف كهذا؛ أما مشغّل Linux فاختصاراته مفاتيح تبديل وتحويلات للنص المحدد، دون أي ملف على القرص لتحريره.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux فقط: يسجّل هذا المشغّل مقاييسه في سجلّه الخاص بدلاً من عرضها في نافذة. يفتح macOS وWindows نافذة مقاييس للأرقام نفسها، ولذلك سيكرّر هذا السطر ما تعرضه تلك النافذة بالفعل.",
 	"platform_reason.libinput_reader_is_linux_only": "قراءة libinput — على لينكس فقط",
 	"metrics_apps.chart_time_series": "الوقت",
 	"metrics_apps.edit_category_hint": "تعديل الفئة",

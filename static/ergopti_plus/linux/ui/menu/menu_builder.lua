@@ -1398,6 +1398,9 @@ local function _manifest_metrics_rows(ctx, k)
 		-- subject. Without this getter the resolver logs an error and falls back to
 		-- the safe answer, so the row would be permanently greyed — right by
 		-- accident, and wrong the moment the widget is shown.
+		metrics_suppressed     = function()
+			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
+		end,
 		wpm_widget_visible     = function()
 			local ok, widget = pcall(require, "ui.wpm.widget")
 			return ok and widget.is_running() or false
@@ -1517,6 +1520,52 @@ local function _manifest_metrics_rows(ctx, k)
 		["filter_private"] = toggle("private_filter_enabled", k.set_private_filter_enabled),
 		["filter_secure"]  = toggle("secure_filter_enabled", k.set_secure_filter_enabled),
 		["filter_sysauth"] = toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled),
+
+		-- This driver answers these five in its log rather than in a window; the
+		-- other two open a metrics WINDOW for the same figures. Declared rows
+		-- since 2026-08-06, so the manifest can describe a driver-specific row
+		-- rather than the driver keeping it to itself.
+		["metrics_session_stats"] = function()
+			if type(k.get_session_stats) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no get_session_stats — the row reports nothing.")
+				return
+			end
+			local stats = k.get_session_stats()
+			Logger.info(LOG, "Session: %d keystrokes, ~%d words, %ds.",
+				stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+		end,
+		["metrics_current_wpm"] = function()
+			if type(k.get_wpm) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no get_wpm — the row reports nothing.")
+				return
+			end
+			Logger.info(LOG, "WPM: %.1f", k.get_wpm())
+		end,
+		["metrics_per_app_stats"] = function()
+			if type(k.get_app_stats) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no get_app_stats — the row reports nothing.")
+				return
+			end
+			for app, stats in pairs(k.get_app_stats()) do
+				Logger.info(LOG, "  %s: %d keystrokes", app, stats.keystrokes)
+			end
+		end,
+		["metrics_suspend"] = function()
+			if type(k.is_suppressed) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no is_suppressed — the row cannot toggle anything.")
+				return
+			end
+			if k.is_suppressed() then k.unsuppress() else k.suppress() end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["metrics_reset_session"] = function()
+			if type(k.reset_session) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no reset_session — the row does nothing.")
+				return
+			end
+			k.reset_session()
+			Logger.info(LOG, "Metrics session reset.")
+		end,
 	}
 
 	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx)
@@ -1554,60 +1603,12 @@ local function _build_metrics(ctx)
 
 	local items = _manifest_metrics_rows(ctx, k)
 
-	for _, row in ipairs({
-		{
-			title = i18n_safe("menu.metrics.session_stats"),
-			fn = function()
-				if type(k.get_session_stats) ~= "function" then return end
-				local s = k.get_session_stats()
-				Logger.info(LOG, "Session: %d keystrokes, ~%d words, %ds.",
-					s.keystrokes, s.words, math.floor(s.duration_ms / 1000))
-			end,
-		},
-		{
-			title = i18n_safe("menu.metrics.current_wpm"),
-			fn = function()
-				if type(k.get_wpm) ~= "function" then return end
-				Logger.info(LOG, "WPM: %.1f", k.get_wpm())
-			end,
-		},
-		{
-			title = i18n_safe("menu.metrics.per_app_stats"),
-			fn = function()
-				if type(k.get_app_stats) ~= "function" then return end
-				local apps = k.get_app_stats()
-				for app, s in pairs(apps) do
-					Logger.info(LOG, "  %s: %d keystrokes", app, s.keystrokes)
-				end
-			end,
-		},
-		{ title = "-" },
-		-- The collection master toggle stays hand-built: this menu's manifest
-		-- `toggle` row is platforms = ["hs"], so it describes macOS's row and not
-		-- this driver's. The four filter and encryption toggles that used to sit
-		-- beside it are gone from here — they are manifest rows now, rendered
-		-- above with their checked_when and disabled_when resolved declaratively.
-		_privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled),
-		_migration_status(k),
-		{ title = "-" },
-		{
-			title = i18n_safe("menu.global.suspend") .. (type(k.is_suppressed) == "function" and k.is_suppressed() and " ✓" or ""),
-			fn = function()
-				if type(k.is_suppressed) ~= "function" then return end
-				if k.is_suppressed() then k.unsuppress() else k.suppress() end
-			end,
-		},
-		{
-			title = i18n_safe("menu.metrics.reset_session"),
-			fn = function()
-				if type(k.reset_session) ~= "function" then return end
-				k.reset_session()
-				Logger.info(LOG, "Metrics session reset.")
-			end,
-		},
-	}) do
-		items[#items + 1] = row
-	end
+	-- The collection master toggle stays hand-built: this menu's manifest
+	-- `toggle` row is platforms = ["hs"], so it describes macOS's row and not
+	-- this driver's. The migration status is pure runtime text with no stable id.
+	items[#items + 1] = { title = "-" }
+	items[#items + 1] = _privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled)
+	items[#items + 1] = _migration_status(k)
 
 	return { title = i18n_safe("menu.metrics.title"), menu = items }
 end

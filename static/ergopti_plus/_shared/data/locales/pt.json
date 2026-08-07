@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Não em Linux: esta linha altera a tecla mágica. macOS e Windows abrem uma caixa de diálogo para isso; o controlador Linux apenas lê a tecla da configuração e não permite alterá-la a partir do menu.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Não em Linux: estas linhas listam os acordes que o utilizador atribuiu. macOS e Windows sabem capturar um acorde e guardá-lo; o controlador Linux não tem qualquer superfície de atribuição, pelo que a lista estaria sempre vazia.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Não em Linux: esta linha abre o ficheiro de atalhos pessoais. macOS e Windows têm um; os atalhos do controlador Linux são interruptores e transformações da seleção, sem qualquer ficheiro para editar.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Apenas Linux: este controlador escreve as suas métricas no seu próprio registo em vez de numa janela. O macOS e o Windows abrem uma janela de métricas para os mesmos números, pelo que a linha repetiria o que essa janela já mostra.",
 	"platform_reason.libinput_reader_is_linux_only": "Leitura libinput — apenas no Linux",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Editar categoria",

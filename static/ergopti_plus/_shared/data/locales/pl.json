@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Nie w Linuksie: ten wiersz zmienia klawisz magiczny. macOS i Windows otwierają w tym celu okno dialogowe; sterownik linuksowy jedynie odczytuje klawisz z konfiguracji i nie pozwala go zmienić z menu.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Nie w Linuksie: te wiersze wypisują skróty przypisane przez użytkownika. macOS i Windows potrafią przechwycić skrót i go zapisać; sterownik linuksowy nie ma żadnego interfejsu przypisywania, więc lista byłaby zawsze pusta.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nie w Linuksie: ten wiersz otwiera plik skrótów osobistych. macOS i Windows taki plik mają; skróty sterownika linuksowego to przełączniki i przekształcenia zaznaczenia, bez pliku do edycji.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Tylko Linux: ten sterownik zapisuje swoje metryki do własnego dziennika zamiast do okna. macOS i Windows otwierają dla tych samych danych okno metryk, więc ten wiersz powtarzałby to, co okno już pokazuje.",
 	"platform_reason.libinput_reader_is_linux_only": "Odczyt libinput — tylko w systemie Linux",
 	"metrics_apps.chart_time_series": "Czas",
 	"metrics_apps.edit_category_hint": "Edytuj kategorię",

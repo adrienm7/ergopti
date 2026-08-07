@@ -3321,6 +3321,59 @@ type = "dynamic"
 id = "encryption"
 disabled_when = ["keylogger_enabled"]
 
+# The readouts this driver answers in its log rather than in a window. They are
+# Linux's own — macOS and Windows open a metrics WINDOW for the same figures —
+# and until 2026-08-06 they were built in menu_builder.lua with nothing
+# describing them. A driver-specific row is fine; a driver-specific row nobody
+# declared is a row no gate can compare, reason about or find.
+
+[[menu.metrics_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.metrics_menu]]
+type = "command"
+id = "metrics_session_stats"
+i18n = "menu.metrics.session_stats"
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "metrics_current_wpm"
+i18n = "menu.metrics.current_wpm"
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "metrics_per_app_stats"
+i18n = "menu.metrics.per_app_stats"
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+
+[[menu.metrics_menu]]
+type = "---"
+platforms = ["linux"]
+
+# Ticked from the keylogger's own suppression state. It used to glue a " ✓" onto
+# the label, which puts one platform's convention inside a string twenty other
+# languages also read — and bypasses the tray's native check item.
+[[menu.metrics_menu]]
+type = "check"
+id = "metrics_suspend"
+i18n = "menu.global.suspend"
+checked_when = ["metrics_suppressed"]
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "metrics_reset_session"
+i18n = "menu.metrics.reset_session"
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_readouts_go_to_the_log_on_linux"
+
 [[menu.layout_menu]]
 type = "toggle"
 i18n_on = "menu.layout.on"

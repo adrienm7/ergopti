@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Ikke på Linux: rækken ændrer magitasten. macOS og Windows viser en dialog til det; Linux-driveren læser blot tasten fra konfigurationen og kan ikke ændre den fra menuen.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Ikke på Linux: disse rækker viser de tastekombinationer, brugeren har tildelt. macOS og Windows kan opfange en kombination og gemme den; Linux-driveren har ingen tildelingsflade overhovedet, så listen ville altid være tom.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: rækken åbner filen med personlige genveje. macOS og Windows har sådan en fil; Linux-driverens genveje er skift og markeringstransformationer, uden nogen fil på disken at redigere.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Kun Linux: denne driver skriver sine målinger i sin egen log i stedet for i et vindue. macOS og Windows åbner et målingsvindue med de samme tal, så rækken ville gentage det, vinduet allerede viser.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-læsning — kun på Linux",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
