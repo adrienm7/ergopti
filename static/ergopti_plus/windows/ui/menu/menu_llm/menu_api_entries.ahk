@@ -41,13 +41,19 @@
 ; has no entries yet, the menu carries a single greyed-out hint plus the
 ; "+ Add" action so the next click takes them straight to the entry dialog.
 _LLM_Menu_BuildApiEntriesMenu() {
-	global _LLM_Menu
 	m := Menu()
+	MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => _LLM_Menu_ApiEntriesRows())
+	return m
+}
+
+; The same list as row DATA. It stands in for the model picker's rows when the
+; backend is remote, which is why it renders under that same list id.
+_LLM_Menu_ApiEntriesRows() {
+	global _LLM_Menu
+	Rows := []
 	entries := _LLM_Menu["api_entries"]
 	if (Type(entries) != "Array" or entries.Length == 0) {
-		label := t("menu.llm.api_no_entry")
-		m.Add(label, (*) => 0)
-		m.Disable(label)
+		Rows.Push(Map("label", t("menu.llm.api_no_entry")))
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		for entry in entries {
@@ -59,19 +65,23 @@ _LLM_Menu_BuildApiEntriesMenu() {
 				: (model != "") ? "  —  " . model
 				: (prov  != "") ? "  —  " . prov
 				: ""
-			label := name . suffix
-			RegisterMenuItem(m, label, _LLM_Menu_MakeSelectApiEntryHandler(entry))
-			if (id == active_id)
-				m.Check(label)
+			Rows.Push(Map(
+				"label",   name . suffix,
+				"checked", (id == active_id),
+				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
 		}
 	}
-	m.Add()
-	RegisterMenuItem(m, t("menu.llm.api_add_entry"),  (*) => _LLM_Menu_PromptApiEntry(""))
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
 	if (Type(entries) == "Array" and entries.Length > 0) {
-		RegisterMenuItem(m, t("menu.llm.api_edit_entry"), (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"]))
-		RegisterMenuItem(m, t("menu.llm.api_remove_entry"), (*) => _LLM_Menu_RemoveActiveApiEntry())
+		Rows.Push(Map(
+			"label",  t("menu.llm.api_edit_entry"),
+			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
+		Rows.Push(Map(
+			"label",  t("menu.llm.api_remove_entry"),
+			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
 	}
-	return m
+	return Rows
 }
 
 _LLM_MenuApiEntryGet(Entry, Key, Default := "") {

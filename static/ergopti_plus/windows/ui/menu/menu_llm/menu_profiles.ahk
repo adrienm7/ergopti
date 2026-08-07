@@ -87,58 +87,68 @@ _LLM_Menu_UniqueMenuLabel(Seen, Label) {
  * @returns {Menu} Populated profile submenu.
  */
 LLM_Menu_BuildProfileMenu() {
-	global _LLM_Menu
 	m := Menu()
+	MenuRenderer_FillFromList(m, "llm_menu", "llm_profile", (*) => _LLM_Menu_ProfileRows())
+	return m
+}
+
+/**
+ * Row data for the profile submenu.
+ * @returns {Array} Built-in profiles, user profiles, the CRUD rows, the
+ *                  auto-detect toggle and the per-app overrides submenu.
+ */
+_LLM_Menu_ProfileRows() {
+	global _LLM_Menu
+	Rows := []
 
 	; Row labels must be unique WITHIN this menu: AHK v2's Menu.Add with an
 	; already-present label modifies the existing item in place instead of
 	; appending, so a second row carrying the same text silently overwrites the
 	; first one's wrapper and RegisterMenuItem then rebinds the single surviving
 	; id to the newcomer. The first profile becomes unselectable and the
-	; checkmark paints on the wrong row. Nothing guarantees uniqueness here: a
-	; user profile's label is free text, and the "(Ctrl+n)" hint that happens to
-	; separate the early ones is empty past LLM_PROFILE_HOTKEY_LIMIT, so two
-	; profiles both named "Perso" collide from the sixth one onward
-	; (duplicate-user-profile-label-menu-collapse).
+	; checkmark paints on the wrong row. That is true of the renderer's Add as
+	; much as of a hand-written one, so the guard belongs here. Nothing
+	; guarantees uniqueness: a user profile's label is free text, and the
+	; "(Ctrl+n)" hint that happens to separate the early ones is empty past
+	; LLM_PROFILE_HOTKEY_LIMIT, so two profiles both named "Perso" collide from
+	; the sixth one onward (duplicate-user-profile-label-menu-collapse).
 	seen_labels := Map()
 
 	; Section header: built-in profiles
-	header_builtin := t("menu.profiles.header_default_profiles")
-	m.Add(header_builtin, (*) => 0)
-	m.Disable(header_builtin)
+	Rows.Push(Map("label", t("menu.profiles.header_default_profiles")))
 
 	for id in ["raw", "basic", "advanced", "batch_advanced"] {
 		base_label := LLM_Menu_GetProfileLabel(id)
 		hint := LLM_Menu_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
-		label := _LLM_Menu_UniqueMenuLabel(seen_labels, label)
-		RegisterMenuItem(m, label, _LLM_Menu_MakeSetProfileHandler(id))
-		if (id == _LLM_Menu["profile_id"])
-			m.Check(label)
+		Rows.Push(Map(
+			"label",   _LLM_Menu_UniqueMenuLabel(seen_labels, label),
+			"checked", (id == _LLM_Menu["profile_id"]),
+			"action",  _LLM_Menu_MakeSetProfileHandler(id)))
 	}
 
 	; Section: user profiles
 	user_profiles := _LLM_Menu["user_profiles"]
 	if (user_profiles.Length > 0) {
-		m.Add()
-		header_custom := t("menu.profiles.header_custom_profiles")
-		m.Add(header_custom, (*) => 0)
-		m.Disable(header_custom)
+		Rows.Push(Map("separator", true))
+		Rows.Push(Map("label", t("menu.profiles.header_custom_profiles")))
 
 		for p in user_profiles {
-			pid        := p.Has("id") ? p["id"] : ""
+			pid         := p.Has("id") ? p["id"] : ""
 			base_plabel := p.Has("label") ? p["label"] : pid
 			hint := LLM_Menu_GetProfileHotkeyHint(pid)
 			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
-			plabel := _LLM_Menu_UniqueMenuLabel(seen_labels, plabel)
-			RegisterMenuItem(m, plabel, _LLM_Menu_MakeUserProfileClickHandler(p))
-			if (pid == _LLM_Menu["profile_id"])
-				m.Check(plabel)
+			Rows.Push(Map(
+				"label",   _LLM_Menu_UniqueMenuLabel(seen_labels, plabel),
+				"checked", (pid == _LLM_Menu["profile_id"]),
+				"action",  _LLM_Menu_MakeUserProfileClickHandler(p)))
 		}
 	}
 
-	m.Add()
-	RegisterMenuItem(m, t("menu.profiles.create_profile"), (*) => LLM_Menu_PromptCreateProfile())
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map(
+		"label",  t("menu.profiles.create_profile"),
+		"action", (*) => LLM_Menu_PromptCreateProfile()))
 
 	; "Clone active built-in" — exposes the built-in system prompt for
 	; editing without requiring the user to type it from scratch. The
@@ -149,27 +159,28 @@ LLM_Menu_BuildProfileMenu() {
 	active_id := _LLM_Menu["profile_id"]
 	is_builtin := (active_id == "raw" or active_id == "basic" or active_id == "advanced" or active_id == "batch_advanced")
 	if is_builtin {
-		clone_label := t("menu.profiles.clone_builtin")
-		RegisterMenuItem(m, clone_label, (*) => LLM_Menu_CloneActiveBuiltinProfile())
+		Rows.Push(Map(
+			"label",  t("menu.profiles.clone_builtin"),
+			"action", (*) => LLM_Menu_CloneActiveBuiltinProfile()))
 	}
 
 	; Auto-detect toggle: when ON, switching model in the model submenu also
 	; re-picks the matching profile based on the params count. Mirrors the
 	; HS get_recommended_profile_info path so the two drivers agree on what
 	; profile each model should run with by default.
-	m.Add()
-	auto_label := t("menu.profiles.auto_detect")
-	RegisterMenuItem(m, auto_label, (*) => _LLM_Menu_ToggleAutoProfile())
-	if _LLM_Menu["auto_profile_for_model"]
-		m.Check(auto_label)
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map(
+		"label",   t("menu.profiles.auto_detect"),
+		"checked", _LLM_Menu["auto_profile_for_model"],
+		"action",  (*) => _LLM_Menu_ToggleAutoProfile()))
 
-	; Per-app profile overrides submenu — list current ones + "Override
-	; active app with active profile" / "Clear override for active app".
-	; The submenu opens lazily so we re-read the focused app each time.
-	m.Add()
-	per_app_menu := _LLM_Menu_BuildPerAppProfileMenu()
-	m.Add(t("menu.profiles.per_app_overrides"), per_app_menu)
-	return m
+	; Per-app profile overrides — the rows list the current ones; the focused
+	; app is read at click time, not here.
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map(
+		"label", t("menu.profiles.per_app_overrides"),
+		"items", _LLM_Menu_PerAppProfileRows()))
+	return Rows
 }
 
 
@@ -182,24 +193,30 @@ LLM_Menu_BuildProfileMenu() {
 ; ============================================
 ; ============================================
 
-_LLM_Menu_BuildPerAppProfileMenu() {
+/**
+ * Row data for the per-app profile overrides submenu.
+ * @returns {Array} The « override the active app » row, then one row per
+ *                  existing override, each clearing it on click.
+ */
+_LLM_Menu_PerAppProfileRows() {
 	global _LLM_Menu
-	sm := Menu()
 	overrides := _LLM_Menu["app_profile_overrides"]
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
-	RegisterMenuItem(sm, t("menu.profiles.override_active_app_with_current"),
-		(*) => _LLM_Menu_AddOverrideForActiveApp())
+	Rows := [Map(
+		"label",  t("menu.profiles.override_active_app_with_current"),
+		"action", (*) => _LLM_Menu_AddOverrideForActiveApp())]
 	if (overrides is Map and overrides.Count > 0) {
-		sm.Add()
+		Rows.Push(Map("separator", true))
 		; List each override: "slack → informel"  + click clears it.
 		for app_name, profile_id in overrides {
-			label := app_name . "  →  " . LLM_Menu_GetProfileLabel(profile_id)
-			RegisterMenuItem(sm, label, _LLM_Menu_MakeClearOverrideHandler(app_name))
+			Rows.Push(Map(
+				"label",  app_name . "  →  " . LLM_Menu_GetProfileLabel(profile_id),
+				"action", _LLM_Menu_MakeClearOverrideHandler(app_name)))
 		}
 	}
-	return sm
+	return Rows
 }
 
 _LLM_Menu_AddOverrideForActiveApp() {
