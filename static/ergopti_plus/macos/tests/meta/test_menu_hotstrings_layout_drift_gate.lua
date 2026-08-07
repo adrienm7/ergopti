@@ -103,7 +103,11 @@ local CANONICAL_HOTSTRINGS_MENU = {
 local CANONICAL_LAYOUT_MENU = {
 	"toggle:Layout",
 	"---",
-	"dynamic:active_layouts",
+	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
+	-- active_layout_rows() as a LIST PROVIDER, and the manifest said `dynamic`,
+	-- so the renderer looked for a dynamic handler, found none, warned once and
+	-- skipped the row — the layout list did not render at all.
+	"list:active_layouts",
 	"---",
 	"feature:hotstrings.magic_key.replace",
 }

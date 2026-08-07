@@ -3525,7 +3525,7 @@ platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.layout_menu]]
-type = "dynamic"
+type = "list"
 id = "active_layouts"
 platforms = ["hs"]
 
