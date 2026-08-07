@@ -80,7 +80,7 @@ _FIONG_NoBareCallShapesRemain() {
 	; feature lookup moved into it when the row and the drawing were split, and
 	; MenuAddItemFromManifest is a two-line wrapper that no longer touches Features.
 	; The invariant is unchanged — whoever resolves the feature declares the global.
-	for _, FuncName in ["MenuRowFromManifest", "MenuAddItemWithLabel", "MenuAddLetterPicker",
+	for _, FuncName in ["MenuRowFromManifest", "MenuRowWithLabel", "MenuAddLetterPicker",
 		"SetFeatureLetter", "SetFeatureLetterOff", "ToggleFeatureV2", "_HS_TryLiveToggleV2"] {
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . " must exist in ui/menu/menu_engine.ahk")

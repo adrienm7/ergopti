@@ -102,29 +102,40 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+	Row := MenuRowWithLabel(V2Path, MenuTitle, MasterCategory)
+	if (Row == "") {
+		return
+	}
+	MenuRenderer_AppendRows(MenuParent, "features", V2Path, [Row])
+}
+
+; The SAME pre-resolved-label item as row DATA. Twin of MenuRowFromManifest, and
+; split from MenuAddItemWithLabel for the same reason: the personal-hotstrings
+; sections are the one block whose labels come from the USER's TOML rather than
+; the manifest, and they had to stay a hand-built Menu as long as the only way to
+; get one of these items was to hand over a Menu to add it to.
+;
+; Returns "" — never a partial row — when the feature does not resolve.
+MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 	global Features
-	; Mirror MenuAddItemFromManifest's guard: skip an item whose feature does not
+	; Mirror MenuRowFromManifest's guard: skip an item whose feature does not
 	; resolve in the live Features Map instead of wiring a toggle/Check call that
 	; can silently no-op forever (personal-hotstring-live-toggle-seed). This is a
 	; defensive backstop — the normal path always seeds the Features node first
 	; (see EnsurePersonalHotstringFeature / RegisterPersonalFeature).
 	if (FeatureLocateV2(Features, V2Path) == false) {
-		try LoggerWarn("Menu", "MenuAddItemWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
-		return
+		try LoggerWarn("Menu", "MenuRowWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
+		return ""
 	}
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
-
 	State := ReadFeatureStateV2(V2Path)
-	IsEnabled := State.Has("enabled") and State["enabled"]
-	if IsEnabled {
-		MenuParent.Check(MenuTitle)
-	} else {
-		MenuParent.Uncheck(MenuTitle)
-	}
-
+	Row := Map(
+		"label",   MenuTitle,
+		"action",  (*) => ToggleFeatureV2(V2Path),
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 	if !IsCategoryGated(MasterCategory) {
-		try MenuParent.Disable(MenuTitle)
+		Row["disabled"] := true
 	}
+	return Row
 }
 
 ; Reads master_gates.hotstring_sub_categories from menu_manifest.json (MG-3).

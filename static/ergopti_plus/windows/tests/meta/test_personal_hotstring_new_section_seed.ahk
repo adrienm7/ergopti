@@ -18,8 +18,8 @@
 ; (_NewSection), and adds two defensive backstops mirroring the existing
 ; manifest-driven code path: WriteFeatureV2 now logs a WARNING on an unresolved
 ; path (like its sibling WriteFeatureBatchV2 already does), and
-; MenuAddItemWithLabel now skips (with a WARNING) an item whose feature does not
-; resolve, mirroring MenuAddItemFromManifest's guard.
+; MenuRowWithLabel now skips (with a WARNING) an item whose feature does not
+; resolve, mirroring MenuRowFromManifest's guard.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,11 +36,11 @@ _PHNS_AssertNewSectionSeeds() {
 Test("editor: _NewSection seeds the Features node for a brand-new section (personal-hotstring-live-toggle-seed)",
 	_PHNS_AssertNewSectionSeeds)
 
-_PHNS_AssertMenuAddItemWithLabelGuarded() {
-	Body := _DriverFuncBody("MenuAddItemWithLabel")
-	Assert(Body != "", "MenuAddItemWithLabel() declaration must exist in ui/menu/menu_engine.ahk")
+_PHNS_AssertMenuRowWithLabelGuarded() {
+	Body := _DriverFuncBody("MenuRowWithLabel")
+	Assert(Body != "", "MenuRowWithLabel() declaration must exist in ui/menu/menu_engine.ahk")
 	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path) == false") > 0,
-		"MenuAddItemWithLabel must skip an item whose feature does not resolve, mirroring MenuAddItemFromManifest's guard (personal-hotstring-live-toggle-seed)")
+		"MenuRowWithLabel must skip an item whose feature does not resolve, mirroring MenuRowFromManifest's guard (personal-hotstring-live-toggle-seed)")
 }
-Test("menu: MenuAddItemWithLabel skips an unresolved v2 path instead of wiring a dead toggle (personal-hotstring-live-toggle-seed)",
-	_PHNS_AssertMenuAddItemWithLabelGuarded)
+Test("menu: MenuRowWithLabel skips an unresolved v2 path instead of wiring a dead toggle (personal-hotstring-live-toggle-seed)",
+	_PHNS_AssertMenuRowWithLabelGuarded)

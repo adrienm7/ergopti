@@ -107,11 +107,15 @@ _LPTM_IsAssignedIn(Body, Name) {
 }
 
 _LPTM_ProvidersTouchNoMenu() {
-	; Floors the scan below. These providers demonstrably build menus of their own
-	; — the personal tree, the extension tree, the per-file submenus — so finding
-	; NO target means the pattern stopped matching, and every provider would then
-	; pass this test without being read at all.
-	SeenTargets := 0
+	; Pins the scan below. ONE provider is named rather than a count required,
+	; because the count falls as the migration proceeds: a provider that returns
+	; pure data touches no menu at all, so a numeric floor fires on progress and
+	; gets lowered until it guards nothing. _HS_PersonalRows is the case that
+	; cannot go away — the personal tree's callbacks repaint the open menu, so it
+	; creates one and hands it over as `submenu`. If it ever stops, this fails and
+	; the next reader picks a new witness instead of the check quietly emptying.
+	WITNESS := "_HS_PersonalRows"
+	WitnessSeen := false
 	for Name in _LPTM_ProviderNames() {
 		Body := _DriverFuncBodyOrEmpty(Name)
 		Assert(Body != "", "list provider '" . Name . "()' must exist in the driver")
@@ -120,16 +124,31 @@ _LPTM_ProvidersTouchNoMenu() {
 		Pos := 1
 		while (Pos := RegExMatch(Body, "(\w+)\.(?:Add|Check|Disable|Enable)\(", &Mt, Pos)) {
 			Targets.Push(Mt[1])
-			SeenTargets += 1
 			Pos += Mt.Len[0]
 		}
 		Pos := 1
 		while (Pos := RegExMatch(Body, "RegisterMenuItem\(\s*(\w+)", &Mr, Pos)) {
 			Targets.Push(Mr[1])
-			SeenTargets += 1
 			Pos += Mr.Len[0]
 		}
+		; The renderer entry points take the menu to fill as their FIRST argument,
+		; and the rule is the same one: it must be a menu this provider created. A
+		; provider that builds its rows as data and renders them — which is what
+		; they all do since 2026-08-07 — touches a menu only through these two, so
+		; without them the scan finds nothing to check and the floor below fires.
+		Pos := 1
+		while (Pos := RegExMatch(Body, "MenuRenderer_(?:AppendRows|FillFromList)\(\s*(\w+)", &Mf, Pos)) {
+			Targets.Push(Mf[1])
+			Pos += Mf.Len[0]
+		}
 
+		if (Name == WITNESS) {
+			WitnessSeen := true
+			Assert(Targets.Length >= 1,
+				"the menu-target scan found no menu in '" . WITNESS . "', which demonstrably builds "
+				. "one: the pattern has stopped matching, and every provider below would then pass "
+				. "this test without being read at all")
+		}
 		for Target in Targets {
 			Assert(_LPTM_IsAssignedIn(Body, Target),
 				"list provider '" . Name . "' mutates '" . Target . "', which it never creates. "
@@ -139,10 +158,10 @@ _LPTM_ProvidersTouchNoMenu() {
 				. "`M.Check(DynTitle)` on 2026-08-07")
 		}
 	}
-	Assert(SeenTargets >= 3,
-		"the menu-target scan found " . SeenTargets . " target(s) across every provider. These "
-		. "providers build menus of their own, so a number this low means the pattern stopped "
-		. "matching and this test is reading nothing")
+	Assert(WitnessSeen,
+		"'" . WITNESS . "' is no longer a registered list provider, so the check above never ran. "
+		. "Name another provider that builds a menu of its own — the pin has to point at something "
+		. "that exists, or an empty scan passes in silence")
 }
 Test("list-providers: no provider mutates a menu it is never handed", _LPTM_ProvidersTouchNoMenu)
 

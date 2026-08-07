@@ -610,48 +610,69 @@ _HS_PersonalRows() {
 		; relevant label below is built from this map instead of the raw
 		; (possibly-duplicate) description.
 		DisambiguatedLabels := _HS_BuildDisambiguatedSectionLabels(TomlData)
-		PersonalMenu := Menu()
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
-		PersonalMenu.Add()
-		ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
-		PersonalMenu.Add(ShortcutLabel, (*) => NoAction())
-		PersonalMenu.Disable(ShortcutLabel)
-		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		; The two Menu objects are created here and kept, because two callbacks
+		; below REPAINT them: choosing a default section renames the parent row and
+		; moves the tick without rebuilding anything, and so does the close-on-add
+		; switch. A full RebuildTrayMenu costs about a second, which is not a price
+		; a checkmark can pay.
+		;
+		; That is not a reason for the rows themselves to be hand-built, which is
+		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
+		; into a menu the CALLER owns, so the driver can hold the reference it needs
+		; and still let the renderer draw every row in it.
+		PersonalMenu       := Menu()
 		DefaultSectionMenu := Menu()
-		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"),
-			(*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
-		if (CurDefaultSec == "")
-			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
-		DefaultSectionMenu.Add()
+		PersonalRows := []
+		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
+		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
+		PersonalRows.Push(Map("separator", true))
+		; A row with a label and nothing else renders inert and greyed — which is
+		; what this shortcut reminder is: it states the trigger, it is not a button.
+		PersonalRows.Push(Map("label", t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]))
+
+		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		DefaultRows := []
+		DefaultRows.Push(Map(
+			"label",   t("menu.hotstrings.default_none"),
+			"action",  (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
+			"checked", (CurDefaultSec == "") ? true : false))
+		DefaultRows.Push(Map("separator", true))
 		for _, SecName in TomlData["sections_order"] {
 			if (SecName == "-")
 				continue
 			if !TomlData["sections"].Has(SecName)
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
-			RegisterMenuItem(DefaultSectionMenu, SecLabel,
-				_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
-			if (CurDefaultSec == SecName)
-				DefaultSectionMenu.Check(SecLabel)
+			DefaultRows.Push(Map(
+				"label",   SecLabel,
+				"action",  _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
+				"checked", (CurDefaultSec == SecName) ? true : false))
 		}
+		MenuRenderer_AppendRows(DefaultSectionMenu, "hotstrings_menu", "hotstring_personal_default", DefaultRows)
+
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
 			: (DisambiguatedLabels.Has(CurDefaultSec) ? DisambiguatedLabels[CurDefaultSec] : CurDefaultSec)
 		global _PrevDefaultLabel := CurDefaultLabel
-		PersonalMenu.Add(t("menu.hotstrings.default_category_prefix") . CurDefaultLabel, DefaultSectionMenu)
-		CloseOnAddLabel := t("menu.hotstrings.close_on_add")
-		RegisterMenuItem(PersonalMenu, CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
-		if (_EditorPrefGet("close_on_add", "1") == "1")
-			PersonalMenu.Check(CloseOnAddLabel)
+		PersonalRows.Push(Map(
+			"label",   t("menu.hotstrings.default_category_prefix") . CurDefaultLabel,
+			"submenu", DefaultSectionMenu))
+		PersonalRows.Push(Map(
+			"label",   t("menu.hotstrings.close_on_add"),
+			"action",  (*) => _TogglePersonalCloseOnAdd(PersonalMenu),
+			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
-			PersonalMenu.Add()
+			PersonalRows.Push(Map("separator", true))
 			; Section-level bulk actions for the personal hotstrings.
-			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.enable_all"),  (*) => HS_TogglePersonalAllSections(true))
-			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.disable_all"), (*) => HS_TogglePersonalAllSections(false))
-			PersonalMenu.Add()
+			PersonalRows.Push(Map(
+				"label",  t("menu.hotstrings.enable_all"),
+				"action", (*) => HS_TogglePersonalAllSections(true)))
+			PersonalRows.Push(Map(
+				"label",  t("menu.hotstrings.disable_all"),
+				"action", (*) => HS_TogglePersonalAllSections(false)))
+			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
-					PersonalMenu.Add()
+					PersonalRows.Push(Map("separator", true))
 					continue
 				}
 				if !TomlData["sections"].Has(SecName)
@@ -660,9 +681,13 @@ _HS_PersonalRows() {
 				SecLabel := DisambiguatedLabels[SecName] . " (" . FmtCount(SecData["entries"].Length) . ")"
 				; v2 path for a runtime-discovered personal section: the Features
 				; node (and config.toml section) key the lowercased TOML section name.
-				MenuAddItemWithLabel(PersonalMenu, "hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
+				Row := MenuRowWithLabel("hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
+				if (Row != "") {
+					PersonalRows.Push(Row)
+				}
 			}
 		}
+		MenuRenderer_AppendRows(PersonalMenu, "hotstrings_menu", "hotstring_personal", PersonalRows)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0
@@ -707,22 +732,34 @@ _HS_PersonalRows() {
 			}
 		}
 		for _, TF in FileNodeList {
-			TFMenu := Menu()
-			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-			if (TF.sections.Length > 0) {
-				TFMenu.Add()
-				for _, ES in TF.sections {
-					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
-					TFMenu.Add(SecLabel, (*) => NoAction())
-					TFMenu.Disable(SecLabel)
-				}
-			}
-			Rows.Push(Map(
-				"label",   TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
-				"submenu", TFMenu))
+			Rows.Push(_HS_TomlFileRow(TF))
 		}
 	}
 	return Rows
+}
+
+; One TOML file of the personal-extensions tree, as a row whose submenu holds
+; « ouvrir le fichier » and one inert line per section.
+;
+; Its own Menu, filled by the renderer from row data: a folder tree follows the
+; USER's directories, so each level builds a menu and hands the level below it
+; over as `submenu` rather than describing the whole tree as one nested array.
+; Every level is still drawn by the renderer, which is the point — the driver
+; decides the SHAPE of the tree, never how a row is drawn.
+_HS_TomlFileRow(TF) {
+	TFMenu := Menu()
+	FileRows := [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path))]
+	if (TF.sections.Length > 0) {
+		FileRows.Push(Map("separator", true))
+		for _, ES in TF.sections {
+			; Label only: these state what the file contains, they toggle nothing.
+			FileRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
+		}
+	}
+	MenuRenderer_AppendRows(TFMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
+	return Map(
+		"label",   TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+		"submenu", TFMenu)
 }
 
 ; Sum all hotstring counts inside a node and its sub-nodes recursively.
@@ -744,13 +781,13 @@ _HS_NodeTotal(Node) {
 ; a dynamic handler's menu parameter used to have — is what made the provider
 ; throw and took the entire tray menu down with it.
 ;
-; The nested levels are NOT row data, and that is deliberate. This tree mirrors
-; the user's own folder layout, which has no depth limit, while the renderer caps
-; nesting at MR_MAX_LIST_DEPTH (3) to stop a self-referential provider from
-; recursing until the stack gives out. Two levels of subfolders already reach the
-; cap, so converting this would silently truncate the folders of the very users
-; who organise their hotstrings the most. The cap is right for a provider and
-; wrong for a filesystem walk; the walk stays native.
+; Every level is row DATA rendered into that level's own Menu since 2026-08-07.
+; The tree mirrors the user's folder layout, which has no depth limit, and the
+; renderer caps a NESTED row array at MR_MAX_LIST_DEPTH to stop a self-referential
+; provider from recursing until the stack gives out — but that cap counts nesting
+; inside one array, and this walk starts a fresh render at each level. So the walk
+; keeps its own recursion, which is what a filesystem needs, and the renderer
+; still draws every row, which is what one menu needs.
 _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	FolderNames := []
 	for FolderName in Tree
@@ -766,6 +803,10 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 			}
 		}
 	}
+	; The folder rows of THIS level. They go back to the caller when it asked for
+	; data (the top level, which is a list provider) and are rendered into the
+	; parent's menu otherwise (every level below it).
+	FolderRows := (Rows is Array) ? Rows : []
 	for _, FolderName in FolderNames {
 		Node := Tree[FolderName]
 		FolderMenu := Menu()
@@ -781,30 +822,23 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 				}
 			}
 		}
+		; Subfolders first — they render themselves into FolderMenu — then the
+		; files of this folder, appended after them.
 		if (Node["subfolders"].Count > 0)
 			_HS_RenderTree(Node["subfolders"], FolderMenu)
+		FileRows := []
 		if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
-			FolderMenu.Add()
+			FileRows.Push(Map("separator", true))
 		for _, TF in FileNodeList {
-			TFMenu := Menu()
-			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-			if (TF.sections.Length > 0) {
-				TFMenu.Add()
-				for _, ES in TF.sections {
-					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
-					TFMenu.Add(SecLabel, (*) => NoAction())
-					TFMenu.Disable(SecLabel)
-				}
-			}
-			FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+			FileRows.Push(_HS_TomlFileRow(TF))
 		}
+		MenuRenderer_AppendRows(FolderMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
 		FolderTotal := _HS_NodeTotal(Node)
 		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-		if (Rows is Array) {
-			Rows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
-		} else {
-			ParentMenu.Add(FolderLabel, FolderMenu)
-		}
+		FolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
+	}
+	if !(Rows is Array) {
+		MenuRenderer_AppendRows(ParentMenu, "hotstrings_menu", "hotstring_personal_ext", FolderRows)
 	}
 }
 
