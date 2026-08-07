@@ -234,6 +234,9 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 105 → 94: the profile picker with its per-app overrides, and the remote-API
+	// endpoint list. That is the whole IA menu now: only the top-level dispatch
+	// stays native, because it reads the tray's own state to paint the health dot.
 	// 116 → 105: the backend picker and the whole model tree — provider, model,
 	// then the per-model specs sheet, the deepest tree the driver draws. The
 	// catalogue keeps its own function boundary (_LLM_Menu_AppendCatalogue) only
@@ -249,7 +252,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 105,
+	windows: 94,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -334,7 +337,12 @@ const MIN_TOTAL = {
 	// construction and the floor eventually fires on progress. 120 is below what
 	// a driver with a fully migrated menu would still show, not merely under
 	// today's number.
-	windows: 120,
+	// windows lowered 120 → 80 on 2026-08-07, same reason again: the IA menu was
+	// the driver's biggest reservoir of hand-built rows and converting it took the
+	// total to 115, four under the floor. 80 is under what a Windows driver whose
+	// menu is fully migrated would still show — the renderer's own Add calls, the
+	// tray root, and the handful of rows that mutate a live menu.
+	windows: 80,
 	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on
