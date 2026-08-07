@@ -237,7 +237,12 @@ const BASELINE = {
 	// karabiner_menu through one of three list providers, which translated each
 	// one on the way out — so the tree was still assembled there. They are
 	// provider data now.
-	macos: 191,
+	// 191 → 153: the personal-hotstrings tree and the keyboard-layout blocks.
+	// Both fed a provider through as_provider_row, so the driver assembled the
+	// tree and the renderer materialised a translation of it. They emit provider
+	// rows themselves now, which retired the adapter in the layout menu — it had
+	// become the identity function — and the import it was the only user of.
+	macos: 153,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and

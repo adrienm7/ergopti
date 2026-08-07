@@ -317,9 +317,9 @@ function M.build_custom(ctx, counts)
 	end
 
 	local cat_menu = { {
-		title   = i18n.get("menu.hotstrings.default_none"),
+		label   = i18n.get("menu.hotstrings.default_none"),
 		checked = (not state.custom_default_section) or nil,
-		fn      = function()
+		action      = function()
 			state.custom_default_section = nil
 			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 				pcall(ctx.hotstring_editor.set_default_section, nil)
@@ -335,7 +335,7 @@ function M.build_custom(ctx, counts)
 			end
 		end
 		if has_real then
-			table.insert(cat_menu, { title = "-" })
+			table.insert(cat_menu, { separator = true })
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 					local lbl   = (type(sec.description) == "string" and sec.description ~= "")
@@ -343,9 +343,9 @@ function M.build_custom(ctx, counts)
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
 					table.insert(cat_menu, {
-						title   = lbl,
+						label   = lbl,
 						checked = (state.custom_default_section == sname) or nil,
-						fn      = function()
+						action      = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -380,21 +380,21 @@ function M.build_custom(ctx, counts)
 
 		-- Section-level bulk actions for this personal subgroup.
 		target[#target + 1] = {
-			title    = i18n.get("menu.hotstrings.enable_all"),
+			label    = i18n.get("menu.hotstrings.enable_all"),
 			disabled = paused or nil,
-			fn       = not paused and setGroupSectionsFn(ctx, group_name, true) or nil,
+			action       = not paused and setGroupSectionsFn(ctx, group_name, true) or nil,
 		}
 		target[#target + 1] = {
-			title    = i18n.get("menu.hotstrings.disable_all"),
+			label    = i18n.get("menu.hotstrings.disable_all"),
 			disabled = paused or nil,
-			fn       = not paused and setGroupSectionsFn(ctx, group_name, false) or nil,
+			action       = not paused and setGroupSectionsFn(ctx, group_name, false) or nil,
 		}
-		target[#target + 1] = { title = "-" }
+		target[#target + 1] = { separator = true }
 
 		for _, sec in ipairs(secs) do
 			if type(sec) ~= "table" then goto continue_sec end
 			if sec.name == "-" then
-				target[#target + 1] = { title = "-" }
+				target[#target + 1] = { separator = true }
 			elseif not sec.is_module_placeholder then
 				local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
 					and ctx.keymap.is_section_enabled(group_name, sec.name) or false
@@ -402,9 +402,9 @@ function M.build_custom(ctx, counts)
 					and sec.description or tostring(sec.name):gsub("_", " ")
 				lbl = ctx.applyTriggerChar(lbl)
 				target[#target + 1] = {
-					title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
+					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
-					fn       = (group_enabled and not paused)
+					action       = (group_enabled and not paused)
 							   and toggleSectionFn(ctx, group_name, sec.name, lbl) or nil,
 					disabled = not group_enabled or paused or nil,
 				}
@@ -418,32 +418,32 @@ function M.build_custom(ctx, counts)
 	-- Assemble menu items
 	local menu_items = {
 		{
-			title    = i18n.get("menu.hotstrings.open_editor"),
+			label    = i18n.get("menu.hotstrings.open_editor"),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
 			end or nil,
 		},
 		{
-			title    = i18n.get("menu.hotstrings.open_file"),
+			label    = i18n.get("menu.hotstrings.open_file"),
 			disabled = paused or nil,
-			fn       = not paused and function() open_toml_path(toml_path_for_group(ctx, "personal")) end or nil,
+			action       = not paused and function() open_toml_path(toml_path_for_group(ctx, "personal")) end or nil,
 		},
-		{ title = "-" },
+		{ separator = true },
 		{
 			-- Clicking this item directly opens the shortcut customisation dialog
-			title    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
+			label    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
 			disabled = paused or nil,
-			fn       = not paused and sc_fn or nil,
+			action       = not paused and sc_fn or nil,
 		},
 		{
-			title = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
-			menu  = cat_menu,
+			label = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
+			items  = cat_menu,
 		},
 		{
-			title    = i18n.get("menu.hotstrings.close_on_add"),
+			label    = i18n.get("menu.hotstrings.close_on_add"),
 			checked  = state.custom_close_on_add or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				state.custom_close_on_add = not state.custom_close_on_add
 				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
 					pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
@@ -460,10 +460,10 @@ function M.build_custom(ctx, counts)
 		local path = toml_path_for_group(ctx, gname)
 		if path then
 			result[#result + 1] = {
-				title = i18n.get("menu.hotstrings.open_file"),
-				fn    = function() open_toml_path(path) end,
+				label = i18n.get("menu.hotstrings.open_file"),
+				action    = function() open_toml_path(path) end,
 			}
-			result[#result + 1] = { title = "-" }
+			result[#result + 1] = { separator = true }
 		end
 		for _, row in ipairs(rows) do result[#result + 1] = row end
 		return result
@@ -496,7 +496,7 @@ function M.build_custom(ctx, counts)
 			target[#target + 1] = { title = folder_label, menu = folder_menu }
 		end
 		if separate_files and #folder_names > 0 and #node.files > 0 then
-			target[#target + 1] = { title = "-" }
+			target[#target + 1] = { separator = true }
 		end
 		table.sort(node.files, function(a, b) return a.title < b.title end)
 		for _, file in ipairs(node.files) do
@@ -513,7 +513,7 @@ function M.build_custom(ctx, counts)
 
 		if #g_rows > 0 then
 			if gname == "personal" then
-				table.insert(menu_items, { title = "-" })
+				table.insert(menu_items, { separator = true })
 				for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
 			else
 				local stem = gname:sub(14)
@@ -542,9 +542,9 @@ function M.build_custom(ctx, counts)
 					end
 					local file_label = parts[#parts] .. (g_count > 0 and (" (" .. fmt_count(g_count) .. ")") or "")
 					node.files[#node.files + 1] = {
-						title = file_label,
+						label = file_label,
 						count = g_count,
-						menu  = file_rows_for_group(gname, g_rows),
+						items  = file_rows_for_group(gname, g_rows),
 					}
 				end
 			end
@@ -552,7 +552,7 @@ function M.build_custom(ctx, counts)
 	end
 
 	if #ext_tree.files > 0 or next(ext_tree.folders) ~= nil then
-		table.insert(menu_items, { title = "-" })
+		table.insert(menu_items, { separator = true })
 		render_ext_tree(ext_tree, menu_items, false)
 	end
 
@@ -560,7 +560,7 @@ function M.build_custom(ctx, counts)
 	local custom_rows = {}
 	append_section_rows(custom_rows, "custom", custom_secs, custom_enabled)
 	if #custom_rows > 0 then
-		table.insert(menu_items, { title = "-" })
+		table.insert(menu_items, { separator = true })
 		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
 	end
 
@@ -571,9 +571,9 @@ function M.build_custom(ctx, counts)
 	end
 	local both_enabled = all_personal_enabled and custom_enabled
 	return {
-		title   = title_str,
+		label   = title_str,
 		checked = both_enabled or nil,
-		fn      = function()
+		action      = function()
 			local will_enable = not both_enabled
 			-- Toggle all personal groups
 			for _, gname in ipairs(personal_group_names) do
@@ -599,7 +599,7 @@ function M.build_custom(ctx, counts)
 			ctx.notify_feature(base_title, will_enable)
 			ctx.updateMenu()
 		end,
-		menu = menu_items,
+		items = menu_items,
 	}
 end
 

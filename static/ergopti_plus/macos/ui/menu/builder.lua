@@ -446,8 +446,11 @@ function M.generate(ctx, menu_mods, actions)
 		local providers = {
 			["hotstring_categories_standard"] = function() return as_rows(std_groups) end,
 			["hotstring_categories_ergopti"]  = function() return as_rows(ergopti_groups_built) end,
+			-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
+			-- that builder emits `label`/`action`/`items` itself, so there is no
+			-- translation step and the renderer materialises the tree.
 			["hotstring_personal"]            = function()
-				return custom_item and { MenuUtils.as_provider_row(custom_item) } or {}
+				return custom_item and { custom_item } or {}
 			end,
 			["hotstring_extensions"]          = function() return as_rows(extension_items) end,
 			-- The dynamic-rule categories are Windows' and Linux's; this driver has
