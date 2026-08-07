@@ -128,6 +128,7 @@
 		"test:menu-manifest-keys-have-readers": "node ./tools/test/test-menu-manifest-keys-have-readers.cjs",
 		"test:menu-rows-outside-renderer": "node ./tools/test/test-menu-rows-outside-renderer.cjs",
 		"test:menu-action-handler-bijection": "node ./tools/test/test-menu-action-handler-bijection.cjs",
+		"test:menu-provider-kind": "node ./tools/test/test-menu-provider-kind-matches-type.cjs",
 		"test:conformance-skips-declared": "node ./tools/test/test-conformance-skips-declared.cjs",
 		"test:hook-scripts-exist": "node ./tools/test/test-hook-scripts-exist.cjs",
 		"test:shared-sources-are-lf": "node ./tools/test/test-shared-sources-are-lf.cjs",
