@@ -342,6 +342,12 @@ function M.new(deps)
 				report_driver_dialect(row, list_id)
 				local entry = { title = row.label, disabled = row.disabled or nil }
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
+				-- An optional per-row image, the Lua twin of the AutoHotkey renderer's
+				-- `icon`. Without it a provider had to choose between reaching the
+				-- renderer and keeping its icons: the bundled-apps list went through an
+				-- adapter that carried label, tick and greying and silently left the
+				-- app icons behind, so every row in that menu rendered blank-faced.
+				if row.image ~= nil then entry.image = row.image end
 				if type(row.items) == "table" then
 					entry.menu = render_rows(row.items, list_id, depth + 1)
 				elseif type(row.submenu) == "table" then

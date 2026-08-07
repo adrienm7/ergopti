@@ -84,9 +84,13 @@ helpers.describe("the Shortcuts master toggle is pause-gated like its siblings",
 
 	helpers.it("refuses to run its handler while paused", function()
 		local item = toggle_item_source()
-		helpers.assert_true(item:find("fn%s*=%s*%(not paused%)") ~= nil,
-			"the handler must be gated with `fn = (not paused) and function`. `disabled` alone "
-			.. "is a rendering hint: enabling the feature mid-pause would bind every hotkey "
+		-- `action`, the provider field, since the tray root became row data on
+		-- 2026-08-07. The rule is the one that matters and it did not change: the
+		-- CALLBACK — whatever the field holding it is called — must not exist while
+		-- paused.
+		helpers.assert_true(item:find("action%s*=%s*%(not paused%)") ~= nil,
+			"the handler must be gated with `action = (not paused) and function`. `disabled` "
+			.. "alone is a rendering hint: enabling the feature mid-pause would bind every hotkey "
 			.. "while the script is supposed to be entirely off (« pause = tout éteint »)")
 	end)
 

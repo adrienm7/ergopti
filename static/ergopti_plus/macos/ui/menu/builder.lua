@@ -458,10 +458,10 @@ function M.generate(ctx, menu_mods, actions)
 
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
-				title = hotstrings_title,
-				menu = hotstrings_menu,
+				label = hotstrings_title,
+				submenu = hotstrings_menu,
 				checked = all_enabled or nil,
-				fn = not ctx.paused and toggle_all_hotstrings or nil
+				action = not ctx.paused and toggle_all_hotstrings or nil
 			})
 		else
 			Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
@@ -531,7 +531,7 @@ function M.generate(ctx, menu_mods, actions)
 	for _, entry in ipairs(load_top_level_tail()) do
 		local id = entry.id
 		if id == "---" then
-			table.insert(items, { title = "-" })
+			table.insert(items, { separator = true })
 		elseif id == "global_actions" then
 			local ga_items = {}
 
@@ -571,23 +571,19 @@ function M.generate(ctx, menu_mods, actions)
 			else
 				Logger.error(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
 			end
-			table.insert(items, { title = i18n.get("menu.global.title"), menu = ga_items })
+			table.insert(items, { label = i18n.get("menu.global.title"), submenu = ga_items })
 		elseif id == "language" then
 			-- The locale rows reach the tray through the manifest's `language_menu`
 			-- now. They were the same twenty-one entries on every driver, from the
 			-- same shared catalogue, and nothing described the menu holding them.
-			local locale_rows = {}
-			for _, row in ipairs(i18n.build_language_menu_items() or {}) do
-				locale_rows[#locale_rows + 1] = MenuUtils.as_provider_row(row)
-			end
 			local rendered = ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
-				["locales"] = function() return locale_rows end,
+				["locales"] = function() return i18n.build_language_menu_items() or {} end,
 			})
-			table.insert(items, { title = i18n.get("menu.global.language"), menu = rendered })
+			table.insert(items, { label = i18n.get("menu.global.language"), submenu = rendered })
 		elseif id == "config_folder" then
-			table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
+			table.insert(items, { label = i18n.get("menu.global.config_folder"), action = actions.open_paths })
 		elseif id == "setup_wizard" then
-			table.insert(items, { title = i18n.get("menu.global.setup_wizard"), fn = actions.show_setup_wizard })
+			table.insert(items, { label = i18n.get("menu.global.setup_wizard"), action = actions.show_setup_wizard })
 		elseif id == "about" then
 			if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
 				local ok_a, about_item = pcall(menu_mods.about.build, ctx)
@@ -595,9 +591,9 @@ function M.generate(ctx, menu_mods, actions)
 			end
 		elseif id == "reload" then
 			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
-			table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), fn = actions.reload })
+			table.insert(items, { label = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), action = actions.reload })
 		elseif id == "quit" then
-			table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), fn = actions.quit })
+			table.insert(items, { label = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), action = actions.quit })
 		elseif id == "debug" then
 			-- The manifest declares every row of this submenu and the shared renderer
 			-- places them; this file supplies only what each one does.
@@ -634,14 +630,37 @@ function M.generate(ctx, menu_mods, actions)
 			else
 				Logger.error(LOG, "Manifest renderer unavailable — the debug submenu is empty.")
 			end
-			table.insert(items, { title = i18n.get("menu.debug.title"), menu = debug_items })
+			table.insert(items, { label = i18n.get("menu.debug.title"), submenu = debug_items })
 		end
+	end
+
+	-- Everything above collected row DATA; this is where the shared renderer turns
+	-- it into the table hs.menubar consumes.
+	--
+	-- Each component builder used to end with the row that hangs its submenu on
+	-- the tray — `title` + `menu`, written by hand once per submenu, a dozen times
+	-- over — and this function returned that array untouched. Linux made the same
+	-- move on 2026-08-07 and it was overdue here for a harder reason than symmetry:
+	-- two of those builders had ALREADY started returning provider rows, so the
+	-- Karabiner and « Disposition » entries reached the menu bar with no title and
+	-- their subtrees on a field hs.menubar does not read. Both were simply gone
+	-- from the menu, and nothing said so.
+	local rendered = {}
+	local ok_root, ManifestMenu = pcall(require, "infra.manifest_menu")
+	if ok_root and type(ManifestMenu.render_rows) == "function" then
+		rendered = ManifestMenu.render_rows(items, "top_level")
+	else
+		Logger.error(LOG, "Manifest renderer unavailable — the tray menu cannot be drawn.")
 	end
 
 	-- Collect the download item now so it participates in canvas width calculation below.
 	-- pcall-isolated like every other component builder above (e.g. the AI zone at
 	-- line ~447) — an exception here must degrade to "no download item", not take
 	-- down the whole menu-build pipeline.
+	--
+	-- Prepended AFTER the render, in the hs.menubar shape: it is a transient
+	-- progress row the LLM module owns and rebuilds on its own timer, not a row of
+	-- the declared menu.
 	local _dl_item = nil
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_download_item) == "function" then
 		local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)
@@ -652,15 +671,19 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 	if _dl_item then
-		table.insert(items, 1, { title = "-" })
-		table.insert(items, 1, _dl_item)
+		table.insert(rendered, 1, { title = "-" })
+		table.insert(rendered, 1, _dl_item)
 	end
 
 	-- This is the single highest-blast-radius call in the whole build pipeline:
-	-- it is the LAST step and mutates `items` in place, so an unguarded exception
+	-- it is the LAST step and mutates the menu in place, so an unguarded exception
 	-- here would unwind past every component built above and turn one broken
 	-- badge render into a total menu-rebuild failure.
-	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, items, ctx, function()
+	--
+	-- It too runs after the render: the badge is an IMAGE with no text, and a
+	-- provider row with an empty label is dropped by the renderer — correctly, for
+	-- every row but this one.
+	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, rendered, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
 			if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
@@ -670,7 +693,7 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
 	end
 
-	return items
+	return rendered
 end
 
 return M

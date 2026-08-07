@@ -483,9 +483,9 @@ function M.build(ctx)
 	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)
 
 	return {
-		title   = i18n.get("menu.metrics.title"),
+		label   = i18n.get("menu.metrics.title"),
 		checked = state.keylogger_enabled,
-		fn      = function()
+		action  = function()
 			if not state.keylogger_enabled then
 				local res = dialog.block_alert(
 					i18n.get("dialog.metrics.security_warning_title"),
