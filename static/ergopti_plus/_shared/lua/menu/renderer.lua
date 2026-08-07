@@ -444,8 +444,19 @@ function M.new(deps)
 				end
 				if type(built) == "table" then
 					flush_sep()
-					-- built may be a raw items list or a table with {menu=…, disabled=…}
-					local sub_menu     = type(built.menu) == "table" and built.menu or built
+					-- Three accepted shapes, and the third is why a group builder no
+					-- longer has to assemble driver rows: `items` is provider DATA,
+					-- materialised here exactly as a `list` row's is. `menu` is a
+					-- finished tree in the driver's own dialect, and a bare array is
+					-- the same thing without the wrapper — both predate the renderer
+					-- and stay accepted so a group can move when its author is ready
+					-- rather than all at once.
+					local sub_menu
+					if type(built.items) == "table" then
+						sub_menu = render_rows(built.items, group_id, 1)
+					else
+						sub_menu = type(built.menu) == "table" and built.menu or built
+					end
 					local sub_disabled = built.disabled or nil
 					table.insert(result, { title = label, menu = sub_menu, disabled = sub_disabled })
 					item_count = item_count + 1
