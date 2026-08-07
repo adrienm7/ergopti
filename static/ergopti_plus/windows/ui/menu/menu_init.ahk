@@ -122,9 +122,10 @@ initMenu() {
 	; type entry but uses the ToggleAllHostrings* pattern for hotstrings.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
-	_HotDynHandlers := Map(
-		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
-	)
+	; Empty since 2026-08-07: every row of the hotstrings tree is declarative or a
+	; list provider now. Kept as a Map rather than removed so the renderer's
+	; handler argument stays a Map and a future `dynamic` row has somewhere to go.
+	_HotDynHandlers := Map()
 
 	; repeat_key left _HotDynHandlers: its manifest row is `type = "check"` now,
 	; so the renderer draws the row, its label and its tick from the declaration
@@ -146,6 +147,7 @@ initMenu() {
 		; word_expanders did: its manifest row is `type = "list"` now, so the
 		; renderer builds the item from the data this returns.
 		"magic_key_config",              (*) => _HS_MagicKeyRows(),
+		"delays_colors",                 (*) => _HS_DelaysColorsRows(),
 		; The five category blocks. Their ROW — label, count, checkmark and
 		; position — is the renderer's now; the submenu hanging off each one is
 		; still SubMenus[Category], assembled by a different subsystem, and is

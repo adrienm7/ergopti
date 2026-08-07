@@ -3723,8 +3723,11 @@ id = "hotstring_extensions"
 type = "list"
 id = "word_expanders"
 
+# `list` since 2026-08-07, the last row of this group to move. It opens the
+# settings window and offers the per-category delays beside it — the same rows on
+# all three drivers, built three times because `action` hands the id back.
 [[menu.hotstrings_params_group]]
-type = "action"
+type = "list"
 id = "delays_colors"
 i18n = "menu.hotstrings.delays_colors"
 

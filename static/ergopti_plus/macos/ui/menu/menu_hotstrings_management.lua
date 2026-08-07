@@ -502,7 +502,6 @@ function M.build_management(ctx)
 	-- hand-built row. The name is better this way regardless.
 	local rows = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
 
-		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
 	}, nil, params_ctx, {
 		-- word_expanders is `type = "list"` in the manifest now, so the shared
 		-- renderer materialises every row of the submenu from this data instead of
@@ -525,6 +524,11 @@ function M.build_management(ctx)
 		["magic_key_config"] = function()
 			if not magic_key_item then return {} end
 			return { MenuUtils.as_provider_row(magic_key_item) }
+		end,
+		-- `list` since 2026-08-07, the last row of this group to move.
+		["delays_colors"] = function()
+			if not delays_item then return {} end
+			return { MenuUtils.as_provider_row(delays_item) }
 		end,
 	})
 
