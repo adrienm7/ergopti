@@ -40,30 +40,41 @@ InitSubMenus() {
 		; express « these three come first », which building the array in order says
 		; on its own.
 		Rows := []
-		; Top of the submenu: an enable/disable toggle for the whole TOML file,
-		; mirroring the module toggles (Disposition, Metrics, ...). It sits directly
-		; above the open-file item with NO separator between them. Its state drives
-		; the parent menu checkmark (IsCategoryGated), independent of how many
-		; individual sections are checked. Capture V1Cat by value so each closure
-		; toggles its own category.
+		; THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
+		; them until 2026-08-07: this driver put the two bulk actions above
+		; « ouvrir le fichier », Linux put them below it, and macOS had no category
+		; gate row at all. Same submenu, same five categories, three layouts.
+		;
+		;   1. the category gate — everything under it is inert while it is off
+		;   2. « ouvrir le fichier », when the category has one
+		;   3. ─────────
+		;   4. « tout activer »
+		;   5. « tout désactiver »
+		;   6. ─────────
+		;   7. the sections
+		;
+		; Its state drives the parent menu checkmark (IsCategoryGated), independent
+		; of how many individual sections are checked. Capture V1Cat by value so
+		; each closure toggles its own category.
 		Rows.Push(Map(
 			"label",  IsCategoryGated(V1Cat)
 				? t("menu.hotstrings.category_on")
 				: t("menu.hotstrings.category_off"),
 			"action", ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
-		; Section-level bulk actions for this category, just under its gate toggle.
+
+		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
+		if FileExist(TomlPath) {
+			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
+		}
+		Rows.Push(Map("separator", true))
+		; Section-level bulk actions for this category.
 		Rows.Push(Map(
 			"label",  t("menu.hotstrings.enable_all"),
 			"action", ((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat)))
 		Rows.Push(Map(
 			"label",  t("menu.hotstrings.disable_all"),
 			"action", ((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat)))
-
-		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
-		if FileExist(TomlPath) {
-			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
-			Rows.Push(Map("separator", true))
-		}
+		Rows.Push(Map("separator", true))
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
