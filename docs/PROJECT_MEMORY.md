@@ -131,6 +131,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-python-slice-replace-can-shred-a-file](#project-python-slice-replace-can-shred-a-file) — A `str.replace` whose needle came from two `index()` calls silently becomes `replace("", …)` when the bounds invert, inserting the payload between every character; the original is recoverable because it is interleaved, not lost
 - [project-a-driver-that-types-also-types-into-its-own-keylogger](#project-a-driver-that-types-also-types-into-its-own-keylogger) — Whether the driver's own keylogger sees an expansion depends on WHICH sender emitted it: SendEvent is observed, SendInput is not, and no comment in the tree says so
 - [project-an-enumeration-is-not-a-feature](#project-an-enumeration-is-not-a-feature) — Every hand-written list in this repo has been found short; the fix is to derive the list, and where derivation would explode, to resolve at use time instead
+- [project-one-menu-two-shared-descriptions](#project-one-menu-two-shared-descriptions) — A menu described twice in `_shared/` drifts with nothing comparing the halves; only a test that asserts the retired file STAYS retired closes it
+- [project-dynamic-places-list-materialises](#project-dynamic-places-list-materialises) — `dynamic` and `list` are not two spellings of one thing: a dynamic handler appends driver-shaped rows, a list provider returns provider-shaped rows the renderer builds
 - [project-the-preview-index-is-file-driven-only](#project-the-preview-index-is-file-driven-only) — The Windows preview tooltip reads _PrefixIndex, whose single writer has three FILE-driven callers; a trigger registered imperatively by CreateHotstring can never be previewed, and inserting it into the index is erased by the next rebuild
 
 
@@ -339,6 +341,77 @@ and keep the counter.
 
 Related: [[project-the-preview-index-is-file-driven-only]],
 [[project-an-enumeration-is-not-a-feature]], [[feedback-regression-tests]].
+
+
+
+
+### project-one-menu-two-shared-descriptions
+
+_A menu can be centralised twice. Two shared descriptions of one menu drift with
+nothing comparing them, and the weaker one promises rows nobody draws_
+
+<sub>slug: `project_one_menu_two_shared_descriptions`</sub>
+
+The IA submenu was described in `_shared/modules/llm/menu_layout.json` — row
+order, greying policy, health dot — read by Windows and macOS. It was ALSO
+described in `menu_manifest.json` under `llm_menu`, as two rows only Linux drew.
+Neither file mentioned the other. Consequences, all of them silent:
+
+- The manifest's two rows carried no `platforms`, so they were promised to
+  Windows and macOS, which have never rendered either.
+- The spec file claimed to own the row order. Windows honoured it; macOS read
+  only the greying policy out of it and appended its rows as it built them, so
+  the model row sat second on one driver and ninth on the other.
+- Every manifest-reading gate passed throughout, because each gate only ever
+  looked at one of the two descriptions.
+
+What finds this class of bug: ask which file a menu is described in, and then
+ask whether ANY driver reads a second one. What keeps it fixed: when a
+description is retired, a test asserting the retired path does not exist. The
+grep that would have caught the duplication is cheap; the test that keeps it
+caught is one assertion.
+
+Related: [[project-a-second-vocabulary-fails-silently]],
+[[project-dynamic-places-list-materialises]], [[feedback-regression-tests]].
+
+
+
+
+### project-dynamic-places-list-materialises
+
+_`dynamic` and `list` are not two spellings of "the driver builds it". They
+differ in row DIALECT, and the bypass ratchet counts dialect, not intent_
+
+<sub>slug: `project_dynamic_places_list_materialises`</sub>
+
+In the shared renderer (`_shared/lua/menu/renderer.lua`):
+
+- a **`list`** row calls a provider that RETURNS provider-shaped rows
+  (`label` / `action` / `items` / `checked`), which the renderer materialises
+  into driver rows itself;
+- a **`dynamic`** row calls a handler that APPENDS driver-shaped rows
+  (`title` / `fn` / `menu`) into the result in place — several rows if it wants,
+  which is how a declared row anchors its undeclared extras (a conditional note,
+  a reset entry, a trailing separator).
+
+Two consequences that are easy to get wrong:
+
+1. A dynamic handler must append rows in the DRIVER dialect. Append a
+   provider-shaped row and it reaches `hs.menubar` with `label`/`items` keys and
+   simply does not draw.
+2. `tools/test/test-menu-rows-outside-renderer.cjs` keys on `title =` in driver
+   source. So converting a row from `list` to `dynamic` RAISES the bypass count
+   even though nothing was hand-built that was not hand-built before — the row
+   only changed dialect. Expect it, and write the reason at the baseline rather
+   than arguing with the number.
+
+Choosing `dynamic` buys shared PLACEMENT (the manifest decides where the row
+goes on every driver) at the cost of shared CONSTRUCTION. That is the right
+trade when the drivers currently disagree about order; it is the wrong one when
+the row's contents are already declarable.
+
+Related: [[project-one-menu-two-shared-descriptions]],
+[[project-an-enumeration-is-not-a-feature]].
 
 
 
