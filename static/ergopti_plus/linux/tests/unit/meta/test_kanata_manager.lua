@@ -304,12 +304,60 @@ helpers.describe("kanata manager", function()
       if kanata_section then
         helpers.assert_true(type(kanata_section.menu) == "table" and #kanata_section.menu > 0,
           "Kanata section has submenu items")
-        -- Verify each submenu item has a fn.
+        -- Every row that LOOKS clickable must be. This used to read "every row
+        -- has a callback", which held while the menu was four action rows and
+        -- stopped holding on 2026-08-07, when the tap-hold read-out added a
+        -- separator, a section header and one submenu per configured key. The
+        -- guarantee it was protecting is unchanged and stated exactly: a row
+        -- that is not a separator, is not disabled and opens no submenu must do
+        -- something when clicked.
         for _, sub in ipairs(kanata_section.menu) do
-          helpers.assert_true(type(sub.fn) == "function",
-            "Kanata item '" .. (sub.title or "?") .. "' has a callback")
+          local is_separator = (sub.title == "-")
+          local is_label     = (sub.disabled == true)
+          local opens_menu   = (type(sub.menu) == "table")
+          if not (is_separator or is_label or opens_menu) then
+            helpers.assert_true(type(sub.fn) == "function",
+              "Kanata item '" .. (sub.title or "?") .. "' looks clickable but has no callback")
+          end
         end
       end
+    end)
+
+    helpers.it("the tap-hold read-out is derived from the shared configuration", function()
+      local manager = helpers.load_module("platform.remap.manager")
+      helpers.assert_true(type(manager.tap_hold_keys) == "function",
+        "the manager must expose the tap-hold configuration the tray reads")
+
+      local keys = manager.tap_hold_keys()
+      local expected = 0
+      for _ in pairs(keys or {}) do expected = expected + 1 end
+      helpers.assert_true(expected > 0,
+        "_shared/tap_hold/defaults.toml must declare at least one tap-hold key")
+
+      local mb = helpers.load_module("ui.menu.menu_builder")
+      local items = mb.build({ _version = "test", on_quit = function() end })
+      local kanata_section = nil
+      for _, item in ipairs(items) do
+        if type(item.title) == "string" and item.title:find("Kanata", 1, true) then
+          kanata_section = item
+          break
+        end
+      end
+      helpers.assert_true(kanata_section ~= nil, "Kanata section present in menu")
+
+      -- Rows that open a submenu are the per-key read-outs; the four lifecycle
+      -- rows are flat and the header is a disabled label.
+      local read_outs = 0
+      for _, sub in ipairs(kanata_section.menu or {}) do
+        if type(sub.menu) == "table" then read_outs = read_outs + 1 end
+      end
+
+      -- Counted on both sides rather than compared against a number written
+      -- here: a hardcoded 7 would still pass the day someone adds an eighth key
+      -- to the shared file and the menu keeps showing seven, which is precisely
+      -- the failure this driver has hit before with hand-written lists.
+      helpers.assert_eq(read_outs, expected,
+        "the tray must show one tap-hold row per key in the shared configuration")
     end)
   end)
 
