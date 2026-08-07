@@ -154,13 +154,18 @@ _MMDW_HandlersCallResolver() {
 	; are `command`, so the RENDERER applies the greying from the declaration and
 	; there is no handler left to delegate. That is the case the paragraph above
 	; describes — a row built by more shared code, not less.
+	; The two shortcut pickers and the app-exclusion row became `list` providers on
+	; 2026-08-07 — the renderer draws the row, the provider only says what it says.
+	; They stay in this list under their new names: a provider resolves its own
+	; greying exactly as the handler did, because the label is computed and the
+	; renderer has nothing else to apply the declaration to.
 	Handlers := Map(
-		"_MET_ShortcutTyping",  "shortcut_typing",
-		"_MET_ShortcutApps",    "shortcut_apps",
-		"_MET_ExcludeApps",     "exclude_apps",
-		"_MET_WpmWidget",       "wpm_widget",
-		"_MET_WpmWidgetColors", "widget_colors",
-		"_MET_WpmWidgetGraph",  "include_realtime",
+		"_MET_ShortcutTypingRows", "shortcut_typing",
+		"_MET_ShortcutAppsRows",   "shortcut_apps",
+		"_MET_ExcludeAppsRows",    "exclude_apps",
+		"_MET_WpmWidget",          "wpm_widget",
+		"_MET_WpmWidgetColors",    "widget_colors",
+		"_MET_WpmWidgetGraph",     "include_realtime",
 	)
 	for FuncName, Id in Handlers {
 		Seg := _DriverFuncBody(FuncName)

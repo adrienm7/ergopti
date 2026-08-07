@@ -728,7 +728,7 @@
 			]
 		},
 		{
-			"type": "action",
+			"type": "list",
 			"id": "shortcut_typing",
 			"i18n_dynamic": "menu.metrics.shortcut_prefix",
 			"disabled_when": [
@@ -752,7 +752,7 @@
 			]
 		},
 		{
-			"type": "action",
+			"type": "list",
 			"id": "shortcut_apps",
 			"i18n_dynamic": "menu.metrics.shortcut_prefix",
 			"disabled_when": [
@@ -881,7 +881,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "exclude_apps",
 			"disabled_when": [
 				"keylogger_enabled"
