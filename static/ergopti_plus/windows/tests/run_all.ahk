@@ -629,6 +629,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
 #Include meta/test_menu_gestures_actions_separator.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
+#Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk

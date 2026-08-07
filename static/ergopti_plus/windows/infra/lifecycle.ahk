@@ -449,7 +449,15 @@ BuildTrayMenuDeferred() {
 				finally _DriverReady := _SavedReady
 				UpdateTrayIcon()
 	} catch as e {
-		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1}", e.Message)
+		; The file and line, not only the message. "This local variable has not
+		; been assigned a value" names nothing on its own, and this catch swallows
+		; the ONE build that draws the whole tray — so a menu simply vanishes and
+		; the log says only that something, somewhere, was unset.
+		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1} [{2} at {3}:{4}]",
+			e.Message,
+			(e.HasProp("What") ? e.What : "?"),
+			(e.HasProp("File") ? e.File : "?"),
+			(e.HasProp("Line") ? e.Line : "?"))
 	}
 		if _LangMenuBuildPending
 				SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
