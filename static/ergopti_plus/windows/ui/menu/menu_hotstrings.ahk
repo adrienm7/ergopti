@@ -92,25 +92,35 @@ _HS_MagicKeyRows() {
 ; `submenu` shape the category blocks use while their trees are still built here.
 _HS_DelaysColorsRows() {
 	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
-	Sub := Menu()
-	RegisterMenuItem(Sub, t("menu.hotstrings.config_item"), (*) => OpenHotstringsConfigWindow())
-	Sub.Add()
-	RegisterMenuItem(Sub, _HS_DefaultDelayLabel(), (*) => _HS_PromptDefaultDelay())
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"), (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"), (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection"))
-	; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
-	; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
-	; key, so its no-override default is the UI constant (20 s); the live tooltip
-	; timer reads the same override (infra/tooltip.ahk).
-	Sub.Add()
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC), (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC))
-	; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
-	; mirrors the HS "Délai autocomplétion" item. Backed by the "dynamichotstrings"
-	; override; the no-override default is DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY), (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
+	; Nested row DATA since 2026-08-07. This was a native Menu handed over in
+	; `submenu`, so the whole submenu was assembled here; none of these rows
+	; mutates the live menu — each opens a prompt and the tray rebuilds after —
+	; so nothing held them back.
+	Sub := [
+		Map("label", t("menu.hotstrings.config_item"), "action", (*) => OpenHotstringsConfigWindow()),
+		Map("separator", true),
+		Map("label", _HS_DefaultDelayLabel(), "action", (*) => _HS_PromptDefaultDelay()),
+		Map("label", _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"),
+			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key")),
+		Map("label", _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"),
+			"action", (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection")),
+		Map("separator", true),
+		; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
+		; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
+		; key, so its no-override default is the UI constant (20 s); the live
+		; tooltip timer reads the same override (infra/tooltip.ahk).
+		Map("label", _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC),
+			"action", (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC)),
+		; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
+		; mirrors the HS "Délai autocomplétion" item. Backed by the
+		; "dynamichotstrings" override; the no-override default is
+		; DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
+		Map("label", _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY),
+			"action", (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
+	]
 	return [Map(
-		"label",   t("menu.hotstrings.delays_colors"),
-		"submenu", Sub)]
+		"label", t("menu.hotstrings.delays_colors"),
+		"items", Sub)]
 }
 
 ; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
