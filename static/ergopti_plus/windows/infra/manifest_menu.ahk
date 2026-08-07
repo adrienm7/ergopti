@@ -644,6 +644,28 @@ MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
 	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
 }
 
+; Appends row DATA to an EXISTING menu, at its current end.
+;
+; The third entry point, and the narrowest: unlike MenuRenderer_FillFromList it
+; does not clear the target, so a caller assembling a menu in several passes can
+; hand each pass over. The model picker is the case — its head rows, the curated
+; catalogue and its tail rows are three separate decisions — and the catalogue
+; pass has to keep its own function boundary because a regression test pins the
+; call that appends it.
+;
+; @param TargetMenu Menu The menu to append to (left as-is otherwise).
+; @param MenuKey string Manifest key, for the log.
+; @param ListId string Row id, for the log.
+; @param Rows array The row data.
+; @returns {Integer} Rows added.
+MenuRenderer_AppendRows(TargetMenu, MenuKey, ListId, Rows) {
+	if (!(Rows is Array)) {
+		try LoggerWarn("MenuRenderer", "List '{1}.{2}' got no row array to append — nothing added.", MenuKey, ListId)
+		return 0
+	}
+	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
+}
+
 MenuRenderer_I18nDynamic(MenuKey, ItemId) {
 	Item := _MR_FindItemById(MenuKey, ItemId)
 	if (Item == false) {

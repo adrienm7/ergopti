@@ -49,8 +49,17 @@ global LLM_MENU_POST_PULL_REBUILD_MS := 3000
  * @returns {Menu} Populated backend submenu.
  */
 LLM_Menu_BuildBackendMenu() {
-	global _LLM_Menu
 	m := Menu()
+	MenuRenderer_FillFromList(m, "llm_menu", "llm_backend", (*) => _LLM_Menu_BackendRows())
+	return m
+}
+
+/**
+ * Row data for the backend submenu.
+ * @returns {Array} One row per backend, then the Ollama port and its reset row.
+ */
+_LLM_Menu_BackendRows() {
+	global _LLM_Menu
 	; Hardcoded brand prefix per backend — name + emoji + em-dash. Only
 	; the localised descriptive suffix (e.g. "Standard" / "fournisseur
 	; distant") lives in the i18n catalogue; the rest is the same in
@@ -59,26 +68,28 @@ LLM_Menu_BuildBackendMenu() {
 		"ollama", "Ollama 🦙 — ",
 		"api",    "API 🌐 — "
 	)
+	Rows := []
 	for backend_id in LLM_MENU_BACKEND_OPTIONS {
 		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
-		label := prefix . t("menu.llm.backend_" backend_id "_suffix")
-		RegisterMenuItem(m, label, _LLM_Menu_MakeSetBackendHandler(backend_id))
-		if (backend_id == _LLM_Menu["backend"])
-			m.Check(label)
+		Rows.Push(Map(
+			"label",   prefix . t("menu.llm.backend_" backend_id "_suffix"),
+			"checked", (backend_id == _LLM_Menu["backend"]),
+			"action",  _LLM_Menu_MakeSetBackendHandler(backend_id)))
 	}
 
 	; Ollama server port — the local daemon's port (11434 by default). Configurable
 	; so a user running Ollama on a non-standard port (or behind a proxy) can still
 	; reach it. Shown unconditionally: the user may set it before switching backend.
-	m.Add()
+	Rows.Push(Map("separator", true))
 	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
-	RegisterMenuItem(m, StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
-		(*) => LLM_Menu_PromptOllamaPort())
-	_LLM_MaybeAddReset(m,
+	Rows.Push(Map(
+		"label",  StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
+		"action", (*) => LLM_Menu_PromptOllamaPort()))
+	_LLM_MaybeResetRow(Rows,
 		port_display,
 		_LLM_DefaultFor("llm_ollama_port"),
 		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port")))
-	return m
+	return Rows
 }
 
 
@@ -129,23 +140,23 @@ LLM_Menu_BuildModelMenu() {
 	deps_ready := LLM_Deps_IsReady()
 
 	; "Aucun modèle (Désactivé)" — first row of the HS menu.
-	no_label := t("menu.llm.no_model")
-	RegisterMenuItem(m, no_label, _LLM_Menu_MakeSetModelHandler(""))
-	if (active == "")
-		m.Check(no_label)
+	HeadRows := [Map(
+		"label",   t("menu.llm.no_model"),
+		"checked", (active == ""),
+		"action",  _LLM_Menu_MakeSetModelHandler(""))]
 
 	; Backend default — shortcut that restores the canonical Ollama tag
 	; without scrolling the catalogue. Reads from the shared defaults.json
 	; so any change to the canonical default propagates here automatically.
 	default_name := _LLM_DefaultFor("llm_model", "")
 	if (default_name != "") {
-		def_label := StrReplace(t("menu.llm.backend_default_model"), "%s", default_name)
-		RegisterMenuItem(m, def_label, _LLM_Menu_MakeSetModelHandler(default_name))
-		if (active == default_name)
-			m.Check(def_label)
+		HeadRows.Push(Map(
+			"label",   StrReplace(t("menu.llm.backend_default_model"), "%s", default_name),
+			"checked", (active == default_name),
+			"action",  _LLM_Menu_MakeSetModelHandler(default_name)))
 	}
-
-	m.Add()  ; separator
+	HeadRows.Push(Map("separator", true))
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)
 
 	; Curated catalogue — provider → family → model. Family boundaries are
 	; rendered as separators inside the provider submenu (matches HS's
@@ -170,19 +181,24 @@ LLM_Menu_BuildModelMenu() {
 		; needs to clear a configured model (llm-no-model-row-clobbered). The
 		; selector already reads "no model" and stays clickable, so the
 		; placeholder never carried information the menu was not showing.
+		TagRows := []
 		for tag in installed {
-			RegisterMenuItem(m, tag, _LLM_Menu_MakeSetModelHandler(tag))
-			if (tag == active)
-				m.Check(tag)
+			TagRows.Push(Map(
+				"label",   tag,
+				"checked", (tag == active),
+				"action",  _LLM_Menu_MakeSetModelHandler(tag)))
 		}
+		MenuRenderer_AppendRows(m, "llm_menu", "llm_model", TagRows)
 	}
 
-	m.Add()
-	RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Menu_PromptAddModel())
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	RegisterMenuItem(m, t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", [
+		Map("separator", true),
+		Map("label", t("menu.llm.add_model_entry"),     "action", (*) => LLM_Menu_PromptAddModel()),
+		Map("label", t("menu.llm.browse_models_entry"), "action", (*) => LLM_ModelBrowser_Show())
+	])
 	return m
 }
 
@@ -203,10 +219,29 @@ LLM_Menu_BuildModelMenu() {
  * @returns {Boolean} True when the catalogue produced at least one entry.
  */
 _LLM_Menu_AppendCatalogue(m, presets, active, deps_ready := true) {
-	global JSON_NULL
-	if (Type(presets) != "Array" or presets.Length == 0)
+	Rows := _LLM_Menu_CatalogueRows(presets, active, deps_ready)
+	if (Rows.Length == 0)
 		return false
-	any_added := false
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", Rows)
+	return true
+}
+
+/**
+ * The catalogue as row DATA: one provider row per entry, each holding its
+ * models, each holding its specs sheet. Three levels, which is what the
+ * renderer allows — and the reason the specs sheet is a flat list of disabled
+ * rows rather than a section per topic.
+ *
+ * @param {Array}   presets    - Provider list from ``LLM_GetModelPresets``.
+ * @param {string}  active     - Currently selected model name (for the checkmark).
+ * @param {Boolean} deps_ready - True when the Ollama daemon is confirmed reachable.
+ * @returns {Array} Provider rows; empty when the catalogue yields nothing.
+ */
+_LLM_Menu_CatalogueRows(presets, active, deps_ready := true) {
+	global JSON_NULL
+	Rows := []
+	if (Type(presets) != "Array" or presets.Length == 0)
+		return Rows
 	for provider in presets {
 		if (Type(provider) != "Map")
 			continue
@@ -217,8 +252,7 @@ _LLM_Menu_AppendCatalogue(m, presets, active, deps_ready := true) {
 		if (Type(families) != "Array" or families.Length == 0)
 			continue
 
-		provider_menu := Menu()
-		provider_has_entries := false
+		ProviderRows := []
 		first_family_with_entries := true
 
 		for family in families {
@@ -250,28 +284,24 @@ _LLM_Menu_AppendCatalogue(m, presets, active, deps_ready := true) {
 				; nested sub-sub-menus. Insert it only once per family, and
 				; only if a previous family already contributed rows.
 				if (family_added_any == false and !first_family_with_entries) {
-					provider_menu.Add()
+					ProviderRows.Push(Map("separator", true))
 				}
 
-				rich_title := _LLM_Menu_BuildModelRowTitle(name, active, deps_ready)
-				model_menu := _LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready)
-				provider_menu.Add(rich_title, model_menu)
-				if (name == active)
-					provider_menu.Check(rich_title)
+				ProviderRows.Push(Map(
+					"label",   _LLM_Menu_BuildModelRowTitle(name, active, deps_ready),
+					"checked", (name == active),
+					"items",   _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready)))
 				family_added_any := true
-				provider_has_entries := true
 			}
 
 			if (family_added_any)
 				first_family_with_entries := false
 		}
 
-		if (provider_has_entries) {
-			m.Add(provider_label, provider_menu)
-			any_added := true
-		}
+		if (ProviderRows.Length > 0)
+			Rows.Push(Map("label", provider_label, "items", ProviderRows))
 	}
-	return any_added
+	return Rows
 }
 
 /**
@@ -305,13 +335,13 @@ _LLM_Menu_BuildModelRowTitle(name, active, deps_ready := true) {
 }
 
 /**
- * Builds the per-model sub-submenu shown when the user hovers a model row.
+ * Row data for the per-model sheet shown when the user hovers a model row.
  * Reproduces the HS layout: Select (with checkmark), Delete cache (when
  * installed), Backend + Source URL, then a SPECIFICATIONS section, a
  * CAPABILITIES section, and a HARDWARE REQUIREMENTS section.
  *
- * All info rows are added as disabled items so the user cannot accidentally
- * trigger a no-op click on a spec line.
+ * All info rows carry no action, so the renderer draws them disabled and the
+ * user cannot land a no-op click on a spec line.
  *
  * @param {string}  name       - Model display name.
  * @param {Map}     model      - Raw catalogue record (from models.json).
@@ -319,87 +349,66 @@ _LLM_Menu_BuildModelRowTitle(name, active, deps_ready := true) {
  * @param {string}  active     - Currently selected model name.
  * @param {Boolean} deps_ready - When false the install probe is skipped: every
  *                               model offers "Download" since nothing is confirmed.
- * @returns {Menu} The per-model submenu.
+ * @returns {Array} The per-model rows.
  */
-_LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := true) {
-	global JSON_NULL
-	sub := Menu()
-
-	select_label := t("menu.llm.select_model")
-	RegisterMenuItem(sub, select_label, _LLM_Menu_MakeSetModelHandler(name))
-	if (name == active)
-		sub.Check(select_label)
+_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
+	Rows := [Map(
+		"label",   t("menu.llm.select_model"),
+		"checked", (name == active),
+		"action",  _LLM_Menu_MakeSetModelHandler(name))]
 
 	if (deps_ready and LLM_IsModelInstalled(name)) {
-		del_label := t("menu.llm.delete_model_cache")
-		RegisterMenuItem(sub, del_label, _LLM_Menu_MakeDeleteCacheHandler(name))
+		Rows.Push(Map(
+			"label",  t("menu.llm.delete_model_cache"),
+			"action", _LLM_Menu_MakeDeleteCacheHandler(name)))
 	} else {
-		dl_label := t("menu.llm.download_model")
-		RegisterMenuItem(sub, dl_label, _LLM_Menu_MakeDownloadModelHandler(name))
+		Rows.Push(Map(
+			"label",  t("menu.llm.download_model"),
+			"action", _LLM_Menu_MakeDownloadModelHandler(name)))
 	}
 
-	sub.Add()  ; separator
+	Rows.Push(Map("separator", true))
+	; A row with no action is drawn disabled by the renderer, which is what every
+	; spec line below is: information, not a click target.
+	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s", "Ollama")))
+	Rows.Push(Map(
+		"label",  StrReplace(t("menu.llm.model_source"), "%s", ollama_url),
+		"action", _LLM_Menu_MakeOpenUrlHandler(ollama_url)))
 
-	backend_label := StrReplace(t("menu.llm.model_backend"), "%s", "Ollama")
-	sub.Add(backend_label, (*) => 0)
-	sub.Disable(backend_label)
-
-	source_label := StrReplace(t("menu.llm.model_source"), "%s", ollama_url)
-	RegisterMenuItem(sub, source_label, _LLM_Menu_MakeOpenUrlHandler(ollama_url))
-
-	sub.Add()
-	specs_header := t("menu.llm.specs_header")
-	sub.Add(specs_header, (*) => 0)
-	sub.Disable(specs_header)
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", t("menu.llm.specs_header")))
 
 	type_val := model.Has("type") ? model["type"] : ""
 	type_label_text := t((type_val == "completion") ? "menu.llm.model_type_completion" : "menu.llm.model_type_chat")
-	type_label := StrReplace(t("menu.llm.model_type"), "%s", type_label_text)
-	sub.Add(type_label, (*) => 0)
-	sub.Disable(type_label)
+	Rows.Push(Map("label", StrReplace(t("menu.llm.model_type"), "%s", type_label_text)))
 
 	if (model.Has("last_updated") and model["last_updated"] != "" and model["last_updated"] != "Unknown") {
 		date_val := model["last_updated"]
 		if RegExMatch(date_val, "^(\d{4})-(\d{2})-(\d{2})$", &dm)
 			date_val := dm[3] . "/" . dm[2] . "/" . dm[1]
-		date_label := StrReplace(t("menu.llm.model_date"), "%s", date_val)
-		sub.Add(date_label, (*) => 0)
-		sub.Disable(date_label)
+		Rows.Push(Map("label", StrReplace(t("menu.llm.model_date"), "%s", date_val)))
 	}
 
 	if (model.Has("parameters") and Type(model["parameters"]) == "Map") {
 		params := model["parameters"]
-		if (params.Has("total") and params["total"] != "" and params["total"] != "N/A") {
-			lbl := StrReplace(t("menu.llm.model_params_total"), "%s", params["total"])
-			sub.Add(lbl, (*) => 0)
-			sub.Disable(lbl)
-		}
-		if (params.Has("active") and params["active"] != "" and params["active"] != "N/A") {
-			lbl := StrReplace(t("menu.llm.model_params_active"), "%s", params["active"])
-			sub.Add(lbl, (*) => 0)
-			sub.Disable(lbl)
-		}
+		if (params.Has("total") and params["total"] != "" and params["total"] != "N/A")
+			Rows.Push(Map("label", StrReplace(t("menu.llm.model_params_total"), "%s", params["total"])))
+		if (params.Has("active") and params["active"] != "" and params["active"] != "N/A")
+			Rows.Push(Map("label", StrReplace(t("menu.llm.model_params_active"), "%s", params["active"])))
 	}
 
 	if (model.Has("capabilities") and Type(model["capabilities"]) == "Map") {
 		caps := model["capabilities"]
-		sub.Add()
-		caps_header := t("menu.llm.caps_header")
-		sub.Add(caps_header, (*) => 0)
-		sub.Disable(caps_header)
-		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"])) {
-			lbl := StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])
-			sub.Add(lbl, (*) => 0)
-			sub.Disable(lbl)
-		}
+		Rows.Push(Map("separator", true))
+		Rows.Push(Map("label", t("menu.llm.caps_header")))
+		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"]))
+			Rows.Push(Map("label", StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])))
 		if (caps.Has("tags") and Type(caps["tags"]) == "Array" and caps["tags"].Length > 0) {
 			joined := ""
 			for tag in caps["tags"] {
 				joined .= (joined == "" ? "" : ", ") . tag
 			}
-			lbl := StrReplace(t("menu.llm.model_tags"), "%s", joined)
-			sub.Add(lbl, (*) => 0)
-			sub.Disable(lbl)
+			Rows.Push(Map("label", StrReplace(t("menu.llm.model_tags"), "%s", joined)))
 		}
 	}
 
@@ -407,29 +416,18 @@ _LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 		hw_root := model["hardware_requirements"]
 		if (hw_root.Has("ollama") and Type(hw_root["ollama"]) == "Map") {
 			hw := hw_root["ollama"]
-			sub.Add()
-			hw_header := StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")
-			sub.Add(hw_header, (*) => 0)
-			sub.Disable(hw_header)
-			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"])) {
-				lbl := StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])
-				sub.Add(lbl, (*) => 0)
-				sub.Disable(lbl)
-			}
-			if (hw.Has("disk_gb") and _LLM_Menu_IsNumber(hw["disk_gb"])) {
-				lbl := StrReplace(t("menu.llm.hw_disk"), "%s", hw["disk_gb"])
-				sub.Add(lbl, (*) => 0)
-				sub.Disable(lbl)
-			}
-			if (hw.Has("ram_gb") and _LLM_Menu_IsNumber(hw["ram_gb"])) {
-				lbl := StrReplace(t("menu.llm.hw_ram"), "%s", hw["ram_gb"])
-				sub.Add(lbl, (*) => 0)
-				sub.Disable(lbl)
-			}
+			Rows.Push(Map("separator", true))
+			Rows.Push(Map("label", StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")))
+			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"]))
+				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])))
+			if (hw.Has("disk_gb") and _LLM_Menu_IsNumber(hw["disk_gb"]))
+				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_disk"), "%s", hw["disk_gb"])))
+			if (hw.Has("ram_gb") and _LLM_Menu_IsNumber(hw["ram_gb"]))
+				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_ram"), "%s", hw["ram_gb"])))
 		}
 	}
 
-	return sub
+	return Rows
 }
 
 
