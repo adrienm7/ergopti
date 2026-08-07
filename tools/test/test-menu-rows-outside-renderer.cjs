@@ -230,7 +230,11 @@ const BASELINE = {
 	// in the driver — fourteen rows of bulk actions, per-family groups, the
 	// custom pairs and their delete entries. The renderer builds all of it now,
 	// nesting included.
-	windows: 160,
+	// 160 → 152: not a migration. menu_engine.ahk's MenuAdd* helpers joined the
+	// renderer set, because the predicate already counts every `MenuAdd*(` call a
+	// driver makes and was counting the RegisterMenuItem inside the helper too —
+	// the same row charged where it was asked for and again where it was drawn.
+	windows: 152,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -342,7 +346,14 @@ const DRIVER_SPEC = {
 		// calls; `<something>Menu.Add(` / `Sub*.Add(` is a row added straight to a
 		// Menu object. Restricting the receiver keeps Array.Add and Map.Add out.
 		patterns: [/\bRegisterMenuItem\s*\(/, /\bMenuAdd[A-Za-z]*\s*\(/, /\b(?:[A-Za-z_]*Menu|Sub[A-Za-z_]*|M)\.Add\s*\(/],
-		renderers: new Set(['infra/manifest_menu.ahk'])
+		// ui/menu/menu_engine.ahk joined the set on 2026-08-07, and this is a
+		// correction of DOUBLE COUNTING rather than a migration. Its three
+		// MenuAdd* helpers are this driver's row materialisation — the manifest
+		// renderer calls them at four places — and the predicate above already
+		// counts every `MenuAdd*(` call a driver file makes. Counting the
+		// RegisterMenuItem inside the helper as well charged the same row twice:
+		// once where it was asked for, once where it was drawn.
+		renderers: new Set(['infra/manifest_menu.ahk', 'ui/menu/menu_engine.ahk'])
 	},
 	macos: {
 		exts: ['.lua'],
