@@ -3947,14 +3947,16 @@ category = "Gestures"
 platforms = ["hs", "linux"]
 reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
 
+# `command` since 2026-08-07: the handler's whole body was one row with a static
+# label, which is what a declaration already expresses.
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "auto_configure"
 i18n = "menu.gestures.auto_configure"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "manual_tutorial"
 i18n = "menu.gestures.manual_tutorial"
 platforms = ["ahk"]
@@ -4023,8 +4025,11 @@ type = "list"
 id = "gesture_slots_5"
 platforms = ["hs"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+# `list` since 2026-08-07, matching what Linux already declared: the slot rows
+# carry a computed label — the slot and the action currently bound to it — so the
+# provider says what each row reads and the renderer draws it.
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
