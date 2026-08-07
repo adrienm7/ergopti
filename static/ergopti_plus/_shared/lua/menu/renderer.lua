@@ -299,6 +299,19 @@ function M.new(deps)
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
 				if type(row.items) == "table" then
 					entry.menu = render_rows(row.items, list_id, depth + 1)
+				elseif type(row.submenu) == "table" then
+					-- A subtree this driver has ALREADY built, handed over whole.
+					--
+					-- TRANSITIONAL, and narrow on purpose — the AutoHotkey renderer
+					-- carries the same field for the same reason. The row itself is
+					-- materialised here, which is the point; only the tree hanging off
+					-- it is still the driver's, and that tree is usually built by a
+					-- different subsystem (the app picker, the shortcut chooser).
+					--
+					-- It is deliberately NOT `items`: a caller must say which of the two
+					-- it is handing over, so a finished menu passed where row data was
+					-- expected fails visibly instead of rendering an empty submenu.
+					entry.menu = row.submenu
 				elseif type(row.action) == "function" then
 					entry.fn = row.action
 				end
@@ -306,6 +319,25 @@ function M.new(deps)
 			end
 		end
 		return out
+	end
+
+	--- Materialises row DATA that reaches the renderer outside a `list` entry.
+	---
+	--- The second entry point, and the narrower one: a submenu whose PARENT row is
+	--- still the driver's — because its label carries runtime state the manifest
+	--- cannot express, a health dot or a model name — can still hand its contents
+	--- over as data. Without this the whole subtree would stay hand-built merely
+	--- because one row above it is.
+	---
+	--- @param rows table Array of { label, action?, items?, checked?, disabled?, separator? }.
+	--- @param list_id string An id for the warnings, so a bad row names its source.
+	--- @return table Array of menu item tables; empty when rows is not a table.
+	function R.render_rows(rows, list_id)  -- luacheck: ignore 212
+		if type(rows) ~= "table" then
+			Logger.warn(LOG, "List '%s' got no row array to render — nothing built.", tostring(list_id))
+			return {}
+		end
+		return render_rows(rows, list_id, 1)
 	end
 
 	--- Builds a built-in named group that is always rendered the same way.
