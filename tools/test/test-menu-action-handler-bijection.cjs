@@ -78,7 +78,33 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // to two, and macOS had no handler for the id at all — it built its bulk rows
 // by hand in builder.lua and the manifest's promise went unanswered. Splitting
 // it into two `command` rows is what let the declaration and the driver meet.
-const BASELINE = { ahk: 0, hs: 4, linux: 0 };
+// ── ahk 0 → 1 and hs 4 → 7 on 2026-08-06, and NEITHER is a regression ──
+//
+// Read the filter before reading the numbers. Until today this gate looked only
+// at `action` and `dynamic` rows, so every `list` row in the manifest was
+// invisible to it — and `list` is what a repeated block becomes. Widening the
+// set to every type that names a behaviour (BEHAVIOUR_TYPES below) is what
+// revealed these, and all of them predate the migration that prompted the
+// widening:
+//
+//   ahk llm_menu.llm_models — Windows does not read `llm_menu` from the
+//     manifest at all; it builds its LLM menu by hand under ui/menu/menu_llm/.
+//     Two rows declared for every platform, answered by one driver.
+//   hs — the same llm_models, layout_menu.active_layouts, and the five
+//     hotstrings rows, because macOS assembles its hotstrings menu by hand in
+//     ui/menu/builder.lua and reads the manifest for none of it.
+//
+// So the honest number rose while the code improved, exactly as the row-bypass
+// ratchet's own linux 2 → 124 did when ITS definition was corrected. Lower these
+// by wiring the rows or by putting those two menus on the renderer — never by
+// narrowing the filter again.
+const BASELINE = { ahk: 1, hs: 7, linux: 0 };
+
+// The manifest types that name a behaviour the driver must register: `action`
+// and `dynamic` hand the id to a handler, `list` to a provider, `check` and
+// `command` to a named command. A row of any other type is drawn from the
+// declaration alone and has nothing for a driver to miss.
+const BEHAVIOUR_TYPES = new Set(['action', 'dynamic', 'list', 'check', 'command']);
 
 // WHY LINUX IS ZERO AND macOS IS NOT, AND WHAT THE FIVE ARE.
 // Linux reached zero by wiring every row: its metrics and hotstrings submenus
@@ -168,7 +194,14 @@ for (const { key, driver, ext } of PLATFORMS) {
 	for (const [section, rows] of sections) {
 		for (const row of rows) {
 			if (!row || typeof row !== 'object') continue;
-			if (row.type !== 'action' && row.type !== 'dynamic') continue;
+			// Every id-bearing type whose behaviour the driver has to supply.
+			//
+			// Was `action` and `dynamic` alone, and that made the floor below
+			// measure the OLD shape: each migration to `list`, `check` or
+			// `command` moved rows out of the count, and the floor fired as if
+			// the manifest walk had broken. The set has to be what the renderer
+			// looks a driver up for, or the guard fights the work it guards.
+			if (!BEHAVIOUR_TYPES.has(row.type)) continue;
 			if (typeof row.id !== 'string' || row.id === '') continue;
 			if (!visibleOn(row, key)) continue;
 			declared.push({ section, id: row.id });
@@ -177,7 +210,7 @@ for (const { key, driver, ext } of PLATFORMS) {
 
 	if (declared.length < MIN_DECLARED[key]) {
 		errors.push(
-			`${key}: only ${declared.length} action/dynamic row(s) declared (floor ${MIN_DECLARED[key]}) — ` +
+			`${key}: only ${declared.length} behaviour row(s) declared (floor ${MIN_DECLARED[key]}) — ` +
 				'the manifest walk is broken, and every row would then look resolved'
 		);
 		continue;
