@@ -130,7 +130,11 @@ end
 --- @param none_label string|nil Label when shortcut is disabled.
 --- @return string Display label.
 function M.shortcut_to_label(sc, none_label)
-	if type(sc) ~= "table" then return none_label or "Aucun" end
+	-- `common.none`, not a French word written here: this is a menu label, and the
+	-- other two drivers already read that key for the same row (Windows in
+	-- menu_settings.ahk, Linux in menu_builder.lua). A literal is a translation of
+	-- exactly one of the twenty-one languages the menu is drawn in.
+	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
 	local ordered_mods = {}
 	for _, m in ipairs(sc.mods or {}) do table.insert(ordered_mods, m) end
 	sort_modifiers(ordered_mods)
@@ -142,7 +146,7 @@ function M.shortcut_to_label(sc, none_label)
 
 	local mods_str = table.concat(mods_cap, " + ")
 	local key_str = string.upper(sc.key or "")
-	if key_str == "" then return none_label or "Aucun" end
+	if key_str == "" then return none_label or i18n.get("common.none") end
 	return (mods_str ~= "" and (mods_str .. " + ") or "") .. key_str
 end
 

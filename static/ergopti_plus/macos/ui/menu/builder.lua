@@ -452,9 +452,14 @@ function M.generate(ctx, menu_mods, actions)
 		end
 
 		-- Grand total already includes extensions (computed by HotCounter.count_all)
+		-- From the shared key, not a literal. Windows and Linux both read
+		-- `menu.hotstrings.title` for this same entry, and it is translated in all
+		-- twenty-one locales — « ⚡ ホットストリング » in Japanese — so the hardcoded
+		-- string was the one top-level menu this driver refused to translate.
+		local hotstrings_label = i18n.get("menu.hotstrings.title")
 		hotstrings_title = grand_has_count
-			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
-			or  "⚡ Hotstrings"
+			and (hotstrings_label .. " (" .. fmt_grand(grand_total) .. ")")
+			or  hotstrings_label
 
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
