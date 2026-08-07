@@ -118,7 +118,7 @@ LLM_Menu_Build() {
 	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", A_TickCount - _tStaged)
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
 	for _i, _row in _rows
-		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational)
+		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational, _MR_Get(_row, "health_dot", false))
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
 
 	_LLM_Menu_Handle.Add()  ; separator
@@ -245,14 +245,14 @@ _LLM_MenuLayout_Rows() {
  */
 _LLM_MenuLayout_Fallback() {
 	return [
-		Map("id", "llm_backend",             "disabled_when_off", false),
-		Map("id", "llm_model",               "disabled_when_off", false),
-		Map("id", "llm_profile",             "disabled_when_off", true),
-		Map("id", "llm_num_predictions",     "disabled_when_off", true),
-		Map("id", "llm_trigger",             "disabled_when_off", true),
-		Map("id", "llm_generation_settings", "disabled_when_off", true),
-		Map("id", "llm_display",             "disabled_when_off", true),
-		Map("id", "llm_navigation",          "disabled_when_off", true)
+		Map("id", "llm_backend",             "disabled_when_off", false, "health_dot", false),
+		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
+		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_num_predictions",     "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_display",             "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_navigation",          "disabled_when_off", true,  "health_dot", false)
 	]
 }
 
@@ -266,8 +266,11 @@ _LLM_MenuLayout_Fallback() {
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
  * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
+ * @param {Boolean} has_health_dot      The row's declared health_dot flag. Which row
+ *                                      carries the dot is the manifest's call, not this
+ *                                      file's, so macOS cannot end up dotting another row.
  */
-_LLM_Menu_EmitRow(id, disabled, llm_is_operational) {
+_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	switch id {
 	case "llm_backend":
@@ -291,7 +294,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational) {
 		_LLM_Menu_FireHealthProbe(true)
 		_LLM_Menu_FireInstalledTagsProbe()
 		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-		health_dot := llm_is_operational
+		health_dot := (has_health_dot && llm_is_operational)
 			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
 			: ""
 		_LLM_Menu_AddRow(health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Menu["model"]), model_menu, disabled)

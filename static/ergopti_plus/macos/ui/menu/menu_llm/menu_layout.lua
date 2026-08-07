@@ -59,8 +59,24 @@ local FALLBACK_GREYS_WHEN_OFF = {
 	llm_navigation          = true,
 }
 
+--- Built-in fallback — mirrors which row carries the backend-health dot. Same
+--- role as FALLBACK_GREYS_WHEN_OFF above, and pinned the same way.
+local FALLBACK_HEALTH_DOT = {
+	llm_backend             = false,
+	llm_model               = true,
+	llm_profile             = false,
+	llm_num_predictions     = false,
+	llm_trigger             = false,
+	llm_generation_settings = false,
+	llm_display             = false,
+	llm_navigation          = false,
+}
+
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil
+
+-- Map of row id -> health_dot (bool). nil until first load.
+local _dots = nil
 
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
 --- restriction is visible everywhere.
@@ -83,18 +99,19 @@ end
 local function load_policy()
 	if _policy then return _policy end
 
-	local policy = nil
+	local policy, dots = nil, nil
 	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
 	if ok_menu and ManifestMenu and type(ManifestMenu.get_array) == "function" then
 		local rows = ManifestMenu.get_array(LLM_MENU_KEY)
 		if type(rows) == "table" then
-			policy = {}
+			policy, dots = {}, {}
 			for _, row in ipairs(rows) do
 				-- Only the rows this driver renders carry a greying policy: the
 				-- separator and Linux's two inline lists have no submenu to grey.
 				if type(row) == "table" and type(row.id) == "string"
 					and row.type == "dynamic" and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
+					dots[row.id] = (row.health_dot == true)
 				end
 			end
 		end
@@ -102,11 +119,12 @@ local function load_policy()
 
 	if not policy or next(policy) == nil then
 		Logger.warn(LOG, "menu_manifest.json 'llm_menu' unreadable/empty — using built-in fallback greying policy.")
-		policy = {}
+		policy, dots = {}, {}
 		for id, v in pairs(FALLBACK_GREYS_WHEN_OFF) do policy[id] = v end
+		for id, v in pairs(FALLBACK_HEALTH_DOT) do dots[id] = v end
 	end
 
-	_policy = policy
+	_policy, _dots = policy, dots
 	return _policy
 end
 
@@ -124,6 +142,17 @@ function M.greys_when_off(id)
 	local v = p[id]
 	if v == nil then return true end
 	return v
+end
+
+--- Whether the given row carries the backend-reachability dot (its ``health_dot``
+--- flag in the manifest). Exactly one row does; asking the manifest rather than
+--- hardcoding which means moving the dot is a manifest edit on both drivers at
+--- once, not a source edit on each.
+--- @param id string Row id from the manifest's llm_menu.
+--- @return boolean.
+function M.has_health_dot(id)
+	load_policy()
+	return _dots[id] == true
 end
 
 --- Resolves a menu row's `disabled` value from the shared policy, mirroring the

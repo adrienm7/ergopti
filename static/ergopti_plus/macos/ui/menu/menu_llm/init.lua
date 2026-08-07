@@ -535,7 +535,10 @@ function M.create(deps)
 				-- is_backend_ready() is synchronous and reflects the warmup state accurately
 				-- even on the first menu open after a model swap.
 				local health_dot
-				if not state.llm_enabled or paused then
+				-- Which row carries the dot is the manifest's call, not this file's:
+				-- the same declaration drives the Windows renderer, so the two cannot
+				-- end up dotting different rows.
+				if not MenuLayout.has_health_dot("llm_model") or not state.llm_enabled or paused then
 						health_dot = ""
 				else
 						local backend_ready = false
