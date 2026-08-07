@@ -208,22 +208,18 @@ _LogLevelMenuLabel() {
 	return t("menu.debug.log_level") . " : " . _LogLevelEmoji(LOGGER_MIN_LEVEL) . " " . LOGGER_MIN_LEVEL
 }
 
-; Build the log level submenu for the Debug entry. Returns a Menu object
-; with one item per severity level (DEBUG / INFO / WARNING / ERROR),
-; the currently active level pre-checked.
-_BuildLogLevelMenu() {
+; The log-level choices, as row DATA: one row per severity level
+; (DEBUG / INFO / WARNING / ERROR), the currently active one ticked.
+_MI_LogLevelChoiceRows() {
 	global LOGGER_MIN_LEVEL
-	LevelMenu := Menu()
+	Rows := []
 	for _, Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
-		; Capture loop variable for the callback closure
-		_Lvl := Level
-		Label := _LogLevelEmoji(Level) . " " . Level
-		RegisterMenuItem(LevelMenu, Label, ((_l) => (*) => LoggerSetLevel(_l))(Level))
-		if (LOGGER_MIN_LEVEL == Level) {
-			LevelMenu.Check(Label)
-		}
+		Rows.Push(Map(
+			"label",   _LogLevelEmoji(Level) . " " . Level,
+			"checked", (LOGGER_MIN_LEVEL == Level),
+			"action",  ((_l) => (*) => LoggerSetLevel(_l))(Level)))
 	}
-	return LevelMenu
+	return Rows
 }
 
 _LogLevelEmoji(Level) {

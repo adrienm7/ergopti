@@ -304,22 +304,20 @@ _MI_AppendTail() {
 }
 
 
-; Builds the "Actions globales" submenu from the manifest's global_actions array (MENU-2).
+; Builds the "Actions globales" submenu from the manifest's global_actions array.
+;
+; Every row there is a `command`, so the renderer builds each label and each
+; separator from the declaration and this driver supplies only what a click does.
+; It used to iterate the same array and then write the label for each id by hand,
+; in a chain of `else if` — the manifest decided the ORDER and this file decided
+; everything else. Linux has rendered this same array for weeks.
 _MI_BuildGlobalActionsMenu() {
-	M := Menu()
-	for _, Entry in MenuManifest_LoadGlobalActions() {
-		Id := Entry["id"]
-		if Id == "---" {
-			M.Add()
-		} else if Id == "enable_all" {
-			RegisterMenuItem(M, t("menu.global.enable_all"),    ToggleAllFeaturesOn)
-		} else if Id == "disable_all" {
-			RegisterMenuItem(M, t("menu.global.disable_all"),   ToggleAllFeaturesOff)
-		} else if Id == "reset_defaults" {
-			RegisterMenuItem(M, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-		}
-	}
-	return M
+	Commands := Map(
+		"enable_all",     ToggleAllFeaturesOn,
+		"disable_all",    ToggleAllFeaturesOff,
+		"reset_defaults", ReloadWithDefaultConfig
+	)
+	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
 }
 
 
@@ -396,29 +394,27 @@ _MI_AboutUpdateRows() {
 
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
+;
+; Same move as the global actions above, and the same day: every row is a
+; `command` except the log-level picker, whose label carries the CURRENT level
+; and is therefore a `list` — exactly the shape Linux declared for it.
 _MI_BuildDebuggingMenu() {
-	DebuggingMenu := Menu()
-	for _, Entry in MenuManifest_LoadDebugMenu() {
-		Id := Entry["id"]
-		if Id == "---" {
-			DebuggingMenu.Add()
-		} else if Id == "window_spy" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),     WindowSpy)
-		} else if Id == "list_vars" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),      ActivateListVars)
-		} else if Id == "key_history" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),    ActivateKeyHistory)
-		} else if Id == "log_level" {
-			DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
-		} else if Id == "open_logs" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),      OpenLogsFolder)
-		} else if Id == "open_today_log" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
-		} else if Id == "open_error_log" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_error_log"), OpenErrorLog)
-		} else if Id == "healthcheck" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),    ShowHealthCheck)
-		}
-	}
-	return DebuggingMenu
+	Commands := Map(
+		"window_spy",     WindowSpy,
+		"list_vars",      ActivateListVars,
+		"key_history",    ActivateKeyHistory,
+		"open_logs",      OpenLogsFolder,
+		"open_today_log", OpenTodayLog,
+		"open_error_log", OpenErrorLog,
+		"healthcheck",    ShowHealthCheck
+	)
+	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
+	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands)
+}
+
+; List provider: the log-level picker, whose parent row reads the current level.
+_MI_LogLevelRows() {
+	return [Map(
+		"label", _LogLevelMenuLabel(),
+		"items", _MI_LogLevelChoiceRows())]
 }
