@@ -286,6 +286,10 @@ const BASELINE = {
 	// stopped reading under two different names on the three drivers.
 	// 117 → 116, windows 175 → 174: the WPM-position reset. Its two neighbours
 	// stay `dynamic` because they mutate the live menu; this one sets nothing.
+	// 65 → 56: the script-control shortcut tree — three key submenus and the whole
+	// action list under each — and the MLX port rows the IA menu appends to the
+	// model selector's tree. The parent row of each stays the driver's: both carry
+	// the current binding in their label.
 	// 82 → 65: the profile picker, with its per-profile edit/delete submenu. One
 	// line in it is NOT a row and must never be renamed: prompt_shortcut takes a
 	// `title` of its own, and the predicate counts it because it cannot tell a
@@ -299,7 +303,7 @@ const BASELINE = {
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 65,
+	macos: 56,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
