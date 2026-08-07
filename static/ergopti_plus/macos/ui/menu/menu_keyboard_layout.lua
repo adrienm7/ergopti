@@ -28,7 +28,6 @@ local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
-local MenuUtils     = require("ui.menu.menu_utils")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
@@ -197,7 +196,7 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 	if installed and not version_gt(latest_ver, installed.version) then
 		-- Latest already installed — nothing to do
 		return {
-			title    = string.format(i18n.get("menu.layout.installed_version"), scope_label, latest_str),
+			label    = string.format(i18n.get("menu.layout.installed_version"), scope_label, latest_str),
 			disabled = true,
 		}
 	end
@@ -205,13 +204,13 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 		-- An older version is on disk; offer an in-place upgrade
 		local old_str = version_str(installed.version)
 		return {
-			title = string.format(i18n.get("menu.layout.update_version"), scope_label, old_str, latest_str),
-			fn    = do_install,
+			label = string.format(i18n.get("menu.layout.update_version"), scope_label, old_str, latest_str),
+			action    = do_install,
 		}
 	end
 	return {
-		title = string.format(i18n.get("menu.layout.install_version"), emoji_install, scope_label, latest_str),
-		fn    = do_install,
+		label = string.format(i18n.get("menu.layout.install_version"), emoji_install, scope_label, latest_str),
+		action    = do_install,
 	}
 end
 
@@ -308,7 +307,7 @@ function M.build(ctx)
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
 		bundle_rows[#bundle_rows + 1] = {
-			title    = i18n.get("menu.layout.no_bundle"),
+			label    = i18n.get("menu.layout.no_bundle"),
 			disabled = true,
 		}
 	end
@@ -333,7 +332,7 @@ function M.build(ctx)
 	if all_variants_active and installed_ver then
 		-- 1. All variants already in list and up to date
 		bundle_rows[#bundle_rows + 1] = {
-			title    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
+			label    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
 			disabled = true,
 		}
 	elseif #legacy_active > 0 and latest ~= nil and not latest_installed_anywhere then
@@ -342,7 +341,7 @@ function M.build(ctx)
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
 		bundle_rows[#bundle_rows + 1] = {
-			title    = string.format(i18n.get("menu.layout.update_list_install_first"),
+			label    = string.format(i18n.get("menu.layout.update_list_install_first"),
 				latest_str, old_str),
 			disabled = true,
 		}
@@ -351,8 +350,8 @@ function M.build(ctx)
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
 		bundle_rows[#bundle_rows + 1] = {
-			title = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
-			fn    = function()
+			label = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
+			action    = function()
 				defer_tis_call(function()
 					local ok = upgrade_active_list(legacy_active)
 					if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
@@ -389,13 +388,13 @@ function M.build(ctx)
 			local already_added = active_id_set[id] == true
 			if already_added then
 				add_sub[#add_sub + 1] = {
-					title    = string.format(i18n.get("menu.layout.already_added"), var.label, latest_str),
+					label    = string.format(i18n.get("menu.layout.already_added"), var.label, latest_str),
 					disabled = true,
 				}
 			else
 				add_sub[#add_sub + 1] = {
-					title = string.format("%s v%s", var.label, latest_str),
-					fn    = function()
+					label = string.format("%s v%s", var.label, latest_str),
+					action    = function()
 						defer_tis_call(function()
 							local ok = enable_and_select_source(id, var.label, bundle_full_path, internal_name)
 							if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
@@ -407,13 +406,13 @@ function M.build(ctx)
 			end
 		end
 		bundle_rows[#bundle_rows + 1] = {
-			title = string.format(i18n.get("menu.layout.add_to_list"), latest_str),
-			menu  = add_sub,
+			label = string.format(i18n.get("menu.layout.add_to_list"), latest_str),
+			items  = add_sub,
 		}
 	else
 		-- 5. Absent and bundle missing — greyed
 		bundle_rows[#bundle_rows + 1] = {
-			title    = i18n.get("menu.layout.install_first"),
+			label    = i18n.get("menu.layout.install_first"),
 			disabled = true,
 		}
 	end
@@ -436,14 +435,14 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 	end
 	logo_rows[#logo_rows + 1] = {
-		title   = i18n.get("menu.layout.logo_default"),
+		label   = i18n.get("menu.layout.logo_default"),
 		checked = current_variant == "simple",
-		fn      = function() set_variant("simple") end,
+		action      = function() set_variant("simple") end,
 	}
 	logo_rows[#logo_rows + 1] = {
-		title   = i18n.get("menu.layout.logo_custom"),
+		label   = i18n.get("menu.layout.logo_custom"),
 		checked = current_variant == "complex",
-		fn      = function() set_variant("complex") end,
+		action      = function() set_variant("complex") end,
 	}
 
 	-- The separator that stood here is a `---` row in the manifest now.
@@ -471,19 +470,6 @@ function M.build(ctx)
 			return r.name
 		end
 		return clean_layout_name(id)
-	end
-
-	--- Adapts already-built rows into the provider data a `list` row takes. These
-	--- two blocks were written as menu trees years before the renderer existed;
-	--- adapting them is what lets it own their placement without rewriting both.
-	--- @param built table Rows in this driver's shape.
-	--- @return table Provider rows.
-	local function as_provider_rows(built)
-		local out = {}
-		for _, entry in ipairs(built or {}) do
-			out[#out + 1] = MenuUtils.as_provider_row(entry)
-		end
-		return out
 	end
 
 	-- The layouts macOS reports as active. A `list`, because the rows are
@@ -541,9 +527,9 @@ function M.build(ctx)
 		if ok_mm and type(ManifestMenu.build) == "function" then
 			local rendered = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
 				["active_layouts"] = active_layout_rows,
-				["layout_bundle"]  = function() return as_provider_rows(bundle_rows) end,
-				["layout_logo"]    = function() return as_provider_rows(logo_rows) end,
-				["layout_switching"] = function() return as_provider_rows(switching_rows) end,
+				["layout_bundle"]  = function() return bundle_rows end,
+				["layout_logo"]    = function() return logo_rows end,
+				["layout_switching"] = function() return switching_rows end,
 			})
 			for _, row in ipairs(rendered or {}) do submenu[#submenu + 1] = row end
 		else
@@ -566,20 +552,20 @@ function M.build(ctx)
 		-- false / nil / "" all mean "no automatic switch" (the default)
 		local is_auto = (current_id == nil or current_id == false or current_id == "")
 		sub[#sub + 1] = {
-			title   = i18n.get("menu.layout.layout_auto"),
+			label   = i18n.get("menu.layout.layout_auto"),
 			checked = is_auto or nil,
-			fn      = function()
+			action      = function()
 				on_pick(nil)
 			end,
 		}
-		sub[#sub + 1] = { title = "-" }
+		sub[#sub + 1] = { separator = true }
 		for _, r in ipairs(records) do
 			local display = display_for_record(r)
 			local rid     = r.id
 			sub[#sub + 1] = {
-				title   = display,
+				label   = display,
 				checked = (current_id == rid) or nil,
-				fn      = function()
+				action      = function()
 					on_pick(rid)
 				end,
 			}
@@ -592,9 +578,9 @@ function M.build(ctx)
 
 		-- The separator that stood here is a `---` row in the manifest now.
 		switching_rows[#switching_rows + 1] = {
-			title   = i18n.get("menu.layout.pause_layout_enabled"),
+			label   = i18n.get("menu.layout.pause_layout_enabled"),
 			checked = feature_on or nil,
-			fn      = function()
+			action      = function()
 				state.layout_pause_switch_enabled = not feature_on
 				if save_prefs then save_prefs() end
 				if update_menu then update_menu() end
@@ -608,10 +594,10 @@ function M.build(ctx)
 			and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
 			or  i18n.get("menu.layout.layout_auto")
 		switching_rows[#switching_rows + 1] = {
-			title    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
+			label    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
 			-- Grayed out when the feature is disabled or the script is currently paused
 			disabled = (not feature_on) or hs_paused_pre or nil,
-			menu     = build_layout_picker_submenu(cur_pause, function(id)
+			items     = build_layout_picker_submenu(cur_pause, function(id)
 				state.layout_on_pause = id
 				if save_prefs then save_prefs() end
 				if update_menu then update_menu() end
@@ -622,9 +608,9 @@ function M.build(ctx)
 			and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
 			or  i18n.get("menu.layout.layout_auto")
 		switching_rows[#switching_rows + 1] = {
-			title    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
+			label    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
 			disabled = (not feature_on) or hs_paused_pre or nil,
-			menu     = build_layout_picker_submenu(cur_resume, function(id)
+			items     = build_layout_picker_submenu(cur_resume, function(id)
 				state.layout_on_resume = id
 				if save_prefs then save_prefs() end
 				if update_menu then update_menu() end
@@ -661,12 +647,12 @@ function M.build(ctx)
 		end
 	end
 	if replace_label then
-		submenu[#submenu + 1] = { title = "-" }
+		submenu[#submenu + 1] = { separator = true }
 		submenu[#submenu + 1] = {
-			title    = replace_label,
+			label    = replace_label,
 			checked  = replace_enabled or nil,
 			disabled = not replace_group_on or hs_paused or nil,
-			fn       = (replace_group_on and not hs_paused) and function()
+			action       = (replace_group_on and not hs_paused) and function()
 				if ctx and ctx.keymap then
 					if replace_enabled then
 						if type(ctx.keymap.disable_section) == "function" then
@@ -685,8 +671,8 @@ function M.build(ctx)
 	end
 
 	return {
-		title = i18n.get("menu.layout.title"),
-		menu  = submenu,
+		label = i18n.get("menu.layout.title"),
+		items  = submenu,
 	}
 end
 
