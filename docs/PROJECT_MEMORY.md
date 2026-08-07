@@ -4264,3 +4264,46 @@ A test asserted `set_override("rolls", nil, "priority", 5) == false`, with the r
 - When a guard changes a public contract, grep for tests asserting the OLD one in the same commit. A test that should have gone red and did not is a test that was passing for the wrong reason all along.
 
 Related: [[project-a-green-probe-can-mean-redundant-guards]], [[project-fixed-field-lists-drop-flags]].
+
+
+
+
+### project-a-depth-cap-is-right-for-a-provider-and-wrong-for-a-filesystem
+
+_The shared renderer truncates nested rows past three levels; the personal-hotstrings tree mirrors the user's own folders, so it stays hand-built_
+
+<sub>slug: `project_a_depth_cap_is_right_for_a_provider_and_wrong_for_a_filesystem`</sub>
+
+Both renderers cap nested list rows at three levels — `MAX_LIST_DEPTH` in `_shared/lua/menu/renderer.lua`, `MR_MAX_LIST_DEPTH` in `windows/infra/manifest_menu.ahk`. The cap exists so a provider returning a structure that contains itself cannot recurse until the stack gives out, and it is deliberately the same number on both so a list that renders on one driver cannot be silently truncated on the other.
+
+That reasoning holds for every tree whose shape the code decides. It does not hold for `_HS_RenderTree` in `windows/ui/menu/menu_hotstrings.ahk`, which walks the user's personal-hotstrings folders: two levels of subfolders already reach the cap, and the user who organises their hotstrings the most is the one whose folders would vanish. Truncation there is silent — one ERROR line in the log, no visible difference in the menu.
+
+**How to apply:**
+
+- Before converting a tree to row data, ask who decides its depth. Code → convert. The user's filesystem, an imported catalogue, anything unbounded → leave it native and write the reason where the next person will look.
+- Do not raise the cap to fit one case. It is a stack guard, and a number chosen to fit today's deepest tree stops being a guard.
+- The same question settles the other recurring one: a row whose callback repaints the OPEN menu (`_HS_PersonalRows`, the WPM widget toggles) cannot be declarative either, because the renderer rebuilds rather than repaints.
+
+Related: [[project-dynamic-places-list-materialises]], [[project-one-menu-two-shared-descriptions]].
+
+
+
+
+### project-a-computed-label-is-a-list-of-one
+
+_A menu handler that formats a label from runtime state and then adds a single row is a `list` provider that returns one row_
+
+<sub>slug: `project_a_computed_label_is_a_list_of_one`</sub>
+
+The manifest can express a row whose label is a static i18n key (`command`, `check`). It cannot express one that reads « Raccourci : Ctrl+Alt+T » or « Désactivé dans 3 applications » — the label depends on state the manifest never sees. That is why those rows were `dynamic` handlers, and why converting them looked impossible.
+
+A handler that computes a label and then adds exactly one row is a provider that returns exactly one row. The renderer still draws it — label, tick, greying, and the `RegisterMenuItem` wiring that keeps it in the WM_COMMAND retry path on Windows. The metrics shortcut pickers and the app-exclusion row moved this way on both drivers in one declaration.
+
+**How to apply:**
+
+- Three recipes, in decreasing yield: a native builder → a provider emitting rows; a `dynamic` with a static label → `check` or `command`; a `dynamic` with a COMPUTED label → a `list` returning one row.
+- A `list` of one is not a workaround. The distinction the ratchet measures is who materialises the row, not how many there are.
+- After any conversion, re-read the whole provider path for rows left in the old dialect — `title`/`fn` on Lua, a row with no `"label"` on AHK. Both render blank, and nothing fails: five slipped through in a single day of migrations.
+- Writing a meta test about this on Windows: `InStr` is case-INSENSITIVE, so `_BuildTapHoldsSubmenu()` contains « menu() ». Use `RegExMatch`.
+
+Related: [[project-dynamic-places-list-materialises]], [[project-a-depth-cap-is-right-for-a-provider-and-wrong-for-a-filesystem]].
