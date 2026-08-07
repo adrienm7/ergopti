@@ -217,12 +217,19 @@ const MEASURE = process.argv.includes('--measure');
 // themselves reach the renderer as provider data, but their rows are still
 // written in this driver's dialect, so the predicate keeps counting them — see
 // the paragraph above about what this number measures.
+//
+// windows 196 → 195, macos 227 → 226, linux 69 → 68 on 2026-08-07: the
+// repeat-key toggle. One checkbox, drawn three times from a declaration that
+// named only the slot — AutoHotkey with RegisterMenuItem + M.Check, macOS and
+// Linux each with their own table. It is `type = "check"` now and each driver
+// supplies just the toggle and the state behind the tick. All three fall
+// together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 196,
+	windows: 195,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
-	macos: 227,
-	linux: 69
+	macos: 226,
+	linux: 68
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
