@@ -30,7 +30,6 @@ _BuildShortcutsSubmenu() {
 	DynHandlers := Map(
 		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
 		"script_control_shortcuts",   (M, C) => _SC_ScriptControl(M, C),
-		"extensions_shortcuts",       (M, C) => _SC_Extensions(M, C),
 		"edit_shortcuts",             (M, C) => _SC_EditAction(M, C),
 	)
 
@@ -42,6 +41,10 @@ _BuildShortcutsSubmenu() {
 	ListProviders := Map(
 		"keyboard_slots",             () => KeyboardSlotRows(),
 		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
+		; extensions_shortcuts left DynHandlers on 2026-08-07: its manifest row is
+		; `type = "list"` now, so the renderer draws the separator, the header and
+		; one row per extension from this data.
+		"extensions_shortcuts",       () => _SC_ExtensionRows(),
 	)
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders)
@@ -59,7 +62,11 @@ _SC_ScriptControl(SubMenu, _Cat) {
 }
 
 ; Dynamic handler: extensions shortcuts submenus.
-_SC_Extensions(SubMenu, _Cat) {
+; List provider: one row per installed extension that ships shortcuts/menu.ahk,
+; behind its own separator and section header. `list` since 2026-08-07 — the row
+; SHAPE is the renderer's now; the submenu hanging off each extension is still
+; the native Menu its builder populates, handed over as `submenu`.
+_SC_ExtensionRows() {
 	global _ExtensionsDir
 	ExtShortcutsBaseDir := _ExtensionsDir . "\"
 	HasExtShortcuts := false
@@ -72,13 +79,12 @@ _SC_Extensions(SubMenu, _Cat) {
 			}
 		}
 	}
+	Rows := []
 	if !HasExtShortcuts {
-		return false
+		return Rows
 	}
-	SubMenu.Add()
-	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
-	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
-	SubMenu.Disable(ExtShortcutsHeader)
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", MenuSectionTitle(t("menu.extensions.header")), "disabled", true))
 	Loop Files ExtShortcutsBaseDir . "*", "D" {
 		ExtId       := A_LoopFileName
 		ExtDir      := A_LoopFileFullPath
@@ -124,8 +130,9 @@ _SC_Extensions(SubMenu, _Cat) {
 			ExtMenu.Add(NaLabel, (*) => NoAction())
 			ExtMenu.Disable(NaLabel)
 		}
-		SubMenu.Add(ExtName, ExtMenu)
+		Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 	}
+	return Rows
 }
 
 ; Returns how many items a Menu currently holds, via its native HMENU. Used to

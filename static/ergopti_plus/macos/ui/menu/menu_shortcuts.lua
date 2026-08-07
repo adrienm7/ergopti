@@ -20,6 +20,7 @@ local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("infra.i18n")
+local MenuUtils     = require("ui.menu.menu_utils")
 local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
@@ -540,13 +541,17 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_extensions_shortcuts(items, _ctx)
+	-- `list` since 2026-08-07: the separator, the header and one row per
+	-- extension are the renderer's now, and only the submenu each extension
+	-- declares for itself stays this driver's.
+	local function extension_shortcut_rows()
+		local items = {}
 		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
 		-- Same truncation as hotstring_counter: `and pcall() or false` keeps only
 		-- the status, so attr was always nil and this branch never ran.
 		local ok_attr, attr = false, nil
 		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
-		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return items end
 
 		local ext_ids = {}
 		for _, fname in ipairs(fs_dir.entries(ext_root)) do
@@ -610,11 +615,13 @@ function M.build(ctx)
 		end
 
 		if #ext_menu_items > 0 then
-			table.insert(items, { title = i18n.section("menu.extensions.header"), disabled = true })
+			table.insert(items, { separator = true })
+			table.insert(items, { label = i18n.section("menu.extensions.header"), disabled = true })
 			for _, it in ipairs(ext_menu_items) do
-				table.insert(items, it)
+				table.insert(items, MenuUtils.as_provider_row(it))
 			end
 		end
+		return items
 	end
 
 	local function dyn_edit_shortcuts(items, _ctx)
@@ -651,7 +658,6 @@ function M.build(ctx)
 
 	local dyn_handlers = {
 		["script_control_shortcuts"] = dyn_script_control,
-		["extensions_shortcuts"]    = dyn_extensions_shortcuts,
 		["edit_shortcuts"]          = dyn_edit_shortcuts,
 	}
 
@@ -675,6 +681,7 @@ function M.build(ctx)
 		keyboard_slots = function(_ctx)
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
 		end,
+		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, ctx, list_providers)

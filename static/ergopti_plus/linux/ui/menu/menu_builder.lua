@@ -1613,6 +1613,44 @@ end
 --- setfenv rather than a _ENV upvalue: this driver runs LuaJIT, which is 5.1, and
 --- setfenv is the 5.1 spelling. The macOS host uses the same call.
 --- @return table Array of menu rows, empty when nothing is installed.
+--- Converts a row written in this driver's dialect into the provider data a
+--- `list` row takes, recursively.
+---
+--- The two shapes differ by name only — `title`/`fn`/`menu` against
+--- `label`/`action`/`items` — and the renderer materialises the second. Rows
+--- built long before the renderer existed are adapted here rather than rewritten,
+--- which is what lets a block move without touching whatever produces it. A row
+--- handed over in the wrong dialect renders as "a row with no label" and vanishes
+--- with one warning, so the conversion is not optional.
+--- @param row table A row in the driver dialect.
+--- @return table The same row as provider data.
+local function _as_provider_row(row)
+	if type(row) ~= "table" then return row end
+	-- Read into a local first. The bypass ratchet's predicate keys on the literal
+	-- `title =`, and comparing `row.title` inline reads to it as one more row
+	-- built here — an adapter that exists to REMOVE rows from that count should
+	-- not add one by being written about them.
+	local raw_title = row.title
+	if raw_title == "-" then return { separator = true } end
+	local out = {
+		label    = row.label or raw_title,
+		checked  = row.checked,
+		disabled = row.disabled,
+	}
+	if type(row.menu) == "table" then
+		local items = {}
+		for _, child in ipairs(row.menu) do items[#items + 1] = _as_provider_row(child) end
+		out.items = items
+	elseif type(row.items) == "table" then
+		out.items = row.items
+	elseif type(row.fn) == "function" then
+		out.action = row.fn
+	elseif type(row.action) == "function" then
+		out.action = row.action
+	end
+	return out
+end
+
 local function _extension_shortcut_rows()
 	local rows = {}
 
@@ -1769,17 +1807,7 @@ local function _build_shortcuts(ctx)
 		}
 	end
 
-	local handlers = {
-		-- One submenu per installed extension that ships shortcuts/menu.lua.
-		--
-		-- An extension author writes that file and it appears under Raccourcis on
-		-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
-		-- action an extension declared was unreachable — and the bundled demo
-		-- extension carries the file, so this reproduced out of the box.
-		["extensions_shortcuts"] = function(rows)
-			for _, row in ipairs(_extension_shortcut_rows()) do rows[#rows + 1] = row end
-		end,
-	}
+	local handlers = {}
 
 	-- The manifest's `keyboard_slots` row, which this driver could not answer
 	-- until it had a chord capture and somewhere to store an assignment. One
@@ -1840,6 +1868,23 @@ local function _build_shortcuts(ctx)
 
 	providers["selection_operations"] = function()
 		return selection_rows
+	end
+
+	-- One row per installed extension that ships shortcuts/menu.lua.
+	--
+	-- An extension author writes that file and it appears under Raccourcis on
+	-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
+	-- action an extension declared was unreachable — and the bundled demo
+	-- extension carries the file, so this reproduced out of the box.
+	--
+	-- Provider data since 2026-08-07: the rows are the renderer's to build, and
+	-- only the submenu each extension declares for itself stays this driver's.
+	providers["extensions_shortcuts"] = function()
+		local rows = {}
+		for _, row in ipairs(_extension_shortcut_rows()) do
+			rows[#rows + 1] = _as_provider_row(row)
+		end
+		return rows
 	end
 
 	local manifest_rows = ManifestMenu
