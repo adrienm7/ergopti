@@ -1060,6 +1060,29 @@ local function main()
 		os.exit(1)
 	end
 
+	-- 8.8b) Initialise i18n (loads persisted locale, enables ★ substitution).
+	--
+	-- BEFORE the tray, and this ordering is the whole point. init() is what reads
+	-- the locale the user chose; until it runs, i18n answers in the default, which
+	-- is French. Running it after section 8.9 meant the first tray a non-French
+	-- user ever saw was drawn entirely in French, and stayed that way until
+	-- something happened to rebuild the menu.
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	if ok_i18n and i18n_mod then
+		i18n_mod.init()
+		-- From the manifest, like every other reader of this value. This was the
+		-- last hardcoded backslash: the i18n layer substitutes the magic key into
+		-- every localised label that mentions it, so a driver that answered "\"
+		-- here printed the wrong key in 21 languages while the engine listened for
+		-- ★ — a menu that documented a keystroke nothing responded to.
+		-- Read on every substitution rather than captured once, so changing the key
+		-- from the menu relabels the 21 locales without a restart.
+		i18n_mod.set_trigger_provider(function()
+			return MagicKey.get()
+		end)
+	end
+
+
 	-- 8.9) Start the tray menu if requested.
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
@@ -1243,9 +1266,17 @@ local function main()
 		end
 		rebuild_tray_menu()
 		else
+			-- The degraded tray, shown when the menu builder is unavailable. Its
+			-- labels are translated like every other one: this row carried the
+			-- French word for « quit » written into the source, which is a label in
+			-- one of the twenty-one languages this driver speaks.
+			local quit_label = "Quitter"
+			if ok_i18n and i18n_mod then
+				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
+			end
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-				{ title = "Quitter", fn = function() keyboard_hook.stop() end },
+				{ title = quit_label, fn = function() keyboard_hook.stop() end },
 			})
 		end
 	elseif opts.tray and not tray_menu then
@@ -1293,22 +1324,6 @@ local function main()
 			tooltip_preview.set_enabled(name, value)
 		end)
 		PreviewSettings.apply(tooltip_preview)
-	end
-
-	-- 8.10a) Initialise i18n (loads persisted locale, enables ★ substitution).
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
-	if ok_i18n and i18n_mod then
-		i18n_mod.init()
-		-- From the manifest, like every other reader of this value. This was the
-		-- last hardcoded backslash: the i18n layer substitutes the magic key into
-		-- every localised label that mentions it, so a driver that answered "\"
-		-- here printed the wrong key in 21 languages while the engine listened for
-		-- ★ — a menu that documented a keystroke nothing responded to.
-		-- Read on every substitution rather than captured once, so changing the key
-		-- from the menu relabels the 21 locales without a restart.
-		i18n_mod.set_trigger_provider(function()
-			return MagicKey.get()
-		end)
 	end
 
 	-- 8.10b) Let a magic-key change actually reach the engine.
