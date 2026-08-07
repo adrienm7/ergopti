@@ -46,9 +46,7 @@ BuildMetricsMenu() {
 	; its own grey-out state from the manifest's disabled_when predicate.
 
 	DynHandlers := Map(
-		"show_typing",        (M, C) => _MET_ShowTyping(M, C, _MET_STATE_GETTERS),
 		"shortcut_typing",    (M, C) => _MET_ShortcutTyping(M, C, _MET_STATE_GETTERS),
-		"show_apps",          (M, C) => _MET_ShowApps(M, C, _MET_STATE_GETTERS),
 		"shortcut_apps",      (M, C) => _MET_ShortcutApps(M, C, _MET_STATE_GETTERS),
 		"exclude_apps",       (M, C) => _MET_ExcludeApps(M, C, _MET_STATE_GETTERS),
 		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
@@ -62,10 +60,15 @@ BuildMetricsMenu() {
 	; rows are `type = "check"`, so the renderer builds them from the
 	; declaration and this file supplies only the behaviour. One row shape for
 	; three drivers, which is what the manifest was for.
+	; show_typing and show_apps left DynHandlers on 2026-08-07: their manifest
+	; rows are `command` now, so the renderer builds the label and applies the
+	; greying from the declaration and this driver supplies only the click.
 	Commands := Map(
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
 		"filter_sysauth",  ToggleFilterSystemAuth,
+		"show_typing",     KLUI_ToggleTyping,
+		"show_apps",       KLUI_ToggleApps,
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", "", Commands, _MET_STATE_GETTERS)
@@ -81,27 +84,11 @@ BuildMetricsMenu() {
 	return MetricsMenu
 }
 
-; Dynamic handler: Show Typing button.
-_MET_ShowTyping(M, _Cat, Getters) {
-	Label := t("menu.metrics.show_typing")
-	RegisterMenuItem(M, Label, (*) => KLUI_ToggleTyping())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "show_typing", Getters)
-		M.Disable(Label)
-}
-
 ; Dynamic handler: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
 _MET_ShortcutTyping(M, _Cat, Getters) {
 	Label := t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing")
 	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: Show Apps button.
-_MET_ShowApps(M, _Cat, Getters) {
-	Label := t("menu.metrics.show_apps")
-	RegisterMenuItem(M, Label, (*) => KLUI_ToggleApps())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "show_apps", Getters)
 		M.Disable(Label)
 }
 

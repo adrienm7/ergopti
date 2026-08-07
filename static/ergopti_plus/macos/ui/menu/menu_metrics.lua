@@ -149,15 +149,11 @@ function M.build(ctx)
 		metrics_menubar_colors = function() return state.keylogger_menubar_colors end,
 	}
 
-	local function dyn_show_typing(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.show_typing"),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "show_typing", STATE_GETTERS),
-			fn       = function()
-				local Keylogger = require("modules.keylogger")
-				Keylogger.show_metrics()
-			end,
-		})
+	-- `command` rows since 2026-08-07: the label and the greying are the
+	-- manifest's, so these supply only the click.
+	local function cmd_show_typing()
+		local Keylogger = require("modules.keylogger")
+		Keylogger.show_metrics()
 	end
 
 	-- Coerce sc.mods to a table so that a disk-persisted scalar string (e.g.
@@ -212,17 +208,11 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_show_apps(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.show_apps"),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "show_apps", STATE_GETTERS),
-			fn       = function()
-				local ok, at = pcall(require, "ui.metrics_apps")
-				if ok and type(at.show) == "function" then
-					pcall(at.show, hs.configdir .. "/logs")
-				end
-			end,
-		})
+	local function cmd_show_apps()
+		local ok, at = pcall(require, "ui.metrics_apps")
+		if ok and type(at.show) == "function" then
+		pcall(at.show, hs.configdir .. "/logs")
+		end
 	end
 
 	local function dyn_shortcut_apps(items, _ctx)
@@ -468,9 +458,7 @@ function M.build(ctx)
 	-- =============================================
 
 	local dyn_handlers = {
-		show_typing      = dyn_show_typing,
 		shortcut_typing  = dyn_shortcut_typing,
-		show_apps        = dyn_show_apps,
 		shortcut_apps    = dyn_shortcut_apps,
 		exclude_apps     = dyn_exclude_apps,
 		wpm_widget       = dyn_wpm_widget,
@@ -489,6 +477,8 @@ function M.build(ctx)
 		["filter_private"] = cmd_filter_private,
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
+		["show_typing"]    = cmd_show_typing,
+		["show_apps"]      = cmd_show_apps,
 		["wpm_menubar"]    = cmd_wpm_menubar,
 		["menubar_colors"] = cmd_menubar_colors,
 	}

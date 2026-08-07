@@ -1543,14 +1543,6 @@ local function _manifest_metrics_rows(ctx, k)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
-		show_typing = function(items)
-			items[#items + 1] = row("show_typing", i18n_safe("menu.metrics.show_typing"), false,
-				open_window("metrics_typing"))
-		end,
-		show_apps = function(items)
-			items[#items + 1] = row("show_apps", i18n_safe("menu.metrics.show_apps"), false,
-				open_window("metrics_apps"))
-		end,
 		-- The three privacy filters are gone from this table on purpose: their
 		-- manifest rows are `type = "check"` now, so the SHARED renderer builds
 		-- them from the declaration and this driver supplies only the behaviour,
@@ -1579,6 +1571,11 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
+		-- `command` rows since 2026-08-07: the label and the greying are the
+		-- manifest's, so this driver supplies only the window each one opens.
+		["show_typing"]    = open_window("metrics_typing"),
+		["show_apps"]      = open_window("metrics_apps"),
+
 		["filter_private"] = toggle("private_filter_enabled", k.set_private_filter_enabled),
 		["filter_secure"]  = toggle("secure_filter_enabled", k.set_secure_filter_enabled),
 		["filter_sysauth"] = toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled),

@@ -28,7 +28,11 @@ local helpers = require("tests.helpers")
 -- Every assertion below is a substring or per-line check — order-independent —
 -- so concatenation, were the symbol ever non-unique, could not silently change
 -- what is asserted.
-local src = helpers.read_driver_source("dyn_show_typing")
+-- A selector unique to this file rather than its path, so moving or splitting a
+-- module cannot turn these invariants into path errors. It named dyn_show_typing
+-- until 2026-08-07, when that handler became a `command` — a selector has to be
+-- something the file keeps.
+local src = helpers.read_driver_source("local STATE_GETTERS")
 if not src or src == "" then error("menu_metrics.lua source not found via read_driver_source") end
 
 --- Drops lines whose first non-blank characters are a Lua comment marker, so the
