@@ -219,7 +219,9 @@ const MEASURE = process.argv.includes('--measure');
 // the paragraph above about what this number measures.
 const BASELINE = {
 	windows: 196,
-	macos: 228,
+	// 228 → 227: the pause/resume layout pickers moved with them, and the
+	// separator that framed them is a `---` row too.
+	macos: 227,
 	linux: 69
 };
 
