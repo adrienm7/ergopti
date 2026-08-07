@@ -234,6 +234,11 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 79 → 65: the Windows global-actions and debug submenus. Both iterated a
+	// manifest array and then wrote the label for each id by hand, in a chain of
+	// `else if` — the manifest decided the ORDER and the driver decided
+	// everything else. Linux had rendered both for weeks. The log-level picker is
+	// a `list`, because its parent row reads the level currently set.
 	// 83 → 79: the Windows gestures menu. The two buttons are `command` rows —
 	// each handler's whole body was one row with a static label — and the slot
 	// list is a `list`, which is what Linux had declared for its own slots since
@@ -264,7 +269,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 79,
+	windows: 65,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's

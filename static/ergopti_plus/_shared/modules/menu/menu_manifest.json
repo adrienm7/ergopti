@@ -512,34 +512,43 @@
 	],
 	"debug_menu": [
 		{
+			"type": "command",
 			"id": "window_spy",
+			"i18n": "menu.debug.window_spy",
 			"platforms": [
 				"ahk"
 			],
 			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		},
 		{
+			"type": "command",
 			"id": "list_vars",
+			"i18n": "menu.debug.list_vars",
 			"platforms": [
 				"ahk"
 			],
 			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		},
 		{
+			"type": "command",
 			"id": "key_history",
+			"i18n": "menu.debug.key_history",
 			"platforms": [
 				"ahk"
 			],
 			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		},
 		{
+			"type": "command",
 			"id": "console",
+			"i18n": "menu.debug.console",
 			"platforms": [
 				"hs"
 			],
 			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
 		},
 		{
+			"type": "---",
 			"id": "---"
 		},
 		{
@@ -562,6 +571,7 @@
 			"i18n": "menu.debug.open_error_log"
 		},
 		{
+			"type": "---",
 			"id": "---"
 		},
 		{

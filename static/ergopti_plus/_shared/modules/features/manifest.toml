@@ -3222,23 +3222,40 @@ type = "command"
 id = "reset_defaults"
 i18n = "menu.global.reset_defaults"
 
+# These four carried an id and nothing else until 2026-08-07 — no type, no label
+# key — so every driver that drew one spelled its label out in its own source.
+# They are `command` now, like the four rows below them, and the label is the
+# manifest's. macOS reads only the id from this array, so the added type changes
+# nothing there.
 [[menu.debug_menu]]
+type = "command"
 id = "window_spy"
+i18n = "menu.debug.window_spy"
 platforms = ["ahk"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 [[menu.debug_menu]]
+type = "command"
 id = "list_vars"
+i18n = "menu.debug.list_vars"
 platforms = ["ahk"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 [[menu.debug_menu]]
+type = "command"
 id = "key_history"
+i18n = "menu.debug.key_history"
 platforms = ["ahk"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 [[menu.debug_menu]]
+type = "command"
 id = "console"
+i18n = "menu.debug.console"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+# `type` AND `id` on the separators: the shared renderer keys on the type, and
+# both driver-side loaders that predate it key on the id.
 [[menu.debug_menu]]
+type = "---"
 id = "---"
 
 [[menu.debug_menu]]
@@ -3261,6 +3278,7 @@ id = "open_error_log"
 i18n = "menu.debug.open_error_log"
 
 [[menu.debug_menu]]
+type = "---"
 id = "---"
 
 [[menu.debug_menu]]
