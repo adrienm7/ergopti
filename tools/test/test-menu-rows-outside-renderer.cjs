@@ -234,6 +234,10 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 137 → 116: the five IA settings submenus — count, trigger, generation,
+	// display, navigation. Each was a native Menu with the ticks and the greying
+	// applied by hand; every action rebuilds the tray rather than repainting it,
+	// so all five are row data and the renderer draws them.
 	// 144 → 137: the bundled-extensions tree. Three levels deep — extension, TOML
 	// file, its sections — which is exactly what the renderer's nesting allows,
 	// and every leaf is a label or « open the file », so none of it mutates the
@@ -241,7 +245,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 137,
+	windows: 116,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
