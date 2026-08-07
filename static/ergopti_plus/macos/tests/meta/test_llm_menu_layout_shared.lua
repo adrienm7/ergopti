@@ -159,6 +159,20 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		end
 	end)
 
+	helpers.it("the manifest PLACES the rows — init.lua no longer orders them itself", function()
+		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		helpers.assert_true(src:find('ManifestMenu%.build%("llm_menu"') ~= nil,
+			"init.lua must build this menu through the shared renderer")
+		helpers.assert_true(src:find("MenuLayout%.row_ids%(%)") ~= nil,
+			"init.lua must register one handler per DECLARED row, taken from the manifest — " ..
+			"a hardcoded id list here would be a fourth copy of the row set")
+		-- The rows used to be appended to the menu as they were built, which is why
+		-- the model row sat ninth here and second on Windows from one shared spec.
+		helpers.assert_true(src:find("table%.insert%(main_menu") == nil,
+			"init.lua must not append settings rows to the menu directly — the order is " ..
+			"the manifest's, and an in-place insert silently escapes it")
+	end)
+
 	helpers.it("the retired second description has not come back", function()
 		local fh = io.open(DRIVER_ROOT .. "../_shared/modules/llm/menu_layout.json", "r")
 		if fh then fh:close() end

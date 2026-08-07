@@ -16,7 +16,6 @@ local hs            = hs
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
-local MenuUtils     = require("ui.menu.menu_utils")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Models        = require("ui.menu.menu_llm.models_manager")
@@ -458,7 +457,20 @@ function M.create(deps)
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 				local is_disabled = (not state.llm_enabled) or paused
 				Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
-				local main_menu = {}
+				-- Rows are collected under the id the manifest declares them with, and
+				-- the SHARED renderer places them. The order was the one thing the
+				-- shared spec always claimed to own and only Windows honoured: this
+				-- menu inserted its rows as it built them, so the model row sat ninth
+				-- here and second there, from one description.
+				local rows_by_id = {}
+				local function row_for(id, row)
+						local bucket = rows_by_id[id]
+						if not bucket then
+								bucket = {}
+								rows_by_id[id] = bucket
+						end
+						bucket[#bucket + 1] = row
+				end
 
 
 				local backend_title, backend_menu = BackendPanel.build({
@@ -477,7 +489,7 @@ function M.create(deps)
 						reset_llm_health_status = M.reset_llm_health_status,
 				})
 
-				table.insert(main_menu, {
+				row_for("llm_backend", {
 						title    = backend_title,
 						disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
 						menu     = backend_menu
@@ -492,7 +504,10 @@ function M.create(deps)
 								WarmupCtrl  = WarmupCtrl,
 						})
 						if api_title and api_menu then
-								table.insert(main_menu, {
+								-- Anchored to the backend row: it configures the backend the row
+								-- above selects, and the manifest declares no row of its own for
+								-- it because Windows has no API-entry CRUD to declare.
+								row_for("llm_backend", {
 										title    = api_title,
 										disabled = paused or nil,
 										menu     = api_menu,
@@ -627,33 +642,27 @@ function M.create(deps)
 						end
 				end
 
-				-- Held for the `llm_models` provider below rather than inserted here:
-				-- the manifest places this row, and did so for a slot nobody filled.
-				-- ApiPanel still hands over an hs.menubar tree; ModelsSelector returns
-				-- provider rows directly since 2026-08-06. Adapting only what needs it
-				-- keeps the conversion from becoming a permanent layer.
-				local model_items = (state.llm_backend == "api")
-						and MenuUtils.rows_from_menu(model_submenu)
-						or model_submenu
-				local model_row = {
-						label    = rich_model_title,
+				row_for("llm_model", {
+						title    = rich_model_title,
 						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
-						items    = model_items,
-				}
+						menu     = model_submenu,
+				})
 
+				-- Anchored to the model row it describes. It used to be inserted BEFORE
+				-- that row, because the row itself was placed further down.
 				if info and info.emojis and info.emojis:find("🧠💭") then
-						table.insert(main_menu, { title = i18n.get("menu.llm.thinking_model_info"), disabled = true })
+						row_for("llm_model", { title = i18n.get("menu.llm.thinking_model_info"), disabled = true })
 				end
 
-				table.insert(main_menu, { title = "-" })
+				row_for("llm_model", { title = "-" })
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
-				table.insert(main_menu, profiles_item)
+				row_for("llm_profile", profiles_item)
 
-				table.insert(main_menu, { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
+				row_for("llm_num_predictions", { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
-						table.insert(main_menu, {
+						row_for("llm_num_predictions", {
 								title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
 								disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused),
 								fn       = function()
@@ -664,7 +673,7 @@ function M.create(deps)
 						})
 				end
 
-				table.insert(main_menu, { title = "-" })
+				row_for("llm_num_predictions", { title = "-" })
 
 
 				-- ===== Trigger submenu =====
@@ -679,7 +688,7 @@ function M.create(deps)
 						apply_llm_shortcut = apply_llm_shortcut,
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
+				row_for("llm_trigger", { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
 
 
 				-- ===== Generation settings submenu =====
@@ -726,27 +735,11 @@ function M.create(deps)
 						settings_mgr = settings_mgr,
 				}, generation_menu)
 
-				local generation_row = {
-						label    = i18n.get("menu.llm.generation_menu_title"),
+				row_for("llm_generation_settings", {
+						title    = i18n.get("menu.llm.generation_menu_title"),
 						disabled = MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused),
-						items    = MenuUtils.rows_from_menu(generation_menu),
-				}
-
-				-- The two declared rows, placed by the SHARED renderer — with the
-				-- separator the manifest puts between them, which this file used to
-				-- write out itself.
-				do
-						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
-						if ok_mm and type(ManifestMenu.build) == "function" then
-								local rendered = ManifestMenu.build("llm_menu", "LLM", nil, nil, ctx, {
-										["llm_models"]     = function() return { model_row } end,
-										["llm_generation"] = function() return { generation_row } end,
-								})
-								for _, row in ipairs(rendered or {}) do table.insert(main_menu, row) end
-						else
-								Logger.error(LOG, "Manifest renderer unavailable — the model and generation rows are not rendered.")
-						end
-				end
+						menu     = generation_menu,
+				})
 
 
 				-- ===== Display submenu =====
@@ -760,7 +753,7 @@ function M.create(deps)
 						settings_mgr = settings_mgr,
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.display_menu_title"), disabled = MenuLayout.row_disabled("llm_display", is_disabled, paused), menu = display_menu })
+				row_for("llm_display", { title = i18n.get("menu.llm.display_menu_title"), disabled = MenuLayout.row_disabled("llm_display", is_disabled, paused), menu = display_menu })
 
 
 				-- ===== Navigation submenu =====
@@ -792,7 +785,36 @@ function M.create(deps)
 						menu     = settings_mgr.build_val_modifier_menu()
 				})
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = nav_menu_items })
+				row_for("llm_navigation", { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = nav_menu_items })
+
+				-- One handler per declared row, each appending what was collected for
+				-- it. A row the manifest declares and this table does not answer is
+				-- logged and dropped by the renderer, which is what makes the
+				-- handler-bijection gate able to see it.
+				local main_menu = {}
+				do
+						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+						if ok_mm and type(ManifestMenu.build) == "function" then
+								local handlers = {}
+								for _, id in ipairs(MenuLayout.row_ids()) do
+										handlers[id] = function(items)
+												local bucket = rows_by_id[id] or {}
+												-- A declared row nothing filled would render as nothing at
+												-- all, and the renderer would count it as handled — the one
+												-- failure the bijection gate cannot see from outside.
+												if #bucket == 0 then
+														Logger.warn(LOG, "Declared row '%s' has no content — nothing to place.", id)
+												end
+												for _, row in ipairs(bucket) do
+														items[#items + 1] = row
+												end
+										end
+								end
+								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, ctx, {}) or {}
+						else
+								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
+						end
+				end
 
 				return {
 						title   = i18n.get("menu.llm.title"),
