@@ -124,8 +124,18 @@ initMenu() {
 
 	_HotDynHandlers := Map(
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
-		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
+	)
+
+	; repeat_key left _HotDynHandlers: its manifest row is `type = "check"` now,
+	; so the renderer draws the row, its label and its tick from the declaration
+	; and this driver supplies only the toggle and the state behind the tick. It
+	; was three copies of one checkbox before that, one per driver.
+	_HotParamCommands := Map(
+		"repeat_key", ToggleRepeatKeyEnabled,
+	)
+	_HotParamGetters := Map(
+		"hotstrings_repeat_enabled", () => HSE_RepeatEnabled,
 	)
 
 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
@@ -153,7 +163,7 @@ initMenu() {
 	)
 
 	_HotGroupBuilders := Map(
-		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders),
+		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands)

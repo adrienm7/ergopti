@@ -467,17 +467,23 @@ function M.build_management(ctx)
 	local repeat_enabled = ctx and ctx.keymap
 		and type(ctx.keymap.is_repeat_feature_enabled) == "function"
 		and ctx.keymap.is_repeat_feature_enabled()
-	local repeat_item = {
-		title    = i18n.get("menu.hotstrings.repeat_key_toggle"),
-		checked  = repeat_enabled,
-		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
-			if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
-				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
-			end
-			ctx.do_reload("menu")
-		end or nil,
-	}
+	-- `repeat_key` is a `check` row since 2026-08-07: the renderer draws it from
+	-- the declaration, and this driver supplies only the toggle and the state
+	-- behind the tick. It was three copies of one checkbox before that, one per
+	-- driver, from a declaration that named only the slot.
+	local params_ctx = {}
+	for key, value in pairs(ctx) do params_ctx[key] = value end
+	params_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do params_ctx.commands[key] = value end
+	params_ctx.commands["repeat_key"] = function()
+		if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
+			pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+		end
+		ctx.do_reload("menu")
+	end
+	params_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
+	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
 
 	-- The manifest's rows for this group, dispatched by id, and then the two rows
 	-- it does not describe.
@@ -504,12 +510,7 @@ function M.build_management(ctx)
 		-- four toggles for BOTH drivers from the start. Naming the row is what let
 		-- Linux render the same one instead of reimplementing it.
 		["preview_bubbles"]  = function(items) if bubble_item then items[#items + 1] = bubble_item end end,
-		-- Rendered by id since 2026-08-05. This row was built by hand here while
-		-- the manifest called `repeat_key` Windows-only, so the ratchet counted it
-		-- as a row macOS never wired — and Linux, reading the same manifest, drew
-		-- nothing. It now has the feature too, so the restriction is gone.
-		["repeat_key"]       = function(items) items[#items + 1] = repeat_item end,
-	}, nil, ctx, {
+	}, nil, params_ctx, {
 		-- word_expanders is `type = "list"` in the manifest now, so the shared
 		-- renderer materialises every row of the submenu from this data instead of
 		-- this driver assembling the hs.menubar shape itself. Same provider shape

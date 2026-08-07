@@ -3766,9 +3766,16 @@ reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 # Unrestricted with the feature above, and for the same reason: macOS built this
 # row by hand while the manifest said it was Windows-only, which is why the
 # handler-bijection ratchet counted it as one of the rows macOS never wired.
+# `check` since 2026-08-07, and it was three copies of one checkbox before that.
+# Each driver built the row, its label and its tick — AutoHotkey with
+# RegisterMenuItem + M.Check, macOS and Linux each with their own table — from a
+# declaration that named only the slot. One declaration draws it on all three
+# now, and each driver supplies just the toggle and the state behind the tick.
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "check"
 id = "repeat_key"
+i18n = "menu.hotstrings.repeat_key_toggle"
+checked_when = ["hotstrings_repeat_enabled"]
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while

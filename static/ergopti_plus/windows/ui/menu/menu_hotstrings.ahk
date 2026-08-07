@@ -76,16 +76,6 @@ _HS_MagicKeyConfig(M, _Cat) {
 ; Dynamic handler: whole-tree bulk actions (force every hotstring section on/off).
 ; Rendered inside the "⚙️ Paramètres hotstrings" group, just after its separator.
 
-; Dynamic handler: repeat-key toggle (★ as repeat key).
-_HS_RepeatKey(M, _Cat) {
-	global HSE_RepeatEnabled
-	Label := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(M, Label, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		M.Check(Label)
-	}
-}
-
 ; Dynamic handler: delays & colours sub-menu. Mirrors the Hammerspoon "delays"
 ; submenu — the per-category config window, then quick-access per-delay items
 ; grouped by a separator, exactly like the HS make_delay_item rows: the base

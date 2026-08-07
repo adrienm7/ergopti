@@ -777,17 +777,6 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.delays_colors"), menu = sub }
 		end,
-		["repeat_key"] = function(items)
-			local enabled = RepeatKey.is_enabled()
-			items[#items + 1] = {
-				title   = i18n_safe("menu.hotstrings.repeat_key_toggle"),
-				checked = enabled,
-				fn      = function()
-					RepeatKey.toggle()
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
-		end,
 		["preview_bubbles"] = function(items)
 			-- The four toggles the manifest has declared for this driver all along
 			-- and that nothing could reach: ui/tooltip/preview.lua honoured them on
@@ -1093,8 +1082,25 @@ local function _manifest_hotstring_rows(ctx, config)
 
 	local group_builders = {
 		["hotstrings_params"] = function(c)
+			-- `repeat_key` is a `check` row: the renderer draws it from the
+			-- declaration and this driver supplies only the toggle and the state
+			-- behind the tick. Registered on the context the group is rendered
+			-- with, because that is where the check branch looks.
+			local params_ctx = {}
+			for key, value in pairs(c) do params_ctx[key] = value end
+			params_ctx.commands = {}
+			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
+			params_ctx.commands["repeat_key"] = function()
+				RepeatKey.toggle()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end
+			params_ctx.state_getters = {}
+			for key, value in pairs(c.state_getters or {}) do params_ctx.state_getters[key] = value end
+			params_ctx.state_getters["hotstrings_repeat_enabled"] = function()
+				return RepeatKey.is_enabled()
+			end
 			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
-				params_handlers, nil, c, params_providers)
+				params_handlers, nil, params_ctx, params_providers)
 		end,
 	}
 

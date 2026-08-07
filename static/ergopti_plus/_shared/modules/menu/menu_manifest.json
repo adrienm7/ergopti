@@ -1079,8 +1079,12 @@
 			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
 		},
 		{
-			"type": "dynamic",
-			"id": "repeat_key"
+			"type": "check",
+			"id": "repeat_key",
+			"i18n": "menu.hotstrings.repeat_key_toggle",
+			"checked_when": [
+				"hotstrings_repeat_enabled"
+			]
 		}
 	],
 	"gestures_menu": [
