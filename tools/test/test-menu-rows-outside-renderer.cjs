@@ -234,6 +234,10 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 83 → 79: the Windows gestures menu. The two buttons are `command` rows —
+	// each handler's whole body was one row with a static label — and the slot
+	// list is a `list`, which is what Linux had declared for its own slots since
+	// 2026-08-06. Windows was the last driver still appending them by hand.
 	// 86 → 83 (windows) and 56 → 53 (macos), one declaration for both: the two
 	// metrics shortcut pickers and the app-exclusion row became `list`. Their
 	// labels are computed — the shortcut assigned, the number of excluded apps —
@@ -260,7 +264,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 83,
+	windows: 79,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's

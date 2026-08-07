@@ -19,9 +19,6 @@ BuildGesturesMenu() {
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
 	DynHandlers := Map(
-		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
-		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
-		"gesture_slots_ahk",  (M, C) => _GES_SlotsAhk(M, C),
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
 		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
@@ -31,11 +28,17 @@ BuildGesturesMenu() {
 	; builds each row and its label from the declaration, and this driver
 	; registers only what the click does. All three drivers had been writing the
 	; same two rows with the same two labels.
+	; The two whole-tree actions joined them on the same day, and the two buttons
+	; below on 2026-08-07: each handler's whole body was one row with a static
+	; label, which the declaration already expresses.
 	Commands := Map(
 		"disable_all",      (*) => _GES_SetEverySlot("none"),
 		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
+		"auto_configure",   (*) => GestureAutoConfigureAction(),
+		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
-	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", "", Commands)
+	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
+	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands)
 	; Gestures toggle uses a dedicated fn (writes Features.Enabled + Reload)
 	; rather than the generic ToggleCategoryAllFeatures used by other menus.
 	AddCategoryToggleItem(GMenu,
@@ -44,15 +47,6 @@ BuildGesturesMenu() {
 	return GMenu
 }
 
-; Dynamic handler: auto-configure button.
-_GES_AutoConfigure(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.auto_configure"), (*) => GestureAutoConfigureAction())
-}
-
-; Dynamic handler: manual tutorial button.
-_GES_ManualTutorial(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
-}
 
 ; These actions alter bindings only. They deliberately keep the master gesture
 ; toggle intact, so an existing user choice to keep gestures off is respected.
@@ -74,27 +68,31 @@ _GES_RestoreFactoryDefaults() {
 	ReloadPreservingSuspend()
 }
 
-; Dynamic handler: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
+; List provider: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
 ; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
-_GES_SlotsAhk(M, _Cat) {
+; Row DATA since 2026-08-07, as on Linux: each label is the slot plus the action
+; currently bound to it, which no static declaration can carry.
+_GES_SlotRows() {
 	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
+	Rows := []
 	for _, Slot in GESTURE_SLOTS {
 		if (Slot == "tap_4")
-			M.Add()
+			Rows.Push(Map("separator", true))
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
 			? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 			: t("dialog.action_picker.disabled")
-		EntryLabel := SlotLabel . " : " . CurrentLabel
-		RegisterMenuItem(M, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l,
-			GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
-			(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
-		if !GestEnabled
-			M.Disable(EntryLabel)
+		Rows.Push(Map(
+			"label",    SlotLabel . " : " . CurrentLabel,
+			"disabled", !GestEnabled,
+			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
+				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
+				(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel)))
 	}
+	return Rows
 }
 
 ; Dynamic handlers for HS finger groups (unused on AHK — manifest filters them out).

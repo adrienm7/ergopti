@@ -83,8 +83,15 @@ _GBA_HandlerMap() {
 	; below. The invariant is unchanged and applies to both kinds: an action this
 	; driver implements must be visible on the ahk platform, or the filter drops
 	; the row before the dispatch ever runs and the action is unreachable.
+	;
+	; The target is ANY function, not only a _GES_ one: on 2026-08-07 the two
+	; button handlers were deleted outright and their ids now name the action
+	; itself (GestureAutoConfigureAction, GestureShowManualTutorialDialog). A
+	; pattern that insisted on the _GES_ prefix stopped seeing them the moment the
+	; indirection they only existed to provide went away — so it broadened instead,
+	; which also brings the list providers registered the same way into the map.
 	Pos := 1
-	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*\(\*\)\s*=>\s*(_GES_\w+)\(', &C, Pos)) {
+	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*\(\*\)\s*=>\s*(\w+)\(', &C, Pos)) {
 		Handlers[C[1]] := C[2]
 		Pos := Found + StrLen(C[0])
 	}

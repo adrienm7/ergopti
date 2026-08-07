@@ -1194,7 +1194,7 @@
 			"reason_key": "platform_reason.category_toggle_is_drawn_by_the_caller"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "auto_configure",
 			"i18n": "menu.gestures.auto_configure",
 			"platforms": [
@@ -1203,7 +1203,7 @@
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "manual_tutorial",
 			"i18n": "menu.gestures.manual_tutorial",
 			"platforms": [
@@ -1306,7 +1306,7 @@
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "gesture_slots_ahk",
 			"platforms": [
 				"ahk"
