@@ -77,6 +77,17 @@ _GBA_HandlerMap() {
 		Handlers[M[1]] := M[2]
 		Pos := Found + StrLen(M[0])
 	}
+	; The `command` rows, added 2026-08-07. Two actions moved out of DynHandlers
+	; that day — the renderer builds their rows from the declaration now — and
+	; this map stopped seeing them, which dropped the count below the floor
+	; below. The invariant is unchanged and applies to both kinds: an action this
+	; driver implements must be visible on the ahk platform, or the filter drops
+	; the row before the dispatch ever runs and the action is unreachable.
+	Pos := 1
+	while (Found := RegExMatch(Body, '"([a-z0-9_]+)"\s*,\s*\(\*\)\s*=>\s*(_GES_\w+)\(', &C, Pos)) {
+		Handlers[C[1]] := C[2]
+		Pos := Found + StrLen(C[0])
+	}
 	return Handlers
 }
 

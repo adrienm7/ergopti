@@ -3870,14 +3870,19 @@ id = "manual_tutorial"
 i18n = "menu.gestures.manual_tutorial"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+
+# `command` since 2026-08-07: the row, its label and its position are the
+# manifest's, and each driver supplies only what the click does. It was an
+# `action` before, which hands the id back and had all three building the same
+# two rows with the same two labels.
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "disable_all"
 i18n = "menu.gestures.disable_all"
 platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "restore_defaults"
 i18n = "menu.gestures.restore_defaults"
 platforms = ["hs", "ahk", "linux"]

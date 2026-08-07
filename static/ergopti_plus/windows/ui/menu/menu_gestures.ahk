@@ -21,15 +21,21 @@ BuildGesturesMenu() {
 	DynHandlers := Map(
 		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
 		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
-		"disable_all",        (M, C) => _GES_DisableAll(M, C),
-		"restore_defaults",   (M, C) => _GES_RestoreDefaults(M, C),
 		"gesture_slots_ahk",  (M, C) => _GES_SlotsAhk(M, C),
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
 		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
 		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
 	)
-	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
+	; The two whole-tree actions are `command` rows since 2026-08-07: the renderer
+	; builds each row and its label from the declaration, and this driver
+	; registers only what the click does. All three drivers had been writing the
+	; same two rows with the same two labels.
+	Commands := Map(
+		"disable_all",      (*) => _GES_SetEverySlot("none"),
+		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
+	)
+	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", "", Commands)
 	; Gestures toggle uses a dedicated fn (writes Features.Enabled + Reload)
 	; rather than the generic ToggleCategoryAllFeatures used by other menus.
 	AddCategoryToggleItem(GMenu,
@@ -50,14 +56,6 @@ _GES_ManualTutorial(M, _Cat) {
 
 ; These actions alter bindings only. They deliberately keep the master gesture
 ; toggle intact, so an existing user choice to keep gestures off is respected.
-_GES_DisableAll(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.disable_all"), (*) => _GES_SetEverySlot("none"))
-}
-
-_GES_RestoreDefaults(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.restore_defaults"), (*) => _GES_RestoreFactoryDefaults())
-}
-
 _GES_SetEverySlot(ActionName) {
 	global GESTURE_SLOTS
 	Assignments := Map()

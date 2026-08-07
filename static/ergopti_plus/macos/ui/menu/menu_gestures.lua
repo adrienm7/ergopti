@@ -304,39 +304,31 @@ function M.build(ctx)
 
 	-- Dynamic handlers — each appends its items to the list it receives.
 
-	local function dyn_disable_all(items, _ctx)
-		table.insert(items, {
-			title = i18n.get("menu.gestures.disable_all"),
-			fn    = function()
-				local gestures_enabled = state.gestures == true
-				local all_slots = gestures_mod.SINGLE_SLOTS or {}
-				for _, slot in ipairs(all_slots) do
-					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
-				end
-				state.gestures = gestures_enabled
-				if gestures_enabled then
-					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-				else
-					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
-				end
-				ctx.save_prefs()
-				ctx.updateMenu()
-			end,
-		})
+	-- `command` since 2026-08-07: the renderer builds the row and its label from
+	-- the declaration, so this supplies only what the click does.
+	local function cmd_disable_all()
+		local gestures_enabled = state.gestures == true
+		local all_slots = gestures_mod.SINGLE_SLOTS or {}
+		for _, slot in ipairs(all_slots) do
+			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+		end
+		state.gestures = gestures_enabled
+		if gestures_enabled then
+			if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+		else
+			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
 	end
 
-	local function dyn_restore_defaults(items, _ctx)
-		table.insert(items, {
-			title = i18n.get("menu.gestures.restore_defaults"),
-			fn    = function()
-				local defaults = gestures_mod.DEFAULT_GESTURES or {}
-				for slot, action in pairs(defaults) do
-					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-				end
-				ctx.save_prefs()
-				ctx.updateMenu()
-			end,
-		})
+	local function cmd_restore_defaults()
+		local defaults = gestures_mod.DEFAULT_GESTURES or {}
+		for slot, action in pairs(defaults) do
+			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
 	end
 
 	-- The row itself is `type = "check"` in the manifest now: the label, the tick
@@ -369,8 +361,6 @@ function M.build(ctx)
 	end
 
 	local dyn_handlers = {
-		["disable_all"]      = dyn_disable_all,
-		["restore_defaults"] = dyn_restore_defaults,
 	}
 
 	local providers = {
@@ -391,6 +381,12 @@ function M.build(ctx)
 		-- live, so this answers "are gestures usable", not "are they off".
 		gestures_enabled = function() return (state.gestures and not paused) and true or false end,
 	}
+
+	-- The two whole-tree actions are `command` rows: the renderer builds them from
+	-- the declaration and this driver registers only the behaviour.
+	render_ctx.commands = render_ctx.commands or {}
+	render_ctx.commands["disable_all"] = cmd_disable_all
+	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	item.menu = gm
