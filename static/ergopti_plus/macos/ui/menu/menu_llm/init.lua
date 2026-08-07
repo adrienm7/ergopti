@@ -623,22 +623,30 @@ function M.create(deps)
 														{ silent_notifications = true })
 										end
 								end
-								table.insert(model_submenu, { title = "-" })
-								table.insert(model_submenu, {
-										title    = string.format(i18n.get("menu.llm.mlx_port_label"), tostring(ApiMlx.get_port())),
-										disabled = paused or nil,
-										fn       = not paused and function()
-												settings_mgr.set_mlx_port(restart_mlx_for_current_port)
-										end or nil,
-								})
-								if type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port() then
-										table.insert(model_submenu, {
-												title    = string.format(i18n.get("menu.llm.reset_label"), tostring(ApiMlx.get_default_port())),
+								-- Row DATA appended to the selector's finished tree: the rows
+								-- above it are ModelsSelector's, these three are this file's,
+								-- and the renderer materialises this file's.
+								local port_rows = {
+										{ separator = true },
+										{
+												label    = string.format(i18n.get("menu.llm.mlx_port_label"), tostring(ApiMlx.get_port())),
 												disabled = paused or nil,
-												fn       = not paused and function()
+												action   = not paused and function()
+														settings_mgr.set_mlx_port(restart_mlx_for_current_port)
+												end or nil,
+										},
+								}
+								if type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port() then
+										port_rows[#port_rows + 1] = {
+												label    = string.format(i18n.get("menu.llm.reset_label"), tostring(ApiMlx.get_default_port())),
+												disabled = paused or nil,
+												action   = not paused and function()
 														settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
 												end or nil,
-										})
+										}
+								end
+								for _, row in ipairs(ManifestMenu.render_rows(port_rows, "llm_model")) do
+										table.insert(model_submenu, row)
 								end
 						end
 				end

@@ -453,21 +453,23 @@ function M.build(ctx)
 			return act
 		end
 
-		local function key_submenu(keyname)
+		-- Row DATA since 2026-08-07: the renderer draws all three levels, and this
+		-- only answers what the rows are.
+		local function key_submenu_rows(keyname)
 			local current = state.script_control_shortcuts[keyname] or "none"
 			local sub = {}
 			for _, act in ipairs(actions) do
 				local label = get_label(act)
 				if label == "-" then
-					table.insert(sub, { title = "-" })
+					table.insert(sub, { separator = true })
 				elseif act:match("^#") then
-					table.insert(sub, { title = i18n.decorate_section(label), disabled = true })
+					table.insert(sub, { label = i18n.decorate_section(label), disabled = true })
 				else
 					table.insert(sub, {
-						title    = label,
+						label    = label,
 						checked  = (current == act) or nil,
 						disabled = not enabled or paused or nil,
-						fn       = (enabled and not paused) and (function(a) return function()
+						action   = (enabled and not paused) and (function(a) return function()
 							local function assign()
 								state.script_control_shortcuts[keyname] = a
 								if type(script_control.set_shortcut_action) == "function" then
@@ -525,23 +527,23 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.shortcuts.script_shortcuts"),
 			disabled = not enabled or paused or nil,
-			menu     = {
+			menu     = ManifestMenu.render_rows({
 				{
-					title    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
 					disabled = not enabled or paused or nil,
-					menu     = key_submenu("return_key"),
+					items    = key_submenu_rows("return_key"),
 				},
 				{
-					title    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
 					disabled = not enabled or paused or nil,
-					menu     = key_submenu("backspace"),
+					items    = key_submenu_rows("backspace"),
 				},
 				{
-					title    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
 					disabled = not enabled or paused or nil,
-					menu     = key_submenu("escape"),
+					items    = key_submenu_rows("escape"),
 				},
-			},
+			}, "script_shortcuts"),
 		})
 	end
 
