@@ -108,7 +108,11 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // had. They say platforms = ["linux"] now, and the eight rows Windows DOES draw
 // are declared beside them — the IA menu's second shared description folded into
 // the manifest. Windows answers every row the manifest offers it.
-const BASELINE = { ahk: 0, hs: 5, linux: 0 };
+// hs 5 → 0: the hotstrings submenu reads the manifest. Those five were its five
+// declared `list` rows — the standard, dynamic, ergopti, personal and extension
+// category blocks — which this driver assembled by hand while the declaration
+// named slots nothing filled. Every row every driver declares is answered now.
+const BASELINE = { ahk: 0, hs: 0, linux: 0 };
 
 // The manifest types that name a behaviour the driver must register: `action`
 // and `dynamic` hand the id to a handler, `list` to a provider, `check` and

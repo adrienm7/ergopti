@@ -503,7 +503,11 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // a chain of `elseif` mapping id → label → action, which was the manifest's own
 // table restated in a third language. macOS raised 7 → 8 in the same change,
 // for the same menu.
-const RENDERED_THROUGH_SHARED = { hs: 8, linux: 10 };
+// hs 8 → 9 on 2026-08-07: the hotstrings submenu. It was the last macOS menu
+// that read the manifest for nothing at all — the drift gate in
+// tests/meta/test_menu_hotstrings_layout_drift_gate.lua exists solely because
+// this menu and its declaration could disagree with nothing comparing them.
+const RENDERED_THROUGH_SHARED = { hs: 9, linux: 10 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

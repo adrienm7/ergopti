@@ -410,7 +410,20 @@ function M.new(deps)
 				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
 				if i18n_key ~= "" then
 					flush_sep()
-					table.insert(result, { title = i18n.section(i18n_key), disabled = true })
+					-- A driver may enrich a header's TEXT — macOS puts the group's
+					-- hotstring count in it — without owning the ROW. Given the hook,
+					-- the manifest still decides that the header exists, where it sits
+					-- and which key names it; without one, a driver that wanted a count
+					-- had to build the header itself, and then the whole block around
+					-- it, which is how that menu stayed hand-assembled.
+					local label = nil
+					if type(ctx) == "table" and type(ctx.section_label) == "function" then
+						local ok, enriched = pcall(ctx.section_label, i18n_key)
+						if ok and type(enriched) == "string" and enriched ~= "" then
+							label = enriched
+						end
+					end
+					table.insert(result, { title = label or i18n.section(i18n_key), disabled = true })
 					item_count = item_count + 1
 				end
 

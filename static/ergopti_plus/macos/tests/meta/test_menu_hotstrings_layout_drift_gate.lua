@@ -3,13 +3,18 @@
 --- ==============================================================================
 --- MODULE: Menu Hotstrings/Layout Drift Gate (macOS) — F41b
 --- DESCRIPTION:
---- macOS's hotstrings and layout submenus (ui/menu/menu_hotstrings.lua,
---- ui/menu/menu_keyboard_layout.lua, orchestrated by ui/menu/builder.lua) are
---- hand-assembled imperatively and never read
---- _shared/modules/menu/menu_manifest.json's hotstrings_menu/layout_menu
---- arrays — unlike gestures_menu/metrics_menu/shortcuts_menu, which are
---- rendered through infra/manifest_menu.lua's ManifestMenu.build and therefore
---- cannot drift from the manifest by construction.
+--- UPDATED 2026-08-07: the hotstrings half of this gate's premise is gone.
+--- ui/menu/builder.lua renders hotstrings_menu through ManifestMenu.build now —
+--- the two bulk commands, the params group, the four section headers and the
+--- five category lists all come from the declaration — so that menu can no
+--- longer drift from it by construction. The pinned signature below stays,
+--- because it is what the OTHER two drivers render and a change to it is still
+--- a change to three menus at once, and case 3 now asserts that this driver
+--- keeps reading it.
+---
+--- layout_menu is the half that remains: menu_keyboard_layout.lua renders the
+--- manifest's own rows but still hand-builds the install/update block and the
+--- pause/resume pickers around them.
 ---
 --- A full manifest-driven migration of hotstrings/layout is a larger, riskier
 --- refactor deferred to a follow-up (AUDIT_AHK_2026-07-01.md, F41b — this
@@ -190,5 +195,22 @@ helpers.describe("menu drift gate (macOS): hotstrings_menu/layout_menu manifest 
 		helpers.assert_true(type(data.layout_menu) == "table", "menu_manifest.json must have a layout_menu array")
 		local actual = hs_filtered_signatures(data.layout_menu)
 		assert_signatures_match(actual, CANONICAL_LAYOUT_MENU, "layout_menu")
+	end)
+
+	helpers.it("the hotstrings submenu is built from the manifest, not assembled here", function()
+		local src = helpers.read_driver_source("local function collect_groups")  -- ui/menu/builder.lua
+		helpers.assert_true(src:find('ManifestMenu%.build%("hotstrings_menu"') ~= nil,
+			"builder.lua must render hotstrings_menu through the shared renderer — this gate " ..
+			"existed because it did not, and a menu that stops reading its declaration can " ..
+			"disagree with it in silence")
+		for _, id in ipairs({
+			"hotstring_categories_standard",
+			"hotstring_categories_ergopti",
+			"hotstring_personal",
+			"hotstring_extensions",
+		}) do
+			helpers.assert_true(src:find('%["' .. id .. '"%]') ~= nil,
+				"builder.lua must answer the declared row '" .. id .. "' with a provider")
+		end
 	end)
 end)

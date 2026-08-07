@@ -22,6 +22,7 @@ local i18n       = require("infra.i18n")
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
 local HotCounter  = require("ui.menu.hotstring_counter")
+local MenuUtils   = require("ui.menu.menu_utils")
 local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
 
@@ -311,28 +312,16 @@ function M.generate(ctx, menu_mods, actions)
 
 		local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
 
-		-- Build the three groups in order: paramètres, communs, personnels
+		-- Every row below is collected for the manifest slot that declares it, and
+		-- the SHARED renderer places them. This menu was assembled here by hand
+		-- from the day it was written — the manifest declared two bulk commands, a
+		-- params group, four section headers and five list rows, and this file read
+		-- none of it. The repository carries a drift gate
+		-- (tests/meta/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
+		-- was to notice when the two descriptions disagreed, because nothing else
+		-- could.
 		local hotstrings_menu = {}
 
-		-- 1. Paramètres at top, followed by a separator
-		local mgmt_item = type(menu_mods.hotstrings.build_management) == "function"
-			and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
-		if mgmt_item then
-			table.insert(hotstrings_menu, mgmt_item)
-		end
-
-		-- Whole-tree bulk actions, siblings of the Paramètres sub-menu (directly
-		-- under it, with the separator AFTER them), so they sit at the top of the
-		-- menu rather than buried inside it.
-		if type(menu_mods.hotstrings.build_bulk_actions) == "function" then
-			local bulk = menu_mods.hotstrings.build_bulk_actions(ctx)
-			if type(bulk) == "table" and #bulk > 0 then
-				for _, it in ipairs(bulk) do table.insert(hotstrings_menu, it) end
-			end
-		end
-		table.insert(hotstrings_menu, { title = "-" })
-
-		-- 2a. Common hotstring groups (non-Ergopti) with a disabled header
 		local function collect_groups(only_filter, counts_arg)
 			local result = {}
 			if type(menu_mods.hotstrings.build_groups) ~= "function" then return result end
@@ -361,30 +350,9 @@ function M.generate(ctx, menu_mods, actions)
 		end
 
 		local std_groups = collect_groups(non_ergopti_filter, counts)
-		if #std_groups > 0 then
-			local common_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)))
-			table.insert(hotstrings_menu, { title = common_header, disabled = true })
-			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
-		end
-
-		-- 2b. Ergopti-layout-specific groups — separated from the standard block
 		local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
-		if #ergopti_groups_built > 0 then
-			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
-			local ergopti_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)))
-			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
-			for _, it in ipairs(ergopti_groups_built) do table.insert(hotstrings_menu, it) end
-		end
-
-		-- 3. Personal/custom hotstrings — "Mes hotstrings" (section header) vs "Hotstrings personnels" (sub-item).
 		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 			and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
-		if custom_item then
-			table.insert(hotstrings_menu, { title = "-" })
-			local personal_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)))
-			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
-			table.insert(hotstrings_menu, custom_item)
-		end
 
 		-- 4. The manifest's `hotstring_extensions` row (counts already included in
 		-- grand_total via HotCounter). Named here because the id is what the
@@ -395,14 +363,8 @@ function M.generate(ctx, menu_mods, actions)
 		-- was rendering the result. A row nothing names is a row nothing can check.
 		local manifest_row = "hotstring_extensions"
 		Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
-		if #counts.ext_details > 0 then
-			table.insert(hotstrings_menu, { title = "-" })
-			local ext_base   = i18n.get("menu.extensions.header")
-			local ext_header = ext_has_count
-				and i18n.decorate_section(ext_base .. " (" .. fmt_grand(ext_total) .. ")")
-				or  i18n.decorate_section(ext_base)
-			table.insert(hotstrings_menu, { title = ext_header, disabled = true })
-
+		local extension_items = {}
+		do
 			for _, ext in ipairs(counts.ext_details) do
 				local toml_submenus = {}
 				for _, f in ipairs(ext.files) do
@@ -429,7 +391,89 @@ function M.generate(ctx, menu_mods, actions)
 					table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
 				end
 				local ext_label = ext.name .. (ext.total > 0 and (" (" .. fmt_grand(ext.total) .. ")") or "")
-				table.insert(hotstrings_menu, { title = ext_label, menu = toml_submenus })
+				table.insert(extension_items, { title = ext_label, menu = toml_submenus })
+			end
+		end
+
+
+		-- ===== The manifest's own rows, placed by the shared renderer =====
+
+		-- Section headers carry a count here and a plain key in the manifest, so
+		-- the label is enriched through the renderer's hook rather than by
+		-- building the header — and the manifest still owns whether the header
+		-- exists and where it sits.
+		local section_labels = {
+			["menu.hotstrings.header_common"] = i18n.decorate_section(
+				string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))),
+			["menu.hotstrings.header_ergopti"] = i18n.decorate_section(
+				string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))),
+			["menu.hotstrings.personal_header"] = i18n.decorate_section(
+				string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))),
+			["menu.extensions.header"] = ext_has_count
+				and i18n.decorate_section(i18n.get("menu.extensions.header") .. " (" .. fmt_grand(ext_total) .. ")")
+				or  i18n.decorate_section(i18n.get("menu.extensions.header")),
+		}
+
+		--- Converts already-built hs rows into the provider data a `list` row
+		--- takes. These builders return menu trees, and rewriting all four of them
+		--- to emit provider rows is a larger job than this one; adapting here is
+		--- what lets the renderer own the placement today.
+		--- @param built table Menu rows in this driver's shape.
+		--- @return table Provider rows.
+		local function as_rows(built)
+			local out = {}
+			for _, entry in ipairs(built or {}) do
+				out[#out + 1] = MenuUtils.as_provider_row(entry)
+			end
+			return out
+		end
+
+		local hs_ctx = {}
+		for key, value in pairs(ctx) do hs_ctx[key] = value end
+		hs_ctx.section_label = function(key) return section_labels[key] end
+		-- The two bulk rows are `command` declarations, so the renderer builds the
+		-- row and this driver supplies only the behaviour. Taken from the existing
+		-- builder rather than reimplemented: it owns the section-walk both rows
+		-- perform, and a second copy of that walk is exactly the kind of duplicate
+		-- this migration exists to remove.
+		local bulk_rows = type(menu_mods.hotstrings.build_bulk_actions) == "function"
+			and menu_mods.hotstrings.build_bulk_actions(ctx) or {}
+		hs_ctx.commands = {
+			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].fn or function() end,
+			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].fn or function() end,
+		}
+
+		local providers = {
+			["hotstring_categories_standard"] = function() return as_rows(std_groups) end,
+			["hotstring_categories_ergopti"]  = function() return as_rows(ergopti_groups_built) end,
+			["hotstring_personal"]            = function()
+				return custom_item and { MenuUtils.as_provider_row(custom_item) } or {}
+			end,
+			["hotstring_extensions"]          = function() return as_rows(extension_items) end,
+			-- The dynamic-rule categories are Windows' and Linux's; this driver has
+			-- no separate block for them, and an empty provider is what says so
+			-- without the renderer warning about an unanswered row.
+			["hotstring_categories_dynamic"]  = function() return {} end,
+		}
+
+		local group_builders = {
+			["hotstrings_params"] = function(c)
+				local built = type(menu_mods.hotstrings.build_management) == "function"
+					and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, c)
+					or nil
+				if not built then return nil end
+				return { menu = built.menu, disabled = built.disabled }
+			end,
+		}
+
+		do
+			local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+			if ok_mm and type(ManifestMenu.build) == "function" then
+				local rendered = ManifestMenu.build("hotstrings_menu", "Hotstrings",
+					nil, group_builders, hs_ctx, providers)
+				for _, row in ipairs(rendered or {}) do table.insert(hotstrings_menu, row) end
+			else
+				Logger.error(LOG, "Manifest renderer unavailable — the hotstrings submenu has no row.")
 			end
 		end
 
