@@ -327,16 +327,16 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		-- The gate first, because everything under it is inert while it is off.
 		sub[#sub + 1] = {
-			title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-			fn    = function()
+			label = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+			action    = function()
 				if config.toggle_group then config.toggle_group(id) end
 			end,
 		}
 
 		if category and category.path then
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.open_file"),
-				fn    = function()
+				label = i18n_safe("menu.hotstrings.open_file"),
+				action    = function()
 					if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
 				end,
 			}
@@ -344,7 +344,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local sections = category and category.sections_order or {}
 		if #sections > 0 then
-			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = { separator = true }
 			-- enable_all / disable_all, the keys both other drivers use for these two
 			-- rows. Linux said "Tout cocher / Tout décocher" where macOS and Windows
 			-- say "Tout activer / Tout désactiver", in all 21 languages, for the same
@@ -355,19 +355,19 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- switched-off category to a fully-on one — which is what the other two
 			-- do. Greying it forced the user to find a second control first.
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.enable_all"),
-				fn = function()
+				label = i18n_safe("menu.hotstrings.enable_all"),
+				action = function()
 					if config.set_all_sections then config.set_all_sections(id, true) end
 				end,
 			}
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.disable_all"),
+				label = i18n_safe("menu.hotstrings.disable_all"),
 				disabled = not on,
-				fn = function()
+				action = function()
 					if config.set_all_sections then config.set_all_sections(id, false) end
 				end,
 			}
-			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = { separator = true }
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
@@ -383,13 +383,13 @@ local function _manifest_hotstring_rows(ctx, config)
 				sub[#sub + 1] = {
 					-- The count is the point of the row: a section with three entries
 					-- and one with nine hundred are the same line without it.
-					title    = string.format("%s (%d)", name, section and section.count or 0),
+					label    = string.format("%s (%d)", name, section and section.count or 0),
 					checked  = section_checked and true or false,
 					-- Greyed rather than hidden while the category is off: a row that
 					-- disappears reads as a bug, and the user still needs to see what
 					-- they will get back when they switch the category on.
 					disabled = not on,
-					fn = function()
+					action = function()
 						if config.toggle_section then config.toggle_section(id, name) end
 					end,
 				}
@@ -401,9 +401,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- "what is firing right now" and checks a disable by watching it fall;
 			-- it never moved, so a fully disabled Autocorrection went on advertising
 			-- every entry it would have had.
-			title   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
+			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
 			checked = on and true or false,
-			menu    = sub,
+			items    = sub,
 		}
 	end
 
@@ -428,7 +428,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		end
 		if added == 0 then
 			items[#items + 1] = {
-				title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true,
+				label = i18n_safe("menu.hotstrings.no_group_loaded"), disabled = true,
 			}
 		end
 	end
@@ -814,9 +814,14 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
-	local handlers = {
-		["hotstring_categories_standard"] = function(items) append_class(items, "standard") end,
-		["hotstring_categories_dynamic"] = function(items)
+	local providers = {
+		["hotstring_categories_standard"] = function()
+			local rows = {}
+			append_class(rows, "standard")
+			return rows
+		end,
+		["hotstring_categories_dynamic"] = function()
+			local rows = {}
 			-- Its own handler, not append_class. This driver's group list comes from
 			-- TOML file stems and there is no dynamic-hotstrings TOML — the rules are
 			-- registered in code — so append_class matched nothing and the row
@@ -826,7 +831,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			local dyn = ctx.dyn_hotstrings
 			if type(dyn) ~= "table" or type(dyn.is_enabled) ~= "function" then
 				Logger.error(LOG, "No dynamic-hotstrings manager in the menu context — its category is not shown.")
-				return
+				return rows
 			end
 
 			local on = dyn.is_enabled()
@@ -839,8 +844,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local sub = {
 				{
-					title = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-					fn    = function()
+					label = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+					action    = function()
 						if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
@@ -858,12 +863,12 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- They act on the families only; the category gate above is separate,
 				-- and "tout désactiver" leaving the category on is the point — it is
 				-- what lets the user switch families back on one at a time.
-				sub[#sub + 1] = { title = "-" }
+				sub[#sub + 1] = { separator = true }
 				for _, bulk in ipairs({ { key = "enable_all", on = true }, { key = "disable_all", on = false } }) do
 					sub[#sub + 1] = {
-						title    = i18n_safe("menu.hotstrings." .. bulk.key),
+						label    = i18n_safe("menu.hotstrings." .. bulk.key),
 						disabled = not on,
-						fn       = function()
+						action       = function()
 							for _, family in ipairs(families) do
 								if family.section then dyn.set_rule_enabled(family.section, bulk.on) end
 							end
@@ -871,30 +876,30 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 				end
-				sub[#sub + 1] = { title = "-" }
+				sub[#sub + 1] = { separator = true }
 
 				for _, family in ipairs(families) do
 					if family.separator then
-						sub[#sub + 1] = { title = "-" }
+						sub[#sub + 1] = { separator = true }
 					else
 						local section, enabled = family.section, family.enabled
 						-- The count, on the families that have one. A prefix family with
 						-- 0 behind it is a switch that can do nothing until the user
 						-- fills in that field of personal_info.toml, and the count is
 						-- the only thing on the row that says so.
-						local title = family.count
+						local family_label = family.count
 							and string.format("%s (%d)", family.label, family.count)
 							or family.label
 						sub[#sub + 1] = {
 							-- Resolved by the manager, which owns both the locale key
 							-- and the engine that answers what "{date}" is today.
-							title    = title,
+							label    = family_label,
 							checked  = enabled,
 							-- Greyed while the category itself is off, like a section
 							-- row: the tick still says what comes back when it is
 							-- switched on.
 							disabled = not on,
-							fn       = function()
+							action       = function()
 								dyn.set_rule_enabled(section, not enabled)
 								-- A prefix family is matched by the ORDINARY engine, which
 								-- knows nothing about dynamic families — so its switch has
@@ -911,26 +916,32 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
-			items[#items + 1] = {
+			rows[#rows + 1] = {
 				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
 				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
 				-- description key and has no translation of its own, so it would have
 				-- rendered as the raw string.
-				title   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
+				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
 				checked = on,
-				menu    = sub,
+				items    = sub,
 			}
+			return rows
 		end,
-		["hotstring_categories_ergopti"]  = function(items) append_class(items, "ergopti") end,
-		["hotstring_personal"] = function(items)
+		["hotstring_categories_ergopti"]  = function()
+			local rows = {}
+			append_class(rows, "ergopti")
+			return rows
+		end,
+		["hotstring_personal"] = function()
+			local rows = {}
 			-- The editor comes first, and until 2026-08-05 it was not here at all:
 			-- `_shared/ui/hotstring_editor/` shipped with this driver, its bridge was
 			-- complete and tested, and no code path anywhere opened it. A Linux user
 			-- could not create, edit or delete a single personal hotstring — the row
 			-- expanded to the same generic category submenu every pack gets.
-			items[#items + 1] = {
-				title = i18n_safe("menu.hotstrings.open_editor"),
-				fn    = function()
+			rows[#rows + 1] = {
+				label = i18n_safe("menu.hotstrings.open_editor"),
+				action    = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstring editor.")
 						return
@@ -949,34 +960,34 @@ local function _manifest_hotstring_rows(ctx, config)
 					and config.get_category(PERSONAL_CATEGORY) or nil
 				local sub = {}
 				sub[#sub + 1] = {
-					title   = i18n_safe("common.none"),
+					label   = i18n_safe("common.none"),
 					checked = (current == nil or current == ""),
-					fn      = function()
+					action      = function()
 						Editor.set_pref("default_section", "")
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				}
 				for _, name in ipairs(personal and personal.sections_order or {}) do
 					sub[#sub + 1] = {
-						title   = name,
+						label   = name,
 						checked = (current == name),
-						fn      = function()
+						action      = function()
 							Editor.set_pref("default_section", name)
 							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
 					}
 				end
-				items[#items + 1] = {
-					title = i18n_safe("menu.hotstrings.default_category_prefix")
+				rows[#rows + 1] = {
+					label = i18n_safe("menu.hotstrings.default_category_prefix")
 						.. ((current ~= nil and current ~= "") and current or i18n_safe("common.none")),
-					menu  = sub,
+					items  = sub,
 				}
 
 				local close_on_add = Editor.get_pref("auto_close") == true
-				items[#items + 1] = {
-					title   = i18n_safe("menu.hotstrings.close_on_add"),
+				rows[#rows + 1] = {
+					label   = i18n_safe("menu.hotstrings.close_on_add"),
 					checked = close_on_add,
-					fn      = function()
+					action      = function()
 						Editor.set_pref("auto_close", not close_on_add)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
@@ -985,7 +996,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				Logger.error(LOG, "The hotstring editor bridge is unavailable — its preferences cannot be shown.")
 			end
 
-			items[#items + 1] = { title = "-" }
+			rows[#rows + 1] = { separator = true }
 
 			local added = 0
 			for _, name in ipairs(groups) do
@@ -994,17 +1005,19 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- own section below. Without this test they appeared here, under a
 				-- heading that told the user they had written them.
 				if not classified[name] and not Extensions.parse_category_key(name) then
-					items[#items + 1] = group_row(name)
+					rows[#rows + 1] = group_row(name)
 					added = added + 1
 				end
 			end
 			if added == 0 then
-				items[#items + 1] = {
-					title = i18n_safe("menu.hotstrings.no_group_loaded"), fn = function() end, disabled = true,
+				rows[#rows + 1] = {
+					label = i18n_safe("menu.hotstrings.no_group_loaded"), action = function() end, disabled = true,
 				}
 			end
+			return rows
 		end,
-		["hotstring_extensions"] = function(items)
+		["hotstring_extensions"] = function()
+			local rows = {}
 			-- One submenu per installed extension, holding its packs. Grouped by
 			-- extension rather than listed flat because an extension is the unit the
 			-- user installed and the unit they will want to turn off; its individual
@@ -1023,9 +1036,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 
 			if #order == 0 then
-				items[#items + 1] = {
-					title    = i18n_safe("menu.extensions.none_installed"),
-					fn       = function() end,
+				rows[#rows + 1] = {
+					label    = i18n_safe("menu.extensions.none_installed"),
+					action       = function() end,
 					disabled = true,
 				}
 				return
@@ -1039,8 +1052,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
 				sub[#sub + 1] = {
-					title = i18n_safe("menu.hotstrings.check_all"),
-					fn    = function()
+					label = i18n_safe("menu.hotstrings.check_all"),
+					action    = function()
 						for _, name in ipairs(packs) do
 							if config.is_group_enabled and not config.is_group_enabled(name)
 								and config.toggle_group then config.toggle_group(name) end
@@ -1049,8 +1062,8 @@ local function _manifest_hotstring_rows(ctx, config)
 					end,
 				}
 				sub[#sub + 1] = {
-					title = i18n_safe("menu.hotstrings.uncheck_all"),
-					fn    = function()
+					label = i18n_safe("menu.hotstrings.uncheck_all"),
+					action    = function()
 						for _, name in ipairs(packs) do
 							if config.is_group_enabled and config.is_group_enabled(name)
 								and config.toggle_group then config.toggle_group(name) end
@@ -1058,14 +1071,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				}
-				sub[#sub + 1] = { title = "-" }
+				sub[#sub + 1] = { separator = true }
 
 				for _, name in ipairs(packs) do
 					sub[#sub + 1] = group_row(name)
 				end
 
-				items[#items + 1] = { title = extension_label(extension_id), menu = sub }
+				rows[#rows + 1] = { label = extension_label(extension_id), items = sub }
 			end
+			return rows
 		end,
 	}
 
@@ -1093,7 +1107,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstrings_disable_all"] = set_all(false),
 	}
 
-	return ManifestMenu.build("hotstrings_menu", "Hotstrings", handlers, group_builders, hs_ctx)
+	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 end
 
 --- Builds the hotstrings submenu: the manifest's rows, then this driver's own.

@@ -123,11 +123,6 @@ initMenu() {
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
 	_HotDynHandlers := Map(
-		"hotstring_categories_standard", (M, C) => _HS_CategoriesStandard(M, C),
-		"hotstring_categories_dynamic",  (M, C) => _HS_CategoriesDynamic(M, C),
-		"hotstring_categories_ergopti",  (M, C) => _HS_CategoriesErgopti(M, C),
-		"hotstring_personal",            (M, C) => _HS_Personal(M, C),
-		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
@@ -137,7 +132,16 @@ initMenu() {
 	; now, so the renderer materialises every row of the submenu from the data
 	; the provider returns instead of the driver building a Menu object.
 	_HotListProviders := Map(
-		"word_expanders", (*) => _HS_WordExpanderRows(),
+		"word_expanders",                (*) => _HS_WordExpanderRows(),
+		; The five category blocks. Their ROW — label, count, checkmark and
+		; position — is the renderer's now; the submenu hanging off each one is
+		; still SubMenus[Category], assembled by a different subsystem, and is
+		; handed over as a native Menu until that tree becomes data too.
+		"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),
+		"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),
+		"hotstring_categories_ergopti",  (*) => _HS_CategoryRowsErgopti(),
+		"hotstring_personal",            (*) => _HS_PersonalRows(),
+		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
 	)
 
 	; The two bulk rows were ONE `dynamic` row that expanded to two, so the

@@ -345,8 +345,9 @@ _HS_DelimRemoveCustom(Char) {
 }
 
 ; Dynamic handler: standard hotstring categories.
-_HS_CategoriesStandard(M, _Cat) {
+_HS_CategoryRowsStandard() {
 	global HotstringCategoriesStd, SubMenus
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	; Section header is rendered by the manifest (section_header type), so we
 	; only add the actual category submenus here. The standard + dynamic grand
@@ -360,22 +361,25 @@ _HS_CategoriesStandard(M, _Cat) {
 		; full "what would reactivate" count.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		M.Add(Title, SubMenus[Category])
 		; Checkmark follows the category's own enable toggle, not whether every
 		; section is checked: the category stays checked with its button on even
 		; if some or all sections inside are off.
-		if IsGated and IsCategoryGated(Category)
-			M.Check(Title)
+		Rows.Push(Map(
+			"label",   Title,
+			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"submenu", SubMenus[Category]))
 	}
+	return Rows
 }
 
 ; Dynamic handler: dynamic hotstrings category.
-_HS_CategoriesDynamic(M, _Cat) {
+_HS_CategoryRowsDynamic() {
 	global SubMenus, Features
+	Rows := []
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has("dynamic")
-		return
+		return Rows
 	if !SubMenus.Has("DynamicHotstrings")
-		return
+		return Rows
 	IsGated := IsCategoryGated("Hotstrings")
 	DynMenu := SubMenus["DynamicHotstrings"]
 	DynEnabled := 0
@@ -387,7 +391,6 @@ _HS_CategoriesDynamic(M, _Cat) {
 	; sub-tree has no separate gate, so it follows the master directly).
 	DynTotal := _HS_GatedCount(IsGated, DynEnabled)
 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
-	M.Add(DynTitle, DynMenu)
 	DynAllEnabled := true
 	DynCount := 0
 	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
@@ -397,11 +400,13 @@ _HS_CategoriesDynamic(M, _Cat) {
 	}
 	if IsGated and DynAllEnabled and DynCount > 0
 		M.Check(DynTitle)
+	return Rows
 }
 
 ; Dynamic handler: Ergopti-specific hotstring categories.
-_HS_CategoriesErgopti(M, _Cat) {
+_HS_CategoryRowsErgopti() {
 	global HotstringCategoriesErgopti, SubMenus
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
@@ -411,10 +416,12 @@ _HS_CategoriesErgopti(M, _Cat) {
 		; checkmark follows the category's own toggle, not its section states.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		M.Add(Title, SubMenus[Category])
-		if IsGated and IsCategoryGated(Category)
-			M.Check(Title)
+		Rows.Push(Map(
+			"label",   Title,
+			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"submenu", SubMenus[Category]))
 	}
+	return Rows
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
@@ -562,8 +569,9 @@ _HS_GetOrCreateNode(Root, PathParts) {
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
-_HS_Personal(M, _Cat) {
+_HS_PersonalRows() {
 	global ScriptInformation, Features, _PersonalExtTree
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	PersonalTomlData := false
 	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
@@ -651,9 +659,10 @@ _HS_Personal(M, _Cat) {
 				PersonalAllEnabled := false
 		}
 		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
-		M.Add(PersonalTitle, PersonalMenu)
-		if IsGated and PersonalAllEnabled and PersonalSectionCount > 0
-			M.Check(PersonalTitle)
+		Rows.Push(Map(
+			"label",   PersonalTitle,
+			"checked", (IsGated and PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
+			"submenu", PersonalMenu))
 	}
 
 	RootNode := false
@@ -687,9 +696,12 @@ _HS_Personal(M, _Cat) {
 					TFMenu.Disable(SecLabel)
 				}
 			}
-			M.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+			Rows.Push(Map(
+				"label",   TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+				"submenu", TFMenu))
 		}
 	}
+	return Rows
 }
 
 ; Sum all hotstring counts inside a node and its sub-nodes recursively.
@@ -757,16 +769,16 @@ _HS_RenderTree(Tree, ParentMenu) {
 }
 
 ; Dynamic handler: bundled extension hotstrings.
-_HS_Extensions(M, _Cat) {
+_HS_ExtensionRows() {
 	global _HS_ExtensionsCache
+	Rows := []
 	; Use the pre-warmed cache so menu build never does file I/O here — the heavy
 	; DirExist/Loop Files/FileRead scan runs in _HS_PreScanExtensions off-Critical.
 	_HS_PreScanExtensions()
 	BundledExtensions := _HS_ExtensionsCache
 	if (BundledExtensions.Length == 0) {
 		EmptyLabel := t("menu.extensions.empty")
-		M.Add(EmptyLabel, (*) => NoAction())
-		M.Disable(EmptyLabel)
+		Rows.Push(Map("label", EmptyLabel, "disabled", true))
 	} else {
 		for _, Ext in BundledExtensions {
 			ExtHsMenu    := Menu()
@@ -798,9 +810,12 @@ _HS_Extensions(M, _Cat) {
 					ExtHsMenu.Add(TFTitle, TFMenu)
 				}
 			}
-			M.Add(Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""), ExtHsMenu)
+			Rows.Push(Map(
+				"label",   Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""),
+				"submenu", ExtHsMenu))
 		}
 	}
+	return Rows
 }
 
 

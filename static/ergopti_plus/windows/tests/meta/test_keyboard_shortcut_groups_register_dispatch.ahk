@@ -47,10 +47,20 @@ _KSGRD_RowsUseRegisterMenuItem() {
 		"_MR_RenderRows must wire actionable rows via RegisterMenuItem(TargetMenu, ...) so they land "
 		. "in the WM_COMMAND retry path (HIGH-04)")
 
-	; The only sanctioned raw Add in the renderer is the submenu parent, which
-	; carries no callback. A raw Add that passes a callback is the original bug.
-	Assert(!RegExMatch(Body, "TargetMenu\.Add\(\s*Label\s*,\s*Row\["),
-		"_MR_RenderRows must NOT use raw TargetMenu.Add for a row callback -- use RegisterMenuItem (HIGH-04)")
+	; The sanctioned raw Adds in the renderer are the two submenu parents, which
+	; carry no callback: the nested-rows one (`items`) and the native-Menu one
+	; (`submenu`, the transitional hand-over for a tree a driver has already
+	; built). A raw Add that passes anything ELSE off the row is the original bug,
+	; because a callback added that way misses the WM_COMMAND retry path.
+	;
+	; The pattern used to forbid every `TargetMenu.Add(Label, Row[…])`, which the
+	; `submenu` branch trips while carrying no callback at all — so it names the
+	; two allowed fields instead of banning the shape.
+	for _, Forbidden in ["action", "fn", "callback"] {
+		Assert(!RegExMatch(Body, "TargetMenu\.Add\(\s*Label\s*,\s*Row\[." . Forbidden . "."),
+			"_MR_RenderRows must NOT use raw TargetMenu.Add for Row['" . Forbidden . "'] — a callback "
+			. "added that way misses the WM_COMMAND retry path; use RegisterMenuItem (HIGH-04)")
+	}
 }
 Test("meta keyboard-shortcut-groups: list rows are wired via RegisterMenuItem (HIGH-04)", _KSGRD_RowsUseRegisterMenuItem)
 
