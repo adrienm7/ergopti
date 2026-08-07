@@ -420,6 +420,11 @@ function M.generate(ctx, menu_mods, actions)
 		--- what lets the renderer own the placement today.
 		--- @param built table Menu rows in this driver's shape.
 		--- @return table Provider rows.
+		--- The extension rows are still built in this driver's dialect below, so
+		--- they alone are adapted. The category and personal builders emit provider
+		--- rows themselves since 2026-08-07.
+		--- @param built table Rows in this driver's shape.
+		--- @return table Provider rows.
 		local function as_rows(built)
 			local out = {}
 			for _, entry in ipairs(built or {}) do
@@ -444,8 +449,8 @@ function M.generate(ctx, menu_mods, actions)
 		}
 
 		local providers = {
-			["hotstring_categories_standard"] = function() return as_rows(std_groups) end,
-			["hotstring_categories_ergopti"]  = function() return as_rows(ergopti_groups_built) end,
+			["hotstring_categories_standard"] = function() return std_groups end,
+			["hotstring_categories_ergopti"]  = function() return ergopti_groups_built end,
 			-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
 			-- that builder emits `label`/`action`/`items` itself, so there is no
 			-- translation step and the renderer materialises the tree.
