@@ -510,6 +510,28 @@
 			"id": "wrap_symbols_menu"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_selection",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
+		},
+		{
+			"type": "list",
+			"id": "selection_operations",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
 			"type": "list",
 			"id": "keyboard_slots",
 			"platforms": [
