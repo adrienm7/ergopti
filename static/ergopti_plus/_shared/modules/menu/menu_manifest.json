@@ -988,7 +988,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "layout_features_base",
 			"platforms": [
 				"ahk"
@@ -1008,7 +1008,7 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "layout_features_altgr",
 			"platforms": [
 				"ahk"

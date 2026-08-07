@@ -3724,8 +3724,11 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 type = "---"
 platforms = ["hs"]
 
+# `list` rather than `dynamic` since 2026-08-07: the driver answers with row
+# DATA and the renderer materialises it, where a `dynamic` handler was handed the
+# menu object and built the rows itself.
 [[menu.layout_menu]]
-type = "dynamic"
+type = "list"
 id = "layout_features_base"
 
 # AHK-only, and the FEATURE manifest already said so. This row enumerates
@@ -3746,7 +3749,7 @@ reason_key = "platform_reason.lists_windows_only_settings"
 type = "---"
 
 [[menu.layout_menu]]
-type = "dynamic"
+type = "list"
 id = "layout_features_altgr"
 
 # Same evidence as layout_features_base above: every features.layout.* entry

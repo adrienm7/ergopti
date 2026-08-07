@@ -96,13 +96,14 @@ initMenu() {
 	ShortcutsGated := IsCategoryGated("Shortcuts")
 
 	; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
-	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
+	; The two feature blocks are `list` providers: they enumerate ``ahk.layout``
+	; entries and return one row per feature, which the renderer materialises.
 	; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
-	LayoutDynHandlers := Map(
-		"layout_features_base",   (M, C) => _LAY_LayoutFeaturesBase(M, C),
-		"layout_features_altgr",  (M, C) => _LAY_LayoutFeaturesAltGr(M, C),
+	LayoutListProviders := Map(
+		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
+		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 	)
-	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
+	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders)
 	; Grey out accented-letter shortcuts when Ergopti keyboard emulation is off —
 	; the shortcuts depend on Ergopti key positions and are unusable without it.
 	if !Features["layout"]["ergopti_base"] {

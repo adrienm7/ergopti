@@ -33,11 +33,36 @@ InitSubMenus() {
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
-		SubMenu := Menu()
+		; Rows first, in the order the user sees them, and the renderer draws them
+		; at the end. This block used to append the open-file item and the sections
+		; and THEN splice the category toggle and the two bulk actions on top with
+		; RegisterMenuItemInsert("1&"/"2&"/"3&") — three inserts by position to
+		; express « these three come first », which building the array in order says
+		; on its own.
+		Rows := []
+		; Top of the submenu: an enable/disable toggle for the whole TOML file,
+		; mirroring the module toggles (Disposition, Metrics, ...). It sits directly
+		; above the open-file item with NO separator between them. Its state drives
+		; the parent menu checkmark (IsCategoryGated), independent of how many
+		; individual sections are checked. Capture V1Cat by value so each closure
+		; toggles its own category.
+		Rows.Push(Map(
+			"label",  IsCategoryGated(V1Cat)
+				? t("menu.hotstrings.category_on")
+				: t("menu.hotstrings.category_off"),
+			"action", ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
+		; Section-level bulk actions for this category, just under its gate toggle.
+		Rows.Push(Map(
+			"label",  t("menu.hotstrings.enable_all"),
+			"action", ((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat)))
+		Rows.Push(Map(
+			"label",  t("menu.hotstrings.disable_all"),
+			"action", ((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat)))
+
 		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
 		if FileExist(TomlPath) {
-			RegisterMenuItem(SubMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TomlPath))
-			SubMenu.Add()
+			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
+			Rows.Push(Map("separator", true))
 		}
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
@@ -59,7 +84,7 @@ InitSubMenus() {
 				for _, SecId in SectionsOrder {
 					if (SecId == "-") {
 						if !_PrevWasSep {
-							SubMenu.Add()
+							Rows.Push(Map("separator", true))
 							_PrevWasSep := true
 						}
 						continue
@@ -68,8 +93,11 @@ InitSubMenus() {
 						continue
 					}
 					if EntryBySectionId.Has(SecId) {
-						MenuAddItemFromManifest(SubMenu, EntryBySectionId[SecId], V1Cat)
-						_PrevWasSep := false
+						Row := MenuRowFromManifest(EntryBySectionId[SecId], V1Cat)
+						if (Row != "") {
+							Rows.Push(Row)
+							_PrevWasSep := false
+						}
 					}
 				}
 			} else {
@@ -80,26 +108,15 @@ InitSubMenus() {
 					if (V1Cat == "MagicKey" and Parts[Parts.Length] == "replace") {
 						continue
 					}
-					MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+					Row := MenuRowFromManifest(Entry, V1Cat)
+					if (Row != "") {
+						Rows.Push(Row)
+					}
 				}
 			}
 		}
-		; Top of the submenu: an enable/disable toggle for the whole TOML file,
-		; mirroring the module toggles (Disposition, Metrics, ...). Inserted at
-		; position 1& so it sits directly above the open-file item with NO
-		; separator between them. Its state drives the parent menu checkmark
-		; (IsCategoryGated), independent of how many individual sections are
-		; checked. Capture V1Cat by value so each closure toggles its own category.
-		_CatToggleLabel := IsCategoryGated(V1Cat)
-			? t("menu.hotstrings.category_on")
-			: t("menu.hotstrings.category_off")
-		RegisterMenuItemInsert(SubMenu, "1&", _CatToggleLabel,
-			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
-		; Section-level bulk actions for this category, just under its gate toggle.
-		RegisterMenuItemInsert(SubMenu, "2&", t("menu.hotstrings.enable_all"),
-			((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat))
-		RegisterMenuItemInsert(SubMenu, "3&", t("menu.hotstrings.disable_all"),
-			((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat))
+		SubMenu := Menu()
+		MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_" . V1Cat, Rows)
 		SubMenus[V1Cat] := SubMenu
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,
@@ -132,14 +149,18 @@ InitSubMenus() {
 ; the personal-info editor entry right after the text-expansion item.
 _BuildDynamicHotstringsSubmenu() {
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
-	SubMenu := Menu()
+	Rows := []
 	; Section-level bulk actions for the dynamic-hotstrings category.
-	RegisterMenuItem(SubMenu, t("menu.hotstrings.enable_all"),  (*) => ToggleCategoryAllSections("DynamicHotstrings", true))
-	RegisterMenuItem(SubMenu, t("menu.hotstrings.disable_all"), (*) => ToggleCategoryAllSections("DynamicHotstrings", false))
-	SubMenu.Add()
+	Rows.Push(Map(
+		"label",  t("menu.hotstrings.enable_all"),
+		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", true)))
+	Rows.Push(Map(
+		"label",  t("menu.hotstrings.disable_all"),
+		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", false)))
+	Rows.Push(Map("separator", true))
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
-			SubMenu.Add()
+			Rows.Push(Map("separator", true))
 			continue
 		}
 		if !_LegacyDynamicHotstringsKeyMap.Has(V1Id) {
@@ -154,12 +175,18 @@ _BuildDynamicHotstringsSubmenu() {
 				"DynamicHotstrings: no manifest entry for '{1}' — skipped.", V1Id)
 			continue
 		}
-		MenuAddItemFromManifest(SubMenu, Entry, "DynamicHotstrings")
+		Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
+		if (Row != "") {
+			Rows.Push(Row)
+		}
 		if (V1Id == "TextExpansionPersonalInformation") {
-			RegisterMenuItem(SubMenu,
-				t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
+			Rows.Push(Map(
+				"label",  t("menu.shortcuts.edit_personal_info"),
+				"action", PersonalInformationEditor))
 		}
 	}
+	SubMenu := Menu()
+	MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_DynamicHotstrings", Rows)
 	return SubMenu
 }
 
