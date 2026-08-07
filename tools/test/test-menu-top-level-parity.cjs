@@ -144,7 +144,13 @@ const linuxSrc = fs.readFileSync(LINUX_BUILDER, 'utf8');
 // M.build() appends one entry per top-level row. Reading the calls in order is
 // what makes this a comparison of the real menu rather than of a second list
 // someone would have to remember to update.
-const buildBody = linuxSrc.match(/function M\.build\(ctx\)([\s\S]*?)\n\treturn items/);
+// Anchored on the function's own `end` at column 0 — inner ends are indented, so
+// this cannot stop early. It used to anchor on `return items`, and on 2026-08-07
+// M.build stopped returning that variable: it collects row DATA and hands it to
+// the shared renderer. The parse read nothing and the gate reported all
+// seventeen rows as unimplemented — the loudest possible way for a test to be
+// pinned to a spelling rather than to a shape.
+const buildBody = linuxSrc.match(/function M\.build\(ctx\)([\s\S]*?)\nend\n/);
 if (!buildBody) {
 	errors.push('could not find M.build(ctx) in the Linux menu builder — the parse below reads nothing');
 }

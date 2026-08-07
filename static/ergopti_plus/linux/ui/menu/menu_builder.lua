@@ -181,7 +181,7 @@ end
 --- Returns a single item (not an array) — callers insert it directly.
 local function _build_header(ctx)
 	local v = ctx._version or Version.VERSION
-	return { title = "Ergopti — v" .. v, fn = function() end, disabled = true }
+	return { label = "Ergopti — v" .. v, disabled = true }
 end
 
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
@@ -253,7 +253,7 @@ local function _build_layouts(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
 		or {}
-	return { title = i18n_safe("menu.layout.title"), menu = rows }
+	return { label = i18n_safe("menu.layout.title"), submenu = rows }
 end
 
 --- Renders the rows of the hotstrings submenu that the manifest describes.
@@ -1179,8 +1179,8 @@ local function _build_hotstrings(ctx)
 	local config = ctx.config
 
 	if type(config) ~= "table" then
-		return { title = i18n_safe("menu.hotstrings.title"), menu = {
-			{ title = i18n_safe("menu.hotstrings.unavailable"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.hotstrings.title"), items = {
+			{ label = i18n_safe("menu.hotstrings.unavailable"), disabled = true },
 		}}
 	end
 
@@ -1254,16 +1254,16 @@ local function _build_hotstrings(ctx)
 	local title = i18n_safe("menu.hotstrings.title")
 	if grand_total > 0 then title = string.format("%s (%d)", title, grand_total) end
 
-	return { title = title, menu = items }
+	return { label = title, submenu = items }
 end
 
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { title = i18n_safe("menu.llm.title"), menu = {
-			{ title = i18n_safe("menu.llm.unavailable"), fn = function() end, disabled = true },
-			{ title = i18n_safe("menu.llm.ollama_start_hint"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.llm.title"), items = {
+			{ label = i18n_safe("menu.llm.unavailable"), disabled = true },
+			{ label = i18n_safe("menu.llm.ollama_start_hint"), disabled = true },
 		}}
 	end
 
@@ -1376,7 +1376,7 @@ local function _build_llm(ctx)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
-	return { title = i18n_safe("menu.llm.title"), menu = items }
+	return { label = i18n_safe("menu.llm.title"), submenu = items }
 end
 
 --- Builds the metrics/keylogger submenu.
@@ -1626,8 +1626,8 @@ end
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { title = i18n_safe("menu.metrics.title"), menu = {
-			{ title = i18n_safe("menu.metrics.unavailable"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.metrics.title"), items = {
+			{ label = i18n_safe("menu.metrics.unavailable"), disabled = true },
 		}}
 	end
 
@@ -1640,7 +1640,7 @@ local function _build_metrics(ctx)
 	items[#items + 1] = _privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled)
 	items[#items + 1] = _migration_status(k)
 
-	return { title = i18n_safe("menu.metrics.title"), menu = items }
+	return { label = i18n_safe("menu.metrics.title"), submenu = items }
 end
 
 --- Builds the shortcuts submenu.
@@ -1768,8 +1768,8 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { title = i18n_safe("menu.shortcuts.title"), menu = {
-			{ title = i18n_safe("menu.shortcuts.unavailable"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.shortcuts.title"), items = {
+			{ label = i18n_safe("menu.shortcuts.unavailable"), disabled = true },
 		}}
 	end
 
@@ -1937,7 +1937,7 @@ local function _build_shortcuts(ctx)
 		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
 	end
 
-	return { title = i18n_safe("menu.shortcuts.title"), menu = items }
+	return { label = i18n_safe("menu.shortcuts.title"), submenu = items }
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner equivalent).
@@ -2128,15 +2128,15 @@ local function _build_kanata(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("kanata_menu", "Kanata", nil, nil, ctx, providers)
 		or {}
-	return { title = i18n_safe("menu.kanata.title"), menu = rows }
+	return { label = i18n_safe("menu.kanata.title"), submenu = rows }
 end
 
 --- Builds the gestures submenu.
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { title = i18n_safe("menu.gestures.title"), menu = {
-			{ title = i18n_safe("menu.gestures.unavailable"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.gestures.title"), items = {
+			{ label = i18n_safe("menu.gestures.unavailable"), disabled = true },
 		}}
 	end
 
@@ -2302,7 +2302,7 @@ local function _build_gestures(ctx)
 	local menu = { master_toggle }
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
-	return { title = i18n_safe("menu.gestures.title"), menu = menu }
+	return { label = i18n_safe("menu.gestures.title"), submenu = menu }
 end
 
 --- Builds the apps submenu (per-app configs via webview).
@@ -2338,14 +2338,14 @@ local function _build_apps(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("apps_menu", "Apps", nil, nil, render_ctx)
 		or {}
-	return { title = i18n_safe("menu.apps.title"), menu = rows }
+	return { label = i18n_safe("menu.apps.title"), submenu = rows }
 end
 
 --- Builds the global actions submenu.
 local function _build_global_actions(ctx)
 	if not ManifestMenu then
 		Logger.warn(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
-		return { title = i18n_safe("menu.global.title"), menu = {} }
+		return { label = i18n_safe("menu.global.title"), submenu = {} }
 	end
 
 	--- Calls one of the context's optional callbacks, saying so when it is absent.
@@ -2373,8 +2373,8 @@ local function _build_global_actions(ctx)
 	}
 
 	return {
-		title = i18n_safe("menu.global.title"),
-		menu  = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),
+		label   = i18n_safe("menu.global.title"),
+		submenu = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),
 	}
 end
 
@@ -2418,14 +2418,14 @@ local function _build_language(ctx)
 			["locales"] = function() return items end,
 		})
 		or {}
-	return { title = i18n_safe("menu.global.language"), menu = rows }
+	return { label = i18n_safe("menu.global.language"), submenu = rows }
 end
 
 --- Builds the config folder launcher.
 local function _build_config_folder(ctx)
 	return {
-		title = i18n_safe("menu.global.config_folder"),
-		fn = function()
+		label = i18n_safe("menu.global.config_folder"),
+		action = function()
 			-- Through the resolver: this concatenated a possibly-nil HOME, which
 			-- throws and takes the whole menu build with it.
 			local ConfigPaths = require("infra.config_paths")
@@ -2439,8 +2439,8 @@ end
 --- Builds the setup wizard launcher (opens the WebKitGTK onboarding window).
 local function _build_setup_wizard(ctx)
 	return {
-		title = i18n_safe("menu.global.setup_wizard"),
-		fn = function()
+		label = i18n_safe("menu.global.setup_wizard"),
+		action = function()
 			if ctx.on_show_setup_wizard then ctx.on_show_setup_wizard() end
 		end,
 	}
@@ -2450,8 +2450,8 @@ end
 local function _build_updates(ctx)
 	local up = ctx.updater
 	if not up then
-		return { title = i18n_safe("menu.updates.title"), menu = {
-			{ title = i18n_safe("menu.updates.unavailable"), fn = function() end, disabled = true },
+		return { label = i18n_safe("menu.updates.title"), items = {
+			{ label = i18n_safe("menu.updates.unavailable"), disabled = true },
 		}}
 	end
 
@@ -2547,7 +2547,7 @@ local function _build_updates(ctx)
 	local items = ManifestMenu
 		and ManifestMenu.build("updates_menu", "Updates", nil, nil, ctx, providers)
 		or {}
-	return { title = i18n_safe("menu.updates.title"), menu = items }
+	return { label = i18n_safe("menu.updates.title"), submenu = items }
 end
 
 --- Builds the about item.
@@ -2571,7 +2571,7 @@ local function _build_about(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx)
 		or {}
-	return { title = i18n_safe("menu.about.title"), menu = rows }
+	return { label = i18n_safe("menu.about.title"), submenu = rows }
 end
 
 --- Builds the reload item.
@@ -2587,8 +2587,8 @@ end
 --- asks via on_quit. No signal, no subprocess, no PID to get wrong.
 local function _build_reload(ctx)
 	return {
-		title = i18n_safe("menu.global.reload"),
-		fn = function()
+		label = i18n_safe("menu.global.reload"),
+		action = function()
 			if type(ctx.on_reload) ~= "function" then
 				-- Loudly, not silently: a Reload item that cannot reload is the
 				-- exact failure this replaced.
@@ -2607,8 +2607,8 @@ end
 --- Builds the quit item.
 local function _build_quit(ctx)
 	return {
-		title = i18n_safe("menu.global.quit"),
-		fn = function()
+		label = i18n_safe("menu.global.quit"),
+		action = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if ctx.on_quit then ctx.on_quit() end
 		end,
@@ -2639,7 +2639,7 @@ local DEBUG_LOG_LEVELS = { "DEBUG", "INFO", "WARNING", "ERROR" }
 local function _build_debug(ctx)
 	if not ManifestMenu then
 		Logger.warn(LOG, "Manifest renderer unavailable — the debug submenu loses its declared rows.")
-		return { title = i18n_safe("menu.debug.title"), menu = {} }
+		return { label = i18n_safe("menu.debug.title"), submenu = {} }
 	end
 
 	--- Calls one of the context's optional callbacks, saying so when it is absent.
@@ -2683,7 +2683,7 @@ local function _build_debug(ctx)
 	}
 
 	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)
-	return { title = i18n_safe("menu.debug.title"), menu = rows }
+	return { label = i18n_safe("menu.debug.title"), submenu = rows }
 end
 
 
@@ -2744,11 +2744,21 @@ end
 --- @return table Array of { title, menu?, fn?, checked?, disabled? } items.
 function M.build(ctx)
 	local ctx = type(ctx) == "table" and ctx or {}
-	local items = {}
+	-- Row DATA since 2026-08-07, rendered at the end of this function. Every
+	-- builder used to return the finished tray row that hangs its submenu — the
+	-- same three fields written by hand, once per submenu, twenty times over.
+	-- They return `{ label, submenu }` now and the shared renderer draws the
+	-- whole tray root.
+	--
+	-- `submenu` and not `items` for the trees that are already built: the
+	-- renderer caps nested ROW data at three levels to stop a self-referential
+	-- provider from recursing, and re-describing the hotstrings tree — which is
+	-- already deeper than that — would truncate it silently.
+	local rows = {}
 
 	-- Header (non-interactive). Not a manifest row: it is this driver's version
 	-- string, which no declaration can carry.
-	items[#items + 1] = _build_header(ctx)
+	rows[#rows + 1] = _build_header(ctx)
 
 	-- Every entry below, and the separators between them, in the order the
 	-- manifest declares — read rather than repeated here.
@@ -2781,7 +2791,7 @@ function M.build(ctx)
 	local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}
 	if #declared == 0 then
 		Logger.error(LOG, "The manifest declares no top-level row — the tray would be empty.")
-		return items
+		return {}
 	end
 
 	-- Quit is held back and appended last, which is the ONE place this driver
@@ -2797,7 +2807,7 @@ function M.build(ctx)
 		if type(row) == "table" then
 			local id = row.id
 			if id == "---" then
-				items[#items + 1] = { title = "-" }
+				rows[#rows + 1] = { separator = true }
 			elseif _row_is_for_linux(row) then
 				local build = builders[id]
 				if not build then
@@ -2808,20 +2818,24 @@ function M.build(ctx)
 				elseif id == "quit" then
 					quit_row = build(ctx)
 				else
-					items[#items + 1] = build(ctx)
+					rows[#rows + 1] = build(ctx)
 				end
 			end
 		end
 	end
 
 	if quit_row then
-		items[#items + 1] = { title = "-" }
-		items[#items + 1] = quit_row
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = quit_row
 	else
 		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
 	end
 
-	return items
+	if not (ManifestMenu and type(ManifestMenu.render_rows) == "function") then
+		Logger.error(LOG, "The shared renderer is unavailable — the tray cannot be drawn.")
+		return {}
+	end
+	return ManifestMenu.render_rows(rows, "top_level")
 end
 
 return M
