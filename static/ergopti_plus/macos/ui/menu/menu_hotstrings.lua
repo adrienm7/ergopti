@@ -321,15 +321,36 @@ function M.build_groups(ctx, only, counts)
 				ordered_secs = sections
 			end
 
+			-- THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
+			-- them until 2026-08-07:
+			--
+			--   1. the category gate — everything under it is inert while it is off
+			--   2. « ouvrir le fichier », when the category has one
+			--   3. ─────────
+			--   4. « tout activer »
+			--   5. « tout désactiver »
+			--   6. ─────────
+			--   7. the sections
+			--
+			-- The gate row is NEW here. Windows and Linux have shown it since they
+			-- were written; this driver relied on the parent row toggling the group
+			-- when clicked, which works and which nobody discovers — the parent of a
+			-- submenu reads as something you open, not something you switch off. The
+			-- parent keeps its behaviour; this row makes it visible.
 			local sec_menu = {}
+			sec_menu[#sec_menu + 1] = {
+				label  = i18n.get(enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+				action = not ctx.paused and toggleGroupFn(ctx, name) or nil,
+				disabled = ctx.paused or nil,
+			}
 			local toml_path = toml_path_for_group(ctx, name)
 			if toml_path then
 				sec_menu[#sec_menu + 1] = {
 					label = i18n.get("menu.hotstrings.open_file"),
 					action    = function() open_toml_path(toml_path) end,
 				}
-				sec_menu[#sec_menu + 1] = { separator = true }
 			end
+			sec_menu[#sec_menu + 1] = { separator = true }
 			-- Section-level bulk actions for this category.
 			sec_menu[#sec_menu + 1] = {
 				label    = i18n.get("menu.hotstrings.enable_all"),
