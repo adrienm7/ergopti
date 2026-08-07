@@ -290,6 +290,16 @@
 	],
 	"llm_menu": [
 		{
+			"type": "toggle",
+			"id": "llm_toggle",
+			"i18n_on": "menu.llm.toggle_disable",
+			"i18n_off": "menu.llm.toggle_enable",
+			"checked_when": [
+				"llm_enabled"
+			],
+			"category": "LLM"
+		},
+		{
 			"type": "dynamic",
 			"id": "llm_backend",
 			"i18n": "menu.llm.model_backend",
@@ -583,8 +593,12 @@
 	"shortcuts_menu": [
 		{
 			"type": "toggle",
+			"id": "shortcuts_toggle",
 			"i18n_on": "menu.shortcuts.on",
 			"i18n_off": "menu.shortcuts.off",
+			"checked_when": [
+				"shortcuts_enabled"
+			],
 			"category": "Shortcuts"
 		},
 		{
@@ -721,11 +735,16 @@
 	"metrics_menu": [
 		{
 			"type": "toggle",
+			"id": "metrics_toggle",
 			"i18n_on": "menu.metrics.on",
 			"i18n_off": "menu.metrics.off",
+			"checked_when": [
+				"keylogger_enabled"
+			],
 			"category": "Metrics",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.category_toggle_is_drawn_by_the_caller"
 		},
@@ -942,13 +961,25 @@
 				"linux"
 			],
 			"reason_key": "platform_reason.metrics_collection_is_in_process_on_linux"
+		},
+		{
+			"type": "list",
+			"id": "metrics_migration",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.only_linux_migrates_in_the_background"
 		}
 	],
 	"layout_menu": [
 		{
 			"type": "toggle",
+			"id": "layout_toggle",
 			"i18n_on": "menu.layout.on",
 			"i18n_off": "menu.layout.off",
+			"checked_when": [
+				"layout_enabled"
+			],
 			"category": "Layout"
 		},
 		{
@@ -1081,8 +1112,12 @@
 	"hotstrings_menu": [
 		{
 			"type": "toggle",
+			"id": "hotstrings_toggle",
 			"i18n_on": "menu.hotstrings.on",
 			"i18n_off": "menu.hotstrings.off",
+			"checked_when": [
+				"hotstrings_enabled"
+			],
 			"category": "Hotstrings"
 		},
 		{
@@ -1147,6 +1182,21 @@
 		{
 			"type": "list",
 			"id": "hotstring_extensions"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
+			"type": "command",
+			"id": "hotstrings_reload",
+			"i18n": "menu.global.reload",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.only_linux_rereads_its_catalogue"
 		}
 	],
 	"hotstrings_params_group": [
@@ -1194,8 +1244,12 @@
 	"gestures_menu": [
 		{
 			"type": "toggle",
+			"id": "gestures_toggle",
 			"i18n_on": "menu.gestures.on",
 			"i18n_off": "menu.gestures.off",
+			"checked_when": [
+				"gestures_enabled"
+			],
 			"category": "Gestures",
 			"platforms": [
 				"hs",
@@ -1349,8 +1403,12 @@
 	"tap_holds_menu": [
 		{
 			"type": "toggle",
+			"id": "tapholds_toggle",
 			"i18n_on": "menu.tapholds.on",
 			"i18n_off": "menu.tapholds.off",
+			"checked_when": [
+				"tapholds_enabled"
+			],
 			"category": "TapHolds",
 			"platforms": [
 				"ahk"

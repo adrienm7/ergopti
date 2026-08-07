@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: строка открывает файл личных сочетаний клавиш. У macOS и Windows он есть; сочетания линуксового драйвера — это переключатели и преобразования выделения, редактировать нечего.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Только Linux: этот драйвер собирает метрики внутри самого демона, поэтому может приостановить сбор или сбросить текущую сессию из трея. macOS и Windows пишут свои через отдельное хранилище и не предлагают ни того, ни другого.",
 	"platform_reason.libinput_reader_is_linux_only": "Чтение libinput — только в Linux",
+	"platform_reason.only_linux_rereads_its_catalogue": "Перезагрузка каталога — только Linux",
+	"platform_reason.only_linux_migrates_in_the_background": "Фоновая миграция шифрования — только Linux",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "Не в Linux: эти строки настраивают движок вывода, профиль, триггер и то, как предсказания отображаются и перебираются. Драйвер Linux работает с одним локальным движком и не предлагает ни одной из этих поверхностей, поэтому каждая строка открывала бы пустое подменю.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Только Linux: этот драйвер перечисляет модели и две настройки генерации прямо в меню. macOS и Windows помещают те же варианты за строкой подменю, которую объявляют их собственные строки выше.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Только Linux: tap-hold этого драйвера выполняет kanata, его демон переназначения, поэтому они читаются здесь, а не в отдельном меню. У Windows такое отдельное меню есть, а macOS читает те же значения через Karabiner.",

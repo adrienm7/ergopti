@@ -690,7 +690,19 @@ function M.build(ctx)
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
-	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, ctx, list_providers)
+	-- The category gate's state key. This driver registers no command for that
+	-- row — its tray PARENT carries the toggle, which hs.menubar can bind and the
+	-- Linux tray cannot — so the renderer builds nothing here and this getter is
+	-- never read. It is named anyway: the declaration promises the key to every
+	-- platform the row is visible on, and a key with no getter is an ERROR at
+	-- render time rather than a silently wrong row.
+	local sc_ctx = {}
+	for key, value in pairs(ctx) do sc_ctx[key] = value end
+	sc_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
+
+	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
 	-- Prepend the top-level feature items before the manifest section
 	for i, it in ipairs(top_items) do

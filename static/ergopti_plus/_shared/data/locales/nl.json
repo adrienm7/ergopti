@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Niet op Linux: deze rij opent het bestand met persoonlijke sneltoetsen. macOS en Windows hebben er elk een; de sneltoetsen van de Linux-driver zijn schakelaars en selectiebewerkingen, zonder bestand om te bewerken.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Alleen Linux: deze driver verzamelt zijn metingen in de daemon zelf en kan die verzameling dus pauzeren of de lopende sessie vanuit het systeemvak weggooien. macOS en Windows schrijven de hunne via een aparte opslag en bieden geen van beide.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-lezen — alleen op Linux",
+	"platform_reason.only_linux_rereads_its_catalogue": "Catalogus herladen — alleen Linux",
+	"platform_reason.only_linux_migrates_in_the_background": "Versleutelingsmigratie op de achtergrond — alleen Linux",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "Niet op Linux: deze rijen stellen de inferentie-backend, het profiel, de trigger en de weergave en navigatie van voorspellingen in. De Linux-driver praat met één lokale backend en biedt geen van die schermen, dus elke rij zou een leeg submenu openen.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Alleen Linux: deze driver toont de modellen en de twee generatie-instellingen rechtstreeks in het menu. macOS en Windows zetten dezelfde keuzes achter een submenurij, die hun eigen rijen hierboven declareren.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Alleen Linux: de tap-holds van deze driver worden uitgevoerd door kanata, zijn remap-daemon, dus ze worden hier gelezen in plaats van in een eigen menu. Windows heeft dat aparte menu en macOS leest dezelfde waarden via Karabiner.",

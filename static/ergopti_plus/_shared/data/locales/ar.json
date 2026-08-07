@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "ليس على Linux: يفتح هذا الصف ملف الاختصارات الشخصية. لدى macOS وWindows ملف كهذا؛ أما مشغّل Linux فاختصاراته مفاتيح تبديل وتحويلات للنص المحدد، دون أي ملف على القرص لتحريره.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux فقط: يجمع هذا المشغّل مقاييسه داخل الخدمة نفسها، ولذلك يمكنه إيقاف الجمع مؤقتًا أو تجاهل الجلسة الجارية من شريط النظام. أما macOS وWindows فيكتبان مقاييسهما عبر مخزن منفصل ولا يوفّران أيًّا من هذين الأمرين.",
 	"platform_reason.libinput_reader_is_linux_only": "قراءة libinput — على لينكس فقط",
+	"platform_reason.only_linux_rereads_its_catalogue": "إعادة تحميل الفهرس — على لينكس فقط",
+	"platform_reason.only_linux_migrates_in_the_background": "ترحيل التشفير في الخلفية — على لينكس فقط",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "ليس على Linux: تضبط هذه الصفوف محرّك الاستدلال والملف الشخصي والمُشغّل وطريقة عرض التنبؤات والتنقل بينها. يتعامل مشغّل Linux مع محرّك محلي واحد ولا يوفّر أيًّا من هذه الواجهات، لذا سيفتح كل صف قائمة فرعية فارغة.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux فقط: يعرض هذا المشغّل النماذج وإعدادَي التوليد مباشرةً في القائمة. أما macOS وWindows فيضعان الخيارات نفسها خلف صف قائمة فرعية، وهو ما تعلنه صفوفهما أعلاه.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Linux فقط: يُشغّل kanata، وهو خادم إعادة التعيين لهذا المشغّل، إجراءات الضغط المطوّل، ولذلك تُقرأ هنا بدلاً من قائمة خاصة بها. يملك Windows تلك القائمة المنفصلة، ويقرأ macOS القيم نفسها عبر Karabiner.",

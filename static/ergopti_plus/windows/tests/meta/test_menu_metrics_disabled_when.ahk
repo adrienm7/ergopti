@@ -262,8 +262,17 @@ _MMDW_ManifestTomlSourceExcludesAhk() {
 	Body := (NextTablePos > 0) ? SubStr(Toml, HeaderPos, NextTablePos - HeaderPos) : SubStr(Toml, HeaderPos)
 	Assert(InStr(Body, 'type = "toggle"') > 0,
 		'the first [[menu.metrics_menu]] table must be the type="toggle" master entry')
-	Assert(InStr(Body, 'platforms = ["hs"]') > 0,
-		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare platforms = ["hs"] — without it, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
+	; The INVARIANT is that ahk is excluded, not that the list reads exactly
+	; ["hs"]: Linux joined it on 2026-08-08 when the shared renderer learned to
+	; build `toggle` rows, and pinning the spelling would have failed a change that
+	; respects the rule completely.
+	PlatPos := InStr(Body, "platforms = [")
+	Assert(PlatPos > 0,
+		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare a platforms filter — without one, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
+	PlatEnd := InStr(Body, "]", , PlatPos)
+	PlatList := SubStr(Body, PlatPos, PlatEnd - PlatPos + 1)
+	Assert(!RegExMatch(PlatList, 'i)"ahk"'),
+		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must NOT list "ahk" — that driver builds this row itself in BuildMetricsMenu, and an unrestricted declaration makes its renderer draw a second, dead one (F2). Found: ' . PlatList)
 }
 Test("menu-metrics-disabled-when: manifest.toml SOURCE excludes ahk from the metrics toggle, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceExcludesAhk)
 

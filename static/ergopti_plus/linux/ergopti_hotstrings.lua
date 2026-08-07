@@ -1266,10 +1266,17 @@ local function main()
 		end
 		rebuild_tray_menu()
 		else
-			-- The degraded tray, shown when the menu builder is unavailable. Its
-			-- labels are translated like every other one: this row carried the
-			-- French word for « quit » written into the source, which is a label in
-			-- one of the twenty-one languages this driver speaks.
+			-- The degraded tray, shown when the menu builder is unavailable.
+			--
+			-- The only two rows in this driver the shared renderer does not draw,
+			-- and deliberately: they exist FOR the case where the menu subsystem
+			-- failed to load, so routing them through it would make the fallback
+			-- depend on the very thing it is there to survive without. Two rows,
+			-- a name and a way out.
+			--
+			-- Their labels are still translated like every other one: this row
+			-- carried the French word for « quit » written into the source, which is
+			-- a label in one of the twenty-one languages this driver speaks.
 			local quit_label = "Quitter"
 			if ok_i18n and i18n_mod then
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))

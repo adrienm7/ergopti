@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Inte på Linux: raden öppnar filen med personliga genvägar. macOS och Windows har var sin; Linux-drivrutinens genvägar är växlar och markeringsomvandlingar, utan någon fil att redigera.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Endast Linux: den här drivrutinen samlar in sina mätvärden inne i daemonen och kan därför pausa insamlingen eller kasta den pågående sessionen från aktivitetsfältet. macOS och Windows skriver sina via ett separat lager och erbjuder ingetdera.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-läsning — endast på Linux",
+	"platform_reason.only_linux_rereads_its_catalogue": "Omladdning av katalogen — endast Linux",
+	"platform_reason.only_linux_migrates_in_the_background": "Krypteringsmigrering i bakgrunden — endast Linux",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "Inte på Linux: dessa rader ställer in inferensbackenden, profilen, utlösaren och hur förutsägelser visas och bläddras. Linux-drivrutinen talar med en enda lokal backend och erbjuder ingen av dessa ytor, så varje rad skulle öppna en tom undermeny.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Endast Linux: den här drivrutinen listar modellerna och de två genereringsinställningarna direkt i menyn. macOS och Windows lägger samma val bakom en undermenyrad, som deras egna rader ovan deklarerar.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Endast Linux: den här drivrutinens tap-hold körs av kanata, dess remap-daemon, så de läses här i stället för i en egen meny. Windows har den separata menyn och macOS läser samma värden via Karabiner.",
