@@ -898,6 +898,14 @@
 			"type": "---"
 		},
 		{
+			"type": "list",
+			"id": "layout_switching",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+		},
+		{
 			"type": "feature",
 			"path": "hotstrings.magic_key.replace",
 			"i18n": "menu.layout.replace"

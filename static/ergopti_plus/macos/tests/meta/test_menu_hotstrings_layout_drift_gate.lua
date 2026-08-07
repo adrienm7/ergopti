@@ -122,6 +122,9 @@ local CANONICAL_LAYOUT_MENU = {
 	-- skipped the row — the layout list did not render at all.
 	"list:active_layouts",
 	"---",
+	-- The pause/resume layout pickers, declared 2026-08-07 with the two blocks
+	-- above and for the same reason: their choices are macOS input sources.
+	"list:layout_switching",
 	"feature:hotstrings.magic_key.replace",
 }
 

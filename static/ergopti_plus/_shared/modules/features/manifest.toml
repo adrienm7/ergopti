@@ -3592,6 +3592,15 @@ platforms = ["hs"]
 [[menu.layout_menu]]
 type = "---"
 
+# Which layout to switch to when the driver pauses and when it resumes. macOS's
+# alone, and for the same reason as the two blocks above: the choices are the
+# system's input sources.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_switching"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
 [[menu.layout_menu]]
 type = "feature"
 path = "hotstrings.magic_key.replace"
