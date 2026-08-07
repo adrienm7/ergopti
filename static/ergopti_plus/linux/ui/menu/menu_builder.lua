@@ -1525,31 +1525,6 @@ local function _manifest_metrics_rows(ctx, k)
 		-- other two open a metrics WINDOW for the same figures. Declared rows
 		-- since 2026-08-06, so the manifest can describe a driver-specific row
 		-- rather than the driver keeping it to itself.
-		["metrics_session_stats"] = function()
-			if type(k.get_session_stats) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no get_session_stats — the row reports nothing.")
-				return
-			end
-			local stats = k.get_session_stats()
-			Logger.info(LOG, "Session: %d keystrokes, ~%d words, %ds.",
-				stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-		end,
-		["metrics_current_wpm"] = function()
-			if type(k.get_wpm) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no get_wpm — the row reports nothing.")
-				return
-			end
-			Logger.info(LOG, "WPM: %.1f", k.get_wpm())
-		end,
-		["metrics_per_app_stats"] = function()
-			if type(k.get_app_stats) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no get_app_stats — the row reports nothing.")
-				return
-			end
-			for app, stats in pairs(k.get_app_stats()) do
-				Logger.info(LOG, "  %s: %d keystrokes", app, stats.keystrokes)
-			end
-		end,
 		["metrics_suspend"] = function()
 			if type(k.is_suppressed) ~= "function" then
 				Logger.error(LOG, "Keylogger exposes no is_suppressed — the row cannot toggle anything.")

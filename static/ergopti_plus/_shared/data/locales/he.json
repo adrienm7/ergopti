@@ -2410,7 +2410,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "לא ב-Linux: השורה משנה את מקש הקסם. ב-macOS וב-Windows נפתחת לכך תיבת דו-שיח; מנהל ההתקן של Linux רק קורא את המקש מההגדרות ואינו מאפשר לשנותו מהתפריט.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "לא ב-Linux: שורות אלו מפרטות את צירופי המקשים שהמשתמש שייך. macOS ו-Windows יודעים ללכוד צירוף ולשמור אותו; למנהל ההתקן של Linux אין כל ממשק שיוך, ולכן הרשימה תהיה תמיד ריקה.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
-	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux בלבד: מנהל ההתקן הזה רושם את המדדים שלו ביומן שלו במקום בחלון. macOS ו-Windows פותחים חלון מדדים עבור אותם נתונים, ולכן השורה הזו רק תשכפל את מה שהחלון כבר מציג.",
+	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux בלבד: מנהל ההתקן הזה אוסף את המדדים בתוך הדמון עצמו, ולכן הוא יכול להשהות את האיסוף או להשליך את הפעילות הנוכחית ממגש המערכת. macOS ו-Windows כותבים את שלהם דרך מאגר נפרד ואינם מציעים אף אחת מהפעולות האלה.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "לא ב-Linux: שורות אלה מגדירות את מנוע ההסקה, את הפרופיל, את הטריגר ואת אופן ההצגה והניווט של התחזיות. מנהל ההתקן של Linux מדבר עם מנוע מקומי אחד ואינו מציע אף אחד מהמשטחים האלה, ולכן כל שורה הייתה פותחת תפריט משנה ריק.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux בלבד: מנהל ההתקן הזה מציג את הדגמים ואת שתי הגדרות היצירה ישירות בתפריט. macOS ו-Windows מציבים את אותן האפשרויות מאחורי שורת תפריט משנה, שאותה מכריזות השורות שלהם למעלה.",
