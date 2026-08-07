@@ -5,30 +5,28 @@
 ; DESCRIPTION:
 ; Regression guard for HIGH-07: fix-trapholds-menu-raw-add-drops-clicks.
 ;
-; The Tap-Hold submenu's actionable items (_TH_DynResetDefaults,
-; _TH_DynDisableAll, _TH_DynKeys, _BuildHoldPickerSubmenu) used raw
-; Menu.Add(Label, Callback) for every actionable callback. AHK 2.0's
-; WM_COMMAND -> menu-callback dispatch silently drops ~1 click in 3.
-; infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path, but ONLY
-; for items registered via RegisterMenuItem(MenuObj, Label, Callback).
+; The Tap-Hold submenu's actionable items used raw Menu.Add(Label, Callback) for
+; every callback. AHK 2.0's WM_COMMAND -> menu-callback dispatch silently drops
+; ~1 click in 3. infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry
+; path, but ONLY for items registered via RegisterMenuItem(MenuObj, Label, Cb).
 ;
 ; Since the Tap-Hold block used raw .Add, those items were never in the retry
-; path and roughly one in three clicks on reset-defaults, disable-all,
-; per-key tap/hold pickers, or per-key disable silently did nothing.
+; path and roughly one in three clicks on reset-defaults, disable-all, per-key
+; tap/hold pickers, or per-key disable silently did nothing.
 ;
-; The fix replaces the five raw two-argument .Add calls with RegisterMenuItem,
-; keeping the existing ObjBindMethod/bound-function callbacks:
-;   _TH_DynResetDefaults  : M.Add  → RegisterMenuItem(M, ...)
-;   _TH_DynDisableAll     : M.Add  → RegisterMenuItem(M, ...)
-;   _TH_DynKeys disable   : KeyMenu.Add → RegisterMenuItem(KeyMenu, ...)
-;   _TH_DynKeys tap-picker: KeyMenu.Add → RegisterMenuItem(KeyMenu, ...)
-;   _BuildHoldPickerSubmenu: PickerMenu.Add → RegisterMenuItem(PickerMenu, ...)
+; WHERE THE ROOT CAUSE LIVES NOW (2026-08-07): every one of those rows is DATA.
+; The two buttons are `command` declarations and the per-key tree is a `list`, so
+; the wiring happens once, in _MR_RenderRows, which
+; test_keyboard_shortcut_groups_register_dispatch pins to RegisterMenuItem for
+; every list on every menu. The same move was made for HIGH-04 and for the same
+; reason: a guard on the shared renderer covers every present and future row,
+; where a guard on four functions covered four.
 ;
-; Parent-submenu adds (M.Add(ParentLabel, KeyMenu), KeyMenu.Add(HoldPickerLabel,
-; HoldPickerMenu)) and separator adds (KeyMenu.Add()) remain as raw .Add —
-; those are the sanctioned exceptions in the dispatcher documentation.
+; What is left to check HERE is the other half — that this menu still hands its
+; rows over instead of building them, because a provider that built a Menu again
+; would be adding callbacks outside the renderer, which is how the bug got in.
 ;
-; SCOPE: source introspection of ui/tray_menu.ahk.
+; SCOPE: source introspection of the driver tree.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,91 +36,71 @@
 
 ; ============================================
 ; ============================================
-; ======= 1/ Source scan helpers =============
+; ======= 1/ The buttons are declared ========
 ; ============================================
 ; ============================================
 
-_THRD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_THRD_ButtonsAreCommands() {
+	Body := _DriverFuncBody("_BuildTapHoldsSubmenu")
+	Assert(Body != "", "_BuildTapHoldsSubmenu must be present in the driver source")
+
+	; Both buttons reach the renderer as named commands. A `command` row is drawn
+	; by _MR_RenderToggle/_MR_RenderRows' sibling path, which registers it — the
+	; driver never adds it, so it cannot add it raw.
+	for _, Id in ["reset_defaults", "disable_all"] {
+		Assert(InStr(Body, Chr(34) . Id . Chr(34)) > 0,
+			"_BuildTapHoldsSubmenu must pass '" . Id . "' to the renderer as a command (HIGH-07)")
+	}
+	Assert(!InStr(Body, "RegisterMenuItem("),
+		"_BuildTapHoldsSubmenu must not register rows itself — the renderer owns the menu shape")
+	; RegExMatch, not InStr: AHK's InStr is case-INSENSITIVE, and this function's
+	; OWN name ends in "Submenu()" — which contains "menu()".
+	Assert(!RegExMatch(Body, "Menu\(\)"),
+		"_BuildTapHoldsSubmenu must not build a Menu itself (HIGH-07)")
 }
+Test("meta fix-tapholds-menu-raw-add: the two buttons are declared commands",
+	_THRD_ButtonsAreCommands)
+
+
 
 
 ; ================================================
 ; ================================================
-; ======= 2/ Test implementations ================
+; ======= 2/ The providers return DATA ===========
 ; ================================================
 ; ================================================
 
-_THRD_CheckResetDefaultsRegistered() {
-	Src := _THRD_ReadSource("ui/tray_menu.ahk")
-	Assert(Src != "", "ui/tray_menu.ahk must be readable")
+_THRD_KeyRowsReturnData() {
+	Body := _DriverFuncBody("_TH_KeyRows")
+	Assert(Body != "", "_TH_KeyRows must be present in the driver source")
 
-	Body := _DriverFuncBody("_TH_DynResetDefaults")
-	Assert(Body != "", "_TH_DynResetDefaults must be present in ui/tray_menu.ahk")
-
-	Assert(InStr(Body, "RegisterMenuItem("),
-		"_TH_DynResetDefaults must use RegisterMenuItem (not raw M.Add) for the reset-defaults action (HIGH-07)")
-	Assert(!InStr(Body, "M.Add(t(" . Chr(34) . "tap_hold.reset_defaults" . Chr(34) . "), _TH_ResetAllToDefaults)"),
-		"_TH_DynResetDefaults must NOT use raw M.Add for the reset-defaults callback — use RegisterMenuItem")
+	Assert(!RegExMatch(Body, "Menu\(\)"),
+		"_TH_KeyRows must return row data, never build a Menu — a Menu it filled itself would carry "
+		. "callbacks outside the WM_COMMAND retry path (HIGH-07)")
+	Assert(!InStr(Body, "RegisterMenuItem("),
+		"_TH_KeyRows must not register menu items itself (HIGH-07)")
+	; Every actionable row carries its callback as data under "action", which the
+	; renderer wires with RegisterMenuItem.
+	for _, Fn in ["_TH_MakeDisableFn", "_TH_MakeTapPickerFn"] {
+		Assert(RegExMatch(Body, Chr(34) . "action" . Chr(34) . "\s*,\s*" . Fn),
+			"_TH_KeyRows must carry " . Fn . " as an " . Chr(34) . "action" . Chr(34)
+			. " row field so the renderer wires it (HIGH-07)")
+	}
 }
+Test("meta fix-tapholds-menu-raw-add: the per-key provider returns data, not a menu",
+	_THRD_KeyRowsReturnData)
 
-_THRD_CheckDisableAllRegistered() {
-	Src := _THRD_ReadSource("ui/tray_menu.ahk")
-	Assert(Src != "", "ui/tray_menu.ahk must be readable")
+_THRD_HoldPickerReturnsData() {
+	Body := _DriverFuncBody("_TH_HoldPickerRows")
+	Assert(Body != "", "_TH_HoldPickerRows must be present in the driver source")
 
-	Body := _DriverFuncBody("_TH_DynDisableAll")
-	Assert(Body != "", "_TH_DynDisableAll must be present in ui/tray_menu.ahk")
-
-	Assert(InStr(Body, "RegisterMenuItem("),
-		"_TH_DynDisableAll must use RegisterMenuItem (not raw M.Add) for the disable-all action (HIGH-07)")
-	Assert(!InStr(Body, "M.Add(t(" . Chr(34) . "tap_hold.disable_all" . Chr(34) . "), _TH_DisableAll)"),
-		"_TH_DynDisableAll must NOT use raw M.Add for the disable-all callback — use RegisterMenuItem")
+	Assert(!RegExMatch(Body, "Menu\(\)"),
+		"_TH_HoldPickerRows must return row data, never build a Menu (HIGH-07)")
+	Assert(!InStr(Body, "RegisterMenuItem("),
+		"_TH_HoldPickerRows must not register menu items itself (HIGH-07)")
+	Assert(RegExMatch(Body, Chr(34) . "action" . Chr(34) . "\s*,\s*_TH_MakeHoldFn"),
+		"_TH_HoldPickerRows must carry _TH_MakeHoldFn as an " . Chr(34) . "action" . Chr(34)
+		. " row field so the renderer wires it (HIGH-07)")
 }
-
-_THRD_CheckDynKeysRegistered() {
-	Src := _THRD_ReadSource("ui/tray_menu.ahk")
-	Assert(Src != "", "ui/tray_menu.ahk must be readable")
-
-	Body := _DriverFuncBody("_TH_DynKeys")
-	Assert(Body != "", "_TH_DynKeys must be present in ui/tray_menu.ahk")
-
-	; Disable label and tap-picker must use RegisterMenuItem.
-	Assert(InStr(Body, "RegisterMenuItem(KeyMenu, DisableLabel"),
-		"_TH_DynKeys must use RegisterMenuItem for the per-key disable item (HIGH-07)")
-	Assert(InStr(Body, "RegisterMenuItem(KeyMenu, TapPickerLabel"),
-		"_TH_DynKeys must use RegisterMenuItem for the per-key tap-picker item (HIGH-07)")
-
-	; Raw two-arg .Add for those callbacks must be absent.
-	Assert(!InStr(Body, "KeyMenu.Add(DisableLabel, _TH_MakeDisableFn"),
-		"_TH_DynKeys must NOT use raw KeyMenu.Add for the disable callback — use RegisterMenuItem")
-	Assert(!InStr(Body, "KeyMenu.Add(TapPickerLabel, _TH_MakeTapPickerFn"),
-		"_TH_DynKeys must NOT use raw KeyMenu.Add for the tap-picker callback — use RegisterMenuItem")
-}
-
-_THRD_CheckHoldPickerRegistered() {
-	Src := _THRD_ReadSource("ui/tray_menu.ahk")
-	Assert(Src != "", "ui/tray_menu.ahk must be readable")
-
-	Body := _DriverFuncBody("_BuildHoldPickerSubmenu")
-	Assert(Body != "", "_BuildHoldPickerSubmenu must be present in ui/tray_menu.ahk")
-
-	Assert(InStr(Body, "RegisterMenuItem(PickerMenu, Label"),
-		"_BuildHoldPickerSubmenu must use RegisterMenuItem for each hold option (HIGH-07)")
-	Assert(!InStr(Body, "PickerMenu.Add(Label, _TH_MakeHoldFn"),
-		"_BuildHoldPickerSubmenu must NOT use raw PickerMenu.Add for hold-option callbacks — use RegisterMenuItem")
-}
-
-
-Test("meta fix-tapholds-menu-raw-add: _TH_DynResetDefaults uses RegisterMenuItem",
-	_THRD_CheckResetDefaultsRegistered)
-
-Test("meta fix-tapholds-menu-raw-add: _TH_DynDisableAll uses RegisterMenuItem",
-	_THRD_CheckDisableAllRegistered)
-
-Test("meta fix-tapholds-menu-raw-add: _TH_DynKeys disable and tap-picker use RegisterMenuItem",
-	_THRD_CheckDynKeysRegistered)
-
-Test("meta fix-tapholds-menu-raw-add: _BuildHoldPickerSubmenu hold options use RegisterMenuItem",
-	_THRD_CheckHoldPickerRegistered)
+Test("meta fix-tapholds-menu-raw-add: the hold picker returns data, not a menu",
+	_THRD_HoldPickerReturnsData)

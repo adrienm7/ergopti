@@ -234,6 +234,9 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 94 → 86: the tap-holds menu. Its two buttons are `command` declarations and
+	// the per-key tree is a `list` — the key, its disable / tap / hold rows, and
+	// the hold options inside that. Three levels, drawn by the renderer.
 	// 105 → 94: the profile picker with its per-app overrides, and the remote-API
 	// endpoint list. That is the whole IA menu now: only the top-level dispatch
 	// stays native, because it reads the tray's own state to paint the health dot.
@@ -252,7 +255,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 94,
+	windows: 86,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's

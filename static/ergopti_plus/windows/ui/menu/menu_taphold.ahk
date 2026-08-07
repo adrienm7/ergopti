@@ -37,29 +37,23 @@
 ; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
-	DynHandlers := Map(
-		"reset_defaults", (M, C) => _TH_DynResetDefaults(M, C),
-		"disable_all",    (M, C) => _TH_DynDisableAll(M, C),
-		"tap_hold_keys",  _TH_DynKeys,
+	Commands := Map(
+		"reset_defaults", _TH_ResetAllToDefaults,
+		"disable_all",    _TH_DisableAll
 	)
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", DynHandlers)
+	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands)
 }
 
-; Dynamic handler: reset-defaults action button.
-_TH_DynResetDefaults(M, _Cat) {
-	try LoggerInfo("TapHoldMenu", "Resetting all tap-hold overrides from defaults (script='{1}', pid={2}).", A_ScriptName, DriverPid)
-	RegisterMenuItem(M, t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
-}
-
-; Dynamic handler: disable-all action button.
-_TH_DynDisableAll(M, _Cat) {
-	try LoggerInfo("TapHoldMenu", "Disabling all tap-hold mappings (script='{1}', pid={2}).", A_ScriptName, DriverPid)
-	RegisterMenuItem(M, t("tap_hold.disable_all"), _TH_DisableAll)
-}
-
-; Dynamic handler: per-key tap/hold entries.
-_TH_DynKeys(M, _Cat) {
+; List provider: one row per configurable key.
+;
+; Row DATA since 2026-08-07. The tree is three levels — the key, its disable /
+; tap / hold rows, and the hold picker's options — which is what the renderer
+; allows, and none of it mutates a live menu: every action writes the user's
+; tap_hold.toml and reloads the script, which rebuilds the tray from scratch.
+_TH_KeyRows() {
 	global TapHold
+	Rows := []
 	for _, KeyDef in TapHoldKeyDefs() {
 		KeyId    := KeyDef["id"]
 		KeyLabel := t(KeyDef["i18n"])
@@ -75,30 +69,26 @@ _TH_DynKeys(M, _Cat) {
 			: (TapLbl . "  /  " . HoldLbl)
 		ParentLabel := KeyLabel . "  :  " . ComboLabel
 
-		KeyMenu := Menu()
-
-		DisableLabel := t("tap_hold.action.disable")
-		RegisterMenuItem(KeyMenu, DisableLabel, _TH_MakeDisableFn(KeyId))
-		if !IsConfigured
-			KeyMenu.Disable(DisableLabel)
-
-		KeyMenu.Add()
-
-		TapPickerLabel := StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl)
-		RegisterMenuItem(KeyMenu, TapPickerLabel, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl))
-
-		HoldPickerLabel := StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl)
 		; Indirection avoids a call-site occurrence of the function name before
 		; its definition, which would cause the meta test's body-extractor to
 		; resolve the wrong function body (see HIGH-07 regression guard).
-		_HoldSubmenuBuilder := _BuildHoldPickerSubmenu
-		HoldPickerMenu      := _HoldSubmenuBuilder(KeyId)
-		KeyMenu.Add(HoldPickerLabel, HoldPickerMenu)
+		_HoldRowsBuilder := _TH_HoldPickerRows
 
-		M.Add(ParentLabel, KeyMenu)
-		if IsConfigured
-			M.Check(ParentLabel)
+		Rows.Push(Map(
+			"label",   ParentLabel,
+			"checked", IsConfigured,
+			"items", [
+				Map("label",    t("tap_hold.action.disable"),
+					"disabled", !IsConfigured,
+					"action",   _TH_MakeDisableFn(KeyId)),
+				Map("separator", true),
+				Map("label",  StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl),
+					"action", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
+				Map("label", StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl),
+					"items", _HoldRowsBuilder(KeyId))
+			]))
 	}
+	return Rows
 }
 
 ; Return the "none" hold option map (first entry in _TH_HoldOptions).
@@ -113,6 +103,7 @@ _TH_NoneHoldOpt() {
 ; tap_hold.toml (the loader will fall back to defaults.toml on next reload).
 _TH_ResetAllToDefaults(*) {
 	global _ConfigDir, _AhkSubDir
+	try LoggerInfo("TapHoldMenu", "Resetting all tap-hold overrides from defaults (script='{1}', pid={2}).", A_ScriptName, DriverPid)
 	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
 	try {
 		if FileExist(Path) {
@@ -127,6 +118,7 @@ _TH_ResetAllToDefaults(*) {
 ; Clear every configured key so all physical keys revert to their native OS
 ; behaviour (no tap remapping, no hold remapping).
 _TH_DisableAll(*) {
+	try LoggerInfo("TapHoldMenu", "Disabling all tap-hold mappings (script='{1}', pid={2}).", A_ScriptName, DriverPid)
 	if !IsSet(_TH_WriteTapHoldDisabled) {
 		try LoggerError("TapHoldMenu", "Disable-all unavailable: tap-hold writer is not loaded.")
 		return
@@ -208,9 +200,9 @@ _TH_ApplyTap(KeyId, ActionId) {
 
 ; Build the hold picker submenu for a given key. Shows the fixed hold options
 ; from _TH_HoldOptions; current selection is checked.
-_BuildHoldPickerSubmenu(KeyId) {
+_TH_HoldPickerRows(KeyId) {
 	global _TH_HoldOptions
-	PickerMenu := Menu()
+	Rows := []
 	for _, HoldOpt in _TH_HoldOptions {
 		Label    := ""
 		if (HoldOpt["kind"] == "modifier" && HoldOpt["i18n"] == "") {
@@ -218,13 +210,12 @@ _BuildHoldPickerSubmenu(KeyId) {
 		} else {
 			Label := t(HoldOpt["i18n"])
 		}
-		IsActive := IsTapHoldHoldActive(KeyId, HoldOpt)
-		RegisterMenuItem(PickerMenu, Label, _TH_MakeHoldFn(KeyId, HoldOpt))
-		if IsActive {
-			PickerMenu.Check(Label)
-		}
+		Rows.Push(Map(
+			"label",   Label,
+			"checked", IsTapHoldHoldActive(KeyId, HoldOpt),
+			"action",  _TH_MakeHoldFn(KeyId, HoldOpt)))
 	}
-	return PickerMenu
+	return Rows
 }
 
 ; Build a bound callback that writes a hold option for a key, then reloads.
