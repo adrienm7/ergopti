@@ -2864,6 +2864,45 @@ type = "list"
 id = "kanata_actions"
 platforms = ["linux"]
 
+# The tap-hold read-out, added 2026-08-07.
+#
+# kanata IS the tap-hold engine on Linux — the defalias block it runs is
+# generated from _shared/tap_hold/defaults.toml, the same file Windows parses and
+# macOS's Karabiner defaults derive from. Yet `tap_holds_menu` said ["ahk"] and
+# `karabiner_menu` said ["hs"], so the one driver whose remap daemon exists
+# precisely to do tap-holds had no row about them anywhere in its tray. A user
+# could not see which key taps to what, or how long a hold takes, without
+# opening a generated .kbd.
+#
+# What it is NOT: the Windows menu lets the user CHANGE a tap action from the
+# tray, and this does not, because this driver has no writer for the user's
+# tap_hold.toml — only a reader. Declaring an editable row would promise a
+# control that does nothing. The edit row below opens the file instead, which is
+# the honest version of "configure this" for a driver that reads a file it
+# cannot yet write.
+[[menu.kanata_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.kanata_menu]]
+type = "section_header"
+i18n = "menu.kanata.header_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
+
+[[menu.kanata_menu]]
+type = "list"
+id = "kanata_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
+
+[[menu.kanata_menu]]
+type = "command"
+id = "kanata_edit_tap_holds"
+i18n = "menu.kanata.edit_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
+
 
 # The Karabiner submenu.
 #

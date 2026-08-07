@@ -250,6 +250,29 @@ function M.tap_hold_threshold_ms()
 	return value
 end
 
+--- Absolute path of the user's tap-hold override file.
+---
+--- Public so the tray's "edit this" row opens exactly the file the loader reads,
+--- rather than rebuilding the path from $HOME at the call site — the same
+--- resolver argument the paths block above makes about _shared.
+--- @return string Absolute path to ~/.config/ergopti/tap_hold.toml.
+function M.tap_hold_config_path()
+	_resolve_paths()
+	return _user_toml
+end
+
+--- The tap-hold configuration this driver runs, key id → its fields.
+---
+--- Public because the tray reads it: kanata IS this driver's tap-hold engine, so
+--- the menu's read-out has to come from the same loader that feeds the defalias
+--- block. Re-reading rather than caching is deliberate — a user who edits their
+--- tap_hold.toml and reopens the menu must see what they wrote, and this runs
+--- once per menu build, not per keystroke.
+--- @return table key id → { time_activation_seconds, tap_action, hold_modifier }.
+function M.tap_hold_keys()
+	return _load_tap_hold_config()
+end
+
 --- Test accessor: runs the tap-hold config loader in isolation, bypassing the
 --- template gate in generate_kbd(), so the suite can exercise the user-file
 --- fallback/fail-fast logging without a resolvable kanata.kbd template. The path

@@ -1871,6 +1871,50 @@ end
 --- driver still builds the row, which is what the bypass ratchet measures and
 --- why four of this driver's menus already call the renderer without having
 --- moved a single row out of it.
+--- Display name of a tap-hold key, from the shared vocabulary.
+---
+--- `tap_hold.group.*` is the catalogue Windows already labels its tap-hold menu
+--- with, translated in every locale. Reaching for it rather than spelling the
+--- seven key names out here is the difference between this driver agreeing with
+--- the other two and merely resembling them.
+--- @param key_id string Key id from the tap-hold configuration, e.g. "caps_lock".
+--- @return string.
+local function _tap_hold_key_label(key_id)
+	local label = i18n_safe("tap_hold.group." .. key_id)
+	-- i18n_safe hands back the key when nothing is registered; an unlabelled key
+	-- is better shown by its id than by a dotted path the user cannot read.
+	if label == "tap_hold.group." .. key_id then return key_id end
+	return label
+end
+
+--- Display name of a tap action. Falls back through the shared action catalogue
+--- before giving up and showing the raw value, because a tap action is a key
+--- name in some entries and an `sg_actions.*` id in others.
+--- @param action string|nil Value of `tap_action`.
+--- @return string.
+local function _tap_hold_action_label(action)
+	if type(action) ~= "string" or action == "" then
+		return i18n_safe("tap_hold.tap.none")
+	end
+	for _, prefix in ipairs({ "sg_actions.", "tap_hold.group." }) do
+		local label = i18n_safe(prefix .. action)
+		if label ~= prefix .. action then return label end
+	end
+	return action
+end
+
+--- Display name of a hold modifier, from the shared `tap_hold.hold.*` catalogue.
+--- @param modifier string|nil Value of `hold_modifier`.
+--- @return string.
+local function _tap_hold_hold_label(modifier)
+	if type(modifier) ~= "string" or modifier == "" then
+		return i18n_safe("tap_hold.hold.none")
+	end
+	local label = i18n_safe("tap_hold.hold." .. modifier)
+	if label == "tap_hold.hold." .. modifier then return modifier end
+	return label
+end
+
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_kanata(ctx)
@@ -1926,7 +1970,79 @@ local function _build_kanata(ctx)
 				{ label = i18n_safe("menu.kanata.restart"),  action = call("restart") },
 			}
 		end,
+
+		-- One row per configured tap-hold key, read from the same loader that
+		-- feeds kanata's defalias block. Ordered, because the loader returns a map
+		-- and `pairs` would reshuffle the user's keys on every menu build.
+		["kanata_tap_holds"] = function()
+			if not km or type(km.tap_hold_keys) ~= "function" then
+				Logger.error(LOG, "Kanata manager not loaded — the tap-holds cannot be read.")
+				return {}
+			end
+			local ok, keys = pcall(km.tap_hold_keys)
+			if not ok or type(keys) ~= "table" then
+				Logger.error(LOG, "Tap-hold configuration unreadable — no row to show.")
+				return {}
+			end
+
+			local ids = {}
+			for id in pairs(keys) do ids[#ids + 1] = id end
+			table.sort(ids)
+
+			local rows = {}
+			for _, id in ipairs(ids) do
+				local entry = keys[id] or {}
+				local seconds = tonumber(entry.time_activation_seconds)
+				local ms = seconds and math.floor(seconds * 1000 + 0.5) or nil
+				rows[#rows + 1] = {
+					label = _tap_hold_key_label(id),
+					-- A read-out, not a control: this driver reads the tap-hold file
+					-- and has no writer for it, so every row below is disabled. A
+					-- clickable row that cannot change anything is worse than a
+					-- greyed one — it looks like the setting simply did not take.
+					items = {
+						{ label = string.format(i18n_safe("tap_hold.picker.tap"),
+							_tap_hold_action_label(entry.tap_action)), disabled = true },
+						{ label = string.format(i18n_safe("tap_hold.picker.hold"),
+							_tap_hold_hold_label(entry.hold_modifier)), disabled = true },
+						{ label = ms and string.format(i18n_safe("menu.kanata.tap_hold_delay"), tostring(ms))
+							or i18n_safe("menu.kanata.tap_hold_delay"), disabled = true },
+					},
+				}
+			end
+			return rows
+		end,
 	}
+
+	-- Commands reach the renderer through the context, not as an argument: the
+	-- `command` branch reads ctx.commands[id]. Registering them on a local table
+	-- and passing it positionally would land in `list_providers` and the row
+	-- would render as an unanswered command.
+	ctx.commands = ctx.commands or {}
+	-- Opens the file the loader reads, resolved BY the loader. This driver can
+	-- read a user tap_hold.toml and cannot write one, so "configure" means
+	-- "open the file" until it can.
+	ctx.commands["kanata_edit_tap_holds"] = function()
+			if not km or type(km.tap_hold_config_path) ~= "function" then
+				Logger.error(LOG, "Kanata manager not loaded — no tap-hold file to open.")
+				return
+			end
+			local ok, path = pcall(km.tap_hold_config_path)
+			if not ok or type(path) ~= "string" or path == "" then
+				Logger.error(LOG, "Tap-hold file path unresolved — nothing opened.")
+				return
+			end
+			-- xdg-open on a missing file fails silently, and a user who has never
+			-- written an override is the common case — say so rather than letting
+			-- the row look dead.
+			local probe = io.open(path, "r")
+			if probe then
+				probe:close()
+			else
+				Logger.warn(LOG, "'%s' does not exist yet — the driver is running the shared defaults.", path)
+			end
+			pcall(function() os.execute("xdg-open " .. shell_quote(path) .. " 2>/dev/null &") end)
+	end
 
 	local rows = ManifestMenu
 		and ManifestMenu.build("kanata_menu", "Kanata", nil, nil, ctx, providers)

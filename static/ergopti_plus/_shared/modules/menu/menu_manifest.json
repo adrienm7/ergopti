@@ -164,6 +164,37 @@
 			"platforms": [
 				"linux"
 			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.kanata.header_tap_holds",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.tap_holds_live_under_the_remap_daemon"
+		},
+		{
+			"type": "list",
+			"id": "kanata_tap_holds",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.tap_holds_live_under_the_remap_daemon"
+		},
+		{
+			"type": "command",
+			"id": "kanata_edit_tap_holds",
+			"i18n": "menu.kanata.edit_tap_holds",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.tap_holds_live_under_the_remap_daemon"
 		}
 	],
 	"karabiner_menu": [
