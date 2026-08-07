@@ -326,48 +326,73 @@ _MI_BuildGlobalActionsMenu() {
 ; Builds the About submenu (version, channel, update frequency, changelog).
 _MI_BuildAboutMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
-	AboutMenu := Menu()
-	Ver := Updater_CurrentVersion()
-	VerLabel := "ErgoptiPlus " . Ver
+
+	; The updater block is provider DATA since 2026-08-07: one row per entry,
+	; with the channel and frequency pickers handed over as the native Menus they
+	; already are. The changelog and releases rows are `command` declarations.
+	; Until then the whole submenu was assembled here and described nowhere — on
+	; all three drivers at once.
+	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
+	Commands := Map(
+		"about_changelog",     Updater_ShowChangelog,
+		"about_releases_page", (*) => Run(Updater_ReleasesPageUrl())
+	)
+	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
+}
+
+; List provider: the version row, the channel picker, and — unless this is a
+; local checkout — the update-frequency picker and the one-click update row.
+_MI_AboutUpdateRows() {
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
+	Rows := []
+
+	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
 	if Updater_IsLocalSource() {
-		AboutMenu.Add(VerLabel, (*) => NoAction())
-		AboutMenu.Disable(VerLabel)
+		; A local checkout has no release to open, so the version reads as a label.
+		Rows.Push(Map("label", VerLabel, "disabled", true))
 	} else {
-		RegisterMenuItem(AboutMenu, VerLabel, Updater_OpenCurrentRelease)
+		Rows.Push(Map("label", VerLabel, "action", Updater_OpenCurrentRelease))
 	}
-	AboutMenu.Add()
+	Rows.Push(Map("separator", true))
+
 	ChannelMenu := Menu()
 	RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
 	RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
-	ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
 	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
-	AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
-	if not Updater_IsLocalSource() {
-		FreqMenu := Menu()
-		CurrentLabel := ""
-		CurrentCode  := ""
-		for _, Preset in UPDATER_INTERVAL_PRESETS {
-			Label := t("menu.about.frequency." . Preset.Code)
-			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
-			if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
-				CurrentLabel := Label
-				CurrentCode  := Preset.Code
-			}
-		}
-		if (CurrentLabel != "")
-			FreqMenu.Check(CurrentLabel)
-		FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
-		AboutMenu.Add(t("menu.about.frequency_menu") . ": " . FreqDisplay, FreqMenu)
-		UpdateLabel := Updater_GetUpdateMenuLabel()
-		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
-		if (Updater_GetUpdateState() == "checking")
-			AboutMenu.Disable(UpdateLabel)
+	ChannelMenu.Check(ChannelDisplay)
+	Rows.Push(Map(
+		"label",   t("menu.about.channel_menu") . ": " . ChannelDisplay,
+		"submenu", ChannelMenu))
+
+	if Updater_IsLocalSource() {
+		return Rows
 	}
-	AboutMenu.Add()
-	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
-	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
-	return AboutMenu
+
+	FreqMenu := Menu()
+	CurrentLabel := ""
+	CurrentCode  := ""
+	for _, Preset in UPDATER_INTERVAL_PRESETS {
+		Label := t("menu.about.frequency." . Preset.Code)
+		RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
+		if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
+			CurrentLabel := Label
+			CurrentCode  := Preset.Code
+		}
+	}
+	if (CurrentLabel != "")
+		FreqMenu.Check(CurrentLabel)
+	FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
+	Rows.Push(Map(
+		"label",   t("menu.about.frequency_menu") . ": " . FreqDisplay,
+		"submenu", FreqMenu))
+
+	Rows.Push(Map(
+		"label",    Updater_GetUpdateMenuLabel(),
+		"action",   Updater_OneClickUpdate,
+		"disabled", (Updater_GetUpdateState() == "checking")))
+	return Rows
 }
+
 
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
