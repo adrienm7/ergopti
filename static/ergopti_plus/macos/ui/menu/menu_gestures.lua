@@ -16,6 +16,7 @@ local M = {}
 local hs = hs
 
 local gestures_mod  = require("modules.gestures")
+local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
@@ -338,45 +339,60 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_circular_spaces(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.gestures.circular_spaces"),
-			checked  = (type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap()) or nil,
-			disabled = not state.gestures or paused or nil,
-			fn       = function()
-				if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
-					pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
-					ctx.save_prefs()
-					ctx.updateMenu()
-				end
-			end,
-		})
+	-- The row itself is `type = "check"` in the manifest now: the label, the tick
+	-- predicate and the greying predicate are declared, and this is only what the
+	-- row DOES.
+	local function cmd_circular_spaces()
+		if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
+			pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end
 	end
 
 	-- Build a slot group from the manifest gesture_slots table.
-	local function dyn_slots_group(finger_count)
-		return function(items, _ctx)
+	-- One provider per finger count. The slot ids come from the manifest's own
+	-- `gesture_slots` table, so these rows were already manifest DATA appended by
+	-- hand — the shared renderer materialises them now.
+	local function slots_provider(finger_count)
+		return function()
 			local root = ManifestMenu.get_root()
 			local slots = (type(root) == "table"
 				and type(root.gesture_slots) == "table"
 				and root.gesture_slots[tostring(finger_count)]) or {}
+			local rows = {}
 			for _, slot_id in ipairs(slots) do
-				table.insert(items, slotItem(slot_id))
+				rows[#rows + 1] = MenuUtils.as_provider_row(slotItem(slot_id))
 			end
+			return rows
 		end
 	end
 
 	local dyn_handlers = {
 		["disable_all"]      = dyn_disable_all,
 		["restore_defaults"] = dyn_restore_defaults,
-		["circular_spaces"]  = dyn_circular_spaces,
-		["gesture_slots_2"]  = dyn_slots_group(2),
-		["gesture_slots_3"]  = dyn_slots_group(3),
-		["gesture_slots_4"]  = dyn_slots_group(4),
-		["gesture_slots_5"]  = dyn_slots_group(5),
 	}
 
-	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, ctx)
+	local providers = {
+		["gesture_slots_2"] = slots_provider(2),
+		["gesture_slots_3"] = slots_provider(3),
+		["gesture_slots_4"] = slots_provider(4),
+		["gesture_slots_5"] = slots_provider(5),
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = { ["circular_spaces"] = cmd_circular_spaces }
+	render_ctx.state_getters = {
+		gesture_space_wrap = function()
+			return type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap() or false
+		end,
+		-- disabled_when is an AND of things that must be TRUE for the row to be
+		-- live, so this answers "are gestures usable", not "are they off".
+		gestures_enabled = function() return (state.gestures and not paused) and true or false end,
+	}
+
+	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	item.menu = gm
 	return item
 end

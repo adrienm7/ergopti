@@ -170,9 +170,13 @@ const MEASURE = process.argv.includes('--measure');
 // `llm_menu` and macOS read that key for neither — it built the two rows in
 // place AND wrote out the separator the manifest puts between them, so three
 // pieces of one declaration were reproduced by hand.
+//
+// macos 260 → 259: the gesture menu's four slot groups and its circular-spaces
+// toggle. The slot ids come from the manifest's OWN `gesture_slots` table, so
+// those rows were already manifest data being appended by hand.
 const BASELINE = {
 	windows: 196,
-	macos: 260,
+	macos: 259,
 	linux: 84
 };
 
