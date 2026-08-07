@@ -165,9 +165,14 @@ const MEASURE = process.argv.includes('--measure');
 // restriction recording who wrote the feature first rather than what the
 // platforms can do. It also settled WHERE it hangs: Windows and Linux showed it
 // as a sibling row, macOS as a submenu of the wrap-text toggle.
+//
+// macos 262 → 260: the LLM model and generation rows. Both are declared in
+// `llm_menu` and macOS read that key for neither — it built the two rows in
+// place AND wrote out the separator the manifest puts between them, so three
+// pieces of one declaration were reproduced by hand.
 const BASELINE = {
 	windows: 196,
-	macos: 262,
+	macos: 260,
 	linux: 84
 };
 
