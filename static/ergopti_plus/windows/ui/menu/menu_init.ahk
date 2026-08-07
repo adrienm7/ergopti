@@ -123,7 +123,6 @@ initMenu() {
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
 	_HotDynHandlers := Map(
-		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
 	)
 
@@ -143,6 +142,10 @@ initMenu() {
 	; the provider returns instead of the driver building a Menu object.
 	_HotListProviders := Map(
 		"word_expanders",                (*) => _HS_WordExpanderRows(),
+		; magic_key_config left _HotDynHandlers on 2026-08-07 for the same reason
+		; word_expanders did: its manifest row is `type = "list"` now, so the
+		; renderer builds the item from the data this returns.
+		"magic_key_config",              (*) => _HS_MagicKeyRows(),
 		; The five category blocks. Their ROW — label, count, checkmark and
 		; position — is the renderer's now; the submenu hanging off each one is
 		; still SubMenus[Category], assembled by a different subsystem, and is

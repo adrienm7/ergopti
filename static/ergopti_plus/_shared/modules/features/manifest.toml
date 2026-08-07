@@ -3738,8 +3738,12 @@ type = "---"
 # declaration over an absence. modules/hotstrings/magic_key.lua now owns the
 # value: one reader, one writer, validated (exactly one codepoint, and not a
 # character common in prose) and persisted.
+# `list` since 2026-08-07. The row shows the current magic key and opens a
+# dialog to change it, with a reset row beneath when the key has been
+# customised — two rows, built three times, from a declaration that named only
+# the slot. A `list` returns them as data and the renderer places them.
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "list"
 id = "magic_key_config"
 
 # The four preview-bubble toggles, declared here on 2026-08-05. They were the

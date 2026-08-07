@@ -225,7 +225,7 @@ const MEASURE = process.argv.includes('--measure');
 // supplies just the toggle and the state behind the tick. All three fall
 // together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 195,
+	windows: 194,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	macos: 226,
@@ -233,7 +233,9 @@ const BASELINE = {
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
 	// converted at the provider — the distinction this header is about.
-	linux: 66
+	// 66 → 64, windows 195 → 194: the magic-key row and its reset. Two rows,
+	// built three times, from a declaration that named only the slot.
+	linux: 64
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
