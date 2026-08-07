@@ -337,7 +337,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = i18n.get("menu.shortcuts.title"),
+		label   = i18n.get("menu.shortcuts.title"),
 		checked = state.shortcuts or nil,
 		-- Pause owns the bindings axis until resume: pause_all() snapshots
 		-- is_bindings_started() and resume_all() restores from that snapshot, so a
@@ -346,7 +346,7 @@ function M.build(ctx)
 		-- submenu above, which is pause-gated for exactly this reason. `checked` is
 		-- deliberately left alone: it must keep reporting the stored preference.
 		disabled = paused or nil,
-		fn       = (not paused) and function()
+		action   = (not paused) and function()
 			state.shortcuts = not state.shortcuts
 			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
 			-- call shortcuts.start/stop here: stop() also tears down the script-control
@@ -700,7 +700,7 @@ function M.build(ctx)
 		table.insert(s_menu, #top_items + 1, { title = "-" })
 	end
 
-	item.menu = s_menu
+	item.submenu = s_menu
 	return item
 end
 

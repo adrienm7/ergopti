@@ -504,7 +504,7 @@ function M.build(ctx)
 
 	-- The submenu title uses the generic i18n label (e.g. "Version / Mise à jour")
 	-- so the menubar entry stays compact; the version detail is inside the submenu.
-	return { title = ver_label, menu = rendered }
+	return { label = ver_label, submenu = rendered }
 end
 
 return M

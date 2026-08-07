@@ -252,18 +252,22 @@ function M.get_sorted_locales()
 	return copy
 end
 
---- Returns a list of hs.menu-compatible item tables for a language selector.
---- Each item has a title and an fn; the currently active locale gets a
---- checked = true flag. Pass this list directly into an hs.menubar submenu.
---- @return table[] List of menu item tables.
+--- Returns the locale rows for the language selector, as PROVIDER data.
+---
+--- `label` / `action`, not `title` / `fn`: these rows are the `locales` list the
+--- shared renderer materialises, and it reads the provider field names. They were
+--- built in the hs.menubar shape and translated one by one on the way into the
+--- provider, which is a conversion layer that exists only because two halves of
+--- one path disagreed about the spelling.
+--- @return table[] List of provider rows.
 function M.build_language_menu_items()
 	local items = {}
 	for _, loc in ipairs(M.get_sorted_locales()) do
 		local code = loc.code
 		items[#items + 1] = {
-			title   = loc.flag .. " " .. loc.name,
+			label   = loc.flag .. " " .. loc.name,
 			checked = (code == _locale),
-			fn      = function() M.set_locale(code) end,
+			action  = function() M.set_locale(code) end,
 		}
 	end
 	return items

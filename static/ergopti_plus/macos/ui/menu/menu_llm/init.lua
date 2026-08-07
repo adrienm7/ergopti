@@ -827,9 +827,9 @@ function M.create(deps)
 				end
 
 				return {
-						title   = i18n.get("menu.llm.title"),
+						label   = i18n.get("menu.llm.title"),
 						checked = state.llm_enabled or nil,
-						fn      = not paused and function()
+						action  = not paused and function()
 								local function toggle_state()
 										Logger.info(LOG, string.format("Toggling LLM: %s -> %s", tostring(state.llm_enabled), tostring(not state.llm_enabled)))
 										state.llm_enabled = not state.llm_enabled
@@ -879,7 +879,7 @@ function M.create(deps)
 										toggle_state()
 								end
 						end or nil,
-						menu    = main_menu
+						submenu = main_menu
 				}
 		end
 

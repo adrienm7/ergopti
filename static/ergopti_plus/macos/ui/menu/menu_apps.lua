@@ -24,7 +24,6 @@ local hs     = hs
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
-local MenuUtils = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "menu_apps"
@@ -222,9 +221,9 @@ function M.build(ctx)
 		local app_path = app.path
 		local app_name = app.name
 		table.insert(rows, {
-			title    = label,
+			label    = label,
 			image    = app.icon,
-			fn       = function()
+			action   = function()
 				Logger.info(LOG, "Opening bundled app '%s'…", app_name)
 				-- Resolve locale: Hammerspoon active locale → system locale → "en".
 				-- The two-letter ISO code is extracted from the system locale string
@@ -276,25 +275,26 @@ function M.build(ctx)
 	end
 
 	if #rows == 0 then
-		table.insert(rows, { title = i18n.get("menu.apps.no_apps"), disabled = true })
+		table.insert(rows, { label = i18n.get("menu.apps.no_apps"), disabled = true })
 	end
 
 	-- The list the manifest declares for this driver. Its rows are the bundles
 	-- found on disk, which no static entry can enumerate — and Linux puts
 	-- something else entirely under the same title, which the declaration says
 	-- with its reason rather than leaving the two to be compared by hand.
-	local provider_rows = {}
-	for _, row in ipairs(rows) do
-		provider_rows[#provider_rows + 1] = MenuUtils.as_provider_row(row)
-	end
+	--
+	-- Emitted as provider rows above rather than translated here: the adapter
+	-- carried the label, the tick and the greying and dropped the `image`, so
+	-- every application in this menu rendered without its icon. The renderer
+	-- carries the field now, the way the AutoHotkey one always has.
 	local rendered = ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, {
-		["apps_installed"] = function() return provider_rows end,
+		["apps_installed"] = function() return rows end,
 	})
 
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rendered)
 	return {
-		title    = i18n.get("menu.apps.title"),
-		menu     = rendered,
+		label    = i18n.get("menu.apps.title"),
+		submenu  = rendered,
 	}
 end
 

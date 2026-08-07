@@ -68,7 +68,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = i18n.get("menu.gestures.title"),
+		label   = i18n.get("menu.gestures.title"),
 		checked = state.gestures or nil,
 		-- Disabled while the script is paused. The gesture engine's only gate is the
 		-- shared CoreState.enabled flag, which pause_all() drives via disable_all().
@@ -78,7 +78,7 @@ function M.build(ctx)
 		-- Pause owns the gesture state until resume restores it — mirror the
 		-- hotstrings master toggle, which is likewise pause-gated.
 		disabled = paused or nil,
-		fn      = (not paused) and function()
+		action  = (not paused) and function()
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
@@ -385,7 +385,7 @@ function M.build(ctx)
 	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
-	item.menu = gm
+	item.submenu = gm
 	return item
 end
 

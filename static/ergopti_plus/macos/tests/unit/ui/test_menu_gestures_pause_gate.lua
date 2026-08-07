@@ -30,11 +30,14 @@ helpers.describe("menu_gestures: master toggle is pause-gated (F-MED-5)", functi
 		return src
 	end
 
-	helpers.it("gates the master-toggle fn on `not paused`", function()
+	-- `action`, the provider field, since the tray root became row data on
+	-- 2026-08-07. The rule is unchanged: the CALLBACK must not exist while paused.
+	helpers.it("gates the master-toggle callback on `not paused`", function()
 		local src = read_src()
-		local gate_pos = src:find("fn      = (not paused) and function()", 1, true)
+		local gate_pos = src:find("action  = (not paused) and function()", 1, true)
 		local body_pos = src:find("local new_state = not state.gestures", 1, true)
-		helpers.assert_true(gate_pos ~= nil, "the gestures master toggle fn must be gated on `not paused`")
+		helpers.assert_true(gate_pos ~= nil,
+			"the gestures master toggle callback must be gated on `not paused`")
 		helpers.assert_true(body_pos ~= nil, "the master-toggle body (state.gestures flip) must still exist")
 		helpers.assert_true(gate_pos < body_pos, "the `not paused` gate must wrap the toggle body")
 	end)

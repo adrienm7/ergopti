@@ -365,8 +365,8 @@ end
 --- @return table Menu item table.
 function M.build_menu_item()
 	return {
-		title = i18n.get("menu.paths.menu_item"),
-		fn    = function()
+		label  = i18n.get("menu.paths.menu_item"),
+		action = function()
 			hs.timer.doAfter(0.05, function() pcall(M.open_editor) end)
 		end,
 	}

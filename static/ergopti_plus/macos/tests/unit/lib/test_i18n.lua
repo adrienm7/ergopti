@@ -125,16 +125,24 @@ helpers.describe("i18n: pure getters", function()
 		helpers.assert_eq(#i18n.locales(), 21, "original LOCALES must be unaffected by mutation of sorted copy")
 	end)
 
-	helpers.it("build_language_menu_items() returns menu items with title/checked/fn", function()
+	-- The row shape moved from title/fn to label/action on 2026-08-07: these rows
+	-- are the `locales` list provider's answer, and the shared renderer reads the
+	-- PROVIDER field names. They used to be built in the hs.menubar shape and
+	-- translated one by one on the way into the provider — a conversion layer that
+	-- existed only because the two halves of one path disagreed on the spelling.
+	helpers.it("build_language_menu_items() returns provider rows with label/checked/action", function()
 		local i18n = load_i18n()
 		-- Default locale is "fr" — items should mark French as checked.
 		local items = i18n.build_language_menu_items()
 		helpers.assert_eq(#items, 21, "must return 21 menu items")
 		local checked_count = 0
 		for _, item in ipairs(items) do
-			helpers.assert_true(type(item.title) == "string", "each item must have a title string")
-			helpers.assert_true(type(item.checked) == "boolean", "each item must have a checked boolean")
-			helpers.assert_true(type(item.fn) == "function", "each item must have an fn")
+			helpers.assert_true(type(item.label) == "string", "each row must have a label string")
+			helpers.assert_true(item.title == nil,
+				"`title` is the hs.menubar field: a row carrying it is dropped by the renderer, so the "
+				.. "language menu would come out empty")
+			helpers.assert_true(type(item.checked) == "boolean", "each row must have a checked boolean")
+			helpers.assert_true(type(item.action) == "function", "each row must have an action")
 			if item.checked then checked_count = checked_count + 1 end
 		end
 		helpers.assert_eq(checked_count, 1, "exactly one locale must be checked")
