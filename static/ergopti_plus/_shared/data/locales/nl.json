@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "Elke driver leest het touchpad via een andere stapel — Windows via zijn precision-touchpad-API, macOS via Hammerspoons gebeurtenissen voor gebaren, Linux via evdev — dus de posities die elk kan bieden, en de instelling die elk vraagt, zijn de zijne.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Het systeemvak van elke driver draagt de rijen op het hoogste niveau die zijn platform heeft: de applicatiegereedschappen op macOS en Linux, de ingebouwde updater op Linux, de pauzeschakelaar op Windows. De anderen bereiken hetzelfde elders, of helemaal niet.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "De rij staat op elke driver; alleen sommige mogen haar declareren. Deze aan/uit-schakelaar wordt door de driver zelf gebouwd, en de Windows-renderer tekent — anders dan de gedeelde — ook een gedeclareerde schakelaar, dus vermelding voor dat platform zou de schakelaar twee keer tonen.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Niet op Windows: die driver tekent een vlagpictogram op elke taalrij, en een gedeelde menurij draagt een label, een vinkje, een actie en een submenu — geen pictogram. De rij daar declareren zou de vlaggen inruilen voor een gedeelde beschrijving.",
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",

@@ -3118,6 +3118,20 @@ health_dot = false
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
+# The language selector. It had no declaration of any kind: three drivers each
+# listed the same twenty-one locales from the same shared catalogue, and nothing
+# described the menu they were listing them into.
+#
+# All three. It was very nearly declared for two, because Windows draws a flag
+# ICON on each row and a shared row carried a label, a tick, an action and a
+# submenu — not an icon. Restricting it would have bought a shared declaration
+# with that driver's flags. The row contract gained an optional `icon` instead:
+# the driver that can draw one does, the two that cannot ignore the field, and
+# the menu is described once.
+[[menu.language_menu]]
+type = "list"
+id = "locales"
+
 # The updates submenu — Linux is the only driver with an in-app updater surface
 # at top level; the other two carry theirs under "about". Same reasoning as the
 # kanata block above for why this is a `list`: its rows are the current version,

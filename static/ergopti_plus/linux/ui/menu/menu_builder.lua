@@ -2275,7 +2275,7 @@ end
 --- Builds the language selector submenu.
 --- Lists all available locales, marks the active one with a checkmark.
 --- Switching persists via i18n.set_locale() → storage adapter.
-local function _build_language(_ctx)
+local function _build_language(ctx)
 	local items = {}
 
 	-- Try to load i18n for real locale list + switching.
@@ -2287,28 +2287,32 @@ local function _build_language(_ctx)
 		local active = i18n.get_locale()
 		local locales = i18n.list_locales()
 		for _, code in ipairs(locales) do
-			local label = i18n.display_name(code) .. " (" .. code .. ")"
-			if code == active then label = label .. " ✓" end
 			local cap = code  -- capture for closure
 			items[#items + 1] = {
-				title = label,
-				fn = function()
+				-- Provider data, and the tick is the tray's own check item rather
+				-- than a "✓" glued to the label — that glued form put one platform's
+				-- convention inside a string twenty other languages also read.
+				label   = i18n.display_name(code) .. " (" .. code .. ")",
+				checked = code == active,
+				action  = function()
 					i18n.set_locale(cap)
 					Logger.info(LOG, "Language set to %s (persisted).", cap)
 				end,
 			}
 		end
 	else
-		-- Fallback when i18n module is not loaded.
-		items[#items + 1] = { title = "Français", fn = function()
-			Logger.info(LOG, "[stub] Switch locale to fr.")
-		end }
-		items[#items + 1] = { title = "English", fn = function()
-			Logger.info(LOG, "[stub] Switch locale to en.")
-		end }
+		-- No i18n module: two hardcoded names is a hand-written enumeration of a
+		-- list the shared catalogue owns, and it logged instead of switching. A
+		-- driver that cannot read its locales says so.
+		Logger.error(LOG, "i18n unavailable — the language menu has no locale to offer.")
 	end
 
-	return { title = i18n_safe("menu.global.language"), menu = items }
+	local rows = ManifestMenu
+		and ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
+			["locales"] = function() return items end,
+		})
+		or {}
+	return { title = i18n_safe("menu.global.language"), menu = rows }
 end
 
 --- Builds the config folder launcher.

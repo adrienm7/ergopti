@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "Cada controlador lê o touchpad por uma pilha diferente — o Windows pela API de touchpad de precisão, o macOS pelos eventos de gestos do Hammerspoon, o Linux pelo evdev — pelo que as ranhuras que cada um pode oferecer, e a configuração que cada um exige, são suas.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "A área de notificação de cada controlador traz as linhas de topo que a sua plataforma tem: as ferramentas de aplicações no macOS e no Linux, o atualizador integrado no Linux, o interruptor de suspensão no Windows. Os outros chegam ao mesmo por outro lado, ou não chegam.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "A linha existe em todos os controladores; só alguns a podem declarar. Este interruptor é construído pelo próprio controlador, e o renderizador do Windows — ao contrário do partilhado — também desenha um interruptor declarado, pelo que listá-lo para essa plataforma mostraria o interruptor duas vezes.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Não no Windows: esse controlador desenha um ícone de bandeira em cada linha de idioma, e uma linha de menu partilhada leva uma etiqueta, uma marca, uma ação e um submenu — não um ícone. Declarar aqui essa linha trocaria as bandeiras por uma descrição comum.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Editar categoria",
 	"menu.llm.generation.temperature": "Temperatura",

@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "Hver driver læser pladen gennem en forskellig stak — Windows via sit præcisions-touchpad-API, macOS via Hammerspoons bevægelseshændelser, Linux via evdev — så de pladser hver kan tilbyde, og den opsætning hver kræver, er dens egne.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Hver drivers bakke bærer de øverste rækker, dens platform har: applikationsværktøjerne på macOS og Linux, den indbyggede opdatering på Linux, pauseknappen på Windows. De andre når det samme et andet sted, eller slet ikke.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Rækken findes på alle drivere; kun nogle må erklære den. Denne til/fra-kontakt bygges af driveren selv, og Windows-rendereren tegner — i modsætning til den delte — også en erklæret kontakt, så at nævne den for den platform ville vise kontakten to gange.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driver tegner et flagikon på hver sproglinje, og en delt menurække bærer en etiket, et flueben, en handling og en undermenu — ikke et ikon. At erklære rækken dér ville bytte flagene væk for en fælles beskrivelse.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",

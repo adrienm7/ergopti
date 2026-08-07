@@ -95,6 +95,10 @@ const OPENS_SUBMENU = {
 	// having to repeat it — the same reason tap_holds_menu's children do not each
 	// carry "Windows only".
 	kanata: 'kanata_menu',
+	// The language selector. Its rows inherit `top_level/language`'s visibility,
+	// which is every driver — the DECLARATION is narrower than that, and says why
+	// in its own reason_key rather than through this map.
+	language: 'language_menu',
 	// macOS's tap-hold and chord engine, as kanata is Linux's. Mapped for the
 	// same reason: its rows inherit `top_level/karabiner`'s own macOS-only
 	// visibility instead of each of the twelve repeating "macOS only", which
@@ -521,7 +525,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // that read the manifest for nothing at all — the drift gate in
 // tests/meta/test_menu_hotstrings_layout_drift_gate.lua exists solely because
 // this menu and its declaration could disagree with nothing comparing them.
-const RENDERED_THROUGH_SHARED = { hs: 9, linux: 10 };
+// hs 9 → 10, linux 10 → 11 on 2026-08-07: the language selector. Three drivers
+// listed the same twenty-one locales from the same shared catalogue into a menu
+// nothing described.
+const RENDERED_THROUGH_SHARED = { hs: 10, linux: 11 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

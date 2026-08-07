@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "כל מנהל התקן קורא את משטח המגע דרך ערימה אחרת — Windows דרך ממשק משטח המגע המדויק, macOS דרך אירועי המחוות של Hammerspoon, Linux דרך evdev — ולכן החריצים שכל אחד יכול להציע, וההגדרה שכל אחד דורש, הם שלו.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "מגש כל מנהל התקן נושא את שורות הרמה העליונה שיש לפלטפורמה שלו: כלי היישומים ב-macOS וב-Linux, המעדכן המובנה ב-Linux, מתג ההשהיה ב-Windows. האחרים מגיעים לאותו דבר במקום אחר, או בכלל לא.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "השורה קיימת בכל מנהלי ההתקן; רק לחלקם מותר להכריז עליה. מתג ההפעלה הזה נבנה בידי מנהל ההתקן עצמו, ומנוע הרינדור של Windows — בשונה מהמשותף — מצייר גם מתג מוכרז, ולכן הכללתו עבור אותה פלטפורמה הייתה מציגה את המתג פעמיים.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "לא ב-Windows: מנהל ההתקן הזה מצייר סמל דגל בכל שורת שפה, ושורת תפריט משותפת נושאת תווית, סימון, פעולה ותפריט משנה — לא סמל. הכרזה על השורה שם הייתה מחליפה את הדגלים בתיאור משותף.",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה",
 	"menu.llm.generation.temperature": "טמפרטורה",

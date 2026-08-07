@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "Her sürücü dokunmatik yüzeyi farklı bir yığınla okur — Windows hassas dokunmatik yüzey API'siyle, macOS Hammerspoon'un hareket olaylarıyla, Linux evdev ile — bu nedenle her birinin sunabileceği yuvalar ve gerektirdiği kurulum kendine özgüdür.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Her sürücünün tepsisi platformunun sahip olduğu üst düzey satırları taşır: macOS ve Linux'ta uygulama araçları, Linux'ta yerleşik güncelleyici, Windows'ta askıya alma anahtarı. Diğerleri aynı yere başka bir yoldan varır ya da hiç varmaz.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Satır her sürücüde vardır; yalnızca bazıları onu bildirebilir. Bu açma/kapama anahtarını sürücünün kendisi kurar ve Windows tarafındaki çizici — ortak olanın aksine — bildirilmiş bir anahtarı da çizer; bu yüzden o platform için listelemek anahtarı iki kez gösterirdi.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows'ta yok: o sürücü her dil satırına bir bayrak simgesi çizer; ortak bir menü satırı ise etiket, işaret, eylem ve alt menü taşır, simge değil. Bu satırı orada bildirmek, bayrakları ortak bir tanım karşılığında vermek olurdu.",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",
 	"menu.llm.generation.temperature": "Sıcaklık",

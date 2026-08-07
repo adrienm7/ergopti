@@ -606,7 +606,17 @@ function M.generate(ctx, menu_mods, actions)
 			end
 			table.insert(items, { title = i18n.get("menu.global.title"), menu = ga_items })
 		elseif id == "language" then
-			table.insert(items, { title = i18n.get("menu.global.language"), menu = i18n.build_language_menu_items() })
+			-- The locale rows reach the tray through the manifest's `language_menu`
+			-- now. They were the same twenty-one entries on every driver, from the
+			-- same shared catalogue, and nothing described the menu holding them.
+			local locale_rows = {}
+			for _, row in ipairs(i18n.build_language_menu_items() or {}) do
+				locale_rows[#locale_rows + 1] = MenuUtils.as_provider_row(row)
+			end
+			local rendered = ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
+				["locales"] = function() return locale_rows end,
+			})
+			table.insert(items, { title = i18n.get("menu.global.language"), menu = rendered })
 		elseif id == "config_folder" then
 			table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 		elseif id == "setup_wizard" then
