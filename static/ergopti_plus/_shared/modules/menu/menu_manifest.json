@@ -895,8 +895,12 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "encryption",
+			"i18n": "menu.metrics.encrypt_toggle",
+			"checked_when": [
+				"metrics_encrypt_enabled"
+			],
 			"disabled_when": [
 				"keylogger_enabled"
 			]

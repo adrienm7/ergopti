@@ -1548,15 +1548,6 @@ local function _manifest_metrics_rows(ctx, k)
 		-- them from the declaration and this driver supplies only the behaviour,
 		-- through `ctx.commands` below. Three fewer rows built here, and the tick
 		-- is the tray's own check item instead of a " ✓" glued to the title.
-		encryption = function(items)
-			-- Read from state rather than resolved: unlike the three filters above,
-			-- this manifest row declares no checked_when. Every driver therefore
-			-- computes the checkmark itself, and that asymmetry is worth one comment
-			-- rather than an invented predicate.
-			items[#items + 1] = row("encryption", i18n_safe("menu.metrics.encrypt_at_rest"),
-				privacy("encrypt")(),
-				toggle("encrypt", k.set_encrypt_enabled))
-		end,
 	}
 
 	-- The declarative rows read their state and their behaviour off the context:
@@ -1566,6 +1557,7 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handed to every other submenu builder in this file.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
+	getters["metrics_encrypt_enabled"] = privacy("encrypt")
 	render_ctx.state_getters = getters
 	-- Bracketed keys on purpose: the bijection gate resolves "does this driver
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
@@ -1573,6 +1565,10 @@ local function _manifest_metrics_rows(ctx, k)
 	render_ctx.commands = {
 		-- `command` rows since 2026-08-07: the label and the greying are the
 		-- manifest's, so this driver supplies only the window each one opens.
+		-- `check` since 2026-08-07: the label and the tick are the manifest's, so
+		-- this supplies only the toggle. The row used to carry a DIFFERENT label
+		-- here than on the other two drivers — one switch, two names.
+		["encryption"]     = toggle("encrypt", k.set_encrypt_enabled),
 		["show_typing"]    = open_window("metrics_typing"),
 		["show_apps"]      = open_window("metrics_apps"),
 

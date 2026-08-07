@@ -27,6 +27,9 @@ global _MET_STATE_GETTERS := Map(
 	"metrics_filter_private",  () => MetricsFilters.private_browsing,
 	"metrics_filter_secure",   () => MetricsFilters.secure_field,
 	"metrics_filter_sysauth",  () => MetricsFilters.system_auth,
+	; The encryption row became `check` on 2026-08-07, so its tick is read here
+	; instead of being set by a handler.
+	"metrics_encrypt_enabled", () => KL_Enc_IsEnabled(),
 )
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
@@ -53,7 +56,6 @@ BuildMetricsMenu() {
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
 		"reset_wpm_position", (M, C) => _MET_WpmWidgetReset(M, C, _MET_STATE_GETTERS),
-		"encryption",         (M, C) => _MET_Encryption(M, C, _MET_STATE_GETTERS),
 	)
 
 	; The three privacy filters left DynHandlers on 2026-08-06: their manifest
@@ -67,6 +69,7 @@ BuildMetricsMenu() {
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
 		"filter_sysauth",  ToggleFilterSystemAuth,
+		"encryption",      ToggleAtRestEncryption,
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
 	)
@@ -102,16 +105,6 @@ _MET_ShortcutApps(M, _Cat, Getters) {
 
 
 
-
-; Dynamic handler: At-rest encryption toggle.
-_MET_Encryption(M, _Cat, Getters) {
-	Label := t("menu.metrics.encrypt_toggle")
-	RegisterMenuItem(M, Label, ToggleAtRestEncryption)
-	if KL_Enc_IsEnabled()
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "encryption", Getters)
-		M.Disable(Label)
-}
 
 ; Dynamic handler: App exclusion — label reflects current count.
 _MET_ExcludeApps(M, _Cat, Getters) {
