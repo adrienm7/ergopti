@@ -248,7 +248,9 @@ const BASELINE = {
 	// import the adapter was the only user of went with them.
 	// 135 → 124: the hotstring category and personal builders. Only the
 	// extension rows are still adapted, and the comment beside as_rows says so.
-	macos: 124,
+	// 124 → 122: the two menubar-WPM rows became `check`. They were dynamic
+	// handlers building a checkbox the renderer already knows how to draw.
+	macos: 122,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and

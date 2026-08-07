@@ -768,8 +768,12 @@
 			"type": "---"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "wpm_menubar",
+			"i18n": "menu.metrics.show_wpm_menubar",
+			"checked_when": [
+				"metrics_menubar_wpm"
+			],
 			"platforms": [
 				"hs"
 			],
@@ -779,8 +783,12 @@
 			"reason_key": "platform_reason.wpm_readout_is_a_macos_menubar_item"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "menubar_colors",
+			"i18n": "menu.metrics.colors_by_source",
+			"checked_when": [
+				"metrics_menubar_colors"
+			],
 			"platforms": [
 				"hs"
 			],
