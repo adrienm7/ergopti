@@ -827,8 +827,9 @@
 			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
 		},
 		{
-			"type": "dynamic",
+			"type": "command",
 			"id": "reset_wpm_position",
+			"i18n": "menu.metrics.reset_wpm_position",
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"

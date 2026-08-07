@@ -150,7 +150,7 @@ _MMDW_HandlersCallResolver() {
 	; shared resolver, never from a condition re-derived here — and section 4
 	; below asserts it for the migrated rows. Keeping them in this list would
 	; have made a row built by MORE shared code look like a regression.
-	; show_typing and show_apps left this list on 2026-08-07: their manifest rows
+	; show_typing, show_apps and reset_wpm_position left this list on 2026-08-07: their manifest rows
 	; are `command`, so the RENDERER applies the greying from the declaration and
 	; there is no handler left to delegate. That is the case the paragraph above
 	; describes — a row built by more shared code, not less.
@@ -161,7 +161,6 @@ _MMDW_HandlersCallResolver() {
 		"_MET_WpmWidget",       "wpm_widget",
 		"_MET_WpmWidgetColors", "widget_colors",
 		"_MET_WpmWidgetGraph",  "include_realtime",
-		"_MET_WpmWidgetReset",  "reset_wpm_position",
 	)
 	for FuncName, Id in Handlers {
 		Seg := _DriverFuncBody(FuncName)

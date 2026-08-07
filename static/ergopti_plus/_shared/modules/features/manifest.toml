@@ -3550,9 +3550,13 @@ id = "include_realtime"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.metrics_extras_are_not_on_linux"
+# `command` since 2026-08-07: a button with a label, a greying rule and a click.
+# Its two neighbours stay `dynamic` for the reason written above wpm_widget —
+# they mutate the live menu — but this one sets nothing on it.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "command"
 id = "reset_wpm_position"
+i18n = "menu.metrics.reset_wpm_position"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.metrics_extras_are_not_on_linux"

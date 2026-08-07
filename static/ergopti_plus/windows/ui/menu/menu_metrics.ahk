@@ -55,7 +55,6 @@ BuildMetricsMenu() {
 		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
-		"reset_wpm_position", (M, C) => _MET_WpmWidgetReset(M, C, _MET_STATE_GETTERS),
 	)
 
 	; The three privacy filters left DynHandlers on 2026-08-06: their manifest
@@ -69,7 +68,8 @@ BuildMetricsMenu() {
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
 		"filter_sysauth",  ToggleFilterSystemAuth,
-		"encryption",      ToggleAtRestEncryption,
+		"encryption",         ToggleAtRestEncryption,
+		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
 	)
@@ -146,14 +146,6 @@ _MET_WpmWidgetGraph(M, _Cat, Getters) {
 	if WPMWidget.visible && WPMWidget.show_graph
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "include_realtime", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: Reset WPM widget position.
-_MET_WpmWidgetReset(M, _Cat, Getters) {
-	Label := t("menu.metrics.reset_wpm_position")
-	RegisterMenuItem(M, Label, (*) => WPMWidget_ResetPosition())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "reset_wpm_position", Getters)
 		M.Disable(Label)
 }
 

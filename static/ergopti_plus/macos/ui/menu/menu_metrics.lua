@@ -401,15 +401,9 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_reset_wpm_position(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.reset_wpm_position"),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "reset_wpm_position", STATE_GETTERS),
-			fn       = function()
-				local WpmWidget = require("ui.wpm.wpm_widget")
-				if type(WpmWidget.reset_position) == "function" then WpmWidget.reset_position() end
-			end,
-		})
+	local function cmd_reset_wpm_position()
+		local WpmWidget = require("ui.wpm.wpm_widget")
+		if type(WpmWidget.reset_position) == "function" then WpmWidget.reset_position() end
 	end
 
 	local function cmd_encryption()
@@ -458,7 +452,6 @@ function M.build(ctx)
 		wpm_widget       = dyn_wpm_widget,
 		widget_colors    = dyn_widget_colors,
 		include_realtime = dyn_include_realtime,
-		reset_wpm_position = dyn_reset_wpm_position,
 	}
 
 	-- The declarative rows read their state and their behaviour off the
@@ -471,6 +464,7 @@ function M.build(ctx)
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
 		["encryption"]     = cmd_encryption,
+		["reset_wpm_position"] = cmd_reset_wpm_position,
 		["show_typing"]    = cmd_show_typing,
 		["show_apps"]      = cmd_show_apps,
 		["wpm_menubar"]    = cmd_wpm_menubar,
