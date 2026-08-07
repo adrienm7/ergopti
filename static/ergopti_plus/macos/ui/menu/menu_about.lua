@@ -437,13 +437,19 @@ function M.build(ctx)
 	local menu_items = {}
 
 	-- Version header — always the first item, always disabled.
-	table.insert(menu_items, { title = ver_display, disabled = true })
+	--
+	-- `label`, not `title`. This array is what the `about_updates` list provider
+	-- returns, so the renderer reads it as provider DATA: a row keyed `title` has
+	-- no label, and the renderer drops it with one warning. This row and the
+	-- channel selector below were both invisible in the About submenu from the
+	-- day the block became a provider until 2026-08-07.
+	table.insert(menu_items, { label = ver_display, disabled = true })
 
 	table.insert(menu_items, { separator = true })
 
 	-- Channel selector submenu — always shown so the user can switch.
 	local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. channel_display
-	table.insert(menu_items, { title = channel_title, menu = channel_items })
+	table.insert(menu_items, { label = channel_title, items = channel_items })
 
 	if not local_src then
 		local freq_items = {}
