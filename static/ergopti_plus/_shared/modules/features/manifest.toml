@@ -3470,8 +3470,14 @@ id = "show_typing"
 i18n = "menu.metrics.show_typing"
 disabled_when = ["keylogger_enabled"]
 
+# `list` since 2026-08-07, not `action`/`dynamic`: each of these three rows
+# carries a label built from runtime state — the shortcut currently assigned, the
+# number of excluded apps — so no static i18n key can express it. A provider that
+# returns ONE row is still the renderer drawing it, which is the difference that
+# matters: the driver answers what the row says and the renderer decides what a
+# row looks like.
 [[menu.metrics_menu]]
-type = "action"
+type = "list"
 id = "shortcut_typing"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
@@ -3487,7 +3493,7 @@ i18n = "menu.metrics.show_apps"
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "action"
+type = "list"
 id = "shortcut_apps"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
@@ -3589,7 +3595,7 @@ checked_when = ["metrics_filter_sysauth"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "list"
 id = "exclude_apps"
 disabled_when = ["keylogger_enabled"]
 platforms = ["ahk", "hs"]

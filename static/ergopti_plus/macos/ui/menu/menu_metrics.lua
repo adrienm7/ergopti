@@ -165,7 +165,7 @@ function M.build(ctx)
 		return {}
 	end
 
-	local function dyn_shortcut_typing(items, _ctx)
+	local function rows_shortcut_typing(_ctx)
 		local sc_label = i18n.get("menu.metrics.shortcut_none")
 		if type(state.metrics_shortcut) == "table" then
 			local mods_cap = {}
@@ -175,10 +175,10 @@ function M.build(ctx)
 			local mods_str = table.concat(mods_cap, "+")
 			sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.metrics_shortcut.key or "")
 		end
-		table.insert(items, {
-			title    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
+		return {{
+			label    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_typing", STATE_GETTERS),
-			fn       = function()
+			action   = function()
 				local current_str = ""
 				if type(state.metrics_shortcut) == "table" then
 					current_str = table.concat(coerce_mods(state.metrics_shortcut.mods), "+") .. "+" .. (state.metrics_shortcut.key or "")
@@ -206,7 +206,7 @@ function M.build(ctx)
 				if #mods == 0 then mods = { "ctrl" } end
 				if type(ctx.apply_metrics_shortcut) == "function" then ctx.apply_metrics_shortcut(mods, key) end
 			end,
-		})
+		}}
 	end
 
 	local function cmd_show_apps()
@@ -216,7 +216,7 @@ function M.build(ctx)
 		end
 	end
 
-	local function dyn_shortcut_apps(items, _ctx)
+	local function rows_shortcut_apps(_ctx)
 		local sc_label = i18n.get("menu.metrics.shortcut_none")
 		if type(state.apps_time_shortcut) == "table" then
 			local mods_cap = {}
@@ -226,10 +226,10 @@ function M.build(ctx)
 			local mods_str = table.concat(mods_cap, "+")
 			sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.apps_time_shortcut.key or "")
 		end
-		table.insert(items, {
-			title    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
+		return {{
+			label    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_apps", STATE_GETTERS),
-			fn       = function()
+			action   = function()
 				local current_str = ""
 				if type(state.apps_time_shortcut) == "table" then
 					current_str = table.concat(coerce_mods(state.apps_time_shortcut.mods), "+") .. "+" .. (state.apps_time_shortcut.key or "")
@@ -257,7 +257,7 @@ function M.build(ctx)
 				if #mods == 0 then mods = { "ctrl" } end
 				if type(ctx.apply_apps_time_shortcut) == "function" then ctx.apply_apps_time_shortcut(mods, key) end
 			end,
-		})
+		}}
 	end
 
 	--- Flips the private filter. The ROW is built by the shared renderer from
@@ -293,7 +293,7 @@ function M.build(ctx)
 		save_prefs(); updateMenu()
 	end
 
-	local function dyn_exclude_apps(items, _ctx)
+	local function rows_exclude_apps(_ctx)
 		local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
 		local label = disabled_count > 0
 			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
@@ -310,11 +310,12 @@ function M.build(ctx)
 			end,
 			i18n.get("menu.metrics.exclude_apps")
 		)
-		table.insert(items, {
-			title    = label,
+		return {{
+			label    = label,
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "exclude_apps", STATE_GETTERS),
-			menu     = exclusion_menu,
-		})
+			-- AppPickerLib's tree, handed over whole rather than described.
+			submenu  = exclusion_menu,
+		}}
 	end
 
 	-- `check` rows since 2026-08-07: the label, the tick and the greying are the
@@ -445,13 +446,21 @@ function M.build(ctx)
 	-- ===== 3.2) Manifest-Driven Menu Assembly =====
 	-- =============================================
 
+	-- The two shortcut pickers and the app-exclusion row left dyn_handlers on
+	-- 2026-08-07: their labels are computed, so no static declaration can carry
+	-- them, but a provider that returns one row is still the renderer drawing it.
+	-- The three WPM widget rows stay handlers — their callbacks repaint the OPEN
+	-- menu rather than rebuilding the tray, which a declarative row cannot do.
 	local dyn_handlers = {
-		shortcut_typing  = dyn_shortcut_typing,
-		shortcut_apps    = dyn_shortcut_apps,
-		exclude_apps     = dyn_exclude_apps,
 		wpm_widget       = dyn_wpm_widget,
 		widget_colors    = dyn_widget_colors,
 		include_realtime = dyn_include_realtime,
+	}
+
+	local list_providers = {
+		shortcut_typing = rows_shortcut_typing,
+		shortcut_apps   = rows_shortcut_apps,
+		exclude_apps    = rows_exclude_apps,
 	}
 
 	-- The declarative rows read their state and their behaviour off the
@@ -471,7 +480,7 @@ function M.build(ctx)
 		["menubar_colors"] = cmd_menubar_colors,
 	}
 
-	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx)
+	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)
 
 	return {
 		title   = i18n.get("menu.metrics.title"),

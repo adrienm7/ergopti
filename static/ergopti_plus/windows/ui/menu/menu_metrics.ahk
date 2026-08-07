@@ -49,9 +49,6 @@ BuildMetricsMenu() {
 	; its own grey-out state from the manifest's disabled_when predicate.
 
 	DynHandlers := Map(
-		"shortcut_typing",    (M, C) => _MET_ShortcutTyping(M, C, _MET_STATE_GETTERS),
-		"shortcut_apps",      (M, C) => _MET_ShortcutApps(M, C, _MET_STATE_GETTERS),
-		"exclude_apps",       (M, C) => _MET_ExcludeApps(M, C, _MET_STATE_GETTERS),
 		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
@@ -74,7 +71,18 @@ BuildMetricsMenu() {
 		"show_apps",       KLUI_ToggleApps,
 	)
 
-	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", "", Commands, _MET_STATE_GETTERS)
+	; The two shortcut pickers and the app-exclusion row left DynHandlers on
+	; 2026-08-07: their labels are computed, so no static declaration can carry
+	; them, but a provider that returns one row is still the renderer drawing it.
+	; The three WPM widget rows stay handlers — their callbacks repaint the OPEN
+	; menu rather than rebuilding the tray, which a declarative row cannot do.
+	ListProviders := Map(
+		"shortcut_typing", (*) => _MET_ShortcutTypingRows(_MET_STATE_GETTERS),
+		"shortcut_apps",   (*) => _MET_ShortcutAppsRows(_MET_STATE_GETTERS),
+		"exclude_apps",    (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
+	)
+
+	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
 	; Metrics toggle uses a dedicated fn (confirm/security-warning dialogs +
 	; MetricsShortcuts.enabled + MS_SaveToIni) rather than the generic
 	; ToggleCategoryAllFeatures used by manifest-only menus — same pattern
@@ -87,34 +95,34 @@ BuildMetricsMenu() {
 	return MetricsMenu
 }
 
-; Dynamic handler: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
-_MET_ShortcutTyping(M, _Cat, Getters) {
-	Label := t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing")
-	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters)
-		M.Disable(Label)
+; List provider: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
+_MET_ShortcutTypingRows(Getters) {
+	return [Map(
+		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing"),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters),
+		"action",   (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))]
 }
 
-; Dynamic handler: Apps shortcut picker (ZWS differentiates from typing sc label).
-_MET_ShortcutApps(M, _Cat, Getters) {
-	Label := t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B)
-	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters)
-		M.Disable(Label)
+; List provider: Apps shortcut picker (ZWS differentiates from typing sc label).
+_MET_ShortcutAppsRows(Getters) {
+	return [Map(
+		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters),
+		"action",   (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))]
 }
 
 
 
 
-; Dynamic handler: App exclusion — label reflects current count.
-_MET_ExcludeApps(M, _Cat, Getters) {
+; List provider: App exclusion — label reflects current count.
+_MET_ExcludeAppsRows(Getters) {
 	n := MF_DisabledCount()
-	Label := (n > 0)
-		? StrReplace(StrReplace(t("menu.metrics.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
-		: t("menu.metrics.exclude_apps")
-	RegisterMenuItem(M, Label, OpenMetricsAppPicker)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "exclude_apps", Getters)
-		M.Disable(Label)
+	return [Map(
+		"label", (n > 0)
+			? StrReplace(StrReplace(t("menu.metrics.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
+			: t("menu.metrics.exclude_apps"),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "exclude_apps", Getters),
+		"action",   OpenMetricsAppPicker)]
 }
 
 ; Dynamic handler: WPM floating widget toggle.

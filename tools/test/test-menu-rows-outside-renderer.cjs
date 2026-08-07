@@ -234,6 +234,11 @@ const BASELINE = {
 	// renderer set, because the predicate already counts every `MenuAdd*(` call a
 	// driver makes and was counting the RegisterMenuItem inside the helper too —
 	// the same row charged where it was asked for and again where it was drawn.
+	// 86 → 83 (windows) and 56 → 53 (macos), one declaration for both: the two
+	// metrics shortcut pickers and the app-exclusion row became `list`. Their
+	// labels are computed — the shortcut assigned, the number of excluded apps —
+	// so a provider that returns ONE row is what a declaration cannot be. The
+	// three WPM widget rows stay handlers: their callbacks repaint the open menu.
 	// 94 → 86: the tap-holds menu. Its two buttons are `command` declarations and
 	// the per-key tree is a `list` — the key, its disable / tap / hold rows, and
 	// the hold options inside that. Three levels, drawn by the renderer.
@@ -255,7 +260,7 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 86,
+	windows: 83,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -306,7 +311,7 @@ const BASELINE = {
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 56,
+	macos: 53,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
