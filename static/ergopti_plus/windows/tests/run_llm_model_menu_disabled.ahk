@@ -38,6 +38,38 @@ LLM_Menu_PromptAddModel()    => ""
 _LLM_Menu_BuildApiEntriesMenu() => Menu()
 LLM_Menu_SetModel(n*)        => ""
 
+; --- Renderer stubs ---
+; The catalogue is row DATA since 2026-08-07 and the shared renderer materialises
+; it; this harness loads menu_models.ahk alone, so the two entry points it calls
+; are stubbed. Both walk the rows the way the real renderer does — a row with
+; ``items`` becomes a submenu, a row without a label raises — so a provider that
+; returns a malformed row still fails the suite instead of rendering nothing.
+_MMD_RenderRows(TargetMenu, Rows) {
+	Added := 0
+	for Row in Rows {
+		if (Row.Has("separator") and Row["separator"]) {
+			TargetMenu.Add()
+			continue
+		}
+		if (Row.Has("items"))
+			TargetMenu.Add(Row["label"], _MMD_RowsToMenu(Row["items"]))
+		else
+			TargetMenu.Add(Row["label"], Row.Has("action") ? Row["action"] : (*) => 0)
+		Added += 1
+	}
+	return Added
+}
+_MMD_RowsToMenu(Rows) {
+	Sub := Menu()
+	_MMD_RenderRows(Sub, Rows)
+	return Sub
+}
+MenuRenderer_AppendRows(TargetMenu, MenuKey, ListId, Rows) => _MMD_RenderRows(TargetMenu, Rows)
+MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
+	try TargetMenu.Delete()
+	return _MMD_RenderRows(TargetMenu, Provider())
+}
+
 LLM_IsModelInstalled(name) {
 	global _MMD_ProbeCalls
 	_MMD_ProbeCalls += 1
