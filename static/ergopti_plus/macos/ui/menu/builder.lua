@@ -523,25 +523,42 @@ function M.generate(ctx, menu_mods, actions)
 			-- immediately and breaks the « pause = tout éteint » invariant the
 			-- pause exists to guarantee. The per-feature toggles were gated for
 			-- exactly this; these three, which move ALL of them at once, were not.
-			local function global_action_item(label_key, fn)
-				return {
-					title    = i18n.get(label_key),
-					disabled = ctx.paused or nil,
-					fn       = (not ctx.paused) and fn or nil,
+			-- The three rows are `type = "command"` in the manifest: their labels
+			-- and their order are declared, and this file supplies only what each
+			-- one does. The chain of `elseif` that used to map id → label → action
+			-- was the manifest's own table written out a second time, in a third
+			-- language, and the separator before the reset was written out here too.
+			--
+			-- Pause owns the bindings axis for the whole pause window: pause_all()
+			-- snapshots what was running and resume_all() restores that snapshot.
+			-- A global action taken in between is therefore either silently
+			-- discarded on resume, or — for « Tout activer » — binds every hotkey
+			-- immediately and breaks the « pause = tout éteint » invariant the
+			-- pause exists to guarantee. The per-feature toggles were gated for
+			-- exactly this; these three, which move ALL of them at once, were not.
+			local ok_ga, ManifestMenu = pcall(require, "infra.manifest_menu")
+			if ok_ga and type(ManifestMenu.build) == "function" then
+				local ga_ctx = {}
+				for key, value in pairs(ctx or {}) do ga_ctx[key] = value end
+				ga_ctx.commands = {
+					["enable_all"]      = actions.enable_all,
+					["disable_all"]     = actions.disable_all,
+					["reset_defaults"]  = actions.reset_defaults,
 				}
-			end
-
-			for _, ga in ipairs(load_global_actions()) do
-				local gid = ga.id
-				if gid == "---" then
-					table.insert(ga_items, { title = "-" })
-				elseif gid == "enable_all" then
-					table.insert(ga_items, global_action_item("menu.global.enable_all", actions.enable_all))
-				elseif gid == "disable_all" then
-					table.insert(ga_items, global_action_item("menu.global.disable_all", actions.disable_all))
-				elseif gid == "reset_defaults" then
-					table.insert(ga_items, global_action_item("menu.global.reset_defaults", actions.reset_defaults))
+				for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
+					if ctx.paused then
+						-- Greyed AND stripped of its handler, not merely greyed. A
+						-- disabled row whose fn survives still fires the moment the
+						-- greying is rendered wrong somewhere else, and these three move
+						-- every binding at once — which is the whole reason the pause
+						-- window has to own that axis alone.
+						row.disabled = true
+						row.fn = nil
+					end
+					table.insert(ga_items, row)
 				end
+			else
+				Logger.error(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
 			end
 			table.insert(items, { title = i18n.get("menu.global.title"), menu = ga_items })
 		elseif id == "language" then

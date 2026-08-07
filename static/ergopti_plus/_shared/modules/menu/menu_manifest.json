@@ -275,13 +275,22 @@
 	],
 	"global_actions": [
 		{
-			"id": "enable_all"
+			"type": "command",
+			"id": "enable_all",
+			"i18n": "menu.global.enable_all"
 		},
 		{
-			"id": "disable_all"
+			"type": "command",
+			"id": "disable_all",
+			"i18n": "menu.global.disable_all"
 		},
 		{
-			"id": "reset_defaults"
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "reset_defaults",
+			"i18n": "menu.global.reset_defaults"
 		}
 	],
 	"debug_menu": [

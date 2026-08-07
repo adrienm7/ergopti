@@ -2126,27 +2126,39 @@ end
 
 --- Builds the global actions submenu.
 local function _build_global_actions(ctx)
-	return { title = i18n_safe("menu.global.title"), menu = {
-		{
-			title = i18n_safe("menu.global.enable_all"),
-			fn = function()
-				if ctx.on_enable_all then ctx.on_enable_all() end
-			end,
-		},
-		{
-			title = i18n_safe("menu.global.disable_all"),
-			fn = function()
-				if ctx.on_disable_all then ctx.on_disable_all() end
-			end,
-		},
-		{ title = "-" },
-		{
-			title = i18n_safe("menu.global.reset_defaults"),
-			fn = function()
-				if ctx.on_reset_defaults then ctx.on_reset_defaults() end
-			end,
-		},
-	}}
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
+		return { title = i18n_safe("menu.global.title"), menu = {} }
+	end
+
+	--- Calls one of the context's optional callbacks, saying so when it is absent.
+	--- @param name string
+	--- @return function
+	local function call_ctx(name)
+		return function()
+			if type(ctx[name]) ~= "function" then
+				Logger.error(LOG, "Global actions: ctx.%s is absent — the row does nothing.", name)
+				return
+			end
+			ctx[name]()
+		end
+	end
+
+	-- The three rows are `type = "command"` in the manifest, and so is the
+	-- separator before the reset: labels, order and spacing declared once, with
+	-- this driver supplying only what each row does.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["enable_all"]     = call_ctx("on_enable_all"),
+		["disable_all"]    = call_ctx("on_disable_all"),
+		["reset_defaults"] = call_ctx("on_reset_defaults"),
+	}
+
+	return {
+		title = i18n_safe("menu.global.title"),
+		menu  = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),
+	}
 end
 
 --- Builds the language selector submenu.

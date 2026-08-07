@@ -498,7 +498,12 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // hs raised 6 → 7: the LLM menu. Its two declared rows — the model picker and
 // the generation settings — were built in place, and the separator the manifest
 // puts between them was written out by hand as well.
-const RENDERED_THROUGH_SHARED = { hs: 7, linux: 9 };
+// linux raised 9 → 10 on 2026-08-06: the global-actions submenu. Its three rows
+// AND the separator between them were written out by each driver — macOS through
+// a chain of `elseif` mapping id → label → action, which was the manifest's own
+// table restated in a third language. macOS raised 7 → 8 in the same change,
+// for the same menu.
+const RENDERED_THROUGH_SHARED = { hs: 8, linux: 10 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
