@@ -228,7 +228,12 @@ const BASELINE = {
 	windows: 187,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
-	macos: 223,
+	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
+	// dialect and the provider translated each one on the way out, so the tree
+	// was still assembled here and every row of it counted. They are provider
+	// data now and the renderer materialises them — which also retired the
+	// adapter call and the section() helper that had no caller left.
+	macos: 211,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
