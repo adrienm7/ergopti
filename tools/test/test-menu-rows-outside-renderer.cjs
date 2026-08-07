@@ -303,6 +303,11 @@ const BASELINE = {
 	// stopped reading under two different names on the three drivers.
 	// 117 → 116, windows 175 → 174: the WPM-position reset. Its two neighbours
 	// stay `dynamic` because they mutate the live menu; this one sets nothing.
+	// 53 → 51: the About submenu's version header and channel selector, which had
+	// been in the DRIVER dialect inside a list provider since the block moved —
+	// so the renderer dropped both and macOS showed no version and no way to
+	// switch channel. A bug fix, not a migration; the count moves because the
+	// rows finally speak the dialect they are read in.
 	// 65 → 56: the script-control shortcut tree — three key submenus and the whole
 	// action list under each — and the MLX port rows the IA menu appends to the
 	// model selector's tree. The parent row of each stays the driver's: both carry
@@ -320,7 +325,7 @@ const BASELINE = {
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 53,
+	macos: 51,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
