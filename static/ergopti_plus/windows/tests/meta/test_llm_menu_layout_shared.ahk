@@ -45,14 +45,14 @@
 ; before enabling), true = greyed while off. Mirrors macOS is_disabled vs paused.
 _LMLS_Canonical() {
 	return [
-		Map("id", "llm_backend",             "off", false),
-		Map("id", "llm_model",               "off", false),
-		Map("id", "llm_profile",             "off", true),
-		Map("id", "llm_num_predictions",     "off", true),
-		Map("id", "llm_trigger",             "off", true),
-		Map("id", "llm_generation_settings", "off", true),
-		Map("id", "llm_display",             "off", true),
-		Map("id", "llm_navigation",          "off", true)
+		Map("id", "llm_backend",             "off", false, "dot", false),
+		Map("id", "llm_model",               "off", false, "dot", true),
+		Map("id", "llm_profile",             "off", true,  "dot", false),
+		Map("id", "llm_num_predictions",     "off", true,  "dot", false),
+		Map("id", "llm_trigger",             "off", true,  "dot", false),
+		Map("id", "llm_generation_settings", "off", true,  "dot", false),
+		Map("id", "llm_display",             "off", true,  "dot", false),
+		Map("id", "llm_navigation",          "off", true,  "dot", false)
 	]
 }
 
@@ -112,6 +112,9 @@ _LMLS_ManifestMatchesCanonical() {
 		Assert((rows[i]["disabled_when_off"] = true) == (c["off"] = true),
 			"llm_menu row '" . c["id"] . "' disabled_when_off must be " . (c["off"] ? "true" : "false")
 			. " (backend/model stay usable while off; the rest grey out — macOS parity)")
+		Assert((rows[i]["health_dot"] = true) == (c["dot"] = true),
+			"llm_menu row '" . c["id"] . "' health_dot must be " . (c["dot"] ? "true" : "false")
+			. " — exactly one row carries the backend-reachability dot, and the manifest is what says which")
 	}
 }
 Test("llm-menu-layout-shared: the manifest matches the canonical row order + greying policy", _LMLS_ManifestMatchesCanonical)
@@ -125,10 +128,13 @@ _LMLS_FallbackMirrorsManifest() {
 		; Tolerate variable inner spacing: assert the id and its bool co-occur in the body.
 		idTok  := '"id", "' . c["id"] . '"'
 		boolTok := '"disabled_when_off", ' . (c["off"] ? "true" : "false")
+		dotTok  := '"health_dot", ' . (c["dot"] ? "true" : "false")
 		Assert(InStr(Seg, idTok) > 0,
 			"_LLM_MenuLayout_Fallback must contain row id '" . c["id"] . "'")
 		Assert(InStr(Seg, idTok) > 0 and InStr(Seg, boolTok) > 0,
 			"_LLM_MenuLayout_Fallback row '" . c["id"] . "' must carry disabled_when_off=" . (c["off"] ? "true" : "false") . " (mirror the manifest)")
+		Assert(InStr(Seg, idTok) > 0 and InStr(Seg, dotTok) > 0,
+			"_LLM_MenuLayout_Fallback row '" . c["id"] . "' must carry health_dot=" . (c["dot"] ? "true" : "false") . " (mirror the manifest)")
 	}
 }
 Test("llm-menu-layout-shared: Windows fallback mirrors the manifest", _LMLS_FallbackMirrorsManifest)
@@ -159,6 +165,19 @@ _LMLS_DispatchAnswersEveryRow() {
 	}
 }
 Test("llm-menu-layout-shared: the dispatch answers every declared row", _LMLS_DispatchAnswersEveryRow)
+
+; The declared health_dot must REACH the row. A field the manifest declares and
+; no driver reads is worse than no field: editing it moves nothing and there is
+; nothing to read that says so.
+_LMLS_HealthDotIsRead() {
+	Build := _DriverFuncBody("LLM_Menu_Build")
+	Assert(InStr(Build, '_MR_Get(_row, "health_dot"') > 0,
+		"LLM_Menu_Build must pass each row's declared health_dot into _LLM_Menu_EmitRow")
+	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
+	Assert(InStr(Emit, "has_health_dot && llm_is_operational") > 0,
+		"_LLM_Menu_EmitRow must gate the dot on the declared flag, not on the row id alone")
+}
+Test("llm-menu-layout-shared: the declared health_dot reaches the row", _LMLS_HealthDotIsRead)
 
 ; The retired spec file must stay retired. Two shared descriptions of one menu is
 ; the state this migration ended; a reintroduced menu_layout.json would drift from

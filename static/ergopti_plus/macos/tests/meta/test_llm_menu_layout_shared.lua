@@ -36,14 +36,14 @@ local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 -- Canonical row order + greying policy. greys_off=false -> stays usable while the
 -- feature is off (configure before enabling); true -> greyed while off.
 local CANON = {
-	{ id = "llm_backend",             greys_off = false },
-	{ id = "llm_model",               greys_off = false },
-	{ id = "llm_profile",             greys_off = true  },
-	{ id = "llm_num_predictions",     greys_off = true  },
-	{ id = "llm_trigger",             greys_off = true  },
-	{ id = "llm_generation_settings", greys_off = true  },
-	{ id = "llm_display",             greys_off = true  },
-	{ id = "llm_navigation",          greys_off = true  },
+	{ id = "llm_backend",             greys_off = false, dot = false },
+	{ id = "llm_model",               greys_off = false, dot = true  },
+	{ id = "llm_profile",             greys_off = true,  dot = false },
+	{ id = "llm_num_predictions",     greys_off = true,  dot = false },
+	{ id = "llm_trigger",             greys_off = true,  dot = false },
+	{ id = "llm_generation_settings", greys_off = true,  dot = false },
+	{ id = "llm_display",             greys_off = true,  dot = false },
+	{ id = "llm_navigation",          greys_off = true,  dot = false },
 }
 
 -- Takes a selector unique to one production file rather than that file's
@@ -100,6 +100,9 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 				"llm_menu row " .. i .. " must be '" .. c.id .. "' (order is the menu order)")
 			helpers.assert_true((row.disabled_when_off == true) == c.greys_off,
 				"llm_menu row '" .. c.id .. "' disabled_when_off must be " .. tostring(c.greys_off))
+			helpers.assert_true((row.health_dot == true) == c.dot,
+				"llm_menu row '" .. c.id .. "' health_dot must be " .. tostring(c.dot) ..
+				" — exactly one row carries the backend-reachability dot, and the manifest says which")
 		end
 	end)
 
@@ -117,17 +120,34 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 			"llm_backend must be disabled when paused")
 		helpers.assert_true(MenuLayout.row_disabled("llm_profile", true, false) == true,
 			"llm_profile (greys off) must be disabled when the feature is off")
+		for _, c in ipairs(CANON) do
+			helpers.assert_true(MenuLayout.has_health_dot(c.id) == c.dot,
+				"MenuLayout.has_health_dot('" .. c.id .. "') must be " .. tostring(c.dot))
+		end
+	end)
+
+	helpers.it("init.lua asks the manifest which row carries the health dot", function()
+		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		helpers.assert_true(src:find('MenuLayout%.has_health_dot%("llm_model"') ~= nil,
+			"init.lua must gate the health dot on the declared flag — a field the manifest " ..
+			"declares and no driver reads is decoration, and editing it would move nothing")
 	end)
 
 	helpers.it("the menu_layout.lua fallback mirrors the canonical policy", function()
 		local src = read_source("local function load_policy") -- ui/menu/menu_llm/menu_layout.lua
 		local block = src:match("FALLBACK_GREYS_WHEN_OFF%s*=%s*{(.-)}")
 		helpers.assert_true(block ~= nil, "menu_layout.lua must define FALLBACK_GREYS_WHEN_OFF")
+		local dot_block = src:match("FALLBACK_HEALTH_DOT%s*=%s*{(.-)}")
+		helpers.assert_true(dot_block ~= nil, "menu_layout.lua must define FALLBACK_HEALTH_DOT")
 		for _, c in ipairs(CANON) do
 			local val = block:match(c.id .. "%s*=%s*(%a+)")
 			helpers.assert_true(val ~= nil, "fallback must list row '" .. c.id .. "'")
 			helpers.assert_true((val == "true") == c.greys_off,
 				"fallback row '" .. c.id .. "' must be " .. tostring(c.greys_off) .. " (mirror the manifest)")
+			local dot_val = dot_block:match(c.id .. "%s*=%s*(%a+)")
+			helpers.assert_true(dot_val ~= nil, "health-dot fallback must list row '" .. c.id .. "'")
+			helpers.assert_true((dot_val == "true") == c.dot,
+				"health-dot fallback row '" .. c.id .. "' must be " .. tostring(c.dot) .. " (mirror the manifest)")
 		end
 	end)
 
