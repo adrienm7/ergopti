@@ -95,11 +95,14 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	local is_on  = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
 	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
 	local pk     = pretty_key(s.id, state)
+	-- Provider data since 2026-08-07: the shared renderer's `group` branch
+	-- materialises `items` the same way a `list` row's provider rows are, so a
+	-- group builder no longer has to assemble the driver's own tree.
 	return {
-		title    = pk .. (desc ~= "" and (" : " .. desc) or ""),
+		label    = pk .. (desc ~= "" and (" : " .. desc) or ""),
 		checked  = is_on or nil,
 		disabled = not state.shortcuts or paused or nil,
-		fn       = (state.shortcuts and not paused) and (function(id)
+		action   = (state.shortcuts and not paused) and (function(id)
 			return function()
 				local on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(id) or false
 				if on then
@@ -389,9 +392,9 @@ function M.build(ctx)
 						-- Inject ChatGPT URL editor inline below ctrl_g
 						if s.id == "ctrl_g" then
 							table.insert(ctrl_items, {
-								title    = i18n.get("menu.shortcuts.chatgpt_url_item"),
+								label    = i18n.get("menu.shortcuts.chatgpt_url_item"),
 								disabled = paused or nil,
-								fn       = not paused and function()
+								action   = not paused and function()
 									local ok_p, clicked, url = pcall(dialog.text_prompt,
 										i18n.get("dialog.shortcuts.chatgpt_title"),
 										i18n.get("dialog.shortcuts.chatgpt_prompt"),
@@ -422,16 +425,17 @@ function M.build(ctx)
 
 	-- Each handler appends its items into the ``items`` list it receives.
 
-	-- group_builders return { menu = items } (or nil to skip) — the manifest
-	-- renderer wraps them with the i18n label from the manifest entry.
+	-- group_builders return { items = rows } (or nil to skip) — the renderer wraps
+	-- them with the i18n label from the manifest entry and materialises the rows,
+	-- so what a group hands over is DATA rather than a finished tree.
 	local function build_ctrl_shortcuts(_ctx)
 		if #ctrl_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, menu = ctrl_items }
+		return { disabled = not state.shortcuts or paused or nil, items = ctrl_items }
 	end
 
 	local function build_cmd_shortcuts(_ctx)
 		if #cmd_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, menu = cmd_items }
+		return { disabled = not state.shortcuts or paused or nil, items = cmd_items }
 	end
 
 	local function dyn_script_control(items, _ctx)
