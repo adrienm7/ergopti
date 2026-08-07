@@ -158,9 +158,9 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 			-- Spécial: show directly without category header
 			local aid = action.id
 			items[#items + 1] = {
-				title   = action.label,
+				label   = action.label,
 				checked = (aid == current_id),
-				fn      = function()
+				action      = function()
 					pcall(set_fn, aid)
 					pcall(karabiner.regenerate)
 					if update_menu then update_menu() end
@@ -174,7 +174,7 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 
 	-- Now use MenuUtils for the grouped, non-Spécial actions
 	if #non_special > 0 then
-		if #items > 0 then items[#items + 1] = { title = "-" } end
+		if #items > 0 then items[#items + 1] = { separator = true } end
 		local grouped = MenuUtils.build_action_picker(non_special, current_id, function(aid)
 			pcall(set_fn, aid)
 			pcall(karabiner.regenerate)
@@ -211,7 +211,7 @@ local function _load_left_hand_from_catalog()
 		tab           = true,
 		caps_lock     = true,
 		left_shift    = true,
-		fn            = true,
+		action            = true,
 		left_control  = true,
 		left_option   = true,
 		left_command  = true,
@@ -294,19 +294,19 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 
 	local key_submenu = {
 		{
-			title    = i18n.get("menu.karabiner.nothing_tap_hold"),
+			label    = i18n.get("menu.karabiner.nothing_tap_hold"),
 			disabled = (current_tap == "none" and current_hold == "none"),
-			fn       = function()
+			action       = function()
 				pcall(karabiner.set_tap_action,  kid, "none")
 				pcall(karabiner.set_hold_action, kid, "none")
 				pcall(karabiner.regenerate)
 				if update_menu then update_menu() end
 			end,
 		},
-		{ title = "-" },
+		{ separator = true },
 		{
-			title = string.format(i18n.get("menu.karabiner.tap_arrow"), tap_slbl),
-			menu  = build_action_picker(
+			label = string.format(i18n.get("menu.karabiner.tap_arrow"), tap_slbl),
+			items  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_tap_action(kid, action_id) end,
 				current_tap,
@@ -315,8 +315,8 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			),
 		},
 		{
-			title = string.format(i18n.get("menu.karabiner.hold_arrow"), hold_slbl),
-			menu  = build_action_picker(
+			label = string.format(i18n.get("menu.karabiner.hold_arrow"), hold_slbl),
+			items  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_hold_action(kid, action_id) end,
 				current_hold,
@@ -324,15 +324,15 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 				"hold"
 			),
 		},
-		{ title = "-" },
+		{ separator = true },
 		-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
 		-- revert to the single global delay. The title shows the effective value.
 		{
-			title = string.format(i18n.get("menu.karabiner.key_tap_delay"), fmt_delay(effective_ms)),
-			menu  = {
+			label = string.format(i18n.get("menu.karabiner.key_tap_delay"), fmt_delay(effective_ms)),
+			items  = {
 				{
-					title = i18n.get("menu.karabiner.key_tap_delay_set"),
-					fn    = function()
+					label = i18n.get("menu.karabiner.key_tap_delay_set"),
+					action    = function()
 						hs.focus()
 						local prompt = string.format(
 							i18n.get("menu.karabiner.key_tap_delay_dialog_prompt"), global_ms)
@@ -353,10 +353,10 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 					end,
 				},
 				{
-					title   = string.format(i18n.get("menu.karabiner.key_tap_delay_use_global"), fmt_delay(global_ms)),
+					label   = string.format(i18n.get("menu.karabiner.key_tap_delay_use_global"), fmt_delay(global_ms)),
 					checked = (per_key_ms == nil),
 					disabled = (per_key_ms == nil),
-					fn      = function()
+					action      = function()
 						karabiner.set_tap_timeout(kid, nil)
 						pcall(karabiner.regenerate)
 						if update_menu then update_menu() end
@@ -367,10 +367,10 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	}
 
 	return {
-		title    = string.format("%s  :  %s", key_def.label, combo_label),
+		label    = string.format("%s  :  %s", key_def.label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
-		menu     = enabled and key_submenu or nil,
+		items     = enabled and key_submenu or nil,
 	}
 end
 
@@ -444,9 +444,9 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 
 	local combo_submenu = {
 		{
-			title    = i18n.get("menu.karabiner.nothing_combo"),
+			label    = i18n.get("menu.karabiner.nothing_combo"),
 			disabled = is_empty,
-			fn       = function()
+			action       = function()
 				pcall(karabiner.set_combo_combo_action, cid, "none")
 				pcall(karabiner.set_combo_tap_action,   cid, "none")
 				pcall(karabiner.set_combo_hold_action,  cid, "none")
@@ -454,10 +454,10 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 				if update_menu then update_menu() end
 			end,
 		},
-		{ title = "-" },
+		{ separator = true },
 		{
-			title = string.format(i18n.get("menu.karabiner.combo_arrow"), combo_slbl),
-			menu  = build_action_picker(
+			label = string.format(i18n.get("menu.karabiner.combo_arrow"), combo_slbl),
+			items  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_combo_action(cid, action_id) end,
 				current_combo,
@@ -466,8 +466,8 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			title = string.format(i18n.get("menu.karabiner.tap_colon"), tap_slbl),
-			menu  = build_action_picker(
+			label = string.format(i18n.get("menu.karabiner.tap_colon"), tap_slbl),
+			items  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_tap_action(cid, action_id) end,
 				current_tap,
@@ -476,8 +476,8 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			title = string.format(i18n.get("menu.karabiner.hold_colon"), hold_slbl),
-			menu  = build_action_picker(
+			label = string.format(i18n.get("menu.karabiner.hold_colon"), hold_slbl),
+			items  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_hold_action(cid, action_id) end,
 				current_hold,
@@ -488,10 +488,10 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 	}
 
 	return {
-		title    = string.format("%s  :  %s", combo_def.label, combo_label),
+		label    = string.format("%s  :  %s", combo_def.label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
-		menu     = enabled and combo_submenu or nil,
+		items     = enabled and combo_submenu or nil,
 	}
 end
 
@@ -552,8 +552,8 @@ local function build_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_tap_hold_timeout()
 
 	return {
-		title = string.format(i18n.get("menu.karabiner.tap_hold_title"), fmt_delay(timeout_ms)),
-		fn    = function()
+		label = string.format(i18n.get("menu.karabiner.tap_hold_title"), fmt_delay(timeout_ms)),
+		action    = function()
 			-- Bring Hammerspoon to front so the dialog appears above other windows
 			hs.focus()
 			local prompt = string.format(i18n.get("menu.karabiner.tap_hold_dialog_prompt"), karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS)
@@ -590,8 +590,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_sticky_timeout()
 
 	return {
-		title = string.format(i18n.get("menu.karabiner.sticky_title"), fmt_delay(timeout_ms)),
-		fn    = function()
+		label = string.format(i18n.get("menu.karabiner.sticky_title"), fmt_delay(timeout_ms)),
+		action    = function()
 			hs.focus()
 			local prompt = i18n.get("menu.karabiner.sticky_dialog_prompt")
 			local title_d = i18n.get("menu.karabiner.sticky_dialog_title")
@@ -627,8 +627,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	local threshold_ms = karabiner.get_simultaneous_threshold()
 
 	return {
-		title = string.format(i18n.get("menu.karabiner.simultaneous_title"), fmt_delay(threshold_ms)),
-		fn    = function()
+		label = string.format(i18n.get("menu.karabiner.simultaneous_title"), fmt_delay(threshold_ms)),
+		action    = function()
 			hs.focus()
 			local prompt = string.format(i18n.get("menu.karabiner.simultaneous_dialog_prompt"), karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS)
 			local title_d = i18n.get("menu.karabiner.simultaneous_dialog_title")
@@ -661,9 +661,9 @@ local function build_combo_symmetric_item(karabiner, update_menu)
 	local is_symmetric = karabiner.get_combo_symmetric()
 
 	return {
-		title   = i18n.get("menu.karabiner.symmetric"),
+		label   = i18n.get("menu.karabiner.symmetric"),
 		checked = is_symmetric,
-		fn      = function()
+		action      = function()
 			karabiner.set_combo_symmetric(not is_symmetric)
 			pcall(karabiner.regenerate)
 			if update_menu then update_menu() end
@@ -971,18 +971,18 @@ function M.build(ctx)
 				build_combo_symmetric_item(karabiner, update_menu),
 				build_sticky_delay_item(karabiner, update_menu),
 			}) do
-				rows[#rows + 1] = MenuUtils.as_provider_row(item)
+				rows[#rows + 1] = item
 			end
 			return rows
 		end,
 		["karabiner_tap_holds"] = function()
 			local rows = {}
-			for _, item in ipairs(tap_hold) do rows[#rows + 1] = MenuUtils.as_provider_row(item) end
+			for _, item in ipairs(tap_hold) do rows[#rows + 1] = item end
 			return rows
 		end,
 		["karabiner_shortcuts"] = function()
 			local rows = {}
-			for _, item in ipairs(raccourcis) do rows[#rows + 1] = MenuUtils.as_provider_row(item) end
+			for _, item in ipairs(raccourcis) do rows[#rows + 1] = item end
 			return rows
 		end,
 	}
@@ -1036,14 +1036,14 @@ function M.build(ctx)
 	local submenu = ManifestMenu.build("karabiner_menu", "Karabiner", nil, nil, render_ctx, providers)
 
 	return {
-		title   = "⌨️ Karabiner",
+		label   = "⌨️ Karabiner",
 		checked = enabled,
 		-- Clicking the item title toggles enabled state
-		fn      = function()
+		action      = function()
 			karabiner.set_enabled(not karabiner.get_enabled())
 			if update_menu then update_menu() end
 		end,
-		menu    = submenu,
+		items    = submenu,
 	}
 end
 

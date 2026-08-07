@@ -98,11 +98,29 @@ end
 --- @param item table The built Karabiner menu item.
 --- @param title string Title to match exactly.
 --- @return table|nil The matching submenu entry.
-local function find_item(item, title)
-	for _, entry in ipairs(item.menu or {}) do
-		if entry.title == title then return entry end
+--- Finds a row by its label, in either dialect.
+---
+--- This menu's rows became provider DATA on 2026-08-07 — `label` / `action`
+--- instead of `title` / `fn` — so the renderer materialises them rather than
+--- receiving a finished tree. What this test pins is unchanged: the delay rows
+--- exist and committing one regenerates karabiner.json. Reading both spellings
+--- keeps it pinned through the conversion instead of pinning the spelling.
+--- @param item table The built menu entry.
+--- @param label string The row label to find.
+--- @return table|nil
+local function find_item(item, label)
+	for _, entry in ipairs(item.menu or item.items or {}) do
+		if entry.title == label or entry.label == label then return entry end
 	end
 	return nil
+end
+
+--- The callback a row carries, in either dialect.
+--- @param row table
+--- @return function|nil
+local function row_action(row)
+	if type(row) ~= "table" then return nil end
+	return row.fn or row.action
 end
 
 --- Builds the Karabiner menu with a fresh double and an AppleScript stub that
@@ -136,9 +154,9 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		local item, karabiner = build_menu()
 		local delay_item = find_item(item, TAP_HOLD_ITEM_TITLE)
 		helpers.assert_not_nil(delay_item, "the tap/hold delay item must exist in the submenu")
-		helpers.assert_type(delay_item.fn, "function")
+		helpers.assert_type(row_action(delay_item), "function")
 
-		delay_item.fn()
+		row_action(delay_item)()
 
 		helpers.assert_eq(karabiner._calls.set_tap_hold, 1, "the setter must run")
 		helpers.assert_true(karabiner._calls.regenerate >= 1,
@@ -156,9 +174,9 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		local item, karabiner = build_menu()
 		local sticky_item = find_item(item, STICKY_ITEM_TITLE)
 		helpers.assert_not_nil(sticky_item, "the sticky delay item must exist in the submenu")
-		helpers.assert_type(sticky_item.fn, "function")
+		helpers.assert_type(row_action(sticky_item), "function")
 
-		sticky_item.fn()
+		row_action(sticky_item)()
 
 		helpers.assert_eq(karabiner._calls.set_sticky, 1, "the setter must run")
 		helpers.assert_true(karabiner._calls.regenerate >= 1,
