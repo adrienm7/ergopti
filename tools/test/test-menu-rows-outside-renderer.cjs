@@ -269,7 +269,15 @@ const BASELINE = {
 	// 152 → 144: the delays-and-colours submenu. It was a native Menu handed over
 	// in `submenu`; none of its rows mutates the live menu — each opens a prompt
 	// and the tray rebuilds after — so nothing held them back from being data.
-	windows: 65,
+	// 65 → 52: the per-category hotstring submenus and the two layout feature
+	// blocks. They were the last places building a native Menu one manifest entry
+	// at a time — MenuAddItemFromManifest added the item, ticked it and greyed it
+	// in one call, so the decision and the drawing were the same function and no
+	// caller could take the row without taking the Menu. Splitting them gave
+	// MenuRowFromManifest, and the three inserts by position that put the category
+	// toggle and the bulk actions on top went with it: the array is built in the
+	// order the user reads it.
+	windows: 52,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -393,7 +401,13 @@ const MIN_TOTAL = {
 	// total to 115, four under the floor. 80 is under what a Windows driver whose
 	// menu is fully migrated would still show — the renderer's own Add calls, the
 	// tray root, and the handful of rows that mutate a live menu.
-	windows: 80,
+	// windows lowered 80 → 45 on 2026-08-07, same reason a third time for this
+	// driver: the per-category hotstring submenus were the last block assembling a
+	// native Menu one manifest entry at a time, and converting them took the total
+	// to 72, eight under the floor. 45 is under what a Windows driver whose menu is
+	// fully migrated would still show — the renderer's own Add calls, the tray
+	// root, and the rows whose callbacks repaint a menu that is already open.
+	windows: 45,
 	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on

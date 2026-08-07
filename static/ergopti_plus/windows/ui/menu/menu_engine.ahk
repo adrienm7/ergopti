@@ -24,29 +24,48 @@
 ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
 ; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+	Row := MenuRowFromManifest(ManifestEntry, V1CategoryPath)
+	if (Row == "") {
+		return
+	}
+	MenuRenderer_AppendRows(MenuParent, "features", ManifestEntry["path"], [Row])
+}
+
+; The SAME feature item as row DATA — label, checkmark, greying and click — for a
+; caller that hands its rows to the renderer instead of a Menu object.
+;
+; This is where the feature row is decided, and MenuAddItemFromManifest above is
+; now a two-line wrapper over it. Splitting them is what let the hotstring
+; category submenus become data: they were the last caller assembling a native
+; Menu one manifest entry at a time, and the rule for a row's tick and its
+; greying is far too subtle to be worth a second copy.
+;
+; Returns "" — never a partial row — when the feature does not resolve.
+;
+; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
+; ``path`` (canonical v2), ``id``, ``description_key``, etc.
+; ``V1CategoryPath`` is the PascalCase top-level category used for the greying.
+MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	global Features
 	V2Path := ManifestEntry["path"]
 	; Skip an item whose feature does not resolve in the live Features Map — it
 	; could not be toggled. Features is manifest-derived, so this only trips on a
 	; malformed or partial manifest entry.
 	if (FeatureLocateV2(Features, V2Path) == false) {
-		try LoggerWarn("Menu", "MenuAddItemFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
-		return
+		try LoggerWarn("Menu", "MenuRowFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
+		return ""
 	}
 	MenuTitle := MenuLabelFromManifestEntry(ManifestEntry)
 	; Apply the same runtime substitutions ``GetMenuTitleByPath`` does (count
 	; suffix " (N)" for hotstring categories, the live ``{date}`` for dynamic
 	; hotstrings entries) so the manifest-driven render is visually identical.
 	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V2Path)
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
 	State := ReadFeatureStateV2(V2Path)
-	IsEnabled := State.Has("enabled") and State["enabled"]
-	if IsEnabled {
-		MenuParent.Check(MenuTitle)
-	} else {
-		MenuParent.Uncheck(MenuTitle)
-	}
+	Row := Map(
+		"label",   MenuTitle,
+		"action",  (*) => ToggleFeatureV2(V2Path),
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 
 	; Greying — off when the master category gate is off OR the per-file
 	; sub-category gate is off. The sub-category gate lets a single hotstring
@@ -66,8 +85,9 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	SubCategory := StrSplit(V1CategoryPath, ".")[1]
 	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
 		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
-		try MenuParent.Disable(MenuTitle)
+		Row["disabled"] := true
 	}
+	return Row
 }
 
 ; Add a clickable menu item with a pre-resolved label and a canonical v2 path —
