@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: rækken åbner filen med personlige genveje. macOS og Windows har sådan en fil; Linux-driverens genveje er skift og markeringstransformationer, uden nogen fil på disken at redigere.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Kun Linux: denne driver indsamler sine målinger inde i dæmonen, så den kan sætte indsamlingen på pause eller kassere den igangværende session fra bakken. macOS og Windows skriver deres via et separat lager og tilbyder ingen af delene.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-læsning — kun på Linux",
+	"platform_reason.only_linux_rereads_its_catalogue": "Genindlæsning af kataloget — kun Linux",
+	"platform_reason.only_linux_migrates_in_the_background": "Krypteringsmigrering i baggrunden — kun Linux",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "Ikke på Linux: disse rækker konfigurerer inferens-backend, profilen, udløseren og hvordan forudsigelser vises og gennemses. Linux-driveren taler med én lokal backend og tilbyder ingen af disse flader, så hver række ville åbne en tom undermenu.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Kun Linux: denne driver viser modellerne og de to genereringsindstillinger direkte i menuen. macOS og Windows lægger de samme valg bag en undermenurække, som deres egne rækker ovenfor erklærer.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Kun Linux: denne drivers tap-hold køres af kanata, dens remap-dæmon, så de læses her i stedet for i deres egen menu. Windows har den separate menu, og macOS læser de samme værdier via Karabiner.",

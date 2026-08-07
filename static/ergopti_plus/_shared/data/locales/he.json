@@ -2409,6 +2409,8 @@
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux בלבד: מנהל ההתקן הזה אוסף את המדדים בתוך הדמון עצמו, ולכן הוא יכול להשהות את האיסוף או להשליך את הפעילות הנוכחית ממגש המערכת. macOS ו-Windows כותבים את שלהם דרך מאגר נפרד ואינם מציעים אף אחת מהפעולות האלה.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
+	"platform_reason.only_linux_rereads_its_catalogue": "טעינה מחדש של הקטלוג — לינוקס בלבד",
+	"platform_reason.only_linux_migrates_in_the_background": "העברת הצפנה ברקע — לינוקס בלבד",
 	"platform_reason.llm_configuration_surface_is_not_on_linux": "לא ב-Linux: שורות אלה מגדירות את מנוע ההסקה, את הפרופיל, את הטריגר ואת אופן ההצגה והניווט של התחזיות. מנהל ההתקן של Linux מדבר עם מנוע מקומי אחד ואינו מציע אף אחד מהמשטחים האלה, ולכן כל שורה הייתה פותחת תפריט משנה ריק.",
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux בלבד: מנהל ההתקן הזה מציג את הדגמים ואת שתי הגדרות היצירה ישירות בתפריט. macOS ו-Windows מציבים את אותן האפשרויות מאחורי שורת תפריט משנה, שאותה מכריזות השורות שלהם למעלה.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Linux בלבד: את פעולות ה-tap-hold של מנהל ההתקן הזה מריץ kanata, דמון המיפוי שלו, ולכן הן נקראות כאן ולא בתפריט נפרד. ל-Windows יש תפריט נפרד כזה, ו-macOS קורא את אותם הערכים דרך Karabiner.",

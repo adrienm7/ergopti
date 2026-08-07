@@ -209,6 +209,15 @@ local function _build_layouts(ctx)
 
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
+	-- The category gate's state key. This driver registers no command for that
+	-- row — kanata owns the remap and there is no on/off for it here — so the
+	-- renderer builds nothing and this getter is never read. It is named anyway,
+	-- because the declaration promises the key to every platform the row is
+	-- visible on, and a key with no getter is an ERROR at render time rather than
+	-- a silently wrong row.
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["layout_enabled"] = function() return true end
 
 	local providers = {
 		["base_layouts"] = function()
@@ -1164,10 +1173,47 @@ local function _manifest_hotstring_rows(ctx, config)
 	-- by the shared renderer, so this driver supplies only the behaviour.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
+	--- True only when every hotstring group is on — what the gate row's two
+	--- labels distinguish.
+	--- @return boolean
+	local function all_groups_on()
+		if type(config.get_groups) ~= "function" or type(config.is_group_enabled) ~= "function" then
+			return false
+		end
+		local groups = config.get_groups() or {}
+		if #groups == 0 then return false end
+		for _, name in ipairs(groups) do
+			if not config.is_group_enabled(name) then return false end
+		end
+		return true
+	end
+
 	hs_ctx.commands = {
 		["hotstrings_enable_all"]  = set_all(true),
 		["hotstrings_disable_all"] = set_all(false),
+		-- The category gate. Registering it is what tells the renderer this tray
+		-- needs the row; a driver whose parent can be clicked registers nothing.
+		["hotstrings_toggle"]      = function()
+			-- The batched writers, not a loop of toggle_group: each toggle_group
+			-- ends in a full load_all(), which re-parses every pack — magickey.toml
+			-- alone is 305 KB — once per category, inside a menu callback.
+			if all_groups_on() then
+				if config.disable_all then config.disable_all() end
+			else
+				if config.enable_all then config.enable_all() end
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		-- Reloading the catalogue from disk: this driver's own affordance, because
+		-- it is the only one whose hotstrings can change under it without a
+		-- restart. Declared with that reason rather than appended unannounced.
+		["hotstrings_reload"]      = function()
+			if config.reload then config.reload() end
+		end,
 	}
+	hs_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
+	hs_ctx.state_getters["hotstrings_enabled"] = all_groups_on
 
 	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 end
@@ -1186,56 +1232,15 @@ local function _build_hotstrings(ctx)
 
 	local items = _manifest_hotstring_rows(ctx, config)
 
-	-- Row 1 of [[menu.hotstrings_menu]] is a `toggle`, and the shared renderer
-	-- skips those by contract ("Category toggles rendered by caller") — so this
-	-- caller has to build it, and did not. There was no single switch that turned
-	-- hotstrings off on this driver and no indication of whether they were on.
+	-- The gate row and the reload row are BOTH the manifest's now, and both are
+	-- built by the shared renderer from their declaration — see the `commands`
+	-- and `state_getters` registered in _manifest_hotstring_rows.
 	--
-	-- Inside the submenu rather than on the parent, which is where Windows puts
-	-- it: platform/tray/appindicator.lua binds item.fn only when the row has NO
-	-- submenu (`if item.menu … elseif item.fn …`), so macOS's clickable parent is
-	-- not representable on this backend. Prepended, because it is the manifest's
-	-- first row and belongs at that position.
-	local all_on = false
-	if type(config.get_groups) == "function" and type(config.is_group_enabled) == "function" then
-		local groups = config.get_groups() or {}
-		all_on = #groups > 0
-		for _, name in ipairs(groups) do
-			if not config.is_group_enabled(name) then
-				all_on = false
-				break
-			end
-		end
-	end
-	table.insert(items, 1, {
-		title = i18n_safe(all_on and "menu.hotstrings.on" or "menu.hotstrings.off"),
-		fn    = function()
-			-- The batched writers, not a loop of toggle_group: each toggle_group
-			-- ends in a full load_all(), which re-parses every pack — magickey.toml
-			-- alone is 305 KB — once per category, inside a menu callback.
-			if all_on then
-				if config.disable_all then config.disable_all() end
-			else
-				if config.enable_all then config.enable_all() end
-			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
-	})
-
-	-- Not a manifest row on any driver: reloading the catalogue from disk is this
-	-- driver's own affordance, because it is the only one whose hotstrings can
-	-- change under it without a restart.
-	items[#items + 1] = { title = "-" }
-	items[#items + 1] = {
-		-- The generic reload label, not a hotstrings-specific one: this row sat on
-		-- a hardcoded French string, which is a label in one of the twenty-one
-		-- languages this menu is drawn in. Inside the Hotstrings submenu the
-		-- context already says what is being reloaded.
-		title = i18n_safe("menu.global.reload"),
-		fn = function()
-			if config.reload then config.reload() end
-		end,
-	}
+	-- The gate sits inside the submenu rather than on the parent, which is where
+	-- macOS puts it: platform/tray/appindicator.lua binds item.fn only when the row
+	-- has NO submenu (`if item.menu … elseif item.fn …`), so a clickable parent is
+	-- not representable on this backend. That is a driver answer, and it is
+	-- expressed by registering the command rather than by a second declaration.
 
 	-- The grand total, which macOS and Windows both put on this entry and Linux
 	-- did not. On a driver that re-scans its catalogue from disk it is the fastest
@@ -1270,15 +1275,11 @@ local function _build_llm(ctx)
 	local items = {}
 	local enabled = llm.is_enabled and llm.is_enabled() or false
 
-	-- The master toggle stays with the caller: the renderer skips `toggle` rows
-	-- by contract, because whether a category is on is driver state rather than
-	-- manifest data. Everything below it is the manifest's, in its order.
-	items[#items + 1] = {
-		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
-		fn = function()
-			if llm.toggle then llm.toggle() end
-		end,
-	}
+	-- The master gate is the manifest's first row and the shared renderer draws
+	-- it, from the command and the getter registered below. It also gets its OWN
+	-- two labels back — « Activer / Désactiver les suggestions IA », translated in
+	-- twenty-one locales and read by nobody — instead of a generic « Activé » with
+	-- a " ✓" glued on, a mark that belongs to the tray rather than to the string.
 
 	local providers = {}
 
@@ -1371,8 +1372,23 @@ local function _build_llm(ctx)
 		return rows
 	end
 
+	-- Registering the command is what tells the renderer this tray needs a gate
+	-- ROW: appindicator binds item.fn only on a row with no submenu, so a
+	-- clickable parent is not representable here.
+	local llm_ctx = {}
+	for key, value in pairs(ctx) do llm_ctx[key] = value end
+	llm_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
+	llm_ctx.commands["llm_toggle"] = function()
+		if llm.toggle then llm.toggle() end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	llm_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end
+	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
+
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", nil, nil, ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", nil, nil, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
@@ -1380,43 +1396,27 @@ local function _build_llm(ctx)
 end
 
 --- Builds the metrics/keylogger submenu.
---- Builds one privacy-toggle entry for the metrics submenu.
---- Reads the live value from get_privacy_state() rather than a cached copy, so
---- the tick always reflects what the keylogger is actually doing.
---- @param k       table    The keylogger module.
---- @param key     string   Field of get_privacy_state() this entry reflects.
---- @param label   string   User-facing label (French, per the UI convention).
---- @param setter  function Setter to call on toggle.
---- @return table The menu entry.
-local function _privacy_toggle(k, key, label, setter)
-	local available = type(k.get_privacy_state) == "function" and type(setter) == "function"
-	if not available then
-		return { title = label .. " (indisponible)", fn = function() end, disabled = true }
-	end
-	local active = k.get_privacy_state()[key] == true
-	return {
-		title = label .. (active and " ✓" or ""),
-		fn = function() setter(not k.get_privacy_state()[key]) end,
-	}
-end
-
 --- Reports the at-rest migration and offers to stop it.
 --- Converting a year of stored rows takes minutes, and without this entry the
 --- user ticks menu.metrics.encrypt_at_rest and sees nothing happen at all.
+---
+--- PROVIDER data — the `metrics_migration` list declares the slot and the shared
+--- renderer draws the row. A `list` and not a `command`, because the label IS the
+--- progress: "n / total", which no static declaration can spell.
 --- @param k table The keylogger module.
---- @return table One menu entry.
-local function _migration_status(k)
+--- @return table One provider row.
+local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
-		return { title = i18n_safe("menu.metrics.migration_unavailable"), fn = function() end, disabled = true }
+		return { label = i18n_safe("menu.metrics.migration_unavailable"), disabled = true }
 	end
 	local progress = k.get_migration_progress()
 	if not progress.running then
-		return { title = i18n_safe("menu.metrics.migration_idle"), fn = function() end, disabled = true }
+		return { label = i18n_safe("menu.metrics.migration_idle"), disabled = true }
 	end
 	return {
-		title = string.format(i18n_safe("menu.metrics.migration_progress"),
+		label = string.format(i18n_safe("menu.metrics.migration_progress"),
 			progress.scanned, progress.total),
-		fn = function()
+		action = function()
 			if type(k.cancel_migration) == "function" then k.cancel_migration() end
 		end,
 	}
@@ -1563,6 +1563,18 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
+		-- The category gate. Registering the command is what tells the renderer
+		-- this tray needs the ROW: appindicator binds item.fn only on a row with
+		-- no submenu, so the clickable parent macOS uses for the same toggle is
+		-- not representable on this backend.
+		["metrics_toggle"] = function()
+			if type(k.set_enabled) ~= "function" then
+				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
+				return
+			end
+			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 		-- `command` rows since 2026-08-07: the label and the greying are the
 		-- manifest's, so this driver supplies only the window each one opens.
 		-- `check` since 2026-08-07: the label and the tick are the manifest's, so
@@ -1598,7 +1610,13 @@ local function _manifest_metrics_rows(ctx, k)
 		end,
 	}
 
-	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx)
+	-- The migration readout, as the one row a `list` provider returns: its label
+	-- is the progress itself.
+	local providers = {
+		["metrics_migration"] = function() return { _migration_row(k) } end,
+	}
+
+	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx, providers)
 end
 
 --- Builds the metrics submenu, with the rows the manifest describes rendered by
@@ -1633,13 +1651,10 @@ local function _build_metrics(ctx)
 
 	local items = _manifest_metrics_rows(ctx, k)
 
-	-- The collection master toggle stays hand-built: this menu's manifest
-	-- `toggle` row is platforms = ["hs"], so it describes macOS's row and not
-	-- this driver's. The migration status is pure runtime text with no stable id.
-	items[#items + 1] = { title = "-" }
-	items[#items + 1] = _privacy_toggle(k, "enabled", i18n_safe("menu.metrics.collection_enabled"), k.set_enabled)
-	items[#items + 1] = _migration_status(k)
-
+	-- The collection gate and the migration readout are both the manifest's now —
+	-- the gate as the `toggle` row every driver's metrics menu declares, the
+	-- readout as a `list`, because its label IS the progress and no static
+	-- declaration can spell "n / total".
 	return { label = i18n_safe("menu.metrics.title"), submenu = items }
 end
 
@@ -1693,6 +1708,17 @@ local function _as_provider_row(row)
 	return out
 end
 
+--- Converts a LIST of driver-dialect rows, for a caller that emits its own row
+--- as provider data and only adapts what an extension handed it.
+--- @param list table Array of rows in the driver dialect.
+--- @return table Array of provider rows.
+local function _as_provider_row_list(list)
+	local out = {}
+	for _, row in ipairs(list or {}) do out[#out + 1] = _as_provider_row(row) end
+	return out
+end
+
+
 local function _extension_shortcut_rows()
 	local rows = {}
 
@@ -1738,11 +1764,15 @@ local function _extension_shortcut_rows()
 					-- declares nothing, and its author would have no way to tell.
 					Logger.warn(LOG, "Extension '%s' shortcuts/menu.lua failed: %s", id, tostring(err))
 					rows[#rows + 1] = {
-						title = (pack.name or id) .. " — " .. i18n_safe("common.error_title"),
-						fn = function() end, disabled = true,
+						label = (pack.name or id) .. " — " .. i18n_safe("common.error_title"),
+						disabled = true,
 					}
 				elseif #collected > 0 then
-					rows[#rows + 1] = { title = pack.name or id, menu = collected }
+					-- The extension's OWN rows are still adapted: an author writes
+					-- them in the host dialect both Lua drivers expose (`add_item`
+					-- with `title`/`fn`), and that is a published surface. This row —
+					-- the pack's own entry — is ours, so it is provider data.
+					rows[#rows + 1] = { label = pack.name or id, items = _as_provider_row_list(collected) }
 				end
 			end
 		end
@@ -1777,17 +1807,8 @@ local function _build_shortcuts(ctx)
 	local caps_active = sc.is_caps_word_active()
 	local items = {}
 
-	-- Row 1 of [[menu.shortcuts_menu]] is a `toggle`, which the shared renderer
-	-- skips by contract ("Category toggles rendered by caller") — so this caller
-	-- builds it, exactly as the hotstrings submenu does.
-	items[#items + 1] = {
-		title = i18n_safe(enabled and "menu.shortcuts.on" or "menu.shortcuts.off"),
-		fn = function()
-			sc.toggle()
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
-	}
-	items[#items + 1] = { title = "-" }
+	-- The gate row is the manifest's first row and the shared renderer builds it,
+	-- from the command and the state getter registered below.
 
 	-- The seven operations this driver performs on the current selection. Held
 	-- for the `selection_operations` provider below rather than appended here:
@@ -1922,18 +1943,29 @@ local function _build_shortcuts(ctx)
 	-- Provider data since 2026-08-07: the rows are the renderer's to build, and
 	-- only the submenu each extension declares for itself stays this driver's.
 	providers["extensions_shortcuts"] = function()
-		local rows = {}
-		for _, row in ipairs(_extension_shortcut_rows()) do
-			rows[#rows + 1] = _as_provider_row(row)
-		end
-		return rows
+		return _extension_shortcut_rows()
 	end
 
+	-- Registering `shortcuts_toggle` is what tells the renderer this tray needs a
+	-- gate ROW: appindicator binds item.fn only on a row with no submenu, so a
+	-- clickable parent — how macOS carries the same toggle — cannot be expressed
+	-- on this backend.
+	local sc_ctx = {}
+	for key, value in pairs(ctx) do sc_ctx[key] = value end
+	sc_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	sc_ctx.commands["shortcuts_toggle"] = function()
+		sc.toggle()
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	sc_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+
 	local manifest_rows = ManifestMenu
-		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, ctx, providers)
+		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, sc_ctx, providers)
 		or {}
 	if #manifest_rows > 0 then
-		items[#items + 1] = { title = "-" }
 		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
 	end
 
@@ -2164,12 +2196,15 @@ local function _build_gestures(ctx)
 		end,
 	}
 
-	-- The master toggle, built here because the renderer skips `toggle` rows by
-	-- contract: a category gate is driver state, not manifest data.
-	local master_toggle = {
-		title = i18n_safe("menu.common.enabled") .. (enabled and " ✓" or ""),
-		fn = function() ge.toggle() end,
-	}
+	-- The master toggle's BEHAVIOUR. Its label, its position and the two i18n keys
+	-- that distinguish on from off are the manifest's, and the shared renderer
+	-- draws it — which also retires the " ✓" this driver glued to a translated
+	-- label, a mark that belonged to the tray rather than to the string.
+	local gestures_on = enabled
+	local function master_toggle_action()
+		ge.toggle()
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
 
 	local function prompt_parameter(slot, action, spec, prior)
 		if type(ctx.prompt_action_parameter) == "function" then
@@ -2289,17 +2324,20 @@ local function _build_gestures(ctx)
 		}
 	end
 
-	-- The master toggle stays with the caller: the renderer skips `toggle` rows by
-	-- contract, because the category gate is driver state rather than manifest
-	-- data. Everything below it is the manifest's, in the manifest's order.
-	-- The two whole-tree actions are `command` rows: the renderer builds each from
-	-- the declaration and this driver registers only the behaviour.
+	-- The master toggle is the manifest's first row and the renderer builds it,
+	-- from the command registered here — the same mechanism as the two whole-tree
+	-- actions below it, which have been `command` rows since 2026-08-06.
 	local gesture_ctx = {}
 	for key, value in pairs(ctx) do gesture_ctx[key] = value end
-	gesture_ctx.commands = gesture_commands
+	gesture_ctx.commands = {}
+	for key, value in pairs(gesture_commands or {}) do gesture_ctx.commands[key] = value end
+	gesture_ctx.commands["gestures_toggle"] = master_toggle_action
+	gesture_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do gesture_ctx.state_getters[key] = value end
+	gesture_ctx.state_getters["gestures_enabled"] = function() return gestures_on end
 
 	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, gesture_ctx, providers)
-	local menu = { master_toggle }
+	local menu = {}
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
 	return { label = i18n_safe("menu.gestures.title"), submenu = menu }

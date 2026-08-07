@@ -57,7 +57,10 @@ local helpers = require("tests.helpers")
 -- description the other two drivers render — which is exactly what makes it
 -- worth pinning from this side.
 local CANONICAL_HOTSTRINGS_MENU = {
-	"toggle:Hotstrings",
+	-- The gate row gained an id on 2026-08-08, when the shared renderer learned
+	-- to build `toggle` rows: the signature keys on the id when there is one, and
+	-- an id is what lets a driver register the command that asks for the row.
+	"toggle:hotstrings_toggle",
 	"group:hotstrings_params",
 	-- One `dynamic:hotstring_bulk_actions` row until 2026-08-06, which expanded
 	-- to TWO rows inside each driver — so the manifest described neither, and
@@ -106,7 +109,7 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- signature, and the renderer is what collapses a separator with nothing between
 -- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
-	"toggle:Layout",
+	"toggle:layout_toggle",
 	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers. Ten rows

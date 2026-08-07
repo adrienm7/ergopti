@@ -440,6 +440,13 @@ function M.new(deps)
 			pending_sep = false
 		end
 
+		-- Read once for the whole build: `commands` answers a row's declared
+		-- behaviour and `state_getters` answers its checked_when / disabled_when
+		-- keys. Both were resolved inside the check/command branch until the
+		-- `toggle` branch needed them too.
+		local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
+		local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
+
 		for _, item in ipairs(menu_def) do
 			if not is_for_platform(item) then
 				-- A row excluded from this platform that carries a translated
@@ -470,7 +477,40 @@ function M.new(deps)
 				goto continue
 
 			elseif t == "toggle" then
-				-- Category toggles rendered by caller; skip silently.
+				-- The category's own on/off row, materialised HERE since 2026-08-08.
+				--
+				-- It was skipped in silence, with the comment "rendered by caller",
+				-- and that was true of exactly one driver: the AutoHotkey renderer
+				-- has built this type from the declaration all along. Linux rebuilt
+				-- the same row by hand in four submenus — hotstrings, shortcuts,
+				-- metrics, gestures — reading the SAME two i18n keys the declaration
+				-- names, and macOS built none at all because its tray parent toggles
+				-- when clicked.
+				--
+				-- Whether the row is needed is the DRIVER's answer, not a second
+				-- declaration: a caller that registers a command for it gets the row,
+				-- one that does not gets nothing and a DEBUG line saying so. That is
+				-- how one declaration serves a tray whose parent can be clicked and
+				-- one whose parent cannot, without describing the menu twice.
+				local toggle_id  = type(item.id) == "string" and item.id or "category_toggle"
+				local cmd_id     = type(item.command) == "string" and item.command or toggle_id
+				local fn         = commands[cmd_id]
+				local i18n_on    = type(item.i18n_on) == "string" and item.i18n_on or ""
+				local i18n_off   = type(item.i18n_off) == "string" and item.i18n_off or ""
+
+				if i18n_on == "" or i18n_off == "" then
+					Logger.warn(LOG, "'toggle' item in '%s' declares no i18n_on/i18n_off — skipped.", manifest_key)
+				elseif type(fn) ~= "function" then
+					-- Not a warning: on a driver whose tray parent carries the toggle
+					-- there is nothing to build, and that is the normal case there.
+					Logger.debug(LOG, "No command '%s' for the '%s' toggle — this driver toggles from the parent row.",
+						tostring(cmd_id), manifest_key)
+				else
+					local on = R.resolve_checked_when(manifest_key, toggle_id, getters)
+					flush_sep()
+					table.insert(result, { title = i18n.get(on and i18n_on or i18n_off), fn = fn })
+					item_count = item_count + 1
+				end
 
 			elseif t == "feature" then
 				-- Feature items rendered by caller or dynamic handlers; skip silently.
@@ -589,8 +629,6 @@ function M.new(deps)
 				-- cannot build a checkbox was never going to deliver it.
 				local row_id   = type(item.id) == "string" and item.id or ""
 				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
-				local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
-				local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
 				-- `command` defaults to the id, because the two are the same name in
 				-- every case so far and repeating it is a second thing to get wrong.
 				local cmd_id = type(item.command) == "string" and item.command or row_id

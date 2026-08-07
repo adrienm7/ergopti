@@ -3030,6 +3030,18 @@ platforms = ["hs"]
 # the row stays usable while the feature is OFF, so the user can configure a
 # backend and a model before enabling anything. Everything else greys out.
 # `health_dot` marks the one row that carries the backend-reachability dot.
+# The IA master gate. Its two labels have been translated in twenty-one locales
+# since the menu was written and read by nobody — this driver glued " ✓" onto a
+# generic « Activé » instead, and the other two toggle from the tray parent, which
+# is a driver answer expressed by registering the command or not.
+[[menu.llm_menu]]
+type = "toggle"
+id = "llm_toggle"
+i18n_on = "menu.llm.toggle_disable"
+i18n_off = "menu.llm.toggle_enable"
+checked_when = ["llm_enabled"]
+category = "LLM"
+
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
@@ -3288,8 +3300,10 @@ i18n = "menu.debug.healthcheck"
 
 [[menu.shortcuts_menu]]
 type = "toggle"
+id = "shortcuts_toggle"
 i18n_on = "menu.shortcuts.on"
 i18n_off = "menu.shortcuts.off"
+checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
 
 [[menu.shortcuts_menu]]
@@ -3471,12 +3485,23 @@ platforms = ["ahk"]
 # already builds — which is what tests/meta/test_menu_metrics_disabled_when.ahk
 # was written to prevent, and what it caught when this restriction was briefly
 # lifted on 2026-08-07.
+# The row exists wherever a driver registers a command for it: macOS toggles
+# metrics from the tray parent and registers none, Linux cannot and does. The
+# platforms list was recording which driver BUILT it, which is the driver's
+# answer rather than the manifest's.
 [[menu.metrics_menu]]
 type = "toggle"
+id = "metrics_toggle"
 i18n_on = "menu.metrics.on"
 i18n_off = "menu.metrics.off"
+checked_when = ["keylogger_enabled"]
 category = "Metrics"
-platforms = ["hs"]
+# ahk is excluded and must stay excluded: that driver builds this row itself in
+# BuildMetricsMenu (AddCategoryToggleItem), so an unrestricted declaration makes
+# its renderer draw a SECOND, non-functional master row. Linux joined the list on
+# 2026-08-08 — it registers a `metrics_toggle` command, which is what asks the
+# shared renderer for the row.
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
 
 # `command` since 2026-08-07. These two are buttons: a label, a greying rule and
@@ -3673,10 +3698,25 @@ i18n = "menu.metrics.reset_session"
 platforms = ["linux"]
 reason_key = "platform_reason.metrics_collection_is_in_process_on_linux"
 
+
+# The at-rest migration readout. Converting a year of stored rows takes minutes,
+# and without this row the user ticks « chiffrer au repos » and sees nothing
+# happen at all — so it reports progress and offers to stop. Linux's alone: it is
+# the driver that migrates in the background rather than on the next launch.
+#
+# A `list` because its label IS the progress — "n / total" — which no static
+# declaration can spell.
+[[menu.metrics_menu]]
+type = "list"
+id = "metrics_migration"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_migrates_in_the_background"
 [[menu.layout_menu]]
 type = "toggle"
+id = "layout_toggle"
 i18n_on = "menu.layout.on"
 i18n_off = "menu.layout.off"
+checked_when = ["layout_enabled"]
 category = "Layout"
 
 # The two blocks macOS alone has. It installs a .bundle keyboard layout through
@@ -3806,8 +3846,10 @@ platforms = ["ahk"]
 
 [[menu.hotstrings_menu]]
 type = "toggle"
+id = "hotstrings_toggle"
 i18n_on = "menu.hotstrings.on"
 i18n_off = "menu.hotstrings.off"
+checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
 
 [[menu.hotstrings_menu]]
@@ -3880,6 +3922,22 @@ i18n = "menu.extensions.header"
 type = "list"
 id = "hotstring_extensions"
 
+
+# Reloading the catalogue from disk, and Linux's alone: it is the only driver
+# whose hotstrings can change under it without a restart — the daemon watches the
+# TOMLs — so the other two have nothing to offer here. Declared with the reason
+# rather than appended unannounced at the end of the submenu, which is where it
+# lived until 2026-08-08.
+[[menu.hotstrings_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "hotstrings_reload"
+i18n = "menu.global.reload"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_rereads_its_catalogue"
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "word_expanders"
@@ -3962,8 +4020,10 @@ checked_when = ["hotstrings_repeat_enabled"]
 # unrestricted declaration. No test guarded this one — the metrics test caught
 # the pair.
 type = "toggle"
+id = "gestures_toggle"
 i18n_on = "menu.gestures.on"
 i18n_off = "menu.gestures.off"
+checked_when = ["gestures_enabled"]
 category = "Gestures"
 platforms = ["hs", "linux"]
 reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
@@ -4084,8 +4144,10 @@ reason_key = "platform_reason.libinput_reader_is_linux_only"
 
 [[menu.tap_holds_menu]]
 type = "toggle"
+id = "tapholds_toggle"
 i18n_on = "menu.tapholds.on"
 i18n_off = "menu.tapholds.off"
+checked_when = ["tapholds_enabled"]
 category = "TapHolds"
 platforms = ["ahk"]
 
