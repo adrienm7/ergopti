@@ -20,6 +20,7 @@ local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
+local MenuUtils      = require("ui.menu.menu_utils")
 local LOG               = "menu_hotstrings"
 
 
@@ -503,13 +504,6 @@ function M.build_management(ctx)
 
 		["delays_colors"]    = function(items) if delays_item then items[#items + 1] = delays_item end end,
 		["magic_key_config"] = function(items) items[#items + 1] = magic_key_item end,
-		-- Declared in the manifest since 2026-08-05, and rendered here by id
-		-- rather than appended by hand below. It was the last part of the
-		-- hotstrings surface no row described: this driver drew the submenu and
-		-- Linux drew nothing, while features.hotstrings.preview_* had declared all
-		-- four toggles for BOTH drivers from the start. Naming the row is what let
-		-- Linux render the same one instead of reimplementing it.
-		["preview_bubbles"]  = function(items) if bubble_item then items[#items + 1] = bubble_item end end,
 	}, nil, params_ctx, {
 		-- word_expanders is `type = "list"` in the manifest now, so the shared
 		-- renderer materialises every row of the submenu from this data instead of
@@ -518,6 +512,14 @@ function M.build_management(ctx)
 		["word_expanders"] = function()
 			if not exp_item then return {} end
 			return { exp_item }
+		end,
+		-- `list` since 2026-08-07, for the same reason word_expanders became one:
+		-- both Lua drivers built this identical tree of four switches themselves
+		-- because `dynamic` handed the id straight back. The renderer materialises
+		-- it from the data now.
+		["preview_bubbles"] = function()
+			if not bubble_item then return {} end
+			return { MenuUtils.as_provider_row(bubble_item) }
 		end,
 	})
 

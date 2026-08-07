@@ -3757,8 +3757,13 @@ id = "magic_key_config"
 type = "---"
 platforms = ["hs", "linux"]
 
+# `list` since 2026-08-07. The row and the toggles under it are the same on both
+# Lua drivers — the same four switches, the same separator before the one that
+# governs appearance rather than presence — and each built the whole tree itself
+# because `dynamic` hands the id straight back. The provider returns the data
+# and the renderer builds the rows.
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "list"
 id = "preview_bubbles"
 platforms = ["hs", "linux"]
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"

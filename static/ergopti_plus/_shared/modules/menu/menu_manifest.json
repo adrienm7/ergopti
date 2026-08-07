@@ -1070,7 +1070,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "preview_bubbles",
 			"platforms": [
 				"hs",

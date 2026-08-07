@@ -777,30 +777,6 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			items[#items + 1] = { title = i18n_safe("menu.hotstrings.delays_colors"), menu = sub }
 		end,
-		["preview_bubbles"] = function(items)
-			-- The four toggles the manifest has declared for this driver all along
-			-- and that nothing could reach: ui/tooltip/preview.lua honoured them on
-			-- the hot path while its set_enabled() had no caller, so they were fixed
-			-- at their load-time value. PreviewSettings owns them now; this menu is
-			-- the way in.
-			local sub = {}
-			for index, toggle in ipairs(PreviewSettings.toggles()) do
-				-- "colored" is a different kind of switch from the three above it —
-				-- they choose WHICH previews appear, it chooses how they look — so it
-				-- is separated, the same way macOS separates it.
-				if index == #PreviewSettings.toggles() then sub[#sub + 1] = { title = "-" } end
-				local name = toggle.name
-				sub[#sub + 1] = {
-					title   = i18n_safe(toggle.label),
-					checked = PreviewSettings.get(name),
-					fn      = function()
-						PreviewSettings.toggle(name)
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
-			end
-			items[#items + 1] = { title = i18n_safe("menu.hotstrings.preview_bubbles"), menu = sub }
-		end,
 	}
 
 	local providers = {
@@ -1077,6 +1053,33 @@ local function _manifest_hotstring_rows(ctx, config)
 	-- data the provider returns rather than this driver assembling the menu.
 	local params_providers = {
 		["word_expanders"] = params_handlers["word_expanders"],
+		-- The four toggles the manifest has declared for this driver all along and
+		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
+		-- path while its set_enabled() had no caller, so they were fixed at their
+		-- load-time value. PreviewSettings owns them now; this menu is the way in.
+		--
+		-- Provider DATA since 2026-08-07: `{label, checked, action}` rows the
+		-- renderer materialises, rather than a menu tree this driver assembled.
+		["preview_bubbles"] = function()
+			local choices = {}
+			local toggles = PreviewSettings.toggles()
+			for index, toggle in ipairs(toggles) do
+				-- "colored" is a different kind of switch from the three above it —
+				-- they choose WHICH previews appear, it chooses how they look — so it
+				-- is separated, the same way macOS separates it.
+				if index == #toggles then choices[#choices + 1] = { separator = true } end
+				local name = toggle.name
+				choices[#choices + 1] = {
+					label   = i18n_safe(toggle.label),
+					checked = PreviewSettings.get(name),
+					action  = function()
+						PreviewSettings.toggle(name)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			end
+			return { { label = i18n_safe("menu.hotstrings.preview_bubbles"), items = choices } }
+		end,
 	}
 	params_handlers["word_expanders"] = nil
 

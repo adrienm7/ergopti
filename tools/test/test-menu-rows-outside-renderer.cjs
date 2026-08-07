@@ -229,7 +229,11 @@ const BASELINE = {
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	macos: 226,
-	linux: 68
+	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
+	// of four; it is a `list` now and the renderer materialises it. macOS holds
+	// at 226 because its rows are still written in the driver dialect and
+	// converted at the provider — the distinction this header is about.
+	linux: 66
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
