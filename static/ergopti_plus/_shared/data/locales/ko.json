@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux 제외: 이 행은 매직 키를 변경합니다. macOS와 Windows는 이를 위한 대화상자를 엽니다. Linux 드라이버는 설정에서 키를 읽기만 하고 메뉴에서 바꿀 방법이 없습니다.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux 제외: 이 행들은 사용자가 지정한 조합키를 나열합니다. macOS와 Windows는 조합키를 캡처해 저장할 수 있지만, Linux 드라이버에는 슬롯 지정 수단이 전혀 없어 목록이 항상 비어 있게 됩니다.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux 전용: 이 드라이버는 측정값을 창이 아니라 자체 로그에 기록합니다. macOS와 Windows는 같은 수치를 측정 창으로 열기 때문에, 이 항목은 그 창이 이미 보여 주는 내용을 중복해서 보여 줄 뿐입니다.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 읽기 — Linux 전용",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집",

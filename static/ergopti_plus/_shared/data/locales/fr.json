@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Pas sous Linux : cette ligne change la touche magique. macOS et Windows ouvrent chacun une boîte de dialogue pour cela ; le pilote Linux se contente de lire la touche depuis la configuration et n'offre aucun moyen de la changer depuis le menu.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Pas sous Linux : ces lignes listent les accords que l’utilisateur a assignés. macOS et Windows savent capturer un accord et le persister ; le pilote Linux n’a aucune surface d’assignation de slot, la liste serait donc toujours vide.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Pas sous Linux : cette ligne ouvre le fichier de raccourcis personnels. macOS et Windows en ont un ; les raccourcis du pilote Linux sont des bascules et des transformations de la sélection, sans aucun fichier à éditer.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux uniquement : ce pilote inscrit ses métriques dans son propre journal plutôt que dans une fenêtre. macOS et Windows ouvrent une fenêtre de métriques pour les mêmes chiffres, la ligne ferait donc doublon avec ce que cette fenêtre affiche déjà.",
 	"platform_reason.libinput_reader_is_linux_only": "Lecture libinput — propre à Linux",
 	"metrics_apps.chart_time_series": "Temps",
 	"metrics_apps.edit_category_hint": "Modifier la catégorie",

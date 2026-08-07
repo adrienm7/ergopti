@@ -184,10 +184,16 @@ const MEASURE = process.argv.includes('--measure');
 //
 // linux 84 → 81: the global-actions submenu, now three `command` rows and a
 // declared separator rather than four hand-written entries on each driver.
+//
+// linux 81 → 75: the five metrics readouts this driver answers in its log
+// rather than in a window. They are Linux's OWN rows — the other two open a
+// metrics window for the same figures — and nothing described them, so no gate
+// could compare, reason about or find them. Declared with the reason attached,
+// which is what the manifest is for when a row really is driver-specific.
 const BASELINE = {
 	windows: 196,
 	macos: 227,
-	linux: 81
+	linux: 75
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
@@ -208,7 +214,9 @@ const BASELINE = {
 const MIN_TOTAL = {
 	windows: 180,
 	macos: 220,
-	linux: 80
+	// linux lowered 80 → 55 on 2026-08-06, same reason as macOS above: the
+	// predicate keys on `title =` and every migration moves rows to `label =`.
+	linux: 55
 };
 
 const DRIVER_SPEC = {

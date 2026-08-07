@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "לא ב-Linux: השורה משנה את מקש הקסם. ב-macOS וב-Windows נפתחת לכך תיבת דו-שיח; מנהל ההתקן של Linux רק קורא את המקש מההגדרות ואינו מאפשר לשנותו מהתפריט.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "לא ב-Linux: שורות אלו מפרטות את צירופי המקשים שהמשתמש שייך. macOS ו-Windows יודעים ללכוד צירוף ולשמור אותו; למנהל ההתקן של Linux אין כל ממשק שיוך, ולכן הרשימה תהיה תמיד ריקה.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux בלבד: מנהל ההתקן הזה רושם את המדדים שלו ביומן שלו במקום בחלון. macOS ו-Windows פותחים חלון מדדים עבור אותם נתונים, ולכן השורה הזו רק תשכפל את מה שהחלון כבר מציג.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
 	"metrics_apps.chart_time_series": "זמן",
 	"metrics_apps.edit_category_hint": "עריכת קטגוריה",

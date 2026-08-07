@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Не в Linux: строка меняет «магическую» клавишу. macOS и Windows открывают для этого диалог; линуксовый драйвер лишь читает клавишу из конфигурации и изменить её из меню нельзя.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Не в Linux: эти строки перечисляют сочетания, назначенные пользователем. macOS и Windows умеют перехватить сочетание и сохранить его; у линуксового драйвера нет никакого интерфейса назначения, поэтому список всегда был бы пуст.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: строка открывает файл личных сочетаний клавиш. У macOS и Windows он есть; сочетания линуксового драйвера — это переключатели и преобразования выделения, редактировать нечего.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Только Linux: этот драйвер записывает свои метрики в собственный журнал, а не в окно. macOS и Windows открывают для тех же цифр окно метрик, поэтому строка лишь дублировала бы то, что это окно уже показывает.",
 	"platform_reason.libinput_reader_is_linux_only": "Чтение libinput — только в Linux",
 	"metrics_apps.chart_time_series": "Время",
 	"metrics_apps.edit_category_hint": "Изменить категорию",

@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Inte på Linux: raden ändrar magitangenten. macOS och Windows öppnar en dialogruta för det; Linux-drivrutinen läser bara tangenten ur konfigurationen och kan inte ändra den från menyn.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Inte på Linux: dessa rader listar de tangentkombinationer användaren tilldelat. macOS och Windows kan fånga en kombination och spara den; Linux-drivrutinen har ingen tilldelningsyta alls, så listan skulle alltid vara tom.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Inte på Linux: raden öppnar filen med personliga genvägar. macOS och Windows har var sin; Linux-drivrutinens genvägar är växlar och markeringsomvandlingar, utan någon fil att redigera.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Endast Linux: den här drivrutinen skriver sina mätvärden till sin egen logg i stället för i ett fönster. macOS och Windows öppnar ett mätvärdesfönster för samma siffror, så raden skulle upprepa det fönstret redan visar.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-läsning — endast på Linux",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori",

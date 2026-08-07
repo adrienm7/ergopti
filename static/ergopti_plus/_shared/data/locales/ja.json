@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux では利用不可：この行はマジックキーを変更します。macOS と Windows はそのためのダイアログを開きますが、Linux ドライバーは設定からキーを読むだけで、メニューから変更する手段はありません。",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux では利用不可：これらの行はユーザーが割り当てたキーの組み合わせを一覧します。macOS と Windows は組み合わせを取得して保存できますが、Linux ドライバーには割り当ての手段が一切なく、一覧は常に空になります。",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux では利用不可：この行は個人用ショートカットのファイルを開きます。macOS と Windows にはそのファイルがありますが、Linux ドライバーのショートカットはトグルと選択テキストの変換で、編集すべきファイルは存在しません。",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Linux のみ：このドライバーは計測値をウィンドウではなく自身のログに記録します。macOS と Windows は同じ数値を計測ウィンドウで開くため、この項目はそのウィンドウがすでに表示している内容を重複させるだけになります。",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 読み取り — Linux のみ",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",

@@ -2407,6 +2407,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Ne na Linuxu: tento řádek mění magickou klávesu. macOS i Windows k tomu nabízejí dialog; linuxový ovladač klávesu z konfigurace jen čte a z nabídky ji změnit nelze.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Ne na Linuxu: tyto řádky vypisují klávesové zkratky, které si uživatel přiřadil. macOS a Windows umějí zkratku zachytit a uložit; linuxový ovladač nemá žádné rozhraní pro přiřazení, seznam by tedy byl vždy prázdný.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ne na Linuxu: tento řádek otevírá soubor osobních zkratek. macOS a Windows takový soubor mají; zkratky linuxového ovladače jsou přepínače a transformace výběru, bez souboru na disku, který by šlo upravit.",
+	"platform_reason.metrics_readouts_go_to_the_log_on_linux": "Pouze Linux: tento ovladač zapisuje své metriky do vlastního logu místo do okna. macOS a Windows otevírají pro stejné údaje okno metrik, takže by tento řádek jen zopakoval to, co už toto okno ukazuje.",
 	"platform_reason.libinput_reader_is_linux_only": "Čtení libinput — pouze v Linuxu",
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii",
