@@ -354,6 +354,13 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			RegisterMenuItem(TargetMenu, Label, (*) => "")
 		}
 
+		; An optional per-row icon. Win32 menus can carry one and hs.menubar rows
+		; cannot, which is why the language selector was the last common menu with
+		; no shared declaration: describing it would have cost this driver its flags.
+		; The field is optional, so a driver that cannot draw icons simply ignores it.
+		if (Row.Has("icon") and Row["icon"] != "") {
+			try TargetMenu.SetIcon(Label, Row["icon"])
+		}
 		if (Row.Has("checked") and Row["checked"]) {
 			try TargetMenu.Check(Label)
 		}
@@ -612,6 +619,31 @@ MenuRenderer_ResolveCheckedWhen(MenuKey, ItemId, Getters) {
 ; A missing declaration is an ERROR rather than a silent "": the handler is
 ; about to concatenate this into a user-visible label, and an empty prefix
 ; renders as a bare shortcut with no indication of what it does.
+; Fills an EXISTING menu from one list row's provider, instead of returning a
+; fresh Menu the way MenuRenderer_Build does.
+;
+; The language submenu is attached to the tray empty and populated later — its
+; twenty-one locales cost ~156 ms, which is not spent on the boot path — so the
+; object is already in the tray by the time its rows exist. Building a new Menu
+; would leave the tray pointing at the old empty one.
+;
+; @param TargetMenu Menu The menu to fill (cleared first).
+; @param MenuKey string Manifest key, for the log.
+; @param ListId string Row id, for the log.
+; @param Provider Func Returns the row array.
+; @returns {Integer} Rows added.
+MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
+	try TargetMenu.Delete()
+	Rows := ""
+	try {
+		Rows := Provider()
+	} catch as e {
+		try LoggerError("MenuRenderer", "List '{1}.{2}' provider threw ({3}) — menu left empty.", MenuKey, ListId, e.Message)
+		return 0
+	}
+	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
+}
+
 MenuRenderer_I18nDynamic(MenuKey, ItemId) {
 	Item := _MR_FindItemById(MenuKey, ItemId)
 	if (Item == false) {

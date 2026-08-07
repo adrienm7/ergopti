@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "각 드라이버는 서로 다른 방식으로 터치패드를 읽습니다 — Windows는 정밀 터치패드 API, macOS는 Hammerspoon의 제스처 이벤트, Linux는 evdev. 그래서 각자 제공할 수 있는 슬롯과 필요한 설정이 저마다 다릅니다.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "각 드라이버의 트레이에는 그 플랫폼이 가진 최상위 항목이 들어갑니다. macOS와 Linux의 애플리케이션 도구, Linux의 내장 업데이터, Windows의 일시 중지 스위치. 나머지는 같은 일을 다른 곳에서 하거나 아예 하지 않습니다.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "이 항목은 모든 드라이버에 있지만 선언할 수 있는 것은 일부뿐입니다. 켜기/끄기 스위치는 드라이버가 직접 만들며, Windows 렌더러는 공용 렌더러와 달리 선언된 스위치도 그리므로, 그 플랫폼용으로 넣으면 스위치가 두 번 나타납니다.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 제외: 그 드라이버는 각 언어 항목에 국기 아이콘을 그리지만, 공용 메뉴 항목이 갖는 것은 라벨과 체크, 동작, 하위 메뉴이며 아이콘은 아닙니다. 그쪽에 이 항목을 선언하면 국기를 공용 설명과 맞바꾸는 셈입니다.",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집",
 	"menu.llm.generation.temperature": "온도",

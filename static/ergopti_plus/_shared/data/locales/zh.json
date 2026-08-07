@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "每个驱动读取触控板的方式不同——Windows 通过精确式触控板 API，macOS 通过 Hammerspoon 的手势事件，Linux 通过 evdev——因此各自能提供的槽位和所需的设置都是自己的。",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "每个驱动的托盘承载其平台拥有的顶层项：macOS 和 Linux 上的应用工具、Linux 上的内置更新程序、Windows 上的暂停开关。其余的驱动要么从别处到达同样的地方，要么根本没有。",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "这一项在每个驱动上都有，只是并非每个都能声明它。这个开关由驱动自己构建，而 Windows 的渲染器与共享渲染器不同，也会绘制被声明的开关；因此为该平台列出它会让开关出现两次。",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 上没有：该驱动在每个语言项上绘制国旗图标，而共享的菜单项承载的是标签、勾选、动作和子菜单，并不包含图标。在那里声明这一项，等于用国旗换一份共享描述。",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别",
 	"menu.llm.generation.temperature": "温度",

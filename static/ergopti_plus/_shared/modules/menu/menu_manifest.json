@@ -408,6 +408,12 @@
 			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		}
 	],
+	"language_menu": [
+		{
+			"type": "list",
+			"id": "locales"
+		}
+	],
 	"updates_menu": [
 		{
 			"type": "list",

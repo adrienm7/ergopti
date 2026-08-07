@@ -252,42 +252,51 @@ _I18nSortedLocales() {
 ; to call on every menu rebuild.
 ;
 ; @param LangMenu  Menu   The AHK Menu object to populate.
-I18nBuildLanguageMenu(LangMenu) {
+; List provider for the manifest's ``language_menu`` row: one row per supported
+; locale, with the flag this driver draws beside it. The rows are DATA — the
+; renderer builds the items — so the menu the user sees is described in
+; _shared/modules/features/manifest.toml like every other, which it was not until
+; 2026-08-07: three drivers listed the same twenty-one locales from the same
+; shared catalogue into a menu nothing declared.
+I18n_LocaleRows() {
 	global _I18nLocale, _StaticDir, _I18nFlagExistsCache
-	
-	; Safety initialization in case top-level auto-execute was bypassed
+
 	try {
 		if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
 			_I18nFlagExistsCache := Map()
 	} catch {
 		_I18nFlagExistsCache := Map()
 	}
-		
-	try LangMenu.Delete()
+
+	Rows := []
 	FlagsDir := _StaticDir . "\img\flags\"
 	for Loc in _I18nSortedLocales() {
-		; _MakeLocaleSetter wraps the code in a named function so AHK captures
-		; the value at call time rather than sharing the loop variable reference.
-		Label    := Loc.Name
-		RegisterMenuItem(LangMenu, Label, _MakeLocaleSetter(Loc.Code))
-		
 		HasFlag := false
 		try {
 			if _I18nFlagExistsCache.Has(Loc.Code) {
 				HasFlag := _I18nFlagExistsCache[Loc.Code]
 			} else {
-				FlagPath := FlagsDir . Loc.Code . ".png"
-				HasFlag := FileExist(FlagPath)
+				HasFlag := FileExist(FlagsDir . Loc.Code . ".png")
 				_I18nFlagExistsCache[Loc.Code] := HasFlag
 			}
 		} catch {
-			FlagPath := FlagsDir . Loc.Code . ".png"
-			HasFlag := FileExist(FlagPath)
+			HasFlag := FileExist(FlagsDir . Loc.Code . ".png")
 		}
-		
-		if HasFlag
-			try LangMenu.SetIcon(Label, FlagsDir . Loc.Code . ".png")
-		if Loc.Code == _I18nLocale
-			LangMenu.Check(Label)
+		; _MakeLocaleSetter wraps the code in a named function so the value is
+		; captured at call time rather than sharing the loop variable.
+		Rows.Push(Map(
+			"label",   Loc.Name,
+			"checked", (Loc.Code == _I18nLocale) ? true : false,
+			"icon",    HasFlag ? (FlagsDir . Loc.Code . ".png") : "",
+			"action",  _MakeLocaleSetter(Loc.Code)))
 	}
+	return Rows
 }
+
+; Populates ``LangMenu`` from the manifest's language_menu/locales row. The menu
+; object is already in the tray when this runs — the locale list is deferred off
+; the boot path — so the rows are rendered INTO it rather than into a new Menu.
+I18nBuildLanguageMenu(LangMenu) {
+	MenuRenderer_FillFromList(LangMenu, "language_menu", "locales", I18n_LocaleRows)
+}
+

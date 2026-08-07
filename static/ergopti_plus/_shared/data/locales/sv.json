@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "Varje drivrutin läser styrplattan genom en annan stack — Windows via sitt API för precisionsstyrplatta, macOS via Hammerspoons gesthändelser, Linux via evdev — så de platser var och en kan erbjuda, och den uppsättning var och en kräver, är dess egna.",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Varje drivrutins fält bär de toppnivårader som dess plattform har: applikationsverktygen på macOS och Linux, den inbyggda uppdateraren på Linux, pausreglaget på Windows. De andra når samma sak någon annanstans, eller inte alls.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Raden finns på varje drivrutin; bara vissa får deklarera den. Den här på/av-brytaren byggs av drivrutinen själv, och Windows-renderaren ritar — till skillnad från den delade — även en deklarerad brytare, så att ta med den för den plattformen skulle visa brytaren två gånger.",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Inte på Windows: den drivrutinen ritar en flaggikon på varje språkrad, och en delad menyrad bär en etikett, en bock, en åtgärd och en undermeny — inte en ikon. Att deklarera raden där vore att byta bort flaggorna mot en delad beskrivning.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori",
 	"menu.llm.generation.temperature": "Temperatur",

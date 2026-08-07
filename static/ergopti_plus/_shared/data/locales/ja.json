@@ -2426,6 +2426,7 @@
 	"platform_reason.touchpad_stack_is_per_driver": "各ドライバーはタッチパッドを異なる仕組みで読み取ります——Windows は高精度タッチパッド API、macOS は Hammerspoon のジェスチャーイベント、Linux は evdev。ですから提供できる枠も、必要な設定も、それぞれ固有のものです。",
 	"platform_reason.tray_top_level_rows_are_each_drivers": "各ドライバーのトレイには、そのプラットフォームが持つ最上位の項目が並びます。macOS と Linux のアプリケーションツール、Linux の組み込み更新機能、Windows の一時停止スイッチ。ほかのドライバーは同じことを別の場所で行うか、行いません。",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "この項目はどのドライバーにもありますが、宣言してよいのは一部だけです。オンオフの切り替えはドライバー自身が作り、Windows の描画側は——共有のものと違って——宣言された切り替えも描くため、そのプラットフォーム向けに並べると切り替えが二つ現れます。",
+	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows では非対応：あのドライバーは各言語の行に国旗アイコンを描きますが、共有のメニュー行が持つのはラベル、チェック、動作、サブメニューであってアイコンではありません。そちらでこの行を宣言することは、国旗を共通の記述と引き換えにすることになります。",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",
 	"menu.llm.generation.temperature": "温度",
