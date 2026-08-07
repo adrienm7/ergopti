@@ -233,7 +233,11 @@ const BASELINE = {
 	// was still assembled here and every row of it counted. They are provider
 	// data now and the renderer materialises them — which also retired the
 	// adapter call and the section() helper that had no caller left.
-	macos: 211,
+	// 211 → 191: the Karabiner menu. Every row in that file flows into
+	// karabiner_menu through one of three list providers, which translated each
+	// one on the way out — so the tree was still assembled there. They are
+	// provider data now.
+	macos: 191,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -272,7 +276,13 @@ const BASELINE = {
 // this driver's rows use BEFORE assuming the tree shrank.
 const MIN_TOTAL = {
 	windows: 180,
-	macos: 220,
+	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
+	// predicate keys on `title =`, so every conversion of a builder to provider
+	// data shrinks the total by construction and the floor eventually fires on
+	// progress. 120 is below what a driver with a fully migrated menu would still
+	// show — the submenu wrappers and the rows no declaration can carry — rather
+	// than merely under today's number.
+	macos: 120,
 	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
 	// for the reason given for macOS above: the predicate keys on `title =`, so
 	// every successful migration shrinks the total by construction and the floor
