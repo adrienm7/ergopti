@@ -38,6 +38,7 @@ local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 -- single source of truth for which rows grey out while the feature is OFF, consumed
 -- identically by the Windows renderer so the two menus can never drift again.
 local MenuLayout       = require("ui.menu.menu_llm.menu_layout")
+local ManifestMenu     = require("infra.manifest_menu")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -387,12 +388,12 @@ function M.create(deps)
 
 		local function build_num_pred_menu()
 				Logger.debug(LOG, "Building prediction count menu…")
-				local m = {}
+				local rows = {}
 				for i = 1, 10 do
-						table.insert(m, {
-								title   = string.format(i18n.get("menu.llm.prediction_count_label"), i, i > 1 and "s" or ""),
+						table.insert(rows, {
+								label   = string.format(i18n.get("menu.llm.prediction_count_label"), i, i > 1 and "s" or ""),
 								checked = (state.llm_num_predictions == i),
-								fn      = function()
+								action  = function()
 										Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
 										state.llm_num_predictions = i
 										if keymap and type(keymap.set_llm_num_predictions) == "function" then 
@@ -405,7 +406,7 @@ function M.create(deps)
 								end
 						})
 				end
-				return m
+				return ManifestMenu.render_rows(rows, "llm_num_predictions")
 		end
 
 
@@ -693,18 +694,18 @@ function M.create(deps)
 
 				-- ===== Generation settings submenu =====
 
-				local generation_menu = {}
+				local generation_rows = {}
 
-				table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
+				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
 				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
-						table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
+						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.reset_context_length })
 				end
 
-				table.insert(generation_menu, {
-						title    = i18n.get("menu.llm.reset_on_nav"),
+				table.insert(generation_rows, {
+						label    = i18n.get("menu.llm.reset_on_nav"),
 						checked  = state.llm_reset_on_nav,
 						disabled = is_disabled or nil,
-						fn       = function()
+						action   = function()
 								state.llm_reset_on_nav = not state.llm_reset_on_nav
 								if keymap and type(keymap.set_llm_reset_on_nav) == "function" then pcall(keymap.set_llm_reset_on_nav, state.llm_reset_on_nav) end
 								save_prefs(); update_menu()
@@ -713,17 +714,17 @@ function M.create(deps)
 
 				local mw_min = tonumber(state.llm_min_words)
 				local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
-				table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
+				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, action = settings_mgr.set_min_words })
 				if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
-						table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
+						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, action = settings_mgr.reset_min_words })
 				end
 
 				local mw_max = tonumber(state.llm_max_words)
 				local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
-				table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
+				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, action = settings_mgr.set_max_words })
 				if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
 						local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-						table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
+						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, action = settings_mgr.reset_max_words })
 				end
 
 				TempPanel.build({
@@ -733,12 +734,12 @@ function M.create(deps)
 						save_prefs   = save_prefs,
 						update_menu  = update_menu,
 						settings_mgr = settings_mgr,
-				}, generation_menu)
+				}, generation_rows)
 
 				row_for("llm_generation_settings", {
 						title    = i18n.get("menu.llm.generation_menu_title"),
 						disabled = MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused),
-						menu     = generation_menu,
+						menu     = ManifestMenu.render_rows(generation_rows, "llm_generation_settings"),
 				})
 
 
@@ -758,7 +759,7 @@ function M.create(deps)
 
 				-- ===== Navigation submenu =====
 
-				local nav_menu_items = {}
+				local nav_rows = {}
 
 				local nav_mods = hs.settings.get("llm_nav_modifiers")
 				-- Fail closed to the canonical default on any non-table (corrupt/AHK plist),
@@ -772,20 +773,21 @@ function M.create(deps)
 
 				local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
 				local nav_title = format_shortcut_title(i18n.get("menu.llm.nav_label"), nav_mods, i18n.get("menu.llm.arrows_only"), i18n.get("menu.llm.arrows"))
-				table.insert(nav_menu_items, {
-						title    = nav_title,
+				table.insert(nav_rows, {
+						label    = nav_title,
 						disabled = (is_disabled or num_preds_safe < 2) or nil,
-						menu     = settings_mgr.build_nav_modifier_menu()
+						-- The modifier picker is settings_mgr's tree, handed over whole.
+						submenu  = settings_mgr.build_nav_modifier_menu()
 				})
 
 				local val_title = format_shortcut_title(string.format(i18n.get("menu.llm.val_label"), (num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)), val_mods, i18n.get("menu.llm.digits_only"), i18n.get("menu.llm.digits"))
-				table.insert(nav_menu_items, {
-						title    = val_title,
+				table.insert(nav_rows, {
+						label    = val_title,
 						disabled = (is_disabled or num_preds_safe < 2) or nil,
-						menu     = settings_mgr.build_val_modifier_menu()
+						submenu  = settings_mgr.build_val_modifier_menu()
 				})
 
-				row_for("llm_navigation", { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = nav_menu_items })
+				row_for("llm_navigation", { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = ManifestMenu.render_rows(nav_rows, "llm_navigation") })
 
 				-- One handler per declared row, each appending what was collected for
 				-- it. A row the manifest declares and this table does not answer is

@@ -21,6 +21,7 @@ local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
+local ManifestMenu   = require("infra.manifest_menu")
 
 local LOG = "api_panel"
 
@@ -61,7 +62,7 @@ end
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.
 --- @param ctx table Context with fields: state, paused, update_menu, WarmupCtrl.
 --- @return string|nil title   Title string for the parent row, or nil.
---- @return table|nil  menu    Populated api_menu table, or nil.
+--- @return table|nil  menu    The entries submenu, rendered from row data.
 function M.build(ctx)
 	local state       = ctx.state
 	local paused      = ctx.paused
@@ -75,7 +76,7 @@ function M.build(ctx)
 	local api_remote = llm_mod.api_remote
 	local entries    = (api_remote and api_remote.get_entries()) or {}
 	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
-	local api_menu   = {}
+	local rows       = {}
 
 
 	-- =====================================================
@@ -90,11 +91,11 @@ function M.build(ctx)
 			tostring(e.label or e.id or "?"),
 			tostring(e.model or "?"),
 			provider_label)
-		table.insert(api_menu, {
-			title    = entry_title,
+		table.insert(rows, {
+			label    = entry_title,
 			checked  = (e.id == active_id),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				api_remote.set_active_entry_id(e.id)
 				pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
 				WarmupCtrl.warmup("api_set_active")
@@ -104,7 +105,7 @@ function M.build(ctx)
 	end
 
 	if #entries > 0 then
-		table.insert(api_menu, { title = "-" })
+		table.insert(rows, { separator = true })
 	end
 
 
@@ -115,14 +116,14 @@ function M.build(ctx)
 	-- One "Add" entry per provider so the user picks the shape first
 	-- (Bearer auth vs x-api-key vs Gemini's URL token, plus the right
 	-- default model). Subsequent prompts collect the credentials.
-	local add_submenu = {}
+	local add_rows = {}
 	for _, pid in ipairs(api_remote.PROVIDER_ORDER) do
 		local p = api_remote.PROVIDERS[pid]
 		if p then
-			table.insert(add_submenu, {
-				title    = string.format("➕ %s", p.label),
+			table.insert(add_rows, {
+				label    = string.format("➕ %s", p.label),
 				disabled = paused or nil,
-				fn       = not paused and function()
+				action       = not paused and function()
 					local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
 					local function prompt_field(title_key, default_val, hint)
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
@@ -224,10 +225,10 @@ function M.build(ctx)
 		end
 	end
 
-	table.insert(api_menu, {
-		title    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
+	table.insert(rows, {
+		label    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
 		disabled = paused or nil,
-		menu     = add_submenu,
+		items    = add_rows,
 	})
 
 
@@ -240,12 +241,12 @@ function M.build(ctx)
 	-- configured so the user does not chase a no-op click.
 	local active_entry = api_remote and api_remote.get_active_entry() or nil
 	local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
-	table.insert(api_menu, {
-		title    = active_entry
+	table.insert(rows, {
+		label    = active_entry
 			and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
 			or  "🗑️ " .. i18n.get("menu.llm.api_remove_entry"),
 		disabled = (paused or (active_entry == nil)) or nil,
-		fn       = (not paused and active_entry) and function()
+		action       = (not paused and active_entry) and function()
 			-- Confirm before destroying — the saved token is gone for good once
 			-- we delete it. Worth one extra click in a small menu.
 			local ok_c, choice = pcall(dialog.block_alert,
@@ -283,7 +284,7 @@ function M.build(ctx)
 			(api_remote.PROVIDERS[active_entry.provider] and api_remote.PROVIDERS[active_entry.provider].label) or active_entry.provider)
 		or  "API — " .. i18n.get("menu.llm.api_no_entry")
 
-	return api_title, api_menu
+	return api_title, ManifestMenu.render_rows(rows, "llm_backend")
 end
 
 --- Builds the "active model" submenu when the remote API backend is selected.
@@ -300,13 +301,13 @@ function M.build_model_picker(ctx)
 	local api_remote = llm_mod.api_remote
 	local entries    = (api_remote and api_remote.get_entries()) or {}
 	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
-	local menu       = {}
+	local rows       = {}
 
-	table.insert(menu, {
-		title   = i18n.get("menu.llm.no_model"),
+	table.insert(rows, {
+		label   = i18n.get("menu.llm.no_model"),
 		checked = (active_id == "" or active_id == nil),
 		disabled = paused or nil,
-		fn      = not paused and function()
+		action      = not paused and function()
 			if api_remote and api_remote.set_active_entry_id then
 				api_remote.set_active_entry_id("")
 				state.llm_model = ""
@@ -318,7 +319,7 @@ function M.build_model_picker(ctx)
 	})
 
 	if #entries > 0 then
-		table.insert(menu, { title = "-" })
+		table.insert(rows, { separator = true })
 	end
 
 	for _, e in ipairs(entries) do
@@ -327,11 +328,11 @@ function M.build_model_picker(ctx)
 			tostring(e.label or e.id or "?"),
 			tostring(e.model or "?"),
 			provider_label)
-		table.insert(menu, {
-			title    = entry_title,
+		table.insert(rows, {
+			label    = entry_title,
 			checked  = (e.id == active_id),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				api_remote.set_active_entry_id(e.id)
 				state.llm_model = tostring(e.model or "")
 				pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
@@ -341,7 +342,7 @@ function M.build_model_picker(ctx)
 		})
 	end
 
-	return menu
+	return ManifestMenu.render_rows(rows, "llm_model")
 end
 
 return M
