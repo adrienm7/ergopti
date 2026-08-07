@@ -241,7 +241,7 @@ const BASELINE = {
 	// the six delay entries inside it.
 	// 58 → 55: the locale rows. They are provider data now, and the tick is the
 	// tray's own check item instead of a "✓" glued to a translated label.
-	linux: 55
+	linux: 53
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
@@ -262,9 +262,12 @@ const BASELINE = {
 const MIN_TOTAL = {
 	windows: 180,
 	macos: 220,
-	// linux lowered 80 → 55 on 2026-08-06, same reason as macOS above: the
-	// predicate keys on `title =` and every migration moves rows to `label =`.
-	linux: 55
+	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
+	// for the reason given for macOS above: the predicate keys on `title =`, so
+	// every successful migration shrinks the total by construction and the floor
+	// eventually fires on progress. 30 is below what a driver with a fully
+	// migrated menu would still show, not merely under today's number.
+	linux: 30
 };
 
 const DRIVER_SPEC = {

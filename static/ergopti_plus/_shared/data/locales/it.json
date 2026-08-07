@@ -2427,6 +2427,7 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "La barra di ciascun driver porta le righe di primo livello che la sua piattaforma ha: gli strumenti per le applicazioni su macOS e Linux, l'aggiornamento integrato su Linux, l'interruttore di sospensione su Windows. Gli altri raggiungono lo stesso altrove, o per nulla.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "La riga c'è su ogni driver; solo alcuni possono dichiararla. Questo interruttore è costruito dal driver stesso, e il renderer di Windows — a differenza di quello condiviso — disegna anche un interruttore dichiarato, quindi elencarlo per quella piattaforma mostrerebbe l'interruttore due volte.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Non su Windows: quel driver disegna l'icona di una bandiera su ogni riga di lingua, e una riga di menu condivisa porta un'etichetta, una spunta, un'azione e un sottomenu — non un'icona. Dichiarare qui quella riga significherebbe scambiare le bandiere con una descrizione condivisa.",
+	"platform_reason.apps_menu_holds_what_each_platform_offers": "I due driver che hanno questo menu ci mettono cose diverse sotto lo stesso titolo: macOS elenca le applicazioni incluse che trova su disco e le avvia, mentre Linux non ne distribuisce alcuna e lo usa per le impostazioni delle hotstring per applicazione. Windows non ha né l'una né l'altra.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Modifica categoria",
 	"menu.llm.generation.temperature": "Temperatura",

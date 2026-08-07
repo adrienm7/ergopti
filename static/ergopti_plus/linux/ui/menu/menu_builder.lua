@@ -2256,28 +2256,39 @@ local function _build_gestures(ctx)
 end
 
 --- Builds the apps submenu (per-app configs via webview).
+---
+--- Two `command` rows and the separator between them are declared since
+--- 2026-08-07; this driver supplies only what each does. The menu had no
+--- description at all, and macOS puts something else entirely under the same
+--- title — which the declaration now says, with its reason.
 local function _build_apps(ctx)
-	return { title = i18n_safe("menu.apps.title"), menu = {
-		{
-			title = i18n_safe("menu.apps.config_per_app"),
-			fn = function()
-				if ctx.webview then
-					ctx.webview.show("hotstrings_config_window")
-					Logger.info(LOG, "Opening hotstrings config window.")
-				else
-					Logger.info(LOG, "[stub] Webview manager not available — cannot open hotstrings config.")
-				end
-			end,
-		},
-		{ title = "-" },
-		-- Was a hardcoded French string, so every non-French user read one French
-		-- row in an otherwise translated menu. Found on 2026-08-03 while giving
-		-- the manifest its Linux dimension; the key already existed and is the
-		-- one the other two drivers use for the same row.
-		{ title = i18n_safe("menu.global.config_folder"), fn = function()
-			if ctx.on_open_config then ctx.on_open_config() end
-		end },
-	}}
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["apps_per_app_config"] = function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager — the per-application settings cannot open.")
+				return
+			end
+			ctx.webview.show("hotstrings_config_window")
+			Logger.info(LOG, "Opening hotstrings config window.")
+		end,
+		-- The label was a hardcoded French string until 2026-08-03, so every
+		-- non-French user read one French row in an otherwise translated menu. The
+		-- key existed all along and is the one the other two drivers use.
+		["apps_config_folder"] = function()
+			if type(ctx.on_open_config) ~= "function" then
+				Logger.error(LOG, "ctx.on_open_config is absent — the row does nothing.")
+				return
+			end
+			ctx.on_open_config()
+		end,
+	}
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("apps_menu", "Apps", nil, nil, render_ctx)
+		or {}
+	return { title = i18n_safe("menu.apps.title"), menu = rows }
 end
 
 --- Builds the global actions submenu.

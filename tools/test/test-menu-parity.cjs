@@ -99,6 +99,10 @@ const OPENS_SUBMENU = {
 	// which is every driver — the DECLARATION is narrower than that, and says why
 	// in its own reason_key rather than through this map.
 	language: 'language_menu',
+	// The Applications submenu. Its rows inherit `top_level/apps`'s visibility —
+	// macOS and Linux — and each declaration inside is narrower than that, for the
+	// reason each carries.
+	apps: 'apps_menu',
 	// macOS's tap-hold and chord engine, as kanata is Linux's. Mapped for the
 	// same reason: its rows inherit `top_level/karabiner`'s own macOS-only
 	// visibility instead of each of the twelve repeating "macOS only", which
@@ -528,7 +532,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // hs 9 → 10, linux 10 → 11 on 2026-08-07: the language selector. Three drivers
 // listed the same twenty-one locales from the same shared catalogue into a menu
 // nothing described.
-const RENDERED_THROUGH_SHARED = { hs: 10, linux: 11 };
+// hs 10 → 11, linux 11 → 12 on 2026-08-07: the Applications submenu, which had
+// no declaration at all and holds different things on the two drivers that have
+// it — said out loud now, with the reason attached.
+const RENDERED_THROUGH_SHARED = { hs: 11, linux: 12 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

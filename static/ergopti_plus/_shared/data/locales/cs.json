@@ -2427,6 +2427,7 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Oznamovací oblast každého ovladače nese řádky nejvyšší úrovně, které jeho platforma má: nástroje aplikací na macOS a Linuxu, vestavěný aktualizátor na Linuxu, přepínač pozastavení na Windows. Ostatní se k témuž dostanou jinudy, nebo vůbec.",
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Řádek je na každém ovladači; deklarovat jej smějí jen některé. Tento vypínač si staví ovladač sám a vykreslovač na Windows — na rozdíl od sdíleného — deklarovaný přepínač také kreslí, takže uvedení pro tuto platformu by ukázalo vypínač dvakrát.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ne na Windows: ten ovladač kreslí na každém řádku jazyka ikonu vlajky, a sdílený řádek nabídky nese popisek, zaškrtnutí, akci a podnabídku — nikoli ikonu. Deklarovat tento řádek tam by znamenalo vyměnit vlajky za sdílený popis.",
+	"platform_reason.apps_menu_holds_what_each_platform_offers": "Dva ovladače, které tuto nabídku mají, pod stejným názvem nabízejí jiné věci: macOS vypisuje přibalené aplikace, které najde na disku, a spouští je, zatímco Linux žádné takové nepřináší a používá ji pro nastavení hotstringů po aplikacích. Windows nemá ani jedno.",
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii",
 	"menu.llm.generation.temperature": "Teplota",
