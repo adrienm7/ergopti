@@ -3593,9 +3593,20 @@ reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
+# `check` since 2026-08-07, and the conversion settled a divergence nobody could
+# see: this row read "Encrypt logs on disk (Security)" on Windows and macOS and
+# "Encrypt data at rest" on Linux. Two labels for one switch, because each driver
+# picked its own key from a declaration that named neither.
+#
+# `menu.metrics.encrypt_toggle` wins because it says WHAT is encrypted — the logs
+# on disk — where the other names a category. `checked_when` closes the second
+# half of the same gap: the row had no predicate, so all three computed the tick
+# themselves, which the Linux builder had a comment apologising for.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "encryption"
+i18n = "menu.metrics.encrypt_toggle"
+checked_when = ["metrics_encrypt_enabled"]
 disabled_when = ["keylogger_enabled"]
 
 # The readouts this driver answers in its log rather than in a window. They are

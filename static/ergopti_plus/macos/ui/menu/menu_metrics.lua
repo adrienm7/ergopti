@@ -147,6 +147,7 @@ function M.build(ctx)
 		-- the tick through these instead of the handler setting it.
 		metrics_menubar_wpm    = function() return state.keylogger_menubar_wpm end,
 		metrics_menubar_colors = function() return state.keylogger_menubar_colors end,
+		metrics_encrypt_enabled = function() return state.keylogger_encrypt end,
 	}
 
 	-- `command` rows since 2026-08-07: the label and the greying are the
@@ -411,45 +412,38 @@ function M.build(ctx)
 		})
 	end
 
-	local function dyn_encryption(items, _ctx)
+	local function cmd_encryption()
 		-- This entry used to call two empty stubs: it ticked its box, persisted
 		-- the setting, and encrypted nothing, while docs/security told users to
 		-- enable it. It also collected *.log.gz files — a storage format retired
 		-- when persistence moved to SQLite. It is now a plain toggle over the
 		-- real backend, and it refuses to tick when no key can be derived.
 		local TextCipher = require("modules.keylogger.text_cipher")
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.encrypt_toggle"),
-			checked  = state.keylogger_encrypt,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "encryption", STATE_GETTERS),
-			fn       = function()
-				local want = not state.keylogger_encrypt
-				if want and not TextCipher.is_available() then
-					-- Existing keys, already translated in all 21 locales: the only
-					-- way the key derivation fails on a Mac is a missing openssl,
-					-- which is exactly what this message says.
-					dialog.block_alert(
-						i18n.get("dialog.metrics.encryptor_error_title"),
-						i18n.get("apps.encryptor.err_openssl_missing"),
-						i18n.get("button.ok"))
-					return
-				end
-				TextCipher.set_enabled(want)
-				state.keylogger_encrypt = want
-				save_prefs()
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_options) == "function" then
-					Keylogger.set_options({ encrypt = want })
-				end
-				-- The rows already stored predate this click, and the setting is
-				-- worthless to a user with a year of logs unless they are converted
-				-- too. The cipher is flipped FIRST: encrypt() returns the plaintext
-				-- untouched while the toggle is off, so a pass started before it
-				-- would convert nothing and report success.
-				require("modules.keylogger.text_migration").start_for_posture(want)
-				updateMenu()
-			end,
-		})
+		local want = not state.keylogger_encrypt
+		if want and not TextCipher.is_available() then
+			-- Existing keys, already translated in all 21 locales: the only
+			-- way the key derivation fails on a Mac is a missing openssl,
+			-- which is exactly what this message says.
+			dialog.block_alert(
+				i18n.get("dialog.metrics.encryptor_error_title"),
+				i18n.get("apps.encryptor.err_openssl_missing"),
+				i18n.get("button.ok"))
+			return
+		end
+		TextCipher.set_enabled(want)
+		state.keylogger_encrypt = want
+		save_prefs()
+		local Keylogger = require("modules.keylogger")
+		if type(Keylogger.set_options) == "function" then
+			Keylogger.set_options({ encrypt = want })
+		end
+		-- The rows already stored predate this click, and the setting is
+		-- worthless to a user with a year of logs unless they are converted
+		-- too. The cipher is flipped FIRST: encrypt() returns the plaintext
+		-- untouched while the toggle is off, so a pass started before it
+		-- would convert nothing and report success.
+		require("modules.keylogger.text_migration").start_for_posture(want)
+		updateMenu()
 	end
 
 
@@ -465,7 +459,6 @@ function M.build(ctx)
 		widget_colors    = dyn_widget_colors,
 		include_realtime = dyn_include_realtime,
 		reset_wpm_position = dyn_reset_wpm_position,
-		encryption       = dyn_encryption,
 	}
 
 	-- The declarative rows read their state and their behaviour off the
@@ -477,6 +470,7 @@ function M.build(ctx)
 		["filter_private"] = cmd_filter_private,
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
+		["encryption"]     = cmd_encryption,
 		["show_typing"]    = cmd_show_typing,
 		["show_apps"]      = cmd_show_apps,
 		["wpm_menubar"]    = cmd_wpm_menubar,

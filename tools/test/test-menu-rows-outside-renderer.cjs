@@ -225,7 +225,7 @@ const MEASURE = process.argv.includes('--measure');
 // supplies just the toggle and the state behind the tick. All three fall
 // together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 176,
+	windows: 175,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -255,7 +255,9 @@ const BASELINE = {
 	// are, so a group builder hands over DATA instead of a finished tree.
 	// 120 → 118, windows 178 → 176: the two metrics window buttons. A label, a
 	// greying rule and a click — declared `command` now, built once each.
-	macos: 118,
+	// 118 → 117, windows 176 → 175: the at-rest encryption switch, which also
+	// stopped reading under two different names on the three drivers.
+	macos: 117,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
