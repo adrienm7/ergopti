@@ -800,7 +800,12 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	}
 }
 
-; Dynamic handler: bundled extension hotstrings.
+; List provider: bundled extension hotstrings, as nested row DATA.
+;
+; Nothing here mutates the live menu — every leaf is either a label or « open the
+; file » — and the tree is exactly three levels deep (extension → TOML → its
+; sections), which is what the renderer allows. So since 2026-08-07 the renderer
+; builds all of it, and this only answers what the rows are.
 _HS_ExtensionRows() {
 	global _HS_ExtensionsCache
 	Rows := []
@@ -809,43 +814,38 @@ _HS_ExtensionRows() {
 	_HS_PreScanExtensions()
 	BundledExtensions := _HS_ExtensionsCache
 	if (BundledExtensions.Length == 0) {
-		EmptyLabel := t("menu.extensions.empty")
-		Rows.Push(Map("label", EmptyLabel, "disabled", true))
-	} else {
-		for _, Ext in BundledExtensions {
-			ExtHsMenu    := Menu()
-			ExtTotalForExt := 0
-			for _, TF in Ext.toml_files
-				ExtTotalForExt += TF.count
-			if (Ext.toml_files.Length == 0) {
-				NoHsLabel := t("menu.extensions.empty")
-				ExtHsMenu.Add(NoHsLabel, (*) => NoAction())
-				ExtHsMenu.Disable(NoHsLabel)
-			} else {
-				for _, TF in Ext.toml_files {
-					TFMenu := Menu()
-					RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-					if (TF.sections.Length == 0) {
-						TFMenu.Add()
-						NoSecLabel := t("menu.extensions.empty")
-						TFMenu.Add(NoSecLabel, (*) => NoAction())
-						TFMenu.Disable(NoSecLabel)
-					} else {
-						TFMenu.Add()
-						for _, Sec in TF.sections {
-							SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
-							TFMenu.Add(SecLabel, (*) => NoAction())
-							TFMenu.Disable(SecLabel)
-						}
+		return [Map("label", t("menu.extensions.empty"), "disabled", true)]
+	}
+	for _, Ext in BundledExtensions {
+		ExtRows := []
+		ExtTotalForExt := 0
+		for _, TF in Ext.toml_files
+			ExtTotalForExt += TF.count
+		if (Ext.toml_files.Length == 0) {
+			ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
+		} else {
+			for _, TF in Ext.toml_files {
+				TFRows := [
+					Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path)),
+					Map("separator", true)
+				]
+				if (TF.sections.Length == 0) {
+					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
+				} else {
+					for _, Sec in TF.sections {
+						TFRows.Push(Map(
+							"label",    Sec["description"] . " (" . FmtCount(Sec["count"]) . ")",
+							"disabled", true))
 					}
-					TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
-					ExtHsMenu.Add(TFTitle, TFMenu)
 				}
+				ExtRows.Push(Map(
+					"label", TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+					"items", TFRows))
 			}
-			Rows.Push(Map(
-				"label",   Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""),
-				"submenu", ExtHsMenu))
 		}
+		Rows.Push(Map(
+			"label", Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""),
+			"items", ExtRows))
 	}
 	return Rows
 }
