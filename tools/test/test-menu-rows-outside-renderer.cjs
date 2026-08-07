@@ -158,10 +158,17 @@ const MEASURE = process.argv.includes('--measure');
 // nobody — the rows were built in place, so the declaration named a slot the
 // driver never filled and no gate could see it until the handler gate learned to
 // look at `list` rows too.
+//
+// windows 197 → 196, macos 274 → 262, linux 86 → 84: the wrap-symbol picker.
+// The manifest called it platforms = ["ahk"] and all three drivers had been
+// building it — the third time that exact shape has been found here, a
+// restriction recording who wrote the feature first rather than what the
+// platforms can do. It also settled WHERE it hangs: Windows and Linux showed it
+// as a sibling row, macOS as a submenu of the wrap-text toggle.
 const BASELINE = {
-	windows: 197,
-	macos: 274,
-	linux: 86
+	windows: 196,
+	macos: 262,
+	linux: 84
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

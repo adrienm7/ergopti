@@ -32,7 +32,6 @@ _BuildShortcutsSubmenu() {
 		"script_control_shortcuts",   (M, C) => _SC_ScriptControl(M, C),
 		"extensions_shortcuts",       (M, C) => _SC_Extensions(M, C),
 		"edit_shortcuts",             (M, C) => _SC_EditAction(M, C),
-		"wrap_symbols_menu",          (M, C) => _SC_WrapSymbols(M, C),
 	)
 
 	; The keyboard slots are a list, not a group: their rows are the user's own
@@ -42,6 +41,7 @@ _BuildShortcutsSubmenu() {
 	; updater-driven tray refresh
 	ListProviders := Map(
 		"keyboard_slots",             () => KeyboardSlotRows(),
+		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
 	)
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders)
@@ -148,9 +148,16 @@ _SC_EditAction(SubMenu, _Cat) {
 
 ; Dynamic handler: wrap-symbols submenu (toggles per built-in symbol + custom pairs).
 ; Attached as an indented sub-item directly below the wrap_text_if_selected feature row.
-_SC_WrapSymbols(SubMenu, _Cat) {
-	Sub := _WS_BuildSymbolsMenu()
-	SubMenu.Add(t("menu.shortcuts.wrap_symbols_title"), Sub)
+; List provider: the wrap-symbol picker, as a ROW.
+;
+; The manifest called this row Windows-only until 2026-08-06 — and macOS and
+; Linux had both been drawing it all along, in a different place each. It is one
+; shared `list` row now; the tree behind it is still this driver's native Menu,
+; handed over through the renderer's `submenu` field.
+_SC_WrapSymbolRows() {
+	return [Map(
+		"label",   t("menu.shortcuts.wrap_symbols_title"),
+		"submenu", _WS_BuildSymbolsMenu())]
 }
 
 ; Build the full wrap-symbols menu (called by _SC_WrapSymbols and on every initMenu refresh).

@@ -434,7 +434,10 @@ for (const menuKey of MENU_KEYS) {
 //        restriction was true when written — that driver had no floating widget
 //        at all — and stopped being true when linux/ui/wpm/widget.lua drew one on
 //        the GTK surface the preview bubble already uses.
-const UNREASONED_BASELINE = 37;
+//   37 → 36 on 2026-08-06 when wrap_symbols_menu stopped claiming to be
+//        Windows-only. macOS and Linux had both been drawing the picker the
+//        whole time, in a different position each; it is one shared row now.
+const UNREASONED_BASELINE = 36;
 
 if (unreasoned.length > UNREASONED_BASELINE) {
 	errors.push(

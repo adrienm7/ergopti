@@ -155,33 +155,33 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 
 	-- Bulk actions
 	sub[#sub + 1] = {
-		title    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
+		label    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = true end
 			state.wrap_symbol_states = sym_states
 			ctx.save_prefs(); ctx.updateMenu()
 		end or nil,
 	}
 	sub[#sub + 1] = {
-		title    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
+		label    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = false end
 			state.wrap_symbol_states = sym_states
 			ctx.save_prefs(); ctx.updateMenu()
 		end or nil,
 	}
 	sub[#sub + 1] = {
-		title    = i18n.get("menu.global.reset_defaults"),
+		label    = i18n.get("menu.global.reset_defaults"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			state.wrap_symbol_states  = {}
 			state.custom_wrap_symbols = {}
 			ctx.save_prefs(); ctx.updateMenu()
 		end or nil,
 	}
-	sub[#sub + 1] = { title = "-" }
+	sub[#sub + 1] = { separator = true }
 
 	-- Built-in symbols — each shared-catalogue group becomes its own named nested
 	-- sub-submenu so the top-level list stays short. Every group sub-submenu also
@@ -199,9 +199,9 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		local group_items = {}
 		-- Per-group bulk actions
 		group_items[#group_items + 1] = {
-			title    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
+			label    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
 			disabled = paused or nil,
-			fn       = not paused and (function(lefts)
+			action       = not paused and (function(lefts)
 				return function()
 					state.wrap_symbol_states = state.wrap_symbol_states or {}
 					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = true end
@@ -210,9 +210,9 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			end)(group_lefts) or nil,
 		}
 		group_items[#group_items + 1] = {
-			title    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
+			label    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
 			disabled = paused or nil,
-			fn       = not paused and (function(lefts)
+			action       = not paused and (function(lefts)
 				return function()
 					state.wrap_symbol_states = state.wrap_symbol_states or {}
 					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = false end
@@ -220,7 +220,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				end
 			end)(group_lefts) or nil,
 		}
-		group_items[#group_items + 1] = { title = "-" }
+		group_items[#group_items + 1] = { separator = true }
 
 		-- One toggle per opening symbol in the group
 		for _, pair in ipairs(group_pairs) do
@@ -229,10 +229,10 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					and pair.left
 					or  (pair.left .. " … " .. pair.right)
 			group_items[#group_items + 1] = {
-				title    = lbl,
+				label    = lbl,
 				checked  = enabled or nil,
 				disabled = paused or nil,
-				fn       = not paused and (function(k)
+				action       = not paused and (function(k)
 					return function()
 						state.wrap_symbol_states      = state.wrap_symbol_states or {}
 						state.wrap_symbol_states[k]   = not (state.wrap_symbol_states[k] ~= false)
@@ -247,7 +247,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				or i18n.get("menu.shortcuts.wrap_symbols_title")
 		-- Check the parent group item when all of its symbols are enabled.
 		sub[#sub + 1] = {
-			title   = group_title,
+			label   = group_title,
 			menu    = group_items,
 			checked = group_all_on or nil,
 		}
@@ -255,7 +255,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 
 	-- Custom symbols — individual entries with a delete submenu
 	if #custom_syms > 0 then
-		sub[#sub + 1] = { title = "-" }
+		sub[#sub + 1] = { separator = true }
 		for idx, cs in ipairs(custom_syms) do
 			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
 				local right   = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
@@ -263,24 +263,24 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				cs_lbl = cs_lbl .. " : " .. i18n.get("menu.shortcuts.wrap_symbols_custom_label")
 				local del_sub = {
 					{
-						title = i18n.get("button.delete"),
-						fn    = (function(i) return function()
+						label = i18n.get("button.delete"),
+						action    = (function(i) return function()
 							table.remove(state.custom_wrap_symbols, i)
 							ctx.save_prefs(); ctx.updateMenu()
 						end end)(idx),
 					},
 				}
-				sub[#sub + 1] = { title = cs_lbl, menu = del_sub }
+				sub[#sub + 1] = { label = cs_lbl, menu = del_sub }
 			end
 		end
 	end
 
 	-- Add custom symbol button
-	sub[#sub + 1] = { title = "-" }
+	sub[#sub + 1] = { separator = true }
 	sub[#sub + 1] = {
-		title    = i18n.get("menu.shortcuts.wrap_symbols_add_custom"),
+		label    = i18n.get("menu.shortcuts.wrap_symbols_add_custom"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			-- 1. Ask for opening symbol
 			local left_char
 			while true do
@@ -637,9 +637,10 @@ function M.build(ctx)
 	end
 	if wrap_item then
 		if #top_items > 0 then table.insert(top_items, { title = "-" }) end
-		-- Attach the symbols submenu so the user can toggle/add/remove symbols,
-		-- and wire the live getter into the eventtap at build time.
-		wrap_item.menu = build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
+		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
+		-- have always shown it — the same feature was sitting in two different
+		-- places depending on the OS.
 		table.insert(top_items, wrap_item)
 	end
 
@@ -663,6 +664,14 @@ function M.build(ctx)
 	-- assignments, so the manifest can name the section but not enumerate it. The
 	-- provider returns row DATA and the renderer draws it.
 	local list_providers = {
+		-- Its rows are the user's own symbol pairs, so no static entry can
+		-- enumerate them — and the manifest called this Windows-only until
+		-- 2026-08-06 while this driver had been building it all along.
+		["wrap_symbols_menu"] = function()
+			return { { label = i18n.get("menu.shortcuts.wrap_symbols"),
+			           disabled = not state.shortcuts or paused or nil,
+			           items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) } }
+		end,
 		keyboard_slots = function(_ctx)
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
 		end,
