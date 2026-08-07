@@ -95,6 +95,11 @@ const OPENS_SUBMENU = {
 	// having to repeat it — the same reason tap_holds_menu's children do not each
 	// carry "Windows only".
 	kanata: 'kanata_menu',
+	// macOS's tap-hold and chord engine, as kanata is Linux's. Mapped for the
+	// same reason: its rows inherit `top_level/karabiner`'s own macOS-only
+	// visibility instead of each of the twelve repeating "macOS only", which
+	// would turn a real signal into noise nobody reads.
+	karabiner: 'karabiner_menu',
 	updates: 'updates_menu',
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
@@ -478,7 +483,13 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // here. A driver that does not READ a manifest section cannot notice a row it
 // fails to build, which is why "is this menu on the renderer" is worth counting
 // separately from "how many of its rows the renderer materialises".
-const RENDERED_THROUGH_SHARED = { hs: 4, linux: 9 };
+// hs raised 4 → 5 on 2026-08-06: the Karabiner submenu, the largest hand-built
+// menu in the project at thirty-six rows and the last one with NOTHING in the
+// manifest describing it. Its shape is declared now — process control, the
+// destructive resets, the timings, then tap-holds and chords under headers of
+// their own — which is also the split the maintainer asked for: the two families
+// used to run together under one heading.
+const RENDERED_THROUGH_SHARED = { hs: 5, linux: 9 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
