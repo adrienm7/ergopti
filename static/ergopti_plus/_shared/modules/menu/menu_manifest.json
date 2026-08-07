@@ -1347,7 +1347,7 @@
 			]
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "reset_defaults",
 			"i18n": "tap_hold.reset_defaults",
 			"platforms": [
@@ -1355,7 +1355,7 @@
 			]
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "disable_all",
 			"i18n": "tap_hold.disable_all",
 			"platforms": [
@@ -1369,7 +1369,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "tap_hold_keys",
 			"platforms": [
 				"ahk"

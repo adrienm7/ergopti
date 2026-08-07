@@ -4057,14 +4057,19 @@ i18n_off = "menu.tapholds.off"
 category = "TapHolds"
 platforms = ["ahk"]
 
+# `command` since 2026-08-07, not `action`. Both were handlers whose whole body
+# was "add a button, and log that the action just happened" — at MENU BUILD time,
+# so the log claimed every tap-hold override had been reset each time the user
+# opened the tray. The declaration draws the button now and the log moved to the
+# function that does the work.
 [[menu.tap_holds_menu]]
-type = "action"
+type = "command"
 id = "reset_defaults"
 i18n = "tap_hold.reset_defaults"
 platforms = ["ahk"]
 
 [[menu.tap_holds_menu]]
-type = "action"
+type = "command"
 id = "disable_all"
 i18n = "tap_hold.disable_all"
 platforms = ["ahk"]
@@ -4073,8 +4078,11 @@ platforms = ["ahk"]
 type = "---"
 platforms = ["ahk"]
 
+# `list` since 2026-08-07: one row per configurable key, each holding its
+# disable / tap-picker / hold-picker rows, and the hold picker holding its
+# options. The renderer builds all three levels from the provider's data.
 [[menu.tap_holds_menu]]
-type = "dynamic"
+type = "list"
 id = "tap_hold_keys"
 platforms = ["ahk"]
 
