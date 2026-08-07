@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Rækken findes på alle drivere; kun nogle må erklære den. Denne til/fra-kontakt bygges af driveren selv, og Windows-rendereren tegner — i modsætning til den delte — også en erklæret kontakt, så at nævne den for den platform ville vise kontakten to gange.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driver tegner et flagikon på hver sproglinje, og en delt menurække bærer en etiket, et flueben, en handling og en undermenu — ikke et ikon. At erklære rækken dér ville bytte flagene væk for en fælles beskrivelse.",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "De to drivere, der har denne menu, lægger forskellige ting under samme titel: macOS viser de medfølgende programmer, den finder på disken, og starter dem, mens Linux ikke leverer nogen og bruger den til hotstring-indstillinger pr. program. Windows har ingen af delene.",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Kun Linux: denne driver læser rå tastekoder fra kernen og skal vide, hvilket fysisk layout der frembragte dem, så den vælger den tabel, den afkoder med. macOS spørger systemet om dets inputkilder, og Windows installerer et tastaturlayout; ingen af dem har en afkodningstabel at vælge.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",

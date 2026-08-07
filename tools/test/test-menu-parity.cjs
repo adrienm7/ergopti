@@ -535,7 +535,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // hs 10 → 11, linux 11 → 12 on 2026-08-07: the Applications submenu, which had
 // no declaration at all and holds different things on the two drivers that have
 // it — said out loud now, with the reason attached.
-const RENDERED_THROUGH_SHARED = { hs: 11, linux: 12 };
+// linux 12 → 13 on 2026-08-07: the layout submenu, the last one this driver did
+// not read the manifest for. Its rows came from two names written into the
+// builder while the decoder already owned the list.
+const RENDERED_THROUGH_SHARED = { hs: 11, linux: 13 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

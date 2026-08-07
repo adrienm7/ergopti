@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "この項目はどのドライバーにもありますが、宣言してよいのは一部だけです。オンオフの切り替えはドライバー自身が作り、Windows の描画側は——共有のものと違って——宣言された切り替えも描くため、そのプラットフォーム向けに並べると切り替えが二つ現れます。",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows では非対応：あのドライバーは各言語の行に国旗アイコンを描きますが、共有のメニュー行が持つのはラベル、チェック、動作、サブメニューであってアイコンではありません。そちらでこの行を宣言することは、国旗を共通の記述と引き換えにすることになります。",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "このメニューを持つ二つのドライバーは、同じ見出しの下に別のものを置いています。macOS はディスク上に見つかった同梱アプリケーションを並べて起動し、Linux はそうした同梱物を持たず、アプリケーションごとのホットストリング設定に使います。Windows にはどちらもありません。",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Linux のみ：このドライバーはカーネルから生のキーコードを読み取り、それがどの物理配列から出たものかを知る必要があるため、復号に使う表を選びます。macOS はシステムに入力ソースを尋ね、Windows はキーボード配列を導入します。どちらにも選ぶべき復号表はありません。",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",
 	"menu.llm.generation.temperature": "温度",

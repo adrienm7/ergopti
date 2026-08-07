@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "De rij staat op elke driver; alleen sommige mogen haar declareren. Deze aan/uit-schakelaar wordt door de driver zelf gebouwd, en de Windows-renderer tekent — anders dan de gedeelde — ook een gedeclareerde schakelaar, dus vermelding voor dat platform zou de schakelaar twee keer tonen.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Niet op Windows: die driver tekent een vlagpictogram op elke taalrij, en een gedeelde menurij draagt een label, een vinkje, een actie en een submenu — geen pictogram. De rij daar declareren zou de vlaggen inruilen voor een gedeelde beschrijving.",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "De twee drivers die dit menu hebben, zetten er verschillende dingen onder dezelfde titel in: macOS toont de meegeleverde toepassingen die het op schijf vindt en start ze, terwijl Linux die niet meelevert en het gebruikt voor hotstring-instellingen per toepassing. Windows heeft geen van beide.",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Alleen Linux: deze driver leest ruwe toetscodes van de kernel en moet weten welke fysieke indeling ze voortbracht, dus kiest hij de tabel waarmee hij decodeert. macOS vraagt het systeem om zijn invoerbronnen en Windows installeert een toetsenbordindeling; geen van beide heeft een decodeertabel te kiezen.",
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",

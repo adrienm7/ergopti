@@ -897,6 +897,14 @@
 		},
 		{
 			"type": "list",
+			"id": "base_layouts",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
+		},
+		{
+			"type": "list",
 			"id": "layout_bundle",
 			"platforms": [
 				"hs"
