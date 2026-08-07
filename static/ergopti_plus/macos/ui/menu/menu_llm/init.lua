@@ -16,6 +16,7 @@ local hs            = hs
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
+local MenuUtils     = require("ui.menu.menu_utils")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Models        = require("ui.menu.menu_llm.models_manager")
@@ -623,11 +624,13 @@ function M.create(deps)
 						end
 				end
 
-				table.insert(main_menu, {
-						title    = rich_model_title,
+				-- Held for the `llm_models` provider below rather than inserted here:
+				-- the manifest places this row, and did so for a slot nobody filled.
+				local model_row = {
+						label    = rich_model_title,
 						disabled = MenuLayout.row_disabled("model", is_disabled, paused),
-						menu     = model_submenu,
-				})
+						items    = MenuUtils.rows_from_menu(model_submenu),
+				}
 
 				if info and info.emojis and info.emojis:find("🧠💭") then
 						table.insert(main_menu, { title = i18n.get("menu.llm.thinking_model_info"), disabled = true })
@@ -714,7 +717,27 @@ function M.create(deps)
 						settings_mgr = settings_mgr,
 				}, generation_menu)
 
-				table.insert(main_menu, { title = i18n.get("menu.llm.generation_menu_title"), disabled = MenuLayout.row_disabled("generation", is_disabled, paused), menu = generation_menu })
+				local generation_row = {
+						label    = i18n.get("menu.llm.generation_menu_title"),
+						disabled = MenuLayout.row_disabled("generation", is_disabled, paused),
+						items    = MenuUtils.rows_from_menu(generation_menu),
+				}
+
+				-- The two declared rows, placed by the SHARED renderer — with the
+				-- separator the manifest puts between them, which this file used to
+				-- write out itself.
+				do
+						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+						if ok_mm and type(ManifestMenu.build) == "function" then
+								local rendered = ManifestMenu.build("llm_menu", "LLM", nil, nil, ctx, {
+										["llm_models"]     = function() return { model_row } end,
+										["llm_generation"] = function() return { generation_row } end,
+								})
+								for _, row in ipairs(rendered or {}) do table.insert(main_menu, row) end
+						else
+								Logger.error(LOG, "Manifest renderer unavailable — the model and generation rows are not rendered.")
+						end
+				end
 
 
 				-- ===== Display submenu =====

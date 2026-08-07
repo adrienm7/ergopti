@@ -495,7 +495,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // hs raised 5 → 6: the keyboard-layout menu. It renders the manifest's own
 // rows now — the section header, its separators, and the active-layouts list
 // that was declared for macOS and answered by nobody.
-const RENDERED_THROUGH_SHARED = { hs: 6, linux: 9 };
+// hs raised 6 → 7: the LLM menu. Its two declared rows — the model picker and
+// the generation settings — were built in place, and the separator the manifest
+// puts between them was written out by hand as well.
+const RENDERED_THROUGH_SHARED = { hs: 7, linux: 9 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

@@ -91,4 +91,13 @@ function M.as_provider_row(row)
 	return out
 end
 
+--- Converts a whole hs.menubar subtree to provider rows.
+--- @param menu table Array of hs.menubar-shaped rows.
+--- @return table
+function M.rows_from_menu(menu)
+	local out = {}
+	for index, row in ipairs(menu or {}) do out[index] = M.as_provider_row(row) end
+	return out
+end
+
 return M

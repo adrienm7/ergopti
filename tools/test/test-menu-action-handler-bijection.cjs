@@ -101,7 +101,9 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // hs 7 → 6: active_layouts is answered now — macOS's keyboard-layout menu
 // renders the manifest's own rows through the shared renderer instead of
 // building that list in place.
-const BASELINE = { ahk: 1, hs: 6, linux: 0 };
+// hs 6 → 5: llm_models is answered — macOS places its model row through the
+// shared renderer now instead of inserting it in place.
+const BASELINE = { ahk: 1, hs: 5, linux: 0 };
 
 // The manifest types that name a behaviour the driver must register: `action`
 // and `dynamic` hand the id to a handler, `list` to a provider, `check` and
