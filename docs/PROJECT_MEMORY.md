@@ -133,6 +133,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-an-enumeration-is-not-a-feature](#project-an-enumeration-is-not-a-feature) — Every hand-written list in this repo has been found short; the fix is to derive the list, and where derivation would explode, to resolve at use time instead
 - [project-one-menu-two-shared-descriptions](#project-one-menu-two-shared-descriptions) — A menu described twice in `_shared/` drifts with nothing comparing the halves; only a test that asserts the retired file STAYS retired closes it
 - [project-dynamic-places-list-materialises](#project-dynamic-places-list-materialises) — `dynamic` and `list` are not two spellings of one thing: a dynamic handler appends driver-shaped rows, a list provider returns provider-shaped rows the renderer builds
+- [project-declared-answered-and-absent](#project-declared-answered-and-absent) — A menu row registered in the wrong renderer argument is skipped at runtime while every gate reports it as answered; the id being present in the source proves nothing about where
 - [project-the-preview-index-is-file-driven-only](#project-the-preview-index-is-file-driven-only) — The Windows preview tooltip reads _PrefixIndex, whose single writer has three FILE-driven callers; a trigger registered imperatively by CreateHotstring can never be previewed, and inserting it into the index is erased by the next rebuild
 
 
@@ -412,6 +413,50 @@ the row's contents are already declarable.
 
 Related: [[project-one-menu-two-shared-descriptions]],
 [[project-an-enumeration-is-not-a-feature]].
+
+
+
+
+### project-declared-answered-and-absent
+
+_A menu row can be declared in the manifest, reported as answered by the
+bijection gate, and absent from the menu — all at once_
+
+<sub>slug: `project_declared_answered_and_absent`</sub>
+
+`ManifestMenu.build(key, category, dynamic_handlers, group_builders, ctx,
+list_providers)`. The renderer routes each row by its `type`: a `dynamic` row
+looks in argument 3, a `list` row looks in argument 6. Register the function in
+the other one and the renderer finds nothing, logs ONE warning, and skips the
+row.
+
+Nothing else notices. `test-menu-action-handler-bijection.cjs` greps the driver
+for the quoted id — and finds it, in the table passed to the wrong parameter. So
+the row is declared, counted as answered, and does not appear.
+
+Found in production: `active_layouts` was declared `dynamic` while macOS's
+`menu_keyboard_layout.lua` had always supplied `active_layout_rows()` as a list
+provider. The keyboard-layout submenu listed no layouts for as long as both
+halves had existed. Underneath it sat a second defect the first one hid — the
+rows read `label = title`, a name a rename had left behind — which no test could
+reach while the row was being skipped.
+
+Two lessons:
+
+1. **The presence of an id in driver source says nothing about where.** Any gate
+   that greps for a name is measuring vocabulary, not wiring. When such a gate is
+   the only thing watching a seam, assume the seam is unwatched.
+2. **Deciding `list` vs `dynamic` is deciding a row SHAPE, not a preference.** A
+   function that RETURNS `{label = …, action = …}` is a list provider; one that
+   APPENDS `{title = …, fn = …}` to the table it is handed is a dynamic handler.
+   Read what the function returns before declaring the type.
+
+`tools/test/test-menu-provider-kind-matches-type.cjs` now compares the two on
+every build call. It was confirmed against the original defect before being
+trusted — a gate nobody has watched fail is a gate nobody has tested.
+
+Related: [[project-dynamic-places-list-materialises]],
+[[project-one-menu-two-shared-descriptions]], [[feedback-regression-tests]].
 
 
 
