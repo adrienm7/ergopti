@@ -146,9 +146,15 @@ const MEASURE = process.argv.includes('--measure');
 // and the tree behind it did not: the AHK renderer gained a narrow `submenu`
 // field for exactly that hand-over, and turning that tree into data is the next
 // migration rather than a precondition for this one.
+//
+// macos 289 → 277 on 2026-08-06: the Karabiner submenu. Thirty-six rows with no
+// manifest entry at all — the last menu in the project that nothing described.
+// Its deep pickers keep their own recursion and reach the renderer through
+// MenuUtils.as_provider_row, because rewriting a tree to move a menu onto the
+// renderer is a different job from moving the menu.
 const BASELINE = {
 	windows: 197,
-	macos: 289,
+	macos: 277,
 	linux: 86
 };
 

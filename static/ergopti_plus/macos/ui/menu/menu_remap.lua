@@ -19,6 +19,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
 local MenuUtils   = require("ui.menu.menu_utils")
+local ManifestMenu = require("infra.manifest_menu")
 local LOG         = "menu.karabiner"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -865,7 +866,7 @@ function M.build(ctx)
 		status_title = i18n.get("menu.karabiner.status_inactive")
 	end
 
-	local submenu = {}
+	local status_rows = {}
 
 	-- Status item: behavior depends on enabled state.
 	-- When disabled but daemon still running: clicking stops KE (no relaunch — user wants it off).
@@ -895,20 +896,20 @@ function M.build(ctx)
 		end
 	end
 
-	submenu[#submenu + 1] = {
-		title = status_title,
-		fn    = status_fn,
+	status_rows[#status_rows + 1] = {
+		label = status_title,
+		action    = status_fn,
 	}
-	submenu[#submenu + 1] = {
-		title = i18n.get("menu.karabiner.open_gui"),
-		fn    = function() karabiner.open_gui() end,
+	status_rows[#status_rows + 1] = {
+		label = i18n.get("menu.karabiner.open_gui"),
+		action    = function() karabiner.open_gui() end,
 	}
-	submenu[#submenu + 1] = {
-		title    = i18n.get("menu.karabiner.start"),
+	status_rows[#status_rows + 1] = {
+		label    = i18n.get("menu.karabiner.start"),
 		-- Force a fresh prime even if the session marker already exists.
 		-- Useful when the daemon was killed manually or by macOS.
 		disabled = bridge_live,
-		fn       = function()
+		action       = function()
 			Logger.start(LOG, "User requested KE bridge start…")
 			KeLifecycle.prime_ke_for_session(function(ok)
 				Logger.info(LOG, "Manual start: ok=%s.", tostring(ok))
@@ -916,11 +917,11 @@ function M.build(ctx)
 			end, true)
 		end,
 	}
-	submenu[#submenu + 1] = {
-		title    = i18n.get("menu.karabiner.stop"),
+	status_rows[#status_rows + 1] = {
+		label    = i18n.get("menu.karabiner.stop"),
 		-- Grayed when bridge is not running — nothing to stop.
 		disabled = not bridge_live,
-		fn       = function()
+		action       = function()
 			Logger.start(LOG, "User requested KE bridge stop…")
 			local ok_l, kl = pcall(require, "platform.remap.ke_lifecycle")
 			if ok_l and kl and type(kl.run_total_reset_async) == "function" then
@@ -937,32 +938,57 @@ function M.build(ctx)
 	-- The user must quit KE (and optionally remove it from Login Items) to fully
 	-- stop its remappings — our toggle alone does not kill the process.
 	if not enabled and grabber_only then
-		submenu[#submenu + 1] = {
-			title    = i18n.get("menu.karabiner.disabled_warning_1"),
+		status_rows[#status_rows + 1] = {
+			label    = i18n.get("menu.karabiner.disabled_warning_1"),
 			disabled = true,
 		}
-		submenu[#submenu + 1] = {
-			title    = i18n.get("menu.karabiner.disabled_warning_2"),
+		status_rows[#status_rows + 1] = {
+			label    = i18n.get("menu.karabiner.disabled_warning_2"),
 			disabled = true,
 		}
-		submenu[#submenu + 1] = {
-			title    = i18n.get("menu.karabiner.disabled_warning_3"),
+		status_rows[#status_rows + 1] = {
+			label    = i18n.get("menu.karabiner.disabled_warning_3"),
 			disabled = true,
 		}
-		submenu[#submenu + 1] = {
-			title    = i18n.get("menu.karabiner.disabled_warning_4"),
+		status_rows[#status_rows + 1] = {
+			label    = i18n.get("menu.karabiner.disabled_warning_4"),
 			disabled = true,
 		}
 	end
 
-	-- Separator between process-control items and configuration-reset items.
-	submenu[#submenu + 1] = { title = "-" }
 
-	-- Management actions: clear-all first (destructive reset), then restore defaults,
-	-- then the tap→combo propagation helper.
-	submenu[#submenu + 1] = {
-		title = i18n.get("menu.karabiner.clear_all"),
-		fn    = function()
+	-- The rows this driver still assembles, handed to the SHARED renderer as
+	-- provider data. The manifest describes the menu's shape — process control,
+	-- the destructive resets, the timings, then tap-holds and chords under their
+	-- own headers — and this file answers with the rows for each slot.
+	local providers = {
+		["karabiner_status"] = function() return status_rows end,
+		["karabiner_delays"] = function()
+			local rows = {}
+			for _, item in ipairs({
+				build_delay_item(karabiner, update_menu),
+				build_simultaneous_threshold_item(karabiner, update_menu),
+				build_combo_symmetric_item(karabiner, update_menu),
+				build_sticky_delay_item(karabiner, update_menu),
+			}) do
+				rows[#rows + 1] = MenuUtils.as_provider_row(item)
+			end
+			return rows
+		end,
+		["karabiner_tap_holds"] = function()
+			local rows = {}
+			for _, item in ipairs(tap_hold) do rows[#rows + 1] = MenuUtils.as_provider_row(item) end
+			return rows
+		end,
+		["karabiner_shortcuts"] = function()
+			local rows = {}
+			for _, item in ipairs(raccourcis) do rows[#rows + 1] = MenuUtils.as_provider_row(item) end
+			return rows
+		end,
+	}
+
+	local commands = {
+		["karabiner_clear_all"] = function()
 			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
 			local cleared = 0
 			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
@@ -980,18 +1006,12 @@ function M.build(ctx)
 			Logger.success(LOG, "Cleared %d entry/entries — all slots are now 'none'.", cleared)
 			if update_menu then update_menu() end
 		end,
-	}
-	submenu[#submenu + 1] = {
-		title = i18n.get("menu.karabiner.restore_defaults"),
-		fn    = function()
+		["karabiner_restore_defaults"] = function()
 			pcall(karabiner.reset_to_defaults)
 			pcall(karabiner.regenerate)
 			if update_menu then update_menu() end
 		end,
-	}
-	submenu[#submenu + 1] = {
-		title = i18n.get("menu.karabiner.copy_tap_to_combo"),
-		fn    = function()
+		["karabiner_copy_tap_to_combo"] = function()
 			Logger.start(LOG, "Propagating tap → combo for all modifier combos…")
 			local changed = 0
 			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
@@ -1009,29 +1029,11 @@ function M.build(ctx)
 		end,
 	}
 
-	-- Timing and shortcut behaviour — always configurable regardless of enabled state.
-	-- Trigger-side settings first (tap/hold delay, combo window, symmetry), then the
-	-- sticky-modifier delay at the bottom — the only one that acts on the output.
-	submenu[#submenu + 1] = { title = "-" }
-	submenu[#submenu + 1] = build_delay_item(karabiner, update_menu)
-	submenu[#submenu + 1] = build_simultaneous_threshold_item(karabiner, update_menu)
-	submenu[#submenu + 1] = build_combo_symmetric_item(karabiner, update_menu)
-	submenu[#submenu + 1] = build_sticky_delay_item(karabiner, update_menu)
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = commands
 
-	submenu[#submenu + 1] = { title = "-" }
-
-	-- Section 1: tap / hold keys split by hand (grayed when disabled)
-	for _, item in ipairs(tap_hold) do
-		submenu[#submenu + 1] = item
-	end
-
-	submenu[#submenu + 1] = { title = "-" }
-
-	-- Section 2: modifier combo action pickers (grayed when disabled)
-	submenu[#submenu + 1] = { title = i18n.section("menu.karabiner.header_shortcuts"), disabled = true }
-	for _, item in ipairs(raccourcis) do
-		submenu[#submenu + 1] = item
-	end
+	local submenu = ManifestMenu.build("karabiner_menu", "Karabiner", nil, nil, render_ctx, providers)
 
 	return {
 		title   = "⌨️ Karabiner",

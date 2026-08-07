@@ -2864,6 +2864,81 @@ type = "list"
 id = "kanata_actions"
 platforms = ["linux"]
 
+
+# The Karabiner submenu.
+#
+# It did not exist either, and it is the largest hand-built menu in the project:
+# thirty-six rows assembled in macos/ui/menu/menu_remap.lua with nothing
+# describing them. Karabiner is macOS's own tap-hold and chord engine — the
+# maintainer's decision, as the best answer found for that platform — so every
+# row here is platforms = ["hs"]. What is shared is the SHAPE: process control,
+# then the destructive resets, then the timings, then two clearly separated
+# sections for tap-holds and for chords.
+#
+# That split is the point. The menu used to run the two families together under
+# one heading, and the request was to tell them apart the way Windows does: a
+# section header each, with the Karabiner-wide controls above both rather than
+# buried among them.
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_status"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_clear_all"
+i18n = "menu.karabiner.clear_all"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_restore_defaults"
+i18n = "menu.karabiner.restore_defaults"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_copy_tap_to_combo"
+i18n = "menu.karabiner.copy_tap_to_combo"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_delays"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_tap_holds"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "section_header"
+i18n = "menu.karabiner.header_shortcuts"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_shortcuts"
+platforms = ["hs"]
+
 # The LLM submenu.
 #
 # It did not exist. `llm` has been a top-level row on all three drivers since

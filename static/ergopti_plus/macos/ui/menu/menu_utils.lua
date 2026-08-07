@@ -62,4 +62,33 @@ function M.build_action_picker(actions, current_id, on_select, filter)
 	return items
 end
 
+--- Turns an hs.menubar row into the shape a manifest `list` provider returns.
+---
+--- The two differ on purpose: a row is `{title, fn, menu}` because that is what
+--- hs.menubar consumes, and a provider hands over `{label, action, items}`
+--- because it must not know what an hs.menubar is. This adapter exists for the
+--- rows a builder ALREADY produces in the first shape — deep trees like the
+--- Karabiner tap-hold pickers, which have their own recursion and are not worth
+--- rewriting to move a menu onto the renderer.
+---
+--- Recursive, because those trees nest: an unconverted child would reach the
+--- renderer as a row with no label and be dropped with a warning.
+--- @param row table An hs.menubar-shaped row.
+--- @return table The same row as provider data.
+function M.as_provider_row(row)
+	if type(row) ~= "table" then return row end
+	if row.title == "-" then return { separator = true } end
+
+	local out = { label = row.title, disabled = row.disabled }
+	if row.checked ~= nil then out.checked = row.checked and true or false end
+	if type(row.menu) == "table" then
+		local items = {}
+		for index, child in ipairs(row.menu) do items[index] = M.as_provider_row(child) end
+		out.items = items
+	elseif type(row.fn) == "function" then
+		out.action = row.fn
+	end
+	return out
+end
+
 return M

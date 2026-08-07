@@ -166,6 +166,91 @@
 			]
 		}
 	],
+	"karabiner_menu": [
+		{
+			"type": "list",
+			"id": "karabiner_status",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "command",
+			"id": "karabiner_clear_all",
+			"i18n": "menu.karabiner.clear_all",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "command",
+			"id": "karabiner_restore_defaults",
+			"i18n": "menu.karabiner.restore_defaults",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "command",
+			"id": "karabiner_copy_tap_to_combo",
+			"i18n": "menu.karabiner.copy_tap_to_combo",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "karabiner_delays",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "karabiner_tap_holds",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.karabiner.header_shortcuts",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "karabiner_shortcuts",
+			"platforms": [
+				"hs"
+			]
+		}
+	],
 	"llm_menu": [
 		{
 			"type": "list",
