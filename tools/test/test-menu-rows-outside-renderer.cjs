@@ -242,7 +242,11 @@ const BASELINE = {
 	// tree and the renderer materialised a translation of it. They emit provider
 	// rows themselves now, which retired the adapter in the layout menu — it had
 	// become the identity function — and the import it was the only user of.
-	macos: 144,
+	// 144 → 135: the hotstrings-parameters builders. They fed three providers
+	// through as_provider_row, so the driver assembled the trees and the renderer
+	// materialised translations of them. They emit provider rows now, and the
+	// import the adapter was the only user of went with them.
+	macos: 135,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
