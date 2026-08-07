@@ -103,6 +103,9 @@ const OPENS_SUBMENU = {
 	// macOS and Linux — and each declaration inside is narrower than that, for the
 	// reason each carries.
 	apps: 'apps_menu',
+	// The About submenu, declared 2026-08-07. Visible on all three; the updater
+	// rows inside are narrower and say why.
+	about: 'about_menu',
 	// macOS's tap-hold and chord engine, as kanata is Linux's. Mapped for the
 	// same reason: its rows inherit `top_level/karabiner`'s own macOS-only
 	// visibility instead of each of the twelve repeating "macOS only", which
@@ -538,7 +541,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // linux 12 → 13 on 2026-08-07: the layout submenu, the last one this driver did
 // not read the manifest for. Its rows came from two names written into the
 // builder while the decoder already owned the list.
-const RENDERED_THROUGH_SHARED = { hs: 11, linux: 13 };
+// hs 11 → 12, linux 13 → 14 on 2026-08-07: the About submenu, which the three
+// drivers assembled independently and none declared.
+const RENDERED_THROUGH_SHARED = { hs: 12, linux: 14 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

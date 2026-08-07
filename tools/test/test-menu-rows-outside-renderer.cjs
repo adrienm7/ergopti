@@ -225,7 +225,7 @@ const MEASURE = process.argv.includes('--measure');
 // supplies just the toggle and the state behind the tick. All three fall
 // together, which is what a real migration looks like on this ratchet.
 const BASELINE = {
-	windows: 187,
+	windows: 178,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -242,7 +242,7 @@ const BASELINE = {
 	// tree and the renderer materialised a translation of it. They emit provider
 	// rows themselves now, which retired the adapter in the layout menu — it had
 	// become the identity function — and the import it was the only user of.
-	macos: 153,
+	macos: 144,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -261,7 +261,14 @@ const BASELINE = {
 	// click — all three fall together, which is what a real migration looks like.
 	// 51 → 49: the base-layout rows, derived from the decoder's own table
 	// instead of two names written into the builder.
-	linux: 49
+	// 49 → 50, and this is the one direction the header warns about, so the
+	// reason is here. The About entry was a single clickable row on this driver —
+	// one site — and is a SUBMENU now, because about_menu is declared and its
+	// changelog row is the renderer's. A submenu costs its container, which the
+	// driver has to name: the same incompressible "one wrapper per entry" this
+	// file already carries for the other twelve. One row moved into the renderer
+	// and one wrapper appeared to hold it.
+	linux: 50
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

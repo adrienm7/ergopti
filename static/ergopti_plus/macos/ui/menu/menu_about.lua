@@ -28,6 +28,7 @@ local i18n      = require("infra.i18n")
 local dialog    = require("infra.dialog_util")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
+local ManifestMenu = require("infra.manifest_menu")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -422,14 +423,14 @@ function M.build(ctx)
 		or  i18n.get("menu.about.channel_main")
 	local channel_items = {
 		{
-			title   = i18n.get("menu.about.channel_main"),
+			label   = i18n.get("menu.about.channel_main"),
 			checked = (channel == "main") or nil,
-			fn      = function() set_channel("main") end,
+			action      = function() set_channel("main") end,
 		},
 		{
-			title   = i18n.get("menu.about.channel_dev"),
+			label   = i18n.get("menu.about.channel_dev"),
 			checked = (channel == "dev") or nil,
-			fn      = function() set_channel("dev") end,
+			action      = function() set_channel("dev") end,
 		},
 	}
 
@@ -438,7 +439,7 @@ function M.build(ctx)
 	-- Version header — always the first item, always disabled.
 	table.insert(menu_items, { title = ver_display, disabled = true })
 
-	table.insert(menu_items, { title = "-" })
+	table.insert(menu_items, { separator = true })
 
 	-- Channel selector submenu — always shown so the user can switch.
 	local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. channel_display
@@ -453,46 +454,51 @@ function M.build(ctx)
 				current_freq_code = preset.code
 			end
 			table.insert(freq_items, {
-				title   = label,
+				label   = label,
 				checked = (preset.seconds == interval_sec) or nil,
-				fn      = function() set_check_interval(preset.seconds) end,
+				action      = function() set_check_interval(preset.seconds) end,
 			})
 		end
 		local freq_display = (current_freq_code ~= "") and current_freq_code or "?"
 		table.insert(menu_items, {
-			title = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
-			menu  = freq_items,
+			label = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
+			items  = freq_items,
 		})
 
 		-- Dynamic one-click update item — only meaningful for bundled builds.
 		local upd_state = Updater.get_update_state()
 		local is_busy = (upd_state == "checking" or upd_state == "installing")
 		table.insert(menu_items, {
-			title    = get_update_menu_label(),
+			label    = get_update_menu_label(),
 			disabled = is_busy or nil,
-			fn       = not is_busy and function()
+			action       = not is_busy and function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
 				one_click_update(channel, update_menu_fn)
 			end or nil,
 		})
 	end
 
-	table.insert(menu_items, { title = "-" })
-	table.insert(menu_items, {
-		title = i18n.get("menu.about.changelog"),
-		fn    = function()
+	-- The updater block above is the manifest's `about_updates` list; the two rows
+	-- below it are `command` declarations. The separator between them is a `---`
+	-- row. Until 2026-08-07 the whole submenu was assembled here and described
+	-- nowhere, on all three drivers at once.
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["about_changelog"] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
 			show_changelog(channel)
 		end,
-	})
-	table.insert(menu_items, {
-		title = i18n.get("menu.about.open_releases_page"),
-		fn    = function() hs.urlevent.openURL(releases_page_url()) end,
+		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
+	}
+
+	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
+		["about_updates"] = function() return menu_items end,
 	})
 
 	-- The submenu title uses the generic i18n label (e.g. "Version / Mise à jour")
 	-- so the menubar entry stays compact; the version detail is inside the submenu.
-	return { title = ver_label, menu = menu_items }
+	return { title = ver_label, menu = rendered }
 end
 
 return M

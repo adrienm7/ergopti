@@ -2559,13 +2559,14 @@ end
 
 --- Builds the about item.
 local function _build_about(ctx)
-	return {
-		title = i18n_safe("menu.about.title"),
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
 		-- Opens the release notes. It used to log one line to a file the user
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,
 		-- with no caller anywhere. The page existed and nothing could reach it.
-		fn = function()
+		["about_changelog"] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the release notes cannot open.")
 				return
@@ -2573,6 +2574,11 @@ local function _build_about(ctx)
 			ctx.webview.show("changelog")
 		end,
 	}
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx)
+		or {}
+	return { title = i18n_safe("menu.about.title"), menu = rows }
 end
 
 --- Builds the reload item.
