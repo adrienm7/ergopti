@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "这一项在每个驱动上都有，只是并非每个都能声明它。这个开关由驱动自己构建，而 Windows 的渲染器与共享渲染器不同，也会绘制被声明的开关；因此为该平台列出它会让开关出现两次。",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 上没有：该驱动在每个语言项上绘制国旗图标，而共享的菜单项承载的是标签、勾选、动作和子菜单，并不包含图标。在那里声明这一项，等于用国旗换一份共享描述。",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "拥有这个菜单的两个驱动，在同一个标题下放的是不同的东西：macOS 列出它在磁盘上找到的随附应用并启动它们，而 Linux 不附带这类应用，把它用于按应用的热字串设置。Windows 两者都没有。",
+	"platform_reason.base_layout_is_the_linux_decode_table": "仅限 Linux：该驱动从内核读取原始键码，需要知道是哪种物理布局产生的，因此它要选择用来解码的对照表。macOS 向系统询问输入源，Windows 安装键盘布局，两者都没有可选的解码表。",
 	"metrics_apps.chart_time_series": "时长",
 	"metrics_apps.edit_category_hint": "编辑类别",
 	"menu.llm.generation.temperature": "温度",

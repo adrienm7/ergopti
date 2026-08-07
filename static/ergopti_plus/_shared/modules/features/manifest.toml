@@ -3597,6 +3597,22 @@ category = "Layout"
 # Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
 # nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
 # and nothing to compare them against.
+# The base layout the Linux keyboard hook decodes keycodes with. Declared
+# 2026-08-07; the rows were two names written into menu_builder.lua while the
+# driver already owned the list — input_reader.get_layouts() is the table the
+# decoder itself uses, and a menu that enumerates it by hand goes stale the day a
+# third table is added.
+#
+# linux only, because the concept is this driver's: it reads raw evdev keycodes
+# and needs to know which physical layout produced them. macOS asks the system
+# for its input sources and Windows installs a .klc; neither has a decode table
+# to choose.
+[[menu.layout_menu]]
+type = "list"
+id = "base_layouts"
+platforms = ["linux"]
+reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
+
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"

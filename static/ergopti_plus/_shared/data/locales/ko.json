@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "이 항목은 모든 드라이버에 있지만 선언할 수 있는 것은 일부뿐입니다. 켜기/끄기 스위치는 드라이버가 직접 만들며, Windows 렌더러는 공용 렌더러와 달리 선언된 스위치도 그리므로, 그 플랫폼용으로 넣으면 스위치가 두 번 나타납니다.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 제외: 그 드라이버는 각 언어 항목에 국기 아이콘을 그리지만, 공용 메뉴 항목이 갖는 것은 라벨과 체크, 동작, 하위 메뉴이며 아이콘은 아닙니다. 그쪽에 이 항목을 선언하면 국기를 공용 설명과 맞바꾸는 셈입니다.",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "이 메뉴를 가진 두 드라이버는 같은 제목 아래 서로 다른 것을 둡니다. macOS는 디스크에서 찾은 번들 응용 프로그램을 나열해 실행하고, Linux는 그런 번들이 없어 응용 프로그램별 핫스트링 설정에 사용합니다. Windows에는 둘 다 없습니다.",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Linux 전용: 이 드라이버는 커널에서 원시 키코드를 읽고 어떤 물리 배열이 그것을 만들었는지 알아야 하므로, 해독에 쓸 표를 고릅니다. macOS는 시스템에 입력 소스를 묻고 Windows는 키보드 배열을 설치합니다. 둘 다 고를 해독 표가 없습니다.",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집",
 	"menu.llm.generation.temperature": "온도",

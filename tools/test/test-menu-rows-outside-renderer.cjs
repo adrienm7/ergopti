@@ -245,7 +245,9 @@ const BASELINE = {
 	// 53 → 51, with windows 189 → 187 and macos 225 → 223: the two whole-tree
 	// gesture actions. One declaration each, three drivers registering only the
 	// click — all three fall together, which is what a real migration looks like.
-	linux: 51
+	// 51 → 49: the base-layout rows, derived from the decoder's own table
+	// instead of two names written into the builder.
+	linux: 49
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would

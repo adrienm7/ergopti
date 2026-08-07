@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Satır her sürücüde vardır; yalnızca bazıları onu bildirebilir. Bu açma/kapama anahtarını sürücünün kendisi kurar ve Windows tarafındaki çizici — ortak olanın aksine — bildirilmiş bir anahtarı da çizer; bu yüzden o platform için listelemek anahtarı iki kez gösterirdi.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows'ta yok: o sürücü her dil satırına bir bayrak simgesi çizer; ortak bir menü satırı ise etiket, işaret, eylem ve alt menü taşır, simge değil. Bu satırı orada bildirmek, bayrakları ortak bir tanım karşılığında vermek olurdu.",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "Bu menüye sahip iki sürücü aynı başlık altına farklı şeyler koyar: macOS diskte bulduğu paket uygulamaları listeler ve başlatır; Linux ise böyle bir paket sunmaz ve bunu uygulama başına hotstring ayarları için kullanır. Windows'ta ikisi de yoktur.",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Yalnızca Linux: bu sürücü çekirdekten ham tuş kodları okur ve bunları hangi fiziksel düzenin ürettiğini bilmesi gerekir; bu yüzden çözümlemede kullanacağı tabloyu seçer. macOS sisteme giriş kaynaklarını sorar, Windows bir klavye düzeni kurar; ikisinde de seçilecek bir çözümleme tablosu yoktur.",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",
 	"menu.llm.generation.temperature": "Sıcaklık",

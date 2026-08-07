@@ -2428,6 +2428,7 @@
 	"platform_reason.category_toggle_is_drawn_by_the_caller": "Raden finns på varje drivrutin; bara vissa får deklarera den. Den här på/av-brytaren byggs av drivrutinen själv, och Windows-renderaren ritar — till skillnad från den delade — även en deklarerad brytare, så att ta med den för den plattformen skulle visa brytaren två gånger.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Inte på Windows: den drivrutinen ritar en flaggikon på varje språkrad, och en delad menyrad bär en etikett, en bock, en åtgärd och en undermeny — inte en ikon. Att deklarera raden där vore att byta bort flaggorna mot en delad beskrivning.",
 	"platform_reason.apps_menu_holds_what_each_platform_offers": "De två drivrutiner som har den här menyn lägger olika saker under samma titel: macOS listar de medföljande programmen den hittar på disken och startar dem, medan Linux inte levererar några och använder den för hotstring-inställningar per program. Windows har varken det ena eller det andra.",
+	"platform_reason.base_layout_is_the_linux_decode_table": "Endast Linux: den här drivrutinen läser råa tangentkoder från kärnan och måste veta vilken fysisk layout som skapade dem, så den väljer tabellen den avkodar med. macOS frågar systemet om sina inmatningskällor och Windows installerar en tangentbordslayout; ingen av dem har en avkodningstabell att välja.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori",
 	"menu.llm.generation.temperature": "Temperatur",

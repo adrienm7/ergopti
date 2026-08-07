@@ -197,26 +197,63 @@ local function _row_is_for_linux(row)
 end
 
 --- Builds the layout selection submenu.
+---
+--- The rows were two names written out here — "qwerty" and "azerty" — while the
+--- decoder already owned the list. `input_reader.get_layouts()` is the very table
+--- it resolves keycodes through, so a menu that enumerates it by hand goes stale
+--- the day a third one is added, and says nothing about which the driver can
+--- actually decode.
 local function _build_layouts(ctx)
 	local current = ctx.layout or "qwerty"
 	local on_change = ctx.on_layout_change
-	return {
-		title = i18n_safe("menu.layout.title"),
-		menu = {
-			{
-				title = "qwerty " .. (current == "qwerty" and "✓" or ""),
-				fn = function()
-					if on_change then on_change("qwerty") end
-				end,
-			},
-			{
-				title = "azerty " .. (current == "azerty" and "✓" or ""),
-				fn = function()
-					if on_change then on_change("azerty") end
-				end,
-			},
-		},
+
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+
+	local providers = {
+		["base_layouts"] = function()
+			local ok_reader, reader = pcall(require, "modules.hotstrings.input_reader")
+			if not ok_reader or type(reader.get_layouts) ~= "function" then
+				Logger.error(LOG, "The input reader exposes no layout table — no layout can be offered.")
+				return {}
+			end
+			local known = reader.get_layouts()
+			if type(known) ~= "table" then
+				Logger.error(LOG, "The layout table is not a table — no layout can be offered.")
+				return {}
+			end
+
+			-- Ordered: `pairs` would reshuffle the list on every menu build.
+			local names = {}
+			for name in pairs(known) do names[#names + 1] = name end
+			table.sort(names)
+
+			local rows = {}
+			for _, name in ipairs(names) do
+				local chosen = name
+				rows[#rows + 1] = {
+					label   = name,
+					-- The tray draws its own mark. The glued "✓" this used to carry
+					-- puts one platform's convention inside a string, and the row was
+					-- not even a check item.
+					checked = current == name,
+					action  = function()
+						if type(on_change) ~= "function" then
+							Logger.error(LOG, "ctx.on_layout_change is absent — '%s' cannot be selected.", chosen)
+							return
+						end
+						on_change(chosen)
+					end,
+				}
+			end
+			return rows
+		end,
 	}
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
+		or {}
+	return { title = i18n_safe("menu.layout.title"), menu = rows }
 end
 
 --- Renders the rows of the hotstrings submenu that the manifest describes.
