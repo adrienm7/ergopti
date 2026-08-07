@@ -3554,8 +3554,11 @@ platforms = ["hs", "ahk", "linux"]
 type = "---"
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "check"
 id = "circular_spaces"
+i18n = "menu.gestures.circular_spaces"
+checked_when = ["gesture_space_wrap"]
+disabled_when = ["gestures_enabled"]
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
@@ -3563,7 +3566,7 @@ type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_2"
 platforms = ["hs"]
 
@@ -3572,7 +3575,7 @@ type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_3"
 platforms = ["hs"]
 
@@ -3581,7 +3584,7 @@ type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_4"
 platforms = ["hs"]
 
@@ -3590,7 +3593,7 @@ type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_5"
 platforms = ["hs"]
 

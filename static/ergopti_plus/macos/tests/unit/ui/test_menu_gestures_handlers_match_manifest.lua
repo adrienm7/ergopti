@@ -34,9 +34,6 @@ local function make_dyn_handlers()
 	return {
 		disable_all      = noop_handler,
 		restore_defaults = noop_handler,
-		circular_spaces  = function(items, _ctx)
-			table.insert(items, { title = "circular_spaces_item", checked = false })
-		end,
 		gesture_slots_2 = noop_handler,
 		gesture_slots_3 = noop_handler,
 		gesture_slots_4 = noop_handler,
@@ -61,22 +58,44 @@ helpers.describe("menu_gestures: circular_spaces handler is dispatched by the ma
 			if type(e) == "table" and e.id == "circular_spaces" then entry = e end
 		end
 		helpers.assert_true(entry ~= nil, "gestures_menu must declare a circular_spaces item")
-		helpers.assert_eq(entry.type, "dynamic",
-			"circular_spaces must be type=dynamic — type=feature is silently skipped by ManifestMenu.build (F-HIGH-5)")
+		-- `check` since 2026-08-06: the row is declarative now — label, tick
+		-- predicate and greying predicate all in the manifest, with the driver
+		-- supplying only the behaviour. What must never come back is `feature`,
+		-- which ManifestMenu.build skips in SILENCE; that is the finding this
+		-- test was written for, and it is a property of the type, not of which
+		-- non-feature type happens to be in use.
+		helpers.assert_true(entry.type == "check" or entry.type == "dynamic",
+			"circular_spaces must be type=check (or dynamic) — type=feature is silently skipped by ManifestMenu.build (F-HIGH-5), so the row would vanish with nothing said")
 	end)
 
-	helpers.it("ManifestMenu.build renders the circular_spaces item via the real dyn_handlers shape", function()
+	helpers.it("ManifestMenu.build renders the circular_spaces row from its declaration", function()
 		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
-		local dyn_handlers = make_dyn_handlers()
 
-		local built = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, {})
+		-- The row is built by the RENDERER now, so what the driver supplies is the
+		-- behaviour and the state — which is exactly what is stubbed here. The old
+		-- version of this case handed over a row-builder; that shape no longer
+		-- exists, and asserting on it would have made a row built by MORE shared
+		-- code read as a row that vanished.
+		local fired = false
+		local built = ManifestMenu.build("gestures_menu", "Gestures", make_dyn_handlers(), nil, {
+			commands = { circular_spaces = function() fired = true end },
+			state_getters = {
+				gesture_space_wrap = function() return true end,
+				gestures_enabled   = function() return true end,
+			},
+		})
 
-		local found = false
+		local row = nil
 		for _, item in ipairs(built) do
-			if item.title == "circular_spaces_item" then found = true end
+			if type(item.fn) == "function" and item.checked == true then row = item end
 		end
-		helpers.assert_true(found,
-			"circular_spaces handler must have been dispatched and its item present in the built gestures_menu — " ..
+		helpers.assert_true(row ~= nil,
+			"the circular_spaces row must be present, ticked from its checked_when getter — " ..
 			"a type=feature misclassification makes ManifestMenu.build skip it silently (F-HIGH-5)")
+
+		row.fn()
+		helpers.assert_true(fired,
+			"and clicking it must run the command the driver registered, not a no-op: a row " ..
+			"rendered with no behaviour looks identical to one that works")
 	end)
 end)
