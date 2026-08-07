@@ -394,8 +394,18 @@ _HS_CategoryRowsDynamic() {
 		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
 			DynAllEnabled := false
 	}
-	if IsGated and DynAllEnabled and DynCount > 0
-		M.Check(DynTitle)
+	; This function became a `list` provider when the five category blocks moved
+	; onto the manifest, and half of it did not follow. It returned an EMPTY array
+	; — so the dynamic-hotstrings row was missing from the menu entirely — and it
+	; still called `M.Check(DynTitle)` on a menu object a provider is never handed.
+	; That reference is an unset local, and it threw straight through
+	; MenuRenderer_Build into the deferred tray build's catch, which meant the
+	; WHOLE tray vanished, leaving only the submenus that add themselves. Latent
+	; until a configuration satisfied the condition guarding it.
+	Rows.Push(Map(
+		"label",   DynTitle,
+		"checked", (IsGated and DynAllEnabled and DynCount > 0) ? true : false,
+		"submenu", DynMenu))
 	return Rows
 }
 
@@ -667,7 +677,7 @@ _HS_PersonalRows() {
 		RootNode := TreeCopy[""]
 		TreeCopy.Delete("")
 	}
-	_HS_RenderTree(TreeCopy, M)
+	_HS_RenderTree(TreeCopy, "", Rows)
 	if (RootNode != false) {
 		FileNodeList := RootNode["tomls"]
 		loop FileNodeList.Length {
@@ -710,8 +720,15 @@ _HS_NodeTotal(Node) {
 	return Total
 }
 
-; Render recursive ext tree (nested folder structure)
-_HS_RenderTree(Tree, ParentMenu) {
+; Render recursive ext tree (nested folder structure).
+;
+; ``Rows`` is how the TOP level is called since 2026-08-07: the personal block is
+; a `list` provider, which is handed no menu, so its folders have to come back as
+; row data. The nested levels still take a ParentMenu, because a folder's
+; children genuinely hang off the folder's own Menu. Passing `M` here — the name
+; a dynamic handler's menu parameter used to have — is what made the provider
+; throw and took the entire tray menu down with it.
+_HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	FolderNames := []
 	for FolderName in Tree
 		FolderNames.Push(FolderName)
@@ -760,7 +777,11 @@ _HS_RenderTree(Tree, ParentMenu) {
 		}
 		FolderTotal := _HS_NodeTotal(Node)
 		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-		ParentMenu.Add(FolderLabel, FolderMenu)
+		if (Rows is Array) {
+			Rows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
+		} else {
+			ParentMenu.Add(FolderLabel, FolderMenu)
+		}
 	}
 }
 
