@@ -833,6 +833,34 @@
 			"category": "Layout"
 		},
 		{
+			"type": "list",
+			"id": "layout_bundle",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "layout_logo",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
 			"type": "dynamic",
 			"id": "layout_features_base",
 			"platforms": [

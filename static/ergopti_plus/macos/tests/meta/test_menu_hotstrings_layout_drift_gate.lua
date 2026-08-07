@@ -107,6 +107,14 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
 	"toggle:Layout",
+	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
+	-- keyboard layout through the OS's input-source mechanism and draws a
+	-- menubar icon; neither concept exists on the other two drivers. Ten rows
+	-- were built by hand here and described nowhere until now.
+	"list:layout_bundle",
+	"---",
+	"list:layout_logo",
+	"---",
 	"---",
 	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
 	-- active_layout_rows() as a LIST PROVIDER, and the manifest said `dynamic`,

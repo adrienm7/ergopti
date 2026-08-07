@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Endast Linux: den här drivrutinen listar modellerna och de två genereringsinställningarna direkt i menyn. macOS och Windows lägger samma val bakom en undermenyrad, som deras egna rader ovan deklarerar.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Endast Linux: den här drivrutinens tap-hold körs av kanata, dess remap-daemon, så de läses här i stället för i en egen meny. Windows har den separata menyn och macOS läser samma värden via Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Endast Linux: den här drivrutinen samlar sina markeringsåtgärder — CapsWord, versalomvandlingarna, markera ord eller rad, klistra in utan formatering — i ett block. macOS når samma åtgärder via sina Ctrl-genvägar och Windows via egna tangentkombinationer, så en delad rad skulle lista dem två gånger där.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Endast macOS: dessa rader installerar .bundle-tangentbordslayouten via systemets egen inmatningskällemekanism, med ett användar- och ett systemomfång, och väljer menyradsikonen. Windows installerar en .klc med sitt eget installationsprogram, Linux genererar en kanata-layout, och ingen av dem har en menyrad.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Redigera kategori",
 	"menu.llm.generation.temperature": "Temperatur",

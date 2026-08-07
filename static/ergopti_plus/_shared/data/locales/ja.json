@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux のみ：このドライバーはモデルと 2 つの生成設定をメニューに直接並べます。macOS と Windows は同じ選択肢をサブメニュー項目の下に置き、それは上のそれぞれの項目が宣言しています。",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Linux のみ：このドライバーのタップホールドはリマップデーモンである kanata が実行するため、専用メニューではなくここで確認します。Windows には専用メニューがあり、macOS は同じ値を Karabiner 経由で読み取ります。",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Linux のみ：このドライバーは選択範囲への操作——CapsWord、大文字小文字の変換、単語や行の選択、書式なし貼り付け——を一つのまとまりにしています。macOS は同じ操作に Ctrl ショートカットから、Windows は独自のキー組み合わせから届くため、共通の項目にするとそちらでは二重に並ぶことになります。",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "macOS のみ：これらの項目は、システム自身の入力ソース機構を通じて .bundle のキーボードレイアウトをユーザー範囲とシステム範囲で導入し、メニューバーのアイコンを選びます。Windows は独自のインストーラーで .klc を導入し、Linux は kanata のレイアウトを生成します。どちらにもメニューバーはありません。",
 	"metrics_apps.chart_time_series": "時間",
 	"metrics_apps.edit_category_hint": "カテゴリを編集",
 	"menu.llm.generation.temperature": "温度",

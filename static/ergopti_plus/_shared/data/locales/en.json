@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux only: this driver lists the models and the two generation settings straight in the menu. macOS and Windows put the same choices behind a submenu row, which their own rows above declare.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Linux only: this driver's tap-holds are run by kanata, its remap daemon, so they are read here rather than under a menu of their own. Windows has that separate menu and macOS reads the same values through Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Linux only: this driver groups its selection operations — CapsWord, the case transforms, select word or line, paste without formatting — into one block. macOS reaches the same operations through its Ctrl shortcuts and Windows through its own key combinations, so a shared row would list them twice there.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates a kanata layout, and neither has a menubar.",
 	"metrics_apps.chart_time_series": "Time",
 	"metrics_apps.edit_category_hint": "Edit category",
 	"menu.llm.generation.temperature": "Temperature",

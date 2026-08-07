@@ -28,6 +28,7 @@ local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
+local MenuUtils     = require("ui.menu.menu_utils")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
@@ -221,6 +222,12 @@ function M.build(ctx)
 	local bundles_dir  = base_dir .. BUNDLES_RELDIR
 
 	local submenu = {}
+	-- The two blocks this driver alone has — installing the .bundle layout macOS
+	-- needs, and choosing the menubar logo — are collected for the manifest slots
+	-- that declare them rather than appended here. They were eight and two rows
+	-- of a shared menu that nothing described.
+	local bundle_rows = {}
+	local logo_rows   = {}
 
 	-- Pull the live state once so the closures below capture stable values.
 	-- list_active_keyboard_layouts() returns rich records {id, name, selected}
@@ -276,7 +283,7 @@ function M.build(ctx)
 		-- because it makes the layout available for all users and avoids
 		-- duplication between ~/Library and /Library. A system install also
 		-- removes the user copy automatically, keeping a single canonical bundle.
-		submenu[#submenu + 1] = build_install_item(
+		bundle_rows[#bundle_rows + 1] = build_install_item(
 			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
@@ -285,7 +292,7 @@ function M.build(ctx)
 				)
 			end
 		)
-		submenu[#submenu + 1] = build_install_item(
+		bundle_rows[#bundle_rows + 1] = build_install_item(
 			i18n.get("menu.layout.scope_user"), "📥", user_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
@@ -296,7 +303,7 @@ function M.build(ctx)
 		)
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title    = i18n.get("menu.layout.no_bundle"),
 			disabled = true,
 		}
@@ -321,7 +328,7 @@ function M.build(ctx)
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
 	if all_variants_active and installed_ver then
 		-- 1. All variants already in list and up to date
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
 			disabled = true,
 		}
@@ -330,7 +337,7 @@ function M.build(ctx)
 		-- Extract version from the first legacy KeyboardLayout Name (e.g. "Ergopti_v2_1_0" → "2.1.0")
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title    = string.format(i18n.get("menu.layout.update_list_install_first"),
 				latest_str, old_str),
 			disabled = true,
@@ -339,7 +346,7 @@ function M.build(ctx)
 		-- 2. Legacy entry active and latest installed — programmatic swap via TIS
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
 			fn    = function()
 				defer_tis_call(function()
@@ -395,19 +402,19 @@ function M.build(ctx)
 				}
 			end
 		end
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title = string.format(i18n.get("menu.layout.add_to_list"), latest_str),
 			menu  = add_sub,
 		}
 	else
 		-- 5. Absent and bundle missing — greyed
-		submenu[#submenu + 1] = {
+		bundle_rows[#bundle_rows + 1] = {
 			title    = i18n.get("menu.layout.install_first"),
 			disabled = true,
 		}
 	end
 
-	submenu[#submenu + 1] = { title = "-" }
+	-- The separator that stood here is a `---` row in the manifest now.
 
 	-- Logo variant toggle (persisted via hs.settings)
 	local current_variant = (hs.settings and hs.settings.get(LOGO_VARIANT_KEY)) or LOGO_VARIANT_DEFAULT
@@ -424,18 +431,18 @@ function M.build(ctx)
 		-- pcall guards a hard crash from any rebuild path
 		if type(update_menu) == "function" then pcall(update_menu) end
 	end
-	submenu[#submenu + 1] = {
+	logo_rows[#logo_rows + 1] = {
 		title   = i18n.get("menu.layout.logo_default"),
 		checked = current_variant == "simple",
 		fn      = function() set_variant("simple") end,
 	}
-	submenu[#submenu + 1] = {
+	logo_rows[#logo_rows + 1] = {
 		title   = i18n.get("menu.layout.logo_custom"),
 		checked = current_variant == "complex",
 		fn      = function() set_variant("complex") end,
 	}
 
-	submenu[#submenu + 1] = { title = "-" }
+	-- The separator that stood here is a `---` row in the manifest now.
 
 	-- Active layouts list — one item per enabled keyboard layout, with a
 	-- checkmark on the currently selected one. Clicking a row switches the
@@ -460,6 +467,19 @@ function M.build(ctx)
 			return r.name
 		end
 		return clean_layout_name(id)
+	end
+
+	--- Adapts already-built rows into the provider data a `list` row takes. These
+	--- two blocks were written as menu trees years before the renderer existed;
+	--- adapting them is what lets it own their placement without rewriting both.
+	--- @param built table Rows in this driver's shape.
+	--- @return table Provider rows.
+	local function as_provider_rows(built)
+		local out = {}
+		for _, entry in ipairs(built or {}) do
+			out[#out + 1] = MenuUtils.as_provider_row(entry)
+		end
+		return out
 	end
 
 	-- The layouts macOS reports as active. A `list`, because the rows are
@@ -517,6 +537,8 @@ function M.build(ctx)
 		if ok_mm and type(ManifestMenu.build) == "function" then
 			local rendered = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
 				["active_layouts"] = active_layout_rows,
+				["layout_bundle"]  = function() return as_provider_rows(bundle_rows) end,
+				["layout_logo"]    = function() return as_provider_rows(logo_rows) end,
 			})
 			for _, row in ipairs(rendered or {}) do submenu[#submenu + 1] = row end
 		else

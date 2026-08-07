@@ -3525,6 +3525,35 @@ i18n_on = "menu.layout.on"
 i18n_off = "menu.layout.off"
 category = "Layout"
 
+# The two blocks macOS alone has. It installs a .bundle keyboard layout through
+# TIS — the OS's own input-source mechanism, with a user scope and a system scope
+# — and it draws a menubar icon whose variant the user picks. Neither concept
+# exists on the other two drivers: Windows installs a .klc through its own
+# installer and Linux generates a kanata layout, and neither has a menubar.
+#
+# Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
+# nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
+# and nothing to compare them against.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_bundle"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.layout_menu]]
+type = "list"
+id = "layout_logo"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "---"
+platforms = ["hs"]
+
 [[menu.layout_menu]]
 type = "dynamic"
 id = "layout_features_base"
