@@ -743,6 +743,14 @@ _HS_NodeTotal(Node) {
 ; children genuinely hang off the folder's own Menu. Passing `M` here — the name
 ; a dynamic handler's menu parameter used to have — is what made the provider
 ; throw and took the entire tray menu down with it.
+;
+; The nested levels are NOT row data, and that is deliberate. This tree mirrors
+; the user's own folder layout, which has no depth limit, while the renderer caps
+; nesting at MR_MAX_LIST_DEPTH (3) to stop a self-referential provider from
+; recursing until the stack gives out. Two levels of subfolders already reach the
+; cap, so converting this would silently truncate the folders of the very users
+; who organise their hotstrings the most. The cap is right for a provider and
+; wrong for a filesystem walk; the walk stays native.
 _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	FolderNames := []
 	for FolderName in Tree
