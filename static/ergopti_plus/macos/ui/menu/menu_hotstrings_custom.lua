@@ -485,6 +485,16 @@ function M.build_custom(ctx, counts)
 		return total
 	end
 
+	-- Emits provider rows — `label`/`items` — because `target` is always an array
+	-- the `hotstring_personal` provider hands to the renderer.
+	--
+	-- It wrote `title`/`menu` until 2026-08-07, the hs.menubar field names, and it
+	-- READ `file.title`/`file.menu` on nodes that had already been converted to
+	-- `label`/`items`. Both halves were wrong in the same direction: every
+	-- extension file row reached the renderer with no label and was dropped, every
+	-- folder row carried an empty submenu, and `table.sort` compared two nils —
+	-- so a folder holding two or more extension files threw inside the provider
+	-- and took the whole hotstrings menu with it.
 	local function render_ext_tree(node, target, separate_files)
 		if separate_files == nil then separate_files = true end
 		local folder_names = sorted_keys(node.folders)
@@ -493,14 +503,14 @@ function M.build_custom(ctx, counts)
 			render_ext_tree(node.folders[folder_name], folder_menu, true)
 			local folder_total = node_total(node.folders[folder_name])
 			local folder_label = folder_name .. (folder_total > 0 and (" (" .. fmt_count(folder_total) .. ")") or "")
-			target[#target + 1] = { title = folder_label, menu = folder_menu }
+			target[#target + 1] = { label = folder_label, items = folder_menu }
 		end
 		if separate_files and #folder_names > 0 and #node.files > 0 then
 			target[#target + 1] = { separator = true }
 		end
-		table.sort(node.files, function(a, b) return a.title < b.title end)
+		table.sort(node.files, function(a, b) return a.label < b.label end)
 		for _, file in ipairs(node.files) do
-			target[#target + 1] = { title = file.title, menu = file.menu }
+			target[#target + 1] = { label = file.label, items = file.items }
 		end
 	end
 

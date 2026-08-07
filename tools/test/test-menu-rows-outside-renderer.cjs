@@ -325,7 +325,13 @@ const BASELINE = {
 	// converted the same day. The shared renderer gained R.render_rows for it — a
 	// subtree whose parent row is still the driver's can now hand its contents
 	// over as data instead of staying hand-built because one row above it is.
-	macos: 51,
+	// 51 → 49: the personal-extension folder and file rows, which had been in the
+	// DRIVER dialect inside a list provider since that tree moved — so the folders
+	// rendered empty, every file row was dropped for having no label, and the sort
+	// compared two nils, which threw as soon as one folder held two files. A bug
+	// fix, not a migration; the count moves because the rows finally speak the
+	// dialect they are read in. Same day, same shape, third occurrence.
+	macos: 49,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and

@@ -286,10 +286,41 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 
 ; How deep a list provider's rows may nest. A provider returning a structure that
 ; contains itself would recurse until the stack gave out, taking the whole menu
-; with it; three levels is deeper than any menu the driver draws. Kept equal to
-; the macOS renderer's MAX_LIST_DEPTH so a list that renders on one driver cannot
-; be silently truncated on the other
-global MR_MAX_LIST_DEPTH := 3
+; with it, so this is a runaway-recursion guard — NOT a statement about how deep a
+; menu may legitimately be. Kept equal to the shared Lua renderer's
+; MAX_LIST_DEPTH so a list that renders on one driver cannot be silently
+; truncated on another
+;
+; Raised 3 → 8 on 2026-08-07. Three was documented as "deeper than any menu the
+; driver draws" and that was already false on macOS: the personal-extensions tree
+; follows a folder the USER writes, so its depth is theirs to choose, and a single
+; level of subfolder already reaches four. A cap sized for a hand-declared menu
+; cannot bound a filesystem. This driver's own scan stops at _HS_SCAN_MAX_DEPTH
+; (16) for the same tree
+global MR_MAX_LIST_DEPTH := 8
+
+; Report a row written in the OTHER drivers' dialect, field by field.
+;
+; "title", "fn" and "menu" are the hs.menubar field names, and a provider row
+; says "label", "action" and "items". The mistake costs nothing to make and used
+; to cost everything to find: a "title" is not a label, so the row was dropped
+; with a generic warning, and a "menu" was never read at all, so the row appeared
+; with its whole subtree missing and NOTHING was logged. It happened three times
+; on macOS in the days its menu moved onto the renderer. The shared Lua renderer
+; carries the identical check, because a row that renders on one driver and
+; vanishes on another is the exact failure this whole migration exists to end.
+_MR_ReportDriverDialect(Row, ListId) {
+	Named := Row.Has("label") ? Row["label"] : (Row.Has("title") ? Row["title"] : "?")
+	if (Row.Has("title") and !Row.Has("label")) {
+		try LoggerError("MenuRenderer", "List '{1}' row '{2}' uses 'title' — a provider row says 'label', so this row is dropped.", ListId, Named)
+	}
+	if (Row.Has("menu") and !Row.Has("items") and !Row.Has("submenu")) {
+		try LoggerError("MenuRenderer", "List '{1}' row '{2}' hangs its subtree on 'menu' — a provider row says 'items' (or 'submenu' for a tree already built), so the row renders with nothing under it.", ListId, Named)
+	}
+	if (Row.Has("fn") and !Row.Has("action")) {
+		try LoggerError("MenuRenderer", "List '{1}' row '{2}' carries 'fn' — a provider row says 'action', so the row does nothing when clicked.", ListId, Named)
+	}
+}
 
 ; Turn a list provider's row DATA into AHK menu items.
 ;
@@ -322,6 +353,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			TargetMenu.Add()
 			continue
 		}
+		_MR_ReportDriverDialect(Row, ListId)
 		Label := Row.Has("label") ? Row["label"] : ""
 		if (Label == "") {
 			try LoggerWarn("MenuRenderer", "List '{1}' produced a row with no label — skipped.", ListId)

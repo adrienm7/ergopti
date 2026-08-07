@@ -383,7 +383,13 @@ function M.build_groups(ctx, only, counts)
 					end
 				end
 			end
-			item.menu = sec_menu
+			-- `items`, not `menu`: this row is DATA handed to a `list` provider, and
+			-- the renderer reads `items` for nested rows. Written as `menu` — the
+			-- hs.menubar field — the sections were attached to a field nothing reads,
+			-- so every standard and Ergopti category rendered as a bare clickable row
+			-- with its whole submenu gone: no « ouvrir le fichier », no bulk actions,
+			-- no section toggles, and not one warning to say so.
+			item.items = sec_menu
 		end
 		items[#items + 1] = item
 		::continue_group::
