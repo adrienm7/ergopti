@@ -3519,6 +3519,18 @@ reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
 # draws the same pill on the GTK surface the preview bubble already uses, and
 # reads its geometry and colours from _shared/modules/wpm_widget/constants.toml
 # rather than mirroring them the way the other two do.
+# `dynamic` ON PURPOSE, and this note exists because the obvious change is
+# wrong. These two are checkboxes, so `check` looks like the right type — the
+# menubar pair above became exactly that on 2026-08-07. It does not port here.
+#
+# The Windows handlers mutate the LIVE menu when clicked (Menu.ToggleCheck,
+# Enable/Disable on the two dependent rows) instead of rebuilding the tray, which
+# is what keeps a click on this row from costing a full tray rebuild. A `check`
+# row is drawn by the renderer, so its tick would not move until the next
+# rebuild: either the feedback regresses, or every click pays for a rebuild.
+#
+# The row stays `dynamic` on all three rather than splitting into two
+# declarations, which is the duplication this file spent the day removing.
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "wpm_widget"
