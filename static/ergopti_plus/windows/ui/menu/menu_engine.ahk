@@ -460,12 +460,16 @@ GetCategoryTitle(Category) {
 			return t("category.dynamic_hotstrings")
 		case "Personal":
 			return t("category.personal")
+		; The three top-level menus below read the SAME key the other two drivers
+		; read. Each existed twice in all twenty-one locale files — `category.x`
+		; here, `menu.x.title` on macOS and Linux — holding the same string, and
+		; two copies of one label is one translator away from two menus.
 		case "Shortcuts":
-			return t("category.shortcuts")
+			return t("menu.shortcuts.title")
 		case "TapHolds":
-			return t("category.tapholds")
+			return t("menu.tapholds.title")
 		case "Gestures":
-			return t("category.gestures")
+			return t("menu.gestures.title")
 		default:
 			return ""
 	}

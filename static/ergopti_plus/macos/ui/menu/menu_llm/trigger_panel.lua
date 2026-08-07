@@ -50,7 +50,7 @@ function M.build(ctx)
 	-- ===== 1.1) Trigger shortcut =====
 	-- =====================================================
 
-	local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
+	local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, i18n.get("common.none"))
 	rows[#rows + 1] = {
 		label    = string.format(i18n.get("menu.llm.trigger_shortcut_label"), sc_label),
 		disabled = is_disabled or nil,
