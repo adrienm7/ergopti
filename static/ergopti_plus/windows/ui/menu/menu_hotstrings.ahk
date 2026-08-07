@@ -87,7 +87,10 @@ _HS_MagicKeyRows() {
 ; grouped by a separator, exactly like the HS make_delay_item rows: the base
 ; default expansion delay, then the ★ magic-key and autocorrection per-category
 ; delays (settable straight from the menu, not only buried in the config window).
-_HS_DelaysColors(M, _Cat) {
+; `list` since 2026-08-07: the row itself is the renderer's, and the submenu
+; hanging off it stays a native Menu this function owns and hands over — the same
+; `submenu` shape the category blocks use while their trees are still built here.
+_HS_DelaysColorsRows() {
 	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
 	Sub := Menu()
 	RegisterMenuItem(Sub, t("menu.hotstrings.config_item"), (*) => OpenHotstringsConfigWindow())
@@ -105,7 +108,9 @@ _HS_DelaysColors(M, _Cat) {
 	; mirrors the HS "Délai autocomplétion" item. Backed by the "dynamichotstrings"
 	; override; the no-override default is DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
 	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY), (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
-	M.Add(t("menu.hotstrings.delays_colors"), Sub)
+	return [Map(
+		"label",   t("menu.hotstrings.delays_colors"),
+		"submenu", Sub)]
 }
 
 ; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The

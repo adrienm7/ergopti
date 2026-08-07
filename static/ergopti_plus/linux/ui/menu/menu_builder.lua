@@ -510,9 +510,8 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(current) ~= "number" then
 			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
 			return {
-				title    = i18n_safe("menu.hotstrings.tooltip_default") .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				label    = i18n_safe("menu.hotstrings.tooltip_default") .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
 				disabled = true,
-				fn       = function() end,
 			}
 		end
 
@@ -520,9 +519,9 @@ local function _manifest_hotstring_rows(ctx, config)
 		local title = i18n_safe("menu.hotstrings.tooltip_default")
 		return {
 			-- menu.settings.default_indicator carries its own leading space.
-			title = title .. " : " .. delay_display(current)
+			label = title .. " : " .. delay_display(current)
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
-			fn = function()
+			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
 				if config.set_global_delay then config.set_global_delay(chosen) end
@@ -546,17 +545,16 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(current) ~= "number" then
 			Logger.error(LOG, "No resolvable delay for category '%s' — its row shows no value.", tostring(category))
 			return {
-				title    = title .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				label    = title .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
 				disabled = true,
-				fn       = function() end,
 			}
 		end
 
 		local overridden = resolved.has_override == true
 		return {
-			title = title .. " : " .. delay_display(current)
+			label = title .. " : " .. delay_display(current)
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
-			fn = function()
+			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
 				if config.set_override then config.set_override(category, nil, "delay", chosen) end
@@ -746,7 +744,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			return rows
 		end,
-		["delays_colors"] = function(items)
+		["delays_colors"] = function()
 			-- A submenu, not the single row this used to be. The old row opened the
 			-- settings window and stopped there, justified by a comment saying "this
 			-- driver has no per-category delays to prompt for" — which was false when
@@ -757,8 +755,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			local sub = {}
 
 			sub[#sub + 1] = {
-				title = i18n_safe("menu.hotstrings.config_item"),
-				fn    = function()
+				label  = i18n_safe("menu.hotstrings.config_item"),
+				action = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
 						return
@@ -770,14 +768,14 @@ local function _manifest_hotstring_rows(ctx, config)
 					ctx.webview.show("hotstrings_config_window")
 				end,
 			}
-			sub[#sub + 1] = { title = "-" }
+			sub[#sub + 1] = { separator = true }
 			sub[#sub + 1] = global_delay_row()
 
 			for _, entry in ipairs(QUICK_DELAY_CATEGORIES) do
 				sub[#sub + 1] = category_delay_row(entry.category, entry.label)
 			end
 
-			items[#items + 1] = { title = i18n_safe("menu.hotstrings.delays_colors"), menu = sub }
+			return { { label = i18n_safe("menu.hotstrings.delays_colors"), items = sub } }
 		end,
 	}
 
@@ -1056,6 +1054,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	local params_providers = {
 		["word_expanders"] = params_handlers["word_expanders"],
 		["magic_key_config"] = params_handlers["magic_key_config"],
+		["delays_colors"] = params_handlers["delays_colors"],
 		-- The four toggles the manifest has declared for this driver all along and
 		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
 		-- path while its set_enabled() had no caller, so they were fixed at their
@@ -1086,6 +1085,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	}
 	params_handlers["word_expanders"] = nil
 	params_handlers["magic_key_config"] = nil
+	params_handlers["delays_colors"] = nil
 
 	local group_builders = {
 		["hotstrings_params"] = function(c)

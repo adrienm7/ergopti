@@ -1051,7 +1051,7 @@
 			"id": "word_expanders"
 		},
 		{
-			"type": "action",
+			"type": "list",
 			"id": "delays_colors",
 			"i18n": "menu.hotstrings.delays_colors"
 		},
