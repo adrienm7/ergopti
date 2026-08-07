@@ -3331,11 +3331,11 @@ type = "section_header"
 i18n = "menu.hotstrings.header_common"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_standard"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_dynamic"
 
 [[menu.hotstrings_menu]]
@@ -3346,7 +3346,7 @@ type = "section_header"
 i18n = "menu.hotstrings.header_ergopti"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_ergopti"
 
 [[menu.hotstrings_menu]]
@@ -3357,7 +3357,7 @@ type = "section_header"
 i18n = "menu.hotstrings.personal_header"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_personal"
 
 [[menu.hotstrings_menu]]
@@ -3375,7 +3375,7 @@ i18n = "menu.extensions.header"
 # cross-platform from the start and only AHK had a scanner. Both Lua drivers now
 # read it through _shared/lua/hotstrings/extensions.lua.
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_extensions"
 
 [[menu.hotstrings_params_group]]

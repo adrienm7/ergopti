@@ -332,6 +332,20 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			SubMenu := Menu()
 			_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1)
 			TargetMenu.Add(Label, SubMenu)
+		} else if (Row.Has("submenu") and Row["submenu"] is Menu) {
+			; A submenu this driver has ALREADY built as a native Menu.
+			;
+			; TRANSITIONAL, and narrow on purpose. The row itself — its label, its
+			; checkmark, its position among the manifest's other rows — is
+			; materialised here, which is the whole point; only the tree hanging off
+			; it is still the driver's. That tree is `SubMenus[Category]`, assembled
+			; by a different subsystem, and turning it into data is the next
+			; migration rather than a precondition for this one.
+			;
+			; It is deliberately NOT `items`: a caller must say which of the two it
+			; is handing over, so a Menu passed where row data was expected fails
+			; here instead of rendering an empty submenu.
+			TargetMenu.Add(Label, Row["submenu"])
 		} else if (Row.Has("action") and Row["action"] is Func) {
 			RegisterMenuItem(TargetMenu, Label, Row["action"])
 		} else {
@@ -343,7 +357,10 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 		if (Row.Has("checked") and Row["checked"]) {
 			try TargetMenu.Check(Label)
 		}
-		if ((Row.Has("disabled") and Row["disabled"]) or (!Row.Has("items") and !Row.Has("action"))) {
+		; A row with none of the three — no nested rows, no native submenu, no
+		; callback — is a label, and AHK needs it disabled to read as one.
+		if ((Row.Has("disabled") and Row["disabled"])
+			or (!Row.Has("items") and !Row.Has("action") and !Row.Has("submenu"))) {
 			try TargetMenu.Disable(Label)
 		}
 		Added++

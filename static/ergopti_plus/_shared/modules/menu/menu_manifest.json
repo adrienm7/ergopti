@@ -664,11 +664,11 @@
 			"i18n": "menu.hotstrings.header_common"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "hotstring_categories_standard"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "hotstring_categories_dynamic"
 		},
 		{
@@ -679,7 +679,7 @@
 			"i18n": "menu.hotstrings.header_ergopti"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "hotstring_categories_ergopti"
 		},
 		{
@@ -690,7 +690,7 @@
 			"i18n": "menu.hotstrings.personal_header"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "hotstring_personal"
 		},
 		{
@@ -701,7 +701,7 @@
 			"i18n": "menu.extensions.header"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "hotstring_extensions"
 		}
 	],

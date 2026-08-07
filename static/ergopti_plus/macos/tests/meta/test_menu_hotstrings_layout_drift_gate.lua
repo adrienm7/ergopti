@@ -45,6 +45,12 @@ local helpers = require("tests.helpers")
 -- Signature = "<type>:<id>" for entries with a stable id, "<type>:<category|i18n|path>"
 -- for the few entries that key off a different field (toggle/section_header/feature),
 -- or "---" for separators.
+-- The five category blocks became `list` on 2026-08-06: their rows are
+-- materialised by the renderer from provider data instead of each driver
+-- appending them. macOS builds this menu by hand in ui/menu/builder.lua and does
+-- not read the manifest for it, so what this list pins here is the SHARED
+-- description the other two drivers render — which is exactly what makes it
+-- worth pinning from this side.
 local CANONICAL_HOTSTRINGS_MENU = {
 	"toggle:Hotstrings",
 	"group:hotstrings_params",
@@ -57,14 +63,14 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"command:hotstrings_disable_all",
 	"---",
 	"section_header:menu.hotstrings.header_common",
-	"dynamic:hotstring_categories_standard",
-	"dynamic:hotstring_categories_dynamic",
+	"list:hotstring_categories_standard",
+	"list:hotstring_categories_dynamic",
 	"---",
 	"section_header:menu.hotstrings.header_ergopti",
-	"dynamic:hotstring_categories_ergopti",
+	"list:hotstring_categories_ergopti",
 	"---",
 	"section_header:menu.hotstrings.personal_header",
-	"dynamic:hotstring_personal",
+	"list:hotstring_personal",
 	"---",
 	"section_header:menu.extensions.header",
 	-- The extensions row. A first pass on 2026-08-04 removed it from this list on
@@ -76,7 +82,7 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- the section under this very header. The row was restricted out of a menu that
 	-- was already drawing it. Linux gained the same scan through
 	-- _shared/lua/hotstrings/extensions.lua; the manifest now says all three.
-	"dynamic:hotstring_extensions",
+	"list:hotstring_extensions",
 }
 
 -- Canonical hs-filtered signatures for layout_menu, in manifest order.

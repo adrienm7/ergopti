@@ -138,10 +138,18 @@ const MEASURE = process.argv.includes('--measure');
 // ONE `dynamic` row that expanded to two, so the manifest described neither and
 // macOS — which had no handler for that id at all — rendered nothing. They are
 // two `command` rows now.
+//
+// windows 204 → 197, linux 107 → 86 on 2026-08-06: the five hotstring category
+// blocks — standard, dynamic, ergopti, personal and extensions. Linux already
+// held its rows as data, so the whole tree moved. Windows attaches
+// SubMenus[Category], a Menu assembled by another subsystem, so its ROW moved
+// and the tree behind it did not: the AHK renderer gained a narrow `submenu`
+// field for exactly that hand-over, and turning that tree into data is the next
+// migration rather than a precondition for this one.
 const BASELINE = {
-	windows: 204,
+	windows: 197,
 	macos: 289,
-	linux: 107
+	linux: 86
 };
 
 // Floors on the TOTAL count. A predicate that silently stops matching would
