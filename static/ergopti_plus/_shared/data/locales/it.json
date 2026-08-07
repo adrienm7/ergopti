@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Solo Linux: questo driver elenca i modelli e le due impostazioni di generazione direttamente nel menu. macOS e Windows mettono le stesse scelte dietro una riga di sottomenu, dichiarata dalle loro righe qui sopra.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Solo Linux: i tap-hold di questo driver sono eseguiti da kanata, il suo demone di rimappatura, quindi si leggono qui anziché in un menu dedicato. Windows ha quel menu separato e macOS legge gli stessi valori tramite Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Solo Linux: questo driver raccoglie le sue operazioni sulla selezione — CapsWord, le trasformazioni di maiuscole, selezionare parola o riga, incollare senza formattazione — in un unico blocco. macOS raggiunge le stesse operazioni con le sue scorciatoie Ctrl e Windows con le proprie combinazioni, quindi una riga condivisa le elencherebbe due volte.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Solo macOS: queste righe installano il layout di tastiera .bundle tramite il meccanismo delle sorgenti di input del sistema, con un ambito utente e uno di sistema, e scelgono l'icona della barra dei menu. Windows installa un .klc con il proprio installer, Linux genera un layout per kanata e nessuno dei due ha una barra dei menu.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Modifica categoria",
 	"menu.llm.generation.temperature": "Temperatura",

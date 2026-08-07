@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "केवल Linux: यह ड्राइवर मॉडल और दोनों जनरेशन सेटिंग्स सीधे मेनू में सूचीबद्ध करता है। macOS और Windows वही विकल्प एक उपमेनू पंक्ति के पीछे रखते हैं, जिसे ऊपर उनकी अपनी पंक्तियाँ घोषित करती हैं।",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "केवल Linux: इस ड्राइवर के टैप-होल्ड इसके रीमैप डीमन kanata द्वारा चलाए जाते हैं, इसलिए वे अलग मेनू के बजाय यहीं पढ़े जाते हैं। Windows के पास वह अलग मेनू है और macOS वही मान Karabiner के माध्यम से पढ़ता है।",
 	"platform_reason.selection_operations_are_a_block_on_linux": "केवल Linux: यह ड्राइवर अपने चयन-संबंधी कार्यों — CapsWord, अक्षर-रूप बदलना, शब्द या पंक्ति चुनना, बिना स्वरूपण चिपकाना — को एक ही खंड में रखता है। macOS उन्हीं कार्यों तक अपने Ctrl शॉर्टकट से पहुँचता है और Windows अपनी कुंजी-संयोजनों से, इसलिए साझा पंक्ति उन्हें वहाँ दो बार दिखाती।",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "केवल macOS: ये पंक्तियाँ सिस्टम के इनपुट-स्रोत तंत्र के ज़रिए .bundle कीबोर्ड लेआउट स्थापित करती हैं — उपयोगकर्ता और सिस्टम, दोनों दायरों में — और मेनूबार का चिह्न चुनती हैं। Windows अपने इंस्टॉलर से .klc स्थापित करता है, Linux kanata लेआउट बनाता है, और दोनों में मेनूबार नहीं है।",
 	"metrics_apps.chart_time_series": "समय",
 	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें",
 	"menu.llm.generation.temperature": "तापमान",

@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Alleen Linux: deze driver toont de modellen en de twee generatie-instellingen rechtstreeks in het menu. macOS en Windows zetten dezelfde keuzes achter een submenurij, die hun eigen rijen hierboven declareren.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Alleen Linux: de tap-holds van deze driver worden uitgevoerd door kanata, zijn remap-daemon, dus ze worden hier gelezen in plaats van in een eigen menu. Windows heeft dat aparte menu en macOS leest dezelfde waarden via Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Alleen Linux: deze driver bundelt zijn selectiebewerkingen — CapsWord, de hoofdlettertransformaties, woord of regel selecteren, plakken zonder opmaak — in één blok. macOS bereikt dezelfde bewerkingen via zijn Ctrl-sneltoetsen en Windows via eigen toetsencombinaties, dus een gedeelde rij zou ze daar dubbel tonen.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Alleen macOS: deze rijen installeren de .bundle-toetsenbordindeling via het invoerbronmechanisme van het systeem, met een gebruikers- en een systeembereik, en kiezen het menubalkpictogram. Windows installeert een .klc met zijn eigen installatieprogramma, Linux genereert een kanata-indeling, en geen van beide heeft een menubalk.",
 	"metrics_apps.chart_time_series": "Tijd",
 	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",

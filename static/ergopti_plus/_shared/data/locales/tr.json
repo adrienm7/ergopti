@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Yalnızca Linux: bu sürücü modelleri ve iki üretim ayarını doğrudan menüde listeler. macOS ve Windows aynı seçenekleri bir alt menü satırının arkasına koyar; bunu yukarıdaki kendi satırları bildirir.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Yalnızca Linux: bu sürücünün tap-hold'larını yeniden eşleme arka plan süreci kanata çalıştırır; bu yüzden ayrı bir menü yerine burada okunurlar. Windows'ta o ayrı menü vardır ve macOS aynı değerleri Karabiner üzerinden okur.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Yalnızca Linux: bu sürücü seçim işlemlerini — CapsWord, büyük/küçük harf dönüşümleri, sözcük ya da satır seçme, biçimlendirmesiz yapıştırma — tek bir blokta toplar. macOS aynı işlemlere Ctrl kısayollarıyla, Windows kendi tuş birleşimleriyle ulaşır; ortak bir satır bunları orada iki kez listelerdi.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Yalnızca macOS: bu satırlar .bundle klavye düzenini sistemin kendi giriş kaynağı mekanizmasıyla, kullanıcı ve sistem kapsamında kurar ve menü çubuğu simgesini seçer. Windows .klc dosyasını kendi yükleyicisiyle kurar, Linux bir kanata düzeni üretir ve ikisinde de menü çubuğu yoktur.",
 	"metrics_apps.chart_time_series": "Süre",
 	"metrics_apps.edit_category_hint": "Kategoriyi düzenle",
 	"menu.llm.generation.temperature": "Sıcaklık",

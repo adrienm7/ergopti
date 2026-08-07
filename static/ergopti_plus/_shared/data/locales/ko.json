@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux 전용: 이 드라이버는 모델과 두 가지 생성 설정을 메뉴에 바로 나열합니다. macOS와 Windows는 같은 선택지를 하위 메뉴 항목 뒤에 두며, 이는 위의 각자 항목이 선언합니다.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Linux 전용: 이 드라이버의 탭홀드는 리맵 데몬인 kanata가 실행하므로 별도 메뉴가 아니라 여기에서 확인합니다. Windows에는 그 별도 메뉴가 있고 macOS는 같은 값을 Karabiner를 통해 읽습니다.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Linux 전용: 이 드라이버는 선택 영역 관련 작업 — CapsWord, 대소문자 변환, 단어나 줄 선택, 서식 없이 붙여넣기 — 을 한 묶음으로 둡니다. macOS는 같은 작업에 Ctrl 단축키로, Windows는 자체 키 조합으로 접근하므로, 공용 항목을 두면 그쪽에서 두 번 나열됩니다.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "macOS 전용: 이 항목들은 시스템의 입력 소스 메커니즘을 통해 .bundle 키보드 레이아웃을 사용자 범위와 시스템 범위로 설치하고, 메뉴 막대 아이콘을 고릅니다. Windows는 자체 설치 프로그램으로 .klc를 설치하고 Linux는 kanata 레이아웃을 생성하며, 둘 다 메뉴 막대가 없습니다.",
 	"metrics_apps.chart_time_series": "시간",
 	"metrics_apps.edit_category_hint": "카테고리 편집",
 	"menu.llm.generation.temperature": "온도",

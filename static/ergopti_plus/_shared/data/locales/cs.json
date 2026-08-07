@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Pouze Linux: tento ovladač vypisuje modely a dvě nastavení generování přímo v nabídce. macOS a Windows dávají stejné volby za řádek s podnabídkou, který deklarují jejich vlastní řádky výše.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Pouze Linux: tap-hold tohoto ovladače provádí kanata, jeho remapovací démon, takže se čtou zde a ne ve vlastní nabídce. Windows tuto samostatnou nabídku má a macOS čte stejné hodnoty přes Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Pouze Linux: tento ovladač sdružuje operace nad výběrem — CapsWord, převody velikosti písmen, výběr slova či řádku, vložení bez formátování — do jednoho bloku. macOS se ke stejným operacím dostává přes zkratky s Ctrl a Windows přes vlastní kombinace, takže sdílený řádek by je tam uvedl dvakrát.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Pouze macOS: tyto řádky instalují rozložení .bundle přes systémový mechanismus vstupních zdrojů, v uživatelském i systémovém rozsahu, a volí ikonu v liště nabídek. Windows instaluje .klc vlastním instalátorem, Linux generuje rozložení pro kanatu a ani jeden lištu nabídek nemá.",
 	"metrics_apps.chart_time_series": "Čas",
 	"metrics_apps.edit_category_hint": "Změnit kategorii",
 	"menu.llm.generation.temperature": "Teplota",

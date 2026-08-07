@@ -2417,6 +2417,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Apenas Linux: este controlador lista os modelos e as duas definições de geração diretamente no menu. O macOS e o Windows colocam as mesmas opções por trás de uma linha de submenu, declarada pelas suas próprias linhas acima.",
 	"platform_reason.tap_holds_live_under_the_remap_daemon": "Apenas Linux: os tap-hold deste controlador são executados pelo kanata, o seu daemon de remapeamento, pelo que são lidos aqui em vez de num menu próprio. O Windows tem esse menu separado e o macOS lê os mesmos valores através do Karabiner.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Apenas Linux: este controlador agrupa as suas operações sobre a seleção — CapsWord, as transformações de maiúsculas, selecionar palavra ou linha, colar sem formatação — num único bloco. O macOS chega às mesmas operações pelos seus atalhos com Ctrl e o Windows pelas suas combinações, pelo que uma linha partilhada as listaria lá duas vezes.",
+	"platform_reason.layout_bundle_and_menubar_are_macos": "Apenas macOS: estas linhas instalam a disposição de teclado .bundle através do mecanismo de fontes de entrada do próprio sistema, com um âmbito de utilizador e um de sistema, e escolhem o ícone da barra de menus. O Windows instala um .klc pelo seu instalador, o Linux gera uma disposição para o kanata, e nenhum deles tem barra de menus.",
 	"metrics_apps.chart_time_series": "Tempo",
 	"metrics_apps.edit_category_hint": "Editar categoria",
 	"menu.llm.generation.temperature": "Temperatura",

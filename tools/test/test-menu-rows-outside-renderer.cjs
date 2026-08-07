@@ -211,9 +211,15 @@ const MEASURE = process.argv.includes('--measure');
 // renderer as provider data instead of being appended by the driver. They were
 // seven rows of a SHARED menu that no manifest described, so no gate could
 // compare them with what the other two drivers put in the same place.
+//
+// macos 229 → 228: the two separators the keyboard-layout menu wrote out around
+// its install and logo blocks are `---` rows in the manifest now. The blocks
+// themselves reach the renderer as provider data, but their rows are still
+// written in this driver's dialect, so the predicate keeps counting them — see
+// the paragraph above about what this number measures.
 const BASELINE = {
 	windows: 196,
-	macos: 229,
+	macos: 228,
 	linux: 69
 };
 
