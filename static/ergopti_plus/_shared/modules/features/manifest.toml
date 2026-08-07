@@ -3066,10 +3066,19 @@ platforms = ["ahk"]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
 
+# The wrap-symbol picker. Declared platforms = ["ahk"] until 2026-08-06, and all
+# three drivers had been building it the whole time: macOS in
+# build_wrap_symbols_submenu, Linux in menu_builder's wrap_items. The restriction
+# recorded who wrote it first rather than what the platforms can do — the third
+# time this exact shape has been found in this manifest.
+#
+# `list`, because the rows are the user's own symbol pairs and no static entry
+# can enumerate them. Making it a row of its own also settles WHERE it hangs:
+# Windows and Linux showed it as a sibling row, macOS as a submenu of the
+# wrap-text toggle, so the same feature sat in two different places.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "wrap_symbols_menu"
-platforms = ["ahk"]
 
 [[menu.shortcuts_menu]]
 type = "list"

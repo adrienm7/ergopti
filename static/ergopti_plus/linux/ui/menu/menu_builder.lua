@@ -1773,11 +1773,10 @@ local function _build_shortcuts(ctx)
 		-- so the row was a translated label followed by an untranslated one, and
 		-- the ellipsis had already said the same thing in every language.
 		wrap_items[#wrap_items + 1] = {
-			title = string.format("%s … %s", entry.ch, pair.right),
-			fn    = function() sc.wrap_selection(pair.left, pair.right) end,
+			label  = string.format("%s … %s", entry.ch, pair.right),
+			action = function() sc.wrap_selection(pair.left, pair.right) end,
 		}
 	end
-	items[#items + 1] = { title = i18n_safe("menu.shortcuts.wrap_symbols"), menu = wrap_items }
 
 	local handlers = {
 		-- One submenu per installed extension that ships shortcuts/menu.lua.
@@ -1839,6 +1838,13 @@ local function _build_shortcuts(ctx)
 			out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
 		end
 		return out
+	end
+
+	-- The wrap-symbol picker. The manifest called it Windows-only until
+	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
+	-- `list` row now, in the same position on all three drivers.
+	providers["wrap_symbols_menu"] = function()
+		return { { label = i18n_safe("menu.shortcuts.wrap_symbols"), items = wrap_items } }
 	end
 
 	local manifest_rows = ManifestMenu

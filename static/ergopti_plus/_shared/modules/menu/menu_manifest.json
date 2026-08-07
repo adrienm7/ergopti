@@ -359,11 +359,8 @@
 			"path": "shortcuts.wrap_text_if_selected"
 		},
 		{
-			"type": "dynamic",
-			"id": "wrap_symbols_menu",
-			"platforms": [
-				"ahk"
-			]
+			"type": "list",
+			"id": "wrap_symbols_menu"
 		},
 		{
 			"type": "list",
