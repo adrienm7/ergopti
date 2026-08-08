@@ -410,8 +410,8 @@ function M.generate(ctx, menu_mods, actions)
 		local bulk_rows = type(menu_mods.hotstrings.build_bulk_actions) == "function"
 			and menu_mods.hotstrings.build_bulk_actions(ctx) or {}
 		hs_ctx.commands = {
-			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].fn or function() end,
-			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].fn or function() end,
+			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].action or function() end,
+			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].action or function() end,
 		}
 
 		local providers = {
