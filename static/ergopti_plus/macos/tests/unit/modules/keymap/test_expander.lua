@@ -87,6 +87,53 @@ end)
 -- ===========================================
 
 helpers.describe("keymap.expander: require_state guard", function()
+	helpers.it("HS-L-01 every state-dependent public entry fails closed before init", function()
+		local previous_logger = package.loaded["infra.logger"]
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, fmt, ...)
+			local ok_fmt, message = pcall(string.format, tostring(fmt), ...)
+			errors[#errors + 1] = ok_fmt and message or tostring(fmt)
+		end
+		package.loaded["infra.logger"] = logger
+
+		local ok_body, body_err = pcall(function()
+			local E = helpers.load_with_stubs("modules.keymap.expander")
+			local cases = {
+				{
+					name = "perform_text_replacement",
+					call = function()
+						return E.perform_text_replacement(0, function() return 0, "" end,
+							function() end, false, false, "test")
+					end,
+				},
+				{ name = "try_auto_expand", call = function() return E.try_auto_expand({}, 0, false) end },
+				{
+					name = "try_terminator_expand",
+					call = function() return E.try_terminator_expand({}, " ", 1, false) end,
+				},
+				{ name = "try_repeat_feature", call = function() return E.try_repeat_feature("★", false) end },
+				{ name = "try_expand", call = function() return E.try_expand("", false) end },
+			}
+
+			for index, case in ipairs(cases) do
+				local ok_call, result = pcall(case.call)
+				helpers.assert_true(ok_call,
+					case.name .. " must not raise when a cold-start caller reaches it")
+				helpers.assert_eq(result, false,
+					case.name .. " must fail closed before M.init()")
+				helpers.assert_eq(#errors, index,
+					case.name .. " must emit exactly one ERROR for the rejected call")
+				helpers.assert_true(errors[index]:find(case.name, 1, true) ~= nil,
+					case.name .. " must name itself in the ERROR log")
+			end
+		end)
+
+		package.loaded["modules.keymap.expander"] = nil
+		package.loaded["infra.logger"] = previous_logger
+		if not ok_body then error(body_err, 0) end
+	end)
+
 	-- Each test reloads the module so _state is freshly nil.
 	helpers.it("try_auto_expand returns false when init() not called", function()
 		local E = helpers.load_with_stubs("modules.keymap.expander")
