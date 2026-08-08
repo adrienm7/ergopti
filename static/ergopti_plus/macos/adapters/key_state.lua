@@ -201,4 +201,23 @@ function M.set_capslock(enabled)
 	return ok
 end
 
+
+--- Toggles CapsLock through the HID state API.
+--- A false state is a successful toggle-to-off result, so failures use nil.
+--- @return boolean|nil state New CapsLock state, or nil on failure.
+--- @return string|nil error_message Failure detail.
+function M.toggle_capslock()
+	local ok, state_or_err = pcall(function()
+		assert(hs.hid and hs.hid.capslock
+			and type(hs.hid.capslock.toggle) == "function",
+			"hs.hid.capslock.toggle is unavailable")
+		return hs.hid.capslock.toggle()
+	end)
+	if not ok then return nil, tostring(state_or_err) end
+	if type(state_or_err) ~= "boolean" then
+		return nil, "hs.hid.capslock.toggle returned no boolean state"
+	end
+	return state_or_err, nil
+end
+
 return M
