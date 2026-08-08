@@ -540,6 +540,43 @@ Related: [[project-the-wrong-dialect-is-invisible]],
 
 
 
+### project-a-toggle-is-opt-in-per-driver
+
+_One declaration, two tray shapes. Registering the command is what asks the
+renderer for the row_
+
+<sub>slug: `project_a_toggle_is_opt_in_per_driver`</sub>
+
+`type = "toggle"` — a category's on/off gate — was declared in the manifest and
+skipped by the shared Lua renderer in silence, under the comment "rendered by
+caller". That was true of exactly ONE driver: the AutoHotkey renderer has built
+this type from the declaration all along. Linux rebuilt the same row by hand in
+four submenus (hotstrings, shortcuts, metrics, gestures), reading the same two
+i18n keys the declaration names, and macOS built none at all.
+
+The reason the three differ is real and is not about the menu: `hs.menubar` binds
+a click on a row that also has a submenu, so macOS toggles from the tray PARENT.
+`platform/tray/appindicator.lua` binds `item.fn` only when the row has no submenu
+(`if item.menu … elseif item.fn …`), so Linux cannot, and neither can an
+AutoHotkey submenu parent — both need a row INSIDE.
+
+**The rule:** the renderer builds a `toggle` when the caller registered a command
+for it, and logs a DEBUG line when it did not. A driver whose parent carries the
+toggle registers nothing. That is the driver answering a driver question, without
+a second declaration to keep in sync — which is what `platforms = [...]` would
+have become here, and what the metrics toggle actually was (`platforms = ["hs"]`
+meant "the driver that BUILDS it", which is not the manifest's business).
+
+**How to apply:** when two drivers need the same row and a third needs it in a
+different place, ask whether the difference is about the row or about the tray.
+If it is the tray, express it by what the driver registers, not by a second row.
+
+Related: [[project-dynamic-places-list-materialises]],
+[[project-two-keys-for-one-row-is-two-menus]].
+
+
+
+
 ### project-two-keys-for-one-row-is-two-menus
 
 _The same tray entry named by two translation keys reads as identical until a
