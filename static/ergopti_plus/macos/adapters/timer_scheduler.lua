@@ -69,8 +69,10 @@ function M.after(delaySec, fn)
 			Logger.error(LOG, "after() callback raised: %s", tostring(err))
 		end
 	end)
-	if not ok then
-		Logger.error(LOG, "after(): hs.timer.doAfter failed — %s", tostring(timer_or_err))
+	if not ok or timer_or_err == nil then
+		handle.fired = true
+		Logger.error(LOG, "after(): hs.timer.doAfter failed — %s",
+			tostring(timer_or_err or "returned nil"))
 		return handle
 	end
 	handle.timer = timer_or_err
@@ -91,8 +93,10 @@ function M.every(intervalSec, fn)
 			Logger.error(LOG, "every() callback raised: %s", tostring(err))
 		end
 	end)
-	if not ok then
-		Logger.error(LOG, "every(): hs.timer.doEvery failed — %s", tostring(timer_or_err))
+	if not ok or timer_or_err == nil then
+		handle.fired = true
+		Logger.error(LOG, "every(): hs.timer.doEvery failed — %s",
+			tostring(timer_or_err or "returned nil"))
 		return handle
 	end
 	handle.timer = timer_or_err
