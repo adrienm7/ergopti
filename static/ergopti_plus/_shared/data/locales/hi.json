@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "टैप क्रिया — ",
+	"tap_hold.picker.tap_title": "टैप क्रिया",
+	"tap_hold.picker.tap_prompt": "छोटे दबाव पर क्रिया (खाली = मूल कुंजी):",
 	"tap_hold.reset_defaults": "डिफ़ॉल्ट मान पुनर्स्थापित करें",
 	"tap_hold.tap.none": "मूल कुंजी",
 	"terminators.label_close_paren": ") : बंद कोष्ठक",

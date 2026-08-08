@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "إجراء النقر — ",
+	"tap_hold.picker.tap_title": "إجراء النقر",
+	"tap_hold.picker.tap_prompt": "الإجراء عند الضغط القصير (فارغ = المفتاح الأصلي):",
 	"tap_hold.reset_defaults": "إعادة تعيين القيم الافتراضية",
 	"tap_hold.tap.none": "المفتاح الأصلي",
 	"terminators.label_close_paren": ") : قوس إغلاق",

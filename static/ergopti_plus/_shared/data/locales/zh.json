@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "点按操作 — ",
+	"tap_hold.picker.tap_title": "轻按动作",
+	"tap_hold.picker.tap_prompt": "短按时发出的动作（留空 = 键本身）：",
 	"tap_hold.reset_defaults": "重置为默认値",
 	"tap_hold.tap.none": "原生按键",
 	"terminators.label_close_paren": ") : 右括号",

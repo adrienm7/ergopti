@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap-Aktion — ",
+	"tap_hold.picker.tap_title": "Tipp-Aktion",
+	"tap_hold.picker.tap_prompt": "Aktion bei kurzem Druck (leer = native Taste):",
 	"tap_hold.reset_defaults": "Standardwerte wiederherstellen",
 	"tap_hold.tap.none": "Native Taste",
 	"terminators.label_close_paren": ") : Schließende Klammer",

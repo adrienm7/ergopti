@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Akcja przy kliknięciu — ",
+	"tap_hold.picker.tap_title": "Akcja przy naciśnięciu",
+	"tap_hold.picker.tap_prompt": "Akcja przy krótkim naciśnięciu (puste = klawisz natywny):",
 	"tap_hold.reset_defaults": "Przywróć wartości domyślne",
 	"tap_hold.tap.none": "Natywny klawisz",
 	"terminators.label_close_paren": ") : Nawias zamykający",

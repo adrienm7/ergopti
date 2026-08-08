@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Acción al pulsar — ",
+	"tap_hold.picker.tap_title": "Acción al tocar",
+	"tap_hold.picker.tap_prompt": "Acción emitida por una pulsación corta (vacío = tecla nativa):",
 	"tap_hold.reset_defaults": "Restablecer valores predeterminados",
 	"tap_hold.tap.none": "Tecla nativa",
 	"terminators.label_close_paren": ") : Paréntesis de cierre",

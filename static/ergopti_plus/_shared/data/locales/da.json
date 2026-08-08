@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap-handling — ",
+	"tap_hold.picker.tap_title": "Tryk-handling",
+	"tap_hold.picker.tap_prompt": "Handling ved kort tryk (tom = oprindelig tast):",
 	"tap_hold.reset_defaults": "Nulstil til standardværdier",
 	"tap_hold.tap.none": "Nativ nøgle",
 	"terminators.label_close_paren": ") : Afsluttende parentes",
