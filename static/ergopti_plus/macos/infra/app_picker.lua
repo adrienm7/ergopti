@@ -204,9 +204,9 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			)
 
 			table.insert(menu, {
-				title = styled,
-				image = icon,
-				fn    = function()
+				label  = styled,
+				image  = icon,
+				action = function()
 					local new_apps = {}
 					for _, a in ipairs(apps) do
 						local same = (app_path   and a.appPath   == app_path)
@@ -222,8 +222,8 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	if #menu > 0 then table.insert(menu, {title = "-"}) end
 
 	table.insert(menu, {
-		title = i18n.get("app_picker.add_another_app"),
-		fn    = function()
+		label  = i18n.get("app_picker.add_another_app"),
+		action = function()
 			-- The chooser is built inside the discovery callback. The 0.1 s timer this
 			-- used to rely on moved the scan off the click's stack frame but not off
 			-- the runloop, so the whole driver froze for the duration of the `find`.
@@ -282,9 +282,9 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 				end
 			end
 			table.insert(menu, {
-				title = i18n.get("app_picker.exclude_current"):gsub("{app}", escape_replacement(appName)),
-				image = icon,
-				fn    = function()
+				label  = i18n.get("app_picker.exclude_current"):gsub("{app}", escape_replacement(appName)),
+				image  = icon,
+				action = function()
 					local new_apps = {}
 					for _, a in ipairs(apps) do table.insert(new_apps, a) end
 					table.insert(new_apps, {
@@ -300,8 +300,13 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	-- (built once per picker per menu tree rebuild — keylogger + LLM = two per tree).
 	Logger.info(LOG, "Application exclusion menu built successfully (%d excluded app(s), %.1f ms).",
 		#sorted_apps, (hs.timer.absoluteTime() - _build_t0) / 1e6)
+	-- PROVIDER rows, not an hs.menubar tree. They used to be `title`/`fn`/`image`
+	-- and every caller handed the result over as `submenu`, which meant the icons
+	-- survived and the rows were never the renderer's. The renderer carries
+	-- `image` since 2026-08-07, so there is nothing left that only a hand-built
+	-- tree could do here.
 	if #menu == 0 then
-		table.insert(menu, { title = i18n.get("app_picker.no_app_excluded"), disabled = true })
+		table.insert(menu, { label = i18n.get("app_picker.no_app_excluded"), disabled = true })
 	end
 	return type(menu) == "table" and menu or {}
 end

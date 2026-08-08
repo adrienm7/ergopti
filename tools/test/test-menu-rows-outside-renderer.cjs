@@ -383,7 +383,12 @@ const BASELINE = {
 	// drivers that have it. Its label is static and the three key submenus below
 	// it were already row data, so the `dynamic` handler was appending a single
 	// row the renderer can build.
-	macos: 29,
+	// 29 → 25: the application picker. It built an hs.menubar tree and every
+	// caller handed the result over as `submenu`, which is how it kept its app
+	// icons — the adapter that would otherwise have translated it drops `image`.
+	// The renderer carries that field now, so there is nothing left the hand-built
+	// tree could do that the declaration cannot.
+	macos: 25,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
