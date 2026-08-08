@@ -158,8 +158,8 @@ function M.build(ctx)
 	local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
 	local disabled_label = string.format(i18n.get("menu.llm.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
 
-	-- The picker is AppPickerLib's tree, not this panel's, so it is handed over
-	-- whole rather than described row by row.
+	-- AppPickerLib's rows. They are provider data since 2026-08-08, so they are
+	-- materialised by the renderer like everything else in this panel.
 	local exclusion_menu = AppPickerLib.build_menu(
 		state.llm_disabled_apps,
 		function(new_list)
@@ -173,7 +173,7 @@ function M.build(ctx)
 	rows[#rows + 1] = {
 		label    = disabled_label,
 		disabled = is_disabled or nil,
-		submenu  = exclusion_menu,
+		items    = exclusion_menu,
 	}
 
 	return ManifestMenu.render_rows(rows, "llm_trigger")

@@ -313,8 +313,8 @@ function M.build(ctx)
 		return {{
 			label    = label,
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "exclude_apps", STATE_GETTERS),
-			-- AppPickerLib's tree, handed over whole rather than described.
-			submenu  = exclusion_menu,
+			-- AppPickerLib's rows, which the renderer materialises like any other.
+			items    = exclusion_menu,
 		}}
 	end
 

@@ -75,9 +75,13 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 	--- @param menu table The built menu structure.
 	--- @param title string The exact title to look for.
 	--- @return boolean True when an entry with that title exists.
+	-- `label`, the PROVIDER field: build_menu returns row data since 2026-08-08
+	-- and the shared renderer materialises it. `title` is still accepted so the
+	-- check reads the row whichever field carries it — what is asserted here is
+	-- the escaping of the app NAME, not which of the two shapes holds it.
 	local function has_title(menu, title)
 		for _, entry in ipairs(menu) do
-			if type(entry) == "table" and entry.title == title then return true end
+			if type(entry) == "table" and (entry.label == title or entry.title == title) then return true end
 		end
 		return false
 	end
