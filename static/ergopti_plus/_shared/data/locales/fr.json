@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Action au tap — ",
+	"tap_hold.picker.tap_title": "Action au tap",
+	"tap_hold.picker.tap_prompt": "Action émise par un appui court (vide = touche native) :",
 	"tap_hold.reset_defaults": "Réinitialiser les valeurs par défaut",
 	"tap_hold.tap.none": "Touche native",
 	"terminators.label_close_paren": ") : Parenthèse fermante",

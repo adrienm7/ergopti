@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "タップ操作 — ",
+	"tap_hold.picker.tap_title": "タップ時の動作",
+	"tap_hold.picker.tap_prompt": "短押しで送る動作（空欄 = キー本来の動作）:",
 	"tap_hold.reset_defaults": "デフォルト値にリセット",
 	"tap_hold.tap.none": "ネイティブキー",
 	"terminators.label_close_paren": ") : 閉じ括弧",

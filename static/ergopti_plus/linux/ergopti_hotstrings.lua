@@ -204,6 +204,17 @@ local kanata = nil
 local ok_kan, kan_mod = pcall(require, "platform.remap.manager")
 if ok_kan then kanata = kan_mod end
 
+-- Tap-hold writer (optional — persists a menu change to the user's tap_hold.toml
+-- and reloads kanata). Initialised here because it needs the manager above: this
+-- driver could READ its tap-hold configuration and not change it until
+-- 2026-08-08, so every row of that submenu was greyed.
+if kanata then
+	local ok_thw, thw_mod = pcall(require, "platform.remap.tap_hold_writer")
+	if ok_thw and type(thw_mod.init) == "function" then
+		thw_mod.init({ manager = kanata })
+	end
+end
+
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.

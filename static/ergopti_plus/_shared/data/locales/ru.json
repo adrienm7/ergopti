@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Действие при нажатии — ",
+	"tap_hold.picker.tap_title": "Действие при нажатии",
+	"tap_hold.picker.tap_prompt": "Действие при коротком нажатии (пусто = исходная клавиша):",
 	"tap_hold.reset_defaults": "Сбросить до значений по умолчанию",
 	"tap_hold.tap.none": "Нативная клавиша",
 	"terminators.label_close_paren": ") : Закрывающая скобка",

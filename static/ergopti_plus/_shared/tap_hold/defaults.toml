@@ -50,6 +50,27 @@
 
 
 
+# ===============================
+# ===== 1.0 The hold picker =====
+# ===============================
+
+# The modifiers a hold may emit, IN THE ORDER the menu offers them, and the
+# layers it may activate. Every driver's hold picker is built from this list:
+# the "none" sentinel, then every non-empty combination of the modifiers below
+# (depth-first, left to right — ctrl, ctrl+shift, ctrl+shift+alt, …), then one
+# entry per layer.
+#
+# It lived in windows/platform/remap/tap_hold_writer.ahk until 2026-08-08, as a
+# hardcoded array whose comment said it "mirrors _shared/modules/menu/
+# menu_manifest.json hold_options" — a key that has never existed in that file.
+# So the canonical list was a copy pointing at nothing, and the two Lua drivers
+# offered no hold picker at all.
+[tap_hold.hold_picker]
+modifiers = ["ctrl", "shift", "alt", "alt_gr", "win"]
+layers = ["nav"]
+
+
+
 # =========================
 # ===== 1.1 caps_lock =====
 # =========================

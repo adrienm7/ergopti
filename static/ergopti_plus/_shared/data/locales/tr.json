@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Dokunma eylemi — ",
+	"tap_hold.picker.tap_title": "Dokunma eylemi",
+	"tap_hold.picker.tap_prompt": "Kısa basışta üretilen eylem (boş = özgün tuş):",
 	"tap_hold.reset_defaults": "Varsayılan değerlere sıfırla",
 	"tap_hold.tap.none": "Yerel tuş",
 	"terminators.label_close_paren": ") : Kapatan parantez",

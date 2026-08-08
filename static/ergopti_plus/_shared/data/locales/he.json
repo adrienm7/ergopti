@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "פעולת הקשה — ",
+	"tap_hold.picker.tap_title": "פעולת הקשה",
+	"tap_hold.picker.tap_prompt": "פעולה בלחיצה קצרה (ריק = המקש המקורי):",
 	"tap_hold.reset_defaults": "אפס לערכי ברירת מחדל",
 	"tap_hold.tap.none": "מקשים מקוריים",
 	"terminators.label_close_paren": ") : סוגריים סוגרים",

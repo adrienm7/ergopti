@@ -269,6 +269,42 @@ end
 --- tap_hold.toml and reopens the menu must see what they wrote, and this runs
 --- once per menu build, not per keystroke.
 --- @return table key id → { time_activation_seconds, tap_action, hold_modifier }.
+--- The `[tap_hold.hold_picker]` catalogue from the shared defaults.
+---
+--- The menu's hold picker is built from it by _shared/lua/tap_hold/hold_options,
+--- so the list this driver offers and the one AutoHotkey offers come from the
+--- same table rather than from two arrays that agree today.
+--- @return table|nil { modifiers = {...}, layers = {...} }, or nil when unreadable.
+function M.hold_picker_catalogue()
+	_resolve_paths()
+	local defaults_path = _shared_dir and (_shared_dir .. "/tap_hold/defaults.toml") or nil
+	if not defaults_path then
+		local ok_paths, Paths = pcall(require, "infra.paths")
+		defaults_path = ok_paths and Paths.shared("tap_hold/defaults.toml") or nil
+	end
+	if not defaults_path then
+		Logger.error(LOG, "No shared defaults path — the hold picker has no catalogue.")
+		return nil
+	end
+
+	local fh = io.open(defaults_path, "r")
+	if not fh then
+		Logger.error(LOG, "Cannot read '%s' — the hold picker has no catalogue.", defaults_path)
+		return nil
+	end
+	local content = fh:read("*a")
+	fh:close()
+
+	-- The same codec the key loader above uses, so the catalogue and the keys are
+	-- read by one parser rather than two that could disagree about this file.
+	local parsed = TomlCodec.decode(content)
+	if type(parsed) ~= "table" or type(parsed.tap_hold) ~= "table" then
+		Logger.error(LOG, "'%s' did not parse — the hold picker has no catalogue.", defaults_path)
+		return nil
+	end
+	return parsed.tap_hold.hold_picker
+end
+
 function M.tap_hold_keys()
 	return _load_tap_hold_config()
 end

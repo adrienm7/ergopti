@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap-åtgärd — ",
+	"tap_hold.picker.tap_title": "Tryckåtgärd",
+	"tap_hold.picker.tap_prompt": "Åtgärd vid kort tryck (tomt = ursprunglig tangent):",
 	"tap_hold.reset_defaults": "Återställ standardvärden",
 	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Avslutande parentes",

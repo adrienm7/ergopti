@@ -2028,6 +2028,115 @@ local function _tap_hold_hold_label(modifier)
 	return label
 end
 
+--- The tap-hold writer, loaded lazily and once.
+---
+--- Lazily because a driver whose kanata manager never loaded must still build its
+--- menu — the rows then report the configuration they can read and refuse to
+--- change it, which is what it is.
+--- @return table|nil
+local function _tap_hold_writer()
+	local ok_mod, writer = pcall(require, "platform.remap.tap_hold_writer")
+	if not ok_mod or type(writer) ~= "table" then
+		Logger.error(LOG, "The tap-hold writer is unavailable — this key cannot be changed from the menu.")
+		return nil
+	end
+	return writer
+end
+
+--- Whether the user's own file names this key.
+--- @param key_id string
+--- @return boolean
+local function _tap_hold_is_overridden(key_id)
+	local writer = _tap_hold_writer()
+	if not writer or type(writer.is_overridden) ~= "function" then return false end
+	local ok, overridden = pcall(writer.is_overridden, key_id)
+	return ok and overridden or false
+end
+
+--- Returns this key to the shared default.
+--- @param ctx table Menu context.
+--- @param key_id string
+local function _tap_hold_clear(ctx, key_id)
+	local writer = _tap_hold_writer()
+	if not writer then return end
+	pcall(writer.clear_key, key_id)
+	if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+end
+
+--- Asks for a new tap action and persists it.
+---
+--- A free-text prompt rather than a list, for the same reason Windows opens a
+--- dialog here: a tap action is a key name in some entries and a shared action id
+--- in others, so the set is not enumerable without deciding which half to drop.
+--- @param ctx table Menu context.
+--- @param key_id string
+--- @param current string|nil
+local function _tap_hold_prompt_tap(ctx, key_id, current)
+	local writer = _tap_hold_writer()
+	if not writer then return end
+	local value = prompt_text(
+		i18n_safe("tap_hold.picker.tap_title"),
+		i18n_safe("tap_hold.picker.tap_prompt"),
+		current or "")
+	if value == nil then return end
+	-- An empty answer clears the tap action, which is how the key goes back to
+	-- emitting itself — the same meaning `tap_action = null` has in the file.
+	pcall(writer.set_field, key_id, "tap_action", value ~= "" and value or nil)
+	if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+end
+
+--- The hold picker's rows, from the SHARED catalogue.
+---
+--- `_shared/lua/tap_hold/hold_options.lua` builds the ordered list — the "none"
+--- sentinel, every combination of the declared modifiers, then the layers — from
+--- `[tap_hold.hold_picker]` in the shared defaults. The AutoHotkey driver offers
+--- the same list from the same table; before 2026-08-08 it was a hardcoded array
+--- there and no list at all here.
+--- @param ctx table Menu context.
+--- @param key_id string
+--- @param entry table The key's current configuration.
+--- @return table Provider rows.
+local function _tap_hold_hold_rows(ctx, key_id, entry)
+	local ok_mod, HoldOptions = pcall(require, "tap_hold.hold_options")
+	if not ok_mod or type(HoldOptions) ~= "table" then
+		Logger.error(LOG, "The shared hold-option catalogue is unavailable — the hold picker is empty.")
+		return {}
+	end
+	local km = ctx.kanata
+	local catalogue = nil
+	if km and type(km.hold_picker_catalogue) == "function" then
+		local ok, value = pcall(km.hold_picker_catalogue)
+		catalogue = ok and value or nil
+	end
+
+	local current_mod   = type(entry.hold_modifier) == "string" and entry.hold_modifier or ""
+	local current_layer = type(entry.hold_layer) == "string" and entry.hold_layer or ""
+	local rows = {}
+	for _, option in ipairs(HoldOptions.build(catalogue)) do
+		local id, kind = option.id, option.kind
+		local checked = (kind == "none" and current_mod == "" and current_layer == "")
+			or (kind == "modifier" and current_mod == id)
+			or (kind == "layer" and current_layer == id)
+		rows[#rows + 1] = {
+			label   = HoldOptions.label(option, i18n_safe),
+			checked = checked or nil,
+			action  = function()
+				local writer = _tap_hold_writer()
+				if not writer then return end
+				if kind == "layer" then
+					pcall(writer.set_field, key_id, "hold_layer", id)
+				elseif kind == "modifier" then
+					pcall(writer.set_field, key_id, "hold_modifier", id)
+				else
+					pcall(writer.set_field, key_id, "hold_modifier", nil)
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
+	return rows
+end
+
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_kanata(ctx)
@@ -2107,17 +2216,34 @@ local function _build_kanata(ctx)
 				local entry = keys[id] or {}
 				local seconds = tonumber(entry.time_activation_seconds)
 				local ms = seconds and math.floor(seconds * 1000 + 0.5) or nil
+				local key_id = id
+				-- CONTROLS since 2026-08-08, not a read-out. Every row below was
+				-- greyed, with the note « a clickable row that cannot change
+				-- anything is worse than a greyed one » — true of the row, and the
+				-- wrong conclusion for the driver: Windows has edited these from its
+				-- tray since the feature existed, from this same file format. The
+				-- writer lives in platform/remap/tap_hold_writer.lua and reloads
+				-- kanata, so a click here takes effect immediately.
 				rows[#rows + 1] = {
-					label = _tap_hold_key_label(id),
-					-- A read-out, not a control: this driver reads the tap-hold file
-					-- and has no writer for it, so every row below is disabled. A
-					-- clickable row that cannot change anything is worse than a
-					-- greyed one — it looks like the setting simply did not take.
-					items = {
-						{ label = string.format(i18n_safe("tap_hold.picker.tap"),
-							_tap_hold_action_label(entry.tap_action)), disabled = true },
-						{ label = string.format(i18n_safe("tap_hold.picker.hold"),
-							_tap_hold_hold_label(entry.hold_modifier)), disabled = true },
+					label   = _tap_hold_key_label(id),
+					checked = _tap_hold_is_overridden(key_id),
+					items   = {
+						{
+							label    = i18n_safe("tap_hold.action.disable"),
+							disabled = not _tap_hold_is_overridden(key_id),
+							action   = function() _tap_hold_clear(ctx, key_id) end,
+						},
+						{ separator = true },
+						{
+							label  = string.format(i18n_safe("tap_hold.picker.tap"),
+								_tap_hold_action_label(entry.tap_action)),
+							action = function() _tap_hold_prompt_tap(ctx, key_id, entry.tap_action) end,
+						},
+						{
+							label = string.format(i18n_safe("tap_hold.picker.hold"),
+								_tap_hold_hold_label(entry.hold_modifier)),
+							items = _tap_hold_hold_rows(ctx, key_id, entry),
+						},
 						{ label = ms and string.format(i18n_safe("menu.kanata.tap_hold_delay"), tostring(ms))
 							or i18n_safe("menu.kanata.tap_hold_delay"), disabled = true },
 					},

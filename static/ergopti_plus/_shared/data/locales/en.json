@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap action — ",
+	"tap_hold.picker.tap_title": "Tap action",
+	"tap_hold.picker.tap_prompt": "Action emitted by a short press (empty = native key):",
 	"tap_hold.reset_defaults": "Reset to default values",
 	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Closing parenthesis",

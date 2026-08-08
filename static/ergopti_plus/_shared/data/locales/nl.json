@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tik-actie — ",
+	"tap_hold.picker.tap_title": "Tik-actie",
+	"tap_hold.picker.tap_prompt": "Actie bij een korte druk (leeg = originele toets):",
 	"tap_hold.reset_defaults": "Standaardwaarden herstellen",
 	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Sluitende haak",

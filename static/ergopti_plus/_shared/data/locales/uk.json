@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Дія при натисканні — ",
+	"tap_hold.picker.tap_title": "Дія при натисканні",
+	"tap_hold.picker.tap_prompt": "Дія при короткому натисканні (порожньо = початкова клавіша):",
 	"tap_hold.reset_defaults": "Скинути до стандартних значень",
 	"tap_hold.tap.none": "Рідна клавіша",
 	"terminators.label_close_paren": ") : Закриваюча дужка",

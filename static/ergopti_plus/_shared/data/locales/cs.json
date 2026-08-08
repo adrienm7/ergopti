@@ -1799,6 +1799,8 @@
 	"tap_hold.picker.hold": "Hold → %s",
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Akce při klepnutí — ",
+	"tap_hold.picker.tap_title": "Akce při ťuknutí",
+	"tap_hold.picker.tap_prompt": "Akce při krátkém stisku (prázdné = původní klávesa):",
 	"tap_hold.reset_defaults": "Obnovit výchozí hodnoty",
 	"tap_hold.tap.none": "Nativní klávesa",
 	"terminators.label_close_paren": ") : Uzavírací závorka",
