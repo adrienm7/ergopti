@@ -113,6 +113,19 @@ helpers.describe("TimerScheduler adapter — after()", function()
 		timer_stub.fire(1)
 		helpers.assert_eq(TS.activeCount(), 0)
 	end)
+
+	helpers.it("does not register a nil native timer as live", function()
+		local timer_stub = make_timer_stub()
+		timer_stub.doAfter = function() return nil end
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+			{ timer = timer_stub })
+		local handle = TS.after(1, function() end)
+		helpers.assert_true(handle.fired,
+			"a schedule failure must return a terminal handle")
+		helpers.assert_nil(handle.timer)
+		helpers.assert_eq(TS.activeCount(), 0,
+			"a nil native handle cannot be retained as a live timer")
+	end)
 end)
 
 helpers.describe("TimerScheduler adapter — cancel()", function()
@@ -183,6 +196,18 @@ helpers.describe("TimerScheduler adapter — cancelAll()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — every()", function()
+	helpers.it("does not register a nil repeating timer as live", function()
+		local timer_stub = make_timer_stub()
+		timer_stub.doEvery = function() return nil end
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+			{ timer = timer_stub })
+		local handle = TS.every(1, function() end)
+		helpers.assert_true(handle.fired,
+			"a repeating schedule failure must return a terminal handle")
+		helpers.assert_nil(handle.timer)
+		helpers.assert_eq(TS.activeCount(), 0)
+	end)
+
 	helpers.it("does not mark handle fired after first firing (repeating)", function()
 		local timer_stub = make_timer_stub()
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
