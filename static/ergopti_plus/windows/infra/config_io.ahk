@@ -687,13 +687,17 @@ SetScriptShortcutAction(Slot, ActionName) {
 
 BuildScriptShortcutsMenu() {
 		global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, GESTURE_ACTIONS
-		SMenu := Menu()
+		Rows := []
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
 				Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
 				CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
-				RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel, ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
+				Rows.Push(Map(
+					"label",  SlotLabel . " : " . CurrentLabel,
+					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel)))
 		}
+		SMenu := Menu()
+		MenuRenderer_AppendRows(SMenu, "shortcuts_menu", "script_control", Rows)
 		return SMenu
 }
 

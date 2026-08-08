@@ -29,17 +29,23 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 		return
 	}
 
-	PersonalMenu := Menu()
+	; One nested row per registered personal shortcut, drawn by the renderer.
+	PersonalRows := []
 	for _, Name in Names {
 		; Label comes straight from the registry (the description, or the name
 		; itself when none); the v2 path keys the lowercased name under
 		; [shortcuts.personal]. Names are already lowercased at registration.
 		Desc  := _PersonalShortcutsRegistry.Has(Name) ? _PersonalShortcutsRegistry[Name] : ""
 		Label := (Desc != "") ? Desc : Name
-		MenuAddItemWithLabel(PersonalMenu, "shortcuts.personal." . Name, Label, "Shortcuts")
+		Row := MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")
+		if (Row != "") {
+			PersonalRows.Push(Row)
+		}
 	}
-	ShortcutsMenu.Add()
-	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)
+	MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", [
+		Map("separator", true),
+		Map("label", t("menu.shortcuts.personal"), "items", PersonalRows)
+	])
 }
 
 
@@ -354,36 +360,45 @@ _MI_AboutUpdateRows() {
 	}
 	Rows.Push(Map("separator", true))
 
-	ChannelMenu := Menu()
-	RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
-	RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
+	; The two channels as nested row DATA. The parent's label carries the channel
+	; currently set, which is why the row stays a provider's rather than a
+	; declaration's — but what hangs off it is the renderer's to draw.
 	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
-	ChannelMenu.Check(ChannelDisplay)
 	Rows.Push(Map(
-		"label",   t("menu.about.channel_menu") . ": " . ChannelDisplay,
-		"submenu", ChannelMenu))
+		"label", t("menu.about.channel_menu") . ": " . ChannelDisplay,
+		"items", [
+			Map("label",   t("menu.about.channel_main"),
+				"action",  (*) => Updater_SetChannel("main"),
+				"checked", (UPDATER_CHANNEL != "dev")),
+			Map("label",   t("menu.about.channel_dev"),
+				"action",  (*) => Updater_SetChannel("dev"),
+				"checked", (UPDATER_CHANNEL == "dev"))
+		]))
 
 	if Updater_IsLocalSource() {
 		return Rows
 	}
 
-	FreqMenu := Menu()
+	; Same shape for the check-frequency presets: one nested row per preset, the
+	; tick on whichever matches the interval in force.
+	FreqRows := []
 	CurrentLabel := ""
 	CurrentCode  := ""
 	for _, Preset in UPDATER_INTERVAL_PRESETS {
 		Label := t("menu.about.frequency." . Preset.Code)
-		RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
+		FreqRows.Push(Map(
+			"label",   Label,
+			"action",  _MakeFreqSetter(Preset.Seconds),
+			"checked", (Preset.Seconds == UPDATER_CHECK_INTERVAL)))
 		if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
 			CurrentLabel := Label
 			CurrentCode  := Preset.Code
 		}
 	}
-	if (CurrentLabel != "")
-		FreqMenu.Check(CurrentLabel)
 	FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
 	Rows.Push(Map(
-		"label",   t("menu.about.frequency_menu") . ": " . FreqDisplay,
-		"submenu", FreqMenu))
+		"label", t("menu.about.frequency_menu") . ": " . FreqDisplay,
+		"items", FreqRows))
 
 	Rows.Push(Map(
 		"label",    Updater_GetUpdateMenuLabel(),

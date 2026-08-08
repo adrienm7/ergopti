@@ -285,7 +285,25 @@ const BASELINE = {
 	// keeps the reference those callbacks need and the renderer still draws every
 	// row in it. The folder walk keeps its own recursion, because a user's
 	// directories have no depth the renderer may assume, and renders each level.
-	windows: 28,
+	// 28 → 5 on 2026-08-08, in two halves.
+	//
+	// The DEFINITION half is described in the `renderers` set below: three files
+	// were being charged for drawing rows other files had decided — the row API's
+	// own definition, the tray transport, and the adapter.
+	//
+	// The MIGRATION half: the About channel and frequency pickers, the
+	// personal-shortcuts submenu, the script-control row (a `list` of one, since
+	// its label is static and another subsystem builds its tree), the two
+	// extension error markers, the IA warning and About rows, the conditional
+	// reset row and the script-shortcut slot picker. `edit_shortcuts` became a
+	// `command` on both drivers that have it — the handler's whole body was one
+	// row with a static label and a click.
+	//
+	// Five remain: the three WPM widget rows, where the manifest records why they
+	// stay `dynamic` (their callbacks repaint the OPEN menu rather than rebuild
+	// the tray), and two tray publishes, which are the transport writing an
+	// already-decided subtree into A_TrayMenu.
+	windows: 5,
 	// 228 → 227: the pause/resume layout pickers moved with them, and the
 	// separator that framed them is a `---` row too.
 	// 223 → 211: the gesture slot rows. slotItem built them in this driver's
@@ -361,7 +379,11 @@ const BASELINE = {
 	// already started returning provider rows, so « ⌨️ Karabiner » and
 	// « Disposition » reached the menu bar with no title and their subtrees on a
 	// field hs.menubar does not read — both simply absent, with nothing to say so.
-	macos: 31,
+	// 31 → 29: the script-control shortcut tree became a `list` of one on both
+	// drivers that have it. Its label is static and the three key submenus below
+	// it were already row data, so the `dynamic` handler was appending a single
+	// row the renderer can build.
+	macos: 29,
 	// 68 → 66: the preview-bubble switches. Both Lua drivers built the same tree
 	// of four; it is a `list` now and the renderer materialises it. macOS holds
 	// at 226 because its rows are still written in the driver dialect and
@@ -450,7 +472,10 @@ const MIN_TOTAL = {
 	// extension folders took it to 47, two above the floor. 25 is under what a
 	// Windows driver whose menu is fully migrated would still show — the renderer's
 	// own Add calls and the tray root.
-	windows: 25,
+	// windows lowered 25 → 15 on 2026-08-08: naming the transport and converting
+	// the last submenus took the total to 33, of which 28 are the renderer's own.
+	// 15 is under what this driver would show with every convertible row moved.
+	windows: 15,
 	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
 	// predicate keys on `title =`, so every conversion of a builder to provider
 	// data shrinks the total by construction and the floor eventually fires on
@@ -510,7 +535,31 @@ const DRIVER_SPEC = {
 		// counts every `MenuAdd*(` call a driver file makes. Counting the
 		// RegisterMenuItem inside the helper as well charged the same row twice:
 		// once where it was asked for, once where it was drawn.
-		renderers: new Set(['infra/manifest_menu.ahk', 'ui/menu/menu_engine.ahk'])
+		// Three more joined on 2026-08-08, and all three are the SAME correction as
+		// menu_engine's above — the predicate charging a row where it is DRAWN as
+		// well as where it was decided:
+		//
+		//   infra/menu_dispatcher.ahk defines RegisterMenuItem. Counting the
+		//     definition of the row API as a row is counting the ruler as a length.
+		//   ui/menu/menu_rebuild.ahk is the tray TRANSPORT: TrayMenuStage_* records
+		//     what a caller decided and replays it into A_TrayMenu at publish. Every
+		//     Menu.Add in it is a replay of a decision made elsewhere — and the
+		//     equivalent layer on the other two drivers (tray_menu.setMenu,
+		//     hs.menubar:setMenu) takes a finished table and is not counted at all.
+		//   adapters/tray_menu.ahk is the adapter, which is that boundary by
+		//     definition.
+		//
+		// This is a definition change, not a migration: the rows those files touch
+		// were already decided by initMenu and the submenu builders, which ARE
+		// counted. Windows falls 28 → 18 with nothing rewritten, and the number
+		// finally means the same thing on all three drivers.
+		renderers: new Set([
+			'infra/manifest_menu.ahk',
+			'ui/menu/menu_engine.ahk',
+			'infra/menu_dispatcher.ahk',
+			'ui/menu/menu_rebuild.ahk',
+			'adapters/tray_menu.ahk'
+		])
 	},
 	macos: {
 		exts: ['.lua'],

@@ -676,7 +676,7 @@
 			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "script_control_shortcuts",
 			"platforms": [
 				"ahk"
@@ -692,7 +692,7 @@
 			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
 		{
-			"type": "action",
+			"type": "command",
 			"id": "edit_shortcuts",
 			"platforms": [
 				"ahk",

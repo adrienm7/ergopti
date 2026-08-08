@@ -3405,8 +3405,11 @@ id = "cmd_shortcuts"
 i18n = "menu.shortcuts.submenu_cmd"
 platforms = ["hs"]
 reason_key = "platform_reason.chord_families_are_each_platforms"
+# `list` since 2026-08-08: the handler's whole body was one row with a static
+# label whose submenu another subsystem builds, which is what a provider
+# returning a single `submenu` row says.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "script_control_shortcuts"
 
 # AHK-only, on the same evidence as personal_shortcuts below: the four
@@ -3426,8 +3429,10 @@ id = "personal_shortcuts"
 # macOS "edit_shortcuts" action below already covers "open the file to edit".
 platforms = ["ahk"]
 reason_key = "platform_reason.chord_families_are_each_platforms"
+# `command` since 2026-08-08, not `action`: the handler's whole body was one row
+# with a static label and a click, which is exactly what a declaration carries.
 [[menu.shortcuts_menu]]
-type = "action"
+type = "command"
 id = "edit_shortcuts"
 # "Open the personal shortcuts file." macOS has one — infra/personal_shortcuts.lua,
 # resolved through config_paths PersonalShortcutsLuaPath — and Windows has

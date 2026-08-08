@@ -438,9 +438,11 @@ function M.build(ctx)
 		return { disabled = not state.shortcuts or paused or nil, items = cmd_items }
 	end
 
-	local function dyn_script_control(items, _ctx)
+	--- The script-control shortcuts, as the one row a `list` provider returns.
+	--- @return table Provider rows (empty when the module is absent).
+	local function dyn_script_control()
 		local script_control = ctx.script_control
-		if not script_control then return end
+		if not script_control then return {} end
 		local enabled = state.script_control_enabled
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
 
@@ -524,10 +526,13 @@ function M.build(ctx)
 		local cur_back   = state.script_control_shortcuts.backspace  or "none"
 		local cur_escape = state.script_control_shortcuts.escape     or "none"
 
-		table.insert(items, {
-			title    = i18n.get("menu.shortcuts.script_shortcuts"),
+		-- ONE provider row, and the renderer draws it. It was a `dynamic` handler
+		-- appending one row whose label is static — which is a `list` of one, the
+		-- same shape Windows uses for the same row since 2026-08-08.
+		return { {
+			label    = i18n.get("menu.shortcuts.script_shortcuts"),
 			disabled = not enabled or paused or nil,
-			menu     = ManifestMenu.render_rows({
+			items    = ({
 				{
 					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
 					disabled = not enabled or paused or nil,
@@ -543,8 +548,8 @@ function M.build(ctx)
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("escape"),
 				},
-			}, "script_shortcuts"),
-		})
+			}),
+		} }
 	end
 
 	-- `list` since 2026-08-07: the separator, the header and one row per
@@ -630,16 +635,14 @@ function M.build(ctx)
 		return items
 	end
 
-	local function dyn_edit_shortcuts(items, _ctx)
-		table.insert(items, {
-			title = i18n.get("menu.global.edit_shortcuts"),
-			fn    = function()
-				local acts = ctx.actions
-				if type(acts) == "table" and type(acts.open_personal_shortcuts) == "function" then
-					pcall(acts.open_personal_shortcuts)
-				end
-			end,
-		})
+	--- Opens the personal-shortcuts file. The ROW is the manifest's — a `command`
+	--- since 2026-08-08, because a static label and a click is exactly what a
+	--- declaration carries — so this is only the behaviour behind it.
+	local function cmd_edit_shortcuts()
+		local acts = ctx.actions
+		if type(acts) == "table" and type(acts.open_personal_shortcuts) == "function" then
+			pcall(acts.open_personal_shortcuts)
+		end
 	end
 
 	-- Top-level items (at_hash, layer_scroll) are not in the manifest list yet;
@@ -663,8 +666,6 @@ function M.build(ctx)
 	-- =============================================
 
 	local dyn_handlers = {
-		["script_control_shortcuts"] = dyn_script_control,
-		["edit_shortcuts"]          = dyn_edit_shortcuts,
 	}
 
 	local group_builders = {
@@ -687,6 +688,7 @@ function M.build(ctx)
 		keyboard_slots = function(_ctx)
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
 		end,
+		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
@@ -698,6 +700,9 @@ function M.build(ctx)
 	-- render time rather than a silently wrong row.
 	local sc_ctx = {}
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
+	sc_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end

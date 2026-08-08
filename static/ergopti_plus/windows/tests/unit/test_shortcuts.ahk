@@ -544,8 +544,18 @@ TestShortcuts_MenuItemsUseRegisterMenuItem() {
 	Src := _DriverDirConcat("ui/menu")
 	Assert(Src != "", "ui/menu must be readable")
 	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
-	Assert(InStr(MenuShortcutsSrc, "RegisterMenuItem(") > 0,
-		"ui/menu/menu_shortcuts.ahk must register actionable items via RegisterMenuItem so they join the WM_COMMAND retry path (project-ahk-menu-dispatcher-drop)")
+	; TWO ways to be on the retry path, and the file must be on one of them. It
+	; used to call RegisterMenuItem directly; since 2026-08-08 its last actionable
+	; row is a `command` declaration and the renderer builds it — and _MR_RenderRows
+	; registers through the very same helper. Pinning the first spelling would have
+	; failed the change that made the rule harder to break.
+	ViaHelper   := InStr(MenuShortcutsSrc, "RegisterMenuItem(") > 0
+	ViaRenderer := InStr(MenuShortcutsSrc, "MenuRenderer_") > 0
+	Assert(ViaHelper or ViaRenderer,
+		"ui/menu/menu_shortcuts.ahk must put actionable items on the WM_COMMAND retry path — either "
+		. "through RegisterMenuItem directly or by handing its rows to MenuRenderer_*, which registers "
+		. "through the same helper. A raw Menu.Add(Title, Callback) silently drops about one click in "
+		. "three under AHK 2.0 (project-ahk-menu-dispatcher-drop)")
 }
 Test("Shortcuts/menu: shortcut menu items are registered via RegisterMenuItem, not raw Menu.Add (project-ahk-menu-dispatcher-drop)",
 	TestShortcuts_MenuItemsUseRegisterMenuItem)
