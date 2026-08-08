@@ -290,6 +290,26 @@ _MM_DebugFallback() {
 ; ======================================================
 ; ======================================================
 
+; Loads the whole ``top_level`` array from the shared manifest, unfiltered, as an
+; Array of Maps. Returns an empty array when the manifest cannot be read.
+;
+; The tail loader below slices this same array; the HEAD needs it whole, because
+; the order check compares what initMenu stages against everything declared
+; before the first separator.
+MenuManifest_LoadTopLevel() {
+	Root := _MM_GetManifestRoot()
+	if !(Root is Map) {
+		try LoggerWarn("MenuManifest", "menu_manifest.json unreadable — the top-level order cannot be checked.")
+		return []
+	}
+	RawItems := _MM_MapGet(Root, "top_level")
+	if !(RawItems is Array) {
+		try LoggerWarn("MenuManifest", "menu_manifest.json declares no top_level array.")
+		return []
+	}
+	return RawItems
+}
+
 ; Loads the tail slice of the ``top_level`` array from the shared manifest —
 ; starting at the "global_actions" entry — and returns it as an Array of Maps,
 ; filtered for the AHK platform.  Used by _MI_AppendTail() to drive the

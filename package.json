@@ -166,6 +166,7 @@
 		"test:ahk-v2-syntax-antipatterns": "node ./tools/test/test-ahk-v2-syntax-antipatterns.cjs",
 		"test:report": "node ./tools/test/test-report.cjs",
 		"test:locale-resolution-single-source": "node ./tools/test/test-locale-resolution-single-source.cjs",
+		"test:menu-category-coverage": "node ./tools/test/test-menu-category-coverage.cjs",
 		"test:tap-hold-hold-options-parity": "node ./tools/test/test-tap-hold-hold-options-parity.cjs",
 		"test:hotstring-category-submenu-order": "node ./tools/test/test-hotstring-category-submenu-order.cjs",
 		"test:menu-titles-single-key": "node ./tools/test/test-menu-titles-single-key.cjs",

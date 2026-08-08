@@ -238,6 +238,14 @@ initMenu() {
 		TrayMenuStage_Check(GetCategoryTitle("Gestures"))
 	}
 
+	; The HEAD is staged in the fixed sequence above, and the manifest declares
+	; that sequence too — so the two can disagree, and nothing would say which is
+	; right. This names what was staged, in order, and compares it with what
+	; top_level declares for this platform: a reordered manifest that this file
+	; does not follow is reported instead of silently ignored.
+	_MI_AssertHeadOrder(["keyboard_layout", "hotstrings", "llm", "metrics",
+		"shortcuts", "tap_holds", "gestures"])
+
 	; ─── Tail (global_actions onwards): order driven by the shared manifest top_level.
 	; Each id dispatches to its builder/registrar — only action closures and OS glue
 	; live here; layout data comes from menu_manifest.json.
@@ -250,6 +258,59 @@ initMenu() {
 	}
 }
 
+
+; Reports a head order that no longer matches the shared declaration.
+;
+; The tail below reads menu_manifest.json and dispatches by id; the head is a
+; fixed sequence of calls, because each entry needs different state assembled in
+; a different way and a generic dispatch would gain nothing. What it must not do
+; is DIFFER from the declaration — the two Lua drivers place the same entries by
+; reading it, so a manifest edit that this file ignores puts the same menu in two
+; orders.
+;
+; Reported, not enforced: reordering the calls is a real change with real
+; sequencing (the IA menu is initialised where it is because the metrics build
+; below depends on nothing it does), and a build-time ERROR naming the drift is
+; what tells the next person to make it deliberately.
+_MI_AssertHeadOrder(StagedIds) {
+	Declared := []
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if !(Entry is Map) or !Entry.Has("id")
+			continue
+		Id := Entry["id"]
+		if (Id == "---")
+			break  ; the head ends at the first separator; the tail is read below
+		if _MR_IsForAhk(Entry)
+			Declared.Push(Id)
+	}
+	if (Declared.Length == 0) {
+		try LoggerWarn("Menu", "top_level declares no head row for this platform — the order check read nothing.")
+		return
+	}
+	Mismatch := (Declared.Length != StagedIds.Length)
+	if !Mismatch {
+		for Index, Id in Declared {
+			if (Id != StagedIds[Index]) {
+				Mismatch := true
+				break
+			}
+		}
+	}
+	if Mismatch {
+		try LoggerError("Menu",
+			"The tray head is staged as [{1}] and menu_manifest.json declares [{2}] — the same menu is in two orders across the drivers.",
+			_MI_JoinIds(StagedIds), _MI_JoinIds(Declared))
+	}
+}
+
+; Comma-joins ids for the message above.
+_MI_JoinIds(Ids) {
+	Out := ""
+	for _, Id in Ids {
+		Out .= (Out == "" ? "" : ", ") . Id
+	}
+	return Out
+}
 
 ; Appends the tail section of the tray menu (from global_actions to debug) in the
 ; order declared in menu_manifest.json top_level, filtered for AHK.  Behaviour
