@@ -58,28 +58,82 @@ global _TH_KeyDefs := [
 ; Ordered hold options — value stored as hold_modifier or hold_layer in TOML.
 ; Each entry: Map("id" => storage_value, "kind" => "modifier"|"layer"|"none",
 ;                 "i18n" => label_i18n_key).
-; **Canonical list mirrors _shared/modules/menu/menu_manifest.json
-; hold_options (MENU-4).**
-global _TH_HoldModifierIds := ["ctrl", "shift", "alt", "alt_gr", "win"]
+;
+; The ids come from _shared/tap_hold/defaults.toml's [tap_hold.hold_picker].
+; They were a hardcoded array here until 2026-08-08, under a comment claiming it
+; "mirrors _shared/modules/menu/menu_manifest.json hold_options" — a key that has
+; never existed in that file. So the canonical list was a copy pointing at
+; nothing, and the two Lua drivers offered no hold picker at all. They read the
+; same table now through _shared/lua/tap_hold/hold_options.lua, and
+; tools/test/test-tap-hold-hold-options-parity.cjs holds the two enumerations
+; together.
 global _TH_HoldOptions := _TH_BuildHoldOptions()
 
+; Reads one array from [tap_hold.hold_picker] in the shared defaults.
+; Returns an empty array when the file or the key is unreadable — the caller
+; logs and falls back, because a hold picker with no options is a menu that
+; cannot be diagnosed from the outside.
+_TH_ReadHoldPickerArray(FieldName) {
+	global _SharedDir
+	Out := []
+	Path := _SharedDir . "	ap_hold\defaults.toml"
+	Content := ""
+	try Content := ReadTomlFile(Path)
+	if (Content == "") {
+		try LoggerError("TapHoldWriter", "Cannot read '{1}' — the hold picker has no {2}.", Path, FieldName)
+		return Out
+	}
+	InSection := false
+	loop parse, Content, "`n", "`r" {
+		Line := Trim(A_LoopField)
+		if (SubStr(Line, 1, 1) == "[") {
+			InSection := (Line == "[tap_hold.hold_picker]")
+			continue
+		}
+		if !InSection or (Line == "") or (SubStr(Line, 1, 1) == "#") {
+			continue
+		}
+		if RegExMatch(Line, "^" . FieldName . "\s*=\s*\[(.*)\]", &M) {
+			; Quotes stripped with Chr() rather than a regex class: AHK v2 escapes a
+			; double quote with a BACKTICK, so a backslash-escaped one inside a
+			; string is not an escape at all — it ends the literal early and leaves
+			; the rest of the line as code. The brace-balance meta test caught
+			; exactly that, four braces out.
+			DQ := Chr(34)
+			SQ := Chr(39)
+			loop parse, M[1], "," {
+				Item := Trim(A_LoopField)
+				Item := Trim(Item, DQ . SQ)
+				if (Item != "") {
+					Out.Push(Item)
+				}
+			}
+			return Out
+		}
+	}
+	try LoggerError("TapHoldWriter", "[tap_hold.hold_picker] declares no '{1}' — the hold picker is short.", FieldName)
+	return Out
+}
+
 ; Build the menu hold options once at startup: native-key sentinel, all
-; modifier combinations, and nav layer entry.
+; modifier combinations, then one entry per declared layer.
 _TH_BuildHoldOptions() {
 	Options := []
 	Options.Push(Map("id", "", "kind", "none", "i18n", "tap_hold.hold.none"))
 
 	ModifierCombos := []
-	_TH_EnumerateHoldModifierCombos("", 1, _TH_HoldModifierIds, ModifierCombos)
+	_TH_EnumerateHoldModifierCombos("", 1, _TH_ReadHoldPickerArray("modifiers"), ModifierCombos)
 	for _, ComboId in ModifierCombos {
 		Options.Push(Map("id", ComboId, "kind", "modifier", "i18n", ""))
 	}
 
-	Options.Push(Map("id", "nav", "kind", "layer", "i18n", "tap_hold.hold.nav_layer"))
+	for _, LayerId in _TH_ReadHoldPickerArray("layers") {
+		Options.Push(Map("id", LayerId, "kind", "layer", "i18n", "tap_hold.hold." . LayerId . "_layer"))
+	}
 	return Options
 }
 
-; Recursively enumerate all non-empty combinations of `_TH_HoldModifierIds` with
+; Recursively enumerate all non-empty combinations of the shared modifier ids with
 ; deterministic order: single modifiers first, then longer ordered combinations.
 _TH_EnumerateHoldModifierCombos(Prefix, StartIndex, Modifiers, Out) {
 	Loop Modifiers.Length {
