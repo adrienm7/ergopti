@@ -29,8 +29,6 @@
 _BuildShortcutsSubmenu() {
 	DynHandlers := Map(
 		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
-		"script_control_shortcuts",   (M, C) => _SC_ScriptControl(M, C),
-		"edit_shortcuts",             (M, C) => _SC_EditAction(M, C),
 	)
 
 	; The keyboard slots are a list, not a group: their rows are the user's own
@@ -39,6 +37,7 @@ _BuildShortcutsSubmenu() {
 	; ended the Menu.Insert splice that used to duplicate the groups on every
 	; updater-driven tray refresh
 	ListProviders := Map(
+		"script_control_shortcuts",   () => _SC_ScriptControlRows(),
 		"keyboard_slots",             () => KeyboardSlotRows(),
 		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
 		; extensions_shortcuts left DynHandlers on 2026-08-07: its manifest row is
@@ -47,7 +46,12 @@ _BuildShortcutsSubmenu() {
 		"extensions_shortcuts",       () => _SC_ExtensionRows(),
 	)
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders)
+	; `command` rows: a static label, a click, and the renderer builds the row.
+	Commands := Map(
+		"edit_shortcuts", OpenPersonalShortcuts
+	)
+
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
@@ -56,9 +60,15 @@ _SC_Personal(SubMenu, _Cat) {
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
-; Dynamic handler: script control shortcuts submenu.
-_SC_ScriptControl(SubMenu, _Cat) {
-	SubMenu.Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
+; List provider: the script-control shortcuts submenu, as one row.
+;
+; A `list` of one rather than a `dynamic` handler: the label is static and the
+; tree below it is built by another subsystem, which is precisely what `submenu`
+; is for. The renderer draws the row.
+_SC_ScriptControlRows() {
+	return [Map(
+		"label",   t("menu.shortcuts.script_shortcuts"),
+		"submenu", BuildScriptShortcutsMenu())]
 }
 
 ; Dynamic handler: extensions shortcuts submenus.
@@ -120,15 +130,15 @@ _SC_ExtensionRows() {
 			if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
 				if !BuildFailed
 					LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
-				ErrLabel := t("common.error_prefix") . ExtId
-				ExtMenu.Add(ErrLabel, (*) => NoAction())
-				ExtMenu.Disable(ErrLabel)
+				; A label and nothing else: the renderer draws it inert and greyed,
+				; which is exactly what a marker is.
+				MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
+					[Map("label", t("common.error_prefix") . ExtId)])
 			}
 		} else {
 			LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-			NaLabel := t("menu.extensions.empty")
-			ExtMenu.Add(NaLabel, (*) => NoAction())
-			ExtMenu.Disable(NaLabel)
+			MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
+				[Map("label", t("menu.extensions.empty"))])
 		}
 		Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 	}
@@ -146,11 +156,6 @@ _ExtMenuItemCount(MenuObj) {
 			return DllCall("GetMenuItemCount", "ptr", HMENU, "int")
 	}
 	return 0
-}
-
-; Dynamic handler: edit personal shortcuts action button.
-_SC_EditAction(SubMenu, _Cat) {
-	RegisterMenuItem(SubMenu, t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 }
 
 ; Dynamic handler: wrap-symbols submenu (toggles per built-in symbol + custom pairs).

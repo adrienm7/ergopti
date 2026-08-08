@@ -462,7 +462,8 @@ _LLM_MaybeAddReset(menu, current, default_val, on_click) {
 	if (current = default_val)
 		return
 	label := StrReplace(t("menu.llm.reset_label"), "%s", default_val)
-	RegisterMenuItem(menu, label, (*) => on_click())
+	MenuRenderer_AppendRows(menu, "llm_menu", "reset_row",
+		[Map("label", label, "action", (*) => on_click())])
 }
 
 /**

@@ -97,7 +97,8 @@ LLM_Menu_Build() {
 		; previous ``(*) => …`` lambda may have been swallowing exceptions
 		; silently — when the user clicked nothing ever fired and no log
 		; line was emitted.
-		RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.warning_install_ollama"), _LLM_Menu_OnWarningInstallClick)
+		MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "install_warning",
+			[Map("label", t("menu.llm.warning_install_ollama"), "action", _LLM_Menu_OnWarningInstallClick)])
 	}
 
 	; ── Settings rows ────────────────────────────────────────────────────────
@@ -121,8 +122,10 @@ LLM_Menu_Build() {
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational, _MR_Get(_row, "health_dot", false))
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
 
-	_LLM_Menu_Handle.Add()  ; separator
-	RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.about"), LLM_Menu_OnAbout)
+	MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "about", [
+		Map("separator", true),
+		Map("label", t("menu.llm.about"), "action", LLM_Menu_OnAbout)
+	])
 
 	; Publish the completed subtree and retire obsolete dispatcher IDs in one
 	; short, non-preemptible commit. Building itself deliberately stays outside
