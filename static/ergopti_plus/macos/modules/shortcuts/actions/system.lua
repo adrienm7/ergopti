@@ -32,6 +32,7 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local EventTapGuard = require("adapters.event_tap_guard")
+local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
 local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -447,18 +448,18 @@ function M.stop_awake()
 	close_awake_alert()
 end
 
---- Toggles the hardware CapsLock state by synthesising a raw CapsLock keystroke.
---- Useful for debugging CapsWord state or recovering a stuck CapsLock LED.
+--- Toggles the hardware CapsLock state through Hammerspoon's HID API.
+--- @return boolean|nil New CapsLock state, or nil when the HID call failed.
 function M.toggle_capslock()
-	local ok, cur = pcall(hs.eventtap.checkKeyboardModifiers)
-	if not ok then
-		Logger.warn(LOG, "toggle_capslock: could not read modifier state.")
-		return
+	-- CapsLock is delivered as flagsChanged on macOS. A newKeyEvent down/up pair
+	-- reports no construction error but does not change the lock state or LED.
+	local state, err = KeyState.toggle_capslock()
+	if state == nil then
+		Logger.error(LOG, "CapsLock toggle failed - %s.", tostring(err))
+		return nil
 	end
-	-- Synthesise a CapsLock key-down + key-up pair; macOS toggles the LED on the down event.
-	pcall(hs.eventtap.keyStroke, {}, "capslock", 0)
-	local new_state = not (cur and cur.capslock)
-	Logger.debug(LOG, "CapsLock toggled — now %s.", new_state and "ON" or "OFF")
+	Logger.debug(LOG, "CapsLock toggled — now %s.", state and "ON" or "OFF")
+	return state
 end
 
 
