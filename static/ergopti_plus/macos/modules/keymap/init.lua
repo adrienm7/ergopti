@@ -20,6 +20,8 @@ local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
@@ -124,12 +126,6 @@ local COMPLEX_DELAY_MULT = 2
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
 local COMPLEX_CARRY_SEC = 0.3
 
--- Maximum time to wait for in-flight synthetic events before treating them as
--- lost and resetting the filter counters. Under normal macOS operation synthetic
--- events arrive in < 50 ms; this generous ceiling handles extreme OS load without
--- letting a stale arm permanently block the auto-reset.
-local SYNTHETIC_STALE_SEC = 5.0
-
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
 -- them out of init.lua prevents three separate files (Registry, Expander,
@@ -150,6 +146,87 @@ Expander.init(CoreState, Registry, LLMBridge)
 local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
+local loopback_keyup_tap = nil
+
+local ACTION_EPOCH_LISTENER_ID = "modules.keymap.action_epoch"
+local _action_listener_registered = false
+local _last_action_epoch = SyntheticInput.current_action_epoch()
+local _last_context_epoch = _last_action_epoch
+local _action_preview_refresh_pending = false
+local _context_reconcile_pending = false
+local _context_reconcile_timer = nil
+
+
+--- Reconciles only the keymap context for one action epoch.
+--- This helper deliberately performs no logging, timer, canvas, or LLM work.
+--- @param epoch table Opaque token returned by SyntheticInput.
+--- @return boolean current True when epoch is still current.
+local function observe_context_epoch(epoch)
+	if epoch ~= SyntheticInput.current_action_epoch() then return false end
+	if epoch ~= _last_context_epoch then
+		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = false
+		_action_preview_refresh_pending = false
+		_last_context_epoch = epoch
+	end
+	return true
+end
+
+
+--- Observes one action epoch using Lua-only, constant-time state mutations.
+--- This is the only action-epoch work permitted inside the keyDown eventtap.
+--- @param epoch table Opaque token returned by SyntheticInput.
+--- @return boolean current True when epoch is still current.
+local function observe_action_epoch(epoch)
+	if not observe_context_epoch(epoch) then return false end
+	LLMBridge.observe_action_epoch(epoch)
+	return true
+end
+
+
+--- Async action-listener entry point. It deliberately propagates reset failures
+--- so the adapter applies its bounded retry/quarantine policy off the HID path.
+--- @param epoch table Opaque action epoch.
+local function reconcile_action_epoch_async(epoch)
+	if not observe_context_epoch(epoch) then return true end
+	if epoch == _last_action_epoch then return true end
+	local reconciled = LLMBridge.reset_for_action_epoch(epoch)
+	if not reconciled then
+		-- A newer token superseded this callback. The adapter notices its own token
+		-- changed and schedules the latest epoch; the stale one must not reopen it.
+		if epoch ~= SyntheticInput.current_action_epoch() then return true end
+		error("LLM action-epoch reset did not reconcile the current token", 0)
+	end
+	-- Physical typing can overtake the async listener. The HID callback still
+	-- updates the authoritative buffer and hotstring preview while the LLM runtime
+	-- is quarantined, but it deliberately cannot arm the prediction timer. Re-run
+	-- the normal preview path here, off the eventtap, so every character typed in
+	-- that window participates in the first post-recovery prediction.
+	if _action_preview_refresh_pending then
+		LLMBridge.update_preview(CoreState.buffer)
+		if epoch ~= SyntheticInput.current_action_epoch() then return true end
+		_action_preview_refresh_pending = false
+	end
+	_last_action_epoch = epoch
+	return true
+end
+
+
+--- Refreshes the preview and remembers when the LLM half was quarantined.
+--- The async action listener consumes the marker after reopening the exact epoch.
+--- @param buffer string Current authoritative typing buffer.
+local function update_preview_with_action_recovery(buffer)
+	if not LLMBridge.is_runtime_available() then
+		_action_preview_refresh_pending = true
+	end
+	LLMBridge.update_preview(buffer)
+end
+
+
+--- Cancels a pending catch-up when navigation made the current buffer ineligible.
+local function cancel_action_preview_recovery()
+	_action_preview_refresh_pending = false
+end
 
 
 --- Discards every belief the driver holds about the text around the cursor.
@@ -165,19 +242,44 @@ local mouse_tap = nil
 --- Declared HERE, above every caller. A Lua local's scope starts after its
 --- declaration, so a copy placed further down would bind the never-assigned
 --- GLOBAL in the error handler that needs it most.
+local function reconcile_observed_context_async()
+	_context_reconcile_timer = nil
+	if not _context_reconcile_pending then return end
+	_context_reconcile_pending = false
+	local ok, err = xpcall(LLMBridge.reconcile_observation_gap, debug.traceback)
+	if not ok then
+		-- Keep the runtime fail-closed; the watchdog will retry outside CGEventTap.
+		_context_reconcile_pending = true
+		Logger.error(LOG, "Typing-context reconciliation failed - %s.", tostring(err))
+		return
+	end
+	Logger.warn(LOG, "Typing context invalidated - keystrokes were missed.")
+end
+
+
+--- Closes cursor/prediction state in O(1), then schedules external work after
+--- the eventtap returns. The retained pending flag lets the watchdog retry if a
+--- timer allocation fails without performing file/canvas work on the HID path.
 local function invalidate_observed_context()
 	CoreState.buffer = ""
+	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
 	CoreState.start_is_word_boundary = false
-	CoreState.expected_synthetic_deletes = 0
-	CoreState.expected_synthetic_chars   = ""
-	CoreState.expected_synthetic_pastes  = 0
 	-- A terminator held across the outage has lost its ordering guarantee, but
 	-- dropping it would silently eat the user's Enter — send it rather than lose it.
-	TerminatorReplay.flush_now("keyboard tap outage")
-	LLMBridge.reset_predictions()
-	Logger.warn(LOG, "Typing context invalidated — keystrokes were missed.")
+	TerminatorReplay.flush_now("keyboard tap outage", true)
+	LLMBridge.set_runtime_quarantined(true)
+	_context_reconcile_pending = true
+	if _context_reconcile_timer then return end
+	local callback_ran = false
+	local ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
+		callback_ran = true
+		reconcile_observed_context_async()
+	end)
+	if ok and timer_or_err ~= nil and not callback_ran then
+		_context_reconcile_timer = timer_or_err
+	end
 end
 
 
@@ -216,29 +318,10 @@ function M.get_trigger_char()
 	return CoreState.magic_key or M.DEFAULT_STATE.trigger_char
 end
 
---- Read-only peek: is the given keystroke the Cmd+V echo of a pending
---- synthetic paste queued by the expander? Exposed so OTHER event taps
---- (namely the keylogger's shortcut-classification branch) can consult the
---- same fact onKeyDownRaw already uses to drain expected_synthetic_pastes,
---- without mutating the counter themselves — only onKeyDownRaw's own drain
---- below is allowed to decrement it (F-HIGH-17 fix).
---- Uses Keycodes.to_name() (which reverse-maps the keycode registry already
---- required by infra/keycodes.lua) rather than a fresh keycode-map lookup here,
---- so this peek adds no new raw OS-API call site to keymap/init.lua (tracked
---- by the OS-API purity baseline meta-test).
---- @param flags table The modifier flags from the key event.
---- @param key_code number The raw keycode.
---- @return boolean True when this keystroke is a pending synthetic paste echo.
-function M.is_pending_synthetic_paste(flags, key_code)
-	local ok, name = pcall(Keycodes.to_name, key_code)
-	local is_v_key = ok and name == "v"
-	return km_utils.is_synthetic_paste_keystroke(
-		flags, is_v_key, CoreState.expected_synthetic_pastes)
-end
-
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 function M.pause_processing()
 	CoreState.processing_paused = true
+	cancel_action_preview_recovery()
 	Logger.debug(LOG, "Processing paused.")
 end
 
@@ -428,7 +511,7 @@ end
 --- @param source_variant string|nil Telemetry variant tag.
 --- @param is_private boolean|nil True when the payload is PII and must be redacted.
 function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private)
-	Expander.perform_text_replacement(
+	return Expander.perform_text_replacement(
 		deletes,
 		emit_action,
 		function()
@@ -446,27 +529,46 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 	)
 end
 
---- Arms the synthetic-event counters so the main eventtap knows to skip the
---- echoes of keystrokes that an external injector (rules_engine, personal_info)
---- is about to emit. Must be called BEFORE the first keyStroke/keyStrokes call.
+--- Starts a provenance-bearing replacement transaction for an external injector.
+--- Must be called before the first synthetic event and sealed after the final
+--- event has been queued. Every producer gets a fresh generation; elapsed time
+--- is never used as transaction identity.
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
 --- also calling suppress_rescan() and keylogger.notify_synthetic() to complete
 --- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
 ---
---- @param deletes number Number of backspace keystrokes the injector will emit.
---- @param text    string The replacement text the injector will emit.
-function M.arm_synthetic(deletes, text)
-	if type(deletes) == "number" and deletes > 0 then
-		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes + deletes
-	end
-	if type(text) == "string" and text ~= "" then
-		CoreState.expected_synthetic_chars = (CoreState.expected_synthetic_chars or "") .. text
-	end
-	-- Record the arm timestamp so the stuck-counter reset guard in onKeyDownRaw
-	-- can distinguish a legitimate idle reset from a reset that would destroy
-	-- counters just armed by an in-flight expansion (A6 audit fix).
-	CoreState.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+--- @param deletes number Retained for compatibility with legacy callers.
+--- @param text string Retained for compatibility with legacy callers.
+--- @param pastes number|nil Retained for compatibility with legacy callers.
+--- @return table transaction SyntheticInput transaction handle.
+function M.arm_synthetic(deletes, text, pastes)
+	TerminatorReplay.flush_now("superseded by a new synthetic transaction")
+	local transaction = SyntheticInput.begin("external_replacement", "replacement")
+	return transaction
+end
+
+--- Runs `fn` inside the explicit external transaction returned by arm_synthetic.
+--- @param transaction table SyntheticInput transaction handle.
+--- @param fn function Injection callback.
+--- @return ... Return values from fn.
+function M.with_synthetic_transaction(transaction, fn, ...)
+	return SyntheticInput.with_transaction(transaction, fn, ...)
+end
+
+--- Seals an external transaction after its final event has been queued.
+--- @param transaction table SyntheticInput transaction handle.
+function M.finish_synthetic(transaction)
+	SyntheticInput.seal(transaction)
+end
+
+
+--- Cancels an external transaction whose producer failed before handoff.
+--- Every event already built under the transaction is discarded atomically.
+--- @param transaction table SyntheticInput transaction handle.
+--- @return boolean changed False when the transaction was already terminal.
+function M.cancel_synthetic(transaction)
+	return SyntheticInput.cancel(transaction)
 end
 
 
@@ -690,7 +792,6 @@ end
 -- (F13–F17, LAYER_SYN_1–3) into a single O(1) set tested once at the very
 -- top of onKeyDownRaw, eliminating the old 12-branch `or` chain.
 local FAST_EXIT_KEYCODES = {
-	[79]  = true,  -- F18 keep-awake jiggler
 	[80]  = true,  -- F19 volume-scroll modifier
 	[90]  = true,  -- F20 Karabiner nav-layer sentinel
 	[105] = true,  -- F13 Karabiner Return sentinel
@@ -717,11 +818,51 @@ local FAST_EXIT_KEYCODES = {
 -- backspace handling, buffer tracking and expansions.
 local _interceptor_error_logged = {}
 
-local function onKeyDownRaw(e)
-	if CoreState.processing_paused then return false end
+local function onKeyDownRaw(e, provenance, provenance_status)
+	-- Tap order is not stable: an action can advance the shared epoch before this
+	-- keymap tap sees its tagged echo. The wrapper also claims older deferred
+	-- output before entering this function, so re-read the epoch before every
+	-- other gate and never route a physical key through stale predictions.
+	local action_epoch = SyntheticInput.current_action_epoch()
+	if action_epoch ~= _last_context_epoch then
+		observe_action_epoch(action_epoch)
+	end
+
+	-- A stale internal loopback has lost the live transaction identity required to
+	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
+	-- every state (including pause) instead of leaking F16 to the frontmost app.
+	local internal_loopback = provenance
+		and (provenance.loopback == true or provenance.stale_loopback == true)
+	if provenance and provenance.stale_loopback then return true end
+
+	-- A failed native user-data read is neither proof of physical input nor proof
+	-- of ownership. Pass the event through, but discard every cursor/text belief so
+	-- an unreadable synthetic echo cannot be appended as human typing.
+	if provenance_status == EventProvenance.STATUS_UNREADABLE then
+		invalidate_observed_context()
+		return false
+	end
+	-- Ordinary owned output is already represented logically by its transaction.
+	-- Only the explicit live loopback control is allowed to reach key decoding;
+	-- every replacement/action echo exits before the native getKeyCode call.
+	if provenance and not internal_loopback then return false end
+
+	if CoreState.processing_paused then return internal_loopback == true end
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
 	local keyCode = e:getKeyCode()
+
+	-- Explicit user-data tags are the only synthetic identity. The wrapper reads
+	-- provenance once before its physical-ordering fence and passes the result in,
+	-- avoiding a second ObjC property read on the hottest callback in the driver.
+	if internal_loopback then
+		-- Quartz may duplicate an injected event during tap recovery. A control
+		-- signal is edge-triggered, so only its first delivery may reach the LLM.
+		if provenance.duplicate then return true end
+	end
+	-- A loopback tag is an explicit control signal (currently F16 for chained
+	-- LLM completion). It is still synthetic for every other consumer, but this
+	-- keymap callback must deliberately route it through handle_llm_keys below.
 
 	-- O(1) fast-exit for synthetic signals and Karabiner/layer sentinels.
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
@@ -739,53 +880,11 @@ local function onKeyDownRaw(e)
 	local now = hs.timer.secondsSinceEpoch()
 
 	if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now) then
-		-- This early exit is ABOVE every synthetic-echo drain below, so an
-		-- expansion performed while such a window has focus arms expectations
-		-- that can never be consumed here. They used to survive until the
-		-- staleness ceiling and then absorb the user's first real keystrokes in
-		-- the next app — keys typed and never recorded, which is how the buffer
-		-- ends up shorter than the screen and the following expansion
-		-- backspaces over real text. Nothing observable is lost by clearing
-		-- them: every echo they describe returns through this same branch and
-		-- is discarded unread.
-		if (CoreState.expected_synthetic_deletes or 0) > 0
-			or #(CoreState.expected_synthetic_chars or "") > 0
-			or (CoreState.expected_synthetic_pastes or 0) > 0 then
-			CoreState.expected_synthetic_deletes = 0
-			CoreState.expected_synthetic_chars   = ""
-			CoreState.expected_synthetic_pastes  = 0
-			TerminatorReplay.flush_now("focus left the observable window")
-			Logger.debug(LOG, "Synthetic expectations cleared — window is not observed.")
-		end
-		return false
+		return internal_loopback == true
 	end
 
 	local dt  = now - CoreState.last_key_time
 	CoreState.last_key_time = now
-
-	-- Auto-reset stuck synthetic counters when typing resumes after a pause.
-	-- Without this, a missed synthetic event would permanently lock the engine.
-	-- Guard: skip the reset while events are still pending (in-flight) unless
-	-- the arm is older than SYNTHETIC_STALE_SEC — at that point we assume the
-	-- events were truly lost and recover. This replaces the old fixed 1.0 s
-	-- arm-age check, which could incorrectly reset counters just before delayed
-	-- synthetic events arrived (race condition under extreme OS load).
-	local pending_deletes = CoreState.expected_synthetic_deletes or 0
-	local pending_chars   = CoreState.expected_synthetic_chars   or ""
-	-- Pastes are a THIRD synthetic counter and the SOLE in-flight marker for a
-	-- 0-delete paste expansion (LLM completions + >50-codepoint/high-unicode
-	-- hotstrings emit via Cmd+V, leaving deletes==0 and chars==""). Omitting it
-	-- here let a stall before the Cmd+V echo wipe the rebuilt buffer and log a
-	-- phantom Cmd+V; the SYNTHETIC_STALE_SEC escape hatch still recovers a truly
-	-- lost echo.
-	local pending_pastes  = CoreState.expected_synthetic_pastes  or 0
-	local arm_age         = now - (CoreState.last_synthetic_arm_time or 0)
-	local events_in_flight = pending_deletes > 0 or #pending_chars > 0 or pending_pastes > 0
-	if dt > 0.5 and (not events_in_flight or arm_age > SYNTHETIC_STALE_SEC) then
-		CoreState.expected_synthetic_deletes = 0
-		CoreState.expected_synthetic_chars   = ""
-		CoreState.expected_synthetic_pastes  = 0
-	end
 
 	-- Wipe the buffer after the user pauses long enough that the next keystroke
 	-- cannot possibly belong to the same word. The pause itself stands in for
@@ -799,50 +898,26 @@ local function onKeyDownRaw(e)
 
 	local flags = e:getFlags()
 
-	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
-	-- Guard with a source-PID check so a human Backspace pressed during an in-flight
-	-- expansion does not incorrectly consume a slot and desync the buffer (Bug 1 fix).
-	-- Is this event one WE posted? Both the synthetic-Delete guard below and the
-	-- LLM-key routing further down need the answer, and the property read is an
-	-- ObjC round-trip on the hottest path in the driver — so it is taken at most
-	-- once per keystroke, and only when something actually asks.
-	local _event_is_ours = nil
-	local function event_is_ours()
-		if _event_is_ours == nil then
-			_event_is_ours = e:getProperty(hs.eventtap.event.properties.eventSourceUnixProcessID) == hs.processInfo.processID
-		end
-		return _event_is_ours
-	end
-
-	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
-		if event_is_ours() then
-			CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
-			-- A held terminator waits on exactly these counters; the last delete of
-			-- a replacement that types nothing (a pure erase) is its release signal.
-			TerminatorReplay.flush_if_delivered()
-			return false
-		end
-	end
-
 	-- Cache hit guaranteed: is_ignored_window was already called above and returned
 	-- false (otherwise we would have early-exited). Re-call returns the same cached
 	-- value — needed here as `is_ignored` is passed on to LLM and later callers.
 	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
-	-- Skipped for our OWN synthetic echoes while an expansion is still emitting.
-	-- The terminator re-type posts a real Return or Tab, which comes back through
-	-- this tap; with predictions on screen handle_llm_keys read it as the user
-	-- accepting one and injected LLM text into the middle of the expansion that
-	-- was still being typed. Same source-PID test as the synthetic-Delete guard
-	-- above, and narrowed to the emitting window so a human Tab pressed at any
-	-- other moment still routes normally.
-	local mid_expansion = (CoreState.expected_synthetic_chars or "") ~= ""
-		or (CoreState.expected_synthetic_pastes or 0) > 0
-	local is_own_event = mid_expansion and event_is_ours()
-	if not is_own_event then
-		if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
+	-- Tagged synthetic keys already returned above, so every event here is a real
+	-- input/control event and must retain the normal LLM semantics.
+	if internal_loopback then
+		-- F16 is an internal edge, never application input. A declined chain (for
+		-- example after a reset) is still consumed; only the first live delivery may
+		-- ask the engine to advance.
+		LLMBridge.handle_llm_keys(keyCode, flags, is_ignored)
+		return true
 	end
+	-- F16 is an internal control channel only when its exact Quartz tag says so.
+	-- A physical/programmable F16 must never satisfy chain_pending ahead of the
+	-- delayed loopback that owns that edge.
+	if keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL then return false end
+	if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
 
 	-- 3. Run custom interceptors registered by external modules.
 	-- The character is read HERE rather than at step 8, because the interceptors
@@ -880,6 +955,7 @@ local function onKeyDownRaw(e)
 	-- The cursor stays where it is; the next keystroke starts a fresh run.
 	if keyCode == Keycodes.ESCAPE then
 		CoreState.start_is_word_boundary = true
+		cancel_action_preview_recovery()
 		return LLMBridge.check_escape_reset()
 	end
 
@@ -889,30 +965,9 @@ local function onKeyDownRaw(e)
 	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
 	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
 	if flags.cmd or flags.ctrl then
-		-- Drain the dedicated paste counter for a Cmd+V echo FIRST — before the
-		-- chars guard below. A terminator-expand-via-paste (e.g. a long/unicode
-		-- hotstring whose non-consumed space terminator is re-typed) arms BOTH
-		-- expected_synthetic_pastes (the Cmd+V echo) AND expected_synthetic_chars
-		-- (the terminator). The OS posts the Cmd+V echo first; if the chars guard
-		-- ran first it would intercept that echo and the paste counter would never
-		-- be drained, leaving it stuck at >0 so the user's NEXT genuine Cmd+V is
-		-- silently swallowed. Order matters: paste check precedes chars check.
-		if flags.cmd and keyCode == hs.keycodes.map["v"]
-			and (CoreState.expected_synthetic_pastes or 0) > 0 then
-			CoreState.expected_synthetic_pastes = CoreState.expected_synthetic_pastes - 1
-			-- A paste-backed replacement echoes no characters, so this is the only
-			-- evidence a held terminator will ever get that its text is on its way.
-			TerminatorReplay.flush_if_delivered()
-			return false
-		end
-		-- If expected_synthetic_chars is non-empty, this Cmd keystroke is the
-		-- Cmd+V echo from our own clipboard-paste expansion — do not wipe the
-		-- buffer; the synthetic chars will be consumed by the filter below.
-		if #CoreState.expected_synthetic_chars > 0 then
-			return false
-		end
 		CoreState.buffer = ""
 		CoreState.start_is_word_boundary = (keyCode == hs.keycodes.map["a"])
+		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
 	end
@@ -924,6 +979,7 @@ local function onKeyDownRaw(e)
 		if flags.cmd or flags.alt then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = false
+			cancel_action_preview_recovery()
 			LLMBridge.check_nav_reset()
 			return false
 		end
@@ -931,7 +987,7 @@ local function onKeyDownRaw(e)
 			-- Remove the last UTF-8 character from the buffer safely.
 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
-			if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
+			if not is_ignored then update_preview_with_action_recovery(CoreState.buffer) end
 		else
 			-- Backspace pressed against an already-empty buffer: the user
 			-- has just deleted a character that lived to the LEFT of where
@@ -939,6 +995,7 @@ local function onKeyDownRaw(e)
 			-- Flip the boundary flag so subsequent word-boundary-required
 			-- triggers refuse to fire until a real terminator is observed.
 			CoreState.start_is_word_boundary = false
+			cancel_action_preview_recovery()
 		end
 		return false
 	end
@@ -948,6 +1005,7 @@ local function onKeyDownRaw(e)
 	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
 		or (keyCode >= 123 and keyCode <= 126) then
 		CoreState.start_is_word_boundary = true
+		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
 	end
@@ -955,47 +1013,6 @@ local function onKeyDownRaw(e)
 	-- 8. The character was gathered above, before the interceptors, so it is read
 	-- from the event exactly once per keystroke.
 	if not chars or chars == "" then return false end
-
-	-- CRUCIAL SYNTHETIC FILTER:
-	-- When we typed a character programmatically, the OS sends it back to us as
-	-- a real event. Skip it here so it does not get added twice to the buffer.
-	-- Comparison is codepoint-aligned: we slice `expected_synthetic_chars` to
-	-- the same number of codepoints as the current event's `chars`, then byte-
-	-- compare. Byte-only slicing used to fail when a single event carried N
-	-- codepoints whose encoded byte length differed from our emitted bytes
-	-- (e.g. grouped multi-codepoint sequences, or unicode normalization by the
-	-- OS text-input stack).
-	if #CoreState.expected_synthetic_chars > 0 then
-		local chars_n = text_utils.utf8_len(chars)
-		local ok_cut, cut = pcall(utf8.offset, CoreState.expected_synthetic_chars, chars_n + 1)
-		if ok_cut and cut and CoreState.expected_synthetic_chars:sub(1, cut - 1) == chars then
-			CoreState.expected_synthetic_chars = CoreState.expected_synthetic_chars:sub(cut)
-			-- The replacement is fully echoed once this drains — release the
-			-- terminator that has been waiting for exactly that.
-			TerminatorReplay.flush_if_delivered()
-			return false
-		elseif event_is_ours() then
-			-- Ours, but not byte-identical to the head of the expectation: the OS
-			-- text-input stack regrouped or normalised what we injected. Discard it
-			-- like any other echo — it is already on screen and must not be counted
-			-- twice — then clear the expectation, which can no longer be aligned.
-			CoreState.expected_synthetic_chars = ""
-			TerminatorReplay.flush_if_delivered()
-			return false
-		else
-			-- A HUMAN keystroke arriving mid-expansion. This branch used to swallow
-			-- it whenever it landed within 20 ms of the previous key, on the theory
-			-- that anything typed that fast had to be our own echo. Speed is not
-			-- evidence of provenance: the character stayed on screen but never
-			-- reached the buffer, so the driver's idea of the line grew shorter than
-			-- the line itself and the next expansion backspaced over text the user
-			-- had typed. Provenance is what the question actually asks, and the
-			-- source-PID test answers it exactly — the same migration from a timing
-			-- window to a provenance filter the Windows driver already made for this
-			-- bug. The stale expectation is purged so it absorbs nothing further.
-			CoreState.expected_synthetic_chars = ""
-		end
-	end
 
 	-- Append to the rolling buffer and cap it at BUFFER_MAX_CHARS CODEPOINTS.
 	-- The cap used to be a byte-count cap (500 bytes) but that silently kept
@@ -1026,7 +1043,7 @@ local function onKeyDownRaw(e)
 	local rescan_suppressed = now < CoreState.no_rescan_until
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
-		if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
+		if not is_ignored then update_preview_with_action_recovery(CoreState.buffer) end
 		return false
 	end
 
@@ -1100,7 +1117,7 @@ local function onKeyDownRaw(e)
 	-- when an expansion happens, which we just ruled out).
 	if not is_ignored then
 		local pv0 = hot_dbg and HotPath.now() or nil
-		LLMBridge.update_preview(CoreState.buffer)
+		update_preview_with_action_recovery(CoreState.buffer)
 		if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
 	end
 
@@ -1108,10 +1125,25 @@ local function onKeyDownRaw(e)
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
 	-- (fast-accepts pred #1) and never reaches this point.
 	if keyCode == Keycodes.RETURN or keyCode == 48 then
+		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 	end
 
 	return false
+end
+
+--- Concatenates two callback-return event arrays while preserving FIFO order.
+--- The common one-sided cases are O(1) and allocate nothing.
+--- @param older table|nil Events that must precede newer.
+--- @param newer table|nil Later callback output.
+--- @return table|nil events
+local function merge_returned_events(older, newer)
+	if older == nil then return newer end
+	if newer == nil then return older end
+	local merged = {}
+	for _, event in ipairs(older) do merged[#merged + 1] = event end
+	for _, event in ipairs(newer) do merged[#merged + 1] = event end
+	return merged
 end
 
 --- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
@@ -1134,8 +1166,69 @@ local function onKeyDown(e)
 	local t0 = Perf.is_enabled() and Perf.now() or nil
 	-- Clear last keystroke's sub-segment timings so a slow line never reports
 	-- stale figures from an earlier keystroke that took a different branch.
+	_tc_chars = ""
 	_tc_dbg_checks_ms, _tc_dbg_preview_ms = nil, nil
-	local ok, result = pcall(onKeyDownRaw, e)
+
+	-- Classify once before any physical-input state mutation. Action-epoch
+	-- reconciliation deliberately runs from this immutable provenance result.
+	-- The first Ergopti tap reached by a
+	-- physical event claims every older deferred action, publishes its epoch and
+	-- returns its payload before the original. This makes keymap/keylogger ordering
+	-- independent of Quartz tap insertion order.
+	local provenance = nil
+	local provenance_status = EventProvenance.STATUS_UNREADABLE
+	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil = pcall(
+		EventProvenance.classify_with_fence, e, "keymap")
+	local fence_events = nil
+	if classify_ok then
+		provenance = provenance_or_err
+		provenance_status = status_or_nil or EventProvenance.STATUS_UNREADABLE
+		if fence_or_nil then fence_events = fence_or_nil.events end
+	else
+		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
+			tostring(provenance_or_err))
+		-- Preserve output ordering even if adapter bookkeeping itself failed. The
+		-- event remains unreadable and therefore cannot mutate keymap state.
+		local fence_ok, fence_or_err = pcall(SyntheticInput.claim_physical_fence)
+		if fence_ok and fence_or_err then
+			fence_events = fence_or_err.events
+		elseif not fence_ok then
+			pcall(Logger.error, LOG, "Synthetic physical-input fence failed: %s.",
+				tostring(fence_or_err))
+		end
+	end
+
+	-- Synthetic injectors reached below build tagged Quartz events instead of
+	-- posting them recursively from inside this eventtap. The collector hands the
+	-- complete ordered batch back as the callback's second result, which keeps the
+	-- HID callback non-blocking and gives every echo immutable provenance.
+	local entered, enter_err = pcall(SyntheticInput.enter_callback)
+	if not entered then
+		Logger.error(LOG, "Synthetic callback collector failed to start: %s.", tostring(enter_err))
+		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
+			fence_events
+	end
+
+	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status)
+	local returned_events = nil
+	if ok then
+		local left, consume_or_err, events = pcall(SyntheticInput.leave_callback, result)
+		if left then
+			result = consume_or_err
+			returned_events = merge_returned_events(fence_events, events)
+		else
+			ok = false
+			result = consume_or_err
+			-- leave_callback is designed to unwind atomically. Keep this backstop
+			-- idempotent so a future implementation cannot strand ambient state.
+			pcall(SyntheticInput.abort_callback)
+		end
+	else
+		-- Discard every event created before the exception. Returning a partial
+		-- replacement would be worse than passing through the user's original key.
+		pcall(SyntheticInput.abort_callback)
+	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
 	local hot_detail = _tc_chars
@@ -1157,9 +1250,10 @@ local function onKeyDown(e)
 			-- text around the cursor is now a guess.
 			invalidate_observed_context()
 		end
-		return false
+		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
+			fence_events
 	end
-	return result
+	return result, returned_events
 end
 
 
@@ -1173,6 +1267,22 @@ end
 -- ===================================
 
 tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
+
+-- Loopback controls are emitted as Quartz down/up pairs. The main keymap tap
+-- consumes the down phase; this minimal sibling consumes the exact tagged up
+-- phase so an application/hotkey cannot observe an orphan F16 release.
+loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
+	if EventTapGuard.handle_disabled(e, loopback_keyup_tap, "keymap.loopback_keyup") then
+		return false
+	end
+	local provenance, _, fence = EventProvenance.classify_with_fence(
+		e, "keymap.loopback_keyup")
+	local fence_events = fence and fence.events or nil
+	if provenance and (provenance.loopback or provenance.stale_loopback) then
+		return true, fence_events
+	end
+	return false, fence_events
+end)
 
 -- Per-side shift state. flagsChanged only tells us "shift is down or up" at
 -- the aggregate level; with both shifts pressed, the old single-slot tracker
@@ -1203,6 +1313,17 @@ shift_tap = eventtap.new(
 	{ eventtap.event.types.flagsChanged },
 	function(e)
 		if EventTapGuard.handle_disabled(e, shift_tap, "keymap.shift") then return false end
+		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
+			e, "keymap.shift")
+		local fence_events = fence and fence.events or nil
+		if provenance then return false end
+		if provenance_status == EventProvenance.STATUS_UNREADABLE then
+			_shift_left_down = false
+			_shift_right_down = false
+			_shift_last_side = nil
+			update_shift_side()
+			return false, fence_events
+		end
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
@@ -1231,10 +1352,16 @@ shift_tap = eventtap.new(
 			return false
 		end)
 		if not ok then
-			Logger.error(LOG, "Shift-side detection failure: %s.", tostring(result))
-			return false
+			_shift_left_down = false
+			_shift_right_down = false
+			_shift_last_side = nil
+			update_shift_side()
+			SyntheticInput.defer_after_callback("shift-side diagnostic", function()
+				Logger.error(LOG, "Shift-side detection failure: %s.", tostring(result))
+			end)
+			return false, fence_events
 		end
-		return result
+		return result, fence_events
 	end
 )
 
@@ -1250,21 +1377,41 @@ mouse_tap = eventtap.new(
 	},
 	function(e)
 		if EventTapGuard.handle_disabled(e, mouse_tap, "keymap.mouse") then return false end
-		local ok, result = pcall(function()
-			-- Mouse click moves the cursor; the next typed run starts
-			-- fresh — treat as a word boundary. check_nav_reset may
-			-- also wipe the buffer when reset_buffer_on_navigation is
-			-- enabled.
-			CoreState.start_is_word_boundary = true
-			LLMBridge.check_nav_reset()
-			LLMBridge.reset_predictions()
-			return false
-		end)
-		if not ok then
-			Logger.error(LOG, "Mouse event handler failure: %s.", tostring(result))
-			return false
+		-- A click can move focus to another app before the deferred broker runs.
+		-- Claim older output here and return it ahead of the original mouseDown, even
+		-- when the optional keylogger tap is disabled. Otherwise an Ergopti shortcut
+		-- queued for app A can land in app B after the click changes focus.
+		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
+			e, "keymap.mouse")
+		local fence_events = fence and fence.events or nil
+		if provenance then return false end
+		if provenance_status == EventProvenance.STATUS_UNREADABLE then
+			invalidate_observed_context()
+			return false, fence_events
 		end
-		return result
+		-- Close the runtime in O(1) before returning the focus-changing click.
+		-- Canvas, AX, task cancellation and logging run only after Quartz receives
+		-- the older fence payload and the original mouse event.
+		CoreState.start_is_word_boundary = true
+		cancel_action_preview_recovery()
+		LLMBridge.set_runtime_quarantined(true)
+		local scheduled = SyntheticInput.defer_after_callback("keymap mouse reset",
+			function()
+				local reset_ok, reset_err = xpcall(function()
+					LLMBridge.check_nav_reset()
+					LLMBridge.reconcile_observation_gap()
+				end, debug.traceback)
+				if reset_ok then return end
+				-- Reuse the retained outage retry if a downstream reset fails. This
+				-- stays off CGEventTap and leaves the runtime closed meanwhile.
+				invalidate_observed_context()
+				error(reset_err, 0)
+			end)
+		if not scheduled then
+			-- A failed timer allocation must not reopen stale prediction state.
+			invalidate_observed_context()
+		end
+		return false, fence_events
 	end
 )
 
@@ -1291,6 +1438,12 @@ local _prewarm_timer   = nil
 local WINFILTER_PREWARM_SEC = 1.0
 
 local function tap_watchdog()
+	-- Timer allocation in the HID callback is best-effort. This periodic path is
+	-- the independent retry that guarantees a closed observation-gap latch cannot
+	-- strand predictions forever.
+	if _context_reconcile_pending and _context_reconcile_timer == nil then
+		reconcile_observed_context_async()
+	end
 	local function revive(name, t)
 		if t and type(t.isEnabled) == "function" and not t:isEnabled() then
 			-- The passive mouse tap only resets predictive state and its recovery never
@@ -1303,6 +1456,7 @@ local function tap_watchdog()
 		return false
 	end
 	local keydown_revived = revive("keyDown", tap)
+	revive("loopbackKeyUp", loopback_keyup_tap)
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
 	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
@@ -1311,6 +1465,15 @@ end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
+	if not _action_listener_registered then
+		-- Register the last fully safe epoch, not the current one. If an action
+		-- occurred while taps were stopped, the adapter immediately schedules the
+		-- async reset instead of falsely acknowledging that unreset token.
+		SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
+			reconcile_action_epoch_async, _last_action_epoch)
+		_action_listener_registered = true
+		observe_action_epoch(SyntheticInput.current_action_epoch())
+	end
 	Logger.start(LOG, "Starting keymap engine…")
 	-- Auto-arm latency sampling when the log level is already DEBUG so the user
 	-- gets measurements without any console intervention. In production (INFO or
@@ -1321,6 +1484,7 @@ function M.start()
 		Logger.info(LOG, "Perf sampling auto-enabled (DEBUG log level active).")
 	end
 	tap:start()
+	loopback_keyup_tap:start()
 	shift_tap:start()
 	mouse_tap:start()
 
@@ -1346,7 +1510,16 @@ end
 --- Stops the eventtap listeners and cleans up prediction state.
 function M.stop()
 	Logger.start(LOG, "Stopping keymap engine…")
+	if _action_listener_registered then
+		SyntheticInput.unregister_action_listener(ACTION_EPOCH_LISTENER_ID)
+		_action_listener_registered = false
+	end
 	if _watchdog_timer then _watchdog_timer:stop(); _watchdog_timer = nil end
+	if _context_reconcile_timer then
+		pcall(function() _context_reconcile_timer:stop() end)
+		_context_reconcile_timer = nil
+	end
+	_context_reconcile_pending = false
 	-- Cancelled here, before km_utils.stop() below, so there is no window in which
 	-- the prewarm can fire into an engine that has already been torn down.
 	if _prewarm_timer then _prewarm_timer:stop(); _prewarm_timer = nil end
@@ -1357,6 +1530,7 @@ function M.stop()
 	-- the engine was toggled off a few milliseconds later.
 	TerminatorReplay.flush_now("keymap engine stopping")
 	tap:stop()
+	loopback_keyup_tap:stop()
 	shift_tap:stop()
 	mouse_tap:stop()
 	LLMBridge.reset_predictions()

@@ -113,7 +113,7 @@ helpers.describe("keymap tap recovery: a revived tap must not trust the old buff
 			"a tap outage means keystrokes were missed; something must exist to say so")
 	end)
 
-	helpers.it("the routine drops the buffer and every synthetic expectation", function()
+	helpers.it("the routine drops only context inferred from observed physical input", function()
 		local body = function_body(keymap_source(), "invalidate_observed_context")
 		helpers.assert_not_nil(body, "invalidate_observed_context must exist")
 		helpers.assert_true(body:find('CoreState%.buffer%s*=%s*""') ~= nil,
@@ -123,13 +123,12 @@ helpers.describe("keymap tap recovery: a revived tap must not trust the old buff
 			"the cursor sits in territory we never observed, so word-anchored triggers must "
 				.. "stay silent until a real terminator is seen — assuming a boundary here "
 				.. "fires expansions flush against unknown text")
-		helpers.assert_true(body:find("CoreState%.expected_synthetic_deletes%s*=%s*0") ~= nil,
-			"a stale delete expectation swallows the user's next real Backspace")
-		helpers.assert_true(body:find('CoreState%.expected_synthetic_chars%s*=%s*""') ~= nil,
-			"a stale char expectation absorbs the user's next real keystrokes — the exact "
-				.. "'my letters disappear' report")
-		helpers.assert_true(body:find("CoreState%.expected_synthetic_pastes%s*=%s*0") ~= nil,
-			"a stale paste expectation swallows the user's next genuine Cmd+V")
+		helpers.assert_true(body:find("LLMBridge%.set_runtime_quarantined%(true%)") ~= nil,
+			"the HID path must close prediction interaction immediately without canvas/task work")
+		helpers.assert_true(body:find("_context_reconcile_pending%s*=%s*true") ~= nil,
+			"the closed runtime must retain a full-reset obligation for the async retry")
+		helpers.assert_true(body:find("SyntheticInput%.cancel") == nil,
+			"tap recovery must not revoke already-authorized tagged user output")
 	end)
 
 	helpers.it("the routine releases a held terminator rather than dropping it", function()
@@ -197,24 +196,23 @@ end)
 -- ==================================================
 -- ==================================================
 
-helpers.describe("keymap: an unobserved window must not leave expectations armed", function()
+helpers.describe("keymap: tagged events are filtered before ignored-window exits", function()
 
-	helpers.it("the ignored-window fast exit clears the synthetic counters", function()
+	helpers.it("the explicit ownership gate precedes the window query", function()
 		local src = keymap_source()
-		-- This early return sits ABOVE every synthetic-echo drain, so an expansion
-		-- performed while such a window has focus arms expectations no keystroke can
-		-- ever consume. They survived to the staleness ceiling and then absorbed the
-		-- user's first real keystrokes in the next app.
-		local at = src:find("is_ignored_window%(CoreState%.ignored_window_titles")
-		helpers.assert_not_nil(at, "the ignored-window fast exit must still exist")
-		local window = src:sub(at, at + 1400)
-		helpers.assert_true(window:find('CoreState%.expected_synthetic_chars%s*=%s*""') ~= nil,
-			"an expectation that can never drain must be cleared where it is created, not left "
-				.. "to expire into the next application's first keystrokes")
-		helpers.assert_true(window:find("CoreState%.expected_synthetic_pastes%s*=%s*0") ~= nil,
-			"same for the paste counter, which otherwise swallows a genuine Cmd+V later")
-		helpers.assert_true(window:find("TerminatorReplay%.flush_now") ~= nil,
-			"and a terminator held there would wait for an echo this branch discards unread")
+		local raw_pos = src:find(
+			"local function onKeyDownRaw%(e, provenance, provenance_status%)")
+		helpers.assert_not_nil(raw_pos, "the raw keyDown handler must remain locatable")
+		local raw = src:sub(raw_pos)
+		local gate_pos = raw:find("if provenance and not internal_loopback then", 1, true)
+		local ignored_pos = raw:find("km_utils.is_ignored_window", 1, true)
+		helpers.assert_true(gate_pos ~= nil and ignored_pos ~= nil,
+			"owned-event gate and ignored-window fast exit must both remain present")
+		helpers.assert_true(gate_pos < ignored_pos,
+			"an owned tag must bypass every window-dependent physical-input branch")
+		local gate = raw:sub(gate_pos, ignored_pos)
+		helpers.assert_true(gate:find("return false", 1, true) ~= nil,
+			"ordinary owned events must leave the handler before ignored-window state")
 	end)
 
 end)

@@ -68,8 +68,6 @@ local function load_expander(state_overrides)
 	local state = {
 		buffer                 = "",
 		start_is_word_boundary = true,
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
 		suppress_rescan        = function() end,
 		suppress_rescan_keep_buffer = function() end,
 	}

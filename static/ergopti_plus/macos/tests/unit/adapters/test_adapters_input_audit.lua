@@ -24,6 +24,21 @@ local helpers = require("tests.helpers")
 -- =====================================================
 
 helpers.describe("adapters-input-1: text_sender.send nil-text must not throw", function()
+	local function load_sender_with_event_counter()
+		package.loaded["tests.stubs.hs"] = nil
+		local eventtap = require("tests.stubs.hs").eventtap
+		local new_key_event = eventtap.event.newKeyEvent
+		local created = 0
+		eventtap.event.newKeyEvent = function(...)
+			created = created + 1
+			return new_key_event(...)
+		end
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
+		local sender = helpers.load_with_stubs("adapters.text_sender", { eventtap = eventtap })
+		return sender, function() return created end
+	end
+
 	-- Called DIRECTLY, not through pcall. "did not throw" was the whole assertion,
 	-- and it is the weaker half: log_and_return means the call returns AND emits
 	-- nothing. A guard that threw would fail here anyway, with its real stack
@@ -32,29 +47,17 @@ helpers.describe("adapters-input-1: text_sender.send nil-text must not throw", f
 	-- The strong half is the keystroke count. A malformed payload that still
 	-- reached hs.eventtap would type garbage into whatever the user has focused.
 	helpers.it("send(nil) in auto mode returns without emitting a keystroke", function()
-		local typed = 0
-		local TextSender = helpers.load_with_stubs("adapters.text_sender", {
-			eventtap = {
-				keyStrokes = function() typed = typed + 1 end,
-				keyStroke  = function() typed = typed + 1 end,
-			},
-		})
+		local TextSender, event_count = load_sender_with_event_counter()
 		TextSender.send(nil)
-		helpers.assert_eq(typed, 0,
+		helpers.assert_eq(event_count(), 0,
 			"a nil payload must emit nothing — reaching hs.eventtap would type into whatever "
 				.. "window the user has focused")
 	end)
 
 	helpers.it("send(123) numeric payload returns without emitting a keystroke", function()
-		local typed = 0
-		local TextSender = helpers.load_with_stubs("adapters.text_sender", {
-			eventtap = {
-				keyStrokes = function() typed = typed + 1 end,
-				keyStroke  = function() typed = typed + 1 end,
-			},
-		})
+		local TextSender, event_count = load_sender_with_event_counter()
 		TextSender.send(123)
-		helpers.assert_eq(typed, 0, "a non-string payload must emit nothing either")
+		helpers.assert_eq(event_count(), 0, "a non-string payload must emit nothing either")
 	end)
 end)
 

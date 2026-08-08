@@ -1,56 +1,146 @@
 --- tests/unit/modules/keylogger/test_synth_queue_context_clear.lua
 
 --- ==============================================================================
---- MODULE: Regression — synth_queue cleared on context change (F-LOW-1 / C6)
+--- MODULE: Privacy Context Provenance Regression Tests
 --- DESCRIPTION:
---- When a synthetic expansion's echoes are suppressed by the secure-field /
---- private-window / disabled-app guards (which return before consuming the
---- synth_queue), the queued entries persist. If the user returns to a normal field
---- and types within SYNTH_IDLE_DRAIN_MS (500 ms), the stale head mis-tags the first
---- real keystroke as synthetic. The only recovery was the time-based idle drain.
----
---- Fix: clear CoreState.synth_queue on the context changes that suppress input —
---- secure-field entry (update_secure_field_state) and app activation
---- (app_watcher_cb) — so the C6 case is deterministically safe, not drain-timed.
---- context_tracker's _state is module-local, so the two clears are pinned at source.
+--- Privacy context changes must clear sensitive logical buffers,
+--- but they must neither create nor erase physical-event ownership. Ownership is
+--- an immutable tag on each emitted event, so an identical untagged key remains
+--- physical across secure-field and application boundaries.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local provenance_fixture = require("tests.support.keylogger_provenance_fixture")
 
-helpers.describe("context_tracker: synth_queue cleared on context change (F-LOW-1)", function()
-	local function read_src()
-		-- Selected by a declaration unique to modules/keylogger/context_tracker.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function update_secure_field_state")
-		helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source must be locatable")
-		return src
-	end
+local function load_tracker(focused_element)
+	local observer_callback
+	local observer = {
+		addWatcher = function() end,
+		removeWatcher = function() end,
+		callback = function(_self, fn) observer_callback = fn end,
+		start = function() end,
+		stop = function() end,
+	}
+	local app_element = {
+		attributeValue = function(_self, attr)
+			if attr == "AXFocusedUIElement" then return focused_element end
+			return nil
+		end,
+	}
+	package.loaded["adapters.secure_field_detector"] = {
+		refresh = function() end,
+		isSecureField = function() return false end,
+		isSecureApp = function() return false end,
+	}
+	local tracker = helpers.load_with_stubs("modules.keylogger.context_tracker", {
+		application = { watcher = { activated = 1 } },
+		axuielement = {
+			observer = { new = function() return observer end },
+			applicationElement = function() return app_element end,
+			windowElement = function() return nil end,
+		},
+	})
+	local state = {
+		active_app_name = "TextEdit",
+		active_app_start = 0,
+		is_secure_field = false,
+		is_private_window = false,
+		buffer_events = { { "secret" } },
+		buffer_text = "secret",
+		rich_chunks = { { type = "physical", text = "secret" } },
+		last_time = 0,
+	}
+	tracker.init(state, {
+		append_log = function() end,
+		flush_buffer = function() end,
+		log_app_switch = function() end,
+	}, function() return false end)
+	return tracker, state, function() return observer_callback end
+end
 
-	helpers.it("clears synth_queue on secure-field entry (right after the buffer clears)", function()
-		local src = read_src()
-		local rc_pos = src:find("_state.rich_chunks   = {}", 1, true)
-		helpers.assert_true(rc_pos ~= nil, "secure-field buffer clear must exist")
-		local sq_pos = src:find("_state.synth_queue", rc_pos, true)
-		helpers.assert_true(sq_pos ~= nil and (sq_pos - rc_pos) < 500,
-			"the secure-field branch must clear _state.synth_queue right after the buffers")
+local function make_event_pair(owner)
+	local synthetic_input = require("adapters.synthetic_input")
+	local provenance = require("adapters.event_provenance")
+	return {
+		synthetic_input = synthetic_input,
+		provenance = provenance,
+		tagged = provenance_fixture.tagged_key(
+			synthetic_input, owner, "replacement", "x"),
+		physical = provenance_fixture.physical_key(_G.hs, "x"),
+	}
+end
+
+local function assert_exact_pair(pair, consumer, owner)
+	local metadata = pair.provenance.classify(pair.tagged, consumer .. ".tagged")
+	helpers.assert_not_nil(metadata)
+	helpers.assert_eq(metadata.owner, owner)
+	helpers.assert_eq(metadata.effect, "replacement")
+	helpers.assert_nil(pair.provenance.classify(pair.physical, consumer .. ".physical"),
+		"the same-process, same-key physical event has no ownership tag")
+end
+
+helpers.describe("context tracker: exact provenance across privacy boundaries", function()
+	helpers.it("secure-field entry clears sensitive buffers but preserves event identity", function()
+		local secure_field = {
+			attributeValue = function(_self, attr)
+				if attr == "AXRole" then return "AXSecureTextField" end
+				if attr == "AXValue" then return "" end
+				return nil
+			end,
+		}
+		local tracker, state = load_tracker(secure_field)
+		local pair = make_event_pair("test.secure-boundary")
+		local records_before = pair.synthetic_input.stats().records
+
+		tracker.update_ax_observer(42)
+
+		helpers.assert_true(state.is_secure_field)
+		helpers.assert_eq(#state.buffer_events, 0)
+		helpers.assert_eq(state.buffer_text, "")
+		helpers.assert_eq(#state.rich_chunks, 0)
+		helpers.assert_eq(pair.synthetic_input.stats().records, records_before)
+		assert_exact_pair(pair, "test.secure-boundary", "test.secure-boundary")
 	end)
 
-	helpers.it("clears synth_queue on app activation (context boundary)", function()
-		local src = read_src()
-		-- Anchor on the active_app_name ASSIGNMENT (not the earlier `if` check); the
-		-- clear sits just before it.
-		local assign_pos = src:find("_state%.active_app_name%s*=%s*app_name")
-		helpers.assert_true(assign_pos ~= nil, "app_watcher_cb must assign active_app_name = app_name")
-		local window = src:sub(math.max(1, assign_pos - 400), assign_pos)
-		helpers.assert_true(window:find("_state.synth_queue", 1, true) ~= nil,
-			"app activation must clear _state.synth_queue just before updating the active app")
+	helpers.it("application activation updates context without mutating ownership", function()
+		local tracker, state = load_tracker(nil)
+		local pair = make_event_pair("test.app-boundary")
+		local stats_before = pair.synthetic_input.stats()
+
+		tracker.app_watcher_cb("Terminal", _G.hs.application.watcher.activated, {
+			bundleID = function() return "com.apple.Terminal" end,
+			path = function() return "/System/Applications/Utilities/Terminal.app" end,
+			pid = function() return 73 end,
+		})
+
+		helpers.assert_eq(state.active_app_name, "Terminal")
+		helpers.assert_eq(state.active_app_bundle, "com.apple.Terminal")
+		helpers.assert_eq(state.active_app_pid, 73)
+		local stats_after = pair.synthetic_input.stats()
+		helpers.assert_eq(stats_after.records, stats_before.records)
+		helpers.assert_eq(stats_after.generation, stats_before.generation)
+		assert_exact_pair(pair, "test.app-boundary", "test.app-boundary")
 	end)
 
-	helpers.it("has at least two synth_queue clears (both context paths)", function()
-		local src = read_src()
-		local n = 0
-		for _ in src:gmatch("_state%.synth_queue%s*=%s*{}") do n = n + 1 end
-		helpers.assert_true(n >= 2, "expected synth_queue cleared on both secure-field entry and app activation, found " .. n)
+	helpers.it("a focus callback cannot turn an untagged key into an owned echo", function()
+		local plain_field = {
+			attributeValue = function(_self, attr)
+				if attr == "AXRole" then return "AXTextField" end
+				if attr == "AXValue" then return "plain" end
+				return nil
+			end,
+		}
+		local tracker, _, get_observer_callback = load_tracker(nil)
+		local pair = make_event_pair("test.focus-boundary")
+		tracker.update_ax_observer(91)
+		local callback = get_observer_callback()
+		helpers.assert_type(callback, "function")
+
+		callback(plain_field, "AXFocusedUIElementChanged", {
+			addWatcher = function() end,
+			removeWatcher = function() end,
+		})
+
+		assert_exact_pair(pair, "test.focus-boundary", "test.focus-boundary")
 	end)
 end)

@@ -34,7 +34,6 @@ local WIRED_MS = {
 	{ "keylogger", "idle_check_interval_ms",  10000 },
 	{ "keylogger", "maintenance_interval_ms",  5000 },
 	{ "keylogger", "system_load_poll_ms",    300000 },
-	{ "keylogger", "synth_match_delay_ms",        3 },
 	{ "keylogger", "auto_flush_idle_ms",     120000 },
 	-- llm/prediction_engine.lua
 	{ "llm", "prediction_debounce_min_ms",       50 },
@@ -61,7 +60,8 @@ local WIRED_MS = {
 
 helpers.describe("timings: ms / sec accessors", function()
 	helpers.it("ms returns the raw millisecond value", function()
-		helpers.assert_eq(Timings.ms("keylogger", "synth_match_delay_ms"), 3, "synth_match_delay_ms")
+		helpers.assert_eq(Timings.ms("keylogger", "idle_check_interval_ms"), 10000,
+			"idle_check_interval_ms")
 		helpers.assert_eq(Timings.ms("gestures", "tap_max_ms"), 700, "tap_max_ms")
 	end)
 

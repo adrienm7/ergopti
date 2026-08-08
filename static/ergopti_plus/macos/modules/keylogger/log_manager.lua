@@ -106,6 +106,18 @@ local _ingest_listeners = {}
 --- Whether `_uuid_v4` has seeded math.randomseed.
 local _uuid_seeded = false
 
+--- Ordered outbox used when an eventtap must detach a typing run without doing
+--- any serialization or file I/O. Once this queue is non-empty, later
+--- append_log() calls join it so they cannot overtake the detached run.
+local _deferred_log_queue = {}
+local _deferred_log_head  = 1
+local _deferred_log_tail  = 0
+local _deferred_log_timer = nil
+
+--- Retry delay after a timer-allocation or sink failure. The ingest timer also
+--- retries the queue, so a one-shot scheduling failure cannot strand it.
+local DEFERRED_LOG_RETRY_SEC = 0.1
+
 
 
 
@@ -285,77 +297,90 @@ end
 -- ==============================================================
 -- ==============================================================
 
---- Append a single event entry to today.log as a JSONL line.
---- Delegates to Rotation.append_log (hot path — no SQLite).
---- @param entry table The event entry. Must contain a `type` field.
-function M.append_log(entry)
-	Rotation.append_log(entry)
+local _drain_deferred_logs
+
+
+--- Returns whether the ordered deferred outbox contains any work.
+--- @return boolean
+local function _has_deferred_logs()
+	return _deferred_log_head <= _deferred_log_tail
 end
 
---- Serialize the keystroke buffer accumulated in CoreState into a
---- typing event and append it to today.log. Resets per-flush buffers.
-function M.flush_buffer()
-	if not _require_state("flush_buffer") then return end
+
+--- Appends one operation to the in-memory ordered outbox.
+--- @param operation table `{ kind = "typing_snapshot"|"entry", value = table }`.
+local function _queue_deferred_log(operation)
+	_deferred_log_tail = _deferred_log_tail + 1
+	_deferred_log_queue[_deferred_log_tail] = operation
+end
+
+
+--- Schedules the outbox drain on the next run-loop turn.
+--- The handle is retained until the callback fires; losing a doAfter handle can
+--- let Hammerspoon's GC cancel the timer before it runs.
+--- @param delay number|nil Delay in seconds (zero for the initial drain).
+--- @return boolean scheduled
+local function _schedule_deferred_log_drain(delay)
+	if not _has_deferred_logs() then return true end
+	if _deferred_log_timer ~= nil then return true end
+
+	local callback_ran = false
+	local marker = {}
+	_deferred_log_timer = marker
+	local ok, timer_or_err = pcall(timer.doAfter, delay or 0, function()
+		callback_ran = true
+		_deferred_log_timer = nil
+		local drained_ok, drain_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drained_ok then
+			Logger.error(LOG, "Deferred keylogger drain failed: %s.", tostring(drain_err))
+		end
+		if _has_deferred_logs() then
+			_schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC)
+		end
+	end)
+	if not ok or timer_or_err == nil then
+		if _deferred_log_timer == marker then _deferred_log_timer = nil end
+		Logger.error(LOG, "Cannot schedule deferred keylogger drain: %s.",
+			tostring(timer_or_err or "hs.timer.doAfter returned nil"))
+		return false
+	end
+	-- Some unit-test clocks execute doAfter callbacks synchronously. Do not leave
+	-- their already-fired handle looking like a live scheduling gate.
+	if not callback_ran then _deferred_log_timer = timer_or_err end
+	return true
+end
+
+
+--- Detaches the current mutable typing run in O(1).
+--- No loop, JSON encoding, SQLite access, or file append is allowed here: this
+--- function is the action-epoch backstop reached from the keyboard eventtap.
+--- @return table|nil snapshot
+local function _detach_buffer_snapshot()
 	if #_state.buffer_events == 0
 		and _state.session_mouse_clicks == 0
 		and _state.session_mouse_scrolls == 0 then
-		return
+		return nil
 	end
 
-	local total_time_ms, total_chars = 0, 0
-	for _, ev in ipairs(_state.buffer_events) do
-		local meta = ev[3] or {}
-		if not meta.s then
-			local d = math.min(ev[2] or 0, WPM_MAX_EVENT_DELAY_MS)
-			total_time_ms = total_time_ms + d
-			total_chars   = total_chars + 1
-		end
-	end
-	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
-
-	-- Build a rich-text representation from rich_chunks.
-	local rich_str, cur_type, cur_text = "", nil, ""
-	local function flush_chunk()
-		if not cur_type then return end
-		if cur_type == "text" then
-			rich_str = rich_str .. cur_text
-		elseif cur_type == "correction" then
-			rich_str = rich_str .. "<correction><del>" .. cur_text .. "</del></correction>"
-		else
-			rich_str = rich_str .. "<autocomplete type=\"" .. cur_type .. "\">" .. cur_text .. "</autocomplete>"
-		end
-	end
-	for _, chunk in ipairs(_state.rich_chunks or {}) do
-		if chunk.type == cur_type then
-			cur_text = cur_text .. chunk.text
-		else
-			flush_chunk()
-			cur_type = chunk.type; cur_text = chunk.text
-		end
-	end
-	flush_chunk()
-
-	M.append_log({
-		type              = "typing",
-		text              = _state.buffer_text,
-		rich_text         = rich_str,
-		app               = _state.session_app_name,
-		title             = _state.session_win_title,
-		url               = _state.session_url,
-		field_role        = _state.session_field_role,
-		layout            = _state.session_layout,
-		document_path     = _state.session_document_path,
-		is_fullscreen     = _state.is_fullscreen,
-		in_meeting        = _state.in_meeting,
-		mouse_clicks      = _state.session_mouse_clicks,
-		mouse_scrolls     = _state.session_mouse_scrolls,
-		mouse_distance_px = math.floor(_state.mouse_distance_px or 0),
-		pause_before_ms   = _state.current_session_pause,
-		battery_level     = _state.current_battery_level,
-		audio_volume      = _state.current_audio_volume,
-		wpm               = tonumber(string.format("%.1f", wpm)),
-		events            = _state.buffer_events,
-	})
+	local snapshot = {
+		buffer_events         = _state.buffer_events,
+		buffer_text           = _state.buffer_text,
+		rich_chunks           = _state.rich_chunks or {},
+		session_app_name      = _state.session_app_name,
+		session_win_title     = _state.session_win_title,
+		session_url           = _state.session_url,
+		session_field_role    = _state.session_field_role,
+		session_layout        = _state.session_layout,
+		session_document_path = _state.session_document_path,
+		is_fullscreen         = _state.is_fullscreen,
+		in_meeting            = _state.in_meeting,
+		session_mouse_clicks  = _state.session_mouse_clicks,
+		session_mouse_scrolls = _state.session_mouse_scrolls,
+		mouse_distance_px     = _state.mouse_distance_px,
+		current_session_pause = _state.current_session_pause,
+		current_battery_level = _state.current_battery_level,
+		current_audio_volume  = _state.current_audio_volume,
+	}
 
 	_state.buffer_events         = {}
 	_state.buffer_text           = ""
@@ -366,6 +391,137 @@ function M.flush_buffer()
 	_state.session_mouse_scrolls = 0
 	_state.mouse_distance_px     = 0
 	_state.last_flush_time       = hs.timer.absoluteTime() / 1000000
+	return snapshot
+end
+
+
+--- Converts an immutable detached snapshot into its persisted typing entry.
+--- @param snapshot table Snapshot returned by _detach_buffer_snapshot().
+--- @return table entry
+local function _typing_entry_from_snapshot(snapshot)
+	local total_time_ms, total_chars = 0, 0
+	for _, ev in ipairs(snapshot.buffer_events) do
+		local meta = ev[3] or {}
+		if not meta.s then
+			local d = math.min(ev[2] or 0, WPM_MAX_EVENT_DELAY_MS)
+			total_time_ms = total_time_ms + d
+			total_chars   = total_chars + 1
+		end
+	end
+	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
+
+	local rich_str, cur_type, cur_text = "", nil, ""
+	local function flush_chunk()
+		if not cur_type then return end
+		if cur_type == "text" then
+			rich_str = rich_str .. cur_text
+		elseif cur_type == "correction" then
+			rich_str = rich_str .. "<correction><del>" .. cur_text .. "</del></correction>"
+		else
+			rich_str = rich_str .. "<autocomplete type=\"" .. cur_type .. "\">"
+				.. cur_text .. "</autocomplete>"
+		end
+	end
+	for _, chunk in ipairs(snapshot.rich_chunks) do
+		if chunk.type == cur_type then
+			cur_text = cur_text .. chunk.text
+		else
+			flush_chunk()
+			cur_type = chunk.type
+			cur_text = chunk.text
+		end
+	end
+	flush_chunk()
+
+	return {
+		type              = "typing",
+		text              = snapshot.buffer_text,
+		rich_text         = rich_str,
+		app               = snapshot.session_app_name,
+		title             = snapshot.session_win_title,
+		url               = snapshot.session_url,
+		field_role        = snapshot.session_field_role,
+		layout            = snapshot.session_layout,
+		document_path     = snapshot.session_document_path,
+		is_fullscreen     = snapshot.is_fullscreen,
+		in_meeting        = snapshot.in_meeting,
+		mouse_clicks      = snapshot.session_mouse_clicks,
+		mouse_scrolls     = snapshot.session_mouse_scrolls,
+		mouse_distance_px = math.floor(snapshot.mouse_distance_px or 0),
+		pause_before_ms   = snapshot.current_session_pause,
+		battery_level     = snapshot.current_battery_level,
+		audio_volume      = snapshot.current_audio_volume,
+		wpm               = tonumber(string.format("%.1f", wpm)),
+		events            = snapshot.buffer_events,
+	}
+end
+
+
+--- Drains queued operations in strict insertion order.
+--- The head advances only after Rotation accepted the operation, so a throwing
+--- sink leaves the exact item available for the next timer/ingest retry.
+--- @return boolean drained Whether the queue is now empty.
+_drain_deferred_logs = function()
+	while _has_deferred_logs() do
+		local operation = assert(_deferred_log_queue[_deferred_log_head],
+			"keylogger deferred-log queue is sparse")
+		local entry = operation.kind == "typing_snapshot"
+			and _typing_entry_from_snapshot(operation.value)
+			or operation.value
+		local ok, err = xpcall(function() Rotation.append_log(entry) end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Cannot append deferred keylogger entry: %s.", tostring(err))
+			return false
+		end
+		_deferred_log_queue[_deferred_log_head] = nil
+		_deferred_log_head = _deferred_log_head + 1
+	end
+	_deferred_log_head = 1
+	_deferred_log_tail = 0
+	return true
+end
+
+
+--- Append a single event entry to today.log as a JSONL line.
+--- Delegates to Rotation.append_log (hot path — no SQLite).
+--- @param entry table The event entry. Must contain a `type` field.
+--- @return boolean|nil accepted True when queued behind deferred work.
+function M.append_log(entry)
+	if _has_deferred_logs() then
+		_queue_deferred_log({ kind = "entry", value = entry })
+		-- Queue insertion is the acceptance boundary; timer allocation only controls
+		-- when accepted work drains; the ingest tick and stop path independently retry it
+		_schedule_deferred_log_drain(0)
+		return true
+	end
+	return Rotation.append_log(entry)
+end
+
+--- Serialize the keystroke buffer accumulated in CoreState into a
+--- typing event and append it to today.log. Resets per-flush buffers.
+function M.flush_buffer()
+	if not _require_state("flush_buffer") then return end
+	local snapshot = _detach_buffer_snapshot()
+	if not snapshot then return end
+	return M.append_log(_typing_entry_from_snapshot(snapshot))
+end
+
+--- Detaches the current typing buffer and queues it for a post-eventtap drain.
+--- This is the only flush primitive allowed in an eventtap action-epoch
+--- backstop. It performs O(1) table swaps and never calls the persistence sink.
+--- @return boolean accepted False only when no initialized outbox can accept work.
+function M.defer_flush_buffer()
+	if not _require_state("defer_flush_buffer") then return false end
+	local snapshot = _detach_buffer_snapshot()
+	if snapshot then
+		_queue_deferred_log({ kind = "typing_snapshot", value = snapshot })
+	end
+	if not _has_deferred_logs() then return true end
+	-- The snapshot is already owned by the FIFO; reporting the scheduling result
+	-- as acceptance made the epoch listener retry the completed detach and abort
+	-- every later physical key when timer allocation stayed unavailable
+	_schedule_deferred_log_drain(0)
+	return true
 end
 
 ---@param prev_app string
@@ -874,6 +1030,10 @@ end
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
+	-- A failed timer allocation still leaves the ordered outbox intact. The
+	-- recurring ingest tick is the independent retry path that guarantees an
+	-- action with no following key cannot strand its detached typing run.
+	if _has_deferred_logs() then _drain_deferred_logs() end
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
@@ -1255,6 +1415,11 @@ end
 --- Stop the ingest timer and close the SQLite cache cleanly.
 function M.stop()
 	if _ingest_timer then _ingest_timer:stop(); _ingest_timer = nil end
+	if _deferred_log_timer then
+		pcall(_deferred_log_timer.stop, _deferred_log_timer)
+		_deferred_log_timer = nil
+	end
+	if _has_deferred_logs() then _drain_deferred_logs() end
 	pcall(M.ingest_once)
 	SqliteWriter.close_db()
 	Logger.debug(LOG, "Log manager stopped")

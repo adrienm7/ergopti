@@ -22,6 +22,8 @@ local M = {}
 local hs            = hs
 local notifications = require("infra.notifications")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
 local i18n          = require("infra.i18n")
@@ -403,8 +405,33 @@ end
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
 	if EventTapGuard.handle_disabled(e, _tap, "shortcuts.script_control") then return false end
+	local provenance, status, fence = EventProvenance.classify_with_fence(
+		e, "shortcuts.script_control")
+	local fence_events = fence and fence.events or nil
+	local function finish(consume) return consume == true, fence_events end
+	if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
+		return finish(false)
+	end
 	local ok, code = pcall(function() return e:getKeyCode() end)
-	if not ok or type(code) ~= "number" then return false end
+	if not ok or type(code) ~= "number" then return finish(false) end
+
+	local function defer_dispatch(log_format, label, action, binding)
+		return SyntheticInput.defer_after_callback("script control " .. binding,
+			function()
+				Logger.info(LOG, log_format, tostring(action))
+				log_shortcut_if_available(label)
+				dispatch_action(action, M.BINDING_PREFIX .. binding)
+			end)
+	end
+
+	local function defer_rejected_sentinel(name, keycode)
+		SyntheticInput.defer_after_callback("rejected script-control sentinel",
+			function()
+				Logger.info(LOG,
+					"%s sentinel (%s) seen without an authoritative Ergopti modifier — passing through (%s).",
+					name, keycode, KeyState.describe_held_modifiers())
+			end)
+	end
 
 	-- Primary path: sentinel keycodes from KE's script-control rules. These ARE
 	-- the physical F13/F14/F15 keycodes, so a bare function-key press on an
@@ -413,58 +440,49 @@ local function handle_key(e)
 	-- of every genuine KE sentinel — and pass a stray function key through.
 	if code == KEYCODE_BACKSPACE_SENTINEL then
 		if not sentinel_is_genuine(e) then
-			Logger.info(LOG, "Backspace sentinel (F14) seen but neither AltGr held (%s) nor tagged — passing through.",
-				KeyState.describe_held_modifiers())
-			return false
+			defer_rejected_sentinel("Backspace", "F14")
+			return finish(false)
 		end
-		Logger.info(LOG, "Backspace sentinel (F14) — dispatching '%s'.", tostring(_key_actions.backspace))
-		log_shortcut_if_available("Alt+Backspace")
-		dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
-		return true
+		return finish(defer_dispatch("Backspace sentinel (F14) — dispatching '%s'.",
+			"Alt+Backspace", _key_actions.backspace, "backspace"))
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
 		if not sentinel_is_genuine(e) then
-			Logger.info(LOG, "Return sentinel (F13) seen but neither AltGr held (%s) nor tagged — passing through.",
-				KeyState.describe_held_modifiers())
-			return false
+			defer_rejected_sentinel("Return", "F13")
+			return finish(false)
 		end
-		Logger.info(LOG, "Return sentinel (F13) — dispatching '%s'.", tostring(_key_actions.return_key))
-		log_shortcut_if_available("Alt+Enter")
-		dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
-		return true
+		return finish(defer_dispatch("Return sentinel (F13) — dispatching '%s'.",
+			"Alt+Enter", _key_actions.return_key, "return_key"))
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
 		if not sentinel_is_genuine(e) then
-			Logger.info(LOG, "Escape sentinel (F15) seen but neither AltGr held (%s) nor tagged — passing through.",
-				KeyState.describe_held_modifiers())
-			return false
+			defer_rejected_sentinel("Escape", "F15")
+			return finish(false)
 		end
-		Logger.info(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
-		log_shortcut_if_available("Alt+Escape")
-		dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
-		return true
+		return finish(defer_dispatch("Escape sentinel (F15) — dispatching '%s'.",
+			"Alt+Escape", _key_actions.escape, "escape"))
 	end
 
 	-- Fallback path: KE paused — physical right_command + target key.
-	if not is_right_cmd_only(e) then return false end
+	if not is_right_cmd_only(e) then return finish(false) end
 
 	if code == KEYCODE_BACKSPACE then
-		Logger.info(LOG, "Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.backspace))
-		log_shortcut_if_available("Alt+Backspace")
-		return dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
+		return finish(defer_dispatch(
+			"Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.",
+			"Alt+Backspace", _key_actions.backspace, "backspace"))
 	end
 	if code == KEYCODE_RETURN then
-		Logger.info(LOG, "Right-cmd + Return (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.return_key))
-		log_shortcut_if_available("Alt+Enter")
-		return dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
+		return finish(defer_dispatch(
+			"Right-cmd + Return (KE-paused fallback) — dispatching '%s'.",
+			"Alt+Enter", _key_actions.return_key, "return_key"))
 	end
 	if code == KEYCODE_ESCAPE then
-		Logger.info(LOG, "Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.escape))
-		log_shortcut_if_available("Alt+Escape")
-		return dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
+		return finish(defer_dispatch(
+			"Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.",
+			"Alt+Escape", _key_actions.escape, "escape"))
 	end
 
-	return false
+	return finish(false)
 end
 
 

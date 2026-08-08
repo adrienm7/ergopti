@@ -35,6 +35,7 @@ local KEYCODE_LETTER_A = 0
 --- @return table
 local function fake_key_event(keycode)
 	return {
+		getProperty   = function() return 0 end,
 		getKeyCode    = function() return keycode end,
 		getFlags      = function() return {} end,
 		getCharacters = function() return "" end,
@@ -45,6 +46,7 @@ end
 --- mounts, and shows a prediction so the watcher is live.
 --- @return table module, function|nil keydown_callback
 local function load_with_keydown_watcher()
+	package.loaded["ui.tooltip.config"] = nil
 	local T = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
 	package.loaded["ui.tooltip.renderer"] = {
 		render = function(_blocks, _state, on_shown) if type(on_shown) == "function" then on_shown() end end,
@@ -119,6 +121,8 @@ helpers.describe("tooltip_llm: the dismissal watcher leaves Escape alone", funct
 		helpers.assert_true(T.is_visible(), "the tooltip must be showing")
 
 		keydown(fake_key_event(KEYCODE_LETTER_A))
+		-- Canvas/timer teardown is deliberately outside the eventtap callback.
+		hs.timer.__fire_all()
 
 		helpers.assert_true(not T.is_visible(),
 			"a normal keystroke must still dismiss — an exemption list that swallowed everything "

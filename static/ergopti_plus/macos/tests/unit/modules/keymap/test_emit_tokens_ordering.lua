@@ -51,13 +51,19 @@ local function load_utils()
 	local pending   = {}
 
 	package.loaded["modules.keymap.utils"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.synthetic_input"] = {
+		current_transaction = function() return nil end,
+		emit_key_stroke = function(_mods, key)
+			emissions[#emissions + 1] = "key:" .. tostring(key)
+			return true
+		end,
+		emit_key_strokes = function(text)
+			emissions[#emissions + 1] = "type:" .. tostring(text):sub(1, 6)
+			return true
+		end,
+	}
 	local KU = helpers.load_with_stubs("modules.keymap.utils", {
-		eventtap = {
-			keyStroke  = function(_mods, key) emissions[#emissions + 1] = "key:" .. tostring(key) end,
-			keyStrokes = function(s) emissions[#emissions + 1] = "type:" .. tostring(s):sub(1, 6) end,
-			event      = { types = { keyDown = 10 } },
-			new        = function() return { start = function() end, stop = function() end } end,
-		},
 		-- The override replaces hs.pasteboard wholesale, so it must carry every
 		-- member perform_paste touches (readAllData / writeAllData included).
 		pasteboard = {
@@ -213,6 +219,7 @@ end)
 
 
 
+
 -- ================================================
 -- ================================================
 -- ======= 3/ The Fence Is Reported Outward =======
@@ -284,3 +291,5 @@ helpers.describe("emit_tokens reports its ordering fence to the caller", functio
 			"short text goes out as keystrokes, which need no settle window")
 	end)
 end)
+
+package.loaded["adapters.synthetic_input"] = nil

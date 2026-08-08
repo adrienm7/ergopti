@@ -59,7 +59,7 @@ local DEFAULT_SUPPRESS_KEEP_SEC = 0.3
 --- Builds a fresh CoreState table seeded from the canonical defaults.
 ---
 --- The returned table carries:
----   - the rolling keystroke buffer and its synthetic-event bookkeeping,
+---   - the rolling keystroke buffer,
 ---   - the mapping database (flat list + O(1) lookup + tail-char buckets),
 ---   - the terminator/delay configuration pulled from the supplied defaults,
 ---   - bound closures (suppress_rescan / suppress_rescan_keep_buffer) that
@@ -113,13 +113,6 @@ function M.new(defaults, delays_default)
 		group_order_counter        = 0,
 		interceptors               = {},
 		preview_providers          = {},
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
-		expected_synthetic_pastes  = 0,
-		-- Epoch timestamp (seconds) of the last arm_synthetic() / perform_text_replacement()
-		-- call. Used by the stuck-counter reset guard in onKeyDownRaw to avoid wiping
-		-- counters that were just armed by an in-flight expansion (A6 audit fix).
-		last_synthetic_arm_time    = 0,
 		shift_side                 = nil,
 		processing_paused          = false,
 		last_key_time              = 0,

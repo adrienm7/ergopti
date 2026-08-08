@@ -75,8 +75,15 @@ local function _make_handler()
 		-- the hook goes permanently deaf and nothing anywhere says so.
 		if EventTapGuard.handle_disabled(event, _tap, "keyboard_hook") then return false end
 		if _on_event then
-			local ok, consume = pcall(_on_event, event)
-			return ok and consume == true
+			local ok, consume, returned_events = pcall(_on_event, event)
+			if not ok then return false end
+			if returned_events ~= nil and type(returned_events) ~= "table" then
+				Logger.error(LOG,
+					"onEvent returned invalid ordered events (%s); propagating the original only.",
+					type(returned_events))
+				returned_events = nil
+			end
+			return consume == true, returned_events
 		end
 		local ok, char = pcall(function() return event:getCharacters() end)
 		-- Use utf8.len() instead of # (byte count) so multi-byte characters like

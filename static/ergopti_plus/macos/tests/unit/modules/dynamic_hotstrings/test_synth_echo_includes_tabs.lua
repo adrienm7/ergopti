@@ -1,33 +1,13 @@
 --- tests/unit/modules/dynamic_hotstrings/test_synth_echo_includes_tabs.lua
 
 --- ==============================================================================
---- MODULE: Regression — multi-field @-expansion must not under-fill the synth queue
+--- MODULE: Regression — multi-field @-expansion carries exact event provenance
 --- DESCRIPTION:
---- Audit finding G3. do_expand's emitter types the field values AND fires a real
---- inter-field Tab keyStroke (counting it in `c`), but returned a TAB-FREE echo
---- string as its physical_echo. perform_text_replacement feeds that value to BOTH
---- synthetic trackers, and they treat a mismatch very differently:
----
----   - keymap (expected_synthetic_chars): on a head mismatch inside its 20 ms
----     window it returns WITHOUT consuming — non-destructive, self-correcting.
----   - keylogger (synth_queue): its fast path POPS an entry on a char mismatch
----     too (init.lua "Pop the queue even on a char-mismatch fast-path"), so the
----     Tab echo consumed a value entry.
----
---- With N fields the queue therefore ran N-1 entries short, and the trailing
---- characters of the payload found an EMPTY queue: classified is_synthetic=false
---- and recorded as HUMAN keystrokes into buffer_text, rich_chunks, the physical
---- WPM window and the n-gram index. For an IBAN+SSN combo that is the tail of the
---- SSN. It was silent because the stale-queue self-heal only warns about LEFTOVER
---- entries — here the queue was UNDER-filled.
----
---- Fix: physical_echo enumerates EVERY keydown the OS delivers (fields joined by
---- "\t"), while the LOGICAL text and CoreState.buffer stay tab-free — a Tab moves
---- focus to the next field, it inserts nothing on screen. That tab-free buffer
---- value is the earlier F-H3 fix and is deliberately preserved here.
----
---- This test drives the REAL interceptor (@ p n ★) so the REAL do_expand runs and
---- the emitter under assertion is production code, not a re-implementation.
+--- Drives the real interceptor through @ p n ★, executes its production emitter
+--- inside one real SyntheticInput replacement transaction, and inspects the
+--- callback-return event table. Every field character and the inter-field Tab
+--- must carry an owned tag from the same generation. The logical buffer remains
+--- tab-free because Tab changes focus rather than inserting text.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -64,11 +44,11 @@ local function fake_event(chars)
 	}
 end
 
---- Loads personal_info, drives the real interceptor through "@pn★", and returns
---- the arguments the production code handed to keymap.inject_dynamic.
---- @return table captured Fields: n_back, result_text, emit_action, variant.
+--- Loads personal_info and drives the real interceptor through "@pn★".
+--- @return table captured Transaction output and inject_dynamic arguments.
 local function drive_real_expansion()
 	local PI = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+	local SyntheticInput = require("adapters.synthetic_input")
 
 	local captured = {}
 	local interceptor
@@ -78,9 +58,27 @@ local function drive_real_expansion()
 		inject_dynamic = function(n_back, result_text, emit_action, variant)
 			captured.n_back      = n_back
 			captured.result_text = result_text
-			captured.emit_action = emit_action
 			captured.variant     = variant
+
+			SyntheticInput.enter_callback()
+			local transaction = SyntheticInput.begin("test.personal", "replacement")
+			local ok_emit, count_or_err, _, logical_text = pcall(function()
+				return SyntheticInput.with_transaction(transaction, emit_action)
+			end)
+			if not ok_emit then
+				pcall(SyntheticInput.cancel, transaction)
+				SyntheticInput.abort_callback()
+				error(count_or_err, 0)
+			end
+			local sealed = SyntheticInput.seal(transaction)
+			local consume, events = SyntheticInput.leave_callback(sealed == true)
+			captured.count              = count_or_err
+			captured.logical_text       = logical_text
+			captured.consume            = consume
+			captured.events             = events or {}
+			return true
 		end,
+		classify_trigger = function() return nil end,
 	}
 
 	local toml_path = write_personal_info_toml()
@@ -96,57 +94,62 @@ local function drive_real_expansion()
 	interceptor(fake_event("n"), "@p")
 	local verdict = interceptor(fake_event(PI.get_trigger_char()), "@pn")
 	helpers.assert_eq(verdict, "consume", "the trigger keystroke must be consumed by the expansion")
+	PI.stop()
 
-	return captured
+	return captured, SyntheticInput
 end
 
 
-helpers.describe("multi-field @-expansion: the physical echo enumerates every keydown", function()
-	helpers.it("the emitter fires a real Tab between the two fields", function()
-		local captured = drive_real_expansion()
-		helpers.assert_type(captured.emit_action, "function", "inject_dynamic must receive an emit callback")
+helpers.describe("multi-field @-expansion: exact transaction provenance", function()
+	helpers.it("returns every field character and Tab in one owned generation", function()
+		local captured, SyntheticInput = drive_real_expansion()
+		local expected_pairs = utf8.len(FIRST_NAME) + 1 + utf8.len(LAST_NAME)
+		helpers.assert_true(captured.consume)
+		helpers.assert_eq(#captured.events, expected_pairs * 2,
+			"each field character and the inter-field Tab must return one key pair")
 
-		local before = #hs.eventtap.__keystrokes
-		captured.emit_action()
-		local tab_strokes, text_strokes = 0, 0
-		for i = before + 1, #hs.eventtap.__keystrokes do
-			local k = hs.eventtap.__keystrokes[i]
-			if k.key == "tab" then tab_strokes = tab_strokes + 1 end
-			if k.text then text_strokes = text_strokes + 1 end
+		local property = hs.eventtap.event.properties.eventSourceUserData
+		local generation = nil
+		for index, event in ipairs(captured.events) do
+			local metadata = SyntheticInput.lookup_tag(event:getProperty(property))
+			helpers.assert_true(metadata and metadata.owned,
+				"every returned event must carry an Ergopti-owned Quartz tag")
+			helpers.assert_eq(metadata.owner, "test.personal")
+			helpers.assert_eq(metadata.effect, "replacement")
+			generation = generation or metadata.generation
+			helpers.assert_eq(metadata.generation, generation,
+				"field values and focus navigation must never split into sibling actions")
+			helpers.assert_eq(metadata.ordinal, math.floor((index + 1) / 2))
+			helpers.assert_eq(metadata.phase, event.isDown and "down" or "up")
 		end
-		helpers.assert_eq(text_strokes, 2, "both field values must be typed")
-		helpers.assert_eq(tab_strokes, 1,
-			"a real Tab keyStroke must be fired between the two fields — it echoes back as a keydown")
 	end)
 
-	helpers.it("physical_echo contains the tab and its codepoint count equals the emitted count", function()
+	helpers.it("emits a named Tab between the two Unicode field sequences", function()
 		local captured = drive_real_expansion()
-		local count, physical_echo, logical_text = captured.emit_action()
+		local downs = {}
+		for _, event in ipairs(captured.events) do
+			if event.isDown then downs[#downs + 1] = event end
+		end
+		local first_len = utf8.len(FIRST_NAME)
+		helpers.assert_eq(downs[first_len + 1].key, "tab",
+			"the separator must be a focus-navigation key, not a literal tab character")
+		local first, last = {}, {}
+		for index = 1, first_len do first[#first + 1] = downs[index].unicode end
+		for index = first_len + 2, #downs do last[#last + 1] = downs[index].unicode end
+		helpers.assert_eq(table.concat(first), FIRST_NAME)
+		helpers.assert_eq(table.concat(last), LAST_NAME)
+		helpers.assert_eq(captured.count, #downs)
+	end)
 
-		helpers.assert_type(physical_echo, "string", "the emitter must return a physical echo string")
-		helpers.assert_contains(physical_echo, "\t",
-			"physical_echo must include the inter-field Tab: the keylogger's synth_queue pops one "
-			.. "entry per echo, so omitting it leaves the queue short and the payload's trailing "
-			.. "characters are recorded as HUMAN keystrokes")
-
-		-- One queue entry per emitted keydown — the invariant the bug violated.
-		helpers.assert_eq(utf8.len(physical_echo), count,
-			"physical_echo must hold exactly as many codepoints as the emitter reported emitting")
-		helpers.assert_eq(physical_echo, FIRST_NAME .. "\t" .. LAST_NAME)
-
-		-- The logical text is a DIFFERENT string: a Tab moves focus, it inserts
-		-- nothing, so the buffer and the logged record must stay tab-free.
-		helpers.assert_type(logical_text, "string", "the emitter must return a logical text")
-		helpers.assert_true(not logical_text:find("\t", 1, true),
+	helpers.it("keeps both logical result channels tab-free", function()
+		local captured = drive_real_expansion()
+		helpers.assert_type(captured.logical_text, "string", "the emitter must return logical text")
+		helpers.assert_true(not captured.logical_text:find("\t", 1, true),
 			"logical_text must stay tab-free — a Tab inserts no character on screen")
-		helpers.assert_eq(logical_text, FIRST_NAME .. LAST_NAME)
-	end)
-
-	helpers.it("keeps CoreState.buffer tab-free (the earlier F-H3 fix is preserved)", function()
-		local captured = drive_real_expansion()
+		helpers.assert_eq(captured.logical_text, FIRST_NAME .. LAST_NAME)
 		helpers.assert_type(captured.result_text, "string")
 		helpers.assert_true(not captured.result_text:find("\t", 1, true),
-			"inject_dynamic's result_text seeds CoreState.buffer and must contain no \t")
+			"inject_dynamic's result_text seeds CoreState.buffer and must contain no tab")
 		helpers.assert_eq(captured.result_text, FIRST_NAME .. LAST_NAME)
 	end)
 end)

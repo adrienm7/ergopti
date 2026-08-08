@@ -1,105 +1,164 @@
 --- tests/unit/modules/keymap/test_synthetic_echo_not_an_accept.lua
 
 --- ==============================================================================
---- MODULE: Regression — our own synthetic echo must not accept a prediction
----         (synthetic-echo-not-an-accept)
+--- MODULE: Synthetic Echo Must Not Accept An LLM Prediction
 --- DESCRIPTION:
---- An expansion could inject LLM text into the middle of itself.
----
---- ROOT CAUSE ENCODED: the terminator re-type posts a REAL Return or Tab, and
---- that event comes straight back through the keymap tap. handle_llm_keys runs
---- before any synthetic-echo filtering, so with predictions on screen it read
---- our own echo as the user accepting one — and typed the completion into the
---- middle of the replacement still being emitted.
----
---- The synthetic-Delete guard immediately above already had the answer: compare
---- the event's source PID against our own. The check is narrowed to the window
---- in which an expansion is still emitting, so a human Tab pressed at any other
---- moment routes normally — an unconditional PID filter would break accepting a
---- prediction from any Hammerspoon-injected key.
----
---- WHY IT WAS SILENT: everything reported success. The expansion completed, the
---- prediction was "accepted", and the log recorded both. Only the text on screen
---- was wrong — two overlapping insertions that no single component considered a
---- failure.
+--- Drives the real keymap callback with a Return built by the real
+--- SyntheticInput adapter. Its explicit ownership tag must bypass LLM accept
+--- routing, while an otherwise identical untagged Return must still reach that
+--- route. This pins behavior rather than a particular source layout.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+local KEYCODE_RETURN = 36
 
 
+--- Adds keymap-native accessors to adapter-created key events.
+--- @param event table
+--- @param key string|number
+--- @param is_down boolean
+--- @return table event
+local function decorate_event(event, key, is_down)
+	event.getType = function()
+		return is_down and hs.eventtap.event.types.keyDown
+			or hs.eventtap.event.types.keyUp
+	end
+	event.getKeyCode = function()
+		return key == "return" and KEYCODE_RETURN or 0
+	end
+	event.getFlags = function() return {} end
+	event.getCharacters = function() return "" end
+	return event
+end
 
--- ================================================================
--- ================================================================
--- ======= 1/ The routing is gated on event provenance ============
--- ================================================================
--- ================================================================
 
-helpers.describe("keymap: an LLM accept key is not routed from our own echo", function()
-	helpers.it("checks the source PID before routing to handle_llm_keys", function()
-		local src = helpers.read_driver_source("handle_llm_keys")
-		helpers.assert_true(src ~= nil and src ~= "", "the keymap tap must be locatable")
+--- Loads a real keymap tap with a counting LLM boundary.
+--- @return table fixture
+local function load_fixture()
+	for name in pairs(package.loaded) do
+		if type(name) == "string" and (
+			name:match("^modules%.keymap")
+			or name:match("^modules%.llm")
+			or name == "adapters.synthetic_input"
+			or name == "adapters.event_provenance"
+		) then
+			package.loaded[name] = nil
+		end
+	end
 
-		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("LLMBridge.handle_llm_keys", 1, true)
-		helpers.assert_true(at ~= nil, "the LLM key routing must still exist")
+	local accept_calls = 0
+	local llm = setmetatable({
+		init = function() end,
+		observe_action_epoch = function() end,
+		reset_for_action_epoch = function() return true end,
+		handle_llm_keys = function()
+			accept_calls = accept_calls + 1
+			return true
+		end,
+		update_preview = function() end,
+		reset_predictions = function() end,
+		check_nav_reset = function() end,
+		check_escape_reset = function() return false end,
+		get_llm_enabled = function() return false end,
+		is_runtime_available = function() return true end,
+	}, {
+		__index = function() return function() end end,
+	})
+	package.loaded["modules.keymap.llm_bridge"] = llm
 
-		-- The routing must carry its OWN gate. A wide lookback would be satisfied
-		-- by the synthetic-Delete guard further up, which has always had a PID
-		-- check and says nothing about whether this call site is protected.
-		local guard_at = code:find("if not is_own_event then", 1, true)
-		helpers.assert_true(guard_at ~= nil,
-			"the routing must be gated on where the event came from. The terminator re-type "
-				.. "posts a real Return or Tab that arrives back through this tap, and with "
-				.. "predictions on screen it was read as the user accepting one — injecting the "
-				.. "completion into the middle of the expansion still being typed")
-		helpers.assert_true(guard_at < at and (at - guard_at) < 200,
-			"and that gate must sit immediately before the routing call, not somewhere else in "
-				.. "the tap")
+	package.loaded["tests.stubs.hs"] = nil
+	local base_hs = require("tests.stubs.hs")
+	local base_eventtap = base_hs.eventtap
+	local base_new_key_event = base_eventtap.event.newKeyEvent
+	local taps = {}
+	local eventtap = {}
+	for key, value in pairs(base_eventtap) do eventtap[key] = value end
+	eventtap.event = {}
+	for key, value in pairs(base_eventtap.event) do eventtap.event[key] = value end
+	eventtap.event.newKeyEvent = function(modifiers, key, is_down)
+		return decorate_event(base_new_key_event(modifiers, key, is_down), key, is_down)
+	end
+	eventtap.new = function(types, callback)
+		local tap = {
+			types = types,
+			callback = callback,
+			enabled = true,
+			start = function(self) self.enabled = true; return self end,
+			stop = function(self) self.enabled = false; return self end,
+			isEnabled = function(self) return self.enabled end,
+		}
+		taps[#taps + 1] = tap
+		return tap
+	end
 
-		local decl_at = code:find("local is_own_event", 1, true)
-		helpers.assert_true(decl_at ~= nil, "the provenance test must be computed")
-		local decl = code:sub(decl_at, decl_at + 300)
-		helpers.assert_true(decl:find("event_is_ours()", 1, true) ~= nil,
-			"through the shared provenance probe — the same answer the synthetic-Delete guard "
-				.. "needs, so it is resolved once per keystroke rather than read twice")
+	helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
+	local hs_stub = require("hs")
+	local keydown = nil
+	for _, tap in ipairs(taps) do
+		if #tap.types == 1 and tap.types[1] == hs_stub.eventtap.event.types.keyDown then
+			keydown = tap.callback
+			break
+		end
+	end
+	helpers.assert_not_nil(keydown, "production keyDown tap must be created")
+	return {
+		handle = keydown,
+		synthetic = require("adapters.synthetic_input"),
+		hs = hs_stub,
+		accept_calls = function() return accept_calls end,
+		cleanup = function()
+			for name in pairs(package.loaded) do
+				if type(name) == "string" and name:match("^modules%.keymap") then
+					package.loaded[name] = nil
+				end
+			end
+		end,
+	}
+end
 
-		-- And that probe must actually compare against our own process, not just
-		-- exist: a helper that returned a constant would satisfy every check above.
-		local probe_at = code:find("local function event_is_ours", 1, true)
-		helpers.assert_true(probe_at ~= nil, "the shared probe must exist")
-		local probe = code:sub(probe_at, probe_at + 400)
-		helpers.assert_true(probe:find("eventSourceUnixProcessID", 1, true) ~= nil
-			and probe:find("hs.processInfo.processID", 1, true) ~= nil,
-			"the probe must compare the event's source against our OWN process id")
-		helpers.assert_true(probe:find("_event_is_ours == nil", 1, true) ~= nil,
-			"and memoise it: this is the hottest path in the driver and the property read is an "
-				.. "ObjC round-trip, so it must not be paid twice per keystroke")
-	end)
 
-	helpers.it("the gate is narrowed to the emitting window", function()
-		local src = helpers.read_driver_source("handle_llm_keys")
-		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("LLMBridge.handle_llm_keys", 1, true)
+--- Builds an untagged physical Return event.
+--- @param fixture table
+--- @return table event
+local function physical_return(fixture)
+	local properties = fixture.hs.eventtap.event.properties
+	return {
+		getType = function() return fixture.hs.eventtap.event.types.keyDown end,
+		getKeyCode = function() return KEYCODE_RETURN end,
+		getFlags = function() return {} end,
+		getCharacters = function() return "" end,
+		getProperty = function(_self, property)
+			if property == properties.eventSourceUserData then return 0 end
+			return fixture.hs.processInfo.processID
+		end,
+	}
+end
 
-		local before = code:sub(math.max(1, at - 700), at)
-		helpers.assert_true(before:find("expected_synthetic_chars", 1, true) ~= nil
-			or before:find("expected_synthetic_pastes", 1, true) ~= nil,
-			"the filter must apply only while an expansion is still emitting. An unconditional "
-				.. "PID test would also reject a genuine accept driven by any other "
-				.. "Hammerspoon-injected key, turning a mis-accept into a dead feature")
+
+helpers.describe("keymap: an owned Return is not an LLM accept", function()
+	helpers.it("filters the tagged echo but routes an identical physical Return", function()
+		local fixture = load_fixture()
+		local tx = fixture.synthetic.begin("test.terminator", "replacement")
+		local batch = fixture.synthetic.begin_callback(tx)
+		fixture.synthetic.keyStroke(batch, {}, "return")
+		local _, events = fixture.synthetic.finish_callback(batch, true)
+		fixture.synthetic.seal(tx)
+
+		local owned_consume = fixture.handle(events[1])
+		helpers.assert_eq(owned_consume, false,
+			"the injected Return must continue to the app without entering keymap logic")
+		helpers.assert_eq(fixture.accept_calls(), 0,
+			"a tagged terminator echo must not accept a prediction")
+
+		local physical_consume = fixture.handle(physical_return(fixture))
+		helpers.assert_true(physical_consume,
+			"the real LLM route must remain reachable for an untagged Return")
+		helpers.assert_eq(fixture.accept_calls(), 1)
+		fixture.cleanup()
 	end)
 end)
 
-
-
-
-
--- =================================================================
--- =================================================================
--- ======= 2/ The debounce callback reports its own failures =======
--- =================================================================
--- =================================================================
 
 helpers.describe("prediction engine: the debounce callback is guarded", function()
 	helpers.it("reports a throw through the logger, not the console", function()
@@ -108,15 +167,11 @@ helpers.describe("prediction engine: the debounce callback is guarded", function
 
 		local code = src:gsub("%-%-[^\n]*", "")
 		local at = code:find("hs.timer.delayed.new", 1, true)
-		helpers.assert_true(at ~= nil, "the debounce timer must still be created")
-
+		helpers.assert_not_nil(at, "the debounce timer must still be created")
 		local body = code:sub(at, at + 600)
 		helpers.assert_true(body:find("xpcall", 1, true) ~= nil,
-			"this is the single entry point for EVERY debounced prediction. An unhandled throw "
-				.. "reaches Hammerspoon's own handler, which the runtime capture persists only as "
-				.. "an anonymous [CONSOLE] line — no module, no level, no context — while the "
-				.. "prediction for that keystroke is simply gone")
+			"a debounce exception must be contained outside Hammerspoon Console")
 		helpers.assert_true(body:find("Logger.error", 1, true) ~= nil,
-			"and it must report through the logger, or the xpcall merely relocates the silence")
+			"the contained exception must reach the file logger")
 	end)
 end)

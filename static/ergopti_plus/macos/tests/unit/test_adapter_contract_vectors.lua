@@ -210,16 +210,72 @@ end)
 -- ======================================
 
 helpers.describe("Adapter contract vectors: TextSender", function()
-	local adapter = helpers.load_with_stubs("adapters.text_sender")
+	local MAX_BROKER_STEPS = 100
+
+	local function load_tagged_sender()
+		package.loaded["tests.stubs.hs"] = nil
+		local eventtap = require("tests.stubs.hs").eventtap
+		local new_mouse_event = eventtap.event.newMouseEvent
+		local posted_triggers = {}
+		eventtap.event.newMouseEvent = function(...)
+			local event = new_mouse_event(...)
+			event.post = function(self)
+				posted_triggers[#posted_triggers + 1] = self
+				return self
+			end
+			return event
+		end
+
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["adapters.event_tap_guard"] = nil
+		local adapter = helpers.load_with_stubs("adapters.text_sender", { eventtap = eventtap })
+		local hs_table = _G.hs
+
+		local function drain()
+			local emitted = {}
+			for _ = 1, MAX_BROKER_STEPS do
+				if #posted_triggers > 0 then
+					local trigger = table.remove(posted_triggers, 1)
+					local pump = nil
+					for _, tap in ipairs(hs_table.eventtap.__taps) do
+						if tap.types and tap.types[1] == hs_table.eventtap.event.types.otherMouseUp then
+							pump = tap
+							break
+						end
+					end
+					helpers.assert_not_nil(pump, "tagged text dispatch must create its broker tap")
+					local consume, events = pump.fn(trigger)
+					helpers.assert_eq(consume, true, "the private broker trigger must be consumed")
+					for _, event in ipairs(events or {}) do emitted[#emitted + 1] = event end
+				else
+					local pending = nil
+					for _, timer in ipairs(hs_table.timer.__timers) do
+						if timer.running and timer.delay == 0 and not timer.recurring then
+							pending = timer
+							break
+						end
+					end
+					if not pending then return emitted end
+					pending:fire()
+				end
+			end
+			error(string.format(
+				"tagged text fixture did not become idle after %d broker steps",
+				MAX_BROKER_STEPS))
+		end
+
+		return adapter, drain
+	end
 
 	helpers.it("erase_chars — eraseChars(3) emits exactly 3 Backspace events", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.eraseChars(3)
-		local ks = hs.eventtap.__keystrokes
+		local ks = drain()
 		local bs = 0
 		for _, k in ipairs(ks) do
-			if k.key == "delete" or k.key == "forwarddelete" or
-			   (type(k.key) == "string" and k.key:lower():find("delete")) then
+			if k.isDown and (k.key == "delete" or k.key == "forwarddelete" or
+			   (type(k.key) == "string" and k.key:lower():find("delete"))) then
 				bs = bs + 1
 			end
 		end
@@ -227,28 +283,38 @@ helpers.describe("Adapter contract vectors: TextSender", function()
 	end)
 
 	helpers.it("erase_chars_zero — eraseChars(0) is a no-op", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.eraseChars(0)
-		helpers.assert_eq(#hs.eventtap.__keystrokes, 0,
+		helpers.assert_eq(#drain(), 0,
 			"eraseChars(0) must not emit any keystroke")
 	end)
 
 	helpers.it("press_key_no_modifiers — pressKey emits the key", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.pressKey("return", {})
-		helpers.assert_true(#hs.eventtap.__keystrokes > 0,
+		local events = drain()
+		helpers.assert_eq(#events, 2,
 			"pressKey must emit at least one keystroke")
+		helpers.assert_eq(events[1].key, "return")
+		helpers.assert_eq(events[2].key, "return")
 	end)
 
 	-- "does not throw" said nothing about whether the text was TYPED. A send that
 	-- returned early — the exact shape of the nil-payload guard two files over —
 	-- would have passed it while inserting nothing.
 	helpers.it("send types short text directly and reports completion", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		local done = false
 		adapter.send("hello", {}, function() done = true end)
-		helpers.assert_true(#hs.eventtap.__keystrokes > 0,
+		local events = drain()
+		helpers.assert_eq(#events, 10,
 			"a short payload must be typed through the direct path, not silently dropped")
+		local text = {}
+		for _, event in ipairs(events) do
+			if event.isDown then text[#text + 1] = event.unicode end
+		end
+		helpers.assert_eq(table.concat(text), "hello",
+			"the tagged direct events must reproduce the requested text exactly")
 		helpers.assert_true(done,
 			"the completion callback must fire — the LLM bridge chains its cleanup on it, "
 				.. "so a callback that never runs leaves the tooltip up forever")

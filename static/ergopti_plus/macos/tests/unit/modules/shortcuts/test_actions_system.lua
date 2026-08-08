@@ -5,6 +5,66 @@ local helpers = require("tests.helpers")
 -- Load the stubbed hammerspoon environment
 local hs_stub = helpers.load_with_stubs("tests.stubs.hs")
 
+
+--- Adds the Quartz property accessor that distinguishes an explicitly untagged
+--- physical event from a malformed/unreadable test double.
+--- @param event table Partial event double.
+--- @return table event
+local function as_physical(event)
+	event.getProperty = event.getProperty or function() return 0 end
+	return event
+end
+
+
+--- Fires the most recently scheduled retained timer.
+--- @param hs_table table Active Hammerspoon stub.
+local function fire_latest_timer(hs_table)
+	local timers = hs_table.timer.__timers
+	local latest = timers[#timers]
+	helpers.assert_not_nil(latest, "the eventtap action must schedule a post-return timer")
+	if latest then latest:fire() end
+end
+
+
+--- Fires the retained FIFO dispatcher used by SyntheticInput.defer_after_callback.
+--- It is created before any per-action timer, so selecting the first running
+--- zero-delay handle avoids accidentally firing a broker/confirmation timer.
+--- @param hs_table table Active Hammerspoon stub.
+local function fire_post_callback_actions(hs_table)
+	for _, candidate in ipairs(hs_table.timer.__timers or {}) do
+		if candidate.running and candidate.delay == 0 and type(candidate.fire) == "function" then
+			candidate:fire()
+			return
+		end
+	end
+	error("no retained post-eventtap dispatcher is running", 2)
+end
+
+
+--- Returns a shallow contract-preserving override table.
+--- Tests replace only the native methods they observe; every other field stays
+--- available so fail-fast adapters still load against a realistic hs surface.
+--- @param base table Shared hs stub API.
+--- @param overrides table Methods replaced by the fixture.
+--- @return table merged
+local function extend_contract(base, overrides)
+	local merged = {}
+	for key, value in pairs(base) do merged[key] = value end
+	for key, value in pairs(overrides) do merged[key] = value end
+	return merged
+end
+
+
+--- Loads an isolated complete hs contract for a partial native-API fixture.
+--- @return table hs_contract
+local function fresh_hs_contract()
+	package.loaded["tests.stubs.hs"] = nil
+	local contract = require("tests.stubs.hs")
+	contract.__reset()
+	return contract
+end
+
+
 helpers.describe("shortcuts.actions.system", function()
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
 		package.loaded["infra.keycodes"] = nil
@@ -284,6 +344,8 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	local function activate_with_watcher()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 		local hs  = _G.hs
 
@@ -304,17 +366,17 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		end
 
 		sys.toggle_awake()   -- ON → builds and "starts" the watcher, capturing its callback
-		return sys, clock, close_all, captured
+		return sys, clock, close_all, captured, require("adapters.synthetic_input")
 	end
 
 	-- A fake CGEvent of an arbitrary type that is neither keyDown nor mouseMoved,
 	-- so the watcher callback falls straight through to the deactivation branch.
-	local function fake_activity_event()
-		return {
+local function fake_activity_event()
+		return as_physical({
 			getType  = function() return 4242 end,
 			getFlags = function() return {} end,
 			location = function() return { x = 0, y = 0 } end,
-		}
+		})
 	end
 
 	-- Regression for the `local type = _ev:getType()` shadow bug: it turned the
@@ -331,6 +393,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		-- inside the callback) raised, and a raise here now fails with that error
 		-- rather than with a boolean. The assertion is the callback's EFFECT.
 		captured.cb(fake_activity_event())
+		fire_post_callback_actions(_G.hs)
 		helpers.assert_true(close_all.count > before, "auto-deactivation must close the keep-awake banner")
 	end)
 
@@ -353,43 +416,133 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 
 	-- A fake keyDown CGEvent with the given keycode and no modifiers.
 	local function fake_key_event(keycode)
-		return {
+		return as_physical({
 			getType    = function() return _G.hs.eventtap.event.types.keyDown end,
 			getKeyCode = function() return keycode end,
 			getFlags   = function() return {} end,
 			location   = function() return { x = 0, y = 0 } end,
-		}
+		})
 	end
 
-	helpers.it("_emit_activity_keystroke posts the F18 wake key (down + up)", function()
+	helpers.it("_emit_activity_keystroke pumps one tagged F18 pair without advancing the action epoch (keep-awake-non-action)", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
-		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
-		local hs  = _G.hs
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
 
-		local posted = {}
-		hs.eventtap.event.newKeyEvent = function(_mods, key, isDown)
-			return { key = key, isDown = isDown, post = function() posted[#posted + 1] = { key = key, isDown = isDown } end }
+		-- Drive the production adapter all the way through its deferred Quartz
+		-- pump. Looking only at a mocked emit_key_stroke call would stay green if
+		-- the real transaction were accidentally observable and advanced the
+		-- action epoch on every keep-awake tick.
+		local payload_posts = 0
+		local posted_trigger = nil
+		package.loaded["tests.stubs.hs"] = nil
+		local eventtap = require("tests.stubs.hs").eventtap
+		local base_new_key = eventtap.event.newKeyEvent
+		local base_new_mouse = eventtap.event.newMouseEvent
+		eventtap.event.newKeyEvent = function(_mods, key, isDown)
+			local event = base_new_key(_mods, key, isDown)
+			event.post = function(self)
+				payload_posts = payload_posts + 1
+				return self
+			end
+			return event
 		end
+		eventtap.event.newMouseEvent = function(event_type, pos, mods)
+			local event = base_new_mouse(event_type, pos, mods)
+			event.post = function(self)
+				posted_trigger = self
+				return self
+			end
+			return event
+		end
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			eventtap = eventtap,
+		})
+		local hs = _G.hs
+
+		local synthetic = require("adapters.synthetic_input")
+		local provenance = require("adapters.event_provenance")
+		local epoch_before = synthetic.current_action_epoch()
 
 		sys._emit_activity_keystroke()
-		helpers.assert_eq(#posted, 2, "must post a key-down and a key-up")
-		helpers.assert_eq(posted[1].key, F18, "wake key must be F18 (the keymap-reserved no-op)")
-		helpers.assert_eq(posted[1].isDown, true)
-		helpers.assert_eq(posted[2].isDown, false)
+		local broker = hs.timer.__timers[#hs.timer.__timers]
+		helpers.assert_not_nil(broker, "the deferred adapter must arm its broker timer")
+		broker:fire()
+		helpers.assert_not_nil(posted_trigger, "the broker must post its tagged pump trigger")
+
+		local pump = nil
+		for _, tap in ipairs(hs.eventtap.__taps) do
+			if tap.types and tap.types[1] == hs.eventtap.event.types.otherMouseUp then
+				pump = tap
+				break
+			end
+		end
+		helpers.assert_not_nil(pump, "the production synthetic-input pump must be active")
+		local consume, events = pump.fn(posted_trigger)
+		helpers.assert_true(consume)
+		helpers.assert_eq(#events, 2, "the pump must return one key-down/key-up pair")
+		helpers.assert_eq(payload_posts, 0,
+			"payload keys must be callback-returned by the pump, never posted individually")
+		helpers.assert_eq(events[1].key, F18, "wake key must be F18 (the keymap-reserved no-op)")
+		helpers.assert_eq(events[1].isDown, true)
+		helpers.assert_eq(events[2].key, F18)
+		helpers.assert_eq(events[2].isDown, false)
+
+		local user_data = hs.eventtap.event.properties.eventSourceUserData
+		local down_tag = events[1]:getProperty(user_data)
+		local up_tag = events[2]:getProperty(user_data)
+		helpers.assert_true(down_tag ~= 0 and up_tag ~= 0 and down_tag ~= up_tag,
+			"both F18 phases need distinct immutable provenance tags")
+		helpers.assert_true(synthetic.current_action_epoch() == epoch_before,
+			"a keep-awake heartbeat is not a user action and must preserve the action epoch")
+
+		local down = provenance.classify(events[1], "unit.keep_awake")
+		local up = provenance.classify(events[2], "unit.keep_awake")
+		helpers.assert_true(down.owned and up.owned)
+		helpers.assert_eq(down.owner, "shortcuts.keep_awake")
+		helpers.assert_eq(down.effect, "replacement",
+			"the explicit non-observable transaction must survive through the real pump")
+
+		-- The pump hands the batch back to Quartz first, then closes it on the
+		-- next runloop turn. Exercise that terminal transition as well: a sealed
+		-- keep-awake heartbeat must not leave one transaction alive per tick.
+		hs.timer.__fire_all()
+		helpers.assert_eq(synthetic.stats().active_transactions, 0,
+			"the dispatched keep-awake transaction must complete after pump handoff")
+
+		-- Do not leak an adapter captured against this test's hs table into later
+		-- system-action fixtures, which intentionally install partial hs overrides.
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
 	end)
 
-	helpers.it("watcher ignores the synthetic F18 wake key but deactivates on a real key", function()
-		local _sys, clock, close_all, captured = activate_with_watcher()
+	helpers.it("watcher ignores only an exactly tagged F18 and treats physical F18 as user activity (keep-awake-exact-provenance)", function()
+		local _sys, clock, close_all, captured, synthetic = activate_with_watcher()
 		clock.now = clock.now + 100   -- past the activation grace window
 
-		local before = close_all.count
-		captured.cb(fake_key_event(F18))
-		helpers.assert_eq(close_all.count, before, "the F18 jiggle key must NOT auto-deactivate keep-awake")
+		local tx = synthetic.begin("unit.keep_awake.owned", "replacement")
+		local batch = synthetic.begin_callback(tx)
+		synthetic.keyStroke(batch, {}, F18)
+		local _, events = synthetic.finish_callback(batch, true)
+		synthetic.seal(tx)
+		local tagged_f18 = events[1]
+		tagged_f18.getType = function() return _G.hs.eventtap.event.types.keyDown end
+		tagged_f18.getKeyCode = function() return F18 end
+		tagged_f18.getFlags = function() return {} end
+		tagged_f18.location = function() return { x = 0, y = 0 } end
 
-		-- A genuine, unmodified keypress (keycode 0 = 'a') means the user is back.
-		captured.cb(fake_key_event(0))
-		helpers.assert_true(close_all.count > before, "a real keypress must auto-deactivate keep-awake")
+		local before = close_all.count
+		captured.cb(tagged_f18)
+		helpers.assert_eq(close_all.count, before,
+			"an Ergopti-owned F18 heartbeat must not auto-deactivate keep-awake")
+
+		-- F18 exists on extended/program keyboards. Keycode equality is not identity:
+		-- the same untagged key must be treated like any other real user input.
+		captured.cb(fake_key_event(F18))
+		fire_post_callback_actions(_G.hs)
+		helpers.assert_true(close_all.count > before,
+			"a physical F18 press must auto-deactivate keep-awake")
 	end)
 end)
 
@@ -461,6 +614,8 @@ end)
 local function make_sys_screenshot_spies(window_override)
 	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.event_provenance"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
 	package.loaded["infra.notifications"] = { notify = function() end }
@@ -473,26 +628,25 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["adapters.shell_runner"] = nil
 
 	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {}, tasks = {} }
+	local contract = fresh_hs_contract()
+	local eventtap = extend_contract(contract.eventtap, {
+		new = function(_types, cb)
+			spy.captured_cb = cb
+			return { start = function() end, stop = function() end, isEnabled = function() return true end }
+		end,
+	})
+	local timer = extend_contract(contract.timer, {
+		doAfter  = function(delay, fn) table.insert(spy.do_after_calls, { delay = delay, fn = fn }) return { stop = function() end } end,
+		doEvery  = function(_d, _fn) return { start = function() end, stop = function() end } end,
+		new      = function(_d, _fn) return { start = function() end, stop = function() end } end,
+		secondsSinceEpoch = function() return 0 end,
+		absoluteTime      = function() return 0 end,
+		usleep   = function() end,
+	})
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
-		eventtap = {
-			new = function(_types, cb)
-				spy.captured_cb = cb
-				return { start = function() end, stop = function() end, isEnabled = function() return true end }
-			end,
-			event = {
-				types      = { keyDown = 10 },
-				newKeyEvent = function() return { post = function() end } end,
-			},
-		},
-		timer = {
-			doAfter  = function(delay, fn) table.insert(spy.do_after_calls, { delay = delay, fn = fn }) return { stop = function() end } end,
-			doEvery  = function(_d, _fn) return { start = function() end, stop = function() end } end,
-			new      = function(_d, _fn) return { start = function() end, stop = function() end } end,
-			secondsSinceEpoch = function() return 0 end,
-			absoluteTime      = function() return 0 end,
-			usleep   = function() end,
-		},
+		eventtap = eventtap,
+		timer    = timer,
 		execute  = function(cmd) table.insert(spy.exec_calls, cmd) return "", true, "exit", 0 end,
 		-- hs.task is stubbed rather than the ShellRunner module: the capture now
 		-- goes through the real adapter, so stubbing at the OS boundary exercises
@@ -519,8 +673,16 @@ local function make_sys_screenshot_spies(window_override)
 			end,
 		},
 	})
+	spy.hs = _G.hs
 
 	return sys, spy
+end
+
+
+--- Delivers the most recent post-eventtap callback in the screenshot fixture.
+--- @param spy table Fixture spy.
+local function run_screenshot_deferred(spy)
+	fire_post_callback_actions(spy.hs)
 end
 
 --- Returns the first recorded spawn whose binary basename matches, or nil.
@@ -564,10 +726,10 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 		helpers.assert_true(spy.captured_cb ~= nil, "bind_instant_screenshot must register an eventtap callback")
 
 		-- Simulate the @ key with no modifiers
-		local fake_event = {
+		local fake_event = as_physical({
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
-		}
+		})
 		spy.captured_cb(fake_event)
 
 		helpers.assert_eq(#spy.exec_calls, 0,
@@ -578,11 +740,14 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
-		local fake_event = {
+		local fake_event = as_physical({
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
-		}
+		})
 		spy.captured_cb(fake_event)
+		helpers.assert_eq(#spy.tasks, 0,
+			"frontmost-window lookup and subprocess creation must not run on the eventtap")
+		run_screenshot_deferred(spy)
 
 		-- This is the half of the invariant the "no inline hs.execute" case cannot
 		-- carry: silently doing NOTHING also calls no blocking API.
@@ -603,11 +768,12 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
-		local fake_event = {
+		local fake_event = as_physical({
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
-		}
+		})
 		spy.captured_cb(fake_event)
+		run_screenshot_deferred(spy)
 
 		local mkdir = spawn_of(spy, "mkdir")
 		helpers.assert_true(mkdir ~= nil, "the screenshots directory must still be created")
@@ -664,20 +830,18 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 		local _sys, spy = make_sys_screenshot_spies(nil_id_window)
 		_sys.bind_instant_screenshot()
 
-		local fake_event = {
+		local fake_event = as_physical({
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
-		}
+		})
 		helpers.assert_true(spy.captured_cb ~= nil, "eventtap must have been registered")
 		-- The callback must not raise even when id() returns nil
 		-- Called directly: the regression is a raise, so a raise must fail this case
 		-- with its own error rather than with a boolean.
 		spy.captured_cb(fake_event)
 
-		-- Run any deferred work that was scheduled
-		for _, call in ipairs(spy.do_after_calls) do
-			if call.fn then pcall(call.fn) end
-		end
+		-- Run the retained post-eventtap FIFO; the nil-id guard lives inside it.
+		run_screenshot_deferred(spy)
 		-- The nil-id guard must bail out before scheduling screencapture
 		local found_screencapture = false
 		for _, cmd in ipairs(spy.exec_calls) do
@@ -697,10 +861,11 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 		})
 		_sys.bind_instant_screenshot()
 
-		spy.captured_cb({
+		spy.captured_cb(as_physical({
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
-		})
+		}))
+		run_screenshot_deferred(spy)
 
 		helpers.assert_eq(#spy.tasks, 0,
 			"a borderless or system window returns nil from :id(), and screencapture -l "
@@ -739,6 +904,8 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
 
 		local ax_call_count = 0
 		local clock = { now = 1000 }
@@ -752,43 +919,47 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 				ax_call_count = ax_call_count + 1
 				return selection
 			end,
-			wrap_selection = function() end,
+			wrap_selection = function() return true end,
 		}
 
 		local captured = { cb = nil }
+		local contract = fresh_hs_contract()
+		local eventtap = extend_contract(contract.eventtap, {
+			new = function(_types, cb)
+				captured.cb = cb
+				return { start = function() end, stop = function() end }
+			end,
+		})
+		local timer = extend_contract(contract.timer, {
+			secondsSinceEpoch = function() return clock.now end,
+		})
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
-			eventtap = {
-				new = function(_types, cb)
-					captured.cb = cb
-					return { start = function() end, stop = function() end }
-				end,
-				event = { types = { keyDown = 10 } },
-			},
-			timer = {
-				doAfter = function(_d, _fn) return { stop = function() end } end,
-				secondsSinceEpoch = function() return clock.now end,
-			},
+			eventtap = eventtap,
+			timer    = timer,
 		})
 
 		sys.bind_wrap_text_if_selected(nil)
-		return sys, captured, clock, function() return ax_call_count end
+		local function invoke(event)
+			return captured.cb(event)
+		end
+		return sys, captured, clock, function() return ax_call_count end, invoke, _G.hs
 	end
 
 	-- A fake keyDown event typing the wrap symbol "(" with no modifiers.
 	local function fake_wrap_key_event()
-		return {
+		return as_physical({
 			getFlags      = function() return {} end,
 			getCharacters = function() return "(" end,
-		}
+		})
 	end
 
 	helpers.it("N rapid wrap-key presses within the TTL trigger at most 1 real AX call", function()
-		local _sys, captured, _clock, get_count = make_sys_with_ax_spy()
+		local _sys, captured, _clock, get_count, invoke = make_sys_with_ax_spy()
 		helpers.assert_true(type(captured.cb) == "function", "bind_wrap_text_if_selected must register an eventtap callback")
 
 		local REPEAT_COUNT = 10
 		for _ = 1, REPEAT_COUNT do
-			captured.cb(fake_wrap_key_event())
+			invoke(fake_wrap_key_event())
 		end
 
 		helpers.assert_eq(get_count(), 1,
@@ -796,17 +967,17 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	end)
 
 	helpers.it("a press after the TTL window elapses triggers a second real AX call", function()
-		local _sys, captured, clock, get_count = make_sys_with_ax_spy()
+		local _sys, _captured, clock, get_count, invoke = make_sys_with_ax_spy()
 
-		captured.cb(fake_wrap_key_event())
+		invoke(fake_wrap_key_event())
 		helpers.assert_eq(get_count(), 1, "first press must call read_ax_selection")
 
 		clock.now = clock.now + 0.05  -- still within the TTL window
-		captured.cb(fake_wrap_key_event())
+		invoke(fake_wrap_key_event())
 		helpers.assert_eq(get_count(), 1, "a press within the TTL window must reuse the cached selection")
 
 		clock.now = clock.now + 1.0  -- past the TTL window
-		captured.cb(fake_wrap_key_event())
+		invoke(fake_wrap_key_event())
 		helpers.assert_eq(get_count(), 2, "a press after the TTL window must trigger a fresh AX call")
 	end)
 
@@ -819,11 +990,11 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	-- sibling site this is. The spy above could not express it: it hardcoded a
 	-- positive selection.
 	helpers.it("N rapid presses with NO selection also trigger at most 1 real AX call", function()
-		local _sys, captured, _clock, get_count = make_sys_with_ax_spy("")
+		local _sys, _captured, _clock, get_count, invoke = make_sys_with_ax_spy("")
 
 		local REPEAT_COUNT = 10
 		for _ = 1, REPEAT_COUNT do
-			captured.cb(fake_wrap_key_event())
+			invoke(fake_wrap_key_event())
 		end
 
 		helpers.assert_eq(get_count(), 1,
@@ -892,4 +1063,463 @@ helpers.describe("shortcuts.actions.system: schedule_awake_tick float random bou
 			"span must be computed before the interval assignment")
 	end)
 
+end)
+
+
+
+
+-- ======================================================================================
+-- ======================================================================================
+-- ======= Exact provenance + physical-fence integration (HS-H-01) =====================
+-- ======================================================================================
+-- ======================================================================================
+
+local SyntheticInputStack = require("tests.support.synthetic_input_stack")
+
+
+--- Loads system.lua and the real provenance producer/consumer against one hs stub.
+--- @param options table|nil Optional dependency doubles.
+--- @return table fixture
+local function load_h01_system(options)
+	options = options or {}
+	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["modules.shortcuts.actions.text"] = nil
+	package.loaded["modules.gestures"] = options.gestures or {}
+	package.loaded["adapters.shell_runner"] = nil
+	if options.text_actions then
+		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
+	end
+	local system, synthetic = SyntheticInputStack.load(
+		"modules.shortcuts.actions.system", options.hs_overrides)
+	return { system = system, synthetic = synthetic, hs = _G.hs }
+end
+
+
+--- Creates one real adapter-tagged keyDown and adds only the native accessors
+--- needed by a target tap. The Quartz user-data accessor remains production-real.
+--- @param fixture table H01 fixture.
+--- @param key string|number Synthetic key value.
+--- @param keycode number Native keycode observed by the target tap.
+--- @param characters string|nil Decoded characters.
+--- @param flags table|nil Modifier flags.
+--- @return table event
+local function owned_key_down(fixture, key, keycode, characters, flags)
+	local tx = fixture.synthetic.begin("unit.system.owned", "replacement")
+	local batch = fixture.synthetic.begin_callback(tx)
+	fixture.synthetic.keyStroke(batch, {}, key)
+	local _, events = fixture.synthetic.finish_callback(batch, true)
+	fixture.synthetic.seal(tx)
+	local event = events[1]
+	event.getType = function() return fixture.hs.eventtap.event.types.keyDown end
+	event.getKeyCode = function() return keycode end
+	event.getCharacters = function() return characters or "" end
+	event.getFlags = function() return flags or {} end
+	event.location = function() return { x = 0, y = 0 } end
+	return event
+end
+
+
+--- Builds one explicitly untagged physical key event.
+local function physical_key_down(fixture, keycode, characters, flags)
+	return as_physical({
+		getType = function() return fixture.hs.eventtap.event.types.keyDown end,
+		getKeyCode = function() return keycode end,
+		getCharacters = function() return characters or "" end,
+		getFlags = function() return flags or {} end,
+		location = function() return { x = 0, y = 0 } end,
+	})
+end
+
+
+--- Builds one explicitly untagged physical scroll event.
+local function physical_scroll(fixture, delta)
+	local delta_property = fixture.hs.eventtap.event.properties.scrollWheelEventDeltaAxis1
+	return {
+		getType = function() return fixture.hs.eventtap.event.types.scrollWheel end,
+		getProperty = function(_, property)
+			if property == delta_property then return delta end
+			return 0
+		end,
+	}
+end
+
+
+--- Reinterprets a genuinely tagged adapter event as a scroll event while
+--- preserving its exact user-data property.
+local function owned_scroll(fixture, delta)
+	local event = owned_key_down(fixture, "x", 0, "", {})
+	local base_get_property = event.getProperty
+	local delta_property = fixture.hs.eventtap.event.properties.scrollWheelEventDeltaAxis1
+	event.getType = function() return fixture.hs.eventtap.event.types.scrollWheel end
+	event.getProperty = function(self, property)
+		if property == delta_property then return delta end
+		return base_get_property(self, property)
+	end
+	return event
+end
+
+
+helpers.describe("shortcuts.actions.system: exact provenance and ordered fences (HS-H-01)", function()
+	helpers.it("an owned @ event cannot trigger the screenshot tap (HS-H-01)", function()
+		local fixture = load_h01_system()
+		local window_reads = 0
+		fixture.hs.window.frontmostWindow = function()
+			window_reads = window_reads + 1
+			return { id = function() return 42 end }
+		end
+		fixture.system.bind_instant_screenshot()
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		local event = owned_key_down(fixture, "@", 10, "@", {})
+		local timers_before = #fixture.hs.timer.__timers
+
+		local consume, returned = tap.fn(event)
+
+		helpers.assert_true(not consume, "owned output must continue downstream unchanged")
+		helpers.assert_nil(returned)
+		helpers.assert_eq(window_reads, 0,
+			"an Ergopti-owned @ must not be reinterpreted as a physical screenshot command")
+		helpers.assert_eq(#fixture.hs.timer.__timers, timers_before,
+			"the ignored owned event must not schedule a screenshot action")
+	end)
+
+	helpers.it("an owned Cmd+star cannot recurse into Cmd+S (HS-H-01)", function()
+		local fixture = load_h01_system()
+		local trigger_count = 0
+		fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		local event = owned_key_down(fixture, "*", 28, "*", { cmd = true, shift = true })
+		local pending_before = fixture.synthetic.stats().pending
+		local timers_before = #fixture.hs.timer.__timers
+
+		local consume, returned = tap.fn(event)
+
+		helpers.assert_true(not consume)
+		helpers.assert_nil(returned)
+		helpers.assert_eq(trigger_count, 0)
+		helpers.assert_eq(fixture.synthetic.stats().pending, pending_before,
+			"the owned chord must not queue a second synthetic shortcut")
+		helpers.assert_eq(#fixture.hs.timer.__timers, timers_before)
+	end)
+
+	helpers.it("an owned wrap symbol cannot consume output or probe AX (HS-H-01)", function()
+		local ax_reads, wraps = 0, 0
+		local fixture = load_h01_system({
+			text_actions = {
+				WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+				read_ax_selection = function() ax_reads = ax_reads + 1 return "selected" end,
+				wrap_selection = function() wraps = wraps + 1 end,
+			},
+		})
+		fixture.system.bind_wrap_text_if_selected(nil)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		local consume, returned = tap.fn(owned_key_down(fixture, "(", 25, "(", {}))
+
+		helpers.assert_true(not consume)
+		helpers.assert_nil(returned)
+		helpers.assert_eq(ax_reads, 0)
+		helpers.assert_eq(wraps, 0,
+			"tagged expansion/LLM text must reach the app, never recurse into wrap")
+	end)
+
+	helpers.it("wrap fails open on a non-empty fence and never consumes/replays the symbol (HS-H-01)", function()
+		local ax_reads, wraps = 0, 0
+		local fixture = load_h01_system({
+			text_actions = {
+				WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+				read_ax_selection = function() ax_reads = ax_reads + 1 return "stale selection" end,
+				wrap_selection = function() wraps = wraps + 1 end,
+			},
+		})
+		fixture.system.bind_wrap_text_if_selected(nil)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		fixture.synthetic.emit_key_stroke({ "cmd" }, "tab", 0)
+		local handoffs_before = fixture.synthetic.stats().action_handoffs
+
+		local consume, fence_events = tap.fn(physical_key_down(fixture, 25, "(", {}))
+
+		helpers.assert_true(not consume,
+			"the original physical symbol must continue to keymap/app after the fence")
+		helpers.assert_true(type(fence_events) == "table" and #fence_events == 2)
+		helpers.assert_eq(ax_reads, 0,
+			"pre-return AX state belongs to the pre-fence application and cannot be used")
+		helpers.assert_eq(wraps, 0)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+			"the symbol is passed physically; no owned replay may desynchronise CoreState")
+		helpers.assert_eq(fixture.synthetic.stats().action_handoffs, handoffs_before + 1,
+			"only the older fenced action is handed off")
+	end)
+
+	helpers.it("wrap with no AX selection passes the physical symbol without a synthetic action (HS-H-01)", function()
+		local fixture = load_h01_system({
+			text_actions = {
+				WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+				read_ax_selection = function() return nil end,
+				wrap_selection = function() error("no selection must not wrap") end,
+			},
+		})
+		fixture.system.bind_wrap_text_if_selected(nil)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		local handoffs_before = fixture.synthetic.stats().action_handoffs
+
+		local consume, returned = tap.fn(physical_key_down(fixture, 25, "(", {}))
+
+		helpers.assert_true(not consume)
+		helpers.assert_nil(returned)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
+		helpers.assert_eq(fixture.synthetic.stats().action_handoffs, handoffs_before,
+			"passthrough must stay physical so keymap buffer/preview observe the same character")
+	end)
+
+	helpers.it("F19 state is immediate, while owned F19/scroll events never control volume (HS-H-01)", function()
+		local cleanup_count = 0
+		local click_held = true
+		local fixture = load_h01_system({
+			gestures = {
+				isRightClickHeld = function() return click_held end,
+				forceCleanup = function()
+					click_held = false
+					cleanup_count = cleanup_count + 1
+				end,
+			},
+		})
+		local media_events = {}
+		fixture.hs.eventtap.event.newSystemKeyEvent = function(key, is_down)
+			return { post = function() media_events[#media_events + 1] = { key, is_down } end }
+		end
+		fixture.system.bind_layer_scroll()
+		local taps = fixture.hs.eventtap.__taps
+		local key_tap = taps[#taps - 1]
+		local scroll_tap = taps[#taps]
+		local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
+
+		key_tap.fn(owned_key_down(fixture, "f19", f19, "", {}))
+		local owned_consume = scroll_tap.fn(owned_scroll(fixture, 1))
+		helpers.assert_true(not owned_consume,
+			"an owned F19 must not arm the physical layer, and owned scroll is never a command")
+
+		local down = physical_key_down(fixture, f19, "", {})
+		local down_consume = key_tap.fn(down)
+		helpers.assert_true(not down_consume, "the physical F19 itself remains visible to the OS")
+		-- Do not fire the deferred gesture-cleanup timer. The very first following
+		-- scroll must already observe layer_held=true.
+		local scroll_consume = scroll_tap.fn(physical_scroll(fixture, 1))
+		helpers.assert_true(scroll_consume,
+			"F19 layer state must be O(1) synchronous or the first scroll notch leaks")
+		helpers.assert_eq(#media_events, 0,
+			"media emission and gesture cleanup must still run after the tap returns")
+		fire_post_callback_actions(fixture.hs)
+		helpers.assert_eq(#media_events, 2, "one notch must emit one media down/up pair")
+		helpers.assert_eq(cleanup_count, 1)
+	end)
+
+	helpers.it("screenshot target lookup happens after every older fence event (HS-H-01)", function()
+		local fixture = load_h01_system()
+		local current_window_id = 1
+		local tasks = {}
+		fixture.hs.window.frontmostWindow = function()
+			local captured_id = current_window_id
+			return { id = function() return captured_id end }
+		end
+		fixture.hs.task.new = function(path, on_done, args)
+			local rec = { path = path, on_done = on_done, args = args }
+			tasks[#tasks + 1] = rec
+			return { start = function() return true end, terminate = function() end }
+		end
+		fixture.system.bind_instant_screenshot()
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+
+		fixture.synthetic.emit_key_stroke({ "cmd" }, "tab", 0)
+		local consume, fence_events = tap.fn(physical_key_down(fixture, 10, "@", {}))
+		helpers.assert_true(consume)
+		helpers.assert_true(type(fence_events) == "table" and #fence_events == 2,
+			"the older action must be returned ahead of the consumed screenshot key")
+		helpers.assert_eq(#tasks, 0,
+			"window lookup/subprocess work must not run before the returned fence")
+
+		-- Models the returned Cmd+Tab reaching the application before timer-zero.
+		current_window_id = 2
+		fire_post_callback_actions(fixture.hs)
+		helpers.assert_eq(#tasks, 1)
+		local argv = table.concat(tasks[1].args or {}, " ")
+		helpers.assert_true(argv:find("-p", 1, true) ~= nil,
+			"the first deferred subprocess must still be mkdir")
+		-- Finish mkdir; screencapture must inherit the post-fence target id.
+		tasks[1].on_done(0, "", "")
+		helpers.assert_eq(#tasks, 2)
+		helpers.assert_eq(tasks[2].args and tasks[2].args[2], "2",
+			"capture must target the window frontmost after the fence, never the stale id 1")
+	end)
+
+	helpers.it("Cmd+star returns older output before scheduling its replacement and telemetry (HS-H-01)", function()
+		local fixture = load_h01_system()
+		local trigger_count = 0
+		fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		fixture.synthetic.emit_key_stroke({}, "a", 0)
+
+		local consume, fence_events = tap.fn(
+			physical_key_down(fixture, 28, "*", { cmd = true, shift = true }))
+		helpers.assert_true(consume)
+		helpers.assert_true(type(fence_events) == "table" and #fence_events == 2)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+			"the older batch is adopted into the callback return, not left in the pump")
+		helpers.assert_eq(trigger_count, 0,
+			"telemetry must not execute on the eventtap or before its ordering fence")
+
+		fire_post_callback_actions(fixture.hs)
+		helpers.assert_eq(trigger_count, 1)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 1,
+			"the Cmd+S replacement is queued only after the older batch was handed off")
+	end)
+
+	helpers.it("the real tagged pump trigger cannot auto-disable keep-awake (HS-H-01)", function()
+		local posted_trigger = nil
+		local contract = fresh_hs_contract()
+		local base_new_mouse = contract.eventtap.event.newMouseEvent
+		local event_api = extend_contract(contract.eventtap.event, {
+			newMouseEvent = function(event_type, position, modifiers)
+				local event = base_new_mouse(event_type, position, modifiers)
+				event.getType = function(self) return self.t end
+				event.post = function(self)
+					posted_trigger = self
+					return self
+				end
+				return event
+			end,
+		})
+		local eventtap = extend_contract(contract.eventtap, { event = event_api })
+		local fixture = load_h01_system({ hs_overrides = { eventtap = eventtap } })
+		local now = 1000
+		fixture.hs.timer.secondsSinceEpoch = function() return now end
+		local close_count = 0
+		fixture.hs.alert.show = function() return "awake" end
+		fixture.hs.alert.closeSpecific = function() close_count = close_count + 1 end
+		fixture.system.toggle_awake()
+		now = now + 10
+
+		local watcher = nil
+		for _, tap in ipairs(fixture.hs.eventtap.__taps) do
+			for _, event_type in ipairs(tap.types or {}) do
+				if event_type == fixture.hs.eventtap.event.types.keyDown then watcher = tap end
+			end
+		end
+		helpers.assert_not_nil(watcher)
+
+		fixture.system._emit_activity_keystroke()
+		fire_latest_timer(fixture.hs)
+		helpers.assert_not_nil(posted_trigger,
+			"the production broker must post its exact-tag control trigger")
+		local consume, returned = watcher.fn(posted_trigger)
+		helpers.assert_true(not consume)
+		helpers.assert_nil(returned)
+		helpers.assert_eq(close_count, 0,
+			"otherMouseUp is user activity only when foreign; the owned pump control is not")
+
+		local pump = nil
+		for _, tap in ipairs(fixture.hs.eventtap.__taps) do
+			if tap.types and #tap.types == 1
+				and tap.types[1] == fixture.hs.eventtap.event.types.otherMouseUp then
+				pump = tap
+			end
+		end
+		helpers.assert_not_nil(pump)
+		local pump_consume, payload = pump.fn(posted_trigger)
+		helpers.assert_true(pump_consume)
+		helpers.assert_eq(#payload, 2,
+			"ignoring the control event in the watcher must still let the pump return F18")
+	end)
+
+	helpers.it("unreadable keyboard provenance fails closed and still returns the older fence (HS-H-01)", function()
+		local cases = {
+			{
+				name = "screenshot",
+				bind = function(fixture, effects)
+					fixture.hs.window.frontmostWindow = function()
+						effects.count = effects.count + 1
+						return { id = function() return 42 end }
+					end
+					fixture.system.bind_instant_screenshot()
+				end,
+				keycode = 10, characters = "@", flags = {},
+			},
+			{
+				name = "cmd-star",
+				bind = function(fixture, effects)
+					fixture.system.bind_cmd_star(function() effects.count = effects.count + 1 end)
+				end,
+				keycode = 28, characters = "*", flags = { cmd = true, shift = true },
+			},
+			{
+				name = "wrap",
+				text_actions = function(effects)
+					return {
+						WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+						read_ax_selection = function() effects.count = effects.count + 1 return "x" end,
+						wrap_selection = function() effects.count = effects.count + 1 end,
+					}
+				end,
+				bind = function(fixture) fixture.system.bind_wrap_text_if_selected(nil) end,
+				keycode = 25, characters = "(", flags = {},
+			},
+		}
+
+		for _, case in ipairs(cases) do
+			local effects = { count = 0 }
+			local text_actions = case.text_actions and case.text_actions(effects) or nil
+			local fixture = load_h01_system({ text_actions = text_actions })
+			case.bind(fixture, effects)
+			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+			fixture.synthetic.emit_key_stroke({}, "a", 0)
+			local unreadable = {
+				getType = function() return fixture.hs.eventtap.event.types.keyDown end,
+				getProperty = function() error("Quartz user-data unavailable") end,
+				getKeyCode = function() return case.keycode end,
+				getCharacters = function() return case.characters end,
+				getFlags = function() return case.flags end,
+			}
+			local consume, fence_events = tap.fn(unreadable)
+			helpers.assert_true(not consume, case.name .. " must pass an unreadable original")
+			helpers.assert_true(type(fence_events) == "table" and #fence_events == 2,
+				case.name .. " must not drop the older batch while failing closed")
+			helpers.assert_eq(effects.count, 0,
+				case.name .. " must not interpret unreadable provenance as a user command")
+		end
+	end)
+
+	helpers.it("unreadable F19 and scroll provenance cannot mutate layer state or emit media (HS-H-01)", function()
+		local fixture = load_h01_system({ gestures = {} })
+		local media_count = 0
+		fixture.hs.eventtap.event.newSystemKeyEvent = function()
+			return { post = function() media_count = media_count + 1 end }
+		end
+		fixture.system.bind_layer_scroll()
+		local taps = fixture.hs.eventtap.__taps
+		local key_tap = taps[#taps - 1]
+		local scroll_tap = taps[#taps]
+		local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
+
+		fixture.synthetic.emit_key_stroke({}, "a", 0)
+		local unreadable_key = {
+			getType = function() return fixture.hs.eventtap.event.types.keyDown end,
+			getProperty = function() error("unreadable") end,
+			getKeyCode = function() return f19 end,
+		}
+		local key_consume, key_fence = key_tap.fn(unreadable_key)
+		helpers.assert_true(not key_consume)
+		helpers.assert_true(type(key_fence) == "table" and #key_fence == 2)
+		helpers.assert_true(not scroll_tap.fn(physical_scroll(fixture, 1)),
+			"unreadable F19 must not arm the volume layer")
+
+		key_tap.fn(physical_key_down(fixture, f19, "", {}))
+		fixture.synthetic.emit_key_stroke({}, "b", 0)
+		local unreadable_scroll = {
+			getType = function() return fixture.hs.eventtap.event.types.scrollWheel end,
+			getProperty = function() error("unreadable") end,
+		}
+		local scroll_consume, scroll_fence = scroll_tap.fn(unreadable_scroll)
+		helpers.assert_true(not scroll_consume)
+		helpers.assert_true(type(scroll_fence) == "table" and #scroll_fence == 2)
+		helpers.assert_eq(media_count, 0,
+			"unreadable scroll provenance must fail closed even while physical F19 is held")
+	end)
 end)

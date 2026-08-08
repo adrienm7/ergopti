@@ -25,6 +25,7 @@ local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local MouseControl  = require("adapters.mouse_control")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "shortcuts.actions.system"
 
@@ -132,7 +133,7 @@ end
 function M.open_emoji_picker()
 	Logger.start(LOG, "Opening emoji picker…")
 	local ok, err = pcall(function()
-		hs.eventtap.keyStroke({"ctrl", "cmd"}, "space", 0)
+		SyntheticInput.emit_key_stroke({"ctrl", "cmd"}, "space", 0)
 	end)
 	if ok then
 		Logger.success(LOG, "Emoji picker triggered.")

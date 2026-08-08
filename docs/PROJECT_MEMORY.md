@@ -59,7 +59,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-hs-script-quit-kills-karabiner](#project-hs-script-quit-kills-karabiner) — The quit shortcut os.exit()s and bypasses the shutdown callback, so it must kill Karabiner itself
 - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — The first-run wizard must write the canonical HS config schema, and the "ready" notification was removed
 - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Ou vivent les defauts du module keymap, et pourquoi une seule place
-- [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — The macOS driver tracks self-emitted synthetic keystrokes in TWO independent places; any injector that bypasses the expander choke point desyncs them and can corrupt typed output
+- [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — Every macOS keyboard injector uses one exact-tag transaction adapter; source PID, timing and character equality are never synthetic identity
 - [project-locale-parity-test](#project-locale-parity-test) — en.json est le jeu de cles canonique ; le meta-test AHK test_locale_json_valid.ahk impose la parite en CI ; `tools/locale/check_locales.py --fix` est l'outil de backfill manuel
 - [project-locale-fast-cache](#project-locale-fast-cache) — Le `.tsv` de locale du driver Windows est un cache gitignore auto-reparateur regenere depuis le `.json` canonique ; seul le `.json` est versionne
 - [project_metrics_pipeline_17](#project_metrics_pipeline_17) — Architecture du pipeline metrics AHK — pourquoi AHK ne peut pas devenir pur-walker comme macOS
@@ -2055,13 +2055,13 @@ _Qui possede le terminateur, et pourquoi une expansion doit etre atomique — le
 
 Trois symptomes signales par l'utilisateur (« Entree part avant l'autocorrection », « pex★ donne pexar exemple », « des touches sont avalees ») remontent a **deux** proprietes que seul le driver Windows possedait deja.
 
-**1. Ordre : le terminateur ne doit partir qu'apres le remplacement.** Sur macOS le tap consomme la touche terminatrice (pour effacer declencheur + terminateur ensemble) puis la re-emet. Elle etait re-emise *en ligne*, juste apres le texte, en supposant qu'un evenement clavier brut poste apres une injection de texte est delivre apres ce texte. **C'est faux** : le remplacement voyage par le pipeline d'entree texte (evenement unicode, ou une lecture du presse-papier que la cible planifie elle-meme) tandis que Entree et Tab voyagent comme evenements bruts que beaucoup d'hotes traitent a l'arrivee. Rien n'ordonnait les deux. Correctif : `modules/keymap/terminator_replay.lua` **retient** le terminateur jusqu'a ce que le remplacement ait provablement atterri — les compteurs `expected_synthetic_*` que le driver tient deja pour ignorer son propre echo sont la preuve — avec un chien de garde borne, car **tard est rattrapable, perdu ne l'est pas**.
+**1. Ordre : le terminateur ne doit partir qu'apres le remplacement.** Sur macOS le tap consomme la touche terminatrice (pour effacer declencheur + terminateur ensemble) puis la re-emet. Elle etait re-emise *en ligne*, juste apres le texte, en supposant qu'un evenement clavier brut poste apres une injection de texte est delivre apres ce texte. **C'est faux** : le remplacement voyage par le pipeline d'entree texte (evenement unicode, ou une lecture du presse-papier que la cible planifie elle-meme) tandis que Entree et Tab voyagent comme evenements bruts que beaucoup d'hotes traitent a l'arrivee. Rien n'ordonnait les deux. Le contrat cible est que `modules/keymap/terminator_replay.lua` retienne le terminateur avec une reference a la transaction de remplacement, attende sa completion reussie, puis ouvre une transaction de replay distincte pour le terminateur. Au 2026-08-08, l'adaptateur fournit ces transactions, mais le callback de replay ne distingue pas encore `complete` de `failed`/`cancelled`; ce reliquat est suivi separement et ne doit pas etre considere comme garanti. Un compteur d'echo ou un delai ne constitue jamais une barriere d'ordonnancement, car le texte colle est produit plus tard par l'application cible.
 
 **Corollaire non evident : `emit_text`/`emit_tokens` doivent annoncer une barriere meme pour un collage EN LIGNE.** L'ancien code ne posait la barriere que pour un collage *differe*, au motif que « Cmd+V est deja poste et l'ordre de post est preserve ». Il l'est — mais **le texte colle n'est pas un de nos evenements** : c'est la cible qui le produit, plus tard, quand elle lit le presse-papier. Toute frappe postee juste derriere le Cmd+V arrive donc *devant* le texte qu'elle est censee suivre.
 
 **2. Atomicite : rien ne doit pouvoir s'intercaler dans une expansion.** Windows emet **une seule** rafale `SendInput` (`Burst := BackSpaceSeq . ReplacementPart . EndCharPart`, `hotstring_dispatch.ahk`) sous `Critical`. C'est ce qui rend impossible qu'une touche physique se glisse au milieu (« outpubct », « Cha[lettre]tGPT ») ou qu'un backspace se perde. L'ancien code y envoyait BackSpace, Replacement et EndChar en trois `SendInput` separes — et ces intervalles etaient precisement la source de corruption. **Ne jamais rescinder cette rafale.** Garde : `windows/tests/meta/test_expansion_burst_atomic.ahk`.
 
-**3. Provenance, jamais une fenetre temporelle.** macOS classait comme « notre propre echo » toute frappe arrivee moins de 20 ms apres la precedente (`elseif dt < 0.02`). La vitesse de frappe n'est pas une preuve de provenance : le caractere restait a l'ecran mais n'entrait plus dans le buffer, donc l'expansion suivante dimensionnait ses backspaces sur un buffer plus court que la ligne et **effacait le texte de l'utilisateur**. Windows avait deja fait exactement cette migration (fenetre de 60 ms → filtre `I1` par provenance, cf. [[project_hotstring_engine_internals]]) ; macOS utilise desormais le test de PID source qu'il avait deja sous la main deux branches plus haut.
+**3. Provenance, jamais une fenetre temporelle.** macOS classait comme « notre propre echo » toute frappe arrivee moins de 20 ms apres la precedente (`elseif dt < 0.02`). La vitesse de frappe n'est pas une preuve de provenance : le caractere restait a l'ecran mais n'entrait plus dans le buffer, donc l'expansion suivante dimensionnait ses backspaces sur un buffer plus court que la ligne et **effacait le texte de l'utilisateur**. Un test de PID seul ne suffit pas non plus : plusieurs injecteurs Hammerspoon partagent le meme processus. Le driver exige desormais le tag `eventSourceUserData` exact emis par `adapters.synthetic_input`; caractere, modificateurs, delai et PID ne sont que des donnees ou diagnostics, jamais une identite.
 
 **4. Un tap mort est une panne totale et silencieuse.** macOS desactive un event tap dont le callback depasse le budget systeme. Rien dans le driver ne peut s'en apercevoir : **un tap mort ne delivre aucun evenement avec quoi s'en apercevoir**, donc le seul detecteur est un chien de garde par sondage — et **son intervalle EST la duree de la panne**. Il etait a 5 s. Pire, le reveil restaurait la plomberie sans la verite : `CoreState.buffer` decrivait encore la ligne d'avant la panne, et l'expansion suivante effacait par-dessus le texte reellement tape (symptome maison : « hs★ » → « hsammerspoon »). Toute reprise de tap doit donc **invalider le contexte observe** (`invalidate_observed_context`), et les **deux** chemins de reprise le doivent — le gestionnaire d'erreur re-arme le tap si vite que le chien de garde ne le voit jamais tombe.
 
@@ -2164,46 +2164,74 @@ _Ou vivent les defauts du module keymap, et pourquoi une seule place_
 
 ### project-hs-synthetic-injection-choke-point
 
-_The macOS driver tracks self-emitted synthetic keystrokes in TWO independent places; any injector that bypasses the expander choke point desyncs them and can corrupt typed output_
+_Every macOS keyboard injector uses one exact-tag transaction adapter; source
+PID, timing and character equality are never synthetic identity_
 
 <sub>slug: `project_hs_synthetic_injection_choke_point`</sub>
 
-The Hammerspoon driver runs **two independent CGEvent taps** that each see the
-app's own synthetic keystrokes and each keep their own "skip my synthetic
-output" bookkeeping:
+`adapters/synthetic_input.lua` is the single authority for keyboard injection.
+It assigns an `eventSourceUserData` tag to every key-down/key-up pair and keeps
+bounded enrichment containing the transaction generation, effect, batch,
+ordinal and phase. `adapters/event_provenance.lua` is the single consumer-side
+classifier. Source PID remains diagnostic only: an untagged event from the same
+Hammerspoon process is foreign input and must traverse the human path.
 
-- **keymap tap** (`modules/keymap/init.lua`): `CoreState.expected_synthetic_deletes` + `expected_synthetic_chars`, plus `suppress_rescan()` / `no_rescan_until` to stop emitted text from re-entering `run_trigger_checks`.
-- **keylogger tap** (`modules/keylogger/init.lua`): a separate `CoreState.synth_queue`, fed only by `M.notify_synthetic()` and drained in `handle_key`.
+The old `CoreState.expected_synthetic_*` counters and keylogger `synth_queue`
+were removed. They matched by character, modifier and timing, so a physical
+exact character, Backspace or `Cmd+V` could drain another transaction and make
+later private output enter the human log. Logical replacement accounting still
+uses `keylogger.notify_synthetic()`, but that call never grants physical-event
+ownership.
 
-`expander.perform_text_replacement` is the **single correct choke point**: it
-arms both counters, calls `suppress_rescan`, calls `keylogger.notify_synthetic`,
-and resyncs the buffer. `llm_bridge.apply_prediction` mostly mirrors it.
+Input-callback emitters append prebuilt tagged events to the callback return
+table. Timer/menu emitters use the adapter's single FIFO eventtap broker; they
+must not call `event:post()` per payload event. Each successfully handed-off
+action transaction publishes at most one opaque action epoch. A multi-emitter
+user action gets one epoch only when it owns one explicit transaction; standalone
+convenience emits each create their own transaction. Keymap/tooltip and keylogger
+reconcile epochs asynchronously, with an allocation-free comparison at each
+event as the tap-order backstop. Building, cancellation and dispatch failure
+**before** handoff to Quartz never publish an epoch. A post-return confirmation
+can fail after irrevocable handoff; that action has already published an epoch
+and must keep it. A producer must still inspect a `false` convenience-emitter
+result; unchecked shortcut/gesture siblings are tracked with the failed-delivery
+work and are not covered merely because their success path is tagged.
 
-**Foot-gun (the class of bug found in the 2026-06 HS audit, see
-`AUDIT_HAMMERSPOON_BUGS.md` at repo root):** injectors that emit raw
-`hs.eventtap.keyStroke("delete")` + `emit_text` **outside** that choke point
-desync the two trackers. Both named injectors below were fixed by the
-2026-07-01 audit's implementation pass and now route through the choke point —
-this entry previously (incorrectly) described them as still bypassing it; keep
-this paragraph in sync with the source when either injector changes again.
-`dynamic_hotstrings/rules_engine` now routes through `keymap.inject_dynamic`
-(with a fallback path that itself calls `suppress_rescan`, the counters, and
-`notify_synthetic`). `personal_info.do_expand` likewise now calls
-`notify_synthetic`, not just `suppress_rescan`. The paste branch (`emit_text`
-returns `(1,"")` for >50 chars or codepoints >U+FFFF) leaves
-`expected_synthetic_chars` empty and the synthetic Cmd+V then hits the
-Cmd/Ctrl buffer-wipe branch — this remains a live constraint for any new
-injector to respect.
+**How to apply:** no production keyboard injector may call raw
+`hs.eventtap.keyStroke`, `hs.eventtap.keyStrokes`, or post a raw
+`newKeyEvent`; AppleScript `System Events` keyboard commands are the same bypass
+in another process and are forbidden too. Use `adapters.synthetic_input`
+directly or run inside the transaction opened by `perform_text_replacement`.
+NX system-key events and mouse/scroll events are separate Quartz event classes
+and are explicit exceptions. Keep a runtime-tree spelling ratchet for known raw
+APIs, paired with behavioral tests that interleave foreign exact/mismatch/
+Backspace/`Cmd+V` events with real tagged output. A source grep alone is not
+proof. Every observer that interprets a key as a **human** command or state
+mutation needs an explicit, tested provenance policy. Keymap, keylogger and the
+LLM tooltip classify tags today; another observer may deliberately let synthetic
+activity dismiss stale UI, so blindly filtering every eventtap is also wrong.
+This distinction matters: the LLM tooltip once accepted a tagged replacement
+`Tab` because it lacked any policy while keymap and keylogger were correct.
 
-**How to apply:** never emit synthetic deletes/text from a new injector with raw
-`hs.eventtap` calls. Route it through `perform_text_replacement` or a shared
-`keymap.inject_replacement(deletes, text, variant)` helper so the bookkeeping is
-guaranteed. The two synthetic trackers must also stay in sync on recovery: the
-keymap self-heals (`dt > 0.5s` reset) and the keylogger `synth_queue` now also
-self-heals via a `SYNTH_IDLE_DRAIN_MS` (500 ms) idle drain in
-`modules/keylogger/init.lua`. This foot-gun watch-list entry is about the NEXT
-injector someone adds, not `rules_engine`/`personal_info` specifically anymore.
-Related: [[project_keymap_architecture]], [[feedback_regression_tests]].
+The enrichment ledger is intentionally bounded. A valid evicted tag from a
+sequence block reserved by the current module instance is still filtered as
+Ergopti-owned, but does not republish the action epoch: its current-session
+logical mutation already happened. The adapter retains a bounded history of
+those million-tag reservation blocks, including blocks that wrap the 38-bit
+sequence ring.
+
+A valid non-loopback tag outside that current-session block history is treated
+as pre-reload output. Its first real consumer publishes a conservative process-
+wide action epoch so keymap, tooltip and keylogger discard context that did not
+observe the old instance's logical mutation. This publication is deduplicated by
+full tag in a bounded central ring across consumers; `claim_tag(tag, nil)` and
+`EventProvenance.is_owned()` remain read-only. An old loopback tag is different:
+it is consumed as an internal control key without regaining loopback authority
+and without publishing an epoch, because loopback alone was never an observable
+user action.
+
+Related: [[project_typing_order_and_atomicity]],
+[[project_keymap_architecture]], [[feedback_regression_tests]].
 
 ### project-locale-parity-test
 
@@ -2539,7 +2567,11 @@ _Four Hammerspoon API contract facts a plausible-looking call gets wrong — fou
 - `checkKeyboardModifiers()` only accepts canonical modifier names — normalise `LShift`/`RShift` → `shift` (`KEY_NORMALISATION` in `adapters/key_state.lua`) before querying.
 - `hs.eventtap`'s `start()` leaks a disabled-but-allocated tap — unconditionally stop and nil any existing tap before creating a new one.
 
-(The eight 2026-06-16 macOS audit fixes this entry used to narrate — paste-path `emit_text` return value, the 0.5 s stuck-counter reset, `doAfter(0)` injection, `synth_queue` idle drain, `prediction_engine.reset` chain timer, stale-success failure counter, and three tooltip lifecycle bugs — all shipped with regression tests, which are now the living memory.)
+(The eight 2026-06-16 macOS audit fixes this entry used to narrate included a
+0.5 s stuck-counter reset and a keylogger `synth_queue` idle drain. Those two
+heuristic trackers were retired by the exact-tag transaction design documented
+in [[project_hs_synthetic_injection_choke_point]]; do not restore their runtime
+use or their tests as current macOS invariants.)
 
 ### project-ahk-v2-static-unset-unreadable
 
@@ -2928,7 +2960,7 @@ Related: [[project_ahk_invariant_incomplete_application]]
 ### [project-macos-split-module-stub-reload] Splitting a stateful macOS module out of its caller requires adding it to `load_with_stubs`' reload list
 * **Symptom**: after the F4 split extracted the async active-layout probe from `ui/menu/menu_keyboard_layout.lua` into `modules/keymap/input_sources.lua`, `test_menu_keyboard_layout_latency.lua` failed with "cache must hold the two probed layouts: expected 2, got 1" — the `hs.task` stub the test injected via `load_with_stubs("ui.menu.menu_keyboard_layout", {task=...})` never reached the relocated `refresh_active_layouts_async`.
 * **Cause**: `tests/helpers/init.lua` `load_with_stubs(module_name, …)` clears `package.loaded[module_name]` plus a *curated list* of always-reload modules (text_utils, toml_codec, i18n, paths, llm.init), then sets the fresh `hs` stub. A required module that is NOT in that list and is already cached returns its old instance — and Lua modules capture `local hs = hs` at *require time*, so the cached instance is bound to a previous test's `hs`, ignoring the new stub.
-* **The invariant**: when you split a stateful module (session caches, or anything that captures `hs`/`Logger` at load) out of a module that tests drive through `load_with_stubs`, add the new module(s) to the force-reload block in `tests/helpers/init.lua`. F4 added `modules.keymap.layout_install` + `modules.keymap.input_sources` there. Symptom of forgetting: a stub injected for the parent silently fails to reach the child, and a behavioural assertion sees stale/empty cache state.
+* **The invariant**: when you split a stateful module (session caches, or anything that captures `hs`/`Logger` at load) out of a module that tests drive through `load_with_stubs`, its production instance must be reloaded under the fresh `hs`. But a global `package.loaded[name] = nil` is valid only when tests do **not** intentionally install that same module as a dependency stub before calling `load_with_stubs`. The synthetic-input migration added six unconditional evictions and erased `adapters.timer_scheduler`/`adapters.synthetic_input` doubles across the suite; in the observed full run, all 15 LLM/remap-watchdog failures came from that one helper change. For heavily stubbed dependencies, the behavioural fixture that requires the real module owns the explicit eviction (for example `tests/support/keylogger_provenance_fixture.lua`); the generic helper preserves the caller's `package.loaded` seam. F4's `modules.keymap.layout_install` + `modules.keymap.input_sources` remain in the curated global list because their tests replace `hs`, not those modules themselves. Symptom of forgetting a required production reload: a stub injected for the parent silently fails to reach the child; symptom of over-broad reload: the child's deliberate double silently disappears.
 * **Related**: the `test_port_adapter_coverage.lua` `LUA_HS_BASELINE`/`LUA_IO_OS_BASELINE` ratchets scan only `macos/modules/` + `macos/infra/` — moving OS-calling code from `ui/` into `modules/` raises the count without adding any new OS call. Re-baseline with a "relocation, not new OS calls" comment (precedent: the init.lua → lib/personal_hotstrings bumps).
 
 ### [project-macos-reload-during-git-pull] Auto-reload watchers must hold the reload while ANY bulk write (git pull, cloud sync, rsync) rewrites the tree

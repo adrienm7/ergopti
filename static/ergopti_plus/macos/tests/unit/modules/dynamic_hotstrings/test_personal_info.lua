@@ -15,29 +15,77 @@ local helpers = require("tests.helpers")
 -- the early return at the top of the keystroke path — so this case used to be
 -- "assert_true(true)" with a comment saying where the real guard lived.
 --
--- What is checkable is WHERE that guard sits. It has to be the first statement
--- of onKeyDownRaw: everything after it mutates the buffer, and a pause check
--- that drifted even one statement down would leave a paused driver still
--- tracking keystrokes, so the first thing typed after a resume would expand
--- against a buffer built while the user thought nothing was listening.
+-- What is checkable is WHERE that guard sits. Action-epoch reconciliation and
+-- stale internal-loopback disposal intentionally precede it in every state, but
+-- no physical event accessor, interceptor, or buffer mutation may. Otherwise the
+-- first thing typed after a resume could expand against a buffer built while the
+-- user thought nothing was listening.
+local PHYSICAL_OBSERVATION_MARKERS = {
+	"e:getKeyCode()",
+	"e:getFlags()",
+	"e:getCharacters(false)",
+	"CoreState.interceptors",
+	"LLMBridge.handle_llm_keys",
+	"CoreState.buffer",
+}
+
+
+--- @param source string
+--- @return string raw
+local function raw_keydown_slice(source)
+	local start_pos = source:find("local function onKeyDownRaw%(")
+	local end_pos = start_pos and source:find(
+		"\nlocal function merge_returned_events", start_pos, true)
+	helpers.assert_not_nil(start_pos, "onKeyDownRaw must remain locatable")
+	helpers.assert_not_nil(end_pos, "onKeyDownRaw must remain independently bounded")
+	return source:sub(start_pos, end_pos - 1)
+end
+
+
+--- @param raw string
+--- @return boolean valid
+local function pause_precedes_physical_observation(raw)
+	local code = raw:gsub("%-%-[^\n]*", "")
+	local parameters = code:match("local function onKeyDownRaw%s*%(([^)]*)%)")
+	parameters = parameters and parameters:gsub("%s+", "") or nil
+	if parameters ~= "e,provenance,provenance_status" then return false end
+	local stale_at = code:find(
+		"if provenance and provenance.stale_loopback then return true end", 1, true)
+	local unreadable_at = code:find(
+		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
+	local owned_at = code:find(
+		"if provenance and not internal_loopback then return false end", 1, true)
+	local pause_at = code:find(
+		"if CoreState.processing_paused then return internal_loopback == true end", 1, true)
+	if not (stale_at and unreadable_at and owned_at and pause_at) then return false end
+	if not (stale_at < unreadable_at and unreadable_at < owned_at and owned_at < pause_at) then
+		return false
+	end
+	for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do
+		local marker_at = code:find(marker, 1, true)
+		if marker_at == nil or marker_at <= pause_at then return false end
+	end
+	return true
+end
+
+
 helpers.describe("Personal info pause guard", function()
-	helpers.it("the keystroke path returns on pause before touching anything", function()
-		local src = helpers.read_driver_source("local function onKeyDownRaw")
-		helpers.assert_true(src ~= nil, "modules/keymap/init.lua must be locatable")
+	helpers.it("the keystroke path returns on pause before observing physical input", function()
+		local src, err = helpers.read_driver_unit("local function onKeyDownRaw")
+		helpers.assert_not_nil(src, err)
+		local raw = raw_keydown_slice(src)
+		helpers.assert_true(pause_precedes_physical_observation(raw),
+			"the current (event, provenance, status) handler must reconcile provenance, "
+				.. "then stop paused input before every enumerated physical observation")
 
-		local body = src:match("local function onKeyDownRaw%s*%(.-%)\n(.-)\n\tlocal keyCode")
-		helpers.assert_true(body ~= nil,
-			"onKeyDownRaw must still open with its guard then read the key code — if this "
-				.. "match fails the function was restructured and the guard needs re-checking")
-
-		-- Only comments and blank lines may precede the guard.
-		local first_stmt
-		for line in body:gmatch("[^\n]+") do
-			local t = line:match("^%s*(.-)%s*$")
-			if t ~= "" and not t:match("^%-%-") then first_stmt = t break end
+		local pause = "if CoreState.processing_paused then return internal_loopback == true end"
+		local pause_at = raw:find(pause, 1, true)
+		helpers.assert_not_nil(pause_at, "the sensitivity mutation needs the real pause gate")
+		for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do
+			local mutant = raw:sub(1, pause_at - 1) .. marker .. "\n" .. raw:sub(pause_at)
+			helpers.assert_true(not pause_precedes_physical_observation(mutant),
+				"the pause guard must fail if physical work moves ahead of it: " .. marker)
 		end
-		helpers.assert_eq(first_stmt, "if CoreState.processing_paused then return false end",
-			"the pause check must be the FIRST statement of onKeyDownRaw")
 	end)
 end)
 

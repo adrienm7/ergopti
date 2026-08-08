@@ -48,8 +48,6 @@ local function make_state(sentinel)
 	return {
 		_sentinel              = sentinel,
 		buffer                 = "",
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
 		start_is_word_boundary = true,
 		magic_key              = "★",
 		suppress_rescan        = function() end,

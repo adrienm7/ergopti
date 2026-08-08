@@ -14,9 +14,9 @@
 local M = {}
 
 local hs       = hs
-local eventtap = hs.eventtap
 local timer    = hs.timer
 local Logger   = require("infra.logger")
+local SyntheticInput = require("adapters.synthetic_input")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -309,17 +309,17 @@ end
 
 --- Performs the actual injection of the requested data.
 --- @param combo string Sequence of typed letters corresponding to the data.
+--- @return boolean injected True only when the keymap accepted the transaction.
 local function do_expand(combo)
 	Logger.debug(LOG, "Injecting personal data…")
 	local n_back = 1 + #combo
 	local parts  = resolve_combo(combo)
 	_replacing = true
-	-- Two DIFFERENT strings for two different trackers — see the emit callback's
-	-- return below.
-	-- `emitted` enumerates every keydown the OS will deliver back to us: the
-	-- field values PLUS the inter-field Tab, which is fired as a real keyStroke
-	-- and echoes as a "\t" character event exactly like the Tab terminator the
-	-- expander already tracks in try_terminator_expand.
+	-- Two strings serve the historical emitter return contract; neither identifies
+	-- an OS event. Immutable transaction tags now provide that provenance.
+	-- `emitted` describes the character-producing key sequence: field values plus
+	-- each inter-field Tab. It remains compatibility metadata for callers that
+	-- inspect physical_echo.
 	-- `echoed` is the LOGICAL text: values only, no tab. A Tab moves focus to the
 	-- next field, it inserts nothing on screen, so this is what CoreState.buffer
 	-- and the keylogger's logical record must hold.
@@ -328,35 +328,29 @@ local function do_expand(combo)
 
 	local ok, err = pcall(function()
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
-			_keymap.inject_dynamic(n_back, echoed, function()
+			local injected = _keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
 				local ok_tu, text_utils = pcall(require, "infra.text_utils")
 				for i, value in ipairs(parts) do
-					eventtap.keyStrokes(value)
+					assert(SyntheticInput.emit_key_strokes(value),
+						"personal-info field could not be dispatched")
 					if ok_tu and type(text_utils.utf8_len) == "function" then
 						c = c + text_utils.utf8_len(value)
 					else
 						c = c + #value
 					end
 					if i < #parts then
-						eventtap.keyStroke({}, "tab", 0)
+						assert(SyntheticInput.emit_key_stroke({}, "tab", 0),
+							"personal-info Tab could not be dispatched")
 						c = c + 1
 					end
 				end
-				-- (count, physical_echo, logical_text) per perform_text_replacement's
-				-- contract. physical_echo MUST enumerate every keydown the OS
-				-- delivers, tabs included: the keylogger's synth_queue pops one
-				-- entry per echo, and on a char mismatch inside its fast window it
-				-- pops ANYWAY (no non-destructive tolerance, unlike the keymap
-				-- tracker's 20 ms path, which declines without consuming). Omitting
-				-- the tabs left the queue N-1 entries short for N fields, so the
-				-- trailing characters of the payload found an empty queue and were
-				-- recorded as HUMAN keystrokes — buffer_text, rich_chunks, physical
-				-- WPM and the n-gram index. For an IBAN+SSN combo that is the tail
-				-- of the SSN. Nothing warned: the stale-queue self-heal only reports
-				-- LEFTOVER entries, and this queue was UNDER-filled.
-				-- logical_text stays tab-free so the buffer and the logged record
-				-- hold only what the fields actually inserted.
+				-- Historical (count, physical_echo, logical_text) contract.
+				-- physical_echo describes field keydowns and inter-field Tabs for
+				-- compatibility only; immutable tags on the emitted events provide
+				-- exact ownership and prevent them from being classified as human.
+				-- logical_text stays tab-free so the buffer and logical telemetry hold
+				-- only text inserted into fields, not focus-navigation keys.
 				return c, emitted, echoed
 			-- is_private = true: every value this module emits comes from
 			-- personal_info.toml, which rules_engine already treats as PII in its
@@ -365,31 +359,48 @@ local function do_expand(combo)
 			-- the prefix-triggered one, and only this argument tells the keylogger
 			-- to redact what it persists.
 			end, "personal", true)
+			assert(injected == true,
+				"keymap rejected the personal-info replacement transaction")
 		else
-			-- Fallback: emit raw keystrokes without inject_dynamic.
-			-- Only arm the synthetic delete count — not the replacement text. The
-			-- replacement contains inter-field tabs fired as real keyStroke events,
-			-- which the keymap buffer does not see as literal \t chars, so passing
-			-- emitted to arm_synthetic would leave expected_synthetic_chars with an
-			-- unmatched \t that permanently desyncs the buffer counter.
-			if _keymap then
-				if type(_keymap.arm_synthetic) == "function" then _keymap.arm_synthetic(n_back, "") end
-				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
+			-- The fallback still needs one keymap-owned replacement transaction.
+			-- Independent implicit actions would expose its tabs/deletes as user input.
+			if not _keymap or type(_keymap.arm_synthetic) ~= "function"
+					or type(_keymap.with_synthetic_transaction) ~= "function"
+					or type(_keymap.finish_synthetic) ~= "function"
+					or type(_keymap.cancel_synthetic) ~= "function" then
+				error("personal-info fallback requires the keymap synthetic-transaction API", 0)
 			end
+			local transaction = _keymap.arm_synthetic(n_back, "")
+			if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path: this branch reaches
 				-- the identical sink and must carry the identical flag.
 				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
-			for _ = 1, n_back do
-				eventtap.keyStroke({}, "delete", 0)
-			end
-			for i, value in ipairs(parts) do
-				eventtap.keyStrokes(value)
-				if i < #parts then
-					eventtap.keyStroke({}, "tab", 0)
+			local ok_emit, emit_err = pcall(_keymap.with_synthetic_transaction, transaction, function()
+				for _ = 1, n_back do
+					assert(SyntheticInput.emit_key_stroke({}, "delete", 0),
+						"personal-info fallback Backspace could not be dispatched")
 				end
+				for i, value in ipairs(parts) do
+					assert(SyntheticInput.emit_key_strokes(value),
+						"personal-info fallback field could not be dispatched")
+					if i < #parts then
+						assert(SyntheticInput.emit_key_stroke({}, "tab", 0),
+							"personal-info fallback Tab could not be dispatched")
+					end
+				end
+			end)
+			-- Failed multi-field construction may already own deletes, field text and
+			-- Tabs. Cancel that whole prefix; sealing it while passing the physical
+			-- trigger through would produce a private, partial replacement.
+			local close = ok_emit and _keymap.finish_synthetic or _keymap.cancel_synthetic
+			local ok_close, close_err = pcall(close, transaction)
+			if not ok_close then
+				error(string.format("personal-info fallback transaction close failed: %s (emission: %s)",
+					tostring(close_err), ok_emit and "ok" or tostring(emit_err)), 0)
 			end
+			if not ok_emit then error(emit_err, 0) end
 		end
 	end)
 
@@ -397,13 +408,15 @@ local function do_expand(combo)
 		Logger.error(LOG, "Personal data injection failed: %s.", tostring(err))
 	end
 
-	-- Always release the flag, even on error, so future expansions are not blocked.
+	-- Preserve the existing re-entry guard in this provenance-only change. Its
+	-- fixed delay is removed separately with a back-to-back behavioral repro.
 	timer.doAfter(0.15, function()
 		_replacing = false
 		if ok then
 			Logger.info(LOG, "Personal data injection completed.")
 		end
 	end)
+	return ok
 end
 
 
@@ -552,8 +565,8 @@ local function interceptor(event, _km_buffer, ctx)
 				_state = STATE_IDLE
 				_combo = ""
 				
-				do_expand(combo)
-				return "consume"
+				if do_expand(combo) then return "consume" end
+				return nil
 			end
 			
 			_state = STATE_IDLE

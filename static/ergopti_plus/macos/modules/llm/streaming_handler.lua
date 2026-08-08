@@ -170,12 +170,24 @@ function M.build_callbacks(ctx)
 	local reset_llm_dismiss_timer = ctx.reset_llm_dismiss_timer
 	local pending_ref             = ctx.pending_predictions_ref
 	local visible_ref             = ctx.predictions_visible_ref
+	local runtime_guard           = type(ctx.runtime_available) == "function"
+		and ctx.runtime_available
+		or function() return true end
+
+	-- Action-epoch invalidation can race every backend callback independently of
+	-- the request generation. Treat a missing/throwing answer as closed before
+	-- touching logs, telemetry, prediction pools, or UI.
+	local function runtime_available()
+		local ok, available = pcall(runtime_guard)
+		return ok and available == true
+	end
 
 
 	-- ── Streaming partial callback ────────────────────────────────────────────
 
 	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
 	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw)
+		if not runtime_available() then return end
 		if get_fetch_id() ~= my_fetch_id then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
@@ -249,6 +261,7 @@ function M.build_callbacks(ctx)
 	-- ── Success callback ──────────────────────────────────────────────────────
 
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		if not runtime_available() then return end
 		-- Suppress intermediate batches in all-at-once mode (batch_progressive = fetch_batch reveal)
 		if not is_final and not is_streaming_multi and not is_batch_progressive then return end
 		if get_fetch_id() ~= my_fetch_id then
@@ -371,6 +384,7 @@ function M.build_callbacks(ctx)
 	-- ── Failure callback ──────────────────────────────────────────────────────
 
 	local function on_fail()
+		if not runtime_available() then return end
 		if get_fetch_id() ~= my_fetch_id then return end
 
 		-- Cancel the watchdog so a stale timer cannot fire show_predictions
@@ -440,8 +454,17 @@ function M.arm_watchdog(ctx)
 	local get_fetch_id  = ctx.get_fetch_id
 	local pending_ref   = ctx.pending_predictions_ref
 	local visible_ref   = ctx.predictions_visible_ref
+	local runtime_guard = type(ctx.runtime_available) == "function"
+		and ctx.runtime_available
+		or function() return true end
+
+	local function runtime_available()
+		local ok, available = pcall(runtime_guard)
+		return ok and available == true
+	end
 
 	_stream_watchdog_timer = hs.timer.doAfter(STREAM_WATCHDOG_SEC, function()
+		if not runtime_available() then return end
 		if get_fetch_id() ~= my_fetch_id or not visible_ref.value then return end
 		Logger.warn(LOG, "Watchdog triggered: stream stalled for %gs — surfacing partial results.", STREAM_WATCHDOG_SEC)
 		local val_shortcut = format_validation_shortcut(ctx.validation_mods)

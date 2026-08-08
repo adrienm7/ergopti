@@ -16,6 +16,8 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
 local LOG = "tooltip_hotstring"
 
@@ -115,10 +117,16 @@ local function start_watchers()
 	-- sufficient for dismissal; pure mouse movement must not block input delivery.
 	-- The dequeue-cycle comment still holds for the remaining event types.
 	local ok_mouse, watcher_mouse
-	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(e)
-		if EventTapGuard.handle_disabled(e, watcher_mouse, "tooltip.hotstring_mouse") then return false end
-		M.hide()
-		return false
+	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(event)
+		if EventTapGuard.handle_disabled(event, watcher_mouse, "tooltip.hotstring_mouse") then return false end
+		local provenance, status, fence = EventProvenance.classify_with_fence(
+			event, "tooltip.hotstring_mouse")
+		local fence_events = fence and fence.events or nil
+		if provenance ~= nil then return false, fence_events end
+		if status ~= EventProvenance.STATUS_UNREADABLE then
+			SyntheticInput.defer_after_callback("hotstring tooltip mouse dismissal", M.hide)
+		end
+		return false, fence_events
 	end)
 	
 	if ok_mouse and watcher_mouse then 
@@ -129,7 +137,22 @@ local function start_watchers()
 	local ok_key, watcher_key
 	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
 		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.hotstring_key") then return false end
-		local keycode = event:getKeyCode()
+		local provenance, status, fence = EventProvenance.classify_with_fence(
+			event, "tooltip.hotstring")
+		local fence_events = fence and fence.events or nil
+		local function finish(consume) return consume == true, fence_events end
+		if provenance then return finish(false) end
+		if status == EventProvenance.STATUS_UNREADABLE then
+			return finish(false)
+		end
+		local key_ok, keycode = pcall(event.getKeyCode, event)
+		if not key_ok or type(keycode) ~= "number" then
+			SyntheticInput.defer_after_callback("hotstring tooltip key diagnostic",
+				function()
+					Logger.error(LOG, "Cannot read dismissal keycode: %s.", tostring(keycode))
+				end)
+			return finish(false)
+		end
 		local ignored_keycodes = {
 			54, 55, 56, 58, 59, 60,
 			-- Escape belongs to the persistent trap, not to this watcher. This tap
@@ -152,11 +175,11 @@ local function start_watchers()
 		}
 		
 		for _, ignored_code in ipairs(ignored_keycodes) do
-			if keycode == ignored_code then return false end
+			if keycode == ignored_code then return finish(false) end
 		end
 		-- A real keystroke is an authoritative dismissal — bypass dequeue guard.
-		M.hide_forced()
-		return false
+		SyntheticInput.defer_after_callback("hotstring tooltip key dismissal", M.hide_forced)
+		return finish(false)
 	end)
 	
 	if ok_key and watcher_key then 

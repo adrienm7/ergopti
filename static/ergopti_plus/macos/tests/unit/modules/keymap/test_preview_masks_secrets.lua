@@ -446,6 +446,7 @@ helpers.describe("preview masking: the @-tag provider", function()
 			register_interceptor      = function(fn) interceptor = fn end,
 			inject_dynamic            = function(deletes, text)
 				rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
+				return true
 			end,
 		}
 

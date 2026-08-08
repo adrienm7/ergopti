@@ -51,10 +51,13 @@ helpers.describe("keylogger: pause guard precedes the mouse/keyUp/flagsChanged b
 		-- First is_paused() AFTER handle_key starts = the pause guard.
 		local guard = src:find("is_paused()", hk, true)
 		local mouse = src:find("leftMouseDown", hk, true)
-		local flags = src:find("flagsChanged", hk, true)
+		-- The provenance prelude names the flagsChanged ENUM before the pause guard
+		-- but performs no write. Anchor on the first modifier writer, which is the
+		-- side effect the pause invariant actually protects.
+		local flags = src:find("LogManager.log_modifier_press", hk, true)
 
 		helpers.assert_true(guard ~= nil, "handle_key must contain an is_paused() guard")
-		helpers.assert_true(mouse ~= nil and flags ~= nil, "handle_key must branch on mouse + flagsChanged events")
+		helpers.assert_true(mouse ~= nil and flags ~= nil, "handle_key must retain mouse + modifier writers")
 		helpers.assert_true(guard < mouse, "the pause guard must precede the mouse branch (else clicks log while paused)")
 		helpers.assert_true(guard < flags, "the pause guard must precede the flagsChanged branch (else modifiers log while paused)")
 	end)

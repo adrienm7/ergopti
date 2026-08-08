@@ -342,8 +342,8 @@ wpm_min_duration_ms = 2000
 # HS: keylogger/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
 system_load_poll_ms = 300000
 
-# Tolerance window for matching synthetic vs. physical keystrokes.
-# HS: keylogger/init.lua SYNTH_MATCH_DELAY_MS.
+# Legacy registry value retained for shared schema and test-vector compatibility.
+# macOS synthetic ownership must never consume this timing heuristic.
 synth_match_delay_ms = 3
 
 # Auto-flush trigger: flush buffer when typing has been idle this long.

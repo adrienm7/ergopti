@@ -19,6 +19,7 @@ local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
 local LOG           = "gestures.actions"
@@ -59,6 +60,8 @@ end
 -- =========================================
 
 --- Sends a system-level media or hardware key event.
+--- NX system-defined events are deliberately outside SyntheticInput: they are
+--- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
 	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
@@ -72,7 +75,7 @@ end
 --- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
 --- @param key string The key code or character.
 local function postKeyStroke(mods, key)
-	pcall(function() hs.eventtap.keyStroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
+	pcall(function() SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
 end
 
 local function url_encode_query(value)
@@ -269,10 +272,11 @@ local function spaceNav(goNext)
 	end
 
 	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	ShellRunner.applescript(string.format(
-		"tell application \"System Events\" to key code %d using {control down}",
-		key_code
-	))
+	-- AppleScript-generated key events carry no Ergopti provenance. Both taps then
+	-- treated this Space navigation as physical typing, so action-epoch consumers
+	-- could retain text/LLM state from the previous desktop. Numeric Quartz keycodes
+	-- are supported by the same exact-tag adapter used by named gesture keys.
+	postKeyStroke({ "ctrl" }, key_code)
 end
 
 -- Axis actions (prev / next)
@@ -503,16 +507,10 @@ end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
 sg("mission_control",        function()
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		ShellRunner.applescript("tell application \"System Events\" to key code 160")
-	end)
+	postKeyStroke({}, 160)
 end)
 sg("app_expose",                  function()
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		ShellRunner.applescript("tell application \"System Events\" to key code 125 using {control down}")
-	end)
+	postKeyStroke({ "ctrl" }, 125)
 end)
 
 -- Cursor movement

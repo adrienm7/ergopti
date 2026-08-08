@@ -21,20 +21,23 @@ No domain spec directly — the keylogger implements the on-disk schema describe
 
 ## Public API
 
-| Function             | Description                                                       |
-| -------------------- | ----------------------------------------------------------------- |
-| `M.init(state)`      | Initialize with the shared core state table                       |
-| `M.start()`          | Arm the eventtap and start all maintenance timers                 |
-| `M.stop()`           | Disarm the eventtap and flush pending buffers                     |
-| `M.mark_synthetic()` | Signal that the next N keystrokes are expander output (not human) |
-| `M.flush()`          | Force an immediate flush of the in-memory buffer to disk          |
+| Function               | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `M.start(control)`     | Arm the eventtap and daemons with the runtime pause-state provider               |
+| `M.stop()`             | Disarm the eventtap, stop maintenance, and flush pending buffers                 |
+| `M.resync_context()`   | Drop transient modifier/application context after an observation gap            |
+| `M.notify_synthetic()` | Record a replacement's logical result; the optional privacy flag redacts content |
 
 ## Init pattern
 
 ```lua
 local Keylogger = require("modules.keylogger")
-Keylogger.init(shared_state)
-Keylogger.start()
+local ScriptControl = require("modules.shortcuts.script_control")
+Keylogger.start(ScriptControl)
 ```
 
-The module differentiates synthetic (expander-injected) from human keystrokes automatically via inter-key delay heuristics (`SYNTH_MATCH_DELAY_MS`). The `kc_bridge` sub-module must be initialized before `karabiner` calls into it.
+The module classifies synthetic input only through the immutable
+`eventSourceUserData` tags issued by `adapters.synthetic_input`; timing,
+characters, modifiers, and source PID are not identity. `M.notify_synthetic()`
+records logical replacement content but does not arm physical-event heuristics.
+The `kc_bridge` sub-module must be initialized before `karabiner` calls into it.

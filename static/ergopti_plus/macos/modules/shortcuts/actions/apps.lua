@@ -20,7 +20,6 @@ local M = {}
 
 local hs            = hs
 local timer         = hs.timer
-local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local urlevent      = hs.urlevent
 local http          = hs.http
@@ -32,6 +31,7 @@ local AppLauncher   = require("adapters.app_launcher")
 local WindowInfo    = require("adapters.window_info")
 local WindowManager = require("adapters.window_manager")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -304,7 +304,7 @@ function M.copy_or_open_path()
 		-- this reason; this one did not.
 		local prior = nil
 		pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-		eventtap.keyStroke({"cmd", "alt"}, "c", KEYSTROKE_NO_DELAY_US)
+		SyntheticInput.emit_key_stroke({"cmd", "alt"}, "c", KEYSTROKE_NO_DELAY_US)
 
 		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
 			local ok_p, p = pcall(pasteboard.getContents)
@@ -315,7 +315,7 @@ function M.copy_or_open_path()
 
 			-- Finder did not populate the clipboard — copy the selection instead
 			Logger.debug(LOG, "Finder did not write a path — falling back to copying the selection.")
-			eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
+			SyntheticInput.emit_key_stroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 			timer.doAfter(COPY_SETTLE_SEC, function()
 				local sel = nil
@@ -332,7 +332,7 @@ function M.copy_or_open_path()
 	-- Outside a file manager: copy selection and open or search
 	local prior = nil
 	pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-	eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 	timer.doAfter(COPY_SETTLE_SEC, function()
 		local sel = nil

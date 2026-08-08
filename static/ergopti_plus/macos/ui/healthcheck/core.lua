@@ -97,6 +97,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.event_provenance",
+		contract = { "classify", "classify_with_fence", "is_owned" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.event_tap_guard",
 		contract = { "handle_disabled" },
 		wired    = true,
@@ -174,6 +179,15 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.storage",
 		contract = { "get", "set" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.synthetic_input",
+		contract = {
+			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
+			"current_action_epoch", "register_action_listener", "enter_callback",
+			"leave_callback",
+		},
 		wired    = true,
 	},
 	{

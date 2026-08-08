@@ -25,7 +25,7 @@
 --- USAGE:
 ---   local Timings = require("infra.timings")
 ---   local DEBOUNCE_MAX_SEC = Timings.sec("llm", "prediction_debounce_max_ms")
----   local SYNTH_MATCH_DELAY_MS = Timings.ms("keylogger", "synth_match_delay_ms")
+---   local IDLE_CHECK_SEC = Timings.sec("keylogger", "idle_check_interval_ms")
 --- ==============================================================================
 
 local M = {}
@@ -91,7 +91,7 @@ Logger.done(LOG, "Shared timings registry loaded (%d section(s)).", _section_cou
 --- the section or key is absent — every consumed timing must exist in the
 --- registry, so a miss is a misconfiguration to surface loudly.
 --- @param section string The TOML section name (e.g. "keylogger").
---- @param key string The key within that section (e.g. "synth_match_delay_ms").
+--- @param key string The key within that section (e.g. "idle_check_interval_ms").
 --- @return number The value in milliseconds.
 function M.ms(section, key)
 	local s = _sections[section]

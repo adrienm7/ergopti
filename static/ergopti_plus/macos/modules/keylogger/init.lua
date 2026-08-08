@@ -40,6 +40,8 @@ local Metrics        = require("keylogger.metrics")
 local Watchers       = require("modules.keylogger.watchers")
 local ProcessLifecycle = require("adapters.process_lifecycle")
 local KeyboardHook   = require("adapters.keyboard_hook")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 local LOG            = "keylogger"
 
 
@@ -67,20 +69,12 @@ local WPM_MIN_DURATION_MS        = Timings.ms("keylogger", "wpm_min_duration_ms"
 local IDLE_CHECK_INTERVAL_SEC    = Timings.sec("keylogger", "idle_check_interval_ms")
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
 local MAINTENANCE_INTERVAL_SEC   = Timings.sec("keylogger", "maintenance_interval_ms")
--- Delay before synthetic input is considered a match (very fast = synthetic)
-local SYNTH_MATCH_DELAY_MS       = Timings.ms("keylogger", "synth_match_delay_ms")
 -- Flush the buffer after this many milliseconds of inactivity (2 min)
 local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
 
 -- How often the tap watchdog checks that the event tap is still running (seconds).
 -- Mirrors the keymap module's watchdog cadence (script_control TAP_WATCHDOG_INTERVAL_SEC = 2).
 local TAP_WATCHDOG_INTERVAL_SEC = 5
-
--- Inter-keystroke delay (ms) beyond which any remaining synth_queue entries are
--- considered stale and drained. An unmatched entry from a dropped synthetic
--- keyDown would otherwise permanently tag the next real keystroke as synthetic.
--- 500 ms is safely above any realistic expansion round-trip (C5 audit fix).
-local SYNTH_IDLE_DRAIN_MS = 500
 
 -- Keycodes for all modifier keys (these should not be logged as characters)
 local MODIFIER_KEYCODES = {
@@ -103,6 +97,7 @@ local SPECIAL_KEY_LABELS = {
 	[122] = "F1",  [120] = "F2",  [99]  = "F3",  [118] = "F4",
 	[96]  = "F5",  [97]  = "F6",  [98]  = "F7",  [100] = "F8",
 	[101] = "F9",  [109] = "F10", [103] = "F11", [111] = "F12",
+	[79]  = "F18",
 }
 
 -- Keycodes for F1–F12; excluded from the shortcut pipeline when no Cmd or Ctrl
@@ -112,13 +107,13 @@ local F_KEY_CODES = {
 	[122] = "F1",  [120] = "F2",  [99]  = "F3",  [118] = "F4",
 	[96]  = "F5",  [97]  = "F6",  [98]  = "F7",  [100] = "F8",
 	[101] = "F9",  [109] = "F10", [103] = "F11", [111] = "F12",
+	[79]  = "F18",
 }
 
--- Synthetic OS-signal keys that must never appear in keystroke logs or metrics.
--- F18 (79) is tapped by the keep-awake jiggler as a secondary wakeup signal;
--- logging it would pollute character counts and WPM windows.
+-- Untagged reserved OS-signal keys that must never appear in keystroke logs or
+-- metrics. F18 is deliberately absent: exact provenance now suppresses the
+-- keep-awake echo, while a physical/programmable F18 remains real user input.
 local SILENT_KEYCODES = {
-	[79] = true,   -- F18: keep-awake OS signal
 	[80] = true,   -- F19: reserved synthetic channel
 	[90] = true,   -- F20: synthetic "typing complete" signal (KE bridge)
 }
@@ -203,7 +198,6 @@ local CoreState = {
 	buffer_text           = "",
 	rich_chunks           = {},
 	last_time             = 0,       -- ms timestamp of the previous keystroke
-	synth_queue           = {},      -- queue of expected synthetic characters
 	pending_keyup         = {},      -- maps keycode → {down_time, event_ref} for hold-time
 
 	-- Session timing and productivity
@@ -356,6 +350,37 @@ local _layout_listener      = nil
 -- Cached module references to avoid pcall(require, ...) on every keystroke
 local _keymap_mod = nil
 
+local ACTION_EPOCH_LISTENER_ID = "modules.keylogger.action_epoch"
+local _action_listener_registered = false
+local _last_action_epoch = SyntheticInput.current_action_epoch()
+
+
+--- Splits human typing from one logical automation action.
+--- The eventtap path reaches only LogManager.defer_flush_buffer(), whose O(1)
+--- detach cannot serialize or persist. Once the LogManager outbox accepts the
+--- snapshot, timer scheduling belongs to that outbox and cannot veto the epoch;
+--- only a rejection before acceptance propagates to the adapter for retry.
+--- @param epoch table Opaque SyntheticInput action token.
+--- @param handoff_time_ms number|nil Monotonic action handoff timestamp.
+local function reconcile_action_epoch(epoch, handoff_time_ms)
+	if epoch == _last_action_epoch then return end
+	if CoreState.is_enabled then
+		local previous_time_ms = CoreState.last_time
+		if not LogManager.defer_flush_buffer() then
+			error("keylogger action buffer was not accepted for deferred flush")
+		end
+		local action_time_ms = handoff_time_ms
+		if type(action_time_ms) ~= "number" then
+			local clock_ok, ticks = pcall(hs.timer.absoluteTime)
+			action_time_ms = clock_ok and type(ticks) == "number"
+				and (ticks / 1000000)
+				or previous_time_ms
+		end
+		CoreState.last_time = action_time_ms
+	end
+	_last_action_epoch = epoch
+end
+
 -- Lazily built keycode → name mapping
 local _keycode_to_name = nil
 
@@ -498,8 +523,57 @@ end
 --- Wrapped in pcall to prevent any Lua error from locking the OS keyboard.
 --- @param event_obj table The raw hs.eventtap event object.
 --- @return boolean False to propagate the event, true to consume it.
+--- @return table|nil Older deferred synthetic events ordered before the original.
 local function handle_key(event_obj)
+	local returned_events = nil
 	local ok, err = pcall(function()
+		local evt_type = event_obj:getType()
+
+		-- Only an immutable Ergopti user-data tag is synthetic identity. Source PID,
+		-- character equality and arrival time cannot distinguish another Spoon, a
+		-- sibling action or an older generation. Run this before pause/privacy/state
+		-- gates so tagged output can never be persisted during a transition.
+		local is_keyboard_event = evt_type == hs.eventtap.event.types.keyDown
+			or evt_type == hs.eventtap.event.types.keyUp
+			or evt_type == hs.eventtap.event.types.flagsChanged
+		local provenance, provenance_status, fence
+		if is_keyboard_event then
+			provenance, provenance_status, fence = EventProvenance.classify_with_fence(
+				event_obj, "keylogger")
+		else
+			provenance_status = EventProvenance.STATUS_FOREIGN
+			fence = SyntheticInput.claim_physical_fence()
+		end
+		if fence then returned_events = fence.events end
+		-- This tap may be upstream or downstream of keymap. Whichever non-owned
+		-- consumer runs first claims every older deferred action in
+		-- classify_with_fence(), making the returned payload order independent of
+		-- Quartz tap insertion order.
+
+		-- A physical event may beat the timer-zero listener. Re-read after the
+		-- synchronous fence claim so both tap orders observe the same boundary.
+		local action_epoch, handoff_time_ms = SyntheticInput.current_action_epoch()
+		if CoreState.is_enabled and action_epoch ~= _last_action_epoch then
+			reconcile_action_epoch(action_epoch, handoff_time_ms)
+		end
+
+		if provenance then
+			-- Logical action boundaries are process-wide epochs, never whichever
+			-- consumer happens to see a transaction's first tagged event. Replacement
+			-- text was already recorded logically by notify_synthetic().
+			return
+		end
+
+		if provenance_status == EventProvenance.STATUS_UNREADABLE then
+			-- Preserve the already-observed run through the deferred O(1) outbox, but
+			-- do not let an event whose tag could not be read enter human telemetry.
+			LogManager.defer_flush_buffer()
+			CoreState.pending_keyup = {}
+			CoreState.modifier_down_at = {}
+			CoreState.prev_flags = {}
+			return
+		end
+
 		if not CoreState.is_enabled then return end
 
 		-- If the script control module signals a pause (e.g. during hotstring expansion),
@@ -518,7 +592,6 @@ local function handle_key(event_obj)
 		-- expansions this branch would have refused.
 		if not M.context_allows_logging() then return end
 
-		local evt_type = event_obj:getType()
 		local now      = hs.timer.absoluteTime() / 1000000
 
 		-- Resume from micro-idle on any activity
@@ -603,26 +676,18 @@ local function handle_key(event_obj)
 		local keycode = event_obj:getKeyCode()
 
 		-- Shortcuts: flush then log immediately without entering the typing pipeline.
-		-- Gate on the keymap's own pending-synthetic-paste peek FIRST: any hotstring/
-		-- personal-info/LLM expansion whose replacement exceeds the paste threshold
-		-- synthesizes a Cmd+V, which is a genuine cmd+key combo and would otherwise
-		-- match is_shortcut_candidate unconditionally, inflating the user's logged
-		-- Cmd+V shortcut count with synthetic paste echoes (F-HIGH-17 fix).
+		-- Current-process shortcuts (including paste-backed replacements) already
+		-- returned through the provenance guard above, independent of eventtap order.
 		if is_shortcut_candidate(flags, keycode) then
-			local is_synth_paste = _keymap_mod
-				and type(_keymap_mod.is_pending_synthetic_paste) == "function"
-				and _keymap_mod.is_pending_synthetic_paste(flags, keycode)
-			if not is_synth_paste then
-				LogManager.flush_buffer()
-				-- Same re-seed as the mouse branches: this one returns below without
-				-- ever reaching the keystroke path's assignment.
-				CoreState.last_time = now
-				local front_app = hs.application.frontmostApplication()
-				LogManager.log_shortcut(
-					build_shortcut_key(event_obj, flags, keycode),
-					front_app and front_app:title() or "Unknown"
-				)
-			end
+			LogManager.flush_buffer()
+			-- Same re-seed as the mouse branches: this one returns below without
+			-- ever reaching the keystroke path's assignment.
+			CoreState.last_time = now
+			local front_app = hs.application.frontmostApplication()
+			LogManager.log_shortcut(
+				build_shortcut_key(event_obj, flags, keycode),
+				front_app and front_app:title() or "Unknown"
+			)
 			return
 		end
 
@@ -654,15 +719,6 @@ local function handle_key(event_obj)
 			CoreState.last_time = now
 		end
 
-		-- Self-heal: drain stale synthetic queue entries after a long idle.
-		-- An unmatched entry (from a suppressed expansion or a dropped keyDown)
-		-- would permanently tag the next real keystroke as synthetic (C5 audit fix).
-		if delay > SYNTH_IDLE_DRAIN_MS and #CoreState.synth_queue > 0 then
-			Logger.warn(LOG, "Stale synth_queue drained after %d ms idle (%d entry(ies)).",
-				delay, #CoreState.synth_queue)
-			CoreState.synth_queue = {}
-		end
-
 		-- Mark session start on the first keystroke after a long idle
 		if CoreState.session_start_time == 0 then
 			CoreState.session_start_time = now
@@ -686,43 +742,11 @@ local function handle_key(event_obj)
 			CoreState.session_url        = nil
 		end
 
-		-- Determine if this keystroke was produced by a synthetic source
-		-- (hotstring expansion or LLM completion) by matching against the queue
+		-- Every current-process key event returned through the provenance guard.
+		-- The remaining path is therefore physical input; logical synthetic text was
+		-- already recorded by notify_synthetic() before its OS echoes were emitted.
 		local is_synthetic = false
 		local synth_type   = "none"
-
-		if keycode == 51 then
-			-- Backspace: check if the next queued synthetic char is also a backspace
-			if #CoreState.synth_queue > 0 and CoreState.synth_queue[1].char == "[BS]" then
-				local next_synth = CoreState.synth_queue[1]
-				table.remove(CoreState.synth_queue, 1)
-				-- notify_synthetic has already written the logical replacement.
-				-- Drop the later OS echo so it cannot be counted twice.
-				if next_synth.discard then return end
-				is_synthetic = true
-				synth_type   = next_synth.type
-			end
-		else
-			if #CoreState.synth_queue > 0 then
-				local next_synth = CoreState.synth_queue[1]
-				if chars == next_synth.char then
-					-- Exact character match
-					table.remove(CoreState.synth_queue, 1)
-					if next_synth.discard then return end
-					is_synthetic = true
-					synth_type   = next_synth.type
-				elseif delay < SYNTH_MATCH_DELAY_MS then
-					-- Extremely fast keystroke — almost certainly synthetic even if char differs
-					-- Pop the queue even on a char-mismatch fast-path: without this pop the
-					-- head entry stays and re-matches every subsequent fast keystroke,
-					-- tagging all rapid typing as synthetic until a >500 ms gap clears it.
-					table.remove(CoreState.synth_queue, 1)
-					if next_synth.discard then return end
-					is_synthetic = true
-					synth_type   = next_synth.type
-				end
-			end
-		end
 
 		-- Time-to-first-key after focus: triggered once per app activation,
 		-- only for genuine human keystrokes (synthetic expansion is excluded —
@@ -913,9 +937,11 @@ local function handle_key(event_obj)
 
 	if not ok then
 		-- Log and swallow: we MUST return false to avoid locking the OS keyboard
-		Logger.warn(LOG, "Keyboard lock avoidance triggered: %s.", tostring(err))
+		pcall(Logger.warn, LOG, "Keyboard lock avoidance triggered: %s.", tostring(err))
 	end
-	return false
+	-- A failure after the fence claim may not veto the older user action. Returning
+	-- the captured table still places it before the physical original at Quartz.
+	return false, returned_events
 end
 
 
@@ -1040,22 +1066,13 @@ function M.recorded_char(char, is_private)
 	return char
 end
 
---- @param is_private boolean|nil  When true, the CONTENT is replaced by a
----        redacted placeholder in everything that is persisted, while the
----        physical-echo discard markers below still use the real text.
----        Skipping this call outright for a private expansion would be WORSE
----        than the leak it fixes: the physical echoes would then fall through
----        handle_key unclaimed and be recorded as ordinary human keystrokes in
----        buffer_text, so the secret would land in the metrics anyway - just in
----        a different column.
+--- @param is_private boolean|nil When true, the content is replaced by a
+---        redacted placeholder in every persisted field. Physical echoes are
+---        excluded independently by immutable event provenance; this function
+---        records only the logical replacement.
 function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo, is_private)
-	-- When the keylogger is OFF there is no consumer for synth_queue (handle_key
-	-- returns at the is_enabled guard, so the idle-drain self-heal never runs).
-	-- Queuing here while disabled is pure leak/poison: the queue and the WPM window
-	-- grow unbounded across a session of hotstring use, and the FIRST real
-	-- keystrokes after the user later enables the keylogger get mis-tagged
-	-- synthetic against the stale head. Gate on is_enabled like the sibling
-	-- log_hotstring / log_llm. Expander notifies unconditionally on every expansion.
+	-- Expander notifies unconditionally, but an opt-in keylogger that is currently
+	-- disabled must not accumulate logical events or WPM samples for later.
 	if not CoreState.is_enabled then return end
 
 	-- A clipboard paste does not emit one keyDown per inserted character. Record
@@ -1070,12 +1087,9 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	-- buffer_events and in rich_chunks, which become events_json and rich_text
 	-- in the database and are replicated by cross-device export.
 	local function append_virtual(char)
-		-- The four context filters apply to the SYNTHETIC route exactly as they do
-		-- to the physical one. Gating here — at the persistence step — rather than
-		-- at the top of notify_synthetic is deliberate: the synth_queue discard
-		-- markers below MUST still be queued, because dropping them would leave the
-		-- physical echoes unclaimed and handle_key would record the very same
-		-- secret as ordinary human keystrokes. The same text, in a worse place.
+		-- The four context filters apply to logical synthetic output exactly as they
+		-- do to physical input. Tagged OS echoes are filtered by the event adapter,
+		-- so privacy no longer depends on a second mutable character queue.
 		if not M.context_allows_logging() then return end
 		local recorded = M.recorded_char(char, is_private)
 		table.insert(CoreState.buffer_events, {
@@ -1088,13 +1102,12 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 		end
 	end
 
-	Logger.debug(LOG, "Queuing synthetic text from '%s' (%d delete(s), %d char(s))…",
+	Logger.debug(LOG, "Recording synthetic text from '%s' (%d delete(s), %d char(s))…",
 		source_type, deletes or 0, text and (utf8.len(text) or #text) or 0)
 
 	if deletes and deletes > 0 then
 		for _ = 1, deletes do
 			append_virtual("[BS]")
-			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type, discard = true })
 		end
 		-- Mirror the backspaces in the effective WPM window
 		for _ = 1, deletes do
@@ -1117,7 +1130,7 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 		else
 			-- Malformed UTF-8 — queue one opaque, non-validated entry rather than
 			-- raising and aborting the expansion mid-flight (which would leave the
-			-- synthetic-injection trackers desynced for every subsequent keystroke).
+			-- logical synthetic-action accounting incomplete).
 			Logger.warn(LOG, "notify_synthetic: malformed UTF-8 in synthetic text — queuing an opaque fallback entry.")
 			append_virtual(text)
 			char_count = 1
@@ -1131,22 +1144,8 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 		if CoreState.session_start_time == 0 then CoreState.session_start_time = now_ms end
 	end
 
-	-- Paste has no per-character echo. Direct injection does, so queue just its
-	-- physical echo events as discard markers; their logical counterparts above
-	-- have already been persisted once.
-	local echo_text = type(physical_echo) == "string" and physical_echo or text
-	if echo_text and echo_text ~= "" then
-		local ok_echo, echo_count = pcall(utf8.len, echo_text)
-		if ok_echo and echo_count then
-			for _, code in utf8.codes(echo_text) do
-				table.insert(CoreState.synth_queue, {
-					char = utf8.char(code), type = source_type, discard = true,
-				})
-			end
-		else
-			table.insert(CoreState.synth_queue, { char = echo_text, type = source_type, discard = true })
-		end
-	end
+	-- `physical_echo` remains in the public signature for compatibility; immutable
+	-- provenance tags, not that payload, identify the later OS echoes.
 
 	-- A pure Cmd+V insertion would otherwise remain buffered indefinitely: the
 	-- Cmd+V event is a shortcut, not a typing event, and its pasted characters
@@ -1156,7 +1155,6 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	CoreState.last_source_type    = source_type
 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
 	CoreState.last_source_time    = hs.timer.absoluteTime() / 1000000000
-	Logger.debug(LOG, "Synthetic queue size: %d.", #CoreState.synth_queue)
 end
 
 --- Computes the current live WPM from the rolling timestamp buffers.
@@ -1521,15 +1519,18 @@ function M.start(script_control)
 	KcBridge.set_log_manager(LogManager)
 	KcBridge.start()
 	LogManager.ensure_ingest_running()
+	if not _action_listener_registered then
+		-- No typing buffer is live while disabled, so synchronize the local token
+		-- before registration. The stable ID makes repeated start calls harmless.
+		reconcile_action_epoch(SyntheticInput.current_action_epoch())
+		SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
+			reconcile_action_epoch)
+		_action_listener_registered = true
+	end
 
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 
-	-- Clear any synthetic-tracking state so a queue accumulated before this enable
-	-- (or left over from a prior session) cannot mis-tag the FIRST real keystrokes
-	-- as synthetic. notify_synthetic now gates on is_enabled, but the clear also
-	-- guards the stop→start cycle. Mirrors the teardown in M.stop.
-	CoreState.synth_queue        = {}
 	CoreState.recent_typing_eff  = {}
 	CoreState.recent_typing_phys = {}
 
@@ -1617,8 +1618,7 @@ function M.resync_context()
 	-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
 	-- The stale down-timestamp would then be misread as a fresh press on the next
 	-- flagsChanged, inverting press/release and logging a hold that never happened.
-	-- An unmatched down carries no usable duration, so discard it — the same
-	-- reasoning the synth_queue clear applies at the other suppression sites.
+	-- An unmatched down carries no usable duration, so discard it.
 	CoreState.modifier_down_at = {}
 	local ok, res = pcall(ContextTracker.resync_context)
 	if not ok then
@@ -1638,6 +1638,10 @@ function M.stop()
 	Logger.start(LOG, "Stopping keylogger engine…")
 
 	CoreState.is_enabled = false
+	if _action_listener_registered then
+		SyntheticInput.unregister_action_listener(ACTION_EPOCH_LISTENER_ID)
+		_action_listener_registered = false
+	end
 	-- App-switch rows are normally created only on focus changes. Close the
 	-- currently open interval before shutdown so reloads do not erase it.
 	pcall(ContextTracker.close_active_app)
@@ -1663,10 +1667,6 @@ function M.stop()
 	-- Close the SQLite cache cleanly (drains any pending today.log entries
 	-- one last time before stopping). Safe to call even if init never ran.
 	pcall(LogManager.stop)
-
-	-- Discard any unmatched synthetic queue entries so a restart does not
-	-- inherit stale entries that would poison the first real keystroke (C5 fix).
-	CoreState.synth_queue = {}
 
 	Logger.success(LOG, "Keylogger engine stopped.")
 end

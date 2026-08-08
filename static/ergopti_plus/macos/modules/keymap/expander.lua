@@ -29,6 +29,7 @@ local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
+local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local LOG        = "keymap.expander"
@@ -82,56 +83,55 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if not require_state("perform_text_replacement") then return false end
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
-	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
-	-- Record the arm timestamp so the stuck-counter reset guard in onKeyDownRaw
-	-- does not wipe these counters if a runloop lag creates a false 0.5 s gap
-	-- between the arm and the first synthetic echo (A6 audit fix).
-	if hs and hs.timer then
-		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
-	end
+	-- Every logical producer receives a fresh immutable generation. A previous
+	-- terminator cannot remain owned by this replacement, even when two producers
+	-- start within the old timing window.
+	TerminatorReplay.flush_now("superseded by a new replacement")
+	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
-	TextSender.eraseChars(deletes, 0)
-
-	local ok, emit_count, emitted_str, logical_text = pcall(emit_action)
+	local ok, emit_count, emitted_str, logical_text = pcall(function()
+		return SyntheticInput.with_transaction(transaction, function()
+			assert(TextSender.eraseChars(deletes, 0) ~= false,
+				"replacement deletion could not be constructed")
+			return emit_action()
+		end)
+	end)
 	if not ok then
-		-- The emit failed — emitted_str contains the error message from pcall.
+		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
+		-- every already-built prefix, so a producer that emits one token and then
+		-- raises cannot leave half a replacement on screen or advance action state.
+		pcall(SyntheticInput.cancel, transaction)
 		Logger.error(LOG, "emit_action failed: %s.", tostring(emit_count))
-		emitted_str = ""
-		logical_text = ""
+		return false, transaction
 	end
 	emitted_str = emitted_str or ""
 	-- Keep extensions that still return the historical two values working. The
 	-- built-in clipboard emitter supplies an explicit logical value instead.
 	logical_text = logical_text or emitted_str
 
-	-- Track the emitted characters so the main event loop knows to skip them.
-	-- Guard against a nil field: the E2E stub state may not include this slot.
-	_state.expected_synthetic_chars = (_state.expected_synthetic_chars or "") .. emitted_str
-
-	-- When the emission used clipboard paste, register the expected Cmd+V echoes
-	-- in a dedicated counter instead of expected_synthetic_chars. Paste does not
-	-- produce individual character echoes, so expected_synthetic_chars must stay
-	-- empty to avoid absorbing real keystrokes typed after the expansion.
-	local paste_ops = km_utils.take_paste_ops and km_utils.take_paste_ops() or 0
-	if paste_ops > 0 then
-		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
+	if type(buffer_action) == "function" then
+		local ok_buf, buf_err = pcall(buffer_action)
+		if not ok_buf then
+			-- Buffer commit and synthetic output are one transaction. Since the batch
+			-- is still only being built, roll it back instead of displaying output the
+			-- engine cannot describe afterwards.
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
+			return false, transaction
+		end
 	end
 
-	-- Guard: skip notify when nothing was actually injected (deletes=0 and logical_text="")
-	-- to avoid a no-op synth_queue entry that would absorb the first real keystroke typed
-	-- immediately after a cancelled or empty expansion.
+	-- Guard: skip telemetry when nothing was actually injected. This runs only
+	-- after the buffer commit succeeded, so a rolled-back replacement cannot be
+	-- persisted as output the application never received.
 	if (deletes > 0 or logical_text ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
-		-- pcall-wrapped like the neighboring buffer_action call below: a truncated
+		-- pcall-wrapped like the neighboring buffer_action call above: a truncated
 		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
-		-- would otherwise raise, aborting the expansion mid-flight and leaving the
-		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
-		-- is_private is forwarded, NOT used to skip the call. Skipping would let
-		-- the physical echoes fall through handle_key unclaimed and be logged as
-		-- ordinary human keystrokes in buffer_text - the same secret, recorded in
-		-- a worse place. The keylogger's private mode keeps the discard markers
-		-- intact and redacts only what it persists.
+		-- would otherwise raise and abort the expansion mid-flight. is_private is
+		-- forwarded so every logical persistence field is redacted; immutable event
+		-- tags exclude the later OS echoes independently of payload contents.
 		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
 			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
 			is_private)
@@ -140,18 +140,21 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
-	if type(buffer_action) == "function" then
-		local ok_buf, buf_err = pcall(buffer_action)
-		if not ok_buf then
-			-- Buffer desync after an expansion leads to phantom chars or missed
-			-- triggers downstream; surfacing the failure loudly makes it
-			-- traceable instead of masking it as a silent inconsistency.
-			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
-		end
+	-- Deferred emitters retain the transaction before arming their timer. Sealing
+	-- closes the synchronous producer boundary; completion waits for those holds
+	-- and for every tagged batch to be handed to Quartz.
+	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
+	if not sealed then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "replacement transaction could not be sealed: %s.", tostring(seal_err))
+		return false, transaction
 	end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
-		keylogger.set_buffer(_state.buffer)
+		local ok_set, set_err = pcall(keylogger.set_buffer, _state.buffer)
+		if not ok_set then
+			Logger.error(LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
+		end
 	end
 
 	-- Re-evaluate preview on the updated buffer to support chained autocorrections.
@@ -177,11 +180,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- default, and that relationship is invisible when the literal sits here.
 	if is_final then _state.suppress_rescan(CoreStateM.FINAL_RESULT_SUPPRESS_SEC) end
 
-	if not is_ignored and _llm.get_llm_enabled() then
+	if not is_ignored
+		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
+		and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
 
 	Logger.done(LOG, "Replacement complete.")
+	return true, transaction
 end
 
 
@@ -352,11 +358,9 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
 	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
-	-- (a multi-codepoint composed character arriving as one event) made this
-	-- negative, and the negative flowed straight into expected_synthetic_deletes:
-	-- the counter then read as "fewer than zero deletes outstanding", so the NEXT
-	-- expansion's real deletes were mis-accounted and its echoes leaked into the
-	-- buffer as human keystrokes.
+	-- (a multi-codepoint composed character arriving as one event) cannot require
+	-- a negative number of on-screen deletions. Keeping the clamp at the operation
+	-- boundary also prevents malformed replacement transactions.
 	if screen_len < 0 then
 		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
 			trig_len, char_offset)
@@ -374,7 +378,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
 	end
 
-	M.perform_text_replacement(
+	local replaced = M.perform_text_replacement(
 		deletes,
 		function() return emit_dispatch(m, to_type) end,
 		function()
@@ -386,6 +390,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.group or nil,
 		m.is_private
 	)
+	if not replaced then return false end
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
 	-- IBAN). keylogger.log_hotstring writes trigger + replacement verbatim into
@@ -501,8 +506,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		-- to emit tokens (replacements with {Token} directives).
 		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
-		-- Filled in by the emit closure and consumed AFTER perform_text_replacement
-		-- has armed the echo bookkeeping the replay gate reads.
+		-- Filled in by the emit closure and completed with the immutable transaction
+		-- returned by perform_text_replacement below.
 		local replay_spec      = nil
 
 		if repl_text == eff_repl then
@@ -523,7 +528,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
 		if extra_bs_bytes > 0 then deletes = deletes + 1 end
 
-		M.perform_text_replacement(
+		local replacement_ok, replacement_transaction = M.perform_text_replacement(
 			deletes,
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
@@ -540,9 +545,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
 						replay_spec = { kind = "key", key = "return", chars = chars }
-						-- Track the re-typed terminator so expected_synthetic_chars
-						-- and notify_synthetic see it; without this the keylogger
-						-- flushes its buffer mid-expansion on the Enter/Tab echo.
+						-- Keep the logical replacement and keylogger record aligned with
+						-- the terminator replay. Its later OS event is excluded
+						-- independently by the immutable provenance tag.
 						s = s .. chars
 						logical = logical .. chars
 					elseif chars == "\t" then
@@ -554,7 +559,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 						s = s .. chars
 						logical = logical .. chars
 					end
-					replay_spec.echo_bytes = #chars
 					replay_spec.min_delay  = (type(order_delay) == "number" and order_delay > 0)
 						and order_delay or 0
 					c = c + text_utils.utf8_len(chars)
@@ -574,19 +578,20 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.group or nil,
 			m.is_private
 		)
+		if not replacement_ok then return false end
 
-		-- Armed only now: the replay gate reads the synthetic-echo bookkeeping
-		-- that perform_text_replacement writes AFTER emit_action returns. Arming
-		-- from inside the emit closure would test an expectation that had not
-		-- been recorded yet and release the terminator immediately — the very
-		-- race this indirection exists to close.
+		-- Armed only now because perform_text_replacement creates and returns the
+		-- transaction after invoking the emit closure. on_complete is safe even if
+		-- an unusual adapter completes synchronously: late registration immediately
+		-- receives the terminal status.
 		if replay_spec then
-			TerminatorReplay.arm(replay_spec)
-			if is_ignored then
-				-- The keyboard handler exits before its synthetic-echo drain for
-				-- these windows, so no echo can ever be observed here. Waiting for
-				-- one would stall every Enter until the watchdog expired.
-				TerminatorReplay.flush_now("ignored window — echoes unobservable")
+			replay_spec.transaction = replacement_transaction
+			if not TerminatorReplay.arm(replay_spec) then
+				-- The replacement batch is returned before the original event. If an
+				-- older undeliverable terminator prevented arming this one, passing the
+				-- physical terminator through preserves the current user's key instead
+				-- of consuming it with no replay owner.
+				return false
 			end
 		end
 
@@ -601,13 +606,13 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			end
 			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", typed_trigger, repl_text)
 		end
+		return true
 	end
 
-	-- Run synchronously: CGEventPost() is non-blocking so calling keyStroke()
-	-- inside the HID callback is safe. expected_synthetic_chars is already
-	-- armed before events fire, preventing re-entrancy into the trigger loop.
-	do_expansion()
-	return true
+	-- Build synchronously. Inside the keymap eventtap the adapter returns the
+	-- tagged batch to Quartz as the callback's second result; it never posts or
+	-- sleeps in this HID callback.
+	return do_expansion()
 end
 
 --- Fires the magic-key "repeat last character" feature when the user types
@@ -663,30 +668,44 @@ function M.try_repeat_feature(chars, is_ignored)
 	end
 
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+	TerminatorReplay.flush_now("superseded by repeat-key replacement")
+	local transaction = SyntheticInput.begin("repeat_key", "replacement")
+	local emitted, emit_err = pcall(SyntheticInput.with_transaction, transaction, function()
+		-- In ignored windows, the magic key is already on screen and must be deleted.
+		if is_ignored then
+			assert(TextSender.eraseChars(1, 0) ~= false,
+				"repeat-key deletion could not be constructed")
+		end
 
-	-- In ignored windows, the magic key is already on screen and must be deleted.
-	if is_ignored then
-		_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + 1
-		TextSender.eraseChars(1, 0)
+		if keylogger and type(keylogger.notify_synthetic) == "function" then
+			local notify_ok, notify_err = pcall(keylogger.notify_synthetic,
+				last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
+			if not notify_ok then
+				Logger.error(LOG, "repeat-key notify_synthetic failed: %s.", tostring(notify_err))
+			end
+		end
+		assert(TextSender.send(last_char, { mode = "direct" }) ~= false,
+			"repeat-key output could not be constructed")
+	end)
+	if not emitted then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "Repeat feature emission failed: %s.", tostring(emit_err))
+		return false
 	end
-
-	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
-	-- Update the arm timestamp so the stuck-counter reset guard does not wipe
-	-- expected_synthetic_chars if run-loop lag creates a false gap before the echo.
-	if hs and hs.timer then
-		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
+	if not sealed then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "Repeat feature transaction could not be sealed: %s.", tostring(seal_err))
+		return false
 	end
-
-	if keylogger and type(keylogger.notify_synthetic) == "function" then
-		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
-	end
-	TextSender.send(last_char, { mode = "direct" })
 
 	-- Update the buffer: strip the magic key and append the repeated character.
 	-- magic_offset is already the byte start of the magic key — reuse it.
 	_state.buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
 
-	if not is_ignored and _llm.get_llm_enabled() then
+	if not is_ignored
+		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
+		and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
 
