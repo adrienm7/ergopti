@@ -23,11 +23,10 @@ local M  = {}
 
 local text_utils  = require("infra.text_utils")
 local shared_utils = require("keymap.utils")
-local keyStrokes  = hs.eventtap.keyStrokes
-local keyStroke   = hs.eventtap.keyStroke
 local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "keymap.utils"
 
@@ -75,12 +74,11 @@ local IGNORED_WIN_TTL_SEC = 5.0
 -- after a closure binds the nil global instead.
 local _ignored_win_refresh_armed = false
 
--- Key tokens whose synthetic keydown carries a character back through
--- getCharacters() ("return" -> CR, "tab" -> HT). They must appear in the physical
--- echo or the keylogger's synth_queue runs one entry short per token and tags the
--- replacement's tail as a human keystroke. Nav/escape tokens ({Left}, {Delete},
--- {Esc}) produce no character and are deliberately absent — a string-typed echo
--- cannot represent them.
+-- Key tokens whose keydown carries a character through getCharacters()
+-- ("return" -> CR, "tab" -> HT). The legacy physical_echo return value keeps
+-- those characters for extension/telemetry compatibility; immutable event tags,
+-- not this string, identify the OS callbacks. Nav/escape tokens ({Left},
+-- {Delete}, {Esc}) have no character representation and remain absent.
 local KEY_ECHO_CHARS = { ["return"] = "\r", ["tab"] = "\t" }
 
 
@@ -100,7 +98,6 @@ local KEY_ECHO_CHARS = { ["return"] = "\r", ["tab"] = "\t" }
 -- "original" value is ever saved and that the final doAfter always restores it.
 local _paste_saved_original = nil   -- user's full clipboard data (table from readAllData) at first paste
 local _paste_pending_timer  = nil   -- the active restore timer, if any
-local _paste_ops_pending    = 0     -- count of Cmd+V echos yet to arrive (consumed by expander)
 
 --- Returns true when the text is long enough or unicode-heavy enough that
 --- clipboard-paste should be preferred over simulated keystrokes.
@@ -116,37 +113,6 @@ function M.should_paste(text)
 	if ok_high and has_high then return true end
 
 	return false
-end
-
---- Atomically reads and resets the pending paste-ops counter.
---- Called by expander.lua immediately after emit_action() to detect whether
---- any token was delivered via clipboard paste rather than keystrokes. The
---- returned count is added to CoreState.expected_synthetic_pastes so the
---- keydown handler can swallow the Cmd+V echoes without wiping the buffer.
---- @return number Paste operations fired since the last call (usually 0 or 1).
-function M.take_paste_ops()
-	local n = _paste_ops_pending
-	_paste_ops_pending = 0
-	return n
-end
-
---- Pure predicate: is this exact keystroke the Cmd+V echo of a pending
---- synthetic paste? Mirrors the check keymap/init.lua's onKeyDownRaw already
---- uses to DRAIN expected_synthetic_pastes, but as a read-only peek so a
---- second caller (the keylogger's shortcut-classification branch) can consult
---- the same fact without mutating the counter itself (F-HIGH-17 fix: without
---- this, every long paste-worthy expansion was logged as a genuine user
---- Cmd+V keyboard shortcut, inflating the shortcut-count metric).
---- Takes `is_v_key` as an already-resolved boolean (rather than a raw keycode
---- + keycode-map lookup) so this pure function never needs its own OS call.
---- @param flags table The modifier flags from the key event.
---- @param is_v_key boolean Whether the keystroke's keycode resolves to "v".
---- @param pending_pastes number The current CoreState.expected_synthetic_pastes count.
---- @return boolean True when this keystroke is a pending synthetic paste echo.
-function M.is_synthetic_paste_keystroke(flags, is_v_key, pending_pastes)
-	return type(flags) == "table" and flags.cmd == true
-		and is_v_key == true
-		and (tonumber(pending_pastes) or 0) > 0
 end
 
 --- Mutates the clipboard with `value` and issues the Cmd+V keystroke, then
@@ -176,7 +142,8 @@ local function perform_paste(value)
 	-- hotstring paste goes through, was missed.
 	local ok_write = pcall(function()
 		hs.pasteboard.setContents(value)
-		keyStroke({ "cmd" }, "v", 0)
+		assert(SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0),
+			"synthetic paste keystroke could not be dispatched")
 	end)
 	if not ok_write then
 		local original = _paste_saved_original
@@ -214,9 +181,9 @@ end
 --- each paste's Cmd+V has CLIPBOARD_PASTE_GAP_SEC to be consumed before the
 --- next setContents() call runs.
 --- @param tokens table The token list produced by tokens_from_repl().
---- @return number, string, string Total characters, the physical keystroke
----   echo, and the logical text inserted. Clipboard text is deliberately absent
----   from the physical echo, but remains in the logical text for telemetry.
+--- @return number, string, string Total characters, the legacy physical_echo
+---   metadata, and the logical text inserted. Clipboard text is absent from the
+---   compatibility echo; immutable tags carry actual event provenance.
 function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
@@ -241,6 +208,51 @@ function M.emit_tokens(tokens)
 	-- expansion for no benefit.
 	local order_delay = 0
 
+	--- Schedules an emission while retaining the ambient synthetic-input
+	--- transaction. A replacement transaction is sealed as soon as its synchronous
+	--- emitter returns; without the retain, a later token would either be rejected
+	--- as an append-after-completion or escape into an unrelated implicit action.
+	--- The release runs even when the deferred emitter throws, and every failure is
+	--- sent to the file logger because timer callback errors otherwise surface only
+	--- in the Hammerspoon Console.
+	--- @param delay number Seconds to wait before running fn.
+	--- @param fn function Deferred emission closure.
+	local function defer_in_transaction(delay, fn)
+		local tx = SyntheticInput.current_transaction()
+		local retain_token = tx and SyntheticInput.retain(tx) or nil
+
+		local ok_timer, timer_or_err = pcall(TimerScheduler.after, delay, function()
+			local ok_run, run_err = pcall(function()
+				if tx then
+					SyntheticInput.with_transaction(tx, fn)
+				else
+					fn()
+				end
+			end)
+
+			local ok_release, release_err = true, nil
+			if tx then
+				ok_release, release_err = pcall(SyntheticInput.release, tx, retain_token)
+			end
+
+			if not ok_run then
+				Logger.error(LOG, "Deferred synthetic emission failed: %s.", tostring(run_err))
+			end
+			if not ok_release then
+				Logger.error(LOG, "Deferred synthetic transaction release failed: %s.", tostring(release_err))
+			end
+		end)
+
+		if not ok_timer or type(timer_or_err) ~= "table" or timer_or_err.timer == nil then
+			if tx then
+				pcall(SyntheticInput.release, tx, retain_token)
+			end
+			error(ok_timer and "timer scheduler returned no live deferred synthetic timer"
+				or timer_or_err, 0)
+		end
+		return timer_or_err
+	end
+
 	--- Emits inline when nothing is queued ahead, otherwise chains behind it.
 	--- Declared above the loop so the closures below capture it rather than a nil
 	--- global. Keys and short text reach the OS synchronously, so without this a
@@ -249,7 +261,7 @@ function M.emit_tokens(tokens)
 	--- @param delay number Seconds to wait, or <= 0 to fire inline.
 	--- @param fn function The emission to perform.
 	local function emit_in_order(delay, fn)
-		if delay <= 0 then fn() else hs.timer.doAfter(delay, fn) end
+		if delay <= 0 then fn() else defer_in_transaction(delay, fn) end
 	end
 
 	for _, tok in ipairs(tokens) do
@@ -257,12 +269,14 @@ function M.emit_tokens(tokens)
 
 		if tok.kind == "key" then
 			local key_value = tok.value  -- Bound per iteration for the deferred closure
-			emit_in_order(order_delay, function() keyStroke({}, key_value, 0) end)
+			emit_in_order(order_delay, function()
+				assert(SyntheticInput.emit_key_stroke({}, key_value, 0),
+					"synthetic key token could not be dispatched")
+			end)
 			count = count + 1
 
-			-- Character-producing keys echo back as real character keydowns, exactly
-			-- like the terminator re-type path. Without the echo the keylogger's
-			-- synth_queue is one entry short and tags that character as human input.
+			-- Preserve character-producing key tokens in the historical physical_echo
+			-- result. Their OS events are classified by immutable transaction tags.
 			local echo = KEY_ECHO_CHARS[key_value]
 			if echo then
 				emitted_str  = emitted_str .. echo
@@ -276,7 +290,6 @@ function M.emit_tokens(tokens)
 			if M.should_paste(tok.value) then
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
 				count              = count + (ok_l and tok_len or 1)
-				_paste_ops_pending = _paste_ops_pending + 1
 
 				local paste_at    = next_paste_delay
 				local paste_value = tok.value  -- Bound per iteration for the deferred closure
@@ -285,7 +298,7 @@ function M.emit_tokens(tokens)
 				else
 					Logger.debug(LOG, "Deferring paste of %d char(s) by %.2fs to avoid clipboard race.",
 						ok_l and tok_len or 1, paste_at)
-					hs.timer.doAfter(paste_at, function() perform_paste(paste_value) end)
+					defer_in_transaction(paste_at, function() perform_paste(paste_value) end)
 				end
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
@@ -302,7 +315,10 @@ function M.emit_tokens(tokens)
 				order_delay = next_paste_delay
 			else
 				local text_value = tok.value  -- Bound per iteration for the deferred closure
-				emit_in_order(order_delay, function() keyStrokes(text_value) end)
+				emit_in_order(order_delay, function()
+					assert(SyntheticInput.emit_key_strokes(text_value),
+						"synthetic token text could not be dispatched")
+				end)
 				local ok, len = pcall(text_utils.utf8_len, tok.value)
 				count       = count + (ok and len or 1)
 				emitted_str = emitted_str .. tok.value
@@ -323,8 +339,8 @@ end
 
 --- Emits a raw string directly, choosing between keystrokes and clipboard-paste.
 --- @param text string The text to emit.
---- @return number, string, string Characters emitted, the physical echo string
----   (empty on paste), and the logical text inserted (always the supplied text).
+--- @return number, string, string Characters emitted, legacy physical_echo
+---   metadata (empty on paste), and the logical text inserted.
 function M.emit_text(text)
 	if type(text) ~= "string" then
 		Logger.error(LOG, "emit_text: text must be a string (got %s).", type(text))
@@ -341,12 +357,9 @@ function M.emit_text(text)
 	if M.should_paste(text) then
 		perform_paste(text)
 		Logger.done(LOG, "Text pasted via clipboard.")
-		-- Signal the pending Cmd+V echo to expander via the paste counter, NOT
-		-- via expected_synthetic_chars. Returning text as emitted_str would fill
-		-- expected_synthetic_chars with text that Cmd+V never echoes back as
-		-- individual keystrokes, causing subsequent real keystrokes matching the
-		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
-		_paste_ops_pending = _paste_ops_pending + 1
+		-- physical_echo stays empty: Cmd+V emits one tagged key pair, not one
+		-- keydown per pasted character. Immutable transaction provenance owns its
+		-- classification, so no mutable compatibility counter is maintained.
 		local ok_l, l = pcall(text_utils.utf8_len, text)
 		-- The fence is NOT zero just because this paste fired inline. Cmd+V is our
 		-- last event; the text itself is produced by the target when it gets around
@@ -356,7 +369,8 @@ function M.emit_text(text)
 		return (ok_l and l or 1), "", text, CLIPBOARD_PASTE_GAP_SEC
 	end
 
-	keyStrokes(text)
+	assert(SyntheticInput.emit_key_strokes(text),
+		"synthetic text could not be dispatched")
 	local ok, len = pcall(text_utils.utf8_len, text)
 	Logger.done(LOG, "Text emitted as keystrokes (%d char(s)).", ok and len or 1)
 	return (ok and len or 1), text, text, 0

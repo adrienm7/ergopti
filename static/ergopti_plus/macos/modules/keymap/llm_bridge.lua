@@ -25,10 +25,10 @@
 local M = {}
 
 local hs        = hs
-local keyStroke = hs.eventtap.keyStroke
-
 local km_utils         = require("modules.keymap.utils")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance  = require("adapters.event_provenance")
+local SyntheticInput   = require("adapters.synthetic_input")
 local text_utils       = require("infra.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("infra.logger")
@@ -44,6 +44,12 @@ local ManifestReader = require("infra.manifest_reader")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
+-- A failed action-epoch reset must not let stale prediction state consume user
+-- input. This gate is intentionally bridge-wide: keymap, expander, tooltip and
+-- menu callbacks all enter the prediction engine through this module.
+local _runtime_quarantined = false
+local _safe_action_epoch = SyntheticInput.current_action_epoch()
+local _quarantine_hide_pending = false
 
 
 
@@ -169,6 +175,39 @@ local _preview_render_generation = 0
 --- requested moments earlier cannot land afterwards.
 local function invalidate_pending_preview()
 	_preview_render_generation = _preview_render_generation + 1
+end
+
+
+--- Enables/disables the explicit fail-closed runtime interaction latch.
+--- This function is intentionally O(1) and performs no timer, canvas, logger or
+--- engine calls; it is safe to call from an eventtap callback.
+--- @param value boolean True to quarantine runtime LLM interactions.
+function M.set_runtime_quarantined(value)
+	local quarantined = value == true
+	if quarantined == _runtime_quarantined then return end
+	_runtime_quarantined = quarantined
+	if quarantined then invalidate_pending_preview() end
+end
+
+
+--- Reports whether prediction/preview interactions are currently safe.
+--- @return boolean True when runtime calls may reach the prediction engine.
+function M.is_runtime_available()
+	return not _runtime_quarantined
+		and _safe_action_epoch == SyntheticInput.current_action_epoch()
+end
+
+
+--- Observes a new action epoch without doing any external work.
+--- The live-token comparison in is_runtime_available already closes the gate
+--- before this callback runs; the explicit latch also invalidates a pending
+--- hotstring render in constant time.
+--- @param epoch table Opaque SyntheticInput action token.
+--- @return boolean current True when epoch is still the current token.
+function M.observe_action_epoch(epoch)
+	if epoch ~= SyntheticInput.current_action_epoch() then return false end
+	if epoch ~= _safe_action_epoch then M.set_runtime_quarantined(true) end
+	return true
 end
 
 -- ── Preview visibility toggles ────────────────────────────────────────────────
@@ -461,7 +500,7 @@ function M.update_preview(buf)
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
-	local llm_on = engine.get_llm_enabled()
+	local llm_on = M.is_runtime_available() and engine.get_llm_enabled()
 	if llm_on then engine.stop_timer() end
 
 	if not buf or #buf == 0 then
@@ -931,14 +970,44 @@ end
 local function arm_escape_trap()
 	if _escape_trap then return end
 	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-		if EventTapGuard.handle_disabled(event, _escape_trap, "llm.escape_trap") then return false end
-		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
+		if EventTapGuard.handle_disabled(event, _escape_trap, "llm.escape_trap") then
+			return false
+		end
+		local provenance, status, fence = EventProvenance.classify_with_fence(
+			event, "llm.escape_trap")
+		local fence_events = fence and fence.events or nil
+		local function finish(consume) return consume == true, fence_events end
+		if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
+			return finish(false)
+		end
+		local key_ok, keycode = pcall(event.getKeyCode, event)
+		if not key_ok or keycode ~= KEYCODE_ESCAPE then return finish(false) end
+		if not M.is_runtime_available() then
+			-- Hotstring previews remain a valid non-LLM feature during quarantine.
+			-- Dismiss only that surface; stale LLM state is logically invisible and
+			-- must never make Escape consume an application keystroke.
+			if type(tooltip.is_hotstring_visible) == "function"
+				and tooltip.is_hotstring_visible() then
+				local scheduled = SyntheticInput.defer_after_callback(
+					"hotstring Escape dismissal", function()
+						invalidate_pending_preview()
+						local hide = tooltip.hide_forced_silent or tooltip.hide_forced
+						if type(hide) == "function" then hide() end
+					end)
+				return finish(scheduled)
+			end
+			return finish(false)
+		end
 		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
 		-- should handle it normally in that case.
-		if not tooltip.is_visible() then return false end
-		Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
-		M.reset_predictions()
-		return true
+		if not tooltip.is_visible() then return finish(false) end
+		local scheduled = SyntheticInput.defer_after_callback(
+			"LLM Escape dismissal", function()
+				if not M.is_runtime_available() or not tooltip.is_visible() then return end
+				Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
+				M.reset_predictions()
+			end)
+		return finish(scheduled)
 	end)
 	_escape_trap:start()
 	Logger.debug(LOG, "Escape trap armed (persistent).")
@@ -946,9 +1015,30 @@ end
 
 
 
---- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
---- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
-function M.reset_predictions(keep_hotstring_log)
+--- Schedules one coalesced surface hide while the full LLM runtime is closed.
+--- Canvas work stays off the eventtap; a later hotstring preview scheduled on the
+--- same run-loop tick renders after this hide and remains fully available.
+local function schedule_quarantine_surface_hide()
+	if _quarantine_hide_pending then return end
+	_quarantine_hide_pending = true
+	local ok, handle_or_err = pcall(TimerScheduler.after, 0, function()
+		_quarantine_hide_pending = false
+		if not M.is_runtime_available() then
+			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
+			if type(hide) == "function" then pcall(hide) end
+		end
+	end)
+	if not ok or type(handle_or_err) ~= "table" or handle_or_err.timer == nil then
+		_quarantine_hide_pending = false
+	end
+end
+
+
+--- Clears prediction state, optionally bypassing the action-epoch runtime gate.
+--- @param keep_hotstring_log boolean When true, skips dismiss telemetry.
+--- @param force_full boolean True only for the async action-epoch reconciler.
+--- @return boolean full_reset True when engine.reset ran.
+local function reset_predictions_impl(keep_hotstring_log, force_full)
 	-- A preview render requested a tick ago must not land after this reset and
 	-- put the tooltip back on screen.
 	invalidate_pending_preview()
@@ -981,7 +1071,50 @@ function M.reset_predictions(keep_hotstring_log)
 		end
 		last_shown_hotstring = nil
 	end
+	if not force_full and not M.is_runtime_available() then
+		schedule_quarantine_surface_hide()
+		return false
+	end
 	engine.reset()
+	return true
+end
+
+
+--- Reconciles an observation gap after the key event callback has returned.
+--- The HID path first closes the O(1) runtime latch with
+--- set_runtime_quarantined(true); this function performs canvas/timer/task work
+--- later and reopens only that explicit latch. A newer action epoch remains
+--- independently closed by the exact _safe_action_epoch comparison.
+--- @return boolean True after the full reset completed.
+function M.reconcile_observation_gap()
+	reset_predictions_impl(false, true)
+	M.set_runtime_quarantined(false)
+	return true
+end
+
+
+--- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
+--- During an action-epoch quarantine this only invalidates hotstring/surface state;
+--- the throwing full engine reset is reserved for the async reconciler.
+--- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
+--- @return boolean full_reset True when engine.reset ran.
+function M.reset_predictions(keep_hotstring_log)
+	return reset_predictions_impl(keep_hotstring_log, false)
+end
+
+
+--- Performs the full reset for one exact action token outside the eventtap.
+--- Success opens the runtime only if no newer action arrived while reset ran.
+--- @param epoch table Opaque SyntheticInput action token.
+--- @return boolean current True when this exact epoch became safe.
+function M.reset_for_action_epoch(epoch)
+	M.observe_action_epoch(epoch)
+	if epoch ~= SyntheticInput.current_action_epoch() then return false end
+	reset_predictions_impl(false, true)
+	if epoch ~= SyntheticInput.current_action_epoch() then return false end
+	_safe_action_epoch = epoch
+	_runtime_quarantined = false
+	return true
 end
 
 --- Applies the selected prediction: issues deletions, types the completion,
@@ -990,6 +1123,7 @@ end
 --- @return boolean True when the prediction was successfully applied.
 function M.apply_prediction(idx)
 	if not require_state("apply_prediction") then return false end
+	if not M.is_runtime_available() then return false end
 
 	local pred, all_preds = engine.consume(idx)
 	if not pred then return false end
@@ -1021,21 +1155,20 @@ function M.apply_prediction(idx)
 
 	M.reset_predictions()
 
-	-- Route through the single injection choke point so every synthetic-event
-	-- tracker (expected_synthetic_deletes/chars/pastes + keylogger synth_queue) is
-	-- updated atomically in one place — same path as hotstring expansion.
+	-- Route through the single injection choke point so deletion, text and paste
+	-- events share one immutable generation and owner — the same transaction path
+	-- used by hotstring expansion.
 	-- is_final=true: suppress hotstring re-scan after LLM accept.
 	-- is_ignored=true: reset_predictions() already hid the tooltip; the F16 chain
 	--   signal (injected below) handles the next prediction — do not arm the LLM
 	--   inactivity timer or trigger update_preview here.
-	expander.perform_text_replacement(
+	local replaced = expander.perform_text_replacement(
 		delete_count,
 		function() return km_utils.emit_text(text_to_type) end,
 		function()
-			-- Sync the in-memory buffer to reflect the accepted completion.
-			-- Drain paste-ops inline: take_paste_ops is called inside
-			-- perform_text_replacement before this buffer_action fires, so
-			-- the clipboard-paste counter is already accounted for.
+			-- Sync the in-memory buffer to reflect the accepted completion. Tagged
+			-- transaction events already carry their provenance independently of
+			-- whether the text path used direct key pairs or Cmd+V.
 			if delete_count == 0 then
 				_state.buffer = _state.buffer .. text_to_type
 			else
@@ -1050,6 +1183,10 @@ function M.apply_prediction(idx)
 		true,   -- is_ignored
 		"llm"
 	)
+	if not replaced then
+		Logger.error(LOG, "Prediction #%d could not be injected; action was not accepted.", idx)
+		return false
+	end
 	keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
@@ -1061,7 +1198,7 @@ function M.apply_prediction(idx)
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	engine.arm_chain()
 	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
-	hs.eventtap.keyStroke({}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
+	SyntheticInput.emit_loopback_key_stroke({}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
 	return true
 end
 
@@ -1073,6 +1210,7 @@ end
 --- @param is_ignored boolean True when the current app is on the keymap ignore list.
 --- @return boolean True when the event was consumed by the prediction pipeline.
 function M.handle_llm_keys(keyCode, flags, is_ignored)
+	if not M.is_runtime_available() then return false end
 	-- F16: precise "typing complete" signal sent by apply_prediction().
 	if engine.handle_chain_signal(keyCode) then return true end
 
@@ -1130,6 +1268,17 @@ end
 --- @return boolean True when a tooltip was visible and the event was consumed.
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
+	if not M.is_runtime_available() then
+		if reset_buffer_on_navigation then _state.buffer = "" end
+		if type(tooltip.is_hotstring_visible) == "function"
+			and tooltip.is_hotstring_visible() then
+			invalidate_pending_preview()
+			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
+			if type(hide) == "function" then pcall(hide) end
+			return true
+		end
+		return false
+	end
 
 	-- Use tooltip.is_visible() rather than engine.is_visible() so we also catch
 	-- the LLM loading spinner and hotstring previews, which are shown through the
@@ -1173,13 +1322,16 @@ end
 --- @param force_trigger boolean When true, bypasses freshness and word-count guards.
 --- @param profile_name string|nil Optional profile label shown in the info bar.
 function M._perform_llm_check(force_trigger, profile_name)
+	if not M.is_runtime_available() then return end
 	engine.perform_check(force_trigger, profile_name)
 end
 
 --- Re-arms the LLM inactivity timer.
 --- Called by the expander after a text replacement to trigger a fresh prediction.
 function M.start_timer()
+	if not M.is_runtime_available() then return false end
 	engine.start_timer()
+	return true
 end
 
 --- Initializes the bridge with the shared CoreState and keymap defaults.
@@ -1204,6 +1356,12 @@ function M.init(core_state, keymap_defaults)
 	end
 
 	_state = core_state
+	if type(engine.set_runtime_guard) == "function" then
+		engine.set_runtime_guard(M.is_runtime_available)
+	end
+	if type(tooltip.set_runtime_guard) == "function" then
+		tooltip.set_runtime_guard(M.is_runtime_available)
+	end
 	engine.init(core_state)
 
 	-- Seed preview toggles from the canonical keymap defaults.

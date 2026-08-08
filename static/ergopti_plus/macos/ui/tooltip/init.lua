@@ -18,6 +18,16 @@ local TooltipHotstring = require("ui.tooltip.tooltip_hotstring")
 -- Callback fired when the tooltip transitions to visible state.
 -- Registered from llm_bridge to create the persistent Escape trap at HEAD.
 local _on_show_callback = nil
+-- Injected by the keymap LLM bridge. Keeping this as a callback avoids a
+-- tooltip -> keymap require cycle while making stale action epochs inert at the
+-- final rendering/interaction boundary.
+local _runtime_guard = function() return true end
+
+
+local function runtime_available()
+	local ok, available = pcall(_runtime_guard)
+	return ok and available == true
+end
 
 
 
@@ -62,6 +72,12 @@ function M.hide_forced()
 	TooltipHotstring.hide_forced()
 end
 
+--- Authoritative hide for the keyboard hot path without synchronous log I/O.
+function M.hide_forced_silent()
+	if TooltipLLM.hide_silent then TooltipLLM.hide_silent() else TooltipLLM.hide() end
+	TooltipHotstring.hide_forced()
+end
+
 --- Checks if any tooltip is currently rendered on screen.
 --- @return boolean True if visible.
 function M.is_visible()
@@ -72,6 +88,15 @@ end
 --- @param fn function|nil Callback with no arguments; pass nil to unregister.
 function M.set_on_show_callback(fn)
 	_on_show_callback = (type(fn) == "function") and fn or nil
+end
+
+--- Installs the live LLM action-epoch guard in both facade and interactive UI.
+--- @param fn function|nil Zero-arity predicate; nil restores the open default.
+function M.set_runtime_guard(fn)
+	_runtime_guard = type(fn) == "function" and fn or function() return true end
+	if type(TooltipLLM.set_runtime_guard) == "function" then
+		TooltipLLM.set_runtime_guard(_runtime_guard)
+	end
 end
 
 
@@ -110,9 +135,11 @@ end
 --- @param is_enabled boolean Guard clause to prevent rendering if disabled.
 --- @param background_color table|nil Optional background tint.
 function M.show_loading(content, is_enabled, background_color)
+	if not runtime_available() then return false end
 	TooltipLLM.hide()
 	TooltipHotstring.show_loading(content, is_enabled, background_color)
 	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
+	return true
 end
 
 --- Displays AI predictions with interactive navigation (LLM mode).
@@ -127,19 +154,29 @@ end
 --- @param loading_text string Text to show if loading.
 --- @param max_reserved_count number Skeleton slots to render.
 function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
+	if not runtime_available() then return false end
 	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
 	-- the loading indicator in-place — no blank frame between the two tooltips.
 	TooltipHotstring.dismiss_silent()
 	TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
 	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
+	return true
 end
 
-function M.navigate(delta) TooltipLLM.navigate(delta) end
+function M.navigate(delta)
+	if not runtime_available() then return false end
+	return TooltipLLM.navigate(delta)
+end
 function M.set_navigate_callback(cb) TooltipLLM.set_navigate_callback(cb) end
 function M.set_accept_callback(cb) TooltipLLM.set_accept_callback(cb) end
 function M.set_cancel_callback(cb) TooltipLLM.set_cancel_callback(cb) end
 function M.set_enter_validates(v) TooltipLLM.set_enter_validates(v) end
-function M.get_current_index() return TooltipLLM.get_current_index() end
+function M.get_current_index()
+	if not runtime_available() then return nil end
+	return TooltipLLM.get_current_index()
+end
+function M.is_llm_visible() return TooltipLLM.is_visible() end
+function M.is_hotstring_visible() return TooltipHotstring.is_visible() end
 function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 
 
@@ -152,15 +189,24 @@ function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 --- Resets the AI prediction auto-dismiss countdown using the currently configured delay.
 --- Call this after final predictions arrive, or when the delay setting changes.
 --- A configured delay of 0 means infinite display (no timer is started).
-function M.reset_llm_timer() TooltipLLM.reset_timer() end
+function M.reset_llm_timer()
+	if not runtime_available() then return false end
+	return TooltipLLM.reset_timer()
+end
 
 --- Arms the backend-agnostic chain timing origin. See TooltipLLM.set_chain_start.
 --- @param timestamp number Epoch seconds (typically hs.timer.secondsSinceEpoch()).
-function M.set_chain_start(timestamp) TooltipLLM.set_chain_start(timestamp) end
+function M.set_chain_start(timestamp)
+	if not runtime_available() then return false end
+	return TooltipLLM.set_chain_start(timestamp)
+end
 
 --- Finalises the active chain: computes TTLT and renders the full timing line.
 --- Called by prediction_engine when the chain ends — success or failure.
-function M.mark_chain_complete() TooltipLLM.mark_chain_complete() end
+function M.mark_chain_complete()
+	if not runtime_available() then return false end
+	return TooltipLLM.mark_chain_complete()
+end
 
 --- Returns the tinted background color for a display context, or nil if colorization is off.
 --- Delegates to Config.tint() so callers never need to import the config directly.

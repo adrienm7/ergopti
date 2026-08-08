@@ -31,6 +31,8 @@ local M = {}
 local hs            = hs
 local Logger        = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "adapters.modifier_injector"
 
@@ -92,18 +94,46 @@ function M.arm(flags, on_applied)
 
 	local ok, tap_or_err = pcall(hs.eventtap.new, { hs.eventtap.event.types.keyDown }, function(event)
 		if EventTapGuard.handle_disabled(event, _tap, LOG) then return false end
+		local provenance, status, fence = EventProvenance.classify_with_fence(
+			event, "modifier_injector")
+		local fence_events = fence and fence.events or nil
+		-- A delayed Ergopti batch is not the user's "next key". Mutating it would
+		-- corrupt that output, disarm the sticky modifier, and leave the subsequent
+		-- physical key unmodified. Unreadable provenance is equally non-authoritative.
+		if provenance or status == EventProvenance.STATUS_UNREADABLE then
+			return false, fence_events
+		end
 		local applied = _on_applied
+		local committed = false
+		if applied then
+			-- Reserve the policy handoff before mutating the physical event. If the
+			-- post-callback dispatcher is unavailable, the sticky modifier must stay
+			-- armed and the untouched key must pass through for a later retry.
+			local scheduled = SyntheticInput.defer_after_callback(
+				"modifier injector on_applied", function()
+					if committed then applied() end
+				end)
+			if not scheduled then return false, fence_events end
+		end
 		local ok_apply, err = pcall(function()
 			local event_flags = event:getFlags()
 			for name in pairs(_flags) do event_flags[name] = true end
 			event:setFlags(event_flags)
 		end)
 		if not ok_apply then
-			Logger.error(LOG, "Could not set flags on the next key event: %s", tostring(err))
+			SyntheticInput.defer_after_callback("modifier injector setFlags diagnostic",
+				function()
+					Logger.error(LOG, "Could not set flags on the next key event: %s",
+						tostring(err))
+				end)
+			return false, fence_events
 		end
 		M.disarm()
-		if applied then pcall(applied) end
-		return false
+		-- The already-queued callback observes true only after the event mutation
+		-- and adapter state transition both completed. A setFlags failure therefore
+		-- leaves that callback inert while keeping the arm recoverable.
+		committed = true
+		return false, fence_events
 	end)
 
 	if not ok then

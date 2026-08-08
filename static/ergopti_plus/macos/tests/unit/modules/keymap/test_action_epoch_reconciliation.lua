@@ -1,0 +1,389 @@
+--- tests/unit/modules/keymap/test_action_epoch_reconciliation.lua
+
+--- ==============================================================================
+--- MODULE: Keymap action-epoch reconciliation
+--- DESCRIPTION:
+--- Drives the real keymap eventtap wrapper and its registered SyntheticInput
+--- listener. The fixture varies listener/event order and injects a transient LLM
+--- teardown failure to prove an epoch is acknowledged only after the stale UI,
+--- typing buffer, and word-boundary state have all been reconciled.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local RESET_MODULES = {
+	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
+	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
+	"modules.keymap.terminator_replay", "modules.keymap.utils",
+	"adapters.synthetic_input", "adapters.event_provenance",
+	"adapters.event_tap_guard", "infra.logger", "infra.perf",
+	"infra.hotpath_profiler", "infra.manifest_reader", "infra.keycodes",
+}
+
+
+local function noop() end
+
+local function api(overrides)
+	return setmetatable(overrides or {}, {
+		__index = function(t, key)
+			local value = noop
+			rawset(t, key, value)
+			return value
+		end,
+	})
+end
+
+
+local function load_fixture()
+	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
+
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	local taps = {}
+	local base_new = hs_stub.eventtap.new
+	hs_stub.eventtap.new = function(types, callback)
+		local tap = base_new(types, callback)
+		tap.callback = callback
+		taps[#taps + 1] = tap
+		return tap
+	end
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+
+	local epoch = {}
+	local pending_fence = nil
+	local listener = nil
+	local register_calls = 0
+	local unregister_calls = 0
+	local registered_epoch = nil
+	local deferred = {}
+	local synthetic_stub = {
+		current_action_epoch = function() return epoch, 125 end,
+		claim_physical_fence = function()
+			if pending_fence == nil then return nil end
+			local fence = pending_fence
+			pending_fence = nil
+			epoch = {}
+			return fence
+		end,
+		register_action_listener = function(id, callback, acknowledged_epoch)
+			helpers.assert_eq(id, "modules.keymap.action_epoch")
+			register_calls = register_calls + 1
+			listener = callback
+			registered_epoch = acknowledged_epoch
+		end,
+		unregister_action_listener = function(id)
+			helpers.assert_eq(id, "modules.keymap.action_epoch")
+			unregister_calls = unregister_calls + 1
+			listener = nil
+			return true
+		end,
+		enter_callback = function() end,
+		leave_callback = function(consume) return consume == true, {} end,
+		abort_callback = function() end,
+		defer_after_callback = function(_label, callback)
+			deferred[#deferred + 1] = callback
+			return true
+		end,
+	}
+	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["adapters.event_provenance"] = {
+		STATUS_OWNED = "owned",
+		STATUS_FOREIGN = "foreign",
+		STATUS_UNREADABLE = "unreadable",
+		classify_with_fence = function()
+			return nil, "foreign", synthetic_stub.claim_physical_fence()
+		end,
+	}
+	package.loaded["adapters.event_tap_guard"] = {
+		handle_disabled = function() return false end,
+	}
+
+	local state = {
+		buffer = "typed",
+		start_is_word_boundary = true,
+		processing_paused = false,
+		ignored_window_titles = {},
+		ignored_window_patterns = {},
+		last_key_time = 0,
+		WORD_TIMEOUT_SEC = 0,
+		no_rescan_until = 0,
+		last_key_was_complex = false,
+		magic_key = "★",
+		DELAYS = { STAR_TRIGGER = 0 },
+		groups = {},
+		interceptors = {},
+		preview_providers = {},
+		shift_side = nil,
+	}
+	package.loaded["modules.keymap.state"] = {
+		new = function() return state end,
+	}
+	package.loaded["modules.keymap.registry"] = api({
+		is_repeat_feature_enabled = function() return false end,
+		set_repeat_feature_enabled = noop,
+	})
+	package.loaded["modules.keymap.expander"] = api()
+
+	local calls = {}
+	local callback_errors = {}
+	local reset_should_fail = false
+	local record_nav_reset = false
+	local llm_quarantined = false
+	local safe_epoch = epoch
+	package.loaded["modules.keymap.llm_bridge"] = api({
+		reset_predictions = function()
+			calls[#calls + 1] = "ordinary-reset"
+		end,
+		check_nav_reset = function()
+			if record_nav_reset then calls[#calls + 1] = "ordinary-reset" end
+		end,
+		observe_action_epoch = function(observed)
+			calls[#calls + 1] = "observe"
+			if observed ~= safe_epoch then llm_quarantined = true end
+			return observed == epoch
+		end,
+		reset_for_action_epoch = function(observed)
+			calls[#calls + 1] = "observe"
+			if observed ~= safe_epoch then llm_quarantined = true end
+			calls[#calls + 1] = "reset"
+			if reset_should_fail then error("transient prediction reset") end
+			if observed ~= epoch then return false end
+			safe_epoch = observed
+			llm_quarantined = false
+			return true
+		end,
+		is_runtime_available = function()
+			return not llm_quarantined and safe_epoch == epoch
+		end,
+		handle_llm_keys = function()
+			if llm_quarantined or safe_epoch ~= epoch then return false end
+			calls[#calls + 1] = "handle"
+			return true
+		end,
+		update_preview = function(buf)
+			if llm_quarantined then return end
+			calls[#calls + 1] = "preview:" .. tostring(buf)
+		end,
+	})
+	package.loaded["modules.keymap.terminator_replay"] = api()
+	package.loaded["modules.keymap.utils"] = api({
+		is_ignored_window = function() return false end,
+	})
+	package.loaded["infra.logger"] = api({
+		LEVELS = { DEBUG = 10 },
+		is_enabled = function() return false end,
+		error = function(_, fmt, ...)
+			local ok, message = pcall(string.format, tostring(fmt), ...)
+			callback_errors[#callback_errors + 1] = ok and message or tostring(fmt)
+		end,
+	})
+	package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
+	package.loaded["infra.manifest_reader"] = {
+		default_for = function(key)
+			if key == "hotstrings.expansion_delay" then return 0 end
+			if key == "hotstrings.trigger_char" then return "★" end
+			return false
+		end,
+	}
+	package.loaded["infra.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
+
+	local keymap = require("modules.keymap.init")
+	keymap.start()
+	-- Startup observes the already-safe token. Individual cases below assert only
+	-- work caused by the action they create, not that one-time registration step.
+	for i = #calls, 1, -1 do calls[i] = nil end
+
+	local function physical_key(key_code, chars)
+		local before = #callback_errors
+		local results = table.pack(taps[1].callback({
+			getKeyCode = function() return key_code end,
+			getFlags = function() return {} end,
+			getCharacters = function() return chars end,
+			getProperty = function() return 0 end,
+		}))
+		helpers.assert_eq(#callback_errors, before,
+			"the keymap wrapper must not hide a fixture/runtime error as physical pass-through")
+		return table.unpack(results, 1, results.n)
+	end
+	local function tap_for(event_type)
+		for _, candidate in ipairs(taps) do
+			for _, watched in ipairs(candidate.types or {}) do
+				if watched == event_type then return candidate end
+			end
+		end
+		return nil
+	end
+
+	return {
+		keymap = keymap,
+		state = state,
+		calls = calls,
+		advance = function() epoch = {} end,
+		dispatch = function()
+			helpers.assert_type(listener, "function")
+			return listener(epoch, 125)
+		end,
+		physical_enter = function() return physical_key(36, "\r") end,
+		physical_letter = function(chars) return physical_key(0, chars or "x") end,
+		physical_click = function()
+			local mouse_tap = tap_for(hs_stub.eventtap.event.types.leftMouseDown)
+			helpers.assert_type(mouse_tap and mouse_tap.callback, "function")
+			local before = #callback_errors
+			record_nav_reset = true
+			local results = table.pack(mouse_tap.callback({}))
+			helpers.assert_eq(#callback_errors, before,
+				"the mouse wrapper must not hide a fixture/runtime error as pass-through")
+			local pending = deferred
+			deferred = {}
+			for _, callback in ipairs(pending) do callback() end
+			record_nav_reset = false
+			return table.unpack(results, 1, results.n)
+		end,
+		queue_fence = function(events) pending_fence = { events = events } end,
+		set_reset_failure = function(value) reset_should_fail = value end,
+		llm_quarantined = function() return llm_quarantined end,
+		registered_epoch = function() return registered_epoch end,
+		register_calls = function() return register_calls end,
+		unregister_calls = function() return unregister_calls end,
+	}
+end
+
+
+helpers.describe("keymap action epochs", function()
+	helpers.it("an action with no following key clears the buffer and hides predictions", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		fixture.dispatch()
+
+		helpers.assert_eq(fixture.state.buffer, "")
+		helpers.assert_true(not fixture.state.start_is_word_boundary)
+		helpers.assert_eq(table.concat(fixture.calls, ","), "observe,reset")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("the per-event backstop reconciles before reversed-order physical input", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		local consumed = fixture.physical_enter()
+
+		helpers.assert_true(not consumed,
+			"the physical Enter must pass through while stale LLM state is quarantined")
+		helpers.assert_eq(table.concat(fixture.calls, ","), "observe",
+			"the eventtap backstop must perform no full reset or external work")
+		helpers.assert_eq(fixture.state.buffer, "\r")
+		fixture.dispatch()
+		fixture.physical_enter()
+		helpers.assert_eq(table.concat(fixture.calls, ","), "observe,observe,reset,handle")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("claims older output before processing the overtaking physical key", function()
+		local fixture = load_fixture()
+		local older_events = { { key = "older-action" } }
+		fixture.queue_fence(older_events)
+		local consumed, returned_events = fixture.physical_enter()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(#returned_events, 1)
+		helpers.assert_true(returned_events[1] == older_events[1],
+			"the keymap tap must return older output before the physical original")
+		helpers.assert_eq(table.concat(fixture.calls, ","), "observe",
+			"the fence epoch must close stale LLM state without resetting on the HID path")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("claims older output before a focus-changing click without keylogger", function()
+		local fixture = load_fixture()
+		local older_events = { { key = "before-focus-change" } }
+		fixture.queue_fence(older_events)
+		local consumed, returned_events = fixture.physical_click()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(#returned_events, 1)
+		helpers.assert_true(returned_events[1] == older_events[1],
+			"the always-on keymap mouse tap must return queued output before the original click")
+		helpers.assert_true(fixture.state.start_is_word_boundary)
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("a click cancels pre-click preview recovery even when buffer reset is disabled", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		fixture.set_reset_failure(true)
+		helpers.assert_true(not pcall(fixture.dispatch))
+		fixture.physical_letter("x")
+		fixture.physical_click()
+
+		fixture.set_reset_failure(false)
+		fixture.dispatch()
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,reset,ordinary-reset,observe,reset",
+			"recovery must not arm a timer for text typed at the cursor position before the click")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("a permanent reset failure quarantines only LLM while ordinary typing accumulates", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		fixture.set_reset_failure(true)
+
+		local first_listener_ok = pcall(fixture.dispatch)
+		helpers.assert_true(not first_listener_ok,
+			"the listener must raise so SyntheticInput does not acknowledge the epoch")
+		local first_consumed = fixture.physical_letter("x")
+		local second_consumed = fixture.physical_letter("y")
+		helpers.assert_true(not first_consumed and not second_consumed,
+			"quarantine must never consume physical text")
+		helpers.assert_eq(fixture.state.buffer, "xy",
+			"context must reset once; repeated LLM retries cannot erase later typing")
+		helpers.assert_true(fixture.llm_quarantined())
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,reset",
+			"physical keys must not retry the throwing reset on the HID path")
+
+		fixture.set_reset_failure(false)
+		fixture.dispatch()
+		helpers.assert_true(not fixture.llm_quarantined())
+		helpers.assert_eq(fixture.state.buffer, "xy",
+			"successful LLM recovery must not repeat the already-completed context reset")
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,reset,observe,reset,preview:xy",
+			"recovery must rebuild the preview and re-arm LLM from every key typed during quarantine")
+		fixture.physical_enter()
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,reset,observe,reset,preview:xy,handle")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("pause cancels a preview catch-up recorded before reconciliation", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		fixture.set_reset_failure(true)
+		helpers.assert_true(not pcall(fixture.dispatch))
+		fixture.physical_letter("x")
+
+		fixture.keymap.pause_processing()
+		fixture.set_reset_failure(false)
+		fixture.dispatch()
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,reset,observe,reset",
+			"a listener recovering during pause must not re-arm predictions from pre-pause text")
+		fixture.keymap.resume_processing()
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("start and stop register the stable listener exactly once", function()
+		local fixture = load_fixture()
+		fixture.keymap.start()
+		helpers.assert_eq(fixture.register_calls(), 1)
+		helpers.assert_type(fixture.registered_epoch(), "table")
+		fixture.keymap.stop()
+		fixture.keymap.stop()
+		helpers.assert_eq(fixture.unregister_calls(), 1)
+	end)
+end)
+
+for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end

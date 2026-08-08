@@ -463,6 +463,65 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 end)
 
 
+helpers.describe("prediction_engine — reset stays off the input I/O path", function()
+	helpers.it("clears visible state synchronously but defers dismissal persistence", function()
+		local core = package.loaded["modules.llm"]
+		local streaming = package.loaded["modules.llm.streaming_handler"]
+		local keylogger = package.loaded["modules.keylogger"]
+		local scheduler = require("adapters.timer_scheduler")
+		local previous_fetch = core.fetch_llm_prediction
+		local previous_build = streaming.build_callbacks
+		local previous_log = keylogger.log_llm_dismissed
+		local previous_after = scheduler.after
+		local scheduled = {}
+		local dismissal_calls = 0
+
+		scheduler.after = function(_, callback)
+			scheduled[#scheduled + 1] = callback
+			return { timer = {}, fired = false }
+		end
+		keylogger.log_llm_dismissed = function()
+			dismissal_calls = dismissal_calls + 1
+		end
+		streaming.build_callbacks = function(config)
+			local function success(predictions)
+				config.pending_predictions_ref.value = predictions
+				config.predictions_visible_ref.value = true
+			end
+			return nil, success, function() end
+		end
+		core.fetch_llm_prediction = function(...)
+			local on_success = select(7, ...)
+			on_success({ { to_type = " completion", deletes = 0 } }, 1, true, false)
+		end
+
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(PE.is_visible())
+
+			PE.reset()
+			helpers.assert_true(not PE.is_visible(),
+				"stale predictions must be invalid immediately")
+			helpers.assert_eq(dismissal_calls, 0,
+				"reset must not persist telemetry in the caller's eventtap stack")
+			helpers.assert_true(#scheduled > 0,
+				"dismissal persistence must have a deferred continuation")
+			for _, callback in ipairs(scheduled) do callback() end
+			helpers.assert_eq(dismissal_calls, 1)
+		end, debug.traceback)
+
+		core.fetch_llm_prediction = previous_fetch
+		streaming.build_callbacks = previous_build
+		keylogger.log_llm_dismissed = previous_log
+		scheduler.after = previous_after
+		PE.set_llm_enabled(false)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
 
 
 

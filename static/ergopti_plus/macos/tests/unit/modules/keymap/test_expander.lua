@@ -13,11 +13,12 @@
 --- 1. Public surface and require_state guard behavior before init().
 --- 2. try_repeat_feature early-returns: feature disabled, wrong char, buffer
 ---    too short, whitespace-only previous char.
---- 3. perform_text_replacement updates expected_synthetic_chars / deletes and
+--- 3. perform_text_replacement returns one exact-tag replacement transaction and
 ---    refreshes the buffer via the supplied buffer_action.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
@@ -29,11 +30,9 @@ local Expander = helpers.load_with_stubs("modules.keymap.expander")
 --- @return table
 local function make_state(buffer)
 	local s = {
-		buffer                     = buffer or "",
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
-		magic_key                  = "★",
-		repeat_enabled             = true,
+		buffer         = buffer or "",
+		magic_key      = "★",
+		repeat_enabled = true,
 	}
 	function s.is_repeat_feature_enabled() return s.repeat_enabled end
 	function s.suppress_rescan(_) end
@@ -55,6 +54,27 @@ local function make_llm()
 	function L.get_llm_enabled() return L.llm_on end
 	function L.start_timer() L.timer_starts = L.timer_starts + 1 end
 	return L
+end
+
+--- Verifies one ordered, provenance-bearing replacement transaction.
+--- @param events table
+--- @param SyntheticInput table
+--- @param owner string
+local function assert_owned_transaction(events, SyntheticInput, owner)
+	local property = hs.eventtap.event.properties.eventSourceUserData
+	local generation = nil
+	for index, event in ipairs(events) do
+		local metadata = SyntheticInput.lookup_tag(event:getProperty(property))
+		helpers.assert_true(metadata and metadata.owned,
+			"every replacement event must carry an Ergopti-owned Quartz tag")
+		helpers.assert_eq(metadata.owner, owner)
+		helpers.assert_eq(metadata.effect, "replacement")
+		generation = generation or metadata.generation
+		helpers.assert_eq(metadata.generation, generation,
+			"one replacement must never span multiple transaction generations")
+		helpers.assert_eq(metadata.ordinal, math.floor((index + 1) / 2))
+		helpers.assert_eq(metadata.phase, event.isDown and "down" or "up")
+	end
 end
 
 
@@ -221,15 +241,21 @@ helpers.describe("keymap.expander: try_repeat_feature early-returns", function()
 	end)
 
 	helpers.it("fires for a normal letter before the magic key", function()
-		local E = helpers.load_with_stubs("modules.keymap.expander")
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("ab★")
 		E.init(s, make_registry({}, {}), make_llm())
+		SyntheticInput.enter_callback()
 		local result = E.try_repeat_feature("★", false)
+		local consume, events = SyntheticInput.leave_callback(result)
 		helpers.assert_eq(result, true)
+		helpers.assert_true(consume)
+		helpers.assert_eq(#events, 2,
+			"repeat must return one tagged key pair from the callback")
+		assert_owned_transaction(events, SyntheticInput, "repeat_key")
 		-- The magic key is stripped and the previous char ("b") is repeated, so
 		-- the buffer goes from "ab★" → "ab" + "b" = "abb".
 		helpers.assert_eq(s.buffer, "abb")
-		helpers.assert_eq(s.expected_synthetic_chars, "b")
+		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
 	end)
 end)
 
@@ -258,26 +284,34 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 	end)
 
 	helpers.it("issues the requested deletes and runs the buffer_action", function()
-		local E = helpers.load_with_stubs("modules.keymap.expander")
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("hello")
 		local llm = make_llm()
 		E.init(s, make_registry({}, {}), llm)
 
 		local emit_called, buf_called = false, false
-		E.perform_text_replacement(
+		SyntheticInput.enter_callback()
+		local replaced = E.perform_text_replacement(
 			3,
-			function() emit_called = true ; return 4, "wrld" end,
+			function()
+				emit_called = true
+				SyntheticInput.emit_key_strokes("wrld")
+				return 4, "wrld"
+			end,
 			function() buf_called = true ; s.buffer = "hewrld" end,
 			false, false, "test"
 		)
+		local consume, events = SyntheticInput.leave_callback(replaced)
 		-- update_preview is now deferred via hs.timer.doAfter(0) (E2 audit fix)
 		-- so we must fire pending timers before asserting on llm.previews.
 		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
 
 		helpers.assert_eq(emit_called, true)
 		helpers.assert_eq(buf_called,  true)
-		helpers.assert_eq(s.expected_synthetic_deletes, 3)
-		helpers.assert_eq(s.expected_synthetic_chars,   "wrld")
+		helpers.assert_true(consume)
+		helpers.assert_eq(#events, 14,
+			"three Backspace pairs plus four text pairs must be returned atomically")
+		assert_owned_transaction(events, SyntheticInput, "test")
 		helpers.assert_eq(s.buffer, "hewrld")
 		-- update_preview must be called on the rebuilt buffer.
 		helpers.assert_eq(llm.previews[#llm.previews], "hewrld")
@@ -327,18 +361,57 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		helpers.assert_eq(llm.timer_starts, 0)
 	end)
 
-	helpers.it("survives an emit_action that throws (logs + skips synth chars)", function()
-		local E = helpers.load_with_stubs("modules.keymap.expander")
+	helpers.it("cancels an emitted prefix when the producer raises before commit", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+		local s = make_state("trigger")
+		E.init(s, make_registry({}, {}), make_llm())
+		local buffer_committed = false
+
+		SyntheticInput.enter_callback()
+		local replaced = E.perform_text_replacement(
+			2,
+			function()
+				SyntheticInput.emit_key_strokes("x")
+				error("producer failed after a partial prefix")
+			end,
+			function()
+				buffer_committed = true
+				s.buffer = "claimed-output"
+			end,
+			false, false, "test"
+		)
+		local consume, events = SyntheticInput.leave_callback(replaced)
+
+		helpers.assert_true(not replaced)
+		helpers.assert_true(not consume,
+			"the original physical key must pass through after rollback")
+		helpers.assert_true(events == nil,
+			"no prefix event may escape a cancelled callback transaction")
+		helpers.assert_true(not buffer_committed)
+		helpers.assert_eq(s.buffer, "trigger")
+		helpers.assert_eq(SyntheticInput.stats().active_transactions, 0)
+	end)
+
+	helpers.it("cancels the transaction when emit_action throws before output", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("x")
 		E.init(s, make_registry({}, {}), make_llm())
-		E.perform_text_replacement(
+		local before = SyntheticInput.stats()
+		local replaced = E.perform_text_replacement(
 			0,
 			function() error("boom") end,
 			function() end,
 			false, false, "test"
 		)
-		-- emit failed → no synth chars accumulated.
-		helpers.assert_eq(s.expected_synthetic_chars, "")
+		local after = SyntheticInput.stats()
+		helpers.assert_true(not replaced)
+		helpers.assert_eq(s.buffer, "x")
+		helpers.assert_eq(after.active_transactions, before.active_transactions,
+			"a rejected producer must not strand an active transaction")
+		helpers.assert_eq(after.records, before.records,
+			"a rejected producer must leave no owned-event records behind")
+		helpers.assert_eq(after.pending, before.pending,
+			"a rejected producer must not queue an empty broker batch")
 	end)
 end)
 
@@ -368,13 +441,12 @@ helpers.describe("keymap.expander: the pause gate is not here", function()
 
 	helpers.it("150 non-matching calls leave the buffer exactly where they found it", function()
 		-- The stress claim is worth keeping; what it needed was to read the state
-		-- back. The buffer and the synthetic-echo counters are what the keystroke
-		-- path reads next, so a call that nudged either while returning false
-		-- would corrupt the following expansion — and the old case, a comment plus
-		-- assert_true(true), would have passed straight through it.
-		local E = helpers.load_with_stubs("modules.keymap.expander")
+		-- back and inspect the transaction adapter. A refusal that opened or retained
+		-- a transaction would make the next real action inherit stale output state.
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("ab★")
 		E.init(s, make_registry({}, {}), make_llm())
+		local before = SyntheticInput.stats()
 
 		for i = 1, 150 do
 			helpers.assert_eq(E.try_repeat_feature("x" .. i, false), false,
@@ -382,9 +454,11 @@ helpers.describe("keymap.expander: the pause gate is not here", function()
 		end
 
 		helpers.assert_eq(s.buffer, "ab★", "150 refusals must not have touched the buffer")
-		helpers.assert_eq(s.expected_synthetic_chars, "",
-			"nor armed the synthetic-echo filter — a stale value there makes the driver ignore a "
-				.. "real keystroke it mistakes for its own")
-		helpers.assert_eq(s.expected_synthetic_deletes, 0, "nor queued a backspace nobody asked for")
+		local after = SyntheticInput.stats()
+		helpers.assert_eq(after.generation, before.generation,
+			"a non-match must not allocate a synthetic transaction")
+		helpers.assert_eq(after.records, before.records,
+			"a non-match must not allocate any event provenance")
+		helpers.assert_eq(after.active_transactions, before.active_transactions)
 	end)
 end)

@@ -1,129 +1,158 @@
 --- tests/unit/modules/keymap/test_emit_tokens_multi_paste.lua
 
 --- ==============================================================================
---- MODULE: keymap.utils Multi-Segment Paste Serialisation Unit Tests
+--- MODULE: keymap.utils multi-segment paste serialisation
 --- DESCRIPTION:
---- Regression tests for F-HIGH-1: a replacement containing two paste-worthy
---- text segments (e.g. a signature/address block split by a literal newline)
---- must not issue two hs.pasteboard.setContents + Cmd+V pairs back-to-back in
---- the same call stack. CGEventPost is asynchronous, so the second
---- setContents() call can overwrite the clipboard before the OS has delivered
---- the first Cmd+V, corrupting the first segment.
----
---- HISTORY:
---- F-HIGH-1 audit finding — emit_tokens() had zero synchronization between
---- "clipboard mutated, paste queued" and "target app actually consumed the
---- paste" for the second and later paste-worthy tokens in a single call.
+--- Two clipboard segments must never overwrite each other before the first
+--- Cmd+V is handed off. The real SyntheticInput collector proves that inline
+--- and deferred output retain one generation and monotonic event ordinals.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
 
--- load_with_stubs installs a fresh hs stub (tests/stubs/hs.lua) that includes
--- pasteboard.readAllData/writeAllData and an introspectable __timers list, so
--- we can assert on call ORDER without depending on real OS timing.
-local KU = helpers.load_with_stubs("modules.keymap.utils")
-
---- Builds two paste-worthy (>50 char) text tokens with a key token in between,
---- mirroring how tokens_from_repl() splits a replacement on a literal newline.
---- @return table Token list: [text(paste), key(return), text(paste)].
 local function two_segment_tokens()
 	return {
 		{ kind = "text", value = ("A"):rep(60) },
-		{ kind = "key",  value = "return" },
+		{ kind = "key", value = "return" },
 		{ kind = "text", value = ("B"):rep(60) },
 	}
 end
 
 
+local function load_fixture()
+	for _, name in ipairs({
+		"modules.keymap.utils", "adapters.synthetic_input",
+		"adapters.event_provenance", "adapters.timer_scheduler",
+		"infra.logger", "infra.timings",
+	}) do
+		package.loaded[name] = nil
+	end
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.timings"] = {
+		sec = function(_, key)
+			return key == "clipboard_restore_ms" and 0.15 or 0.08
+		end,
+	}
+
+	local pasted_values = {}
+	hs_stub.pasteboard.setContents = function(value)
+		if value ~= "" then pasted_values[#pasted_values + 1] = value end
+		return true
+	end
+	return {
+		hs = hs_stub,
+		synthetic = require("adapters.synthetic_input"),
+		utils = require("modules.keymap.utils"),
+		pasted_values = pasted_values,
+	}
+end
 
 
+local function emit_in_callback(fixture, tokens)
+	fixture.synthetic.enter_callback()
+	local transaction = fixture.synthetic.begin("test.multi_paste", "replacement")
+	local results = table.pack(fixture.synthetic.with_transaction(transaction, function()
+		return fixture.utils.emit_tokens(tokens)
+	end))
+	fixture.synthetic.seal(transaction)
+	local consume, events = fixture.synthetic.leave_callback(true)
+	return results, consume, events, transaction
+end
 
--- =========================================================================
--- =========================================================================
--- ======= 1/ emit_tokens: second paste is deferred, not synchronous =======
--- =========================================================================
--- =========================================================================
 
-helpers.describe("KU.emit_tokens: multi-segment paste is serialised (F-HIGH-1 fix)", function()
-	-- emit_tokens's deferred pastes are scheduled via hs.timer.doAfter, which
-	-- appends to the SAME shared TIMERS list across every it() in this file
-	-- (load_with_stubs runs once per file, not per test). Without this reset,
-	-- a prior test's un-fired deferred-paste timer leaks into the next test's
-	-- hs.timer.__fire_all() call and inflates its setContents count.
-	helpers.before_each(function()
-		hs.__reset()
-	end)
-
-	helpers.it("issues only ONE setContents call synchronously for two paste-worthy tokens", function()
-		local set_contents_calls = {}
-		hs.pasteboard.setContents = function(v)
-			table.insert(set_contents_calls, v)
-			return true
+local function fire_existing_delay(hs_stub, delay)
+	local initial_count = #hs_stub.timer.__timers
+	local fired = 0
+	for index = 1, initial_count do
+		local timer = hs_stub.timer.__timers[index]
+		if timer.running and math.abs(timer.delay - delay) < 0.000001 then
+			timer:fire()
+			fired = fired + 1
 		end
+	end
+	return fired
+end
 
-		KU.take_paste_ops()
-		KU.emit_tokens(two_segment_tokens())
 
-		-- Only the FIRST segment's setContents must have fired synchronously;
-		-- the second segment must still be waiting on a timer.
-		helpers.assert_eq(#set_contents_calls, 1)
-		helpers.assert_eq(set_contents_calls[1], ("A"):rep(60))
+local function metadata(fixture, event)
+	local property = fixture.hs.eventtap.event.properties.eventSourceUserData
+	return fixture.synthetic.lookup_tag(event:getProperty(property))
+end
+
+
+helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
+	helpers.it("writes only the first clipboard segment synchronously", function()
+		local fixture = load_fixture()
+		emit_in_callback(fixture, two_segment_tokens())
+
+		helpers.assert_eq(#fixture.pasted_values, 1)
+		helpers.assert_eq(fixture.pasted_values[1], ("A"):rep(60))
 	end)
 
-	helpers.it("issues the second setContents only after its scheduled timer fires", function()
-		-- Track only the paste-worthy VALUES written to the clipboard; the
-		-- restore-to-original timers also call setContents("") once their own
-		-- delay elapses, which is unrelated bookkeeping this test must ignore.
-		local pasted_values = {}
-		hs.pasteboard.setContents = function(v)
-			if v ~= "" then table.insert(pasted_values, v) end
-			return true
-		end
+	helpers.it("writes the second segment only after the settle timer fires", function()
+		local fixture = load_fixture()
+		local results = emit_in_callback(fixture, two_segment_tokens())
+		helpers.assert_eq(#fixture.pasted_values, 1)
 
-		KU.take_paste_ops()
-		KU.emit_tokens(two_segment_tokens())
-		helpers.assert_eq(#pasted_values, 1)
-		helpers.assert_eq(pasted_values[1], ("A"):rep(60))
-
-		-- Firing every pending timer delivers the deferred second paste (and
-		-- also the restore timers, which are filtered out above).
-		hs.timer.__fire_all()
-
-		helpers.assert_eq(#pasted_values, 2)
-		helpers.assert_eq(pasted_values[2], ("B"):rep(60))
+		local gap = results[4] / 2
+		helpers.assert_eq(fire_existing_delay(fixture.hs, gap), 2,
+			"the intervening key and second paste must share the first settle deadline")
+		helpers.assert_eq(#fixture.pasted_values, 2)
+		helpers.assert_eq(fixture.pasted_values[2], ("B"):rep(60))
 	end)
 
-	helpers.it("still counts both pastes in take_paste_ops even though the second is deferred", function()
-		KU.take_paste_ops()
-		KU.emit_tokens(two_segment_tokens())
-		local ops = KU.take_paste_ops()
-		-- The paste-ops counter must be incremented synchronously when the paste
-		-- is QUEUED, not only once the deferred timer actually fires, so the
-		-- expander's expected_synthetic_pastes bookkeeping stays accurate the
-		-- moment emit_tokens() returns.
-		helpers.assert_eq(ops, 2)
+	helpers.it("keeps inline and deferred batches in one ordered generation", function()
+		local fixture = load_fixture()
+		local results, _, inline_events = emit_in_callback(fixture, two_segment_tokens())
+		helpers.assert_eq(#inline_events, 2,
+			"only the first Cmd+V pair belongs to the immediate callback handoff")
+		local first = metadata(fixture, inline_events[1])
+
+		local gap = results[4] / 2
+		fire_existing_delay(fixture.hs, gap)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 2,
+			"the deferred key and paste must wait in the centralized FIFO")
+		local fence = fixture.synthetic.claim_physical_fence()
+		helpers.assert_not_nil(fence)
+		helpers.assert_eq(#fence.events, 4)
+		local middle = metadata(fixture, fence.events[1])
+		local last = metadata(fixture, fence.events[3])
+
+		helpers.assert_eq(first.owner, "test.multi_paste")
+		helpers.assert_eq(first.effect, "replacement")
+		helpers.assert_eq(first.generation, middle.generation)
+		helpers.assert_eq(first.generation, last.generation)
+		helpers.assert_eq(first.ordinal, 1)
+		helpers.assert_eq(middle.ordinal, 2)
+		helpers.assert_eq(last.ordinal, 3)
+		helpers.assert_eq(fence.events[1].key, "return")
+		helpers.assert_eq(fence.events[3].key, "v")
 	end)
 
-	helpers.it("returns the correct total character count synchronously despite the deferred paste", function()
-		KU.take_paste_ops()
-		local count = KU.emit_tokens(two_segment_tokens())
-		-- 60 chars + 1 for the {Enter} key token + 60 chars.
-		helpers.assert_eq(count, 121)
+	helpers.it("returns the complete logical size before deferred delivery", function()
+		local fixture = load_fixture()
+		local results = emit_in_callback(fixture, two_segment_tokens())
+		helpers.assert_eq(results[1], 121)
+		helpers.assert_eq(results[2], "\r")
+		helpers.assert_eq(results[3], ("A"):rep(60) .. "\r" .. ("B"):rep(60))
+		helpers.assert_true(results[4] > 0)
 	end)
 
-	helpers.it("single paste-worthy token still pastes synchronously (no unnecessary delay)", function()
-		local set_contents_calls = {}
-		hs.pasteboard.setContents = function(v)
-			table.insert(set_contents_calls, v)
-			return true
-		end
+	helpers.it("keeps a single paste in the callback batch without deferred payload", function()
+		local fixture = load_fixture()
+		local _, _, events = emit_in_callback(fixture, {
+			{ kind = "text", value = ("C"):rep(60) },
+		})
 
-		KU.take_paste_ops()
-		KU.emit_tokens({ { kind = "text", value = ("C"):rep(60) } })
-
-		helpers.assert_eq(#set_contents_calls, 1)
+		helpers.assert_eq(#fixture.pasted_values, 1)
+		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(events[1].key, "v")
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
 	end)
 end)

@@ -512,7 +512,12 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 
 	-- F15_KARABINER_ESCAPE per the lib.keycodes stub above (0x6C) → escape slot → script_quit.
 	local ESCAPE_SENTINEL = 0x6C
-	local function make_event(code) return { getKeyCode = function() return code end } end
+	local function make_event(code)
+		return {
+			getProperty = function() return 0 end,
+			getKeyCode = function() return code end,
+		}
+	end
 
 	helpers.it("a bare physical F15 (no modifier held) does NOT dispatch and passes through", function()
 		dispatched = nil
@@ -534,8 +539,9 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0x40 }  -- right option held (KE-active: rcmd remapped to ropt)
 		local consumed = handler(make_event(ESCAPE_SENTINEL))
-		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
 		helpers.assert_eq(consumed, true, "a genuine sentinel must be consumed")
+		_G.hs.timer.__fire_all()
+		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
 	end)
 
 	-- F-HIGH-22 regression: a prior fix required a genuinely right-hand AltGr hold,
@@ -575,13 +581,15 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }  -- nothing held (consumed)
 		local tagged = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return { ctrl = true, shift = true } end,  -- full two-modifier KE tag
 		}
 		local consumed = handler(tagged)
+		helpers.assert_eq(consumed, true)
+		_G.hs.timer.__fire_all()
 		helpers.assert_eq(dispatched, "script_quit",
 			"a KE-tagged sentinel (ctrl+shift) must dispatch even when no live modifier is detectable")
-		helpers.assert_eq(consumed, true)
 	end)
 
 	helpers.it("physical Ctrl+F15 (ctrl only, no shift) does NOT dispatch (M-6 regression)", function()
@@ -591,6 +599,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }  -- no live AltGr held
 		local ctrl_f15 = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return { ctrl = true } end,  -- only ctrl, no shift
 		}
@@ -604,6 +613,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }
 		local untagged = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return {} end,  -- neither tag nor modifier
 		}

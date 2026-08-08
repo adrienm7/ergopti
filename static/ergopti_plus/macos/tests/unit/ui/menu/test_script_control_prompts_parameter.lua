@@ -164,11 +164,17 @@ helpers.describe("the script-control picker configures before it binds", functio
 				.. "precisely the drift that made the configured link unreadable")
 
 		local sc_src = helpers.read_driver_source("BINDING_PREFIX")
-		local dispatches = 0
-		for _ in sc_src:gmatch("dispatch_action%([^\n]-BINDING_PREFIX") do dispatches = dispatches + 1 end
-		helpers.assert_true(dispatches >= 6,
-			"every dispatch must build its binding from that same constant (found " .. dispatches
-				.. ") — a literal on either side of the store re-opens the drift")
+		local routed = 0
+		for _ in sc_src:gmatch("return finish%(defer_dispatch%(") do routed = routed + 1 end
+		helpers.assert_true(routed >= 6,
+			"every sentinel/fallback branch must route through the shared deferred dispatcher (found "
+				.. routed .. ")")
+		local prefixed = 0
+		for _ in sc_src:gmatch("dispatch_action%(action, M%.BINDING_PREFIX %.%. binding%)") do
+			prefixed = prefixed + 1
+		end
+		helpers.assert_eq(prefixed, 1,
+			"the one shared dispatcher must derive its storage key from exported BINDING_PREFIX")
 
 		local menu_src = helpers.read_driver_source("local function dyn_script_control")
 		helpers.assert_true(menu_src ~= nil, "menu_shortcuts source must be locatable")

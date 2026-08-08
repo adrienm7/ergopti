@@ -12,8 +12,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Source Invariant: the interceptor must NOT contain timer.doAfter(0, ...)
 ---    wrapping do_expand — a source-level check that fails on regression.
---- 2. The doAfter(0.15, ...) that releases _replacing remains valid and must
----    still be present (it is not part of the expansion dispatch path).
+--- 2. The existing doAfter(0.15, ...) re-entry guard remains in this provenance
+---    commit; its physical-input blind interval is removed by HS-M-02 separately.
+--- 3. The fallback keeps deletion, field values, and Tabs inside one explicit
+---    replacement transaction, then seals or cancels it before returning.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -45,63 +47,56 @@ helpers.describe("personal_info interceptor — synchronous do_expand (dynhotstr
 		)
 	end)
 
-	helpers.it("source still defers _replacing release via doAfter(0.15, ...) — that path is valid", function()
+	helpers.it("retains the existing 0.15-second re-entry guard until HS-M-02", function()
 		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function parse_toml_section")
 		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
-		-- The 0.15 s deferred _replacing release is intentional (prevents re-entrant
-		-- expansion on the same keystroke) and must still be present.
 		helpers.assert_true(
 			src:find("doAfter(0.15", 1, true) ~= nil,
-			"the 0.15 s _replacing release timer must still be present in do_expand"
+			"the provenance commit must not silently absorb the separate HS-M-02 behavior change"
 		)
 	end)
 
 end)
 
 
-helpers.describe("personal_info fallback — arm_synthetic must not pass emitted text", function()
-	-- Regression: the fallback injection path called arm_synthetic(n_back, emitted)
-	-- where emitted = table.concat(parts, "\t"). The keymap's arm_synthetic stores
-	-- emitted in expected_synthetic_chars, expecting to see those chars appear in the
-	-- key stream. But the fallback fires tab-separated values as individual keyStrokes
-	-- with real keyStroke("tab") events — the keymap sees a navigation-tab (which
-	-- resets the buffer), not a literal \t char. The expected_synthetic_chars counter
-	-- was then never satisfied, permanently desyncing the buffer state.
-	-- Fix: the fallback calls arm_synthetic(n_back, "") — registering only the delete
-	-- count — and relies on suppress_rescan() to prevent spurious hotstring matches.
+helpers.describe("personal_info fallback — one explicit synthetic transaction", function()
+	-- The fallback is not allowed to create independent implicit actions for its
+	-- deletes, values, and Tabs. One transaction generation owns the whole output,
+	-- and closing it prevents a later action from inheriting private output; a
+	-- partially built transaction is cancelled rather than handed off.
 
-	helpers.it("fallback path calls arm_synthetic with empty string, not emitted", function()
+	helpers.it("opens, scopes, and closes the fallback transaction in order", function()
 		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function parse_toml_section")
 		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
-		-- Verify the fallback does NOT pass emitted to arm_synthetic
-		helpers.assert_true(
-			src:find('arm_synthetic(n_back, emitted)', 1, true) == nil,
-			"fallback must not pass emitted to arm_synthetic — tab chars in emitted desync the buffer"
-		)
-		-- And does pass an empty string instead
-		helpers.assert_true(
-			src:find('arm_synthetic(n_back, "")', 1, true) ~= nil,
-			"fallback must call arm_synthetic(n_back, \"\") so expected_synthetic_chars stays unset"
-		)
+		local arm_pos = src:find("local transaction = _keymap.arm_synthetic", 1, true)
+		local scope_pos = src:find("pcall(_keymap.with_synthetic_transaction, transaction", 1, true)
+		local select_pos = src:find(
+			"local close = ok_emit and _keymap.finish_synthetic or _keymap.cancel_synthetic", 1, true)
+		local close_pos = src:find("pcall(close, transaction)", select_pos or 1, true)
+		helpers.assert_true(arm_pos ~= nil and scope_pos ~= nil
+			and select_pos ~= nil and close_pos ~= nil,
+			"fallback must expose an explicit begin/scope/seal-or-cancel lifecycle")
+		helpers.assert_true(arm_pos < scope_pos and scope_pos < select_pos and select_pos < close_pos,
+			"the fallback must close only after every delete, field value, and Tab is attempted")
 	end)
 
-	helpers.it("fallback path calls suppress_rescan after arm_synthetic", function()
+	helpers.it("fallback suppresses matching only after its transaction is opened", function()
 		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function parse_toml_section")
 		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
-		helpers.assert_true(
-			src:find("suppress_rescan", 1, true) ~= nil,
-			"fallback must call suppress_rescan() to prevent hotstring re-triggering after injection"
-		)
+		local arm_pos = src:find("local transaction = _keymap.arm_synthetic", 1, true)
+		local suppress_pos = src:find("_keymap.suppress_rescan()", arm_pos or 1, true)
+		helpers.assert_true(arm_pos ~= nil and suppress_pos ~= nil and suppress_pos > arm_pos,
+			"fallback must not alter matching state unless its replacement transaction exists")
 	end)
 
 end)

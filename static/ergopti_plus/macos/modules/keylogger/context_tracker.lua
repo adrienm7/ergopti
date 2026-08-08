@@ -125,10 +125,6 @@ local function update_secure_field_state(element)
 			_state.buffer_events = {}
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
-			-- Also drop the synthetic queue: a suppressed expansion in a secure field
-			-- leaves stale synth_queue entries that would mis-tag the first real
-			-- keystroke on return as synthetic (C6 made deterministic, not drain-timed)
-			_state.synth_queue   = {}
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")
@@ -475,10 +471,6 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		end
 	end
 
-	-- Any app activation is a context boundary: clear the synthetic queue so a
-	-- synthetic echo suppressed in the previous app (disabled/private/secure)
-	-- cannot mis-tag the first keystroke in the new app as synthetic (C6)
-	_state.synth_queue = {}
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
 	_state.active_app_bundle = new_bundle
@@ -513,7 +505,7 @@ end
 ---
 --- app_watcher_cb returns early while paused — correctly, since « pause = tout
 --- éteint » — but that early return also skips the pure state synchronisation that
---- follows its single write: active_app_*, the synthetic queue, is_secure_field and
+--- follows its single write: active_app_*, synthetic action accounting, is_secure_field and
 --- the AX observer's target PID. Nothing re-syncs them afterwards, because
 --- resume_all() never touched this module and no fresh activation event fires when
 --- the user resumes in the app they already switched to while paused. The cached
@@ -548,9 +540,6 @@ function M.resync_context()
 
 	local now = hs.timer.absoluteTime() / 1000000
 
-	-- A resume is a context boundary exactly like an app activation: a synthetic
-	-- echo suppressed before the pause must not mis-tag the first key after it.
-	_state.synth_queue       = {}
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
 	pcall(function() _state.active_app_bundle = app:bundleID() end)

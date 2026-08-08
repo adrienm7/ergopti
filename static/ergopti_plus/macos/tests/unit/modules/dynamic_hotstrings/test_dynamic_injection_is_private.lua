@@ -198,9 +198,6 @@ helpers.describe("expander: is_private is forwarded to the keylogger, not droppe
 		Expander.init({
 			buffer                     = "abc",
 			magic_key                  = "\xe2\x98\x85",
-			expected_synthetic_deletes = 0,
-			expected_synthetic_chars   = "",
-			expected_synthetic_pastes  = 0,
 			groups                     = {},
 			current_group              = "t",
 			start_is_word_boundary     = true,

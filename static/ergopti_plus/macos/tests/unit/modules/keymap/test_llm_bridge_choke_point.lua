@@ -4,13 +4,13 @@
 --- MODULE: llm_bridge injection choke-point structural regression test
 --- DESCRIPTION:
 --- Structural assertions that encode the F-INFO-1 architectural invariant:
---- all synthetic-event bookkeeping inside apply_prediction() MUST route through
---- expander.perform_text_replacement(), not inline updates to expected_synthetic_*
---- counters.
+--- every prediction replacement MUST route through
+--- expander.perform_text_replacement(). The legacy tracker names below remain
+--- negative guards: none may be reintroduced as a second provenance path.
 ---
 --- RATIONALE:
---- The single-choke-point rule means keylogger synth_queue and keymap counters
---- are always updated together atomically. Inline counter mutations inside
+--- The single-choke-point rule keeps exact Quartz tags, logical logging and
+--- engine state in one transaction. Legacy inline tracker mutations inside
 --- apply_prediction are the regression signature — detect them here before they
 --- reach a live keyboard.
 --- ==============================================================================

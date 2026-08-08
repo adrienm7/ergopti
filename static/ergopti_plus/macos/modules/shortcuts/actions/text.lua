@@ -18,11 +18,11 @@ local M = {}
 
 local hs         = hs
 local timer      = hs.timer
-local eventtap   = hs.eventtap
 local pasteboard = hs.pasteboard
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local Timings    = require("infra.timings")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "shortcuts.actions.text"
 
@@ -199,6 +199,35 @@ local TRANSFORM_LOCK_TIMEOUT_SEC = 2.0
 -- barely started.
 local _transform_generation = 0
 
+--- Re-selects the preceding characters as one ordered synthetic action.
+--- Building one batch avoids one broker trigger/action epoch per cursor key.
+--- Preserve the original Left then Shift+Right sequence: besides selecting the
+--- same text, it leaves the active end of the selection on the right so a
+--- repeated transform replaces the same range in the same direction.
+--- @param count integer Number of preceding characters to select.
+--- @return boolean dispatched
+local function reselect_previous_text(count)
+	if type(count) ~= "number" or count < 1 then return true end
+	local tx = nil
+	local ok, err = xpcall(function()
+		tx = SyntheticInput.begin("shortcuts.text.reselect", "action")
+		local batch = SyntheticInput.begin_batch(tx)
+		for _ = 1, count do
+			SyntheticInput.keyStroke(batch, {}, "left")
+		end
+		for _ = 1, count do
+			SyntheticInput.keyStroke(batch, { "shift" }, "right")
+		end
+		assert(SyntheticInput.dispatch(batch),
+			"synthetic reselection batch could not be dispatched")
+		SyntheticInput.seal(tx)
+	end, debug.traceback)
+	if ok then return true end
+	if tx then pcall(SyntheticInput.cancel, tx) end
+	Logger.error(LOG, "Text reselection could not be dispatched - %s.", tostring(err))
+	return false
+end
+
 local function do_transform(transform_func)
 	if _transform_in_flight then
 		Logger.debug(LOG, "Text transform ignored — a previous one still owns the clipboard.")
@@ -228,7 +257,7 @@ local function do_transform(transform_func)
 	Logger.trace(LOG, "Text transformation started…")
 	local prior = pasteboard.getContents()
 	pasteboard.clearContents()
-	eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 	timer.doAfter(COPY_SETTLE_SEC, function()
 		local sel = pasteboard.getContents()
@@ -251,7 +280,7 @@ local function do_transform(transform_func)
 		pcall(pasteboard.setContents, transformed)
 
 		timer.doAfter(PASTE_SETTLE_SEC, function()
-			eventtap.keyStroke({"cmd"}, "v", 0.02)
+			SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
 
 			timer.doAfter(RESELECT_DELAY_SEC, function()
 				-- Use utf8.len for accuracy; fall back to byte length
@@ -260,9 +289,7 @@ local function do_transform(transform_func)
 				if n > MAX_RESELECT_CHARS then n = MAX_RESELECT_CHARS end
 
 				if n > 0 then
-					-- Move the caret to the start of the pasted block, then re-select
-					for _ = 1, n do eventtap.keyStroke({},        "left",  0.001) end
-					for _ = 1, n do eventtap.keyStroke({"shift"}, "right", 0.001) end
+					reselect_previous_text(n)
 				end
 
 				timer.doAfter(RESTORE_DELAY_SEC, function()
@@ -302,7 +329,7 @@ function M.paste_as_plain_text()
 	end)
 
 	timer.doAfter(PASTE_SETTLE_SEC, function()
-		eventtap.keyStroke({"cmd"}, "v", 0.02)
+		SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
 		timer.doAfter(0.25, function()
 			pcall(function()
 				if prior and prior ~= "" then
@@ -317,17 +344,17 @@ end
 
 --- Selects the entire current line (Cmd+Left, then Cmd+Shift+Right).
 function M.select_line()
-	eventtap.keyStroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
-	eventtap.keyStroke({"cmd", "shift"}, "right", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"cmd", "shift"}, "right", KEYSTROKE_NO_DELAY_US)
 end
 
 --- Wraps the current line in parentheses.
 function M.surround_with_parens()
-	eventtap.keyStroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
-	hs.eventtap.keyStrokes("(")
+	SyntheticInput.emit_key_stroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_strokes("(")
 	timer.doAfter(0.04, function()
-		eventtap.keyStroke({"cmd"}, "right", KEYSTROKE_NO_DELAY_US)
-		hs.eventtap.keyStrokes(")")
+		SyntheticInput.emit_key_stroke({"cmd"}, "right", KEYSTROKE_NO_DELAY_US)
+		SyntheticInput.emit_key_strokes(")")
 	end)
 end
 
@@ -350,8 +377,8 @@ end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
 function M.select_word()
-	eventtap.keyStroke({"alt"}, "right", KEYSTROKE_NO_DELAY_US)
-	eventtap.keyStroke({"alt", "shift"}, "left", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"alt"}, "right", KEYSTROKE_NO_DELAY_US)
+	SyntheticInput.emit_key_stroke({"alt", "shift"}, "left", KEYSTROKE_NO_DELAY_US)
 end
 
 --- Returns the AXSelectedText of the focused UI element, or nil if unavailable.
@@ -434,7 +461,7 @@ function M.wrap_selection(sel, left, right)
 	local prior = pasteboard.getContents()
 	pcall(pasteboard.setContents, left .. sel .. right)
 	timer.doAfter(0, function()
-		eventtap.keyStroke({"cmd"}, "v", 0.02)
+		SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
 		timer.doAfter(0.25, function()
 			pcall(function()
 				if prior and prior ~= "" then pasteboard.setContents(prior)
@@ -461,7 +488,7 @@ function M.surround_selection_if_selected(symbol, left, right)
 		M.wrap_selection(sel, left, right)
 	else
 		-- No selection — type the raw symbol so the key behaves normally
-		hs.eventtap.keyStrokes(symbol)
+		SyntheticInput.emit_key_strokes(symbol)
 	end
 end
 

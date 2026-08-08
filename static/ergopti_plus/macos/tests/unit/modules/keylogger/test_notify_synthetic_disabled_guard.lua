@@ -1,52 +1,46 @@
 --- tests/unit/modules/keylogger/test_notify_synthetic_disabled_guard.lua
 
---- ==============================================================================
---- MODULE: Regression — notify_synthetic gated + synth_queue cleared on enable (F-MED-3)
---- DESCRIPTION:
---- expander.perform_text_replacement calls keylogger.notify_synthetic on EVERY
---- expansion, unconditionally. notify_synthetic had no is_enabled guard, so with
---- the keylogger OFF (a supported opt-in default) every hotstring expansion still
---- pushed into CoreState.synth_queue / recent_typing_eff — and because handle_key
---- returns at its own is_enabled guard, the SYNTH_IDLE_DRAIN self-heal never ran,
---- so the queue grew unbounded. When the user later enabled the keylogger, M.start
---- did NOT clear synth_queue, so the first real keystrokes were matched against the
---- stale head and mis-tagged synthetic (dropped from WPM/n-grams) until a >500 ms gap.
----
---- Fix: gate notify_synthetic on CoreState.is_enabled (like sibling log_hotstring /
---- log_llm), and clear the synthetic state in M.start. CoreState is a module local
---- (not exposed), so the root cause is pinned at source level: the guard must
---- precede the first synth_queue insert, and M.start must reset synth_queue.
---- ==============================================================================
+--- Regression: an opt-in keylogger that is off must not accumulate logical
+--- expansion telemetry. Physical echo ownership is a separate event-tag concern:
+--- an old tagged echo can never make a later, identical untagged key synthetic.
 
 local helpers = require("tests.helpers")
+local fixture_module = require("tests.support.keylogger_provenance_fixture")
 
-helpers.describe("keylogger: notify_synthetic gated on is_enabled + start clears the queue (F-MED-3)", function()
-	local function read_src()
-		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
-		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
-		return src
-	end
+helpers.describe("keylogger: disabled synthetic telemetry and exact ownership", function()
+	helpers.it("records no logical text, WPM sample, source, or flush while disabled", function()
+		local fixture = fixture_module.load_keylogger()
+		local stats_before = fixture.synthetic_input.stats()
 
-	helpers.it("notify_synthetic bails on is_enabled BEFORE touching synth_queue", function()
-		local src = read_src()
-		local body = src:match("function M.notify_synthetic.-\nend")
-		helpers.assert_true(body ~= nil, "notify_synthetic body must be locatable")
-		local guard_pos  = body:find("if not CoreState.is_enabled then return end", 1, true)
-		local insert_pos = body:find("table.insert(CoreState.synth_queue", 1, true)
-		helpers.assert_true(guard_pos ~= nil, "notify_synthetic must guard on `not CoreState.is_enabled`")
-		helpers.assert_true(insert_pos ~= nil, "notify_synthetic still inserts into synth_queue")
-		helpers.assert_true(guard_pos < insert_pos, "the is_enabled guard must precede the first synth_queue insert")
+		fixture.keylogger.notify_synthetic("disabled expansion", "hotstring", 2,
+			"personal", "disabled expansion", false)
+
+		helpers.assert_eq(#fixture.state.buffer_events, 0)
+		helpers.assert_eq(#fixture.state.rich_chunks, 0)
+		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
+		helpers.assert_eq(#fixture.flushes, 0)
+		helpers.assert_eq(fixture.keylogger.get_live_stats().source, "none")
+		local stats_after = fixture.synthetic_input.stats()
+		helpers.assert_eq(stats_after.records, stats_before.records,
+			"logical telemetry must not fabricate physical ownership records")
 	end)
 
-	helpers.it("M.start clears synth_queue right after enabling", function()
-		local src = read_src()
-		local enable_pos = src:find("CoreState.is_enabled%s*=%s*true")
-		helpers.assert_true(enable_pos ~= nil, "M.start must set CoreState.is_enabled = true")
-		local region = src:sub(enable_pos, enable_pos + 600)
-		helpers.assert_true(region:find("CoreState.synth_queue%s*=%s*{}") ~= nil,
-			"M.start must reset CoreState.synth_queue right after enabling (so a stale queue cannot poison the first keystrokes)")
+	helpers.it("an earlier tagged echo cannot claim the first physical key after enable", function()
+		local fixture = fixture_module.load_keylogger()
+		local tagged = fixture_module.tagged_key(
+			fixture.synthetic_input, "test.disabled-expansion", "replacement", "x")
+
+		fixture.keylogger.notify_synthetic("x", "hotstring", 0, nil, "x", false)
+		fixture.state.is_enabled = true
+
+		local physical = fixture_module.physical_key(fixture.hs, "x")
+		helpers.assert_nil(fixture.provenance.classify(
+			physical, "test.disabled-expansion.physical"),
+			"ownership must be read from this event, never inferred from older output")
+		local metadata = fixture.provenance.classify(
+			tagged, "test.disabled-expansion.tagged")
+		helpers.assert_not_nil(metadata)
+		helpers.assert_eq(metadata.owner, "test.disabled-expansion")
+		helpers.assert_eq(metadata.effect, "replacement")
 	end)
 end)

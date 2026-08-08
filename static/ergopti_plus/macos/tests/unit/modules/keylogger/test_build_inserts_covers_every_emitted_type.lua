@@ -116,11 +116,7 @@ local function load_real_keylogger()
 	package.loaded["modules.keylogger.watchers"]    = nil
 
 	local KL = helpers.load_with_stubs("modules.keylogger.init", {
-		eventtap = {
-			new = function() return { start = function() end, stop = function() end, isEnabled = function() return true end } end,
-			event = { types = { keyDown = 10, keyUp = 11, flagsChanged = 12, leftMouseDown = 1, rightMouseDown = 2, scrollWheel = 3 } },
-			checkKeyboardModifiers = function() return {} end,
-		},
+		processInfo = { processID = 7001 },
 		application = {
 			watcher = { new = function() return { start = function() end, stop = function() end } end, activated = 1 },
 			frontmostApplication = function()
@@ -133,7 +129,17 @@ local function load_real_keylogger()
 		caffeinate = { watcher = { new = function() return { start = function() end, stop = function() end } end } },
 		timer = {
 			doAfter = function(_d, fn) fn() end,
+			doEvery = function() return { start = function() end, stop = function() end } end,
 			new = function() return { start = function() end, stop = function() end } end,
+			delayed = {
+				new = function(_delay, fn)
+					return {
+						start = function(self) fn(); return self end,
+						stop = function(self) return self end,
+					}
+				end,
+			},
+			secondsSinceEpoch = function() return 1 end,
 			absoluteTime = (function()
 				local STEP_NS = 80 * 1000000
 				local t = 0

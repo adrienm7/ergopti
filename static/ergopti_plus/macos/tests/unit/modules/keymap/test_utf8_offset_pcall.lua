@@ -154,8 +154,6 @@ local function load_expander(start_is_word_boundary)
 	E.init({
 		buffer                      = "",
 		start_is_word_boundary      = start_is_word_boundary,
-		expected_synthetic_chars    = "",
-		expected_synthetic_deletes  = 0,
 		suppress_rescan             = function() end,
 		suppress_rescan_keep_buffer = function() end,
 	}, { is_terminator = function() return false end }, {

@@ -21,21 +21,6 @@
 local helpers = require("tests.helpers")
 
 helpers.describe("wpm_widget: _wpm_darken_hex survives malformed hex input (F-MED-25)", function()
-	--- Loads wpm_widget and returns its module table plus the private
-	--- _wpm_darken_hex function exposed for testing.
-	local function load_widget()
-		return helpers.load_with_stubs("ui.wpm.wpm_widget", {
-			timer = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
-				absoluteTime = function() return 0 end,
-			},
-			eventtap = {
-				new = function(_types, _cb) return { start = function() end, stop = function() end } end,
-				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
-			},
-		})
-	end
-
 	-- _wpm_darken_hex is a module-local, not part of the public M table. Read
 	-- the source and eval just that function in isolation so the test exercises
 	-- the exact production implementation without needing to expose it.
@@ -55,7 +40,6 @@ helpers.describe("wpm_widget: _wpm_darken_hex survives malformed hex input (F-ME
 	end
 
 	helpers.it("_wpm_darken_hex is source-guarded against non-6-char hex bodies", function()
-		load_widget()
 		local darken = extract_darken_hex_fn()
 
 		local ok1, result1 = pcall(darken, "#fff", 0.5, "#112233")
@@ -72,7 +56,6 @@ helpers.describe("wpm_widget: _wpm_darken_hex survives malformed hex input (F-ME
 	end)
 
 	helpers.it("_wpm_darken_hex still darkens a well-formed hex input", function()
-		load_widget()
 		local darken = extract_darken_hex_fn()
 
 		local ok, result = pcall(darken, "#8040c0", 0.5, "#000000")

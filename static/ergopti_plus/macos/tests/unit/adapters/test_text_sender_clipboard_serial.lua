@@ -23,6 +23,9 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 			write   = function(_) end,
 			restore = function(v) restores[#restores + 1] = v end,
 		}
+		package.loaded["adapters.synthetic_input"] = {
+			emit_key_stroke = function() return true end,
+		}
 
 		local TS = helpers.load_with_stubs("adapters.text_sender", {
 			eventtap = { keyStroke = function() end, keyStrokes = function() end },
@@ -42,6 +45,7 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		helpers.assert_eq(restores[#restores], "ORIGINAL")
 
 		package.loaded["adapters.clipboard"]   = nil
+		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.text_sender"] = nil
 	end)
 end)

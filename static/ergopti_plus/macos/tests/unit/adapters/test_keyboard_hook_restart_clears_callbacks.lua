@@ -227,16 +227,19 @@ helpers.describe("KeyboardHook raw event mode", function()
 		})
 
 		local received = nil
+		local returned_events = { { tag = "older-action" } }
 		M.start({
 			eventTypes = { 42 },
 			onEvent = function(event)
 				received = event
-				return true
+				return false, returned_events
 			end,
 		})
 
-		local consumed = fire_key(42)
+		local consumed, events = fire_key(42)
 		helpers.assert_true(received ~= nil, "raw callback must receive the native event")
-		helpers.assert_true(consumed == true, "raw callback must retain its consume decision")
+		helpers.assert_true(consumed == false, "raw callback must retain its consume decision")
+		helpers.assert_true(events == returned_events,
+			"raw callback must preserve the ordered event table returned to Hammerspoon")
 	end)
 end)

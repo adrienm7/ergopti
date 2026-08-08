@@ -7,10 +7,9 @@
 ---
 --- 1. `screen_len = trig_len - char_offset` went negative when the trigger was
 ---    shorter than the typed event's codepoint count — a composed character
----    arriving as one event. The negative flowed into expected_synthetic_deletes,
----    which then read as "fewer than zero outstanding": the NEXT expansion's real
----    deletes were mis-accounted and its echoes leaked into the buffer as human
----    keystrokes.
+---    arriving as one event. A negative deletion request cannot describe a valid
+---    replacement transaction and would make the logical buffer commit disagree
+---    with the text operation built for the target application.
 --- 2. A final_result expansion suppressed the engine for a bare literal 1.0 s,
 ---    double the module's own named default, with the relationship invisible.
 --- ==============================================================================
@@ -24,9 +23,8 @@ helpers.describe("expander: the erase count is sane and the suppression window i
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the expander source must be readable or this asserts nothing")
 		helpers.assert_true(src:find("if screen_len < 0", 1, true) ~= nil,
-			"a trigger shorter than the typed event makes this negative, and the value is armed "
-			.. "straight into expected_synthetic_deletes — where a negative count silently "
-			.. "corrupts the accounting of the NEXT expansion")
+			"a trigger shorter than the typed event must be clamped before constructing "
+			.. "the deletion events and committing the logical replacement")
 	end)
 
 	helpers.it("the final-result suppression window is a named constant, not a literal", function()

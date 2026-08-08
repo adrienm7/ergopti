@@ -24,6 +24,7 @@ local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 
 local SharedEngine = require("dynamic_hotstrings")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -102,18 +103,20 @@ local function interceptor(event, km_buffer, ctx)
 
 	Logger.debug(LOG, "Injecting dynamic rule for suffix '%s'…", rule.suffix)
 
-	-- Arm the keymap synthetic counters BEFORE deferring injection so that the
+	-- inject_dynamic routes the whole replacement through one immutable-tagged
+	-- keymap transaction; the fallback below must preserve that same ownership.
 	-- We do NOT call keylogger.log_hotstring here: the result may contain private
 	-- data (phone number, SSN, IBAN) whose plaintext must never reach the log.
 	_is_injecting = true
 
 	local ok, err = pcall(function()
 		if _km and type(_km.inject_dynamic) == "function" then
-			_km.inject_dynamic(n_back, result, function()
+			local injected = _km.inject_dynamic(n_back, result, function()
 				if km_utils and type(km_utils.emit_text) == "function" then
 					return km_utils.emit_text(result)
 				else
-					hs.eventtap.keyStrokes(result)
+					assert(SyntheticInput.emit_key_strokes(result),
+						"dynamic fallback text could not be dispatched")
 					return #result, result
 				end
 			-- is_private = true for the same reason the comment above declines
@@ -124,25 +127,47 @@ local function interceptor(event, km_buffer, ctx)
 			-- confidentiality metadata and default-retain is the only shape in
 			-- which a future rule cannot leak by omission.
 			end, "dynamic", true)
+			assert(injected == true,
+				"keymap rejected the dynamic replacement transaction")
 		else
-			-- Fallback if inject_dynamic is not available
-			if _km then
-				if type(_km.suppress_rescan) == "function" then _km.suppress_rescan() end
-				if type(_km.arm_synthetic) == "function" then _km.arm_synthetic(n_back, result) end
+			-- The fallback still needs the keymap-owned replacement transaction;
+			-- independent action tags would return to keymap as user input.
+			if not _km or type(_km.arm_synthetic) ~= "function"
+					or type(_km.with_synthetic_transaction) ~= "function"
+					or type(_km.finish_synthetic) ~= "function"
+					or type(_km.cancel_synthetic) ~= "function" then
+				error("dynamic fallback requires the keymap synthetic-transaction API", 0)
 			end
+			if type(_km.suppress_rescan) == "function" then _km.suppress_rescan() end
+			local transaction = _km.arm_synthetic(n_back, result)
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path above — this branch
 				-- reaches the identical sink, so it needs the identical flag.
 				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
 			end
-			for _ = 1, n_back do
-				hs.eventtap.keyStroke({}, "delete", 0)
+			local ok_emit, emit_err = pcall(_km.with_synthetic_transaction, transaction, function()
+				for _ = 1, n_back do
+					assert(SyntheticInput.emit_key_stroke({}, "delete", 0),
+						"dynamic fallback Backspace could not be dispatched")
+				end
+				if km_utils and type(km_utils.emit_text) == "function" then
+					km_utils.emit_text(result)
+				else
+					assert(SyntheticInput.emit_key_strokes(result),
+						"dynamic fallback text could not be dispatched")
+				end
+			end)
+			-- A throwing emitter may already have built a Backspace prefix in the
+			-- ambient callback collector. Seal only a complete producer; cancellation
+			-- removes that prefix so passing the physical trigger through cannot also
+			-- erase user text.
+			local close = ok_emit and _km.finish_synthetic or _km.cancel_synthetic
+			local ok_close, close_err = pcall(close, transaction)
+			if not ok_close then
+				error(string.format("dynamic fallback transaction close failed: %s (emission: %s)",
+					tostring(close_err), ok_emit and "ok" or tostring(emit_err)), 0)
 			end
-			if km_utils and type(km_utils.emit_text) == "function" then
-				km_utils.emit_text(result)
-			else
-				hs.eventtap.keyStrokes(result)
-			end
+			if not ok_emit then error(emit_err, 0) end
 		end
 	end)
 
@@ -157,7 +182,7 @@ local function interceptor(event, km_buffer, ctx)
 		Logger.info(LOG, "Dynamic rule injection completed.")
 	end
 
-	return "consume"
+	return ok and "consume" or nil
 end
 
 

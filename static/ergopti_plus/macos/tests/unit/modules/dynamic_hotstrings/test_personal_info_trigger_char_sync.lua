@@ -46,7 +46,7 @@ local function make_fake_keymap(custom_trigger)
 		set_group_context         = function() end,
 		sort_mappings             = function() end,
 		add                       = function() end,
-		inject_dynamic            = function() end,
+		inject_dynamic            = function() return true end,
 		register_interceptor      = function(fn) interceptors[#interceptors + 1] = fn end,
 		register_preview_provider = function() end,
 		interceptors              = interceptors,

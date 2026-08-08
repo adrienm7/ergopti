@@ -24,6 +24,8 @@ local M = {}
 local hs      = hs
 local Logger  = require("infra.logger")
 local EventTapGuard = require("adapters.event_tap_guard")
+local EventProvenance = require("adapters.event_provenance")
+local SyntheticInput = require("adapters.synthetic_input")
 local Timings = require("infra.timings")
 local LOG     = "gestures.click"
 
@@ -59,9 +61,45 @@ local function start_click_key_watcher()
 	if click_key_watcher then return end
 	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(e)
 		if EventTapGuard.handle_disabled(e, click_key_watcher, "gestures.click_key") then return false end
-		-- Tear down all state synchronously first.
+		local provenance, status, fence = EventProvenance.classify_with_fence(
+			e, "gestures.click_key")
+		local ordered_events = {}
+		for _, older in ipairs((fence and fence.events) or {}) do
+			ordered_events[#ordered_events + 1] = older
+		end
+		if provenance or status == EventProvenance.STATUS_UNREADABLE then
+			return false, (#ordered_events > 0 and ordered_events or nil)
+		end
+		-- Snapshot the intended release, then construct every mouseUp before
+		-- tearing down a single tap/state bit. A native constructor failure must
+		-- leave the hold recoverable instead of stranding the application in drag.
 		local releaseLeft  = leftClickHeld
 		local releaseRight = rightClickHeld
+		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
+		local release_events = {}
+		local construction_error = nil
+		if not ok_pos or type(pos) ~= "table" then
+			construction_error = tostring(pos or "mouse position unavailable")
+		end
+		local function build_release(event_type)
+			if construction_error then return end
+			local ok_event, mouse_up = pcall(hs.eventtap.event.newMouseEvent, event_type, pos)
+			if not ok_event or mouse_up == nil then
+				construction_error = tostring(mouse_up or "newMouseEvent returned nil")
+				return
+			end
+			release_events[#release_events + 1] = mouse_up
+		end
+		if releaseLeft then build_release(hs.eventtap.event.types.leftMouseUp) end
+		if releaseRight then build_release(hs.eventtap.event.types.rightMouseUp) end
+		if construction_error then
+			SyntheticInput.defer_after_callback("click-hold release diagnostic", function()
+				Logger.error(LOG, "Could not construct click-hold mouseUp: %s.",
+					construction_error)
+			end)
+			return false, (#ordered_events > 0 and ordered_events or nil)
+		end
+
 		local tapL = leftMouseTap
 		local tapR = rightMouseTap
 		if tapL then pcall(function() tapL:stop() end); leftMouseTap = nil end
@@ -70,20 +108,16 @@ local function start_click_key_watcher()
 		rightClickHeld = false
 		pcall(function() click_key_watcher:stop() end)
 		click_key_watcher = nil
-		-- Post the mouseUp first so the app exits drag/click mode, then re-post
-		-- the original keyDown. Swallow the original so the order is guaranteed:
-		-- mouseUp → keyDown (the key watcher is already gone, no infinite loop).
-		local pos = hs.mouse.absolutePosition()
-		if releaseLeft then
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
-			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
+		-- Return mouseUp before the original key. Hammerspoon posts returned events
+		-- first, so no synchronous event:post() or duplicate raw key is needed.
+		for _, mouse_up in ipairs(release_events) do
+			ordered_events[#ordered_events + 1] = mouse_up
 		end
-		if releaseRight then
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
-			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
-		end
-		pcall(function() e:post() end)
-		return true
+		SyntheticInput.defer_after_callback("click-hold release log", function()
+			if releaseLeft then Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.") end
+			if releaseRight then Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.") end
+		end)
+		return false, (#ordered_events > 0 and ordered_events or nil)
 	end)
 	pcall(function() click_key_watcher:start() end)
 end

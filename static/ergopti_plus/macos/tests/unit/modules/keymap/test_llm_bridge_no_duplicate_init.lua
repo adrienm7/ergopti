@@ -199,9 +199,6 @@ local function make_state(sentinel)
 		preview_providers = {},
 		groups           = {},
 		DELAYS           = {},
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
-		last_synthetic_arm_time    = 0,
 		is_repeat_feature_enabled  = function() return false end,
 	}
 	local defaults = {

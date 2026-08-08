@@ -5,22 +5,22 @@
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TextSender port contract defined in
 --- static/ergopti_plus/_shared/core/ports/TextSender.spec.js. Bridges domain-level text
---- insertion requests to hs.eventtap.keyStroke, the Clipboard port adapter, and
---- hs.eventtap.keyStrokes without coupling domain modules to any hs API.
+--- insertion requests to the synthetic-input and Clipboard port adapters
+--- without coupling domain modules to any hs event-construction API.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Auto mode: when opts.mode == "auto" (default), payloads longer than
 ---    CLIPBOARD_THRESHOLD characters use the clipboard path (paste) to avoid
 ---    the overhead of simulating keystrokes for large insertions.
---- 2. Direct mode: hs.eventtap.keyStrokes drives character-by-character
+--- 2. Direct mode: the tagged synthetic-input adapter drives character-by-character
 ---    injection — required when clipboard is inaccessible (e.g., password fields).
 --- 3. Clipboard port: the clipboard path delegates to the Clipboard adapter
 ---    (adapters/clipboard.lua) via save/write/restore instead of touching
 ---    hs.pasteboard directly — keeps the interaction testable and centralises
 ---    all clipboard I/O in a single adapter.
---- 4. Callback semantics: the callback is always invoked synchronously (HS is
----    event-driven but text injection is blocking at the macOS layer), matching
----    the contract's "called inline" note for sync adapters.
+--- 4. Callback semantics: the callback is always invoked synchronously after the
+---    tagged request is accepted for dispatch, matching the contract's "called
+---    inline" note even though Quartz delivery itself remains asynchronous.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +29,7 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "adapters.text_sender"
 
@@ -85,7 +86,7 @@ local _paste_pending_timer  = nil
 function M.send(text, opts, callback)
 	if type(text) ~= "string" then
 		Logger.error(LOG, "M.send() requires a string, got %s — ignoring call.", type(text))
-		return
+		return false
 	end
 	local options = type(opts) == "table" and opts or {}
 	local mode    = type(options.mode) == "string" and options.mode or "auto"
@@ -116,7 +117,9 @@ function M.send(text, opts, callback)
 			-- noticed the clipboard had been eaten.
 			local ok_write = pcall(function()
 				Clipboard.write(text)
-				hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
+				assert(SyntheticInput.emit_key_stroke(
+					PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US),
+					"synthetic paste keystroke could not be dispatched")
 			end)
 			if not ok_write then
 				Clipboard.restore(saved)
@@ -131,7 +134,10 @@ function M.send(text, opts, callback)
 			end)
 		end)
 	else
-		ok, err = pcall(hs.eventtap.keyStrokes, text)
+		ok, err = pcall(function()
+			assert(SyntheticInput.emit_key_strokes(text),
+				"synthetic text could not be dispatched")
+		end)
 	end
 
 	if not ok then
@@ -141,37 +147,46 @@ function M.send(text, opts, callback)
 	if type(callback) == "function" then
 		pcall(callback)
 	end
+	return ok == true
 end
 
 --- Emits count Backspace keystrokes synchronously.
 --- @param count integer Number of Backspace keystrokes to emit.
---- @param delay number|nil Hammerspoon inter-key delay in seconds (defaults to 0).
+--- @param delay number|nil Legacy Hammerspoon delay in microseconds (defaults to 0;
+---   the provenance adapter accepts only the native no-delay range [0, 1)).
 function M.eraseChars(count, ...)
-	if type(count) ~= "number" or count < 1 then return end
+	if type(count) ~= "number" or count < 1 then return true end
 	local delay = select(1, ...)
 	local key_delay = tonumber(delay) or 0
 	local ok, err = pcall(function()
 		for _ = 1, count do
-			hs.eventtap.keyStroke({}, "delete", key_delay)
+			assert(SyntheticInput.emit_key_stroke({}, "delete", key_delay),
+				"synthetic Backspace could not be dispatched")
 		end
 	end)
 	if not ok then
 		Logger.error(LOG, "eraseChars(%d): failed — %s", count, tostring(err))
 	end
+	return ok == true
 end
 
 --- Emits a single keystroke with optional modifiers.
 --- @param key       string   Key name (e.g. "return", "escape", "f1").
 --- @param modifiers table    Array of modifier names: "ctrl"|"shift"|"alt"|"cmd".
---- @param delay     number|nil Hammerspoon inter-key delay in seconds (defaults to 0).
+--- @param delay     number|nil Legacy Hammerspoon delay in microseconds (defaults
+---   to 0; the provenance adapter accepts only the native no-delay range [0, 1)).
 function M.pressKey(key, modifiers, ...)
 	local mods = type(modifiers) == "table" and modifiers or {}
 	local delay = select(1, ...)
 	local key_delay = tonumber(delay) or 0
-	local ok, err = pcall(hs.eventtap.keyStroke, mods, key, key_delay)
+	local ok, err = pcall(function()
+		assert(SyntheticInput.emit_key_stroke(mods, key, key_delay),
+			"synthetic keystroke could not be dispatched")
+	end)
 	if not ok then
 		Logger.error(LOG, "pressKey('%s'): failed — %s", tostring(key), tostring(err))
 	end
+	return ok == true
 end
 
 return M

@@ -83,7 +83,11 @@ M.timer = {
 			local t = make_timer(delay, fn, false)
 			t.running = false  -- delayed timers don't auto-run until setDelay/start
 			function t:setDelay(d) self.delay = d end
-			function t:start() self.running = true ; return self end
+			function t:start(next_delay)
+				if next_delay ~= nil then self.delay = next_delay end
+				self.running = true
+				return self
+			end
 			function t:stop()  self.running = false ; return self end
 			function t:running_() return self.running end
 			return t
@@ -461,13 +465,34 @@ M.eventtap = {
 	-- type list, so "creates an event watcher with the correct events" could only
 	-- ever be written as assert_true(true) — and it was.
 	new = function(types, fn)
-		local tap = { types = types, fn = fn, started = 0, stopped = 0 }
-		tap.start = function(self) local t = self or tap; t.started = t.started + 1; return t end
-		tap.stop  = function(self) local t = self or tap; t.stopped = t.stopped + 1; return t end
+		local tap = { types = types, fn = fn, started = 0, stopped = 0, enabled = false }
+		tap.start = function(self)
+			local t = self or tap
+			t.started = t.started + 1
+			t.enabled = true
+			return t
+		end
+		tap.stop  = function(self)
+			local t = self or tap
+			t.stopped = t.stopped + 1
+			t.enabled = false
+			return t
+		end
+		tap.isEnabled = function(self) return (self or tap).enabled end
 		table.insert(TAPS, tap)
 		return tap
 	end,
 	event = {
+		-- Quartz event fields used to distinguish hardware input from events
+		-- synthesized by this Hammerspoon process. Keep the values opaque: tests
+		-- must address them through the same names as production code.
+		properties = {
+			eventSourceUnixProcessID = 1,
+			eventSourceUserData      = 2,
+			eventSourceStateID       = 3,
+			scrollWheelEventDeltaAxis1 = 4,
+			mouseEventButtonNumber = 5,
+		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
 		-- a table CONSTRUCTOR whose first element is ev.scrollWheel, so a missing
@@ -486,8 +511,32 @@ M.eventtap = {
 			scrollWheel = 22,
 			tapDisabledByTimeout = 0xFFFFFFFE, tapDisabledByUserInput = 0xFFFFFFFF,
 		},
-		newKeyEvent   = function(mods, key, isDown) return { mods = mods, key = key, isDown = isDown, post = function() end } end,
-		newMouseEvent = function(t, pos) return { t = t, pos = pos, post = function() end } end,
+		newKeyEvent   = function(mods, key, isDown)
+			local properties = {}
+			local event = {
+				mods = mods, key = key, isDown = isDown,
+				getProperty = function(_, prop)
+					if prop == M.eventtap.event.properties.eventSourceUnixProcessID then
+						return M.processInfo and M.processInfo.processID or 0
+					end
+					return properties[prop] or 0
+				end,
+				setProperty = function(self, prop, value) properties[prop] = value; return self end,
+				setUnicodeString = function(self, value) self.unicode = value; return self end,
+				getUnicodeString = function(self) return self.unicode or "" end,
+				post = function() end,
+			}
+			return event
+		end,
+		newMouseEvent = function(t, pos, mods)
+			local properties = {}
+			return {
+				t = t, pos = pos, mods = mods,
+				getProperty = function(_, prop) return properties[prop] or 0 end,
+				setProperty = function(self, prop, value) properties[prop] = value; return self end,
+				post = function(self) return self end,
+			}
+		end,
 	},
 	checkKeyboardModifiers = function() return {} end,
 	keyRepeatInterval = function() return 0.05 end,
@@ -506,6 +555,10 @@ M.eventtap = {
 		end
 	end,
 }
+
+-- Identity of the Hammerspoon process. Quartz writes this value into
+-- eventSourceUnixProcessID for hs.eventtap.keyStroke/keyStrokes echoes.
+M.processInfo = { processID = 7001 }
 
 -- Concrete map for the F-key sentinels and core nav/edit keys, mirroring the
 -- macOS HID codes that the production driver compiles into Karabiner JSON.

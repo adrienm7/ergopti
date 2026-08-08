@@ -15,7 +15,7 @@
 ---
 --- The three families fail differently, so each is exercised through its own
 --- observable:
----   keystrokes        — the emit table (home, page_up, spotlight, save, …)
+---   keystrokes        — callback-returned exact-tag action pairs
 ---   Karabiner writes  — layer_on / layer_off / capsword go out over
 ---                       `karabiner_cli --set-variable`, the only IPC that exists
 ---   sticky modifiers  — the 15 sticky_* arm the injector, since
@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.synthetic_action_fixture")
 
 -- The remap menu stores the sticky auto-cancel delay in milliseconds; any
 -- positive value exercises the path, so this one is named for what it is.
@@ -79,8 +80,8 @@ local function fresh_registry()
 	}
 
 	package.loaded["modules.gestures.actions"] = nil
-	local Actions = helpers.load_with_stubs("modules.gestures.actions")
-	return Actions, seen
+	local fixture = Fixture.load("modules.gestures.actions")
+	return fixture.subject, seen, fixture
 end
 
 --- Sorted, comma-joined modifier list, for readable assertions.
@@ -105,14 +106,14 @@ end
 helpers.describe("Karabiner catalogue actions: keystroke family", function()
 
 	local function assert_keystroke(action, expected_mods, expected_key)
-		local Actions = fresh_registry()
-		_G.hs.eventtap.__reset()
+		local Actions, _, fixture = fresh_registry()
 		helpers.assert_true(Actions.execute_single(action),
 			action .. " must have a handler — execute_single() refuses an unregistered action")
-		local ks = _G.hs.eventtap.__keystrokes
-		helpers.assert_eq(#ks, 1, action .. " must post exactly one keystroke")
-		helpers.assert_eq(ks[1].key, expected_key, action .. " must target '" .. expected_key .. "'")
-		helpers.assert_eq(mods_of(ks[1].mods), expected_mods, action .. " modifiers")
+		local events, down, up = fixture.drain("test.karabiner." .. action)
+		helpers.assert_eq(events[1].key, expected_key, action .. " must target '" .. expected_key .. "'")
+		helpers.assert_eq(mods_of(events[1].mods), expected_mods, action .. " modifiers")
+		helpers.assert_eq(down.effect, "action")
+		helpers.assert_eq(up.effect, "action")
 	end
 
 	helpers.it("home posts Home", function() assert_keystroke("home", "", "home") end)

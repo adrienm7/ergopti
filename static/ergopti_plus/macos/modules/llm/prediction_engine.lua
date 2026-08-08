@@ -32,6 +32,7 @@ local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
 local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
+local TimerScheduler   = require("adapters.timer_scheduler")
 local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
@@ -39,6 +40,13 @@ local keylogger        = require("modules.keylogger")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
+local _runtime_guard = function() return true end
+
+
+local function runtime_available()
+	local ok, available = pcall(_runtime_guard)
+	return ok and available == true
+end
 
 
 
@@ -507,10 +515,12 @@ end
 --- Called after the final prediction batch arrives so the timer starts with the correct duration.
 --- A delay of 0 keeps the tooltip on screen indefinitely.
 local function reset_llm_dismiss_timer()
+	if not runtime_available() then return false end
 	local delay = (_state and _state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	tooltip.set_llm_timeout(delay)
 	tooltip.reset_llm_timer()
 	Logger.debug(LOG, "LLM dismiss timer reset (delay: %gs).", delay)
+	return true
 end
 
 --- Computes an adaptive debounce delay based on the user's current typing speed.
@@ -540,6 +550,7 @@ end
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
 --- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
+	if not runtime_available() then return end
 	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return end
 	if delay_override then
 		_inactivity_timer:start(delay_override)
@@ -582,6 +593,7 @@ end
 --- @param force_trigger boolean If true, bypasses the freshness and word-count guards.
 --- @param profile_name string|nil Optional profile label override shown in the info bar.
 function M.perform_check(force_trigger, profile_name)
+	if not runtime_available() then return end
 	if not require_state("perform_check") then return end
 
 	-- Defence-in-depth: a debounce/chain timer armed in the moment before the
@@ -756,6 +768,7 @@ function M.perform_check(force_trigger, profile_name)
 		is_ai_preview_enabled   = is_ai_preview_enabled,
 		pending_predictions_ref = pending_ref,
 		predictions_visible_ref = visible_ref,
+		runtime_available       = runtime_available,
 	})
 
 	-- Wrap callbacks to keep local state in sync after each call.
@@ -773,17 +786,20 @@ function M.perform_check(force_trigger, profile_name)
 	-- The handler-level guard cannot cover this: the clobber happens one level
 	-- above it, in these two-line wrappers.
 	local function is_current_fetch()
-		return fetch_request_counter == my_fetch_id
+		return runtime_available() and fetch_request_counter == my_fetch_id
 	end
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		if not is_current_fetch() then return end
 		on_success_cb(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
 		if is_current_fetch() then sync_refs() end
 	end
 	local function on_fail()
+		if not is_current_fetch() then return end
 		on_fail_cb()
 		if is_current_fetch() then sync_refs() end
 	end
 	local on_partial = on_partial_cb and function(partial_raw)
+		if not is_current_fetch() then return end
 		on_partial_cb(partial_raw)
 		if is_current_fetch() then sync_refs() end
 	end or nil
@@ -802,6 +818,7 @@ function M.perform_check(force_trigger, profile_name)
 		is_ai_preview_enabled   = is_ai_preview_enabled,
 		build_info_bar_text     = build_info_bar_text,
 		resolve_backend_label   = resolve_backend_label,
+		runtime_available       = runtime_available,
 	})
 
 	core_llm.fetch_llm_prediction(
@@ -819,10 +836,7 @@ end
 --- The keymap bridge wraps this to also handle hotstring dismissal telemetry.
 function M.reset()
 	local was_visible = predictions_visible and #pending_predictions > 0
-
-	if was_visible then
-		keylogger.log_llm_dismissed(nil, pending_predictions)
-	end
+	local dismissed_predictions = was_visible and pending_predictions or nil
 
 	-- Finalise chain timing before tearing down state so the tooltip can
 	-- compute TTLT against the last update and render the full line one last
@@ -848,7 +862,13 @@ function M.reset()
 	if _chain_trigger_timer then _chain_trigger_timer:stop(); _chain_trigger_timer = nil end
 
 	StreamingHandler.reset_failure_count()
-	if tooltip.hide_forced then tooltip.hide_forced() else tooltip.hide() end
+	if tooltip.hide_forced_silent then
+		tooltip.hide_forced_silent()
+	elseif tooltip.hide_forced then
+		tooltip.hide_forced()
+	else
+		tooltip.hide()
+	end
 	stop_inactivity_timer()
 	StreamingHandler.stop_watchdog()
 	-- Cancel any in-flight streaming curl UNCONDITIONALLY — not gated on the current
@@ -859,8 +879,14 @@ function M.reset()
 	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
 	pcall(core_llm.cancel_streaming)
 
-	if was_visible then
-		Logger.debug(LOG, "Predictions cleared (were visible).")
+	if dismissed_predictions then
+		-- Persistence performs an open/write/flush in the keylogger. reset() is
+		-- reached from the keyDown eventtap, so telemetry must run only after that
+		-- callback returns. Capture the immutable pool before clearing module state.
+		TimerScheduler.after(0, function()
+			pcall(keylogger.log_llm_dismissed, nil, dismissed_predictions)
+			Logger.debug(LOG, "Predictions cleared (were visible).")
+		end)
 	end
 end
 
@@ -871,6 +897,7 @@ end
 --- @return table|nil pred The prediction entry, or nil if the index is invalid.
 --- @return table|nil all_preds The full prediction pool at the time of consumption, or nil.
 function M.consume(idx)
+	if not runtime_available() then return nil, nil end
 	local pred = pending_predictions[idx]
 	if not pred then
 		Logger.warn(LOG, "consume(%d): invalid index (pool of %d prediction(s)).", idx, #pending_predictions)
@@ -886,6 +913,7 @@ end
 --- Sets chain_pending and starts a fallback timer in case the F16 signal is missed.
 --- Must be called BEFORE hs.eventtap.keyStroke({}, "f16", 0) is sent by the bridge.
 function M.arm_chain()
+	if not runtime_available() then return false end
 	if not require_state("arm_chain") then return end
 	if _inactivity_timer    then _inactivity_timer:stop() end
 	if _chain_trigger_timer then _chain_trigger_timer:stop() end
@@ -894,12 +922,13 @@ function M.arm_chain()
 	_state.suppress_rescan_keep_buffer(CHAIN_FALLBACK_SEC)
 
 	_chain_trigger_timer = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
-		if chain_pending then
+		if chain_pending and runtime_available() then
 			chain_pending = false
 			Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
 			M.perform_check(true)
 		end
 	end)
+	return true
 end
 
 
@@ -913,8 +942,15 @@ end
 --- =============================
 --- =============================
 
+--- Installs the live action-epoch predicate used by timers, fetches and actions.
+--- @param fn function|nil Zero-arity predicate.
+function M.set_runtime_guard(fn)
+	_runtime_guard = type(fn) == "function" and fn or function() return true end
+end
+
+
 --- Initializes the engine by injecting the shared keymap core state.
---- Must be called exactly once before any other engine function.
+--- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
 function M.init(core_state)
 	if type(core_state) ~= "table" then
@@ -943,18 +979,22 @@ end
 --- through to the app — resulting in one extra character on screen before the expansion.
 --- @param delay_override number|nil Optional timer override in seconds.
 function M.start_timer(delay_override)
+	if not runtime_available() then return false end
 	start_inactivity_timer(delay_override)
+	return true
 end
 
 --- Arms the inactivity timer after a completed word (buffer ends with whitespace).
 --- When instant_on_word_end is enabled, bypasses the debounce entirely (delay = 0)
 --- so the prediction fires as soon as the word boundary is detected.
 function M.start_timer_word_end()
+	if not runtime_available() then return false end
 	if instant_on_word_end then
 		start_inactivity_timer(0)
 	else
 		start_inactivity_timer()
 	end
+	return true
 end
 
 --- Cancels the inactivity timer without firing the LLM check.
@@ -971,6 +1011,7 @@ end
 --- @param keyCode number The macOS key code of the pressed key.
 --- @return boolean True if the F16 event was consumed and the chain was triggered.
 function M.handle_chain_signal(keyCode)
+	if not runtime_available() then return false end
 	if keyCode ~= KEYCODE_LLM_CHAIN or not chain_pending then return false end
 	chain_pending = false
 	if _chain_trigger_timer then _chain_trigger_timer:stop() end
@@ -982,25 +1023,36 @@ function M.handle_chain_signal(keyCode)
 	-- the keyboard until the tap is re-armed. Deferring by one run-loop tick makes
 	-- this path structurally identical to the CHAIN_FALLBACK_SEC timer that calls
 	-- the same function.
-	hs.timer.doAfter(0, function() M.perform_check(true) end)
+	hs.timer.doAfter(0, function()
+		if runtime_available() then M.perform_check(true) end
+	end)
 	return true
 end
 
 --- @return boolean True while predictions are displayed and awaiting user interaction.
-function M.is_visible() return predictions_visible end
+function M.is_visible() return runtime_available() and predictions_visible end
 
 --- @return boolean True between an accepted prediction and the incoming F16 chain signal.
-function M.is_chain_pending() return chain_pending end
+function M.is_chain_pending() return runtime_available() and chain_pending end
 
 --- @return table The current pending predictions array.
-function M.get_predictions() return pending_predictions end
+function M.get_predictions()
+	if not runtime_available() then return {} end
+	return pending_predictions
+end
 
 --- @return number|nil The currently selected prediction index, or nil.
-function M.get_current_index() return tooltip.get_current_index() end
+function M.get_current_index()
+	if not runtime_available() then return nil end
+	return tooltip.get_current_index()
+end
 
 --- Navigates the prediction selection by the given delta.
 --- @param delta number Positive moves down the list, negative moves up.
-function M.navigate(delta) tooltip.navigate(delta) end
+function M.navigate(delta)
+	if not runtime_available() then return false end
+	return tooltip.navigate(delta)
+end
 
 --- Normalizes a modifier input (string or table) to a plain array of strings.
 --- Exported so the keymap bridge can use it when routing modifier+key combos.

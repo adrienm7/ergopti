@@ -20,8 +20,12 @@
 ---   1. Characters are fed into the shared CoreState buffer one by one via the
 ---      same `process_char` callback that the live eventtap calls.
 ---   2. The Expander module runs its full matching + replacement logic.
----   3. "Emitted" output is captured from the hs.eventtap stub's keystroke log.
----   4. Assertions compare emitted text and backspace counts against the corpus.
+---   3. SyntheticInput returns the exact tagged Quartz events from the simulated
+---      eventtap callback, as production does.
+---   4. The harness replays those events against a virtual screen and verifies
+---      their immutable transaction provenance.
+---   5. Assertions compare emitted text and logical replacement counts against
+---      the shared corpus.
 ---
 --- This gives 95% of the confidence of a real E2E run for the pure-logic layer,
 --- and the companion PLAN document describes the remaining 5% (real OS injection).
@@ -71,6 +75,7 @@ package.path = table.concat({
 -- Load helpers + stubs (same pattern as tests/run.lua).
 -- ---------------------------------------------------------------------------
 local helpers = require("tests.helpers")
+local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 
 
@@ -143,9 +148,9 @@ end
 
 --- Builds an isolated test environment: fresh stubs + Registry + Expander.
 --- Returns a table with:
----   inject(buffer, terminator) — feeds the full buffer char-by-char then the terminator
+---   inject(buffer, char, mode)  — drives a terminator or auto-expand callback
 ---   emitted()                  — returns the concatenated emitted text
----   backspaces()               — returns the number of synthetic backspaces issued
+---   backspaces()               — returns logical codepoints replaced
 --- @param trigger string The hotstring trigger to register.
 --- @param replacement string The expansion text.
 --- @param opts table Per-entry flags exactly as the shared corpus declares them
@@ -158,10 +163,8 @@ local function make_vkb(trigger, replacement, opts)
 	-- Fresh stub environment for each scenario to prevent cross-test leakage.
 	-- All keymap modules are cleared so they reload together under a single
 	-- fresh hs stub (the one created by the final load_with_stubs call below).
-	-- modules.keymap.utils captures hs.eventtap.keyStrokes at module-load time,
-	-- so it MUST be in the same load wave as expander to guarantee that the
-	-- KEYSTROKES table written by utils and the __keystrokes table read by the
-	-- harness are the same object.
+	-- The emission adapters capture Quartz constructors at module-load time, so
+	-- they MUST be in the same load wave as Expander.
 	package.loaded["infra.logger"]                 = nil
 	package.loaded["infra.text_utils"]             = nil
 	package.loaded["infra.i18n"]                   = nil
@@ -169,11 +172,8 @@ local function make_vkb(trigger, replacement, opts)
 	package.loaded["modules.keymap.utils"]       = nil
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.expander"]    = nil
-	-- Expander delegates deletion to TextSender. It captures `hs` at module
-	-- load time too, so it must be reloaded alongside the keymap modules. If it
-	-- remains cached, deletes are recorded by the preceding scenario's stub while
-	-- this scenario reads the fresh stub below, producing false output and
-	-- backspace counts after the first expansion.
+	-- Expander delegates deletion to TextSender. It captures `hs` at module load
+	-- time too, so it must be reloaded alongside the keymap modules.
 	package.loaded["adapters.text_sender"]        = nil
 	package.loaded["adapters.clipboard"]          = nil
 	-- The terminator is no longer emitted inline by the expander: it is handed to
@@ -182,13 +182,13 @@ local function make_vkb(trigger, replacement, opts)
 	-- pending slot), so it belongs in this reload wave for the same reason
 	-- utils and text_sender do — a cached instance would keep the FIRST
 	-- scenario's CoreState and answer "has the replacement landed?" from a
-	-- ledger this scenario never wrote.
+	-- transaction instance this scenario never created.
 	package.loaded["modules.keymap.terminator_replay"] = nil
 
-	-- One load_with_stubs call — establishes the canonical hs stub for this
-	-- scenario; all dependencies (registry, utils, terminators) cascade from
-	-- the same require chain and share the same KEYSTROKES table.
-	local Expander = helpers.load_with_stubs("modules.keymap.expander")
+	-- One load_with_stubs call establishes the canonical hs stub for this
+	-- scenario; all dependencies cascade from the same require chain and share
+	-- the same SyntheticInput ledger.
+	local Expander, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 	local Registry = require("modules.keymap.registry")
 	local text_utils = require("infra.text_utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
@@ -202,14 +202,6 @@ local function make_vkb(trigger, replacement, opts)
 	local state = {
 		buffer                     = "",
 		magic_key                  = MAGIC_KEY,
-		expected_synthetic_deletes = 0,
-		-- The two other synthetic ledgers TerminatorReplay consults. Present so the
-		-- replay gate reads the same shape of CoreState it sees in production
-		-- instead of falling back to `or 0` / `or ""` defaults — a stub that models
-		-- a narrower shape than the real object is how a guaranteed defect ships
-		-- green (see the hs.fs.dir stub lesson).
-		expected_synthetic_chars   = "",
-		expected_synthetic_pastes  = 0,
 		groups                     = {},
 		current_group              = "e2e",
 		-- Required by word_boundary_blocks: treat start-of-buffer as a word
@@ -254,137 +246,182 @@ local function make_vkb(trigger, replacement, opts)
 
 	Expander.init(state, Registry, llm_stub)
 
-	-- Track emitted text and backspaces via the hs stub.
-	local hs_stub  = require("hs")   -- stub loaded by helpers
-	hs_stub.eventtap.__reset()
-
 	-- Result cache populated by inject(); accessed by emitted() and backspaces().
 	-- terminator_held records the ORDERING guarantee: true when the terminator was
 	-- still pending in the replay gate at the moment the expansion returned, i.e.
 	-- it did NOT race ahead of the replacement.
-	local _result = { expanded = false, replacement = "", logical_bs = 0, terminator_held = false }
+	local _result = {
+		expanded = false,
+		replacement = "",
+		logical_bs = 0,
+		terminator_held = false,
+		provenance_ok = true,
+	}
 
-	-- Feed the buffer into state, then fire try_expand with the terminator.
-	--
-	-- After expansion the engine sets state.buffer to:
-	--   context_prefix_str + replacement_str [+ terminator_if_not_consumed]
-	-- where context_prefix_str is the portion of buffer_text that precedes the
-	-- trigger. We recover the replacement by stripping that prefix from the
-	-- updated buffer. The prefix length in bytes equals:
-	--   #buffer_text - trigger_byte_length
-	-- The trigger_byte_length equals raw_bs (delete events) + the byte length of
-	-- the common leading substring between trigger and replacement, which the
-	-- engine keeps on screen via the prefix-overlap optimisation. We derive the
-	-- common prefix bytes by searching for the replacement string in the updated
-	-- buffer starting right after the context_prefix position.
-	local function inject(buffer_text, terminator)
+	-- Drives one eventtap callback and replays only its returned, tagged events
+	-- against a virtual screen. `mode="auto"` means `terminator` is the trigger's
+	-- last character and has not reached the application; `mode="terminator"`
+	-- means buffer_text already contains the full trigger and the external
+	-- terminator is the callback's current physical event.
+	local function inject(buffer_text, terminator, mode)
+		mode = mode or "terminator"
 		-- Reset from any previous scenario.
 		_result.expanded        = false
 		_result.replacement     = ""
 		_result.logical_bs      = 0
 		_result.terminator_held = false
+		_result.provenance_ok   = true
 
 		state.buffer = buffer_text
-		local fired = Expander.try_expand and (Expander.try_expand(terminator) == true)
-		if not fired then return end
+		SyntheticInput.enter_callback()
+		local ok_expand, fired_or_err = pcall(Expander.try_expand, terminator)
+		if not ok_expand then
+			SyntheticInput.abort_callback()
+			error(fired_or_err, 0)
+		end
+		local fired = fired_or_err == true
+
+		-- Record the hold before handing the replacement table off. The replay is
+		-- collected only afterwards, in a second simulated callback, so the harness
+		-- cannot accidentally certify an inline terminator ahead of the replacement.
+		local replay_pending = TerminatorReplay.is_pending()
+		_result.terminator_held = replay_pending
+		local ok_leave, consume, returned_events = pcall(
+			SyntheticInput.leave_callback, fired)
+		if not ok_leave then
+			SyntheticInput.abort_callback()
+			error(consume, 0)
+		end
+		local events = returned_events or {}
+		if not fired then
+			if consume or #events > 0 then
+				_result.replacement = "<unexpected synthetic output on a non-match>"
+				_result.provenance_ok = false
+			end
+			if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
+			return
+		end
+
+		local replay_flushed = true
+		if replay_pending then
+			SyntheticInput.enter_callback()
+			local ok_flush, flushed_or_err = pcall(TerminatorReplay.flush_now,
+				"e2e harness: emulate post-handoff replay")
+			if not ok_flush then
+				SyntheticInput.abort_callback()
+				error(flushed_or_err, 0)
+			end
+			replay_flushed = flushed_or_err == true
+			local ok_replay, replay_consume, replay_events = pcall(
+				SyntheticInput.leave_callback, replay_flushed)
+			if not ok_replay then
+				SyntheticInput.abort_callback()
+				error(replay_consume, 0)
+			end
+			replay_flushed = replay_flushed and replay_consume == true
+			for _, event in ipairs(replay_events or {}) do
+				events[#events + 1] = event
+			end
+		end
 		_result.expanded = true
+		_result.provenance_ok = consume == true and replay_flushed
 
-		-- The expander no longer re-types a non-consumed terminator inline: it hands
-		-- it to TerminatorReplay, which withholds it until the synthetic-echo ledger
-		-- proves the replacement landed. This harness has no keyboard tap, so no echo
-		-- is ever drained and the gate would hold the terminator forever.
-		--
-		-- Record that it IS being held — that is the ordering guarantee the gate
-		-- exists to provide, and asserting it here is what stops this harness from
-		-- silently accepting a replay module that never emits at all — then release
-		-- it so the accounting below sees the same keystroke log the pre-gate
-		-- expander produced.
-		if TerminatorReplay.is_pending() then
-			_result.terminator_held = true
-			TerminatorReplay.flush_now("e2e harness: no keyboard tap, so no echo can be drained")
-		end
-
-		local raw_bs = 0
-		local found_term_in_keystrokes = false
-		for _, ks in ipairs(hs_stub.eventtap.__keystrokes) do
-			if ks.key == "delete" then
-				raw_bs = raw_bs + 1
-			elseif ks.text == terminator then
-				found_term_in_keystrokes = true
+		-- Validate adjacent down/up phases and group them by immutable generation.
+		-- A terminator replay is intentionally a later transaction; every other
+		-- returned pair must belong to the registered `e2e` replacement.
+		local property = hs.eventtap.event.properties.eventSourceUserData
+		local generations = {}
+		local metadata_by_event = {}
+		if #events == 0 or (#events % 2) ~= 0 then _result.provenance_ok = false end
+		for index = 1, #events, 2 do
+			local down, up = events[index], events[index + 1]
+			local down_meta = down and SyntheticInput.lookup_tag(down:getProperty(property)) or nil
+			local up_meta = up and SyntheticInput.lookup_tag(up:getProperty(property)) or nil
+			metadata_by_event[index] = down_meta
+			metadata_by_event[index + 1] = up_meta
+			local pair_ok = down_meta and up_meta
+				and down_meta.owned and up_meta.owned
+				and down_meta.effect == "replacement" and up_meta.effect == "replacement"
+				and down_meta.phase == "down" and up_meta.phase == "up"
+				and down_meta.generation == up_meta.generation
+				and down_meta.owner == up_meta.owner
+				and down_meta.ordinal == up_meta.ordinal
+				and down_meta.owner ~= nil
+				and (down_meta.owner == "e2e" or down_meta.owner == "terminator_replay")
+			if not pair_ok then
+				_result.provenance_ok = false
+			elseif generations[down_meta.owner]
+				and generations[down_meta.owner] ~= down_meta.generation then
+				_result.provenance_ok = false
+			else
+				generations[down_meta.owner] = down_meta.generation
 			end
 		end
 
-		-- After expansion, state.buffer = context + replacement [+ term].
-		-- Context byte length = #buffer_text - trigger_byte_length.
-		-- Trigger byte length = raw_bs_bytes + common_prefix_bytes.
-		-- We reconstruct the on-screen text by replaying deletes + keyStrokes
-		-- against the original buffer_text; this avoids needing to infer the
-		-- common prefix from the updated state.buffer (which is ambiguous when
-		-- the replacement's leading chars coincide with the trigger's leading chars).
-		--
-		-- Replay: apply raw_bs backspace-codepoints from the right of buffer_text,
-		-- then append the text portions of the keystroke log.
+		-- Apply replacement keyDown events to the screen. TerminatorReplay owns its
+		-- own pair and is deliberately excluded so emitted() returns replacement
+		-- text only, matching the corpus contract.
 		local screen = buffer_text
-		-- Remove raw_bs codepoints from the right (backspace is codepoint-aware).
-		for _ = 1, raw_bs do
-			local ok, off = pcall(utf8.offset, screen, -1)
-			if ok and off and off > 0 then
-				screen = screen:sub(1, off - 1)
-			elseif #screen > 0 then
-				screen = screen:sub(1, -2)  -- ASCII fallback
-			end
-		end
-		-- Append each text keystroke (excluding the re-typed terminator which will
-		-- be stripped separately).
-		for _, ks in ipairs(hs_stub.eventtap.__keystrokes) do
-			if ks.text then screen = screen .. ks.text end
-		end
-		-- Strip the trailing re-typed terminator so we return just the replacement.
-		if found_term_in_keystrokes and terminator ~= "" then
-			if screen:sub(-#terminator) == terminator then
-				screen = screen:sub(1, #screen - #terminator)
-			end
-		end
-
-		-- The context_prefix portion of screen = the leading bytes of buffer_text
-		-- that were NOT inside the trigger. They equal the bytes the engine did NOT
-		-- delete (raw_bs removed from the trigger suffix, but the common prefix
-		-- with the replacement was kept, so context_prefix < #buffer_text - raw_bs).
-		-- Rather than computing the prefix length algebraically, we detect it by
-		-- finding the position of the replacement in screen using the replacement
-		-- string we stored at make_vkb() call time.
-		-- Since we have the replacement available as a closure, search for it in screen.
-		local repl_start = 1
-		if replacement ~= "" then
-			-- Locate the replacement suffix in screen: it starts somewhere after the
-			-- context prefix. We search from position max(1, #screen - #replacement + 1)
-			-- backwards until found, giving the actual start of the replacement.
-			for i = 1, #screen - #replacement + 1 do
-				if screen:sub(i, i + #replacement - 1) == replacement then
-					repl_start = i
-					break
+		local found_terminator_replay = false
+		for index, event in ipairs(events) do
+			if event.isDown then
+				local metadata = metadata_by_event[index]
+				if metadata and metadata.owner == "terminator_replay" then
+					found_terminator_replay = true
+				elseif metadata and metadata.owner == "e2e" then
+					if event.key == "delete" then
+						local ok_off, off = pcall(utf8.offset, screen, -1)
+						if ok_off and off and off > 0 then
+							screen = screen:sub(1, off - 1)
+						elseif #screen > 0 then
+							screen = screen:sub(1, -2)
+						end
+					elseif type(event.unicode) == "string" and event.unicode ~= "" then
+						screen = screen .. event.unicode
+					elseif event.key == "return" then
+						screen = screen .. "\r"
+					elseif event.key == "tab" then
+						screen = screen .. "\t"
+					end
 				end
 			end
 		end
-		_result.replacement = screen:sub(repl_start)
+		if _result.terminator_held and not found_terminator_replay then
+			_result.provenance_ok = false
+		end
 
-		-- Logical backspace count = trigger codepoint length.
-		-- Trigger = buffer_text starting from (repl_start) bytes from the end
-		-- of buffer_text, extended back to include the common prefix bytes.
-		-- Equivalently: trigger occupies the last (#buffer_text - context_prefix_bytes)
-		-- bytes of buffer_text. context_prefix_bytes = repl_start - 1 in screen terms,
-		-- which equals the context_prefix_bytes in buffer_text since context is unchanged.
-		local trigger_str = buffer_text:sub(repl_start)
-		local _, cp_count = trigger_str:gsub("[\0-\127\194-\244]", "")
-		-- A consumed terminator is logically erased by the expansion; include it.
-		local term_was_consumed = (terminator ~= "") and (not found_term_in_keystrokes)
-		if term_was_consumed then cp_count = cp_count + 1 end
+		-- Strip only the input context, never search for the expected replacement.
+		-- This keeps the assertion capable of seeing a wrong or partial emission.
+		local typed_buffer = mode == "auto" and (buffer_text .. terminator) or buffer_text
+		local context_bytes = #typed_buffer - #trigger
+		local context = context_bytes >= 0 and typed_buffer:sub(1, context_bytes) or ""
+		if context_bytes < 0 or screen:sub(1, #context) ~= context then
+			_result.replacement = screen
+		else
+			_result.replacement = screen:sub(#context + 1)
+		end
+
+		-- The corpus defines logical replacement width, not the optimised number of
+		-- Backspace events. Read the production terminator policy for the only extra
+		-- codepoint a terminator-path expansion can consume.
+		local cp_count = text_utils.utf8_len(trigger)
+		if mode == "terminator" and Registry.terminator_is_consumed(terminator) then
+			cp_count = cp_count + text_utils.utf8_len(terminator)
+		end
 		_result.logical_bs = cp_count
+
+		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
+		if SyntheticInput.stats().active_transactions ~= 0 then
+			_result.provenance_ok = false
+		end
 	end
 
 	-- Returns the replacement text that appeared on screen (without surrounding
 	-- context and without the re-typed terminator). Empty when no expansion fired.
 	local function emitted()
+		if _result.expanded and not _result.provenance_ok then
+			return "<invalid synthetic transaction provenance>"
+		end
 		return _result.replacement
 	end
 
@@ -401,11 +438,18 @@ local function make_vkb(trigger, replacement, opts)
 		return _result.terminator_held
 	end
 
+	--- Returns true only when every emitted phase was an exact owned tag and all
+	--- transactions reached a terminal state after callback handoff.
+	local function provenance_ok()
+		return _result.provenance_ok
+	end
+
 	return {
 		inject          = inject,
 		emitted         = emitted,
 		backspaces      = backspaces,
 		terminator_held = terminator_held,
+		provenance_ok   = provenance_ok,
 	}
 end
 
@@ -461,12 +505,12 @@ local function run_corpus_vector(v)
 	if v.auto_expand == true and v.terminator_consumed == nil then
 		local ok_off, off = pcall(utf8.offset, v.buffer, -1)
 		if ok_off and off then
-			vkb.inject(v.buffer:sub(1, off - 1), v.buffer:sub(off))
+			vkb.inject(v.buffer:sub(1, off - 1), v.buffer:sub(off), "auto")
 		else
-			vkb.inject(v.buffer, terminator)
+			vkb.inject(v.buffer, terminator, "terminator")
 		end
 	else
-		vkb.inject(v.buffer, terminator)
+		vkb.inject(v.buffer, terminator, "terminator")
 	end
 
 	if v.expected.matched then
@@ -507,6 +551,8 @@ local function run_hardcoded_scenarios()
 		-- submits the pre-expansion line. Asserting the hold here is what keeps this
 		-- harness honest about the gate instead of merely tolerating it.
 		assert_eq("scenario1 — terminator withheld by the replay gate", true, vkb1.terminator_held())
+		assert_eq("scenario1 — callback output carries exact transaction provenance",
+			true, vkb1.provenance_ok())
 	else
 		fail_count = fail_count + 1
 		print("  FAIL  scenario1 — setup: " .. tostring(vkb1))
