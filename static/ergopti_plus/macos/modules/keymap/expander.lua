@@ -79,6 +79,7 @@ end
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant, is_private)
+	if not require_state("perform_text_replacement") then return false end
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
