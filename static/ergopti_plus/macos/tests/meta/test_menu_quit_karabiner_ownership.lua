@@ -19,6 +19,98 @@ local function quit_action_body()
 	return source:sub(start_at, end_at - 1)
 end
 
+--- Loads the real ui.menu.init action table over narrow pure doubles.
+--- @return function quit_action
+--- @return table exit_calls
+--- @return table stock_calls
+local function load_menu_quit_action()
+	-- Reset the shared hs double before installing module doubles captured by
+	-- ui.menu.init at require time.
+	helpers.load_with_stubs("infra.logger")
+	local exit_calls = {}
+	local stock_calls = { execute = 0, launch = 0 }
+	_G.hs.execute = function()
+		stock_calls.execute = stock_calls.execute + 1
+		return "", true
+	end
+	_G.hs.application.launchOrFocus = function()
+		stock_calls.launch = stock_calls.launch + 1
+		return true
+	end
+
+	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["ui.hotstring_editor"] = {}
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.text_utils"] = {
+		shell_quote = function(value) return tostring(value) end,
+		escape_gsub_replacement = function(value) return tostring(value) end,
+	}
+	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["infra.ui_restore"] = {}
+	package.loaded["infra.preferences"] = {
+		build_initial_state = function()
+			return {
+				hotstrings = {},
+				trigger_char = "★",
+				script_control_enabled = false,
+				script_control_shortcuts = {},
+			}
+		end,
+		load = function() return {}, "present" end,
+		merge_saved_data = function() end,
+		get_group_name = function() return "group" end,
+		save = function() return true end,
+	}
+	package.loaded["ui.menu.builder"] = { generate = function() return {} end }
+	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
+	package.loaded["ui.menu.menu_paths"] = {
+		is_initialized = function() return true end,
+		get = function() return "" end,
+		get_config_dir = function() return "" end,
+	}
+	package.loaded["ui.menu.menu_state"] = { sync_state_to_modules = function() end }
+	package.loaded["ui.menu.menu_watchers"] = {
+		start_config_watcher = function() return {} end,
+		start_theme_watcher = function() return {} end,
+	}
+	package.loaded["modules.updater"] = {
+		get_check_interval = function() return 3600 end,
+		start_background_checks = function() end,
+	}
+	package.loaded["adapters.tray_menu"] = {
+		adopt = function() end,
+		setMenu = function() end,
+	}
+	package.loaded["infra.termination_coordinator"] = {
+		request_exit = function(reason, code)
+			exit_calls[#exit_calls + 1] = { reason = reason, code = code }
+			return true
+		end,
+	}
+
+	for _, module_name in ipairs({
+		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"ui.menu.menu_hotstrings", "ui.menu.menu_llm", "ui.menu.menu_metrics",
+		"ui.menu.menu_remap", "ui.menu.menu_apps", "ui.menu.menu_about",
+		"modules.llm", "modules.keylogger", "modules.dynamic_hotstrings", "modules.gestures",
+	}) do
+		package.loaded[module_name] = {}
+	end
+	local captured_actions = nil
+	package.loaded["modules.shortcuts"] = {
+		is_paused = function() return false end,
+		set_extras = function(actions) captured_actions = actions end,
+	}
+
+	package.loaded["ui.menu.init"] = nil
+	local menu = require("ui.menu.init")
+	local started, start_err = pcall(menu.start, ".", {}, nil, nil, nil, {}, nil, {})
+	helpers.assert_true(started, "ui.menu.init must start over the quit harness: " .. tostring(start_err))
+	helpers.assert_true(type(captured_actions) == "table" and type(captured_actions.quit) == "function",
+		"the real menu start must publish its quit action")
+	return captured_actions.quit, exit_calls, stock_calls
+end
+
 helpers.describe("menu Quit uses exact lease revocation", function()
 	helpers.it("requests one coordinated menu_quit exit", function()
 		local body = quit_action_body()
@@ -38,5 +130,51 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 			helpers.assert_true(body:find(retired, 1, true) == nil,
 				"menu Quit must not regain stock-process authority: " .. retired)
 		end
+	end)
+
+	helpers.it("falls back to the coordinator when timer scheduling throws or returns nil", function()
+		local quit_action, exit_calls, stock_calls = load_menu_quit_action()
+		local saved_do_after = _G.hs.timer.doAfter
+		local saved_exit = os.exit
+		local direct_exits = 0
+		local results = {}
+		local stock_execute_before = stock_calls.execute
+		local stock_launch_before = stock_calls.launch
+		os.exit = function() direct_exits = direct_exits + 1 end
+
+		for _, case in ipairs({
+			{ label = "throw", schedule = function() error("menu timer scheduling fault") end },
+			{ label = "nil", schedule = function() return nil end },
+		}) do
+			_G.hs.timer.doAfter = case.schedule
+			local before = #exit_calls
+			local ok, err = pcall(quit_action)
+			local call = exit_calls[#exit_calls]
+			results[#results + 1] = {
+				label = case.label,
+				ok = ok,
+				err = err,
+				before = before,
+				after = #exit_calls,
+				reason = call and call.reason,
+				code = call and call.code,
+			}
+		end
+
+		_G.hs.timer.doAfter = saved_do_after
+		os.exit = saved_exit
+		for _, result in ipairs(results) do
+			helpers.assert_true(result.ok,
+				result.label .. " scheduling failure must not escape the menu callback: " .. tostring(result.err))
+			helpers.assert_eq(result.after, result.before + 1,
+				result.label .. " scheduling failure must request the controlled exit directly")
+			helpers.assert_eq(result.reason, "menu_quit")
+			helpers.assert_eq(result.code, 0)
+		end
+		helpers.assert_eq(direct_exits, 0)
+		helpers.assert_eq(stock_calls.execute, stock_execute_before,
+			"quit fallbacks must perform no shell/process operation")
+		helpers.assert_eq(stock_calls.launch, stock_launch_before,
+			"quit fallbacks must never launch the stock Karabiner GUI")
 	end)
 end)

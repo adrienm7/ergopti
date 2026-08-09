@@ -789,7 +789,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
 		reload                    = function() do_reload("menu") end,
 		quit                      = function()
-			hs.timer.doAfter(0.05, function()
+			local exit_requested = false
+			local function request_controlled_exit()
+				if exit_requested then return end
+				exit_requested = true
 				local request_ok, accepted_or_err = xpcall(function()
 					return TerminationCoordinator.request_exit("menu_quit", 0)
 				end, debug.traceback)
@@ -797,7 +800,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					Logger.error(LOG, "Menubar controlled exit was rejected: %s",
 						tostring(accepted_or_err))
 				end
+			end
+			local scheduled, timer_or_err = pcall(function()
+				return hs.timer.doAfter(0.05, request_controlled_exit)
 			end)
+			if not scheduled or timer_or_err == nil then
+				Logger.error(LOG, "Menubar controlled exit scheduling failed: %s",
+					tostring(timer_or_err))
+				-- The asynchronous coordinator remains the sole owner of the exact
+				-- lease fence, sibling teardown and eventual process exit.
+				request_controlled_exit()
+			end
 		end,
 		open_logs                 = function()
 			local dir = logs_dir()

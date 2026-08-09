@@ -75,6 +75,45 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		helpers.assert_eq(direct_exits, 0,
 			"only the coordinator may exit after proving the exact fence")
 	end)
+
+	helpers.it("falls back to the coordinator when timer scheduling throws or returns nil", function()
+		local saved_do_after = _G.hs.timer.doAfter
+		local saved_exit = os.exit
+		local direct_exits = 0
+		local results = {}
+		os.exit = function() direct_exits = direct_exits + 1 end
+
+		for _, case in ipairs({
+			{ label = "throw", schedule = function() error("timer scheduling fault") end },
+			{ label = "nil", schedule = function() return nil end },
+		}) do
+			quit_spy = { count = 0, result = true }
+			_G.hs.timer.doAfter = case.schedule
+			local ok, dispatched = pcall(Actions.execute_single, "script_quit")
+			results[#results + 1] = {
+				label = case.label,
+				ok = ok,
+				dispatched = dispatched,
+				count = quit_spy.count,
+				reason = quit_spy.reason,
+				code = quit_spy.code,
+			}
+		end
+
+		_G.hs.timer.doAfter = saved_do_after
+		os.exit = saved_exit
+		for _, result in ipairs(results) do
+			helpers.assert_true(result.ok,
+				result.label .. " scheduling failure must not escape script_quit: "
+				.. tostring(result.dispatched))
+			helpers.assert_eq(result.count, 1,
+				result.label .. " scheduling failure must request the controlled exit directly")
+			helpers.assert_eq(result.reason, "script_quit")
+			helpers.assert_eq(result.code, 0)
+		end
+		helpers.assert_eq(direct_exits, 0,
+			"timer scheduling failure must never bypass the coordinator with os.exit")
+	end)
 end)
 
 helpers.describe("menu_llm.terminate_orphan_mlx_server reaps the detached server", function()
