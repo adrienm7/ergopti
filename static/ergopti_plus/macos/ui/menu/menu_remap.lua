@@ -69,6 +69,22 @@ local function read_lease_status()
 	return phase, type(snapshot) == "table" and snapshot or {}
 end
 
+--- Requests an exact-lease regeneration without letting a menu callback throw.
+--- @param karabiner table Remap facade.
+--- @param source string User action label for diagnostics.
+--- @return boolean accepted
+local function request_regeneration(karabiner, source)
+	local ok, requested_or_err = xpcall(function()
+		return karabiner.regenerate()
+	end, debug.traceback)
+	if not ok or requested_or_err ~= true then
+		Logger.error(LOG, "%s exact lease start request failed: %s.",
+			tostring(source), tostring(requested_or_err))
+		return false
+	end
+	return true
+end
+
 --- Builds an index of action id → action definition for fast lookup.
 --- @param karabiner table The karabiner module.
 --- @return table Map of id → action def.
@@ -785,7 +801,7 @@ function M.build(ctx)
 		disabled = not enabled,
 		action   = enabled and function()
 			Logger.info(LOG, "Status clicked — rebuilding inert rules and requesting exact lease activation.")
-			karabiner.regenerate()
+			request_regeneration(karabiner, "Status rebuild")
 			if update_menu then pcall(update_menu) end
 		end or nil,
 	}
@@ -798,8 +814,7 @@ function M.build(ctx)
 		disabled = not enabled or lease_attached,
 		action   = function()
 			Logger.start(LOG, "User requested exact Ergopti Karabiner lease start…")
-			local requested = karabiner.regenerate()
-			if not requested then Logger.error(LOG, "Exact lease start request failed.") end
+			request_regeneration(karabiner, "Menu Start")
 			if update_menu then pcall(update_menu) end
 		end,
 	}
@@ -808,15 +823,20 @@ function M.build(ctx)
 		disabled = not enabled or not lease_attached,
 		action   = function()
 			Logger.start(LOG, "User requested exact Ergopti Karabiner lease stop…")
-			local requested = LeaseController.stop("menu_stop", function(ok, reason)
-				if ok then
-					Logger.success(LOG, "Exact Ergopti Karabiner lease stopped.")
-				else
-					Logger.error(LOG, "Exact lease stop failed: %s.", tostring(reason))
-				end
-				if update_menu then pcall(update_menu) end
-			end)
-			if not requested then Logger.error(LOG, "Exact lease stop request was not accepted.") end
+			local stop_ok, requested_or_err = xpcall(function()
+				return LeaseController.stop("menu_stop", function(ok, reason)
+					if ok then
+						Logger.success(LOG, "Exact Ergopti Karabiner lease stopped.")
+					else
+						Logger.error(LOG, "Exact lease stop failed: %s.", tostring(reason))
+					end
+					if update_menu then pcall(update_menu) end
+				end)
+			end, debug.traceback)
+			if not stop_ok or requested_or_err ~= true then
+				Logger.error(LOG, "Exact lease stop request was not accepted: %s.",
+					tostring(requested_or_err))
+			end
 		end,
 	}
 

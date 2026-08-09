@@ -60,6 +60,60 @@ local function row_action(row)
 end
 
 helpers.describe("disabled Karabiner menu has no external side effects", function()
+	helpers.it("contains a controller status fault while rendering", function()
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function() error("status fault") end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+
+		local ok, built = pcall(menu.build, { karabiner = remap, updateMenu = function() end })
+		helpers.assert_true(ok, "status faults must remain inside the existing read guard: " .. tostring(built))
+		helpers.assert_true(type(built) == "table")
+	end)
+
+	helpers.it("contains a regenerate fault from the exact-lease Start action", function()
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function() return "idle", { phase = "idle" } end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.get_enabled = function() return true end
+		remap.regenerate = function() error("regenerate fault") end
+		remap.open_gui = function() return true end
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local start_row = find_item(built, "menu.karabiner.start")
+
+		helpers.assert_not_nil(start_row)
+		helpers.assert_type(row_action(start_row), "function")
+		local ok, err = pcall(row_action(start_row))
+		helpers.assert_true(ok, "Start faults must be logged, not escape the menu callback: " .. tostring(err))
+	end)
+
+	helpers.it("contains a controller fault from the exact-lease Stop action", function()
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function() return "active", { phase = "active" } end,
+			stop = function() error("stop fault") end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.get_enabled = function() return true end
+		remap.regenerate = function() return true end
+		remap.open_gui = function() return true end
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local stop_row = find_item(built, "menu.karabiner.stop")
+
+		helpers.assert_not_nil(stop_row)
+		helpers.assert_type(row_action(stop_row), "function")
+		local ok, err = pcall(row_action(stop_row))
+		helpers.assert_true(ok, "Stop faults must be logged, not escape the menu callback: " .. tostring(err))
+	end)
+
 	helpers.it("build and prime perform zero shell, GUI, task, start or stop actions", function()
 		local calls = { status = 0, start = 0, stop = 0, execute = 0, gui = 0 }
 		package.loaded["platform.remap.lease_controller"] = {
