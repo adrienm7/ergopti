@@ -536,7 +536,7 @@ local function refresh_managed_output_set()
 	local ok, result = xpcall(function()
 		return KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
 	end, debug.traceback)
-	if not ok then
+	if not ok or result ~= true then
 		Logger.error(LOG, "Managed-output classifier refresh failed before lease activation: %s.",
 			tostring(result))
 		return false, result

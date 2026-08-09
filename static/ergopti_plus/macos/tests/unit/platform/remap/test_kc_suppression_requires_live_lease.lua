@@ -164,6 +164,7 @@ local function load_remap(initially_enabled, options)
 	package.loaded["modules.keylogger.kc_bridge"] = {
 		refresh_managed_set = function(tap_hold_config)
 			ctx.suppresses_personal_output = next(tap_hold_config) ~= nil
+			return true
 		end,
 		clear_managed_set = function()
 			ctx.suppresses_personal_output = false

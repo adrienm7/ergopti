@@ -198,7 +198,7 @@ local function load_remap(options)
 			calls.managed_clear = calls.managed_clear + 1
 			append("managed-clear")
 		end,
-		refresh_managed_set = function() end,
+		refresh_managed_set = function() return true end,
 	}
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = {

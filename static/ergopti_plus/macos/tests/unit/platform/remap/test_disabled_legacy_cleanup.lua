@@ -114,7 +114,9 @@ local function run_disabled_init(merge_succeeds)
 	package.loaded["adapters.hotkey_registrar"] = { unbind = function() end }
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 	package.loaded["infra.config_paths"] = { get = function() return "existing-config.toml" end }
-	package.loaded["modules.keylogger.kc_bridge"] = { refresh_managed_set = function() end }
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		refresh_managed_set = function() return true end,
+	}
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["platform.remap"] = nil
 
