@@ -28,9 +28,11 @@ local function load_remap(options)
 		build = 0,
 		deploy = 0,
 		lease_start = 0,
+		lease_pause = 0,
 		lease_resume = 0,
 		lease_bound_start = 0,
 		lease_bound_stop = 0,
+		classifier_refresh = 0,
 		managed_clear = 0,
 		ke_stop = 0,
 		rebind = 0,
@@ -39,8 +41,12 @@ local function load_remap(options)
 		timers = {},
 		lease_phase = options.initial_phase or "prepared",
 		lease_start_callbacks = {},
+		lease_pause_callbacks = {},
 		lease_resume_callbacks = {},
 		lease_stop_callbacks = {},
+		script_paused = options.paused == true,
+		activation_blocked = options.activation_blocked == true,
+		refresh_enters_recovery = options.refresh_enters_recovery == true,
 	}
 
 	local function append(value)
@@ -112,6 +118,7 @@ local function load_remap(options)
 		stop = function()
 			calls.ke_stop = calls.ke_stop + 1
 			append("ke-stop")
+			return true
 		end,
 		notify_ready = function() end,
 	}
@@ -120,17 +127,29 @@ local function load_remap(options)
 			calls.phase_listener = listener
 			return true
 		end,
-		token = function() return "00112233445566778899aabbccddeeff" end,
+		token = function()
+			if calls.lease_phase == "idle" or calls.lease_phase == "failed" then
+				calls.lease_phase = "prepared"
+				if calls.phase_listener then calls.phase_listener("prepared") end
+			end
+			return "00112233445566778899aabbccddeeff"
+		end,
 		status = function()
 			return calls.lease_phase, {
 				phase = calls.lease_phase,
-				token = "00112233445566778899aabbccddeeff",
+				token = (calls.lease_phase == "idle" or calls.lease_phase == "failed")
+					and nil or "00112233445566778899aabbccddeeff",
+				activation_blocked = calls.activation_blocked,
 			}
 		end,
 		refresh_liveness = function()
 			calls.refresh = calls.refresh + 1
 			append("refresh")
 			if options.refresh_raises then error("synthetic refresh failure") end
+			if calls.refresh_enters_recovery then
+				calls.lease_phase = "recovering"
+				if calls.phase_listener then calls.phase_listener("recovering") end
+			end
 			return options.refresh_result ~= false
 		end,
 		start = function()
@@ -161,9 +180,16 @@ local function load_remap(options)
 			return true
 		end,
 		stop_exact = function() return true end,
-		pause = function() return true end,
+		pause = function(on_done)
+			calls.lease_pause = calls.lease_pause + 1
+			append("lease-pause")
+			calls.lease_phase = "pausing"
+			calls.lease_pause_callbacks[#calls.lease_pause_callbacks + 1] = on_done
+			return true
+		end,
 		resume = function(on_done)
 			calls.lease_resume = calls.lease_resume + 1
+			append("lease-resume")
 			calls.lease_phase = "resuming"
 			calls.lease_resume_callbacks[#calls.lease_resume_callbacks + 1] = on_done
 			return true
@@ -199,14 +225,18 @@ local function load_remap(options)
 			append("managed-clear")
 			return true
 		end,
-		refresh_managed_set = function() return true end,
+		refresh_managed_set = function()
+			calls.classifier_refresh = calls.classifier_refresh + 1
+			append("classifier-refresh")
+			return true
+		end,
 	}
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function()
 			append("pause-query")
 			if options.pause_raises then error("synthetic pause-state failure") end
-			return options.paused == true
+			return calls.script_paused
 		end,
 		rebind_for_layout = function()
 			calls.rebind = calls.rebind + 1
@@ -289,26 +319,59 @@ local function load_remap(options)
 	end
 	calls.latest_timer = function() return calls.timers[#calls.timers] end
 	calls.retained_callback = function() return retained_callback end
-	calls.deliver_ready = function()
-		calls.lease_phase = "paused"
-		if calls.phase_listener then calls.phase_listener("paused") end
+	calls.set_script_paused = function(value) calls.script_paused = value == true end
+	calls.publish_phase = function(phase)
+		calls.lease_phase = phase
+		append("lease-" .. phase)
+		if calls.phase_listener then calls.phase_listener(phase) end
+	end
+	calls.deliver_start_callbacks = function(ok, reason)
 		local callbacks = calls.lease_start_callbacks
 		calls.lease_start_callbacks = {}
-		for _, callback in ipairs(callbacks) do callback(true, "ready-paused") end
+		for _, callback in ipairs(callbacks) do
+			callback(ok ~= false, reason or (ok == false and "start-failed" or "ready-paused"))
+		end
 	end
-	calls.deliver_resumed = function()
-		calls.lease_phase = "active"
-		if calls.phase_listener then calls.phase_listener("active") end
+	calls.deliver_ready = function()
+		calls.publish_phase("paused")
+		calls.deliver_start_callbacks(true, "ready-paused")
+	end
+	calls.deliver_pause_callbacks = function(ok, reason)
+		local callbacks = calls.lease_pause_callbacks
+		calls.lease_pause_callbacks = {}
+		for _, callback in ipairs(callbacks) do
+			callback(ok ~= false, reason or (ok == false and "pause-failed" or "paused"))
+		end
+	end
+	calls.deliver_paused = function()
+		calls.publish_phase("paused")
+		calls.deliver_pause_callbacks(true, "paused")
+	end
+	calls.deliver_resume_callbacks = function(ok, reason)
 		local callbacks = calls.lease_resume_callbacks
 		calls.lease_resume_callbacks = {}
-		for _, callback in ipairs(callbacks) do callback(true, "resumed") end
+		for _, callback in ipairs(callbacks) do
+			callback(ok ~= false, reason or (ok == false and "resume-failed" or "resumed"))
+		end
 	end
-	calls.deliver_stopped = function()
-		calls.lease_phase = "idle"
-		if calls.phase_listener then calls.phase_listener("idle") end
+	calls.deliver_resumed = function()
+		calls.publish_phase("active")
+		calls.deliver_resume_callbacks(true, "resumed")
+	end
+	calls.deliver_stop_callbacks = function(ok, reason)
 		local callbacks = calls.lease_stop_callbacks
 		calls.lease_stop_callbacks = {}
-		for _, callback in ipairs(callbacks) do callback(true, "stopped") end
+		for _, callback in ipairs(callbacks) do
+			callback(ok ~= false, reason or (ok == false and "stop-failed" or "stopped"))
+		end
+	end
+	calls.deliver_stopped = function()
+		calls.publish_phase("idle")
+		calls.deliver_stop_callbacks(true, "stopped")
+	end
+	calls.deliver_stop_failure = function(reason)
+		calls.publish_phase("failed")
+		calls.deliver_stop_callbacks(false, reason or "stop-failed")
 	end
 	calls.activate_initial = function()
 		helpers.assert_true(remap.regenerate())
@@ -325,6 +388,23 @@ local function error_log_contains(calls, needle)
 	return false
 end
 
+local function sequence_index(sequence, expected)
+	for index, value in ipairs(sequence) do
+		if value == expected then return index end
+	end
+	return nil
+end
+
+local function reset_layout_observations(calls)
+	calls.sequence = {}
+	calls.timers = {}
+	calls.resolve = 0
+	calls.build = 0
+	calls.deploy = 0
+	calls.classifier_refresh = 0
+	calls.rebind = 0
+end
+
 helpers.describe("karabiner wake callback lifecycle", function()
 	helpers.it("renews the exact lease before redeploying the already-active generation", function()
 		local _, calls = load_remap()
@@ -335,6 +415,10 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		calls.resolve = 0
 		calls.build = 0
 		calls.deploy = 0
+		calls.lease_start = 0
+		calls.lease_pause = 0
+		calls.lease_resume = 0
+		calls.classifier_refresh = 0
 		calls.rebind = 0
 
 		local callback_ok, callback_err = calls.wake(SYSTEM_DID_WAKE)
@@ -346,18 +430,31 @@ helpers.describe("karabiner wake callback lifecycle", function()
 			"the pre-settle callback must not read hs.keycodes.map")
 		helpers.assert_eq(calls.build, 0)
 		helpers.assert_true(calls.fire_latest_timer())
+		helpers.assert_eq(calls.lease_pause, 0,
+			"layout maintenance must never create a raw-key window by gating normal rules PAUSED")
+		helpers.assert_eq(calls.lease_phase, "active")
 		helpers.assert_eq(calls.resolve, 1,
 			"the settled active pipeline must resolve exactly once at its consumer")
 		helpers.assert_eq(calls.build, 1)
 		helpers.assert_eq(calls.deploy, 1)
-		helpers.assert_eq(calls.lease_start, 1,
-			"wake redeploy must reuse the active generation instead of opening a second lease")
+		helpers.assert_eq(calls.classifier_refresh, 1,
+			"the redeployed generation must refresh synthetic-output classification")
+		helpers.assert_eq(calls.lease_start, 0,
+			"an ACTIVE replacement must not start or replace the exact lease authority")
 		helpers.assert_eq(calls.rebind, 1,
 			"wake and input-source changes must share the shortcut-rebind path")
+		helpers.assert_eq(calls.lease_resume, 0)
+		local resolve_at = sequence_index(calls.sequence, "resolve")
+		local build_at = sequence_index(calls.sequence, "build")
+		local deploy_at = sequence_index(calls.sequence, "deploy")
+		local classifier_at = sequence_index(calls.sequence, "classifier-refresh")
+		local rebind_at = sequence_index(calls.sequence, "rebind")
+		helpers.assert_true(resolve_at < build_at and build_at < deploy_at)
+		helpers.assert_true(deploy_at < classifier_at and classifier_at < rebind_at)
 	end)
 
 	helpers.it("refreshes while paused but never redeploys", function()
-		local _, calls = load_remap({ paused = true })
+		local _, calls = load_remap({ paused = true, initial_phase = "paused" })
 		calls.sequence = {}
 
 		local callback_ok, callback_err = calls.wake(SCREENS_DID_UNLOCK)
@@ -375,7 +472,7 @@ helpers.describe("karabiner wake callback lifecycle", function()
 	end)
 
 	helpers.it("logs async step failures and refuses a stale-layout deploy", function()
-		local _, calls = load_remap({ resolve_raises = true })
+		local _, calls = load_remap({ resolve_raises = true, initial_phase = "active" })
 		calls.sequence = {}
 
 		local callback_ok, callback_err = calls.wake(SYSTEM_DID_WAKE)
@@ -401,7 +498,7 @@ helpers.describe("karabiner wake callback lifecycle", function()
 	end)
 
 	helpers.it("continues the settled layout pipeline after a logged lease-refresh failure", function()
-		local _, calls = load_remap({ refresh_raises = true })
+		local _, calls = load_remap({ refresh_raises = true, initial_phase = "active" })
 		local callback_ok, callback_err = calls.wake(SYSTEM_DID_WAKE)
 
 		helpers.assert_true(callback_ok, tostring(callback_err))
@@ -454,8 +551,279 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		disabled.stop()
 	end)
 
+	helpers.it("replays a settled wake immediately after heartbeat recovery", function()
+		local _, calls = load_remap()
+		calls.activate_initial()
+		reset_layout_observations(calls)
+		calls.refresh_enters_recovery = true
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		local original_timer = calls.latest_timer()
+		helpers.assert_true(original_timer.delay > 0,
+			"a new OS event must still wait for TIS to publish the new layout")
+		original_timer:fire()
+		helpers.assert_eq(calls.resolve, 0)
+		helpers.assert_eq(calls.build, 0)
+		helpers.assert_eq(calls.deploy, 0)
+		helpers.assert_eq(calls.rebind, 0)
+
+		calls.refresh_enters_recovery = false
+		calls.publish_phase("active")
+		local replay_timer = calls.latest_timer()
+		helpers.assert_true(replay_timer ~= original_timer)
+		helpers.assert_eq(replay_timer.delay, 0,
+			"a retained event that already paid the TIS debounce must replay next-turn")
+		replay_timer:fire()
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
+	helpers.it("coalesces repeated layout events retained during recovery", function()
+		local _, calls = load_remap()
+		calls.activate_initial()
+		reset_layout_observations(calls)
+		calls.refresh_enters_recovery = true
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		helpers.assert_true(calls.wake(SCREENS_DID_UNLOCK))
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 0)
+		helpers.assert_eq(calls.deploy, 0)
+
+		calls.refresh_enters_recovery = false
+		local timer_count_before_replay = #calls.timers
+		calls.publish_phase("active")
+		helpers.assert_eq(#calls.timers, timer_count_before_replay + 1,
+			"the newest durable record must own exactly one recovery replay")
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
+	for _, case in ipairs({
+		{ transient = "stopping", settled = "idle" },
+		{ transient = "fencing", settled = "failed" },
+	}) do
+		helpers.it("replays without redeploy after the exact lease settles " .. case.settled, function()
+			local _, calls = load_remap()
+			calls.activate_initial()
+			reset_layout_observations(calls)
+			calls.publish_phase(case.transient)
+
+			helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+			calls.latest_timer():fire()
+			helpers.assert_eq(calls.resolve, 0)
+			helpers.assert_eq(calls.deploy, 0)
+
+			calls.publish_phase(case.settled)
+			local replay_timer = calls.latest_timer()
+			helpers.assert_eq(replay_timer.delay, 0)
+			replay_timer:fire()
+			helpers.assert_eq(calls.resolve, 1)
+			helpers.assert_eq(calls.build, 0)
+			helpers.assert_eq(calls.deploy, 0)
+			helpers.assert_eq(calls.rebind, 1)
+			local timer_count = #calls.timers
+			calls.publish_phase("active")
+			helpers.assert_eq(#calls.timers, timer_count,
+				"the settled non-deploying pipeline must consume its durable record")
+		end)
+	end
+
+	helpers.it("refreshes Hammerspoon state without deploying from stable PREPARED", function()
+		local _, calls = load_remap({ initial_phase = "prepared" })
+		reset_layout_observations(calls)
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 0)
+		helpers.assert_eq(calls.deploy, 0)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
+	helpers.it("waits for both native PAUSED and the script pause commit", function()
+		local remap, calls = load_remap()
+		calls.activate_initial()
+		local pause_results = {}
+		helpers.assert_true(remap.pause(function(ok, reason)
+			pause_results[#pause_results + 1] = { ok = ok, reason = reason }
+			if ok then calls.set_script_paused(true) end
+		end))
+		reset_layout_observations(calls)
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		calls.publish_phase("paused")
+		local premature_replay = calls.latest_timer()
+		helpers.assert_eq(premature_replay.delay, 0)
+		premature_replay:fire()
+		helpers.assert_eq(calls.resolve, 0,
+			"native PAUSED alone must not consume a layout event before script-control commits")
+
+		calls.deliver_pause_callbacks(true, "paused")
+		helpers.assert_eq(#pause_results, 1)
+		helpers.assert_true(pause_results[1].ok)
+		local committed_replay = calls.latest_timer()
+		helpers.assert_true(committed_replay ~= premature_replay)
+		committed_replay:fire()
+		helpers.assert_eq(#pause_results, 1,
+			"layout replay must not resettle the originating pause transaction")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 0)
+		helpers.assert_eq(calls.deploy, 0)
+		helpers.assert_eq(calls.rebind, 0,
+			"paused bindings are rebuilt only by the eventual resume transaction")
+	end)
+
+	helpers.it("waits for both native ACTIVE and the script resume commit", function()
+		local remap, calls = load_remap({ initial_phase = "paused", paused = true })
+		local resume_results = {}
+		helpers.assert_true(remap.resume(function(ok, reason)
+			resume_results[#resume_results + 1] = { ok = ok, reason = reason }
+			if ok then calls.set_script_paused(false) end
+		end))
+		reset_layout_observations(calls)
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		calls.publish_phase("active")
+		local premature_replay = calls.latest_timer()
+		premature_replay:fire()
+		helpers.assert_eq(calls.resolve, 0,
+			"native ACTIVE alone must not consume a layout event before script-control commits")
+
+		calls.deliver_resume_callbacks(true, "resumed")
+		helpers.assert_eq(#resume_results, 1)
+		helpers.assert_true(resume_results[1].ok)
+		local committed_replay = calls.latest_timer()
+		helpers.assert_true(committed_replay ~= premature_replay)
+		helpers.assert_eq(committed_replay.delay, 0)
+		committed_replay:fire()
+		helpers.assert_eq(#resume_results, 1,
+			"layout replay must not resettle the originating resume transaction")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
+	helpers.it("retains a layout change until an enable transaction commits", function()
+		local remap, calls = load_remap({ enabled = false })
+		local enable_results = {}
+		helpers.assert_true(remap.set_enabled(true, function(ok, reason)
+			enable_results[#enable_results + 1] = { ok = ok, reason = reason }
+		end))
+		reset_layout_observations(calls)
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 0,
+			"the previous disabled value must not consume work owned by an enable transaction")
+		calls.publish_phase("paused")
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 0)
+		calls.deliver_start_callbacks(true, "ready-paused")
+		calls.publish_phase("active")
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 0,
+			"ACTIVE publication precedes the enabled transaction commit callback")
+
+		calls.deliver_resume_callbacks(true, "resumed")
+		helpers.assert_eq(#enable_results, 1)
+		helpers.assert_true(enable_results[1].ok)
+		calls.latest_timer():fire()
+		helpers.assert_eq(#enable_results, 1,
+			"layout replay must not resettle the originating enable transaction")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
+	helpers.it("replays in disabled mode only after STOPPED and preference commit", function()
+		local remap, calls = load_remap()
+		calls.activate_initial()
+		local disable_results = {}
+		helpers.assert_true(remap.set_enabled(false, function(ok, reason)
+			disable_results[#disable_results + 1] = { ok = ok, reason = reason }
+		end))
+		reset_layout_observations(calls)
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.resolve, 0)
+		calls.publish_phase("idle")
+		local premature_replay = calls.latest_timer()
+		helpers.assert_eq(premature_replay.delay, 0)
+		premature_replay:fire()
+		helpers.assert_eq(calls.resolve, 0,
+			"IDLE publication alone must not outrun the disable transaction callback")
+		calls.deliver_stop_callbacks(true, "stopped")
+		helpers.assert_eq(#disable_results, 1)
+		helpers.assert_true(disable_results[1].ok)
+		local replay_timer = calls.latest_timer()
+		helpers.assert_eq(replay_timer.delay, 0)
+		replay_timer:fire()
+		helpers.assert_eq(#disable_results, 1,
+			"layout replay must not resettle the originating disable transaction")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 0)
+		helpers.assert_eq(calls.deploy, 0)
+		helpers.assert_eq(calls.rebind, 1,
+			"disabled Karabiner must not disable Hammerspoon layout maintenance")
+	end)
+
+	helpers.it("serializes a retained layout event behind disable rollback recovery", function()
+		local remap, calls = load_remap()
+		calls.activate_initial()
+		local disable_results = {}
+		helpers.assert_true(remap.set_enabled(false, function(ok, reason)
+			disable_results[#disable_results + 1] = { ok = ok, reason = reason }
+		end))
+		reset_layout_observations(calls)
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		calls.latest_timer():fire()
+
+		calls.deliver_stop_failure("synthetic-stop-failure")
+		local rollback_builds = calls.build
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.build, rollback_builds,
+			"FAILED publication must not race the private rollback transaction")
+		reset_layout_observations(calls)
+		calls.publish_phase("paused")
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.build, 0,
+			"a public layout rebuild must not race the private rollback generation")
+		calls.deliver_start_callbacks(true, "ready-paused")
+		calls.publish_phase("active")
+		calls.latest_timer():fire()
+		helpers.assert_eq(calls.build, 0)
+
+		calls.deliver_resume_callbacks(true, "resumed")
+		helpers.assert_eq(#disable_results, 1)
+		helpers.assert_true(disable_results[1].ok == false)
+		calls.latest_timer():fire()
+		helpers.assert_eq(#disable_results, 1,
+			"rollback replay must not resettle the failed disable transaction")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(calls.rebind, 1)
+	end)
+
 	helpers.it("rejects a cancelled timer callback without erasing its replacement", function()
 		local _, calls = load_remap()
+		calls.activate_initial()
+		calls.sequence = {}
+		calls.resolve = 0
+		calls.build = 0
+		calls.deploy = 0
+		calls.rebind = 0
 		calls.wake(SYSTEM_DID_WAKE)
 		local first = calls.latest_timer()
 		calls.wake(SCREENS_DID_UNLOCK)
@@ -472,6 +840,8 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		helpers.assert_eq(calls.resolve, 1)
 		helpers.assert_eq(calls.deploy, 1)
 		helpers.assert_eq(calls.rebind, 1)
+		helpers.assert_eq(calls.lease_pause, 0)
+		helpers.assert_eq(calls.lease_phase, "active")
 	end)
 
 	helpers.it("rejects a timer that fires before its handle can be retained", function()

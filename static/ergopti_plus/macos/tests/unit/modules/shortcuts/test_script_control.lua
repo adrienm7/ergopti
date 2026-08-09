@@ -411,8 +411,10 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 		if not src then return end
 		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
 			"layout-change handler must consult the pause state")
-		helpers.assert_true(src:find("if paused then", 1, true) ~= nil,
-			"layout-change handler must branch on the settled pause state")
+		helpers.assert_true(src:find('phase == "paused" and paused == true', 1, true) ~= nil,
+			"native PAUSED and the script pause commit must agree before consumption")
+		helpers.assert_true(src:find('if settled_mode == "paused" then', 1, true) ~= nil,
+			"layout-change handler must branch on the proven settled pause mode")
 		helpers.assert_true(src:find("not redeploying", 1, true) ~= nil,
 			"paused layout refresh must explicitly return without redeploying")
 	end)

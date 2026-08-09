@@ -120,6 +120,8 @@ M.MOD_COMBOS = {}
 -- from a menu "Reload") must not re-prompt the user.
 local _wizard_ran_this_session  = false
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
+local _pending_layout_refresh   = nil  -- Latest settled-layout pipeline deferred by a lease transition
+local schedule_layout_refresh  = nil  -- Forward declaration used by the lease-phase callback
 -- Wake-from-sleep watcher. Held at module scope so it survives past the function
 -- that arms it: an hs.caffeinate.watcher referenced only by a local is collected
 -- and stops delivering, silently.
@@ -811,6 +813,58 @@ local function start_or_join_lease_activation(options, on_done)
 	return accepted_or_err == true or transaction.ok == true
 end
 
+local LAYOUT_REGENERATION_DEFER_REASONS = {
+	["disable-in-progress"] = true,
+	["enabled-transition-in-progress"] = true,
+	["lease-transition-in-progress"] = true,
+	["pause-intent-pending"] = true,
+}
+
+--- Leaves the exact newest scheduled layout record pending across a transient
+--- lease state. Identity prevents an older async completion from owning a newer
+--- input-source event.
+--- @param pending table Exact scheduled layout record.
+--- @param reason string Stable transient rejection reason.
+--- @return boolean retained
+local function retain_layout_refresh(pending, reason)
+	if _pending_layout_refresh ~= pending or not _running or _shutdown_requested
+		or _state == nil or _lifecycle_epoch ~= pending.epoch then return false end
+	Logger.info(LOG, "Deferred %s layout refresh until the exact lease settles (%s).",
+		tostring(pending.source), tostring(reason))
+	return true
+end
+
+--- Schedules one retained layout pipeline after the lease reaches a safe phase.
+--- A newer debounce timer already represents equal-or-newer layout state and
+--- therefore subsumes the retained record.
+--- @return boolean scheduled
+local function replay_pending_layout_refresh()
+	local pending = _pending_layout_refresh
+	if not pending then return false end
+	if not _running or _shutdown_requested or _state == nil
+		or _lifecycle_epoch ~= pending.epoch then
+		_pending_layout_refresh = nil
+		return false
+	end
+	if _layout_rebuild_timer then
+		-- The retained timer was scheduled by this record or a newer event.
+		return true
+	end
+	if type(schedule_layout_refresh) ~= "function" then
+		Logger.error(LOG, "Deferred layout refresh scheduler is unavailable.")
+		return false
+	end
+	-- A record retained after its owning timer fired has already paid the TIS
+	-- debounce and can re-enter on the next runloop turn. A record whose timer
+	-- could not be armed must still wait the full settle interval.
+	return schedule_layout_refresh(
+		pending.layout_name,
+		pending.source,
+		pending.epoch,
+		pending.tis_settled
+	) == true
+end
+
 --- Releases derivative state after every settled non-active lease transition.
 --- In-flight pause/resume commands retain the last settled classification until
 --- their ACK, avoiding a double-count window while Karabiner still has old state.
@@ -834,6 +888,10 @@ local function on_lease_phase(phase)
 		clear_managed_output_set()
 		stop_lease_bound_inputs()
 		KeLifecycle.stop()
+	end
+	if phase == "active" or phase == "paused" or phase == "prepared"
+		or phase == "idle" or phase == "failed" then
+		replay_pending_layout_refresh()
 	end
 end
 
@@ -896,6 +954,39 @@ local function query_shortcuts_pause_state(label)
 	return true, result.shortcuts, result.paused
 end
 
+--- Classifies whether a retained layout event may be consumed right now.
+--- Enabled-state transitions are authoritative even when `_state.enabled` still
+--- carries the previous committed value. For a live integration, both the exact
+--- native phase and Hammerspoon's published pause state must describe the same
+--- settled mode before any layout-dependent state is mutated.
+--- @param paused boolean Strict Hammerspoon pause state.
+--- @return string|nil mode `active`, `paused`, `inactive`, or `disabled` when settled.
+--- @return string|nil reason Stable transient reason when not settled.
+local function settled_layout_refresh_mode(paused)
+	if _enabled_transition ~= nil then return nil, "enabled-transition-in-progress" end
+	if _state.enabled == false then return "disabled", nil end
+	if _state.enabled ~= true then return nil, "enabled-state-unavailable" end
+
+	local status_ok, phase, snapshot = pcall(LeaseController.status)
+	if not status_ok or type(snapshot) ~= "table"
+		or type(snapshot.activation_blocked) ~= "boolean" then
+		return nil, "lease-status-unavailable"
+	end
+	-- Direct menu Stop, a fully fenced controller failure, and an observable
+	-- PREPARED token intentionally have no live generation. They are stable
+	-- non-deploying modes; a future explicit Start re-resolves the layout again
+	-- before publishing a fresh generation.
+	if phase == "prepared" or phase == "idle" or phase == "failed" then
+		return paused == true and "paused" or "inactive", nil
+	end
+	if type(snapshot.token) ~= "string" then return nil, "lease-status-unavailable" end
+	if phase == "paused" and paused == true then return "paused", nil end
+	if phase == "active" and paused == false and snapshot.activation_blocked == false then
+		return "active", nil
+	end
+	return nil, "lease-transition-in-progress"
+end
+
 --- Executes the one canonical post-TIS-settle layout refresh pipeline.
 --- Both input-source notifications and wake events schedule this function.
 --- @param layout_name string|nil Notification layout label, if known.
@@ -903,82 +994,139 @@ end
 --- @param epoch integer Scheduling lifecycle epoch.
 local function perform_settled_layout_refresh(layout_name, source, epoch)
 	if not is_current_lifecycle(epoch) then return end
+	local pending = _pending_layout_refresh
+	if not pending or pending.epoch ~= epoch then return end
 	local pause_ok, shortcuts, paused = query_shortcuts_pause_state(
 		"Settled " .. source .. " pause-state query"
 	)
-	if not pause_ok or not is_current_lifecycle(epoch) then return end
+	if not pause_ok or not is_current_lifecycle(epoch)
+		or _pending_layout_refresh ~= pending then return end
+	local settled_mode, unsettled_reason = settled_layout_refresh_mode(paused)
+	if not settled_mode then
+		retain_layout_refresh(pending, unsettled_reason)
+		return
+	end
+
+	local function consume_pending()
+		if _pending_layout_refresh == pending then _pending_layout_refresh = nil end
+	end
+	local function rebind_if_current()
+		if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
+		if type(shortcuts.rebind_for_layout) == "function" then
+			local rebind_ok, rebound = run_async_step(
+				"Settled " .. source .. " shortcut rebind",
+				shortcuts.rebind_for_layout
+			)
+			if not rebind_ok then return end
+			if rebound then
+				Logger.info(LOG, "Shortcuts rebound for layout '%s'.",
+					tostring(layout_name or "current"))
+			else
+				Logger.debug(LOG, "Shortcuts not rebound for layout '%s' — layer is stopped.",
+					tostring(layout_name or "current"))
+			end
+		end
+		consume_pending()
+	end
 
 	local resolved_count = nil
-	if paused or not _state.enabled then
+	if settled_mode ~= "active" then
 		local resolved_ok
 		resolved_ok, resolved_count = resolve_current_layout_actions(
 			"Settled " .. source .. " layout-action resolution"
 		)
-		if not resolved_ok or not is_current_lifecycle(epoch) then return end
+		if not resolved_ok or not is_current_lifecycle(epoch)
+			or _pending_layout_refresh ~= pending then return end
 	end
 
-	if paused then
+	if settled_mode == "paused" then
 		Logger.info(LOG, "%s refresh: re-resolved %s action(s), not redeploying — script is paused.",
 			source, tostring(resolved_count))
+		consume_pending()
 		return
 	end
 
-	if _state.enabled then
+	if settled_mode == "active" then
 		-- regenerate() owns the one active-mode resolution immediately before its
 		-- consumer. Resolving here as well would double the layout hot-path walk.
-		local regenerate_ok, accepted = run_async_step(
-			"Settled " .. source .. " Karabiner regeneration",
-			function() return M.regenerate() end
-		)
-		if not regenerate_ok or accepted ~= true then
-			if regenerate_ok then
-				Logger.error(LOG, "Settled %s Karabiner regeneration was rejected.", source)
+		local callback_fired = false
+		local function finish_regeneration(regenerated, reason)
+			if callback_fired then
+				Logger.warn(LOG, "Duplicate settled %s regeneration callback ignored.", source)
+				return
 			end
+			callback_fired = true
+			if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
+			if regenerated ~= true then
+				if LAYOUT_REGENERATION_DEFER_REASONS[reason] then
+					retain_layout_refresh(pending, reason)
+				else
+					Logger.error(LOG, "Settled %s Karabiner regeneration failed: %s.",
+						source, tostring(reason))
+				end
+				return
+			end
+			if reason == "ready-paused-by-user-intent" then
+				consume_pending()
+				return
+			end
+			rebind_if_current()
+		end
+		local regenerate_ok, accepted_or_err = xpcall(function()
+			return M.regenerate(finish_regeneration)
+		end, debug.traceback)
+		if not regenerate_ok then
+			Logger.error(LOG, "Settled %s Karabiner regeneration raised: %s.",
+				source, tostring(accepted_or_err))
 			return
 		end
-	else
+		if accepted_or_err ~= true and not callback_fired then
+			finish_regeneration(false, "regeneration-request-rejected")
+		end
+		return
+	elseif settled_mode == "disabled" then
 		Logger.info(LOG, "%s refresh: re-resolved %s action(s); bridge disabled, no redeploy.",
 			source, tostring(resolved_count))
+	else
+		Logger.info(LOG, "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy.",
+			source, tostring(resolved_count))
 	end
-	if not is_current_lifecycle(epoch) then return end
-
-	if type(shortcuts.rebind_for_layout) == "function" then
-		local rebind_ok, rebound = run_async_step(
-			"Settled " .. source .. " shortcut rebind",
-			shortcuts.rebind_for_layout
-		)
-		if rebind_ok and rebound then
-			Logger.info(LOG, "Shortcuts rebound for layout '%s'.", tostring(layout_name or "current"))
-		elseif rebind_ok then
-			Logger.debug(LOG, "Shortcuts not rebound for layout '%s' — layer is stopped.",
-				tostring(layout_name or "current"))
-		end
-	end
+	rebind_if_current()
 end
 
 --- Debounces layout work until macOS TIS has published the post-event key map.
 --- @param layout_name string|nil Notification layout label, if known.
 --- @param source string Stable event source for diagnostics.
 --- @param epoch integer Scheduling lifecycle epoch.
+--- @param tis_settled boolean|nil True when a retained event already paid the TIS debounce.
 --- @return boolean scheduled
-local function schedule_layout_refresh(layout_name, source, epoch)
+schedule_layout_refresh = function(layout_name, source, epoch, tis_settled)
 	if not is_current_lifecycle(epoch) then return false end
 	if _layout_rebuild_timer then
 		pcall(function() _layout_rebuild_timer:stop() end)
 		_layout_rebuild_timer = nil
 	end
+	local pending = {
+		layout_name = layout_name,
+		source = source,
+		epoch = epoch,
+		tis_settled = tis_settled == true,
+	}
+	_pending_layout_refresh = pending
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local timer_ok, timer_or_err = pcall(hs.timer.doAfter, LAYOUT_TIS_SETTLE_SEC, function()
+	local timer_ok, timer_or_err = pcall(hs.timer.doAfter,
+		pending.tis_settled and 0 or LAYOUT_TIS_SETTLE_SEC, function()
 		if not armed then
 			fired_before_arm = true
 			return
 		end
 		-- A stopped callback can already be queued when a newer event replaces it.
 		-- Only the currently retained timer may clear the handle or perform work.
-		if _layout_rebuild_timer ~= timer then return end
+		if _layout_rebuild_timer ~= timer or _pending_layout_refresh ~= pending then return end
 		_layout_rebuild_timer = nil
+		pending.tis_settled = true
 		local ok = run_async_step("Delayed " .. source .. " layout refresh", function()
 			perform_settled_layout_refresh(layout_name, source, epoch)
 		end)
@@ -1105,6 +1253,7 @@ function M.set_enabled(value, on_done)
 						tostring(stop_reason))
 				end
 				_enabled_transition = nil
+				replay_pending_layout_refresh()
 				Logger.warn(LOG, "Karabiner enable transaction remained disabled after teardown (%s).",
 					tostring(stop_reason))
 				settle_enabled_callbacks(transaction, false, enable_reason or "enable-failed")
@@ -1127,6 +1276,7 @@ function M.set_enabled(value, on_done)
 			if _enabled_transition ~= transaction then return end
 			if ok == true and transaction.committed == true then
 				_enabled_transition = nil
+				replay_pending_layout_refresh()
 				Logger.info(LOG, "Karabiner integration enabled after READY acknowledgement.")
 				settle_enabled_callbacks(transaction, true, reason or "ready")
 				return
@@ -1154,6 +1304,7 @@ function M.set_enabled(value, on_done)
 	local function finish_recovery(recovered, recovery_reason, disable_reason)
 		if _enabled_transition ~= transaction then return end
 		_enabled_transition = nil
+		replay_pending_layout_refresh()
 		if recovered then
 			Logger.warn(LOG, "Disable failed; the previous enabled state was restored after READY.")
 		else
@@ -1196,6 +1347,7 @@ function M.set_enabled(value, on_done)
 		clear_managed_output_set()
 		stop_lease_bound_inputs()
 		_enabled_transition = nil
+		replay_pending_layout_refresh()
 		Logger.info(LOG, "Karabiner integration disabled after exact lease fencing.")
 		settle_enabled_callbacks(transaction, true, reason or "stopped")
 	end)
@@ -1510,6 +1662,12 @@ function M.regenerate(on_done, recovery_capability)
 		return false
 	end
 	if not require_state("regenerate") then return fail("not-initialized") end
+	local has_private_capability = is_enable_transition
+		or is_disable_recovery or is_resume_regeneration
+	if recovery_capability ~= nil and not has_private_capability then
+		Logger.error(LOG, "Karabiner regeneration refused an invalid private recovery capability.")
+		return fail("invalid-recovery-capability")
+	end
 	if _shutdown_requested then
 		Logger.debug(LOG, "Regenerate skipped — exact lease shutdown is in progress.")
 		return fail("shutdown-in-progress")
@@ -1517,6 +1675,10 @@ function M.regenerate(on_done, recovery_capability)
 	if _enabled_transition and _enabled_transition.kind == "disabling" then
 		Logger.debug(LOG, "Regenerate skipped — Karabiner disable fencing is in progress.")
 		return fail("disable-in-progress")
+	end
+	if recovery_capability == nil and _enabled_transition ~= nil then
+		Logger.debug(LOG, "Regenerate skipped — a Karabiner enabled-state transition is in progress.")
+		return fail("enabled-transition-in-progress")
 	end
 	if not _state.enabled and not is_enable_transition then
 		Logger.debug(LOG, "Regenerate skipped — Karabiner integration is disabled.")
@@ -1542,6 +1704,24 @@ function M.regenerate(on_done, recovery_capability)
 		and not is_resume_regeneration then
 		Logger.info(LOG, "Regenerate skipped — script is paused (« pause = tout éteint »).")
 		return fail("script-paused")
+	end
+
+	if recovery_capability == nil then
+		local status_ok, phase, snapshot = pcall(LeaseController.status)
+		if not status_ok or type(snapshot) ~= "table"
+			or type(snapshot.activation_blocked) ~= "boolean" then
+			return fail("lease-status-unavailable")
+		end
+		if snapshot.activation_blocked == true then
+			Logger.info(LOG,
+				"Karabiner regeneration deferred — an exact pause or stop intent is pending.")
+			return fail("pause-intent-pending")
+		end
+		if phase == "pausing" or phase == "resuming" or phase == "recovering"
+			or phase == "fencing" or phase == "stopping" then
+			Logger.error(LOG, "Karabiner regeneration refused during lease phase '%s'.", tostring(phase))
+			return fail("lease-transition-in-progress")
+		end
 	end
 	Logger.start(LOG, "Regenerating Karabiner config…")
 
@@ -1739,6 +1919,7 @@ function M.pause(on_done)
 				Logger.error(LOG, "Karabiner pause variable update failed: %s.", tostring(reason))
 			end
 			invoke_public_callback("pause", on_done, ok == true, reason)
+			replay_pending_layout_refresh()
 		end)
 	end, debug.traceback)
 	if not request_ok or requested_or_err ~= true then
@@ -1749,6 +1930,7 @@ function M.pause(on_done)
 		if not callback_fired then
 			invoke_public_callback("pause", on_done, false,
 				request_ok and "request-rejected" or "request-raised")
+			replay_pending_layout_refresh()
 		end
 		return false
 	end
@@ -1782,6 +1964,7 @@ function M.resume(on_done)
 				tostring(reason))
 		end
 		invoke_public_callback("resume", on_done, ok == true, reason)
+		replay_pending_layout_refresh()
 	end
 
 	local call_ok, requested_or_err = xpcall(function()
@@ -2122,6 +2305,7 @@ local function stop_local_resources()
 	_running = false
 	_shutdown_requested = true
 	_lifecycle_epoch = _lifecycle_epoch + 1
+	_pending_layout_refresh = nil
 	local all_stopped = true
 	if _wake_watcher then
 		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
@@ -2202,6 +2386,7 @@ function M.revoke(reason, on_done)
 		_shutdown_requested = true
 		_lifecycle_epoch = _lifecycle_epoch + 1
 	end
+	_pending_layout_refresh = nil
 	local callback_fired = false
 	local callback_succeeded = false
 	local function settle_revoke(ok, detail)
