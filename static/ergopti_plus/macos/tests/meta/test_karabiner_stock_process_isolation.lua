@@ -730,13 +730,13 @@ local function collection_items(expression)
 	return nil
 end
 
---- Proves the complete argv shape for the only permitted stock-state command.
+--- Proves the complete argv shape for the only permitted CLI variable commands.
 --- @param expression string Lua table or Swift array expression.
 --- @param constants table Lowercase identifier-to-string map.
 --- @param includes_executable boolean Whether argv[0] is present.
 --- @param aliases table Canonical CLI aliases.
 --- @return boolean valid Whether the shape is exactly CLI, flag, payload.
-local function is_exact_set_variables_arguments(expression, constants, includes_executable, aliases)
+local function is_exact_variable_arguments(expression, constants, includes_executable, aliases)
 	local items = collection_items(expression)
 	local expected_count = includes_executable and 3 or 2
 	if not items or #items ~= expected_count then return false end
@@ -747,11 +747,13 @@ local function is_exact_set_variables_arguments(expression, constants, includes_
 		return false
 	end
 	local flag = fold_constant_string(items[flag_index], constants)
-	if flag ~= "--set-variables" then return false end
+	if flag ~= "--set-variables" and flag ~= "--get-variable" then return false end
 	return items[flag_index + 1]:find("%S") ~= nil
 end
 
---- Tracks argv arrays proven to contain only CLI, --set-variables and payload.
+local CLI_BOUNDARY_OFFENDER = "karabiner_cli command outside exact variable boundary"
+
+--- Tracks argv arrays proven to contain only CLI, a variable flag and payload.
 --- @param statements table Comment-free source statements.
 --- @param constants table Lowercase identifier-to-string map.
 --- @param aliases table Canonical CLI aliases.
@@ -767,7 +769,7 @@ local function collect_exact_cli_argument_arrays(statements, constants, aliases)
 			"%f[%w_]let%s+([%a_][%w_]*)%s*=%s*duplicateleasearguments"
 		)
 		if name and arguments
-			and is_exact_set_variables_arguments(arguments, constants, true, aliases) then
+			and is_exact_variable_arguments(arguments, constants, true, aliases) then
 			arrays[name] = true
 		end
 	end
@@ -908,10 +910,26 @@ local function find_offenders(source)
 					local arguments_index = call_index == 2 and 3 or 2
 					local arguments = call_argument(statement, call_pattern, arguments_index)
 					if not arguments
-						or not is_exact_set_variables_arguments(
+						or not is_exact_variable_arguments(
 							arguments, constants, false, cli_aliases) then
-						add("karabiner_cli command outside exact --set-variables boundary")
+						add(CLI_BOUNDARY_OFFENDER)
 					end
+				end
+			end
+		end
+		-- hs.task.new is commonly passed as the first argument to pcall rather
+		-- than called directly. Treat that call shape as a real spawn boundary;
+		-- otherwise a multiline alias can bypass every canonical-CLI assertion.
+		local protected_target = call_argument(statement, "%f[%w_]pcall", 1)
+		if protected_target
+			and protected_target:lower():match("^%s*hs%s*%.%s*task%s*%.%s*new%s*$") then
+			local executable = call_argument(statement, "%f[%w_]pcall", 2)
+			if executable and is_canonical_cli_expression(executable, constants, cli_aliases) then
+				local arguments = call_argument(statement, "%f[%w_]pcall", 4)
+				if not arguments
+					or not is_exact_variable_arguments(
+						arguments, constants, false, cli_aliases) then
+					add(CLI_BOUNDARY_OFFENDER)
 				end
 			end
 		end
@@ -924,9 +942,9 @@ local function find_offenders(source)
 			if raw_items and #raw_items > 0
 				and (is_canonical_cli_expression(raw_items[1], constants, cli_aliases)
 					or raw_items[1]:lower():match("^%s*clipath%s*$") ~= nil)
-				and not is_exact_set_variables_arguments(
+				and not is_exact_variable_arguments(
 					raw_arguments, constants, true, cli_aliases) then
-				add("karabiner_cli command outside exact --set-variables boundary")
+				add(CLI_BOUNDARY_OFFENDER)
 			end
 		end
 		local posix_executable = call_argument(
@@ -946,11 +964,11 @@ local function find_offenders(source)
 					5
 				)
 				if not posix_arguments
-					or (not is_exact_set_variables_arguments(
+					or (not is_exact_variable_arguments(
 							posix_arguments, constants, true, cli_aliases)
 						and not uses_exact_cli_argument_buffer(
 							statement, posix_arguments, exact_cli_argument_arrays)) then
-					add("karabiner_cli command outside exact --set-variables boundary")
+					add(CLI_BOUNDARY_OFFENDER)
 				end
 			end
 		end
@@ -977,7 +995,7 @@ local function find_offenders(source)
 			local record = swift_processes[key] or {}
 			record.arguments_tainted = is_tainted(arguments_expression, tainted)
 				or has_folded_stock_target(arguments_expression, constants)
-			record.valid_cli_arguments = is_exact_set_variables_arguments(
+			record.valid_cli_arguments = is_exact_variable_arguments(
 				arguments_expression, constants, false, cli_aliases)
 			swift_processes[key] = record
 		end
@@ -987,7 +1005,7 @@ local function find_offenders(source)
 			if record then
 				if record.stock then add("stock Karabiner process auto-launch") end
 				if record.cli and not record.valid_cli_arguments then
-					add("karabiner_cli command outside exact --set-variables boundary")
+					add(CLI_BOUNDARY_OFFENDER)
 				end
 				if record.kill and record.arguments_tainted then
 					add("stock Karabiner kill")
@@ -1009,9 +1027,9 @@ local function find_offenders(source)
 				)
 				arguments = arguments and arguments:gsub("^%s*arguments%s*:%s*", "") or nil
 				if not arguments
-					or not is_exact_set_variables_arguments(
+					or not is_exact_variable_arguments(
 						arguments, constants, false, cli_aliases) then
-					add("karabiner_cli command outside exact --set-variables boundary")
+					add(CLI_BOUNDARY_OFFENDER)
 				end
 			elseif has_exact_executable(static_process_executable, constants, "/bin/kill") then
 				local arguments = call_argument(
@@ -1068,7 +1086,7 @@ local function find_offenders(source)
 			local record = line_processes[key] or {}
 			record.arguments_tainted = is_tainted(arguments_expression, tainted)
 				or has_folded_stock_target(arguments_expression, constants)
-			record.valid_cli_arguments = is_exact_set_variables_arguments(
+			record.valid_cli_arguments = is_exact_variable_arguments(
 				arguments_expression, constants, false, cli_aliases)
 			line_processes[key] = record
 		end
@@ -1078,7 +1096,7 @@ local function find_offenders(source)
 			if record then
 				if record.stock then add("stock Karabiner process auto-launch") end
 				if record.cli and not record.valid_cli_arguments then
-					add("karabiner_cli command outside exact --set-variables boundary")
+					add(CLI_BOUNDARY_OFFENDER)
 				end
 				if record.kill and record.arguments_tainted then add("stock Karabiner kill") end
 			end
@@ -1230,6 +1248,15 @@ try Process.run(URL(fileURLWithPath: "/Applications/Karabiner-Elements.app/Conte
 ShellRunner.spawn(KePaths.CLI, { "--set-variables", payload }, onDone)
 ]],
 			[[
+local KARABINER_CLI = KePaths.CLI
+local ok, task = pcall(
+	hs.task.new,
+	KARABINER_CLI,
+	onDone,
+	{ "--get-variable", scoped_name }
+)
+]],
+			[[
 let cli = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 let process = Process()
 process.executableURL = URL(fileURLWithPath: cli)
@@ -1248,9 +1275,18 @@ posix_spawn(&childPID, cli, nil, nil, [cli, "--set-variables", payload], nil)
 		end
 	end)
 
-	helpers.it("stock-process isolation: rejects every other canonical CLI subcommand", function()
+	helpers.it("stock-process isolation: rejects CLI commands outside exact variable operations", function()
 		local mutants = {
 			[[ShellRunner.spawn(KePaths.CLI, { "--show-current-profile-name" })]],
+			[[
+local KARABINER_CLI = KePaths.CLI
+local ok, task = pcall(
+	hs.task.new,
+	KARABINER_CLI,
+	onDone,
+	{ "--select-profile", "Gaming" }
+)
+]],
 			[[
 let cli = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 let process = Process()
@@ -1284,7 +1320,7 @@ final class Mutant {
 		for index, source in ipairs(mutants) do
 			helpers.assert_eq(
 				find_offenders(source)[1],
-				"karabiner_cli command outside exact --set-variables boundary",
+				CLI_BOUNDARY_OFFENDER,
 				"canonical CLI subcommand mutant must be rejected #" .. index
 			)
 		end
