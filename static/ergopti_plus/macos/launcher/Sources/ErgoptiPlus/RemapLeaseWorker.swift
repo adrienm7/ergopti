@@ -1,4 +1,4 @@
-// Sources/ErgoptiPlus/KarabinerLeaseWorker.swift
+// Sources/ErgoptiPlus/RemapLeaseWorker.swift
 
 // ==============================================================================
 // MODULE: Karabiner Lease Worker
