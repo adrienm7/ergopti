@@ -149,6 +149,48 @@ helpers.describe("hotkey_registrar: unbind", function()
 		helpers.assert_eq(second, false, "and must report that there was nothing to release")
 	end)
 
+	helpers.it("retains and disables a handle when delete throws, then retries it", function()
+		local adapter, hs_stub = fresh()
+		local handle = adapter.bind("Ctrl+T", function() end)
+		local hotkey = hs_stub.hotkey._bound[1]
+		local original_delete = hotkey.delete
+		local attempts = 0
+		function hotkey:delete()
+			attempts = attempts + 1
+			if attempts == 1 then error("synthetic delete failure") end
+			return original_delete(self)
+		end
+
+		helpers.assert_eq(adapter.unbind(handle), false)
+		helpers.assert_eq(adapter.live_count(), 1,
+			"a failed OS delete must retain the only retry capability")
+		helpers.assert_eq(adapter.chord_of(handle), "Ctrl+T")
+		helpers.assert_eq(hotkey.enabled, false,
+			"the leaked global capture must be disabled while awaiting retry")
+
+		helpers.assert_eq(adapter.unbind(handle), true)
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_eq(hotkey.deleted, true)
+		helpers.assert_eq(adapter.live_count(), 0)
+	end)
+
+	helpers.it("fences callback delivery when both native delete and disable throw", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		local handle = adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+		local hotkey = hs_stub.hotkey._bound[1]
+		function hotkey:delete() error("synthetic delete failure") end
+		function hotkey:disable() error("synthetic disable failure") end
+
+		helpers.assert_eq(adapter.unbind(handle), false,
+			"the retained native object still requires a later delete retry")
+		hotkey.pressed_fn()
+		helpers.assert_eq(fired, 0,
+			"a native teardown failure must not deliver a logically revoked action")
+		helpers.assert_eq(adapter.live_count(), 1,
+			"the opaque handle must remain available for exact cleanup retry")
+	end)
+
 	helpers.it("reports false for a handle it never issued", function()
 		local adapter = fresh()
 		helpers.assert_eq(adapter.unbind("hotkey#999"), false,
@@ -188,6 +230,28 @@ helpers.describe("hotkey_registrar: setEnabled", function()
 		helpers.assert_eq(hs_stub.hotkey._bound[1].deleted, false,
 			"a suspend that deleted the hotkey could never be resumed")
 		helpers.assert_eq(adapter.chord_of(handle), "Ctrl+T", "and the handle must stay known")
+	end)
+
+	helpers.it("keeps delivery fenced and retries a failed native disable", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		local handle = adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+		local hotkey = hs_stub.hotkey._bound[1]
+		local original_disable = hotkey.disable
+		local attempts = 0
+		function hotkey:disable()
+			attempts = attempts + 1
+			if attempts == 1 then error("synthetic disable failure") end
+			return original_disable(self)
+		end
+
+		helpers.assert_eq(adapter.setEnabled(handle, false), false)
+		hotkey.pressed_fn()
+		helpers.assert_eq(fired, 0,
+			"logical suspension must not depend on the native disable succeeding")
+		helpers.assert_eq(adapter.setEnabled(handle, false), true,
+			"an unsettled native disable must remain retryable")
+		helpers.assert_eq(attempts, 2)
 	end)
 
 	helpers.it("resumes", function()
