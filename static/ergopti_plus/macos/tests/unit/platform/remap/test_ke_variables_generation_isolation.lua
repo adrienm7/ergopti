@@ -81,6 +81,7 @@ local function replay_old_writer_after_reload(logical_name, personal_value)
 					task.started = true
 					return true
 				end,
+				terminate = function() return true end,
 			}
 		end,
 	}

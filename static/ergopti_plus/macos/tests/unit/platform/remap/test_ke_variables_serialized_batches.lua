@@ -78,6 +78,10 @@ local function fresh_bridge(options)
 		cancel_results = options.cancel_results or {},
 		cancel_handles = {},
 		cancel_calls = 0,
+		terminate_results = options.terminate_results or {},
+		terminate_throws = options.terminate_throws or {},
+		terminate_handles = {},
+		terminate_calls = 0,
 		lease_phase = "active",
 		current_token = TOKEN,
 	}
@@ -171,6 +175,15 @@ local function fresh_bridge(options)
 				end,
 				terminate = function()
 					task.terminate_calls = (task.terminate_calls or 0) + 1
+					ctx.terminate_calls = ctx.terminate_calls + 1
+					ctx.terminate_handles[ctx.terminate_calls] = task
+					if ctx.terminate_throws[ctx.terminate_calls] then
+						error("injected child termination failure #" .. tostring(ctx.terminate_calls))
+					end
+					local configured = ctx.terminate_results[ctx.terminate_calls]
+					if configured == "nil" then return nil end
+					if configured == nil then return true end
+					return configured
 				end,
 			}
 		end,
@@ -746,6 +759,31 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"the retained native timer must become settled after the retry succeeds")
 		helpers.assert_true(ctx.cancel_handles[3] == ctx.timers[2],
 			"after draining the backlog, cleanup must still cancel the current exact watchdog")
+	end)
+
+	helpers.it("retains every unsettled child termination and retries the same exact handle", function()
+		for _, case in ipairs({
+			{ label = "false", options = { terminate_results = { false, true } } },
+			{ label = "nil", options = { terminate_results = { "nil", true } } },
+			{ label = "throw", options = { terminate_throws = { true, false } } },
+		}) do
+			local bridge, ctx = fresh_bridge(case.options)
+
+			helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_ON))
+			local retired_child = ctx.tasks[1]
+			ctx.current_token = TOKEN_B
+			helpers.assert_true(bridge.set("capsword", 1),
+				case.label .. ": a newer exact generation must remain usable after retiring the old writer")
+
+			helpers.assert_eq(ctx.terminate_calls, 2,
+				case.label .. ": an unsettled native termination must be retried before a successor starts")
+			helpers.assert_true(ctx.terminate_handles[1] == retired_child)
+			helpers.assert_true(ctx.terminate_handles[2] == retired_child,
+				case.label .. ": cleanup must retain the original capability instead of discovering by name")
+			helpers.assert_eq(retired_child.terminate_calls, 2)
+			helpers.assert_nil(ctx.tasks[2].terminate_calls,
+				case.label .. ": retrying the retired child must not touch the newer exact writer")
+		end
 	end)
 
 	helpers.it("supersedes a local in-flight CapsWord activation through the shared writer", function()
