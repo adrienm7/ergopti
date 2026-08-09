@@ -1,324 +1,461 @@
 --- tests/unit/platform/remap/test_watchers_capsword_release_race.lua
 
 --- ==============================================================================
---- MODULE: karabiner.watchers CapsWord lock-release race coverage (F-MED-21)
+--- MODULE: CapsWord Pointer Watcher Transaction Tests
 --- DESCRIPTION:
---- deactivate_capsword()'s `_capsword_check_pending` guard can be released by
---- THREE independent paths:
----   1. Task-completion — the async hs.task.new callback fires normally when
----      the karabiner_cli probe process exits.
----   2. Watchdog-timeout — CAPSWORD_PROBE_TIMEOUT_SEC elapses because the
----      probe process hung or zombied; the watchdog force-releases the lock
----      and terminates the stuck task.
----   3. Explicit start-failure — hs.task.new() returns nil (CLI binary
----      absent) or task:start() returns false; the lock is released
----      synchronously, in the same call that armed it.
----
---- Before this test, only tests/meta/test_karabiner_capsword_lock_release.lua
---- existed — a pure source-grep meta test asserting the SHAPE of the fix
---- (that certain identifiers/strings appear in the right order), with zero
---- coverage of actual runtime behaviour: whether the pointer-event watcher
---- can be triggered repeatedly without the lock leaking OR double-releasing,
---- and whether a late-firing (terminated) task callback can corrupt a
---- brand-new, legitimately in-flight probe's pending state.
+--- Proves that the pointer watcher owns only a read-only exact-token probe. Every
+--- mutation goes through platform.remap.ke_variables, whose logical revision
+--- prevents a late probe from clearing a newer CapsWord activation. LED changes
+--- occur only after the serialized write settles and remain lease-generation
+--- gated through watcher stop/restart races.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+local TOKEN_A = "0123456789abcdef0123456789abcdef"
+local TOKEN_B = "fedcba9876543210fedcba9876543210"
+local SCOPED_A = "ergopti_capsword_" .. TOKEN_A
+local SCOPED_B = "ergopti_capsword_" .. TOKEN_B
 
 
+-- =========================================
+-- =========================================
+-- ======= 1/ Controllable Harness =========
+-- =========================================
+-- =========================================
 
--- ============================================================================
--- ============================================================================
--- ======= 1/ Test harness ====================================================
--- ============================================================================
--- ============================================================================
-
---- Loads a fresh watchers module with a fully controllable hs.task.new stub:
---- every call is recorded, and each returned fake task exposes manual
---- `:fire_exit(exit_code, stdout)` / `:fire_terminate()` hooks so a test can
---- decide exactly when (or whether) each spawned probe "completes".
---- @return table watchers The loaded module.
---- @return table spy {tasks=array of {cmd, args, callback, terminated, fake},
----   capsword_set_calls=int} recording every hs.task.new call and every
----   hs.hid.capslock.set(false) invocation.
-local function make_watchers_with_controllable_tasks()
+--- Builds a fresh watcher with separate read-probe and serialized-writer spies.
+--- @param options table|nil Failure injection and initial logical state.
+--- @return table harness Controllable subject and all observable side effects.
+local function fresh_harness(options)
+	options = options or {}
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["adapters.event_tap_guard"] = {
+		handle_disabled = function() return false end,
+	}
 
-	local spy = { tasks = {}, capsword_set_calls = 0 }
-	local clock = { now = 1000 }
-	local captured = { cb = nil }
+	local h = {
+		clock = 1000,
+		tasks = {},
+		writers = {},
+		conditional_calls = {},
+		timers = {},
+		pointer_callbacks = {},
+		capslock = {},
+		watcher_stops = 0,
+		task_attempts = 0,
+		hook_call_count = 0,
+		hook_removal_attempts = 0,
+		eventtap_stop_attempts = 0,
+		timer_cancel_attempts = {},
+		revision = options.revision or 0,
+		pending_activation = options.pending_activation == true,
+	}
 
-	-- TimerScheduler.after/.cancel back the watchdog (PF-1) — install a
-	-- controllable fake BEFORE loading watchers so it captures this exact
-	-- table at require time, letting the test fire the watchdog on demand
-	-- without depending on real elapsed time.
-	local watchdog_handles = {}
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(_delay, fn)
-			local handle = { fired = false, fn = fn }
-			table.insert(watchdog_handles, handle)
+		after = function(delay, callback)
+			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
+			h.timers[#h.timers + 1] = handle
+			if options.timer_unavailable then handle.fired = true end
 			return handle
 		end,
 		cancel = function(handle)
-			if type(handle) == "table" then handle.fired = "cancelled" end
+			if not handle then return true end
+			h.timer_cancel_attempts[handle] = (h.timer_cancel_attempts[handle] or 0) + 1
+			if h.fail_teardown_once and h.timer_cancel_attempts[handle] == 1 then return false end
+			handle.cancelled = true
+			return true
+		end,
+	}
+	package.loaded["adapters.key_state"] = {
+		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
+	}
+	package.loaded["platform.remap.ke_variables"] = {
+		capsword_revision = function() return h.revision end,
+		supersede_capsword_activation = function(callback)
+			if options.supersede_throws then error("injected supersede failure") end
+			if not h.pending_activation then return false, h.revision end
+			h.pending_activation = false
+			h.revision = h.revision + 1
+			local write = {
+				kind = "supersede",
+				name = "capsword",
+				value = 0,
+				revision = h.revision,
+				callback = callback,
+			}
+			h.writers[#h.writers + 1] = write
+			return true, write.revision
+		end,
+		set_if_revision = function(name, value, expected_revision, callback)
+			h.conditional_calls[#h.conditional_calls + 1] = {
+				name = name,
+				value = value,
+				expected_revision = expected_revision,
+			}
+			if expected_revision ~= h.revision then
+				callback(false, "stale-revision", h.revision)
+				return false, h.revision
+			end
+			h.revision = h.revision + 1
+			local write = {
+				kind = "conditional",
+				name = name,
+				value = value,
+				revision = h.revision,
+				callback = callback,
+			}
+			h.writers[#h.writers + 1] = write
+			return true, write.revision
 		end,
 	}
 
-	local watchers = helpers.load_with_stubs("platform.remap.watchers", {
+	local hook_calls = {}
+	h.gestures = {
+		set_any_touch_hook = function(callback)
+			h.hook_call_count = h.hook_call_count + 1
+			if callback == nil then
+				h.hook_removal_attempts = h.hook_removal_attempts + 1
+				if h.fail_teardown_once and h.hook_removal_attempts == 1 then
+					error("injected hook removal failure")
+				end
+			end
+			h.last_hook = callback
+			if callback ~= nil then hook_calls[#hook_calls + 1] = callback end
+			if options.hook_throws and callback ~= nil then error("injected hook failure") end
+		end,
+	}
+	h.hook_calls = hook_calls
+
+	local hs_overrides = {
 		eventtap = {
-			new = function(_types, cb)
-				captured.cb = cb
-				return { start = function() end, stop = function() end }
+			new = function(_types, callback)
+				if options.eventtap_new_throws then error("injected eventtap constructor failure") end
+				h.pointer_callbacks[#h.pointer_callbacks + 1] = callback
+				return {
+					start = function()
+						if options.eventtap_start_throws then error("injected eventtap start failure") end
+						return options.eventtap_start_false ~= true
+					end,
+					stop = function()
+						h.watcher_stops = h.watcher_stops + 1
+						h.eventtap_stop_attempts = h.eventtap_stop_attempts + 1
+						if h.fail_teardown_once and h.eventtap_stop_attempts == 1 then
+							error("injected eventtap stop failure")
+						end
+					end,
+				}
 			end,
 			event = { types = {
-				mouseMoved = 1, scrollWheel = 2, gesture = 3,
-				leftMouseDown = 4, rightMouseDown = 5, otherMouseDown = 6,
+				mouseMoved = 1,
+				scrollWheel = 2,
+				gesture = 3,
+				leftMouseDown = 4,
+				rightMouseDown = 5,
+				otherMouseDown = 6,
 			} },
 		},
 		task = {
-			new = function(cmd, callback, args)
+			new = function(command, callback, args)
+				h.task_attempts = h.task_attempts + 1
+				local index = #h.tasks + 1
+				if options.task_new_nil then return nil end
+				if options.task_new_throws then error("injected probe constructor failure") end
 				local fake = { terminated = false }
-				function fake:start() return true end
-				function fake:terminate() fake.terminated = true end
-				table.insert(spy.tasks, { cmd = cmd, args = args, callback = callback, fake = fake })
+				function fake:start()
+					if options.task_start_throws then error("injected probe start failure") end
+					return options.task_start_false ~= true
+				end
+				function fake:terminate()
+					fake.terminate_attempts = (fake.terminate_attempts or 0) + 1
+					if h.fail_teardown_once and fake.terminate_attempts == 1 then
+						error("injected task terminate failure")
+					end
+					fake.terminated = true
+				end
+				h.tasks[index] = {
+					command = command,
+					callback = callback,
+					args = args,
+					fake = fake,
+				}
 				return fake
 			end,
 		},
 		timer = {
-			secondsSinceEpoch = function() return clock.now end,
-			doAfter = function(_d, fn) return { stop = function() end } end,
+			secondsSinceEpoch = function() return h.clock end,
 		},
-		hid = {
-			capslock = {
-				set = function(_v) spy.capsword_set_calls = spy.capsword_set_calls + 1 end,
-			},
-		},
-	})
+	}
 
-	watchers.start_gesture_watcher(nil)
-	helpers.assert_true(type(captured.cb) == "function", "start_gesture_watcher must register a callback")
-
-	return watchers, spy, clock, captured, watchdog_handles
+	h.watchers = helpers.load_with_stubs("platform.remap.watchers", hs_overrides)
+	h.watcher = h.watchers.start_gesture_watcher(h.gestures, TOKEN_A)
+	return h
 end
 
---- Fires the pointer-event callback once, advancing the clock past
---- CAPSWORD_CHECK_INTERVAL_S first so the throttle guard does not swallow it.
---- @param clock table Mutable {now=...} clock table.
---- @param captured table {cb=...} captured eventtap callback.
-local function trigger_pointer_event(clock, captured)
-	clock.now = clock.now + 1  -- comfortably past the 100 ms throttle window
-	captured.cb({})
+--- Fires one current pointer callback beyond the production throttle interval.
+--- @param h table Harness.
+--- @param index number|nil Watcher callback index.
+local function pointer(h, index)
+	h.clock = h.clock + 1
+	local callback = h.pointer_callbacks[index or #h.pointer_callbacks]
+	helpers.assert_true(type(callback) == "function", "a running watcher must expose its pointer callback")
+	callback({})
+end
+
+--- Settles one captured serialized write exactly like ke_variables does.
+--- @param h table Harness.
+--- @param index number Write index.
+--- @param ok boolean Settlement result.
+--- @param reason string|nil Stable reason.
+local function settle(h, index, ok, reason)
+	local write = h.writers[index]
+	helpers.assert_true(type(write) == "table", "the serialized write must exist")
+	write.callback(ok, reason or (ok and "written" or "failed"), write.revision)
+end
+
+--- Finds timer handles by their named delay without relying on allocation order.
+--- @param h table Harness.
+--- @param delay number Exact delay.
+--- @return table handles Matching timers.
+local function timers_at(h, delay)
+	local found = {}
+	for _, handle in ipairs(h.timers) do
+		if handle.delay == delay then found[#found + 1] = handle end
+	end
+	return found
 end
 
 
+-- =========================================
+-- =========================================
+-- ======= 2/ One Read, One Writer =========
+-- =========================================
+-- =========================================
 
+helpers.describe("watchers CapsWord uses one exact serialized writer", function()
+	helpers.it("CapsWord watcher: queries the scoped variable read-only and clears through ke_variables", function()
+		local h = fresh_harness()
+		helpers.assert_true(h.watcher ~= nil, "the eventtap must start")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 1, "one read-only probe must start")
+		helpers.assert_eq(h.tasks[1].args[1], "--get-variable")
+		helpers.assert_eq(h.tasks[1].args[2], SCOPED_A)
 
--- ============================================================================
--- ============================================================================
--- ======= 2/ Path 1 — normal task-completion release =========================
--- ============================================================================
--- ============================================================================
+		h.tasks[1].callback(0, "1", "")
+		helpers.assert_eq(#h.tasks, 1,
+			"an active result must not spawn a second direct karabiner_cli writer")
+		helpers.assert_eq(#h.writers, 1, "the common serializer must own the clear")
+		helpers.assert_eq(h.writers[1].kind, "conditional")
+		helpers.assert_eq(h.writers[1].name, "capsword")
+		helpers.assert_eq(h.writers[1].value, 0)
+		helpers.assert_eq(#h.capslock, 0, "accepted is not written; the LED must wait")
 
-helpers.describe("watchers.capsword release race: task-completion path (F-MED-21)", function()
+		settle(h, 1, true)
+		helpers.assert_eq(h.capslock[1], false, "a settled clear switches CapsLock off")
+		local corrections = timers_at(h, 0.15)
+		helpers.assert_eq(#corrections, 1, "a settled clear arms one LED correction")
+		corrections[1].callback()
+		helpers.assert_eq(h.capslock[2], false, "the correction repeats the settled LED state")
 
-	helpers.it("a completing probe task (exit_code=0, stdout='1') deactivates CapsWord and releases the lock", function()
-		local _watchers, spy, clock, captured = make_watchers_with_controllable_tasks()
-
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 1, "one probe task must have been spawned")
-
-		-- Simulate the karabiner_cli probe reporting CapsWord is active (stdout "1").
-		-- This branch itself spawns a second "clear the KE variable" inner_task,
-		-- so the count grows by one BEFORE the next pointer event is even fired.
-		spy.tasks[1].callback(0, "1", "")
-		local count_after_completion = #spy.tasks
-		helpers.assert_eq(count_after_completion, 2,
-			"a CapsWord-active report must spawn the inner clear-variable task")
-
-		-- A pointer event immediately after must spawn a NEW probe task —
-		-- proving the OUTER lock was released by the completed callback, not leaked.
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, count_after_completion + 1,
-			"the lock must be released after the task completes, allowing the next probe to spawn")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2, "settlement releases the pointer probe guard")
 	end)
 
-	helpers.it("a probe reporting CapsWord inactive (stdout='0') still releases the lock without deactivating", function()
-		local _watchers, spy, clock, captured = make_watchers_with_controllable_tasks()
+	helpers.it("CapsWord watcher: does not touch personal CapsLock when the scoped variable is inactive", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.tasks[1].callback(0, "0", "")
+		helpers.assert_eq(#h.writers, 0, "an inactive scoped variable needs no write")
+		helpers.assert_eq(#h.capslock, 0, "personal CapsLock state remains untouched")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2, "the inactive result still releases the guard")
+	end)
 
-		trigger_pointer_event(clock, captured)
-		spy.tasks[1].callback(0, "0", "")  -- CapsWord not active — no LED reset expected, no inner_task
+	helpers.it("CapsWord watcher: supersedes an in-flight local activation before launching a probe", function()
+		local h = fresh_harness({ pending_activation = true })
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 0,
+			"a known local activation must be cleared through the writer without a stale read")
+		helpers.assert_eq(#h.writers, 1)
+		helpers.assert_eq(h.writers[1].kind, "supersede")
+		helpers.assert_eq(#h.capslock, 0, "the LED waits for actual write completion")
+		settle(h, 1, true)
+		helpers.assert_eq(h.capslock[1], false)
+	end)
 
-		helpers.assert_eq(spy.capsword_set_calls, 0,
-			"capslock.set must not be called when the probe reports CapsWord inactive")
-		helpers.assert_eq(#spy.tasks, 1,
-			"no inner clear-variable task must be spawned when CapsWord was already inactive")
-
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 2, "the lock must still be released even on the inactive-report branch")
+	helpers.it("CapsWord watcher: a failed serialized clear never changes the LED", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.tasks[1].callback(0, "1", "")
+		settle(h, 1, false, "writer-fenced")
+		helpers.assert_eq(#h.capslock, 0,
+			"failure means the engine state is unknown; an LED side effect would lie")
 	end)
 end)
 
 
+-- =========================================
+-- =========================================
+-- ======= 3/ Revision and Lifecycle Races ==
+-- =========================================
+-- =========================================
 
+helpers.describe("watchers CapsWord fences stale asynchronous callbacks", function()
+	helpers.it("CapsWord watcher: does not let an old probe clear a newer local activation", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.revision = h.revision + 1
+		h.pending_activation = true
+		h.tasks[1].callback(0, "1", "")
 
--- ============================================================================
--- ============================================================================
--- ======= 3/ Path 2 — watchdog-timeout release ================================
--- ============================================================================
--- ============================================================================
-
-helpers.describe("watchers.capsword release race: watchdog-timeout path (F-MED-21)", function()
-
-	helpers.it("a hung probe (callback never fires) is released by the watchdog, allowing a new probe afterwards", function()
-		local _watchers, spy, clock, captured, watchdogs = make_watchers_with_controllable_tasks()
-
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 1, "one probe task must have been spawned")
-		helpers.assert_eq(#watchdogs, 1, "one watchdog must have been armed")
-
-		-- A second pointer event BEFORE the watchdog fires must be swallowed by
-		-- the pending-lock guard — no new task yet.
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 1, "while the probe is pending, a new pointer event must not spawn a second task")
-
-		-- Fire the watchdog: this simulates the hung karabiner_cli process never
-		-- calling back, forcing the lock open again.
-		watchdogs[1].fn()
-		helpers.assert_true(spy.tasks[1].fake.terminated, "the watchdog must terminate the hung task")
-
-		-- Now a new pointer event must be free to spawn a fresh probe.
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 2, "the watchdog must release the lock so a new probe can be spawned")
+		helpers.assert_eq(#h.conditional_calls, 1, "the probe must present its captured revision")
+		helpers.assert_eq(h.conditional_calls[1].expected_revision, 0)
+		helpers.assert_eq(#h.writers, 0, "the stale conditional clear must be rejected")
+		helpers.assert_eq(#h.capslock, 0, "the newer activation remains visible")
 	end)
 
-	helpers.it("a late-firing (terminated) task callback does not corrupt a brand-new probe's pending state", function()
-		-- This is the exact race F-MED-21 flags as untested: the watchdog fires
-		-- (releasing the lock and terminating task #1), a brand-new probe #2 is
-		-- immediately spawned and is legitimately in flight, and THEN task #1's
-		-- callback fires late (a real hs.task.terminate() is not guaranteed to
-		-- prevent an already-scheduled callback from running). Task #1's stale
-		-- callback must not clear _capsword_check_pending out from under #2.
-		local _watchers, spy, clock, captured, watchdogs = make_watchers_with_controllable_tasks()
+	helpers.it("CapsWord watcher: ignores a clear settlement delivered after watcher stop", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.tasks[1].callback(0, "1", "")
+		h.watchers.stop_gesture_watcher(h.watcher)
+		settle(h, 1, true)
+		helpers.assert_eq(#h.capslock, 0, "a stopped lease owns no later LED callback")
+	end)
 
-		trigger_pointer_event(clock, captured)
-		local task1 = spy.tasks[1]
+	helpers.it("CapsWord watcher: cancels delayed LED correction when a newer revision appears", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.tasks[1].callback(0, "1", "")
+		settle(h, 1, true)
+		local correction = timers_at(h, 0.15)[1]
+		helpers.assert_true(correction ~= nil, "the correction timer must be observable")
+		h.revision = h.revision + 1
+		correction.callback()
+		helpers.assert_eq(#h.capslock, 1,
+			"the delayed callback must not overwrite the newer activation's LED")
+	end)
 
-		-- Watchdog fires: releases the lock, terminates task 1.
-		watchdogs[1].fn()
+	helpers.it("CapsWord watcher: a timed-out probe cannot unlock or clear its successor", function()
+		local h = fresh_harness()
+		pointer(h)
+		local first = h.tasks[1]
+		local first_watchdog = timers_at(h, 1.5)[1]
+		helpers.assert_true(first_watchdog ~= nil, "each probe must have a watchdog")
+		first_watchdog.callback()
+		helpers.assert_true(first.fake.terminated, "timeout terminates only the exact probe")
 
-		-- A fresh probe (#2) is spawned immediately — legitimately in flight.
-		trigger_pointer_event(clock, captured)
-		helpers.assert_eq(#spy.tasks, 2, "task #2 must have been spawned after the watchdog released the lock")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2, "a successor probe can start after timeout")
+		first.callback(0, "1", "")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2,
+			"the stale completion must not release the successor's pending guard")
+		helpers.assert_eq(#h.writers, 0, "the stale completion has no write authority")
+	end)
 
-		-- Task #1's callback finally fires late, after being "terminated".
-		-- Document the current (racy) behaviour: this callback unconditionally
-		-- clears _capsword_check_pending, which — if task #2 has not itself
-		-- completed yet — would incorrectly re-open the lock for task #2 too.
-		task1.callback(0, "1", "")
+	helpers.it("CapsWord watcher: stopped lease A callbacks cannot act on restarted lease B", function()
+		local h = fresh_harness()
+		local pointer_a = h.pointer_callbacks[1]
+		local touch_a = h.hook_calls[1]
+		h.watchers.stop_gesture_watcher(h.watcher)
+		local watcher_b = h.watchers.start_gesture_watcher(h.gestures, TOKEN_B)
+		helpers.assert_true(watcher_b ~= nil, "lease B must start")
 
-		-- A third pointer event immediately after: under the current
-		-- implementation the lock is open again (because task #1's stale
-		-- callback cleared it), so a third task spawns even though task #2 is
-		-- still nominally in flight. This assertion documents the actual
-		-- behaviour today; if a future fix makes task callbacks generation-
-		-- gated (ignoring stale callbacks from a terminated/superseded task),
-		-- this test must be updated to assert #spy.tasks stays at 2 here.
-		trigger_pointer_event(clock, captured)
-		helpers.assert_true(#spy.tasks >= 2,
-			"regression guard: at minimum, the lock must never stay stuck forever after a watchdog release + late callback")
+		h.clock = h.clock + 1
+		pointer_a({})
+		touch_a()
+		helpers.assert_eq(#h.tasks, 0, "queued lease A callbacks are inert")
+
+		pointer(h, 2)
+		helpers.assert_eq(#h.tasks, 1, "lease B callback remains live")
+		helpers.assert_eq(h.tasks[1].args[2], SCOPED_B,
+			"lease B queries only its own exact runtime variable")
 	end)
 end)
 
 
+-- =========================================
+-- =========================================
+-- ======= 4/ Fail-Closed Resource Start ====
+-- =========================================
+-- =========================================
 
+helpers.describe("watchers CapsWord resource failures are fail-closed", function()
+	helpers.it("CapsWord watcher: failed teardown retains every exact resource for retry", function()
+		local h = fresh_harness()
+		pointer(h)
+		h.tasks[1].callback(0, "1", "")
+		settle(h, 1, true)
+		local led_timer = timers_at(h, 0.15)[1]
+		helpers.assert_true(led_timer ~= nil, "setup must own a delayed LED timer")
 
--- ============================================================================
--- ============================================================================
--- ======= 4/ Path 3 — explicit start-failure release ==========================
--- ============================================================================
--- ============================================================================
+		pointer(h)
+		local live_task = h.tasks[2].fake
+		local live_watchdog = timers_at(h, 1.5)[2]
+		helpers.assert_true(live_watchdog ~= nil, "setup must own a live probe watchdog")
+		h.fail_teardown_once = true
 
-helpers.describe("watchers.capsword release race: explicit start-failure path (F-MED-21)", function()
+		helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false,
+			"one failed native resource must keep the teardown unsettled")
+		helpers.assert_eq(h.eventtap_stop_attempts, 1)
+		helpers.assert_eq(live_task.terminate_attempts, 1)
+		helpers.assert_eq(h.timer_cancel_attempts[led_timer], 1)
+		helpers.assert_eq(h.timer_cancel_attempts[live_watchdog], 1)
+		helpers.assert_eq(h.hook_removal_attempts, 1)
 
-	helpers.it("hs.task.new() returning nil releases the lock synchronously (CLI binary absent)", function()
-		package.loaded["platform.remap.watchers"] = nil
-		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
-
-		local captured = { cb = nil }
-		local clock = { now = 1000 }
-		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
-			eventtap = {
-				new = function(_types, cb)
-					captured.cb = cb
-					return { start = function() end, stop = function() end }
-				end,
-				event = { types = {
-					mouseMoved = 1, scrollWheel = 2, gesture = 3,
-					leftMouseDown = 4, rightMouseDown = 5, otherMouseDown = 6,
-				} },
-			},
-			task = {
-				new = function() return nil end,  -- simulates a missing CLI binary
-			},
-			timer = {
-				secondsSinceEpoch = function() return clock.now end,
-			},
-		})
-		watchers.start_gesture_watcher(nil)
-
-		trigger_pointer_event(clock, captured)
-		trigger_pointer_event(clock, captured)
-		local ok, cb_err = pcall(captured.cb, {})
-		-- The callback ANSWERS whether it consumed the event; that second return is
-		-- the answer, not an error. An eventtap callback returning nil is read by
-		-- Hammerspoon as "do not consume", so the type is the invariant.
-		helpers.assert_true(type(cb_err) == "boolean" or cb_err == nil,
-			"and must answer whether it consumed the event")
-		helpers.assert_true(ok,
-			"repeated pointer events must never raise even when hs.task.new consistently returns nil "
-			.. "(the lock must be released synchronously every time, not just once)")
+		helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), true,
+			"the same exact resources must settle on retry")
+		helpers.assert_eq(h.eventtap_stop_attempts, 2)
+		helpers.assert_eq(live_task.terminate_attempts, 2)
+		helpers.assert_true(live_task.terminated)
+		helpers.assert_eq(h.timer_cancel_attempts[led_timer], 2)
+		helpers.assert_eq(h.timer_cancel_attempts[live_watchdog], 2)
+		helpers.assert_eq(h.hook_removal_attempts, 2)
 	end)
 
-	helpers.it("task:start() returning false releases the lock synchronously, allowing the next probe", function()
-		package.loaded["platform.remap.watchers"] = nil
-		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+	helpers.it("CapsWord watcher: probe constructor failure releases the guard for a retry", function()
+		local h = fresh_harness({ task_new_throws = true })
+		pointer(h)
+		pointer(h)
+		helpers.assert_eq(h.task_attempts, 2,
+			"both events must reach the throwing constructor, proving the guard reopened")
+	end)
 
-		local spawn_count = 0
-		local captured = { cb = nil }
-		local clock = { now = 1000 }
-		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
-			eventtap = {
-				new = function(_types, cb)
-					captured.cb = cb
-					return { start = function() end, stop = function() end }
-				end,
-				event = { types = {
-					mouseMoved = 1, scrollWheel = 2, gesture = 3,
-					leftMouseDown = 4, rightMouseDown = 5, otherMouseDown = 6,
-				} },
-			},
-			task = {
-				new = function()
-					spawn_count = spawn_count + 1
-					return { start = function() return false end, terminate = function() end }
-				end,
-			},
-			timer = {
-				secondsSinceEpoch = function() return clock.now end,
-			},
-		})
-		watchers.start_gesture_watcher(nil)
+	helpers.it("CapsWord watcher: probe start refusal terminates each exact task and permits retries", function()
+		local h = fresh_harness({ task_start_false = true })
+		pointer(h)
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2, "both pointer events must reach task construction")
+		helpers.assert_true(h.tasks[1].fake.terminated and h.tasks[2].fake.terminated,
+			"each refused probe is reclaimed by exact handle")
+	end)
 
-		trigger_pointer_event(clock, captured)
-		trigger_pointer_event(clock, captured)
-		trigger_pointer_event(clock, captured)
+	helpers.it("CapsWord watcher: eventtap constructor failure returns nil without installing a hook", function()
+		local h = fresh_harness({ eventtap_new_throws = true })
+		helpers.assert_nil(h.watcher, "a missing eventtap is not reported as running")
+		helpers.assert_eq(#h.hook_calls, 0, "the touch hook must not create a half-watcher")
+	end)
 
-		helpers.assert_eq(spawn_count, 3,
-			"a task:start() failure must release the lock synchronously so EVERY subsequent "
-			.. "pointer event spawns a fresh attempt, never leaking the guard permanently")
+	helpers.it("CapsWord watcher: eventtap start refusal stops the partial tap and installs no hook", function()
+		local h = fresh_harness({ eventtap_start_false = true })
+		helpers.assert_nil(h.watcher, "a refused eventtap is not reported as running")
+		helpers.assert_eq(h.watcher_stops, 1, "the exact partial tap is reclaimed")
+		helpers.assert_eq(#h.hook_calls, 0, "no touch-only half-feature remains")
+		h.clock = h.clock + 1
+		h.pointer_callbacks[1]({})
+		helpers.assert_eq(h.task_attempts, 0,
+			"a callback already queued by the refused tap is lifecycle-fenced")
+	end)
+
+	helpers.it("CapsWord watcher: touch-hook failure stops the eventtap and removes any partial hook", function()
+		local h = fresh_harness({ hook_throws = true })
+		helpers.assert_nil(h.watcher, "both inputs are required for a managed watcher")
+		helpers.assert_eq(h.watcher_stops, 1, "the running eventtap is stopped on hook failure")
+		helpers.assert_eq(h.hook_call_count, 2,
+			"cleanup must call the hook API again after registration throws")
+		helpers.assert_nil(h.last_hook,
+			"cleanup attempts to remove a hook that raised after partial installation")
 	end)
 end)

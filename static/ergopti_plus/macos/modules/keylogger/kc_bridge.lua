@@ -358,6 +358,13 @@ function M.refresh_managed_set(tap_hold_config, available_actions)
 	build_managed_output_set(tap_hold_config, available_actions)
 end
 
+--- Releases every output-keycode claim without stopping the physical ledger.
+--- Personal Karabiner may emit the same virtual keycodes as an Ergopti action;
+--- therefore an inert, disabled or failed Ergopti lease must leave this set empty.
+function M.clear_managed_set()
+	_managed_output_kcs = {}
+end
+
 --- Arms the path watcher and backup poll timer. Idempotent: skips creation when
 --- the handles already exist so stop/start cycles can call this repeatedly.
 --- Must only be called after _state is set.

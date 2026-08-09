@@ -50,37 +50,22 @@ end
 
 helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsword-lock-leak)", function()
 
-	helpers.it("task is stored in a variable before calling :start()", function()
+	helpers.it("task construction is protected and stored before calling :start()", function()
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
-		-- The handle must be captured in a local rather than left anonymous
-		-- (`hs.task.new(...):start()`), so the start()-failure branch can release the
-		-- pending lock. BOTH spellings satisfy that:
-		--   local task = hs.task.new(...)        -- original
-		--   local task ; task = hs.task.new(...) -- forward-declared
-		-- The forward-declared form became necessary when the task was added to a GC
-		-- root: its completion callback releases its own pin, so `task` has to exist
-		-- before the closure is built (the closure-before-local rule this repo
-		-- enforces elsewhere). Accepting both keeps the original intent intact.
-		local inline_form   = src:match("local task%s*=%s*hs%.task%.new") ~= nil
-		local declared_form = src:match("local task%s*\n") ~= nil
-			and src:match("\n%s*task%s*=%s*hs%.task%.new") ~= nil
-		helpers.assert_true(
-			inline_form or declared_form,
-			"deactivate_capsword must capture hs.task.new in a local `task` variable, "
-			.. "inline or forward-declared (karabiner-capsword-lock-leak)")
+		helpers.assert_true(src:match("local task%s*\n") ~= nil,
+			"the callback must forward-declare its GC-pinned task handle")
+		helpers.assert_true(src:find("pcall(\n\t\ths.task.new", 1, true) ~= nil,
+			"hs.task.new can raise and must be protected before the lock is released")
+		helpers.assert_true(src:find("task = ok_new and task_or_err or nil", 1, true) ~= nil,
+			"the protected constructor result must become the exact retained handle")
 	end)
 
 	helpers.it("_capsword_check_pending is released when task:start() returns false", function()
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
-		-- The fix must have: if not task:start() then _capsword_check_pending = false
-		helpers.assert_true(
-			src:match("if not task:start%(%)") ~= nil,
-			"deactivate_capsword must guard task:start() and release lock on failure (karabiner-capsword-lock-leak)")
-		helpers.assert_true(
-			src:match("if not task:start%(%)[^\n]-\n[^\n]-_capsword_check_pending%s*=%s*false") ~= nil
-			or src:match("if not task:start%(%)[^\n\r]*\r?\n[^\n\r]*_capsword_check_pending%s*=%s*false") ~= nil
-			or src:find("if not task:start()") ~= nil,
-			"deactivate_capsword must set _capsword_check_pending = false in the failure branch (karabiner-capsword-lock-leak)")
+		helpers.assert_true(src:find("pcall(function() return task:start() end)", 1, true) ~= nil,
+			"task:start() can raise as well as return false and must be protected")
+		helpers.assert_true(src:find("abandon_probe(task, ok_start", 1, true) ~= nil,
+			"both start failure modes must invalidate the generation and release the lock")
 	end)
 
 	-- F-L6: hs.task fires its callback only on process EXIT, so a started-but-hung
@@ -96,12 +81,21 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 			"deactivate_capsword must arm a watchdog timer (_capsword_probe_watchdog)")
 		helpers.assert_true(src:find("CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
 			"the watchdog must use a named timeout constant, not a magic number")
-		helpers.assert_true(src:find("TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
+		local watchdog_arm = src:find(
+			"pcall%s*%(%s*TimerScheduler%.after,%s*CAPSWORD_PROBE_TIMEOUT_SEC"
+		)
+		helpers.assert_true(watchdog_arm ~= nil,
 			"the watchdog must be scheduled via the TimerScheduler adapter, not raw hs.timer.doAfter (PF-1)")
-		-- The watchdog callback must release the pending lock.
-		local wd = src:find("TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC", 1, true)
-		helpers.assert_true(wd ~= nil and src:find("_capsword_check_pending = false", wd) ~= nil,
-			"the watchdog callback must set _capsword_check_pending = false")
+		-- The timeout callback routes through the one abandonment helper that both
+		-- releases the lock and retires the task generation. Merely finding an
+		-- unrelated assignment later in the file was a false-green.
+		local watchdog_body = src:sub(watchdog_arm, watchdog_arm + 900)
+		helpers.assert_true(watchdog_body:find("abandon_probe(task, nil)", 1, true) ~= nil,
+			"the watchdog callback must abandon the exact in-flight probe")
+		local abandon_at = src:find("local function abandon_probe", 1, true)
+		helpers.assert_true(abandon_at ~= nil
+			and src:sub(abandon_at, abandon_at + 900):find("_capsword_check_pending = false", 1, true) ~= nil,
+			"the shared abandonment path must release _capsword_check_pending")
 	end)
 
 end)

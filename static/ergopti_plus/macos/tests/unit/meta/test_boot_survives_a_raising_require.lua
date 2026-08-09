@@ -12,11 +12,11 @@
 ---
 --- 689d807c9 fixed WHERE the teardown is armed: the shutdown callback is now
 --- installed above the risky requires. Necessary, and not sufficient. The
---- callback's Karabiner bootout branch is gated on the `karabiner` local, which is
---- still nil when the require raised, so the branch no-ops — Karabiner-Elements
---- keeps remapping the keyboard after Hammerspoon exits, launchd's KeepAlive
---- restarts the grabber, and both things that could recover it (the menubar and
---- the panic-button eventtap) are below the raise and were never created.
+--- callback's exact-lease shutdown branch is gated on the `karabiner` local,
+--- which is still nil when the require raised, so the branch no-ops. The managed
+--- generation remains active after Hammerspoon exits, and both things that could
+--- recover it (the menubar and the panic-button eventtap) are below the raise and
+--- were never created. No stock Karabiner process is owned by Ergopti.
 ---
 --- ROOT CAUSE ENCODED:
 --- A teardown whose ability to run depends on the very require that failed.
@@ -33,9 +33,11 @@ local helpers = require("tests.helpers")
 -- satisfies the pinned-read ratchet.
 local ANCHOR = "HS_BOOT_READY_SETTING_KEY"
 
--- The line that arms the teardown. Everything after it is inside the window where
+-- The declaration contains the fallback body; the assignment is the line that
+-- actually arms it. Everything after the assignment is inside the window where
 -- a raise costs the user their keyboard rather than merely a feature.
-local ARMING = "hs.shutdownCallback = function()"
+local SHUTDOWN_DECLARATION = "local function shutdown_all_resources()"
+local ARMING = "hs.shutdownCallback = shutdown_all_resources"
 
 -- The module whose require chain is proven to reach an error() at load time.
 -- Matched on the NAME rather than on a call spelling, so the guarded form
@@ -135,38 +137,41 @@ end)
 
 -- ==================================================================
 -- ==================================================================
--- ======= 2/ The bootout does not depend on the risky module =======
+-- ======= 2/ Lease revocation does not depend on the risky module ==
 -- ==================================================================
 -- ==================================================================
 
-helpers.describe("boot: the Karabiner bootout survives a failed require", function()
+helpers.describe("boot: exact lease revocation survives a failed require", function()
 
 	helpers.it("has a fallback that does not go through the karabiner module", function()
 		local code = boot_code()
 		local arm_at = code:find(ARMING, 1, true)
 		helpers.assert_true(arm_at ~= nil, "the teardown arming must be findable")
+		local declaration_at = code:find(SHUTDOWN_DECLARATION, 1, true)
+		helpers.assert_true(declaration_at ~= nil and declaration_at < arm_at,
+			"the complete shutdown body must be declared before it is armed")
 
-		-- The shutdown callback body. 6000 characters comfortably covers it and stops
-		-- well before the boot load block, so a match cannot come from there.
-		local body = code:sub(arm_at, arm_at + 6000)
+		-- The exact-fence helper is deliberately declared before the small armed
+		-- callback. Include both declarations, but stop before later boot loading so
+		-- a match cannot come from a normal platform.remap initialization site.
+		local revoke_at = code:find("local function request_exact_lease_revoke", 1, true)
+		helpers.assert_true(revoke_at ~= nil and revoke_at < declaration_at)
+		local body = code:sub(revoke_at, arm_at - 1)
 
-		helpers.assert_true(body:find("karabiner.kill", 1, true) ~= nil,
-			"the normal bootout path must still be there — this test must not be "
-			.. "satisfiable by deleting it")
+		helpers.assert_true(body:find("karabiner.revoke", 1, true) ~= nil,
+			"the normal exact-lease shutdown path must still be there — this test must not be "
+				.. "satisfiable by deleting it")
 
-		-- ke_lifecycle is required near the top of the file, far above the module that
-		-- can raise, and it owns both KILL_CMD and is_hs_owned_bridge — exactly what
-		-- karabiner.kill() consumes. It is therefore the one fallback guaranteed to be
-		-- loadable at teardown time.
-		helpers.assert_true(body:find("ke_lifecycle", 1, true) ~= nil,
-			"when the karabiner module never loaded, its kill() is unreachable and the "
-			.. "keyboard stays remapped after quit while launchd restarts the grabber. The "
-			.. "teardown needs a path through ke_lifecycle, which is required far earlier")
+		-- LeaseController is captured above the risky platform.remap require. Its stop
+		-- operation targets only the already-known generation variables/watchdog, so
+		-- the fallback neither depends on the failed module nor infers ownership from
+		-- a stock process.
+		helpers.assert_true(body:find("LeaseController.stop", 1, true) ~= nil,
+			"when platform.remap never loaded, the early exact controller must still revoke "
+				.. "the generation without touching stock Karabiner")
 
-		helpers.assert_true(body:find("is_hs_owned_bridge", 1, true) ~= nil,
-			"and that fallback must still refuse to touch a bridge Hammerspoon did not "
-			.. "start — a bare kill would boot out a user-managed Karabiner setup, which is "
-			.. "the exact regression the ownership marker exists to prevent")
+		helpers.assert_true(body:find("is_hs_owned_bridge", 1, true) == nil,
+			"stock-process observation must never authorize teardown")
 	end)
 
 end)

@@ -21,8 +21,10 @@
 ---    sticky_X/X, companion manipulators fire the base modifier immediately
 ---    whenever another modifier-class key is already held, so combined chords
 ---    like Cmd+(sticky-shift key) work without entering the sticky path.
---- 4. Merge-Preserve: only complex_modifications is replaced; devices, fn keys,
----    simple_modifications, and global KE flags survive every regeneration.
+--- 4. Mode-Gated Merge: every manipulator carries one generation mode and one
+---    irreversible revocation condition; regeneration replaces only exact
+---    managed rule tags while preserving personal rules, parameters, profiles,
+---    devices, mappings, virtual HID settings, and global Karabiner preferences.
 --- ==============================================================================
 
 local M = {}
@@ -31,8 +33,17 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
+local LeaseContract = require("platform.remap.lease_contract")
+local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 
 local LOG = "karabiner"
+
+local MANAGED_TAG_LABEL      = "ErgoptiPlus managed"
+local MANAGED_MODE_NORMAL    = "normal"
+local MANAGED_MODE_PAUSE     = "pause"
+
+local LEGACY_PARAMETER_TAP = "basic.to_if_alone_timeout_milliseconds"
+local LEGACY_PARAMETER_SIMULTANEOUS = "basic.simultaneous_threshold_milliseconds"
 
 -- Always-on rule files loaded in order after CapsWord (which is loaded first
 -- separately to guarantee the highest priority in the KE rule engine).
@@ -158,6 +169,303 @@ local function load_json_file(path)
 	return data
 end
 
+--- Verifies that a table is a dense one-based JSON array.
+--- Empty arrays and objects are indistinguishable after JSON decoding and are
+--- accepted; any named key or numeric hole is rejected before an ipairs merge
+--- could silently discard user data.
+--- @param value any Candidate array.
+--- @return boolean dense Whether all keys form the range 1..n.
+local function is_dense_array(value)
+	if type(value) ~= "table" then return false end
+	local count = 0
+	local maximum = 0
+	for key in pairs(value) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return false end
+		count = count + 1
+		if key > maximum then maximum = key end
+	end
+	return maximum == count
+end
+
+--- Builds the exact Karabiner variable name for one generation's atomic mode.
+--- @param token string Canonical 32-character lowercase hexadecimal token.
+--- @return string|nil variable_name Generation-scoped variable name.
+--- @return string|nil error_message Validation failure.
+function M.mode_variable_name(token)
+	return LeaseContract.mode_variable_name(token)
+end
+
+--- Builds the exact irreversible fence variable for one generation.
+--- @param token string Canonical 32-character lowercase hexadecimal token.
+--- @return string|nil variable_name Generation-scoped tombstone name.
+--- @return string|nil error_message Validation failure.
+function M.revoked_variable_name(token)
+	return LeaseContract.revoked_variable_name(token)
+end
+
+--- Builds the exact rule-description prefix owned by ErgoptiPlus.
+--- @param token string Canonical generation token.
+--- @param mode string Managed mode (`normal` or `pause`).
+--- @return string prefix Exact prefix including its trailing space.
+local function managed_description_prefix(token, mode)
+	return string.format("[%s:%s:%s] ", MANAGED_TAG_LABEL, token, mode)
+end
+
+--- Parses only canonical ErgoptiPlus ownership markers.
+--- Lua patterns have no alternation or fixed-count quantifier, so the broad
+--- capture is followed by explicit length, mode, and prefix checks.
+--- @param description any Rule description candidate.
+--- @return string|nil token Canonical token when the prefix is exact.
+--- @return string|nil mode Canonical managed mode when the prefix is exact.
+local function parse_managed_description(description)
+	if type(description) ~= "string" then return nil end
+	local token, mode = description:match(
+		"^%[ErgoptiPlus managed:([0-9a-f]+):([a-z]+)%] "
+	)
+	if not LeaseContract.is_valid_token(token) then return nil end
+	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then return nil end
+	local expected = managed_description_prefix(token, mode)
+	if description:sub(1, #expected) ~= expected then return nil end
+	return token, mode
+end
+
+local VARIABLE_CONDITION_TYPES = {
+	variable_if = true,
+	variable_unless = true,
+}
+
+--- Visits every Karabiner runtime-variable producer and consumer in a rule graph.
+--- Nested delayed actions are included; unrelated `name` fields are ignored.
+--- Shared action tables are visited once and cyclic input cannot recurse forever.
+--- @param value any Rule graph node.
+--- @param visitor function Callback fn(holder, name, path) -> boolean, error.
+--- @param path string|nil Diagnostic path.
+--- @param seen table|nil Already-visited table identities.
+--- @return boolean valid Whether every visited reference was accepted.
+--- @return string|nil error_message Visitor rejection.
+local function walk_runtime_variable_references(value, visitor, path, seen)
+	if type(value) ~= "table" then return true end
+	seen = seen or {}
+	if seen[value] then return true end
+	seen[value] = true
+	path = path or "rules"
+
+	if type(value.set_variable) == "table" and type(value.set_variable.name) == "string" then
+		local ok, err = visitor(value.set_variable, value.set_variable.name, path .. ".set_variable")
+		if ok == false then return false, err end
+	end
+	if VARIABLE_CONDITION_TYPES[value.type] and type(value.name) == "string" then
+		local ok, err = visitor(value, value.name, path .. ".condition")
+		if ok == false then return false, err end
+	end
+
+	for key, nested in pairs(value) do
+		if type(nested) == "table" then
+			local ok, err = walk_runtime_variable_references(
+				nested,
+				visitor,
+				path .. "." .. tostring(key),
+				seen
+			)
+			if not ok then return false, err end
+		end
+	end
+	return true
+end
+
+--- Rewrites every driver-owned bare runtime name to one exact generation.
+--- Stock Karabiner variables are deliberately left untouched.
+--- @param rules table Validated raw managed rule graph.
+--- @param token string Canonical generation token.
+--- @return boolean scoped Whether every owned reference was scoped.
+--- @return string|nil error_message Validation failure.
+local function scope_runtime_variable_references(rules, token)
+	return walk_runtime_variable_references(rules, function(holder, name, path)
+		if LeaseContract.is_managed_variable_name(name) then
+			return false, string.format(
+				"%s already claims reserved generation variable '%s'",
+				path,
+				name
+			)
+		end
+		if not LeaseContract.is_runtime_logical_name(name) then return true end
+		local scoped_name, scope_err = LeaseContract.runtime_variable_name(name, token)
+		if not scoped_name then return false, path .. ": " .. tostring(scope_err) end
+		holder.name = scoped_name
+		return true
+	end)
+end
+
+--- Proves that no bare or foreign Ergopti runtime reference can be deployed.
+--- @param rule table One centrally gated managed rule.
+--- @param token string Token declared by the rule tag.
+--- @return boolean valid Whether every runtime reference uses the exact token.
+--- @return string|nil error_message Validation failure.
+local function validate_scoped_runtime_references(rule, token)
+	return walk_runtime_variable_references(rule, function(_holder, name, path)
+		if LeaseContract.is_runtime_logical_name(name) then
+			return false, string.format("%s retains bare Ergopti runtime variable '%s'", path, name)
+		end
+		if not LeaseContract.is_runtime_variable_namespace_name(name) then return true end
+		local _logical_name, runtime_token = LeaseContract.parse_runtime_variable_name(name)
+		if runtime_token ~= token then
+			return false, string.format(
+				"%s contains foreign or malformed Ergopti runtime variable '%s'",
+				path,
+				name
+			)
+		end
+		return true
+	end)
+end
+
+--- Adds one exact atomic mode and tombstone condition to every manipulator.
+--- Validation completes before mutation so malformed generated data cannot
+--- leave a partially gated configuration in the caller's table.
+--- @param rules table Rules generated for one pause mode.
+--- @param token string Canonical generation token.
+--- @param mode string Managed mode (`normal` or `pause`).
+--- @return table|nil rules The same list after central gating.
+--- @return string|nil error_message Validation failure.
+local function gate_managed_rules(rules, token, mode)
+	if not LeaseContract.is_valid_token(token) then
+		return nil, LeaseContract.invalid_token_error(token)
+	end
+	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then
+		return nil, "managed rule mode must be 'normal' or 'pause'"
+	end
+	if not is_dense_array(rules) then return nil, "managed rules must be a dense array" end
+
+	for rule_index, rule in ipairs(rules) do
+		if type(rule) ~= "table" then
+			return nil, string.format("managed rule %d must be a table", rule_index)
+		end
+		if type(rule.description) ~= "string" or rule.description == "" then
+			return nil, string.format("managed rule %d must have a non-empty description", rule_index)
+		end
+		if not is_dense_array(rule.manipulators) or #rule.manipulators == 0 then
+			return nil, string.format("managed rule %d must contain manipulators", rule_index)
+		end
+		for manipulator_index, manipulator in ipairs(rule.manipulators) do
+			if type(manipulator) ~= "table" then
+				return nil, string.format(
+					"managed rule %d manipulator %d must be a table",
+					rule_index,
+					manipulator_index
+				)
+			end
+			if manipulator.conditions ~= nil and not is_dense_array(manipulator.conditions) then
+				return nil, string.format(
+					"managed rule %d manipulator %d conditions must be a table",
+					rule_index,
+					manipulator_index
+				)
+			end
+			for condition_index, condition in ipairs(manipulator.conditions or {}) do
+				if type(condition) ~= "table" then
+					return nil, string.format(
+						"managed rule %d manipulator %d condition %d must be a table",
+						rule_index,
+						manipulator_index,
+						condition_index
+					)
+				end
+				if LeaseContract.is_managed_variable_name(condition.name) then
+					return nil, string.format(
+						"managed rule %d manipulator %d already uses a reserved generation variable",
+						rule_index,
+						manipulator_index
+					)
+				end
+			end
+		end
+	end
+	local scoped, scope_err = scope_runtime_variable_references(rules, token)
+	if not scoped then return nil, scope_err end
+
+	local variables = LeaseContract.variables(token)
+	local mode_name = variables.mode
+	local revoked_name = variables.revoked
+	local mode_value = mode == MANAGED_MODE_PAUSE
+		and LeaseContract.MODE_PAUSED or LeaseContract.MODE_ACTIVE
+	local prefix = managed_description_prefix(token, mode)
+	for _, rule in ipairs(rules) do
+		rule.description = prefix .. rule.description
+		for _, manipulator in ipairs(rule.manipulators) do
+			if manipulator.conditions == nil then manipulator.conditions = {} end
+			manipulator.conditions[#manipulator.conditions + 1] = {
+				type = "variable_if",
+				name = mode_name,
+				value = mode_value,
+			}
+			manipulator.conditions[#manipulator.conditions + 1] = {
+				type = "variable_if",
+				name = revoked_name,
+				value = 0,
+			}
+		end
+	end
+	return rules
+end
+
+--- Applies ErgoptiPlus timing values at manipulator scope.
+--- Existing profile-level parameters belong to the user and may affect personal
+--- rules, so managed tap/hold and simultaneous rules carry their own values.
+--- A per-key tap timeout already present on a manipulator remains authoritative.
+--- @param rules table Ungated ErgoptiPlus rules.
+--- @param tap_hold_timeout_ms number Default tap/hold timeout.
+--- @param simultaneous_threshold_ms number Simultaneous chord threshold.
+--- @return table|nil rules The same list after timing injection.
+--- @return string|nil error_message Validation failure.
+local function apply_managed_timing_parameters(
+	rules,
+	tap_hold_timeout_ms,
+	simultaneous_threshold_ms
+)
+	if type(tap_hold_timeout_ms) ~= "number" or tap_hold_timeout_ms <= 0 then
+		return nil, "tap/hold timeout must be a positive number"
+	end
+	if type(simultaneous_threshold_ms) ~= "number" or simultaneous_threshold_ms <= 0 then
+		return nil, "simultaneous threshold must be a positive number"
+	end
+
+	for rule_index, rule in ipairs(rules) do
+		if type(rule) ~= "table" or not is_dense_array(rule.manipulators) then
+			return nil, string.format("managed rule %d has invalid manipulators", rule_index)
+		end
+		for manipulator_index, manipulator in ipairs(rule.manipulators) do
+			if type(manipulator) ~= "table" then
+				return nil, string.format(
+					"managed rule %d manipulator %d must be a table",
+					rule_index,
+					manipulator_index
+				)
+			end
+			local has_tap = type(manipulator.to_if_alone) == "table"
+			local has_simultaneous = type(manipulator.from) == "table"
+				and type(manipulator.from.simultaneous) == "table"
+			if has_tap or has_simultaneous then
+				if manipulator.parameters ~= nil and type(manipulator.parameters) ~= "table" then
+					return nil, string.format(
+						"managed rule %d manipulator %d parameters must be a table",
+						rule_index,
+						manipulator_index
+					)
+				end
+				if manipulator.parameters == nil then manipulator.parameters = {} end
+				if has_tap
+					and manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] == nil then
+					manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] = tap_hold_timeout_ms
+				end
+				if has_simultaneous then
+					manipulator.parameters["basic.simultaneous_threshold_milliseconds"] = simultaneous_threshold_ms
+				end
+			end
+		end
+	end
+	return rules
+end
+
 --- Returns true when an event sets layer_active to its "on" value.
 --- @param ev table A karabiner_to event entry.
 --- @return boolean
@@ -218,6 +526,42 @@ local function build_action_index(available_actions)
 		index[action.id] = action
 	end
 	return index
+end
+
+--- Recursively copies a JSON-compatible value without retaining table aliases.
+--- Legacy graph hints must remain in their historical pre-lease form while
+--- timing and generation gates mutate the deployed rule graph in place.
+--- @param value any Value to copy.
+--- @return any copy Structurally independent copy.
+local function deep_copy(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, nested in pairs(value) do
+		copy[deep_copy(key)] = deep_copy(nested)
+	end
+	return copy
+end
+
+--- Copies only catalogue actions whose runtime-variable references will be
+--- rewritten or whose navigation output receives the F20 sentinel. All other
+--- immutable catalogue rows stay shared, avoiding a full 673-action copy while
+--- guaranteeing that regeneration never tokenizes the caller's cached source.
+--- @param available_actions table Canonical cached action catalogue.
+--- @return table prepared Per-build action list with mutable rows detached.
+local function detach_runtime_variable_actions(available_actions)
+	local prepared = {}
+	for index, action in ipairs(available_actions or {}) do
+		local requires_copy = false
+		walk_runtime_variable_references(action, function(_holder, name)
+			if LeaseContract.is_runtime_logical_name(name)
+				or LeaseContract.is_managed_variable_name(name) then
+				requires_copy = true
+			end
+			return true
+		end, "available_actions[" .. tostring(index) .. "]")
+		prepared[index] = requires_copy and deep_copy(action) or action
+	end
+	return prepared
 end
 
 --- Recursively compares two values for structural equality.
@@ -733,22 +1077,11 @@ local function build_script_control_sentinel_rules()
 end
 
 
---- Builds the self-contained script-control rules kept alive in the paused
---- Karabiner config. The normal sentinel rules (build_script_control_sentinel_rules)
---- condition on ke_held_right_command — a variable set by the right_command tap/hold
---- rule — but pause strips every other rule, so that variable would never get set.
---- Here we gate the sentinels DIRECTLY on the physical modifier instead, so
---- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
---- modules/shortcuts/script_control.lua) even while every other remap is off, so
---- the script-control shortcuts stay identical and working while paused.
---- While paused the remap layer is OFF, so the user reaches these shortcuts with the
---- REAL option key — option+Enter / option+Backspace / option+Escape. The rules gate
---- ONLY on the side-agnostic real "option" key and deliberately do NOT include a
---- right_command variant: the user does not press the real rcmd while paused, and a
---- right_command+Backspace/Escape rule would shadow native macOS chords (e.g.
---- Cmd+Delete = delete-to-line-start). One rule per slot (F-H6).
---- @return table List of Karabiner rule objects (one per slot).
-function M.build_paused_script_control_rules()
+--- Builds the historical, ungated pause-only script-control rule graph.
+--- Kept separate so first-upgrade migration can fingerprint the exact config
+--- that older builds deployed while paused.
+--- @return table rules One raw rule per script-control slot.
+local function build_raw_paused_script_control_rules()
 	local rules = {}
 	for _, slot in ipairs(SCRIPT_CONTROL_SENTINEL_SLOTS) do
 		rules[#rules + 1] = {
@@ -771,6 +1104,34 @@ function M.build_paused_script_control_rules()
 	return rules
 end
 
+--- Builds the self-contained script-control rules active only while paused.
+--- The normal sentinel rules condition on ke_held_right_command, but every normal
+--- rule requires the generation-scoped mode to be ACTIVE. These
+--- pause-only rules gate DIRECTLY on the physical modifier, so
+--- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
+--- modules/shortcuts/script_control.lua) while every other remap is off, so
+--- the script-control shortcuts stay identical and working while paused.
+--- While paused the remap layer is OFF, so the user reaches these shortcuts with the
+--- REAL option key — option+Enter / option+Backspace / option+Escape. The rules gate
+--- ONLY on the side-agnostic real "option" key and deliberately do NOT include a
+--- right_command variant: the user does not press the real rcmd while paused, and a
+--- right_command+Backspace/Escape rule would shadow native macOS chords (e.g.
+--- Cmd+Delete = delete-to-line-start). One rule per slot (F-H6).
+--- @param lease_token string Canonical generation token shared with the watchdog.
+--- @return table|nil rules List of managed Karabiner rules (one per slot).
+--- @return string|nil error_message Validation failure.
+function M.build_paused_script_control_rules(lease_token)
+	if not LeaseContract.is_valid_token(lease_token) then
+		local err = LeaseContract.invalid_token_error(lease_token)
+		Logger.error(LOG, "Cannot build paused script-control rules: %s.", err)
+		return nil, err
+	end
+	local rules = build_raw_paused_script_control_rules()
+	local managed, err = gate_managed_rules(rules, lease_token, MANAGED_MODE_PAUSE)
+	if not managed then Logger.error(LOG, "Cannot gate paused script-control rules: %s.", err) end
+	return managed, err
+end
+
 
 
 
@@ -789,6 +1150,7 @@ end
 ---   3. Script-control sentinel rules
 ---   4. Always-on static rules (layer_keys, combos)
 ---   5. Dynamic tap/hold manipulators
+---   6. Pause-only script-control rules (mutually exclusive with 1–5)
 ---
 --- @param state table Current module state (_state from init.lua).
 --- @param available_actions table List from Config.load_available_actions.
@@ -796,8 +1158,27 @@ end
 --- @param mod_combos table List from Config.load_mod_combos.
 --- @param non_canonical table Set from Config.compute_non_canonical_combos.
 --- @param shared_dir string Path to platform/remap/data/ containing the JSON data files.
---- @return table Karabiner config table ready for hs.json.encode.
-function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_combos, non_canonical, shared_dir)
+--- @param lease_token string Canonical generation token shared with the watchdog.
+--- @return table|nil config Karabiner config table ready for hs.json.encode.
+--- @return string|nil error_message Validation or assembly failure.
+--- @return table|nil legacy_rules Non-owning pre-lease compatibility hints.
+--- @return table|nil legacy_context State-independent inputs used to prove an older generated graph.
+function M.build_karabiner_json(
+	state,
+	available_actions,
+	tap_hold_keys,
+	mod_combos,
+	non_canonical,
+	shared_dir,
+	lease_token
+)
+	if not LeaseContract.is_valid_token(lease_token) then
+		local err = LeaseContract.invalid_token_error(lease_token)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
+	available_actions = detach_runtime_variable_actions(available_actions)
+
 	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
 	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
 	prepend_nav_layer_sentinel(available_actions)
@@ -805,6 +1186,7 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	local action_index = build_action_index(available_actions)
 	local all_rules    = {}
 	local none_action  = action_index["none"] or { label = "none", karabiner_to = {} }
+	local legacy_static_anchors = {}
 
 
 	-- CapsWord must be first — it must match before any modifier combo or
@@ -812,6 +1194,7 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	-- whatever else is mapped to those keys.
 	local capsword_rule = load_json_file(shared_dir .. "capsword.json")
 	if capsword_rule then
+		legacy_static_anchors.capsword = deep_copy(capsword_rule)
 		all_rules[#all_rules + 1] = capsword_rule
 	else
 		Logger.warn(LOG, "capsword.json not found — CapsWord will be inactive.")
@@ -897,6 +1280,11 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	for _, fname in ipairs(ALWAYS_ON_RULES) do
 		local rule = load_json_file(shared_dir .. fname)
 		if rule then
+			if fname == "layer_keys.json" then
+				legacy_static_anchors.layer_keys = deep_copy(rule)
+			elseif fname == "combos.json" then
+				legacy_static_anchors.combos = deep_copy(rule)
+			end
 			all_rules[#all_rules + 1] = rule
 		else
 			Logger.warn(LOG, "Always-on rule file not found: '%s' — skipped.", fname)
@@ -928,23 +1316,54 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 		if rule then all_rules[#all_rules + 1] = rule end
 	end
 
+	-- Capture the exact historical rule graph before the new manipulator-local
+	-- timings, ownership tags, and atomic mode gates mutate it. Individual members
+	-- are non-owning compatibility hints: deletion requires reconstruction and
+	-- proof of the complete contiguous historical block.
+	local legacy_available_actions = detach_runtime_variable_actions(available_actions)
+	local legacy_rules = deep_copy(all_rules)
+	for _, paused_rule in ipairs(build_raw_paused_script_control_rules()) do
+		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
+	end
 
-	local timeout_ms      = state.tap_hold_timeout_ms
+	-- A single deployed config contains both pause states. Pause and resume only
+	-- toggle the generation-scoped variable; they never rewrite karabiner.json
+	local timeout_ms = state.tap_hold_timeout_ms
 	local simultaneous_ms = state.simultaneous_threshold_ms
+	local timed_rules, timing_err = apply_managed_timing_parameters(
+		all_rules,
+		timeout_ms,
+		simultaneous_ms
+	)
+	if not timed_rules then
+		Logger.error(LOG, "Cannot apply managed Karabiner timings: %s.", timing_err)
+		return nil, timing_err
+	end
+	all_rules = timed_rules
+
+	local managed_normal, normal_err = gate_managed_rules(
+		all_rules,
+		lease_token,
+		MANAGED_MODE_NORMAL
+	)
+	if not managed_normal then
+		Logger.error(LOG, "Cannot gate normal Karabiner rules: %s.", normal_err)
+		return nil, normal_err
+	end
+	all_rules = managed_normal
+
+	local paused_rules, pause_err = M.build_paused_script_control_rules(lease_token)
+	if not paused_rules then return nil, pause_err end
+	for _, rule in ipairs(paused_rules) do all_rules[#all_rules + 1] = rule end
+
+
 	Logger.debug(LOG, "Building config: tap/hold=%d ms, simultaneous=%d ms, symmetric=%s, %d rule(s).",
 		timeout_ms, simultaneous_ms, tostring(state.combo_symmetric), #all_rules)
 
-	return {
+	local config = {
 		profiles = {
 			{
 				complex_modifications = {
-					-- Global timeouts apply to ALL rules uniformly without per-manipulator overrides.
-					-- simultaneous_threshold_milliseconds controls how long KE waits after the first
-					-- key before giving up on a combo.
-					parameters = {
-						["basic.to_if_alone_timeout_milliseconds"]    = timeout_ms,
-						["basic.simultaneous_threshold_milliseconds"] = simultaneous_ms,
-					},
 					rules = all_rules,
 				},
 				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
@@ -954,80 +1373,1059 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 			}
 		}
 	}
+	local legacy_context = {
+		-- Merge consumes this context synchronously. Keep the immutable catalogues by
+		-- reference instead of copying hundreds of actions on every regeneration;
+		-- candidate reconstruction makes its own copies before any mutation.
+		available_actions = legacy_available_actions,
+		tap_hold_keys = tap_hold_keys,
+		mod_combos = mod_combos,
+		non_canonical = non_canonical,
+		shared_dir = shared_dir,
+		static_anchors = legacy_static_anchors,
+		script_control_slots = deep_copy(SCRIPT_CONTROL_SENTINEL_SLOTS),
+		physical_log_path = KE_PHYSICAL_KC_LOG,
+	}
+	return config, nil, legacy_rules, legacy_context
 end
 
---- Forces the global flags that headless operation requires. Mutates
---- `cfg` in place. KE reads these via FSEvents on the file and applies
---- them live; the menubar helper also picks them up on its own next start.
---- @param cfg table A karabiner.json root-level table.
-local function enforce_headless_global(cfg)
-	if type(cfg.global) ~= "table" then cfg.global = {} end
-	-- Hide the menubar icon. Karabiner-Menu still runs (it owns the IPC link
-	-- to Core-Service that keeps remapping alive after our prime quits the
-	-- main GUI) but renders no icon when this flag is false.
-	cfg.global.show_in_menu_bar = false
-	cfg.global.show_profile_name_in_menu_bar = false
-	-- Disable the quit-confirmation dialog. When true, sending Cmd+Q (or the
-	-- equivalent Apple Event) opens a modal dialog that blocks the whole
-	-- AppleScript thread until dismissed. Our prime cycle relied on the
-	-- AppleScript quit returning quickly; if it blocks, _prime_in_progress
-	-- stays true forever and the menu shows 🔵 indefinitely. False is the
-	-- only safe value for headless operation.
-	cfg.global.ask_for_confirmation_before_quitting = false
-	-- Disable the update check on startup. Each prime cycle would otherwise
-	-- trigger an HTTP call and a popup if a new version is available — both
-	-- unwanted in our silent headless launch.
-	cfg.global.check_for_updates_on_startup = false
+--- Finds the one explicitly selected profile without guessing.
+--- @param config table Karabiner root configuration.
+--- @param label string Name used in validation errors.
+--- @return table|nil profile The selected profile.
+--- @return integer|string|nil profile_index Selected index, or an error string.
+local function find_unique_selected_profile(config, label)
+	if type(config) ~= "table" then return nil, label .. " config must be a table" end
+	if not is_dense_array(config.profiles) or #config.profiles == 0 then
+		return nil, label .. " config must contain profiles"
+	end
+
+	local selected_profile = nil
+	local selected_index = nil
+	local selected_count = 0
+	for index, profile in ipairs(config.profiles) do
+		if type(profile) ~= "table" then
+			return nil, string.format("%s profile %d must be a table", label, index)
+		end
+		if profile.selected == true then
+			selected_count = selected_count + 1
+			selected_profile = profile
+			selected_index = index
+		end
+	end
+	if selected_count ~= 1 then
+		return nil, string.format(
+			"%s config must contain exactly one selected profile, found %d",
+			label,
+			selected_count
+		)
+	end
+	return selected_profile, selected_index
 end
 
---- Merges HS-generated complex_modifications into the existing karabiner.json,
---- preserving every other KE UI setting (devices, fn_function_keys,
---- simple_modifications, global flags, etc.) in the selected profile.
---- Falls back to the raw HS config when the existing file is absent or invalid.
---- Always enforces the headless global flags via enforce_headless_global() so
---- the menubar icon never appears even if a previous KE session toggled it on.
---- @param hs_config table The profile structure returned by build_karabiner_json.
+--- Counts one exact Karabiner condition on a manipulator.
+--- @param manipulator table Karabiner manipulator.
+--- @param name string Variable name.
+--- @param value number Expected value.
+--- @return integer count Exact matching condition count.
+local function count_variable_condition(manipulator, name, value)
+	local count = 0
+	for _, condition in ipairs(manipulator.conditions or {}) do
+		if type(condition) == "table"
+			and condition.type == "variable_if"
+			and condition.name == name
+			and condition.value == value then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+--- Validates that the incoming block contains only centrally gated managed rules.
+--- An empty block is valid and means remove every stale ErgoptiPlus rule without
+--- installing a replacement, which is the non-destructive disable operation.
+--- @param rules table Incoming generated rules.
+--- @return boolean valid Whether every non-empty rule is safe to insert.
+--- @return string|nil error_message Validation failure.
+local function validate_incoming_managed_rules(rules)
+	if not is_dense_array(rules) then
+		return false, "generated managed rules must be a dense array"
+	end
+	local generation_token = nil
+	for rule_index, rule in ipairs(rules) do
+		if type(rule) ~= "table" then
+			return false, string.format("generated rule %d must be a table", rule_index)
+		end
+		local token, mode = parse_managed_description(rule.description)
+		if not token then
+			return false, string.format("generated rule %d lacks an exact managed tag", rule_index)
+		end
+		if generation_token and generation_token ~= token then
+			return false, "generated managed rules must use one generation token"
+		end
+		generation_token = token
+		if not is_dense_array(rule.manipulators) or #rule.manipulators == 0 then
+			return false, string.format("generated rule %d must contain manipulators", rule_index)
+		end
+
+		local variables = LeaseContract.variables(token)
+		local mode_name = variables.mode
+		local revoked_name = variables.revoked
+		local expected_mode = mode == MANAGED_MODE_PAUSE
+			and LeaseContract.MODE_PAUSED or LeaseContract.MODE_ACTIVE
+		for manipulator_index, manipulator in ipairs(rule.manipulators) do
+			if type(manipulator) ~= "table" or not is_dense_array(manipulator.conditions) then
+				return false, string.format(
+					"generated rule %d manipulator %d lacks managed conditions",
+					rule_index,
+					manipulator_index
+				)
+			end
+			for _, condition in ipairs(manipulator.conditions) do
+				if type(condition) ~= "table" then
+					return false, string.format(
+						"generated rule %d manipulator %d contains an invalid condition",
+						rule_index,
+						manipulator_index
+					)
+				end
+				local _runtime_logical, runtime_token =
+					LeaseContract.parse_runtime_variable_name(condition.name)
+				if runtime_token and runtime_token ~= token then
+					return false, string.format(
+						"generated rule %d manipulator %d contains a foreign runtime condition",
+						rule_index,
+						manipulator_index
+					)
+				elseif LeaseContract.is_managed_variable_name(condition.name)
+					and not runtime_token then
+					local is_exact_mode = condition.type == "variable_if"
+						and condition.name == mode_name
+						and condition.value == expected_mode
+					local is_exact_revoked = condition.type == "variable_if"
+						and condition.name == revoked_name
+						and condition.value == 0
+					if not is_exact_mode and not is_exact_revoked then
+						return false, string.format(
+							"generated rule %d manipulator %d contains a foreign managed condition",
+							rule_index,
+							manipulator_index
+						)
+					end
+				end
+			end
+			local runtime_ok, runtime_err = validate_scoped_runtime_references(
+				manipulator,
+				token
+			)
+			if not runtime_ok then
+				return false, string.format(
+					"generated rule %d manipulator %d: %s",
+					rule_index,
+					manipulator_index,
+					tostring(runtime_err)
+				)
+			end
+			if count_variable_condition(manipulator, mode_name, expected_mode) ~= 1
+				or count_variable_condition(manipulator, mode_name, LeaseContract.MODE_OFF) ~= 0
+				or count_variable_condition(manipulator, mode_name,
+					expected_mode == LeaseContract.MODE_ACTIVE
+						and LeaseContract.MODE_PAUSED or LeaseContract.MODE_ACTIVE) ~= 0
+				or count_variable_condition(manipulator, revoked_name, 0) ~= 1
+				or count_variable_condition(manipulator, revoked_name, 1) ~= 0 then
+				return false, string.format(
+					"generated rule %d manipulator %d has inconsistent managed conditions",
+					rule_index,
+					manipulator_index
+				)
+			end
+		end
+	end
+	return true
+end
+
+--- Validates non-owning pre-lease hints supplied by build_karabiner_json.
+--- No individual hint is ever sufficient evidence for deletion.
+--- Fingerprints may remove existing rules by deep equality, so accepting a
+--- managed tag, malformed rule graph, or reserved variable would broaden the
+--- ownership boundary and risk claiming user configuration.
+--- @param rules table|nil Exact historical rule fingerprints.
+--- @return boolean valid Whether the hint list is structurally safe.
+--- @return string|nil error_message Validation failure.
+local function validate_legacy_rule_fingerprints(rules)
+	if rules == nil then return true end
+	if not is_dense_array(rules) then
+		return false, "legacy rule fingerprints must be a dense array"
+	end
+	for rule_index, rule in ipairs(rules) do
+		if type(rule) ~= "table"
+			or type(rule.description) ~= "string"
+			or rule.description == "" then
+			return false, string.format(
+				"legacy rule fingerprint %d must have a non-empty description",
+				rule_index
+			)
+		end
+		if parse_managed_description(rule.description) then
+			return false, string.format(
+				"legacy rule fingerprint %d must be untagged",
+				rule_index
+			)
+		end
+		if not is_dense_array(rule.manipulators) or #rule.manipulators == 0 then
+			return false, string.format(
+				"legacy rule fingerprint %d must contain manipulators",
+				rule_index
+			)
+		end
+		local references_ok, references_err = walk_runtime_variable_references(
+			rule,
+			function(_holder, name, path)
+				if LeaseContract.is_managed_variable_name(name) then
+					return false, string.format(
+						"legacy rule fingerprint %d contains managed variable '%s' at %s",
+						rule_index,
+						name,
+						path
+					)
+				end
+				return true
+			end,
+			"legacy_rules[" .. tostring(rule_index) .. "]"
+		)
+		if not references_ok then return false, references_err end
+		for manipulator_index, manipulator in ipairs(rule.manipulators) do
+			if type(manipulator) ~= "table"
+				or (manipulator.conditions ~= nil
+					and not is_dense_array(manipulator.conditions)) then
+				return false, string.format(
+					"legacy rule fingerprint %d manipulator %d is malformed",
+					rule_index,
+					manipulator_index
+				)
+			end
+			for _, condition in ipairs(manipulator.conditions or {}) do
+				if type(condition) ~= "table"
+					or LeaseContract.is_managed_variable_name(condition.name) then
+					return false, string.format(
+						"legacy rule fingerprint %d manipulator %d contains a managed condition",
+						rule_index,
+						manipulator_index
+					)
+				end
+			end
+		end
+	end
+	return true
+end
+
+--- Reports whether a string starts with an exact byte sequence.
+--- @param value any Candidate string.
+--- @param prefix string Required prefix.
+--- @return boolean matches Whether the prefix is exact.
+local function starts_with(value, prefix)
+	return type(value) == "string" and value:sub(1, #prefix) == prefix
+end
+
+--- Reports whether a string ends with an exact byte sequence.
+--- @param value any Candidate string.
+--- @param suffix string Required suffix.
+--- @return boolean matches Whether the suffix is exact.
+local function ends_with(value, suffix)
+	return type(value) == "string" and value:sub(-#suffix) == suffix
+end
+
+--- Reports whether an action id changes generated structure independently of
+--- the action payload. Sticky/base ids participate in companion-rule selection;
+--- `none` participates in combo emission, so neither may be canonicalised.
+--- @param action_id any Candidate action id.
+--- @return boolean semantic Whether identity itself affects generation.
+local function has_generator_semantic_action_id(action_id)
+	if action_id == "none" or STICKY_TO_BASE_ACTION[action_id] ~= nil then return true end
+	for _, base_id in pairs(STICKY_TO_BASE_ACTION) do
+		if action_id == base_id then return true end
+	end
+	return false
+end
+
+--- Accepts a duplicate localised label only when both actions are exact output
+--- aliases and neither id has generator semantics. This covers the historical
+--- `cmd_tab` -> `alt_tab_apps_list` compatibility alias without guessing between
+--- genuinely different actions that happen to translate to the same label.
+--- @param first table First action.
+--- @param second table Second action.
+--- @return boolean equivalent Whether either id regenerates the same graph.
+local function equivalent_legacy_action_alias(first, second)
+	if type(first) ~= "table" or type(second) ~= "table" then return false end
+	if has_generator_semantic_action_id(first.id) or has_generator_semantic_action_id(second.id) then
+		return false
+	end
+	for key, value in pairs(first) do
+		if key ~= "id" and not deep_equal(value, second[key]) then return false end
+	end
+	for key, value in pairs(second) do
+		if key ~= "id" and not deep_equal(value, first[key]) then return false end
+	end
+	return true
+end
+
+--- Builds a unique string-field index and rejects ambiguous catalogue labels.
+--- @param items table Dense catalogue array.
+--- @param field string String field used as the key.
+--- @param catalogue_name string Diagnostic catalogue name.
+--- @param allow_equivalent_action_aliases boolean|nil Coalesce exact non-semantic action aliases.
+--- @return table|nil index Unique item lookup.
+--- @return string|nil error_message Validation failure.
+local function unique_catalogue_index(items, field, catalogue_name, allow_equivalent_action_aliases)
+	if not is_dense_array(items) then return nil, catalogue_name .. " must be a dense array" end
+	local index = {}
+	for item_index, item in ipairs(items) do
+		local key = type(item) == "table" and item[field] or nil
+		if type(key) ~= "string" or key == "" then
+			return nil, string.format("%s item %d lacks a non-empty %s", catalogue_name, item_index, field)
+		end
+		if index[key]
+			and not (allow_equivalent_action_aliases
+				and equivalent_legacy_action_alias(index[key], item)) then
+			return nil, string.format("%s has duplicate %s '%s'", catalogue_name, field, key)
+		end
+		if not index[key] then index[key] = item end
+	end
+	return index
+end
+
+--- Validates the old generator's profile-level timing signature.
+--- These two keys were written by the pre-lease generator as a complete
+--- parameters table. Extra or missing keys make ownership ambiguous.
+--- @param parameters any Existing complex-modification parameters.
+--- @return boolean matches Whether the table is the exact historical shape.
+local function has_exact_legacy_parameters(parameters)
+	if type(parameters) ~= "table" then return false end
+	local key_count = 0
+	for key in pairs(parameters) do
+		if key ~= LEGACY_PARAMETER_TAP and key ~= LEGACY_PARAMETER_SIMULTANEOUS then return false end
+		key_count = key_count + 1
+	end
+	return key_count == 2
+		and type(parameters[LEGACY_PARAMETER_TAP]) == "number"
+		and parameters[LEGACY_PARAMETER_TAP] > 0
+		and type(parameters[LEGACY_PARAMETER_SIMULTANEOUS]) == "number"
+		and parameters[LEGACY_PARAMETER_SIMULTANEOUS] > 0
+end
+
+--- Prepares and validates state-independent inputs for legacy graph proof.
+--- @param context any Fourth return value from build_karabiner_json.
+--- @return table|nil prepared Validated proof inputs and lookup indices.
+--- @return string|nil error_message Validation failure.
+local function prepare_legacy_context(context)
+	if type(context) ~= "table" then return nil, "legacy migration context must be a table" end
+	if type(context.shared_dir) ~= "string" or context.shared_dir == "" then
+		return nil, "legacy migration context requires a shared data directory"
+	end
+	if type(context.non_canonical) ~= "table" then
+		return nil, "legacy migration context requires a non-canonical combo set"
+	end
+	if not is_dense_array(context.script_control_slots) or #context.script_control_slots ~= 3 then
+		return nil, "legacy migration context requires three script-control slots"
+	end
+	if type(context.physical_log_path) ~= "string" or context.physical_log_path == "" then
+		return nil, "legacy migration context requires the historical physical-key log path"
+	end
+
+	local action_by_label, action_err = unique_catalogue_index(
+		context.available_actions,
+		"label",
+		"legacy action catalogue",
+		true
+	)
+	if not action_by_label then return nil, action_err end
+	local key_by_label, key_err = unique_catalogue_index(
+		context.tap_hold_keys,
+		"label",
+		"legacy tap/hold catalogue"
+	)
+	if not key_by_label then return nil, key_err end
+	local combo_by_label, combo_err = unique_catalogue_index(
+		context.mod_combos,
+		"label",
+		"legacy combo catalogue"
+	)
+	if not combo_by_label then return nil, combo_err end
+
+	local action_id_seen = {}
+	for _, action in ipairs(context.available_actions) do
+		if type(action.id) ~= "string" or action.id == "" or action_id_seen[action.id] then
+			return nil, "legacy action catalogue has a missing or duplicate id"
+		end
+		action_id_seen[action.id] = true
+	end
+	local combo_index_by_id = {}
+	for combo_index, combo in ipairs(context.mod_combos) do
+		if type(combo.id) ~= "string" or combo.id == "" or combo_index_by_id[combo.id] then
+			return nil, "legacy combo catalogue has a missing or duplicate id"
+		end
+		combo_index_by_id[combo.id] = combo_index
+	end
+
+	local anchors = context.static_anchors
+	if type(anchors) ~= "table" then
+		return nil, "legacy migration context requires static rule anchors"
+	end
+	local capsword = anchors.capsword
+	local layer_keys = anchors.layer_keys
+	local combos = anchors.combos
+	if not capsword or not layer_keys or not combos then
+		return nil, "legacy migration context has incomplete static rule anchors"
+	end
+
+	return {
+		available_actions = context.available_actions,
+		tap_hold_keys = context.tap_hold_keys,
+		mod_combos = context.mod_combos,
+		non_canonical = context.non_canonical,
+		shared_dir = context.shared_dir,
+		script_control_slots = context.script_control_slots,
+		physical_log_path = context.physical_log_path,
+		action_by_label = action_by_label,
+		key_by_label = key_by_label,
+		combo_by_label = combo_by_label,
+		combo_index_by_id = combo_index_by_id,
+		capsword = capsword,
+		layer_keys = layer_keys,
+		combos = combos,
+	}
+end
+
+--- Parses the action pair encoded by a historical rule description.
+--- @param description string Existing rule description.
+--- @param prefix string Exact generator-owned prefix.
+--- @param action_by_label table Unique action lookup.
+--- @return table|nil pair Resolved tap and hold actions.
+--- @return string|nil error_message Parse failure.
+local function parse_legacy_action_pair(description, prefix, action_by_label)
+	local suffix = " (hold)"
+	local delimiter = " (tap) / "
+	if not starts_with(description, prefix) or not ends_with(description, suffix) then
+		return nil, "legacy action-pair description has an invalid envelope"
+	end
+	local body = description:sub(#prefix + 1, #description - #suffix)
+	local split_at = body:find(delimiter, 1, true)
+	if not split_at or body:find(delimiter, split_at + #delimiter, true) then
+		return nil, "legacy action-pair description is ambiguous"
+	end
+	local tap_label = body:sub(1, split_at - 1)
+	local hold_label = body:sub(split_at + #delimiter)
+	local tap_action = action_by_label[tap_label]
+	local hold_action = action_by_label[hold_label]
+	if not tap_action or not hold_action then
+		return nil, "legacy action-pair description names an unknown action"
+	end
+	return { tap = tap_action, hold = hold_action }
+end
+
+--- Reconstructs one tap/hold setting from its historical rule.
+--- @param rule table Historical rule candidate.
+--- @param key_def table Tap/hold catalogue entry at this fixed position.
+--- @param action_by_label table Unique action lookup.
+--- @return table|nil config Reconstructed tap, hold, and optional timeout.
+--- @return string|nil error_message Parse failure.
+local function parse_legacy_tap_hold_rule(rule, key_def, action_by_label)
+	if type(rule) ~= "table" or type(rule.description) ~= "string"
+		or not is_dense_array(rule.manipulators) or #rule.manipulators == 0 then
+		return nil, "legacy tap/hold rule is malformed"
+	end
+	local passthrough = key_def.label .. ": passthrough (variable tracked)"
+	if rule.description == passthrough then
+		return { tap = "none", hold = "none" }
+	end
+	local pair, pair_err = parse_legacy_action_pair(
+		rule.description,
+		key_def.label .. ": ",
+		action_by_label
+	)
+	if not pair then return nil, pair_err end
+
+	local main = rule.manipulators[#rule.manipulators]
+	local timeout_ms = nil
+	if main.parameters ~= nil then
+		if type(main.parameters) ~= "table" then return nil, "legacy tap/hold parameters are malformed" end
+		timeout_ms = main.parameters[LEGACY_PARAMETER_TAP]
+		if type(timeout_ms) ~= "number" or timeout_ms <= 0 then
+			return nil, "legacy per-key timeout is invalid"
+		end
+	end
+	return { tap = pair.tap.id, hold = pair.hold.id, timeout_ms = timeout_ms }
+end
+
+--- Parses one historical combo rule description without trusting its output.
+--- The reconstructed state is later re-generated and structurally compared,
+--- so a same-description modified rule never proves ownership.
+--- @param rule table Historical combo rule candidate.
+--- @param prepared table Validated migration context.
+--- @return table|nil parsed Combo index, id, kind, and action ids.
+--- @return string|nil error_message Parse failure.
+local function parse_legacy_combo_rule(rule, prepared)
+	if type(rule) ~= "table" or type(rule.description) ~= "string" then
+		return nil, "legacy combo rule is malformed"
+	end
+	local description = rule.description
+	local matches = {}
+	for combo_index, combo_def in ipairs(prepared.mod_combos) do
+		if not combo_def.menu_hidden then
+			local chord_prefix = combo_def.label .. ": "
+			local chord_suffix = " [chord]"
+			if starts_with(description, chord_prefix) and ends_with(description, chord_suffix) then
+				local action_label = description:sub(#chord_prefix + 1, #description - #chord_suffix)
+				local action = prepared.action_by_label[action_label]
+				if action then
+					matches[#matches + 1] = {
+						combo_index = combo_index,
+						combo_id = combo_def.id,
+						kind = "chord",
+						combo = action.id,
+					}
+				end
+			end
+
+			local simultaneous = type(combo_def.from) == "table" and combo_def.from.simultaneous or nil
+			local first_key = type(simultaneous) == "table" and simultaneous[1] and simultaneous[1].key_code
+			local second_key = type(simultaneous) == "table" and simultaneous[2] and simultaneous[2].key_code
+			if first_key and second_key then
+				local pair_prefix = string.format(
+					"%s (%s→%s): ",
+					combo_def.label,
+					first_key,
+					second_key
+				)
+				local pair_suffix = " [var-based]"
+				if starts_with(description, pair_prefix) and ends_with(description, pair_suffix) then
+					local pair_description = description:sub(1, #description - #pair_suffix)
+					local pair = parse_legacy_action_pair(
+						pair_description,
+						pair_prefix,
+						prepared.action_by_label
+					)
+					if pair then
+						matches[#matches + 1] = {
+							combo_index = combo_index,
+							combo_id = combo_def.id,
+							kind = "tap_hold",
+							tap = pair.tap.id,
+							hold = pair.hold.id,
+						}
+					end
+				end
+			end
+		end
+	end
+	if #matches ~= 1 then return nil, "legacy combo description is unknown or ambiguous" end
+	return matches[1]
+end
+
+--- Reconstructs the old state encoded by one candidate normal-rule block.
+--- @param rules table Candidate rules beginning with the CapsWord anchor.
+--- @param script_index integer Relative index of the first script-control rule.
+--- @param parameters table Exact historical timing table.
+--- @param prepared table Validated migration context.
+--- @return table|nil state Reconstructed generator state.
+--- @return string|nil error_message Parse failure.
+local function reconstruct_legacy_state(rules, script_index, parameters, prepared)
+	local tap_hold_config = {}
+	local tap_start = script_index + #prepared.script_control_slots + 2
+	for key_index, key_def in ipairs(prepared.tap_hold_keys) do
+		local config, config_err = parse_legacy_tap_hold_rule(
+			rules[tap_start + key_index - 1],
+			key_def,
+			prepared.action_by_label
+		)
+		if not config then return nil, config_err end
+		tap_hold_config[key_def.id] = config
+	end
+
+	local mod_combos_config = {}
+	local last_combo_index = 0
+	local last_kind = nil
+	for rule_index = 2, script_index - 1 do
+		local parsed, parsed_err = parse_legacy_combo_rule(rules[rule_index], prepared)
+		if not parsed then return nil, parsed_err end
+		if parsed.combo_index < last_combo_index
+			or (parsed.combo_index == last_combo_index
+				and (last_kind ~= "chord" or parsed.kind ~= "tap_hold")) then
+			return nil, "legacy combo rules violate generator order"
+		end
+		local config = mod_combos_config[parsed.combo_id]
+		if not config then
+			config = { tap = "none", hold = "none", combo = "none" }
+			mod_combos_config[parsed.combo_id] = config
+		end
+		if parsed.kind == "chord" then
+			if config.combo ~= "none" then return nil, "legacy combo chord is duplicated" end
+			config.combo = parsed.combo
+		else
+			if config.tap ~= "none" or config.hold ~= "none" then
+				return nil, "legacy combo tap/hold rule is duplicated"
+			end
+			config.tap = parsed.tap
+			config.hold = parsed.hold
+		end
+		last_combo_index = parsed.combo_index
+		last_kind = parsed.kind
+	end
+
+	return {
+		enabled = true,
+		tap_hold_config = tap_hold_config,
+		mod_combos_config = mod_combos_config,
+		tap_hold_timeout_ms = parameters[LEGACY_PARAMETER_TAP],
+		sticky_timeout_ms = 1,
+		simultaneous_threshold_ms = parameters[LEGACY_PARAMETER_SIMULTANEOUS],
+		combo_symmetric = false,
+	}
+end
+
+--- Verifies one candidate normal block against every immutable release schema
+--- and both historical symmetry modes. This never calls the current generator.
+--- @param rules table Candidate block.
+--- @param script_index integer Relative first script-control index.
+--- @param parameters table Exact historical timing table.
+--- @param prepared table Validated migration context.
+--- @param release_ids table Release schemas sharing the observed sentinel graph.
+--- @return boolean proven Whether the entire block is a generator output.
+local function proves_legacy_normal_block(rules, script_index, parameters, prepared, release_ids)
+	local state = reconstruct_legacy_state(rules, script_index, parameters, prepared)
+	if not state then return false end
+	for _, release_id in ipairs(release_ids) do
+		for _, combo_symmetric in ipairs({ false, true }) do
+			local expected = LegacyReleaseFixtures.build_normal_candidate(
+				release_id,
+				state,
+				combo_symmetric,
+				prepared
+			)
+			if expected and LegacyReleaseFixtures.graph_equal(rules, expected) then return true end
+		end
+	end
+	return false
+end
+
+--- Reports whether an exact rule sequence begins at one index.
+--- @param rules table Existing rule array.
+--- @param start_index integer Candidate first index.
+--- @param expected table Expected rule sequence.
+--- @return boolean matches Whether every rule is deeply equal.
+local function exact_rule_sequence_at(rules, start_index, expected)
+	if start_index < 1 or start_index + #expected - 1 > #rules then return false end
+	for offset, rule in ipairs(expected) do
+		if not deep_equal(rules[start_index + offset - 1], rule) then return false end
+	end
+	return true
+end
+
+--- Finds the one unambiguous, fully re-generated historical block in a profile.
+--- Personal rules may surround the block, but any interleaving breaks the proof.
+--- @param rules table Existing profile rules.
+--- @param complex table Existing complex_modifications object.
+--- @param prepared table Validated migration context.
+--- @return table|nil range Proven inclusive start/end indices, or nil.
+--- @return string|nil error_message Ambiguous proof failure.
+local function find_proven_legacy_block(rules, complex, prepared)
+	local candidates = {}
+	local candidate_keys = {}
+	local function add_candidate(first, last)
+		local key = tostring(first) .. ":" .. tostring(last)
+		if not candidate_keys[key] then
+			candidate_keys[key] = true
+			candidates[#candidates + 1] = { first = first, last = last }
+		end
+	end
+
+	if has_exact_legacy_parameters(complex.parameters) then
+		for _, script_set in ipairs(LegacyReleaseFixtures.script_control_rule_sets(prepared)) do
+			local script_rules = script_set.rules
+			for script_start = 2, #rules do
+				if exact_rule_sequence_at(rules, script_start, script_rules)
+					and deep_equal(rules[script_start + #script_rules], prepared.layer_keys)
+					and deep_equal(rules[script_start + #script_rules + 1], prepared.combos) then
+					local block_end = script_start + #script_rules + 1 + #prepared.tap_hold_keys
+					if block_end <= #rules then
+						for block_start = 1, script_start - 1 do
+							if deep_equal(rules[block_start], prepared.capsword) then
+								local candidate = {}
+								for index = block_start, block_end do
+									candidate[#candidate + 1] = rules[index]
+								end
+								local relative_script_index = script_start - block_start + 1
+								if proves_legacy_normal_block(
+									candidate,
+									relative_script_index,
+									complex.parameters,
+									prepared,
+									script_set.release_ids
+								) then
+									add_candidate(block_start, block_end)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	elseif complex.parameters == nil then
+		for _, paused_set in ipairs(LegacyReleaseFixtures.paused_rule_sets(prepared)) do
+			for start_index = 1, #rules do
+				if exact_rule_sequence_at(rules, start_index, paused_set.rules) then
+					add_candidate(start_index, start_index + #paused_set.rules - 1)
+				end
+			end
+		end
+	end
+
+	if #candidates > 1 then return nil, "multiple historical ErgoptiPlus blocks match" end
+	return candidates[1]
+end
+
+--- Detects an untagged rule carrying historical ErgoptiPlus structure.
+--- Detection is deliberately conservative: a false match aborts without
+--- writing, whereas a missed legacy rule would remain active after a crash.
+--- @param rule any Existing rule candidate.
+--- @param prepared table Validated migration context.
+--- @return boolean suspicious Whether ownership must be resolved first.
+local function looks_like_legacy_ergopti_rule(rule, prepared)
+	if type(rule) ~= "table" or type(rule.description) ~= "string" then return false end
+	if deep_equal(rule, prepared.capsword)
+		or deep_equal(rule, prepared.layer_keys)
+		or deep_equal(rule, prepared.combos)
+		or LegacyReleaseFixtures.is_exact_release_control_rule(rule, prepared) then
+		return true
+	end
+
+	local function contains_runtime_signature(value)
+		if type(value) ~= "table" then return false end
+		if type(value.name) == "string" and starts_with(value.name, "ke_held_") then return true end
+		if type(value.shell_command) == "string"
+			and value.shell_command:find("karabiner_kc.log", 1, true) then
+			return true
+		end
+		for _, nested in pairs(value) do
+			if type(nested) == "table" and contains_runtime_signature(nested) then return true end
+		end
+		return false
+	end
+	return contains_runtime_signature(rule)
+end
+
+--- Classifies every removable rule before the merge mutates an output table.
+--- @param existing_rules table Existing profile rules.
+--- @param complex table Existing complex_modifications object.
+--- @param prepared table|nil State-independent migration context.
+--- @return table|nil removal_set Indices proven to be managed.
+--- @return string|nil error_message Ambiguous legacy residue.
+local function classify_managed_rules(existing_rules, complex, prepared)
+	local removal_set = {}
+	if prepared then
+		local proven_range, range_err = find_proven_legacy_block(
+			existing_rules,
+			complex,
+			prepared
+		)
+		if range_err then return nil, range_err end
+		if proven_range then
+			for index = proven_range.first, proven_range.last do removal_set[index] = true end
+		end
+	end
+
+	for index, rule in ipairs(existing_rules) do
+		local token = type(rule) == "table" and parse_managed_description(rule.description) or nil
+		if token then removal_set[index] = true end
+	end
+
+	if prepared then
+		for index, rule in ipairs(existing_rules) do
+			if not removal_set[index] and looks_like_legacy_ergopti_rule(rule, prepared) then
+				return nil, string.format(
+					"ambiguous legacy ErgoptiPlus rule at index %d ('%s') — refusing to modify personal configuration",
+					index,
+					tostring(rule.description)
+				)
+			end
+		end
+	end
+	return removal_set
+end
+
+--- Replaces exact managed rules while preserving personal-rule order.
+--- The replacement block occupies the first stale managed position; if no
+--- managed or exact historical block exists, it is appended after every
+--- personal rule.
+--- @param existing_rules table Rules in the user's selected profile.
+--- @param incoming_rules table Validated rules for the new generation.
+--- @param complex table Existing complex_modifications object.
+--- @param prepared table|nil State-independent migration context.
+--- @return table|nil merged_rules Non-destructive merged rule list.
+--- @return string|nil error_message Ambiguous legacy residue.
+local function merge_managed_rule_block(
+	existing_rules,
+	incoming_rules,
+	complex,
+	prepared
+)
+	local removal_set, classify_err = classify_managed_rules(
+		existing_rules,
+		complex,
+		prepared
+	)
+	if not removal_set then return nil, classify_err end
+	local retained = {}
+	local insertion_index = nil
+	for index, rule in ipairs(existing_rules) do
+		if removal_set[index] then
+			if not insertion_index then insertion_index = #retained + 1 end
+		else
+			retained[#retained + 1] = rule
+		end
+	end
+	if not insertion_index then insertion_index = #retained + 1 end
+
+	local merged = {}
+	for index = 1, insertion_index - 1 do merged[#merged + 1] = retained[index] end
+	for _, rule in ipairs(incoming_rules) do merged[#merged + 1] = rule end
+	for index = insertion_index, #retained do merged[#merged + 1] = retained[index] end
+	return merged
+end
+
+--- Merges generated ErgoptiPlus rules into a user's Karabiner configuration.
+--- Existing files must decode and contain exactly one selected profile; any
+--- ambiguity fails closed so regeneration cannot erase personal state. Only
+--- descriptions carrying the exact managed prefix and a complete, reconstructed
+--- historical block are removed. Individual legacy fingerprints never establish
+--- ownership. All globals,
+--- profiles, profile parameters, devices, simple/fn mappings, virtual-HID
+--- settings, complex-modification parameters, and personal rules are preserved.
+--- A missing file returns the validated generated config unchanged and never
+--- injects stock Karabiner UI preferences.
+--- @param hs_config table Structure returned by build_karabiner_json, or a selected profile with an empty rules list for disable cleanup.
 --- @param karabiner_out string Absolute path to the live karabiner.json.
---- @return table The merged configuration ready to be JSON-encoded.
-function M.merge_into_existing_config(hs_config, karabiner_out)
-	local raw = FileSystem.read(karabiner_out)
-	if not raw then
-		Logger.debug(LOG, "No existing karabiner.json — writing fresh HS config.")
-		enforce_headless_global(hs_config)
-		return hs_config
+--- @param legacy_fingerprints table|nil Non-owning third return value from build_karabiner_json.
+--- @param legacy_context table|nil Fourth return value from build_karabiner_json.
+--- @return table|nil config Merged configuration ready to be JSON-encoded.
+--- @return string|nil error_message Validation or read failure.
+--- @return string|nil expected_raw Exact source bytes, or nil for observed absence.
+function M.merge_into_existing_config(
+	hs_config,
+	karabiner_out,
+	legacy_fingerprints,
+	legacy_context
+)
+	if type(karabiner_out) ~= "string" or karabiner_out == "" then
+		local err = "karabiner output path must be a non-empty string"
+		Logger.error(LOG, "Merge aborted: %s.", err)
+		return nil, err
 	end
 
-	local ok, existing = pcall(hs.json.decode, raw)
-	if not ok or type(existing) ~= "table" then
-		Logger.warn(LOG, "Existing karabiner.json is not valid JSON — overwriting from scratch.")
-		enforce_headless_global(hs_config)
-		return hs_config
+	local generated_profile, generated_index_or_err = find_unique_selected_profile(
+		hs_config,
+		"generated"
+	)
+	if not generated_profile then
+		Logger.error(LOG, "Merge aborted: %s.", generated_index_or_err)
+		return nil, generated_index_or_err
+	end
+	local generated_complex = generated_profile.complex_modifications
+	if type(generated_complex) ~= "table" or type(generated_complex.rules) ~= "table" then
+		local err = "generated selected profile must contain complex_modifications.rules"
+		Logger.error(LOG, "Merge aborted: %s.", err)
+		return nil, err
+	end
+	local valid_rules, rules_err = validate_incoming_managed_rules(generated_complex.rules)
+	if not valid_rules then
+		Logger.error(LOG, "Merge aborted: %s.", rules_err)
+		return nil, rules_err
+	end
+	if legacy_fingerprints == nil then legacy_fingerprints = {} end
+	local valid_legacy, legacy_err = validate_legacy_rule_fingerprints(legacy_fingerprints)
+	if not valid_legacy then
+		Logger.error(LOG, "Merge aborted: %s.", legacy_err)
+		return nil, legacy_err
 	end
 
-	local hs_profile = hs_config.profiles and hs_config.profiles[1]
-	if not hs_profile then
-		enforce_headless_global(existing)
-		return existing
+	local read_ok, raw = pcall(FileSystem.read, karabiner_out)
+	if not read_ok then
+		local err = "existing karabiner.json read raised: " .. tostring(raw)
+		Logger.error(LOG, "Merge aborted: %s.", err)
+		return nil, err
+	end
+	if raw == nil then
+		local exists = false
+		if type(FileSystem.exists) == "function" then
+			local exists_ok, exists_result = pcall(FileSystem.exists, karabiner_out)
+			if not exists_ok then
+				local err = "existing karabiner.json existence check raised: " .. tostring(exists_result)
+				Logger.error(LOG, "Merge aborted: %s.", err)
+				return nil, err
+			end
+			exists = exists_result == true
+		end
+		if exists then
+			local err = "existing karabiner.json exists but could not be read"
+			Logger.error(LOG, "Merge aborted: %s.", err)
+			return nil, err
+		end
+		Logger.debug(LOG, "No existing karabiner.json — using generated managed config unchanged.")
+		return hs_config, nil, nil
 	end
 
-	if type(existing.profiles) ~= "table" or #existing.profiles == 0 then
-		-- No profiles yet — write HS config wholesale but keep any global section
-		existing.profiles = hs_config.profiles
-		enforce_headless_global(existing)
-		return existing
+	local decode_ok, existing = pcall(hs.json.decode, raw)
+	if not decode_ok or type(existing) ~= "table" then
+		local err = "existing karabiner.json is not valid JSON"
+		Logger.error(LOG, "Merge aborted: %s.", err)
+		return nil, err
 	end
 
-	-- Target the selected profile; fall back to the first one
-	local target_idx = 1
-	for i, profile in ipairs(existing.profiles) do
-		if profile.selected then target_idx = i; break end
+	local selected_profile, target_index_or_err = find_unique_selected_profile(existing, "existing")
+	if not selected_profile then
+		Logger.error(LOG, "Merge aborted: %s.", target_index_or_err)
+		return nil, target_index_or_err
 	end
 
-	-- Overwrite only complex_modifications so KE UI device/fn-key settings survive
-	existing.profiles[target_idx].complex_modifications = hs_profile.complex_modifications
-	enforce_headless_global(existing)
-	Logger.debug(LOG, "Merged HS rules into profile %d of existing karabiner.json (menubar icon hidden).", target_idx)
-	return existing
+	-- Validate every profile before mutating any of them. Stale managed rules may
+	-- live in an inactive profile and become active again after a user switch
+	for profile_index, profile in ipairs(existing.profiles) do
+		local complex = profile.complex_modifications
+		if complex ~= nil and type(complex) ~= "table" then
+			local err = string.format(
+				"existing profile %d complex_modifications must be a table",
+				profile_index
+			)
+			Logger.error(LOG, "Merge aborted: %s.", err)
+			return nil, err
+		end
+		if type(complex) == "table"
+			and complex.rules ~= nil
+			and not is_dense_array(complex.rules) then
+			local err = string.format(
+				"existing profile %d complex_modifications.rules must be a table",
+				profile_index
+			)
+			Logger.error(LOG, "Merge aborted: %s.", err)
+			return nil, err
+		end
+	end
+
+	-- State-independent reconstruction is needed for every untagged rule. An exact
+	-- current-state fingerprint is only a candidate fragment, never ownership
+	-- proof by itself: only the complete historical block may be removed.
+	-- A fully migrated config therefore avoids rebuilding catalogue indices on
+	-- every settings/layout regeneration.
+	local needs_legacy_reconstruction = false
+	if legacy_context ~= nil then
+		for _, profile in ipairs(existing.profiles) do
+			local complex = profile.complex_modifications
+			for _, rule in ipairs(type(complex) == "table" and complex.rules or {}) do
+				local token = type(rule) == "table"
+					and parse_managed_description(rule.description) or nil
+				if not token then
+					needs_legacy_reconstruction = true
+					break
+				end
+			end
+			if needs_legacy_reconstruction then break end
+		end
+	end
+
+	local prepared_legacy = nil
+	if needs_legacy_reconstruction then
+		local context_err
+		prepared_legacy, context_err = prepare_legacy_context(legacy_context)
+		if not prepared_legacy then
+			Logger.error(LOG, "Merge aborted: %s.", context_err)
+			return nil, context_err
+		end
+	end
+
+	local merged_rules_by_profile = {}
+	for profile_index, profile in ipairs(existing.profiles) do
+		local is_selected = profile_index == target_index_or_err
+		local complex = profile.complex_modifications
+		if complex == nil and is_selected then complex = {} end
+		if complex then
+			local existing_rules = complex.rules
+			if existing_rules ~= nil or is_selected then
+				local merged_rules, merge_err = merge_managed_rule_block(
+					existing_rules or {},
+					is_selected and generated_complex.rules or {},
+					complex,
+					prepared_legacy
+				)
+				if not merged_rules then
+					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, merge_err)
+					return nil, merge_err
+				end
+				merged_rules_by_profile[profile_index] = merged_rules
+			end
+		end
+	end
+	for profile_index, merged_rules in pairs(merged_rules_by_profile) do
+		local profile = existing.profiles[profile_index]
+		if profile.complex_modifications == nil then profile.complex_modifications = {} end
+		profile.complex_modifications.rules = merged_rules
+	end
+	Logger.debug(
+		LOG,
+		"Merged %d managed rule(s) with %d validated non-owning legacy hint(s) into selected profile %d without changing personal settings.",
+		#generated_complex.rules,
+		#legacy_fingerprints,
+		target_index_or_err
+	)
+	return existing, nil, raw
+end
+
+--- Re-reads, merges, encodes, and publishes the current Karabiner config.
+--- The live file is read immediately before the merge, and FileSystem.write owns
+--- the repository's proven atomic replacement semantics. Stock and personal
+--- Karabiner processes are never restarted or signalled by this operation.
+--- A non-cooperating external writer can still replace the pathname after this
+--- function returns; do not claim cross-process compare-and-swap guarantees.
+--- @param hs_config table Valid generated managed configuration.
+--- @param karabiner_out string Absolute path to the live karabiner.json.
+--- @param legacy_fingerprints table|nil Non-owning legacy fingerprints.
+--- @param legacy_context table|nil Historical reconstruction context.
+--- @return boolean deployed Whether the current merge was published.
+--- @return string detail Human-readable result or failure.
+--- @return integer attempts Number of publication attempts made.
+function M.merge_and_deploy_config(
+	hs_config,
+	karabiner_out,
+	legacy_fingerprints,
+	legacy_context
+)
+	local merge_ok, merged, merge_err = pcall(
+		M.merge_into_existing_config,
+		hs_config,
+		karabiner_out,
+		legacy_fingerprints,
+		legacy_context
+	)
+	if not merge_ok or type(merged) ~= "table" then
+		local detail = "merge failed: " .. tostring(merge_ok and merge_err or merged)
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+
+	local encode_ok, content = pcall(hs.json.encode, merged, true)
+	if not encode_ok or type(content) ~= "string" then
+		local detail = "JSON encode failed: " .. tostring(content)
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+
+	local call_ok, deployed, deploy_detail = pcall(M.deploy_string, content, karabiner_out)
+	if not call_ok or deployed ~= true then
+		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+
+	return true, deploy_detail or "ok", 1
 end
 
 --- Deploys a file to its destination using two strategies.

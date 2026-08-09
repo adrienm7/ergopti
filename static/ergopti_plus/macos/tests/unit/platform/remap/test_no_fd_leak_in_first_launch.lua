@@ -27,7 +27,7 @@ local function read_karabiner_init_source()
 	-- Selected by a declaration unique to platform/remap/init.lua rather than by
 	-- path, so moving or splitting the module cannot turn this invariant
 	-- into a path error.
-	local body = helpers.read_driver_source("local function build_paused_ke_config")
+	local body = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 	helpers.assert_true(body ~= nil, "platform/remap/init.lua source must be locatable")
 	return body
 end

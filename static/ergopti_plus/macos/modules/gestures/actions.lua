@@ -20,6 +20,7 @@ local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
+local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
 local LOG           = "gestures.actions"
@@ -462,12 +463,38 @@ sg("layer_off", function()
 end)
 sg("capsword", function()
 	local ke = ke_variables()
-	if ke then ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE) end
+	if not ke then return end
+	local function finish_activation(ok, reason, revision)
+		if ok ~= true or reason ~= "written" then
+			Logger.debug(LOG, "CapsWord gesture activation did not settle: %s.", tostring(reason))
+			return
+		end
+		local controller_ok, controller = pcall(require, "platform.remap.lease_controller")
+		if not controller_ok or type(controller) ~= "table"
+			or type(controller.status) ~= "function" then
+			Logger.error(LOG, "CapsWord gesture cannot verify the live remap lease: %s.",
+				tostring(controller))
+			return
+		end
+		local status_ok, phase = pcall(controller.status)
+		if not status_ok or phase ~= "active" then
+			Logger.debug(LOG, "CapsWord gesture LED activation discarded in lease phase %s.",
+				tostring(phase))
+			return
+		end
+		local revision_ok, current_revision = pcall(ke.capsword_revision)
+		if not revision_ok or current_revision ~= revision then
+			Logger.debug(LOG, "CapsWord gesture LED activation was superseded.")
+			return
+		end
+		Logger.pcall(LOG, KeyState.set_capslock, true)
+	end
+	if not ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE, finish_activation) then return end
 	-- A keystroke cannot toggle CapsLock: macOS delivers it as a flagsChanged
 	-- event rather than a keyDown/keyUp pair, so keyStroke fails silently. The
-	-- adapter owns the only path that works, and it is the same one
+	-- adapter owns the only path that works after the lease-gated write settles,
+	-- and it is the same one
 	-- platform/remap/watchers.lua uses to switch CapsWord back off.
-	KeyState.set_capslock(true)
 end)
 
 sg("sticky_shift",             function() arm_sticky({ "shift" }) end)
@@ -723,48 +750,24 @@ sg("script_save_reload",      function()
 end)
 sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
-	-- Tear down Karabiner-Elements BEFORE exiting. os.exit() terminates the Lua
-	-- VM abruptly and BYPASSES the Hammerspoon shutdown callback (where the normal
-	-- KE kill lives), so on this quit path KE would otherwise keep running with the
-	-- Ergopti rules — leaving the physical keyboard remapped after HS is gone.
-	-- karabiner.kill() runs the robust launchctl-bootout teardown SYNCHRONOUSLY
-	-- (so launchd cannot respawn the remapper) and respects a user-managed KE
-	-- install (leaves it untouched when HS did not own the bridge). Because it
-	-- blocks until KE is down, the keyboard is guaranteed free before os.exit.
-	-- Lazy-required so this low-level action module carries no load-time
-	-- dependency on the Karabiner module.
-	pcall(function()
-		local ok_kb, karabiner = pcall(require, "platform.remap")
-		if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
-			karabiner.kill()
-		end
+	-- Leave the gesture/eventtap stack before starting the lifecycle transaction.
+	-- The coordinator keeps every F17 consumer and classifier live until the exact
+	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
+	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
+	local scheduled, schedule_result = pcall(function()
+		return hs.timer.doAfter(0, function()
+			local request_ok, accepted_or_err = xpcall(function()
+				return TerminationCoordinator.request_exit("script_quit", 0)
+			end, debug.traceback)
+			if not request_ok or accepted_or_err ~= true then
+				Logger.error(LOG, "script_quit controlled exit was rejected: %s",
+					tostring(accepted_or_err))
+			end
+		end)
 	end)
-	-- Flush in-memory keystrokes before exiting — os.exit(0) bypasses
-	-- hs.shutdownCallback where the normal keylogger flush lives.
-	pcall(function()
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
-			kl.stop()
-		end
-	end)
-	-- Terminate the MLX server + orphan helper processes — os.exit(0) likewise
-	-- bypasses the HS shutdown callback where these kills live, so without
-	-- duplicating them the mlx_lm.server keeps holding GPU memory + the MLX port and the
-	-- ergopti_plus_expander / ergopti_plus_http_server helpers survive as orphans.
-	-- Shared with that callback via menu_llm so the two quit paths cannot drift.
-	pcall(function()
-		local ok_llm, menu_llm = pcall(require, "ui.menu.menu_llm")
-		if ok_llm and type(menu_llm) == "table" then
-			if type(menu_llm.stop_mlx_server) == "function" then menu_llm.stop_mlx_server() end
-			if type(menu_llm.terminate_helper_processes) == "function" then menu_llm.terminate_helper_processes() end
-			-- stop_mlx_server only kills the in-process wrapper; the detached
-			-- mlx_lm.server (own process group) must be reaped via pgrep/lsof or it
-			-- keeps holding GPU memory + the MLX port after quit. Same sweep the
-			-- shutdown callback runs (script_quit is always a genuine quit) (F-M7).
-			if type(menu_llm.terminate_orphan_mlx_server) == "function" then menu_llm.terminate_orphan_mlx_server() end
-		end
-	end)
-	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
+	if not scheduled or schedule_result == nil then
+		Logger.error(LOG, "script_quit could not schedule controlled exit: %s", tostring(schedule_result))
+	end
 end)
 
 -- Debug

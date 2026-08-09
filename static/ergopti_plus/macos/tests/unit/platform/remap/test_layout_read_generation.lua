@@ -51,8 +51,8 @@ local function load_watchers()
 		spawn = function(_executable, _args, on_done)
 			local rec = { on_done = on_done, terminated = 0, started = false }
 			rec.handle = {
-				start     = function() rec.started = true end,
-				terminate = function() rec.terminated = rec.terminated + 1 end,
+				start     = function() rec.started = true; return true end,
+				terminate = function() rec.terminated = rec.terminated + 1; return true end,
 			}
 			table.insert(ctx.spawns, rec)
 			return rec.handle
@@ -68,6 +68,7 @@ local function load_watchers()
 		end,
 		cancel = function(handle)
 			if type(handle) == "table" then handle.cancelled = true end
+			return true
 		end,
 	}
 

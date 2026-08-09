@@ -4,27 +4,17 @@
 --- MODULE: Regression — the layout fallback poll must release its pending guard
 --- DESCRIPTION:
 --- The Sequoia layout-change fallback poll guards against piling up concurrent
---- `defaults` reads with `_layout_poll_pending`. That flag had exactly ONE release
---- path: inside the completion callback of the async read. But the completion
---- callback is not guaranteed to fire at all —
----   * ShellRunner.spawn() returns a handle UNCONDITIONALLY. When the underlying
----     task constructor failed, the handle's start() only logs an error and
----     returns, so on_done is never invoked.
----   * task:start() can itself return false under fork pressure, which is not a
----     throw either — that variant logs nothing at all.
---- In both cases the flag latched true and the `if _layout_poll_pending then
---- return end` guard short-circuited EVERY subsequent tick for the life of the
---- session, silently killing the very fallback poll that exists because
---- hs.keycodes.inputSourceChanged is unreliable on Sequoia.
+--- `defaults` reads with `_layout_poll_pending`. A successfully started task can
+--- still hang forever and never invoke its completion callback, so the guard
+--- needs an independent watchdog release path.
 ---
 --- The correct sibling lives in the same file: _capsword_check_pending has FOUR
 --- release paths, including a CAPSWORD_PROBE_TIMEOUT_SEC watchdog for a
 --- started-but-hung process. This test mirrors that watchdog's coverage.
 ---
---- ROOT CAUSE ENCODED HERE (behavioural, not a source grep): a spawn whose
---- completion callback NEVER fires must not wedge the poll forever. The stubbed
---- handle below is exactly what a nil/unstartable task produces — start() and
---- terminate() exist, but on_done is dropped on the floor.
+--- ROOT CAUSE ENCODED HERE (behavioural, not a source grep): a successfully
+--- started spawn whose completion callback NEVER fires must not wedge the poll
+--- forever. Refused starts are covered separately by test_watchers_teardown_retry.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -57,13 +47,12 @@ local function load_watchers_with_dead_spawn()
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_executable, _args, _on_done)
 			ctx.spawns = ctx.spawns + 1
-			-- Deliberately drop _on_done: this is precisely what the production
-			-- adapter yields when the task could not be created or started.
+			-- Deliberately drop _on_done: this models a task that started and hung.
 			-- terminate() is counted rather than ignored, so the test can tell
 			-- "stopped waiting for the read" apart from "reclaimed the read".
 			return {
-				start     = function() end,
-				terminate = function() ctx.terminates = ctx.terminates + 1 end,
+				start     = function() return true end,
+				terminate = function() ctx.terminates = ctx.terminates + 1; return true end,
 			}
 		end,
 		_active_tasks = {},
@@ -77,6 +66,7 @@ local function load_watchers_with_dead_spawn()
 		end,
 		cancel = function(handle)
 			if type(handle) == "table" then handle.cancelled = true end
+			return true
 		end,
 	}
 
@@ -216,8 +206,8 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 			spawn = function(_executable, _args, on_done)
 				ctx.spawns = ctx.spawns + 1
 				return {
-					start     = function() if on_done then on_done(0, "", "") end end,
-					terminate = function() end,
+					start     = function() if on_done then on_done(0, "", "") end; return true end,
+					terminate = function() return true end,
 				}
 			end,
 			_active_tasks = {},
@@ -230,6 +220,7 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 			end,
 			cancel = function(handle)
 				if type(handle) == "table" then handle.cancelled = true end
+				return true
 			end,
 		}
 

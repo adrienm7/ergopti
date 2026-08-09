@@ -281,7 +281,7 @@ helpers.describe("Karabiner init.lua — tap/hold setters preserve per-key timeo
 		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		return src
 	end

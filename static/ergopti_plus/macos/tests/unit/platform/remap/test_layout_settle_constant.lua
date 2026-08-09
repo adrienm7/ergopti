@@ -24,8 +24,8 @@ helpers.describe("karabiner: layout-settle delay is a registry constant, not a m
 
 		helpers.assert_true(src:find('Timings.sec("debounce", "layout_tis_settle_ms")', 1, true) ~= nil,
 			"the layout-settle delay must be sourced from Timings.sec(debounce, layout_tis_settle_ms)")
-		helpers.assert_true(src:find("hs.timer.doAfter(LAYOUT_TIS_SETTLE_SEC,", 1, true) ~= nil,
-			"the layout rebuild timer must use the named LAYOUT_TIS_SETTLE_SEC constant")
+		helpers.assert_true(src:find("pcall(hs.timer.doAfter, LAYOUT_TIS_SETTLE_SEC", 1, true) ~= nil,
+			"the guarded layout rebuild timer must use the named LAYOUT_TIS_SETTLE_SEC constant")
 		helpers.assert_true(src:find("_layout_rebuild_timer = hs.timer.doAfter(0.5,", 1, true) == nil,
 			"the bare inline 0.5 literal for the layout rebuild must be gone")
 	end)

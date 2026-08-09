@@ -29,6 +29,7 @@ local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
+local TerminationCoordinator = require("infra.termination_coordinator")
 
 local LOG = "menu"
 local load_errors = {}
@@ -789,38 +790,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		reload                    = function() do_reload("menu") end,
 		quit                      = function()
 			hs.timer.doAfter(0.05, function()
-				-- Tear down Karabiner-Elements via karabiner.kill() — the SAME
-				-- ownership-respecting path script_quit (modules/gestures/actions.lua)
-				-- and hs.shutdownCallback (init.lua) already use. The previous
-				-- run_total_reset_async() call bypassed kill()'s is_hs_owned_bridge()
-				-- guard entirely, so it could tear down a user-managed KE install that
-				-- Hammerspoon never started (F-MED-13).
-				pcall(function()
-					local ok_kb, karabiner = pcall(require, "platform.remap")
-					if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
-						karabiner.kill()
-					end
-				end)
-				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-				-- Full orphan teardown before os.exit — os.exit() bypasses
-				-- hs.shutdownCallback so terminate_helper_processes and
-				-- terminate_orphan_mlx_server (called there) must be replicated here.
-				-- Without this the detached mlx_lm.server + helper daemons survive
-				-- indefinitely after a menubar-Quit (M-11 / F-MED-7 missed sibling).
-				pcall(function()
-					local mlm = require("ui.menu.menu_llm")
-					if type(mlm.terminate_helper_processes) == "function" then mlm.terminate_helper_processes() end
-					if type(mlm.terminate_orphan_mlx_server) == "function" then mlm.terminate_orphan_mlx_server() end
-				end)
-				-- Flush keylogger before os.exit() — it bypasses hs.shutdownCallback
-				-- where the normal flush lives.
-				pcall(function()
-					local ok_kl, kl = pcall(require, "modules.keylogger")
-					if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
-						kl.stop()
-					end
-				end)
-				os.exit(0)
+				local request_ok, accepted_or_err = xpcall(function()
+					return TerminationCoordinator.request_exit("menu_quit", 0)
+				end, debug.traceback)
+				if not request_ok or accepted_or_err ~= true then
+					Logger.error(LOG, "Menubar controlled exit was rejected: %s",
+						tostring(accepted_or_err))
+				end
 			end)
 		end,
 		open_logs                 = function()

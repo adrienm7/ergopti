@@ -1,133 +1,90 @@
 --- tests/unit/platform/remap/test_set_enabled_respects_ownership.lua
 
 --- ==============================================================================
---- MODULE: karabiner set_enabled ownership guard regression tests
+--- MODULE: Karabiner Disable and Shutdown Use the Exact Lease Controller
 --- DESCRIPTION:
---- Verifies that M.set_enabled(false) respects the HS-ownership check before
---- issuing the KE-kill call, mirroring the guard already present in M.kill().
----
---- FEATURES & RATIONALE:
---- 1. Source Invariant: set_enabled must call is_hs_owned_bridge before
----    triggering the KE kill so user-managed KE sessions are never killed
----    from the feature toggle.
---- 2. Ordering Check: the ownership guard must appear BEFORE the kill call
----    in set_enabled so the guard cannot be bypassed.
---- 3. Function-Scoped Search (F-MED-17 fix): earlier versions of this test
----    searched the ENTIRE init.lua source for both substrings, so it could
----    never detect a real regression in set_enabled specifically — M.kill()
----    (an unrelated function ~29000 characters later) happens to contain
----    BOTH substrings in the right order too, so a search over the whole
----    file trivially passes even if set_enabled's own guard were deleted.
----    The fix isolates set_enabled's OWN function body first (using its
----    top-level, zero-indentation closing "end" as the boundary — tabs
----    distinguish that from nested "end"s inside the function) and searches
----    only within that slice.
+--- Guards both sibling teardown paths against dismantling their local F17
+--- consumers before LeaseController proves the exact generation STOPPED.
+--- A process-ownership check is intentionally absent: official Karabiner PIDs
+--- are shared and can never distinguish Ergopti rules from personal rules.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
---- Reads the full source of platform/remap/init.lua.
---- @return string The file contents.
-local function read_source()
-	-- Selected by a declaration unique to platform/remap/init.lua rather than by
-	-- path, so moving or splitting the module cannot turn this invariant
-	-- into a path error.
-	local src = helpers.read_driver_source("local function build_paused_ke_config")
-	helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
-	return src
+--- Reads the uniquely identified platform.remap source.
+--- @return string source
+local function remap_source()
+	local source, err = helpers.read_driver_unit("local KARABINER_KE_TILDE_PATH")
+	helpers.assert_true(source ~= nil, "platform.remap source must be unique: " .. tostring(err))
+	return source
 end
 
---- Extracts the source body of a single top-level function, delimited by its
---- own signature and its own top-level (zero-indentation) closing "end" line.
---- This codebase indents with tabs exclusively, so a nested "end" inside an
---- if/elseif/for block always carries at least one leading tab — only the
---- function's OWN closing "end" is written as a bare "end" with no leading
---- whitespace at all. Searching for the first "\nend\n" (as a naive
---- whole-file scan would) is NOT safe here because a function containing
---- nested blocks has many standalone "end" lines before its own — but every
---- one of those is TAB-indented, so anchoring on the zero-indent form is safe.
---- @param src string The full file source.
---- @param signature string The exact function signature to search for
----   (e.g. "function M.set_enabled(value)").
---- @return string The function body, from the signature through its closing end.
-local function extract_function_body(src, signature)
-	local start_pos = src:find(signature, 1, true)
-	helpers.assert_true(start_pos ~= nil, signature .. " must exist in the source")
-
-	-- Search for the first "\nend" at column 0 (no leading tab/space) after the
-	-- signature — this is guaranteed to be THIS function's own closing end,
-	-- never a nested block's end, because every nested end is tab-indented.
-	local _, end_line_end = src:find("\nend\n", start_pos, true)
-	helpers.assert_true(end_line_end ~= nil,
-		signature .. " must have a zero-indentation closing 'end' line")
-
-	return src:sub(start_pos, end_line_end)
+--- Extracts the final public function through the module return.
+--- @param signature string Exact function signature.
+--- @return string body
+local function final_function_body(signature)
+	local source = remap_source()
+	local start_at = source:find(signature, 1, true)
+	helpers.assert_true(start_at ~= nil, signature .. " must exist")
+	local end_at = source:find("\nreturn M", start_at, true)
+	helpers.assert_true(end_at ~= nil, signature .. " must precede the module return")
+	return source:sub(start_at, end_at - 1)
 end
 
-
-
-
--- ==================================================================================
--- ==================================================================================
--- ======= 1/ set_enabled ownership guard — source-level invariant check ============
--- ==================================================================================
--- ==================================================================================
-
-helpers.describe("karabiner.init set_enabled — ownership guard (karabiner-life-1 regression)", function()
-
-	helpers.it("set_enabled's OWN body calls is_hs_owned_bridge before the KE kill call (F-MED-17)", function()
-		local src  = read_source()
-		local body = extract_function_body(src, "function M.set_enabled(value)")
-
-		-- Sanity check: the extracted slice must actually be set_enabled, not
-		-- some other function — it must NOT contain M.kill's own signature.
-		helpers.assert_true(body:find("function M.kill()", 1, true) == nil,
-			"extract_function_body must isolate set_enabled only, not spill into M.kill (F-MED-17 scoping check)")
-
-		local owned_pos = body:find("is_hs_owned_bridge", 1, true)
-		local kill_pos  = body:find("KeLifecycle.kill_async", 1, true)
-
-		helpers.assert_true(owned_pos ~= nil,
-			"set_enabled must reference is_hs_owned_bridge within its OWN body (ownership guard missing)")
-		helpers.assert_true(kill_pos ~= nil,
-			"set_enabled must reference KeLifecycle.kill_async within its OWN body")
-		-- The guard must appear before the kill call; a guard appearing only
-		-- after the kill would be dead code.
-		helpers.assert_true(owned_pos < kill_pos,
-			"is_hs_owned_bridge guard must appear before KeLifecycle.kill_async within set_enabled's own body")
+helpers.describe("platform.remap teardown authority is the exact lease", function()
+	helpers.it("set_enabled(false) delegates only to the exact lease controller", function()
+		local source = remap_source()
+		local stop_at = source:find(
+			'pcall(LeaseController.stop, "integration_disabled", function(ok, reason)',
+			1,
+			true
+		)
+		helpers.assert_true(stop_at ~= nil,
+			"disable must request acknowledged revocation from the exact lease controller")
+		local callback = source:sub(stop_at)
+		local failed_fence = callback:find(
+			"if%s+ok%s*~=%s*true%s+then%s+rollback_enabled_state%(reason%)%s+return%s+end"
+		)
+		local persist = callback:find("persist_enabled_flag(false)", 1, true)
+		local classifier_teardown = callback:find("clear_managed_output_set()", 1, true)
+		local consumer_teardown = callback:find("stop_lease_bound_inputs()", 1, true)
+		helpers.assert_true(failed_fence ~= nil,
+			"a rejected fence must return through rollback before any local teardown")
+		helpers.assert_true(persist ~= nil and classifier_teardown ~= nil and consumer_teardown ~= nil
+			and failed_fence < persist and persist < classifier_teardown
+			and classifier_teardown < consumer_teardown,
+			"disable may commit state and release F17 consumers only inside the successful STOPPED callback")
+		helpers.assert_true(source:find("is_hs_owned_bridge", 1, true) == nil)
+		helpers.assert_true(source:find("KILL_CMD", 1, true) == nil)
+		helpers.assert_true(source:find("kill_async", 1, true) == nil)
 	end)
 
-	helpers.it("set_enabled's OWN body does NOT call the KE kill unconditionally in the elseif branch (F-MED-17)", function()
-		local src  = read_source()
-		local body = extract_function_body(src, "function M.set_enabled(value)")
+	helpers.it("separates exact revocation proof from retryable local teardown", function()
+		local source = remap_source()
+		local revoke_at = source:find("function M.revoke(reason, on_done)", 1, true)
+		local shutdown_at = source:find("function M.shutdown(reason, on_done)", 1, true)
+		local teardown_at = source:find("function M.teardown_local()", 1, true)
+		helpers.assert_true(revoke_at ~= nil and shutdown_at ~= nil and teardown_at ~= nil)
 
-		-- Pre-fix: the elseif branch called the kill directly without an ownership check.
-		-- Post-fix: the kill call is nested inside an `if hs_owned then` block.
-		local hs_owned_pos = body:find("hs_owned", 1, true)
-		local kill_pos     = body:find("KeLifecycle.kill_async", 1, true)
-		helpers.assert_true(hs_owned_pos ~= nil,
-			"hs_owned variable must exist within set_enabled's own body — ownership guard is wired")
-		helpers.assert_true(hs_owned_pos < kill_pos,
-			"hs_owned check must gate KeLifecycle.kill_async within set_enabled's own body")
+		local revoke_body = source:sub(revoke_at, shutdown_at - 1)
+		helpers.assert_true(revoke_body:find("LeaseController.stop", 1, true) ~= nil)
+		helpers.assert_true(revoke_body:find("stop_local_resources", 1, true) == nil,
+			"exact STOPPED proof must never be reclassified by a local delete failure")
+
+		local teardown_body = source:sub(teardown_at, revoke_at - 1)
+		local status_at = teardown_body:find("LeaseController.status", 1, true)
+		local idle_gate_at = teardown_body:find('phase ~= "idle" and phase ~= "uninitialized"', 1, true)
+		local local_stop_at = teardown_body:find("xpcall(stop_local_resources, debug.traceback)", 1, true)
+		helpers.assert_true(status_at ~= nil and idle_gate_at ~= nil and local_stop_at ~= nil
+			and status_at < idle_gate_at and idle_gate_at < local_stop_at,
+			"local consumers may be released only after the exact controller is idle")
+
+		local shutdown_body = final_function_body("function M.shutdown(reason, on_done)")
+		local composed_revoke_at = shutdown_body:find("M.revoke(reason", 1, true)
+		local composed_teardown_at = shutdown_body:find("M.teardown_local()", 1, true)
+		helpers.assert_true(composed_revoke_at ~= nil and composed_teardown_at ~= nil
+			and composed_revoke_at < composed_teardown_at)
+		helpers.assert_true(shutdown_body:find("hs.execute", 1, true) == nil)
+		helpers.assert_true(shutdown_body:find("is_hs_owned_bridge", 1, true) == nil)
 	end)
-
-	-- Meta-regression: proves the OLD whole-file search was a false-positive
-	-- risk by demonstrating that M.kill() alone (a DIFFERENT function) also
-	-- independently satisfies the same ownership-before-kill ordering. This is
-	-- exactly why the un-scoped version of this test file could never have
-	-- caught a real regression in set_enabled specifically.
-	helpers.it("M.kill() independently also has ownership-before-kill ordering (demonstrates the F-MED-17 false-positive risk)", function()
-		local src  = read_source()
-		local body = extract_function_body(src, "function M.kill()")
-
-		helpers.assert_true(body:find("function M.set_enabled", 1, true) == nil,
-			"extract_function_body must isolate M.kill only, not spill into set_enabled")
-
-		local owned_pos = body:find("is_hs_owned_bridge", 1, true)
-		local kill_pos   = body:find("KeLifecycle.KILL_CMD", 1, true)
-		helpers.assert_true(owned_pos ~= nil and kill_pos ~= nil and owned_pos < kill_pos,
-			"M.kill() itself has the ownership-before-kill ordering — proving a whole-file search "
-			.. "could pass on M.kill()'s content alone, even if set_enabled had no guard at all")
-	end)
-
 end)

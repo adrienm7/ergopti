@@ -36,6 +36,8 @@ local KeyState       = require("adapters.key_state")
 local MouseControl   = require("adapters.mouse_control")
 local Registrar      = require("adapters.hotkey_registrar")
 local KePaths        = require("platform.remap.ke_paths")
+local LeaseContract  = require("platform.remap.lease_contract")
+local KeVariables   = require("platform.remap.ke_variables")
 
 
 local LOG = "karabiner"
@@ -75,13 +77,9 @@ local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 local _layout_poll_timer = nil
 -- Guard so the async fallback poll never piles up concurrent `defaults` reads.
 local _layout_poll_pending = false
--- Max time to wait for the async layout read before force-releasing the pending
--- guard. ShellRunner.spawn() returns a handle UNCONDITIONALLY — when the task
--- constructor failed, handle.start() only logs an error — and task:start() can
--- itself return false under fork pressure. Neither is a throw, and in both cases
--- the completion callback never fires, so without this watchdog
--- _layout_poll_pending latches true and the guard short-circuits EVERY later tick
--- for the rest of the session, silently killing the Sequoia layout-change poll.
+-- Max time to wait for a layout read that reported a successful start but never
+-- completes. Refused starts release the guard synchronously; this watchdog owns
+-- the independent hung/zombied-child failure mode.
 local LAYOUT_POLL_TIMEOUT_SEC = 5.0
 -- Watchdog handle declared ABOVE the poll body (closure-before-local rule): a
 -- `local` declared textually after a closure that uses it binds the nil GLOBAL,
@@ -95,6 +93,9 @@ local _layout_poll_watchdog = nil
 -- live task), so every timeout leaked one process and its pin for the rest of the
 -- session. Declared above the poll body for the same closure-before-local reason.
 local _layout_poll_handle = nil
+-- A timeout whose exact ShellRunner termination was refused must be retried
+-- before a later tick may construct a successor read.
+local _layout_poll_termination_pending = false
 
 -- Identity of the CURRENT layout read. Bumped when a read starts, and again
 -- whenever one is abandoned (watchdog timeout, watcher stop), so a completion
@@ -114,6 +115,13 @@ local _layout_read_generation = 0
 -- installs its own, so stop_input_source_watcher can restore it instead of passing nil
 -- (karabiner-input-source-changed-overwrite).
 local _previous_input_source_cb = nil
+-- Ownership bit is separate because nil is itself a valid previous callback.
+-- Without it teardown cannot distinguish "restore nil" from "already restored".
+local _input_source_callback_owned = false
+local _installed_input_source_cb = nil
+-- Every installed callback captures this generation. A native watcher/timer
+-- whose stop fails remains physically live but becomes logically inert at once.
+local _input_source_watcher_gen = 0
 
 -- Timestamp (fractional seconds) of the last CapsWord subprocess check.
 local _capsword_last_check_s = 0
@@ -128,12 +136,24 @@ local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
 -- callback can cancel it and the watchdog callback can reach the pending flag.
 local _capsword_probe_watchdog = nil
 
+-- Delayed CapsLock LED correction and the optional gestures-engine hook are
+-- lease-owned too; both must be cancellable when Ergopti remapping goes inert.
+local _capsword_led_timer = nil
+local _gestures_engine = nil
+local _capsword_timer_cleanup_backlog = {}
+
 -- Monotonic probe generation. A terminated or timed-out probe's callback still
 -- fires, and it used to clear _capsword_check_pending and cancel the watchdog
 -- unconditionally — the SUCCESSOR probe's, by then. The sibling layout read in
 -- this same module was generation-gated for exactly this; the CapsWord probe was
 -- not, so a slow probe could unlock a fresh one and leave two racing.
 local _capsword_gen = 0
+-- Generation of an accepted CapsWord clear. Ordinary follow-up probes must not
+-- cancel its delayed LED correction, but a newer clear or lifecycle restart must.
+-- Separate lifecycle generation for installed event/touch callbacks. Probe
+-- generations change on every query, so they cannot identify which watcher
+-- closure owns an event queued before stop/restart.
+local _capsword_watcher_gen = 0
 
 -- GC root for the CapsWord probe tasks. An hs.task that is not referenced from a
 -- GC root can be collected mid-run, which kills the subprocess and means its
@@ -141,6 +161,11 @@ local _capsword_gen = 0
 -- the next spacebar would switch CapsLock back on. Canonical spelling recognised
 -- by tests/unit/meta/test_gc_retention.lua. Entries are released in the callbacks.
 local _active_tasks = {}
+-- Partial starts return nil to their caller, so this module must retain any
+-- eventtap whose rollback failed; no outer layer ever received that capability.
+local _capsword_watcher_backlog = {}
+local _input_source_timer_cleanup_backlog = {}
+local _layout_watchdog_cleanup_backlog = {}
 
 -- App history cache for direct app-previous focus.
 local _current_bundle_id = nil
@@ -148,6 +173,30 @@ local _previous_bundle_id = nil
 local _current_app_name = nil
 local _previous_app_name = nil
 local _app_switch_watcher = nil
+local _app_switch_watcher_gen = 0
+local _app_switch_watcher_active = false
+
+--- Adds an exact cleanup capability once.
+--- @param backlog table Dense handle array.
+--- @param handle any Exact native/adapter handle.
+local function retain_cleanup_handle(backlog, handle)
+	for _, retained in ipairs(backlog) do
+		if retained == handle then return end
+	end
+	backlog[#backlog + 1] = handle
+end
+
+--- Cancels one TimerScheduler handle and reports native refusal without throw.
+--- @param handle table Adapter timer handle.
+--- @param label string Diagnostic owner.
+--- @return boolean stopped
+local function cancel_scheduled_timer(handle, label)
+	local cancelled, cancel_result = pcall(TimerScheduler.cancel, handle)
+	if cancelled and cancel_result == true then return true end
+	Logger.error(LOG, "%s cancellation failed; retained for retry: %s.",
+		label, tostring(cancel_result))
+	return false
+end
 
 
 
@@ -159,10 +208,85 @@ local _app_switch_watcher = nil
 -- ===========================================
 -- ===========================================
 
+--- Applies the CapsLock LED side effect only after the serialized exact-token
+--- variable clear has completed and remains the newest local CapsWord intent.
+--- @param watcher_gen number Watcher lifecycle generation.
+--- @param ok boolean Variable-write settlement.
+--- @param reason string Settlement reason.
+--- @param revision number Logical CapsWord revision settled by the writer.
+local function complete_capsword_clear(watcher_gen, ok, reason, revision)
+	if watcher_gen ~= _capsword_watcher_gen then return end
+	_capsword_check_pending = false
+	if ok ~= true then
+		Logger.warn(LOG, "CapsWord clear did not settle successfully: %s.", tostring(reason))
+		return
+	end
+
+	local revision_ok, current_revision = pcall(KeVariables.capsword_revision)
+	if not revision_ok or current_revision ~= revision then
+		Logger.debug(LOG, "CapsWord LED clear superseded by newer local intent.")
+		return
+	end
+
+	if _capsword_led_timer then
+		if not cancel_scheduled_timer(_capsword_led_timer, "Superseded CapsWord LED timer") then
+			retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_led_timer)
+		end
+		_capsword_led_timer = nil
+	end
+	Logger.pcall(LOG, KeyState.set_capslock, false)
+
+	local led_timer = nil
+	local callback_fired_before_return = false
+	local timer_ok, timer_or_err = pcall(
+		TimerScheduler.after,
+		0.15,
+		function()
+			if led_timer == nil then
+				callback_fired_before_return = true
+				return
+			end
+			if _capsword_led_timer ~= led_timer then return end
+			_capsword_led_timer = nil
+			if watcher_gen ~= _capsword_watcher_gen then return end
+			local current_ok, latest_revision = pcall(KeVariables.capsword_revision)
+			if current_ok and latest_revision == revision then
+				Logger.pcall(LOG, KeyState.set_capslock, false)
+			end
+		end
+	)
+	led_timer = timer_or_err
+	if not timer_ok or type(timer_or_err) ~= "table"
+		or timer_or_err.fired == true or callback_fired_before_return then
+		if type(timer_or_err) == "table"
+			and not cancel_scheduled_timer(timer_or_err, "Rejected CapsWord LED timer") then
+			retain_cleanup_handle(_capsword_timer_cleanup_backlog, timer_or_err)
+		end
+		Logger.error(LOG, "CapsWord LED correction timer could not be armed: %s.",
+			tostring(timer_ok and "timer unavailable" or timer_or_err))
+		return
+	end
+	_capsword_led_timer = timer_or_err
+	Logger.done(LOG, "CapsWord deactivated via pointer event.")
+end
+
+--- Stops one native watcher without dropping a failed capability.
+--- @param watcher table Native watcher or eventtap.
+--- @param label string Diagnostic owner.
+--- @return boolean stopped
+local function stop_native_watcher(watcher, label)
+	local stopped, stop_err = pcall(function() watcher:stop() end)
+	if stopped then return true end
+	Logger.error(LOG, "%s stop failed; retained for retry: %s.",
+		label, tostring(stop_err))
+	return false
+end
+
 --- Resets CapsWord: clears the KE variable then turns off the CapsLock LED.
 --- Uses a time-based throttle and async hs.task to avoid blocking the Hammerspoon
 --- main loop — hs.execute is synchronous and would lag the mouse at ~10 calls/sec.
-local function deactivate_capsword()
+local function deactivate_capsword(capsword_variable_name, watcher_gen)
+	if watcher_gen ~= _capsword_watcher_gen then return end
 	-- Throttle: mouseMoved fires at display refresh rate — cap subprocess spawns
 	local now_s = hs.timer.secondsSinceEpoch()
 	if now_s - _capsword_last_check_s < CAPSWORD_CHECK_INTERVAL_S then return end
@@ -172,66 +296,129 @@ local function deactivate_capsword()
 	_capsword_check_pending   = true
 	_capsword_gen             = _capsword_gen + 1
 	local my_capsword_gen     = _capsword_gen
+	local supersede_callback_fired = false
+	local function finish_superseded_activation(ok, reason, revision)
+		supersede_callback_fired = true
+		complete_capsword_clear(watcher_gen, ok, reason, revision)
+	end
+	local supersede_ok, superseded_or_err, my_probe_revision = pcall(
+		KeVariables.supersede_capsword_activation,
+		finish_superseded_activation
+	)
+	if not supersede_ok then
+		_capsword_check_pending = false
+		Logger.error(LOG, "CapsWord activation supersession raised: %s",
+			tostring(superseded_or_err))
+		return
+	end
+	if superseded_or_err == true or supersede_callback_fired then
+		-- A known local activation was either queued for clearing or failed with
+		-- a visible settlement. Do not race it with a second probe-owned write.
+		return
+	end
+	if superseded_or_err ~= false
+		or type(my_probe_revision) ~= "number"
+		or my_probe_revision < 0
+		or my_probe_revision ~= math.floor(my_probe_revision) then
+		_capsword_check_pending = false
+		Logger.error(LOG, "CapsWord activation supersession returned an invalid revision: %s.",
+			tostring(my_probe_revision))
+		return
+	end
+	local function abandon_probe(failed_task, reason)
+		if watcher_gen ~= _capsword_watcher_gen
+			or my_capsword_gen ~= _capsword_gen then return end
+		-- A start/scheduling failure can still produce a late task callback. Move
+		-- the generation first so that callback cannot mutate a successor probe.
+		_capsword_gen = _capsword_gen + 1
+		_capsword_check_pending = false
+		if _capsword_probe_watchdog then
+			if not cancel_scheduled_timer(_capsword_probe_watchdog, "Abandoned CapsWord watchdog") then
+				retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
+			end
+			_capsword_probe_watchdog = nil
+		end
+		if failed_task then
+			local stopped, stop_err = pcall(function() failed_task:terminate() end)
+			if stopped then
+				_active_tasks[failed_task] = nil
+			else
+				Logger.error(LOG, "Abandoned CapsWord task termination failed; retained for retry: %s.",
+					tostring(stop_err))
+			end
+		end
+		if reason then Logger.error(LOG, "%s", reason) end
+	end
 
 	-- Async get: unblocks the main loop immediately; callback fires on completion
 	local task
-	task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
+	local function finish_probe(exit_code, stdout, _)
 		if task then _active_tasks[task] = nil end
 		-- A superseded probe releases nothing: the flag and the watchdog it would
 		-- clear belong to the probe that replaced it.
-		if my_capsword_gen ~= _capsword_gen then return end
-		_capsword_check_pending = false
+		if watcher_gen ~= _capsword_watcher_gen
+			or my_capsword_gen ~= _capsword_gen then return end
 		if _capsword_probe_watchdog then
-			TimerScheduler.cancel(_capsword_probe_watchdog)
+			if not cancel_scheduled_timer(_capsword_probe_watchdog, "Completed CapsWord watchdog") then
+				retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
+			end
 			_capsword_probe_watchdog = nil
 		end
-		if exit_code ~= 0 or tonumber(stdout) ~= 1 then return end
+		if exit_code ~= 0 or tonumber(stdout) ~= 1 then
+			_capsword_check_pending = false
+			return
+		end
 
 		Logger.trace(LOG, "Pointer event while CapsWord active — deactivating…")
 
-		-- Clear the KE variable first so the engine does not re-activate CapsWord
-		-- when it sees the subsequent LED state change.
-		local inner_task
-		inner_task = hs.task.new(KARABINER_CLI, function(_, _, _)
-			if inner_task then _active_tasks[inner_task] = nil end
-			-- macOS sometimes re-displays the CapsLock indicator after a single
-			-- LED reset (race with the Karabiner virtual CapsLock state machine).
-			-- A second unconditional set 150 ms later ensures the indicator stays off.
-			KeyState.set_capslock(false)
-			hs.timer.doAfter(0.15, function() KeyState.set_capslock(false) end)
-			Logger.done(LOG, "CapsWord deactivated via pointer event.")
-		end, {"--set-variable", "capsword", "0"})
-		-- Nil-check: hs.task.new() returns nil when the CLI binary is absent.
-		-- Pin BEFORE start: this task clears KE's capsword variable, and if the GC
-		-- collects it mid-run the variable stays 1 and the next space re-enables
-		-- CapsLock. start() reports a refused launch by RETURNING false, so the pin
-		-- is released on that path too rather than leaking for the session.
-		if inner_task then
-			_active_tasks[inner_task] = true
-			if not inner_task:start() then
-				_active_tasks[inner_task] = nil
-				Logger.error(LOG, "CapsWord clear-variable task failed to start — KE may keep capsword=1.")
-			end
+		local clear_callback_fired = false
+		local function finish_conditional_clear(ok, reason, revision)
+			clear_callback_fired = true
+			complete_capsword_clear(watcher_gen, ok, reason, revision)
 		end
+		local clear_ok, accepted_or_err = pcall(
+			KeVariables.set_if_revision,
+			"capsword",
+			0,
+			my_probe_revision,
+			finish_conditional_clear
+		)
+		if not clear_ok then
+			if not clear_callback_fired then _capsword_check_pending = false end
+			Logger.error(LOG, "Conditional CapsWord clear raised: %s", tostring(accepted_or_err))
+			return
+		end
+		if accepted_or_err ~= true and not clear_callback_fired then
+			_capsword_check_pending = false
+			Logger.error(LOG, "Conditional CapsWord clear was rejected without settlement.")
+		end
+		return
 
-		-- A keystroke does not work for CapsLock on macOS — CapsLock is a
-		-- flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
-		-- silently. The adapter owns the only reliable way to toggle the LED.
-		KeyState.set_capslock(false)
-	end, {"--get-variable", "capsword"})
+	end
+	local ok_new, task_or_err = pcall(
+		hs.task.new,
+		KARABINER_CLI,
+		function(...) Logger.pcall(LOG, finish_probe, ...) end,
+		{"--get-variable", capsword_variable_name}
+	)
+	task = ok_new and task_or_err or nil
+	if not ok_new then
+		abandon_probe(nil, "CapsWord check task creation raised: " .. tostring(task_or_err))
+		return
+	end
 	-- Nil means the CLI binary is absent; release the lock immediately so the guard is not permanent.
 	if not task then
-		_capsword_check_pending = false
-		Logger.error(LOG, "CapsWord check task is nil — CLI binary absent (karabiner-capsword-lock-leak).")
+		abandon_probe(nil, "CapsWord check task is nil; CLI binary absent (karabiner-capsword-lock-leak).")
 		return
 	end
 	-- If task:start() returns false the callback never fires — release the lock so subsequent
 	-- pointer events are not permanently blocked (karabiner-capsword-lock-leak).
 	_active_tasks[task] = true
-	if not task:start() then
-		_active_tasks[task] = nil
-		_capsword_check_pending = false
-		Logger.error(LOG, "CapsWord check task failed to start (karabiner-capsword-lock-leak).")
+	local ok_start, started_or_err = pcall(function() return task:start() end)
+	if not ok_start or not started_or_err then
+		abandon_probe(task, ok_start
+			and "CapsWord check task failed to start (karabiner-capsword-lock-leak)."
+			or "CapsWord check task start raised: " .. tostring(started_or_err))
 		return
 	end
 	-- Started OK, but the async task fires its callback only on process EXIT. Arm a watchdog
@@ -239,15 +426,35 @@ local function deactivate_capsword()
 	-- of permanently disabling trackpad auto-deactivation of CapsWord (F-L6). Scheduled
 	-- via the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
 	-- properly attributed to the adapter boundary (PF-1).
-	if _capsword_probe_watchdog then TimerScheduler.cancel(_capsword_probe_watchdog) end
-	_capsword_probe_watchdog = TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC, function()
-		_capsword_probe_watchdog = nil
-		if _capsword_check_pending then
-			_capsword_check_pending = false
-			Logger.debug(LOG, "CapsWord probe timed out — releasing lock (karabiner-capsword-lock-leak).")
-			pcall(function() task:terminate() end)
+	if _capsword_probe_watchdog then
+		if not cancel_scheduled_timer(_capsword_probe_watchdog, "Superseded CapsWord watchdog") then
+			retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
 		end
-	end)
+		_capsword_probe_watchdog = nil
+	end
+	local watchdog
+	local ok_watchdog, watchdog_or_err = pcall(
+		TimerScheduler.after,
+		CAPSWORD_PROBE_TIMEOUT_SEC,
+		function()
+			if watcher_gen ~= _capsword_watcher_gen
+				or my_capsword_gen ~= _capsword_gen
+				or _capsword_probe_watchdog ~= watchdog then return end
+			_capsword_probe_watchdog = nil
+			if _capsword_check_pending then
+				Logger.debug(LOG, "CapsWord probe timed out — releasing lock (karabiner-capsword-lock-leak).")
+				abandon_probe(task, nil)
+			end
+		end
+	)
+	watchdog = ok_watchdog and watchdog_or_err or nil
+	if type(watchdog) ~= "table" or watchdog.fired then
+		abandon_probe(task, ok_watchdog
+			and "CapsWord probe watchdog could not be armed."
+			or "CapsWord probe watchdog raised: " .. tostring(watchdog_or_err))
+		return
+	end
+	_capsword_probe_watchdog = watchdog
 end
 
 --- Starts the eventtap watching for any pointer event that signals the user
@@ -256,11 +463,23 @@ end
 --- which piggybacks on the existing touchdevice frameCallback in the gestures
 --- module rather than registering a competing second frameCallback.
 --- @param gestures_engine table The gestures engine module (may be nil).
---- @return hs.eventtap The running eventtap watcher instance.
-function M.start_gesture_watcher(gestures_engine)
+--- @param lease_token string Exact active generation token.
+--- @return hs.eventtap|nil The running eventtap watcher instance.
+function M.start_gesture_watcher(gestures_engine, lease_token)
+	local scoped_name, scope_err = LeaseContract.runtime_variable_name("capsword", lease_token)
+	if not scoped_name then
+		Logger.error(LOG, "CapsWord watcher refused — %s.", tostring(scope_err))
+		return nil
+	end
+	_capsword_watcher_gen = _capsword_watcher_gen + 1
+	_capsword_gen = _capsword_gen + 1
+	local watcher_gen = _capsword_watcher_gen
+	local function deactivate_current_capsword()
+		return deactivate_capsword(scoped_name, watcher_gen)
+	end
 	local ev = hs.eventtap.event.types
 	local watcher
-	watcher = hs.eventtap.new(
+	local create_ok, watcher_or_err = pcall(hs.eventtap.new,
 		{
 			ev.mouseMoved,
 			ev.scrollWheel,
@@ -270,30 +489,128 @@ function M.start_gesture_watcher(gestures_engine)
 			ev.otherMouseDown,
 		},
 		function(_event)
+			if watcher_gen ~= _capsword_watcher_gen then return false end
 			if EventTapGuard.handle_disabled(_event, watcher, "karabiner.trackpad_capsword") then return false end
-			-- This callback fires on mouseMoved/scrollWheel/gesture/click — the
-			-- hottest possible eventtap. deactivate_capsword() contains an
-			-- unguarded hs.task.new(...) call; every sibling eventtap added in
-			-- the same refactor window wraps its callback body, so an unhandled
-			-- exception here would silently disable the whole tap
-			-- (karabiner-watchers-unguarded-capsword).
-			Logger.pcall(LOG, deactivate_capsword)
+			-- This is the hottest eventtap. Keep the full probe entry guarded even
+			-- though each async constructor/completion also has its own file-log boundary.
+			Logger.pcall(LOG, deactivate_current_capsword)
 			return false
 		end
 	)
-	watcher:start()
+	watcher = create_ok and watcher_or_err or nil
+	if not create_ok or not watcher then
+		_capsword_watcher_gen = _capsword_watcher_gen + 1
+		Logger.error(LOG, "Trackpad CapsWord watcher creation failed: %s",
+			tostring(watcher_or_err))
+		return nil
+	end
+	local start_ok, started_or_err = pcall(function() return watcher:start() end)
+	if not start_ok or not started_or_err then
+		_capsword_watcher_gen = _capsword_watcher_gen + 1
+		if not stop_native_watcher(watcher, "Partial-start CapsWord eventtap") then
+			_capsword_watcher_backlog[#_capsword_watcher_backlog + 1] = watcher
+		end
+		Logger.error(LOG, "Trackpad CapsWord watcher failed to start: %s",
+			tostring(started_or_err))
+		return nil
+	end
 	Logger.success(LOG, "Trackpad CapsWord watcher started.")
 
 	-- Layer 2: hook into the gestures engine's existing frameCallback so bare
 	-- finger touch (no click, no movement) also deactivates CapsWord.
 	if gestures_engine and type(gestures_engine.set_any_touch_hook) == "function" then
-		gestures_engine.set_any_touch_hook(deactivate_capsword)
+		_gestures_engine = gestures_engine
+		local hook_ok, hook_err = pcall(
+			gestures_engine.set_any_touch_hook,
+			deactivate_current_capsword
+		)
+		if not hook_ok then
+			_capsword_watcher_gen = _capsword_watcher_gen + 1
+			local hook_cleared = pcall(gestures_engine.set_any_touch_hook, nil)
+			if hook_cleared then _gestures_engine = nil end
+			if not stop_native_watcher(watcher, "Touch-hook CapsWord eventtap rollback") then
+				_capsword_watcher_backlog[#_capsword_watcher_backlog + 1] = watcher
+			end
+			Logger.error(LOG, "Bare-touch CapsWord hook registration failed: %s",
+				tostring(hook_err))
+			return nil
+		end
 		Logger.success(LOG, "Bare-touch CapsWord hook registered on gestures engine.")
 	else
 		Logger.warn(LOG, "gestures_engine unavailable — bare-touch CapsWord detection disabled.")
 	end
 
 	return watcher
+end
+
+--- Stops every CapsWord pointer resource owned by this remap generation.
+--- @param watcher table|nil Eventtap returned by start_gesture_watcher().
+function M.stop_gesture_watcher(watcher)
+	_capsword_watcher_gen = _capsword_watcher_gen + 1
+	_capsword_gen = _capsword_gen + 1
+	_capsword_check_pending = false
+	_capsword_last_check_s = 0
+	local all_stopped = true
+	if watcher then
+		if not stop_native_watcher(watcher, "Trackpad CapsWord eventtap") then all_stopped = false end
+	end
+	for index = #_capsword_watcher_backlog, 1, -1 do
+		if stop_native_watcher(_capsword_watcher_backlog[index], "Partial-start CapsWord backlog") then
+			table.remove(_capsword_watcher_backlog, index)
+		else
+			all_stopped = false
+		end
+	end
+	if _capsword_probe_watchdog then
+		if cancel_scheduled_timer(_capsword_probe_watchdog, "CapsWord probe watchdog") then
+			_capsword_probe_watchdog = nil
+		else
+			all_stopped = false
+		end
+	end
+	if _capsword_led_timer then
+		if cancel_scheduled_timer(_capsword_led_timer, "CapsWord LED timer") then
+			_capsword_led_timer = nil
+		else
+			all_stopped = false
+		end
+	end
+	for index = #_capsword_timer_cleanup_backlog, 1, -1 do
+		if cancel_scheduled_timer(_capsword_timer_cleanup_backlog[index],
+			"CapsWord timer backlog") then
+			table.remove(_capsword_timer_cleanup_backlog, index)
+		else
+			all_stopped = false
+		end
+	end
+	local tasks = {}
+	for task in pairs(_active_tasks) do tasks[#tasks + 1] = task end
+	for _, task in ipairs(tasks) do
+		local stopped, stop_err = pcall(function() task:terminate() end)
+		if stopped then
+			_active_tasks[task] = nil
+		else
+			Logger.error(LOG, "CapsWord probe task termination failed; retained for retry: %s.",
+				tostring(stop_err))
+			all_stopped = false
+		end
+	end
+	if _gestures_engine and type(_gestures_engine.set_any_touch_hook) == "function" then
+		local stopped, stop_err = pcall(_gestures_engine.set_any_touch_hook, nil)
+		if stopped then
+			_gestures_engine = nil
+		else
+			Logger.error(LOG, "Bare-touch CapsWord hook removal failed; retained for retry: %s.",
+				tostring(stop_err))
+			all_stopped = false
+		end
+	else
+		_gestures_engine = nil
+	end
+	if all_stopped then
+		Logger.debug(LOG, "Trackpad CapsWord resources stopped with the Ergopti lease.")
+	end
+	return all_stopped
 end
 
 
@@ -333,6 +650,7 @@ end
 --- the whole session — exactly the steady-state main-loop cost the profilers aim
 --- to eliminate, and worse on the Sequoia machines this poll exists for.
 --- @param callback fun(layout_name: string|nil)
+--- @return boolean started True only when the exact read task started.
 local function read_layout_async(callback)
 	-- Stamp this read so its completion can prove it is still the current one.
 	_layout_read_generation = _layout_read_generation + 1
@@ -342,7 +660,8 @@ local function read_layout_async(callback)
 	-- but deliberately does NOT start it; the caller must invoke handle.start().
 	-- Without this the subprocess never launches, the completion callback never
 	-- fires, and _layout_poll_pending leaks true forever (F-LOW-4 regression).
-	local handle = ShellRunner.spawn("/usr/bin/defaults",
+	local handle
+	local spawn_ok, handle_or_err = pcall(ShellRunner.spawn, "/usr/bin/defaults",
 		{ "read", "com.apple.HIToolbox", "AppleSelectedInputSources" },
 		function(exit_code, stdout, _)
 			-- A terminated read still delivers its exit callback, and by then the
@@ -350,6 +669,11 @@ local function read_layout_async(callback)
 			-- now belongs to THAT read, so a stale completion must stop here rather
 			-- than clear its handle, release its guard and cancel its watchdog.
 			if my_generation ~= _layout_read_generation then
+				if _layout_poll_handle == handle then
+					_layout_poll_handle = nil
+					_layout_poll_pending = false
+					_layout_poll_termination_pending = false
+				end
 				Logger.debug(LOG, "Ignoring completion of superseded layout read (gen %d, current %d).",
 					my_generation, _layout_read_generation)
 				return
@@ -357,30 +681,52 @@ local function read_layout_async(callback)
 			-- Drop the ownership reference first: a handle that has completed must
 			-- never be terminated by a later watchdog tick.
 			_layout_poll_handle = nil
+			_layout_poll_termination_pending = false
 			if exit_code ~= 0 then callback(nil); return end
 			callback(parse_layout_name(stdout))
 		end)
+	handle = spawn_ok and handle_or_err or nil
+	if not spawn_ok or type(handle) ~= "table" or type(handle.start) ~= "function" then
+		_layout_read_generation = _layout_read_generation + 1
+		Logger.error(LOG, "Layout read construction failed: %s.", tostring(handle_or_err))
+		return false
+	end
 	-- Published BEFORE start() so a handle that completes synchronously has already
 	-- cleared it in its callback and cannot be overwritten by a stale assignment.
 	_layout_poll_handle = handle
-	handle.start()
+	local start_ok, started_or_err = pcall(handle.start)
+	if not start_ok or started_or_err ~= true then
+		_layout_read_generation = _layout_read_generation + 1
+		if _layout_poll_handle == handle then _layout_poll_handle = nil end
+		_layout_poll_termination_pending = false
+		Logger.error(LOG, "Layout read failed to start: %s.", tostring(started_or_err))
+		return false
+	end
+	return true
 end
 
 --- Fires the on_change callback with proper debouncing, updating _last_known_layout.
 --- @param on_change fun(layout_name: string)
 --- @param layout_name string
-local function fire_layout_change(on_change, layout_name)
+local function fire_layout_change(on_change, layout_name, watcher_gen)
 	if _input_source_timer then
-		pcall(function() _input_source_timer:stop() end)
-	end
-	_input_source_timer = hs.timer.doAfter(INPUT_SOURCE_DEBOUNCE_SEC, function()
+		if not stop_native_watcher(_input_source_timer, "Superseded input-source debounce timer") then
+			retain_cleanup_handle(_input_source_timer_cleanup_backlog, _input_source_timer)
+		end
 		_input_source_timer = nil
+	end
+	local timer
+	timer = hs.timer.doAfter(INPUT_SOURCE_DEBOUNCE_SEC, function()
+		if _input_source_timer ~= timer then return end
+		_input_source_timer = nil
+		if watcher_gen ~= _input_source_watcher_gen then return end
 		_last_known_layout  = layout_name
 		local ok_cb, err = pcall(on_change, layout_name)
 		if not ok_cb then
 			Logger.error(LOG, "Input source change handler failed: %s.", tostring(err))
 		end
 	end)
+	_input_source_timer = timer
 end
 
 --- Registers a debounced layout-change watcher.
@@ -388,15 +734,30 @@ end
 --- periodic HIToolbox poll (fallback for Sequoia where the TIS callback is
 --- unreliable). The on_change callback fires at most once per debounce window.
 --- @param on_change fun(layout_name: string) Called on each debounced layout change.
+local function has_input_source_cleanup_debt()
+	return _input_source_callback_owned
+		or _input_source_timer ~= nil
+		or _layout_poll_timer ~= nil
+		or _layout_poll_watchdog ~= nil
+		or _layout_poll_handle ~= nil
+		or _layout_poll_termination_pending
+		or _layout_poll_pending
+		or #_input_source_timer_cleanup_backlog > 0
+		or #_layout_watchdog_cleanup_backlog > 0
+end
+
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
 
-	-- Guard against double-call: overwriting _layout_poll_timer would orphan the
-	-- previous timer with no reference left to stop it
-	if _layout_poll_timer then
-		Logger.warn(LOG, "start_input_source_watcher() called twice — ignoring.")
-		return
+	-- A failed stop may leave any one of these exact native capabilities alive.
+	-- Never overwrite its only retry handle merely because a sibling resource
+	-- happened to stop successfully.
+	if has_input_source_cleanup_debt() then
+		Logger.warn(LOG, "start_input_source_watcher() refused while prior cleanup is unsettled.")
+		return false
 	end
+	_input_source_watcher_gen = _input_source_watcher_gen + 1
+	local watcher_gen = _input_source_watcher_gen
 
 	-- Seed the initial known layout from HIToolbox
 	_last_known_layout = read_current_layout_from_hitoolbox()
@@ -409,19 +770,39 @@ function M.start_input_source_watcher(on_change)
 	_previous_input_source_cb = hs.keycodes.inputSourceChanged()
 
 	-- Primary: hs.keycodes notification (fires immediately on most macOS versions)
-	hs.keycodes.inputSourceChanged(function()
+	local installed_callback = function()
+		if watcher_gen ~= _input_source_watcher_gen then return end
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
 		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
 		local new_layout = read_current_layout_from_hitoolbox()
 			or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
 			or "<unknown>"
-		fire_layout_change(on_change, new_layout)
-	end)
+		fire_layout_change(on_change, new_layout, watcher_gen)
+	end
+	hs.keycodes.inputSourceChanged(installed_callback)
+	_installed_input_source_cb = installed_callback
+	_input_source_callback_owned = true
 
 	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
 	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
 	_layout_poll_timer = hs.timer.doEvery(LAYOUT_POLL_SEC, function()
+		if watcher_gen ~= _input_source_watcher_gen then return end
+		if _layout_poll_termination_pending then
+			local abandoned = _layout_poll_handle
+			if abandoned then
+				local stopped, stop_result = pcall(abandoned.terminate)
+				if not stopped or stop_result ~= true then
+					Logger.error(LOG,
+						"Abandoned layout read termination retry failed; retaining the exact handle: %s.",
+						tostring(stop_result))
+					return
+				end
+				if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
+			end
+			_layout_poll_pending = false
+			_layout_poll_termination_pending = false
+		end
 		-- Read HIToolbox ASYNCHRONOUSLY (off the main run loop). Skip if a read is
 		-- already in flight so back-to-back ticks under load cannot pile up tasks.
 		if _layout_poll_pending then return end
@@ -430,71 +811,192 @@ function M.start_input_source_watcher(on_change)
 		-- never fires still releases it and the next tick can retry. Scheduled via
 		-- the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
 		-- attributed to the adapter boundary, mirroring the CapsWord probe watchdog.
-		if _layout_poll_watchdog then TimerScheduler.cancel(_layout_poll_watchdog) end
-		_layout_poll_watchdog = TimerScheduler.after(LAYOUT_POLL_TIMEOUT_SEC, function()
-			_layout_poll_watchdog = nil
-			if _layout_poll_pending then
-				_layout_poll_pending = false
-				-- Terminate the abandoned read, don't just stop waiting for it.
-				-- handle.terminate() releases the GC pin as well as killing the
-				-- process, so neither the subprocess nor its pin outlives the timeout.
-				-- Retire the generation BEFORE terminating: terminate() only asks the
-				-- OS to kill the process, and its exit callback still arrives later.
-				-- Without this the abandoned read comes back to clear the NEXT
-				-- read's handle and cancel its watchdog.
-				_layout_read_generation = _layout_read_generation + 1
-				if _layout_poll_handle then
-					local stale = _layout_poll_handle
-					_layout_poll_handle = nil
-					pcall(function() stale.terminate() end)
-				end
-				Logger.warn(LOG, "Layout poll read timed out — terminated the read and released the guard so the next tick can retry.")
+		if _layout_poll_watchdog then
+			if not cancel_scheduled_timer(_layout_poll_watchdog, "Superseded layout watchdog") then
+				retain_cleanup_handle(_layout_watchdog_cleanup_backlog, _layout_poll_watchdog)
 			end
-		end)
-		read_layout_async(function(current)
+			_layout_poll_watchdog = nil
+		end
+		local watchdog
+		local callback_fired_before_return = false
+		local watchdog_ok, watchdog_or_err = pcall(
+			TimerScheduler.after,
+			LAYOUT_POLL_TIMEOUT_SEC,
+			function()
+				if watchdog == nil then
+					callback_fired_before_return = true
+					return
+				end
+				if watcher_gen ~= _input_source_watcher_gen
+					or _layout_poll_watchdog ~= watchdog then return end
+				_layout_poll_watchdog = nil
+				if _layout_poll_pending then
+					_layout_poll_pending = false
+					-- Terminate the abandoned read, don't just stop waiting for it.
+					-- handle.terminate() releases the GC pin as well as killing the
+					-- process, so neither the subprocess nor its pin outlives the timeout.
+					-- Retire the generation BEFORE terminating: terminate() only asks the
+					-- OS to kill the process, and its exit callback still arrives later.
+					-- Without this the abandoned read comes back to clear the NEXT
+					-- read's handle and cancel its watchdog.
+					_layout_read_generation = _layout_read_generation + 1
+					if _layout_poll_handle then
+						local stale = _layout_poll_handle
+						local stopped, stop_result = pcall(stale.terminate)
+						if stopped and stop_result == true then
+							if _layout_poll_handle == stale then _layout_poll_handle = nil end
+							_layout_poll_pending = false
+							_layout_poll_termination_pending = false
+							Logger.warn(LOG, "Layout poll read timed out — terminated the read and released the guard so the next tick can retry.")
+						else
+							_layout_poll_pending = true
+							_layout_poll_termination_pending = true
+							Logger.error(LOG,
+								"Timed-out layout read termination failed; retaining the exact handle: %s.",
+								tostring(stop_result))
+						end
+					end
+				end
+			end
+		)
+		watchdog = watchdog_ok and watchdog_or_err or nil
+		if not watchdog_ok or type(watchdog) ~= "table"
+			or watchdog.fired == true or callback_fired_before_return then
 			_layout_poll_pending = false
-			if _layout_poll_watchdog then
-				TimerScheduler.cancel(_layout_poll_watchdog)
+			if type(watchdog) == "table"
+				and not cancel_scheduled_timer(watchdog, "Rejected layout watchdog") then
+				retain_cleanup_handle(_layout_watchdog_cleanup_backlog, watchdog)
+			end
+			Logger.error(LOG, "Layout poll watchdog could not be armed: %s.",
+				tostring(watchdog_ok and "timer unavailable" or watchdog_or_err))
+			return
+		end
+		_layout_poll_watchdog = watchdog
+		local read_started = read_layout_async(function(current)
+			_layout_poll_pending = false
+			if _layout_poll_watchdog == watchdog then
+				if not cancel_scheduled_timer(watchdog, "Completed layout watchdog") then
+					retain_cleanup_handle(_layout_watchdog_cleanup_backlog, watchdog)
+				end
 				_layout_poll_watchdog = nil
 			end
 			if current and current ~= _last_known_layout then
 				Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
 					tostring(_last_known_layout), current)
-				fire_layout_change(on_change, current)
+				fire_layout_change(on_change, current, watcher_gen)
 			end
 		end)
+		if read_started ~= true then
+			_layout_poll_pending = false
+			if _layout_poll_watchdog == watchdog then
+				if not cancel_scheduled_timer(watchdog, "Unstarted layout watchdog") then
+					retain_cleanup_handle(_layout_watchdog_cleanup_backlog, watchdog)
+				end
+				_layout_poll_watchdog = nil
+			end
+		end
 	end)
 
 	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
+	return true
 end
 
 --- Clears the hs.keycodes.inputSourceChanged callback, cancels the poll timer,
 --- and cancels any pending debounced rebuild.
 function M.stop_input_source_watcher()
 	Logger.trace(LOG, "Stopping input source watcher…")
+	_input_source_watcher_gen = _input_source_watcher_gen + 1
+	local all_stopped = true
 	-- Restore the previous callback rather than passing nil, so that any
 	-- callback registered before this module started is not silently dropped.
-	pcall(function() hs.keycodes.inputSourceChanged(_previous_input_source_cb) end)
-	_previous_input_source_cb = nil
+	if _input_source_callback_owned then
+		local current_ok, current_or_err = pcall(hs.keycodes.inputSourceChanged)
+		if not current_ok then
+			Logger.error(LOG, "Input-source callback ownership check failed; retained for retry: %s.",
+				tostring(current_or_err))
+			all_stopped = false
+		elseif current_or_err ~= _installed_input_source_cb then
+			-- Another subsystem replaced our callback after start. It now owns the
+			-- global slot; restoring our predecessor would clobber that third party.
+			_input_source_callback_owned = false
+			_installed_input_source_cb = nil
+			_previous_input_source_cb = nil
+			Logger.debug(LOG, "Input-source callback already replaced by another owner; leaving it intact.")
+		else
+			local stopped, stop_err = pcall(function()
+				hs.keycodes.inputSourceChanged(_previous_input_source_cb)
+			end)
+			if not stopped then
+				Logger.error(LOG, "Input-source callback restoration failed; retained for retry: %s.",
+					tostring(stop_err))
+				all_stopped = false
+			else
+				_input_source_callback_owned = false
+				_installed_input_source_cb = nil
+				_previous_input_source_cb = nil
+			end
+		end
+	end
 	if _input_source_timer then
-		pcall(function() _input_source_timer:stop() end)
-		_input_source_timer = nil
+		if stop_native_watcher(_input_source_timer, "Input-source debounce timer") then
+			_input_source_timer = nil
+		else
+			all_stopped = false
+		end
+	end
+	for index = #_input_source_timer_cleanup_backlog, 1, -1 do
+		if stop_native_watcher(_input_source_timer_cleanup_backlog[index],
+			"Input-source debounce backlog") then
+			table.remove(_input_source_timer_cleanup_backlog, index)
+		else
+			all_stopped = false
+		end
 	end
 	if _layout_poll_timer then
-		pcall(function() _layout_poll_timer:stop() end)
-		_layout_poll_timer = nil
+		if stop_native_watcher(_layout_poll_timer, "Layout poll timer") then
+			_layout_poll_timer = nil
+		else
+			all_stopped = false
+		end
 	end
 	-- Cancel the in-flight read's watchdog too, so it cannot fire after the watcher
 	-- is gone and flip the guard on a module that is no longer polling.
 	if _layout_poll_watchdog then
-		TimerScheduler.cancel(_layout_poll_watchdog)
-		_layout_poll_watchdog = nil
+		if cancel_scheduled_timer(_layout_poll_watchdog, "Layout poll watchdog") then
+			_layout_poll_watchdog = nil
+		else
+			all_stopped = false
+		end
+	end
+	for index = #_layout_watchdog_cleanup_backlog, 1, -1 do
+		if cancel_scheduled_timer(_layout_watchdog_cleanup_backlog[index],
+			"Layout watchdog backlog") then
+			table.remove(_layout_watchdog_cleanup_backlog, index)
+		else
+			all_stopped = false
+		end
 	end
 	_layout_poll_pending = false
 	-- Retire the in-flight read as well. Its completion would otherwise land on a
 	-- stopped watcher and fire a layout change nobody is listening for.
 	_layout_read_generation = _layout_read_generation + 1
-	Logger.done(LOG, "Input source watcher stopped.")
+	if _layout_poll_handle then
+		local handle = _layout_poll_handle
+		local stopped, stop_result = pcall(handle.terminate)
+		if stopped and stop_result == true then
+			if _layout_poll_handle == handle then _layout_poll_handle = nil end
+			_layout_poll_termination_pending = false
+		else
+			_layout_poll_termination_pending = true
+			Logger.error(LOG, "In-flight layout read termination failed; retained for retry: %s.",
+				tostring(stop_result))
+			all_stopped = false
+		end
+	else
+		_layout_poll_termination_pending = false
+	end
+	if all_stopped then Logger.done(LOG, "Input source watcher stopped.") end
+	return all_stopped
 end
 
 
@@ -538,9 +1040,12 @@ end
 
 --- Starts app-activation tracking for direct previous-app switching.
 local function ensure_app_switch_watcher()
-	if _app_switch_watcher then return end
+	if _app_switch_watcher then return _app_switch_watcher_active == true end
+	_app_switch_watcher_gen = _app_switch_watcher_gen + 1
+	local watcher_gen = _app_switch_watcher_gen
 
-	_app_switch_watcher = hs.application.watcher.new(function(_name, event_type, app)
+	local created, watcher_or_err = pcall(hs.application.watcher.new, function(_name, event_type, app)
+		if watcher_gen ~= _app_switch_watcher_gen or not _app_switch_watcher_active then return end
 		if event_type ~= hs.application.watcher.activated then return end
 		if not app then return end
 
@@ -554,13 +1059,29 @@ local function ensure_app_switch_watcher()
 		_current_bundle_id = bundle_id
 		_current_app_name = app_name
 	end)
-	_app_switch_watcher:start()
+	if not created or not watcher_or_err then
+		Logger.error(LOG, "App-switch watcher creation failed: %s.", tostring(watcher_or_err))
+		return false
+	end
+	_app_switch_watcher = watcher_or_err
+	_app_switch_watcher_active = true
+	local started, start_result = pcall(function() return watcher_or_err:start() end)
+	if not started or start_result == false then
+		_app_switch_watcher_active = false
+		_app_switch_watcher_gen = _app_switch_watcher_gen + 1
+		if stop_native_watcher(watcher_or_err, "Partial app-switch watcher") then
+			_app_switch_watcher = nil
+		end
+		Logger.error(LOG, "App-switch watcher failed to start: %s.", tostring(start_result))
+		return false
+	end
 
 	local front = hs.application.frontmostApplication()
 	if front then
 		_current_bundle_id = front:bundleID()
 		_current_app_name = front:name()
 	end
+	return true
 end
 
 --- Focuses the most recently used standard window, optionally restricted to one
@@ -623,7 +1144,7 @@ end
 
 --- Focuses the previously active application directly (no macOS switcher overlay).
 local function focus_previous_app_direct()
-	ensure_app_switch_watcher()
+	if not ensure_app_switch_watcher() then return false end
 
 	if type(_previous_bundle_id) == "string"
 		and _previous_bundle_id ~= ""
@@ -705,16 +1226,30 @@ end
 --- Registers Option+F17 as "direct previous app".
 --- @return string|nil Registrar handle.
 function M.start_alt_tab_apps_hotkey()
-	ensure_app_switch_watcher()
+	if not ensure_app_switch_watcher() then return nil end
 	return bind_f17(MOD_ALT .. "+" .. KEYCODE_F17_NAME, "Alt+Tab apps", focus_previous_app_direct)
 end
 
 --- Stops the internal app-switch watcher used by Alt+Tab app-previous.
 function M.stop_alt_tab_apps_tracker()
-	if _app_switch_watcher then
-		pcall(function() _app_switch_watcher:stop() end)
-		_app_switch_watcher = nil
+	_app_switch_watcher_gen = _app_switch_watcher_gen + 1
+	if not _app_switch_watcher then return true end
+	_app_switch_watcher_active = false
+	local watcher = _app_switch_watcher
+	local stopped, stop_err = pcall(function() watcher:stop() end)
+	if not stopped then
+		Logger.error(LOG, "App-switch watcher stop failed; retained for retry: %s.",
+			tostring(stop_err))
+		return false
 	end
+	if _app_switch_watcher == watcher then
+		_app_switch_watcher = nil
+		_current_bundle_id = nil
+		_previous_bundle_id = nil
+		_current_app_name = nil
+		_previous_app_name = nil
+	end
+	return true
 end
 
 return M

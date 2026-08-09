@@ -36,13 +36,13 @@ helpers.describe("karabiner.regenerate: resolves against the live layout", funct
 		-- Selected by a declaration unique to platform/remap/init.lua rather than
 		-- by path: a `git mv` of the module must fail this test on its ASSERTION,
 		-- not on a missing file. The repo ratchets these reads for that reason.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 
 		local regen_at = src:find("function M.regenerate(", 1, true)
 		helpers.assert_true(regen_at ~= nil, "platform/remap/init.lua must define M.regenerate()")
 
-		local resolve_at = src:find("Config.resolve_layout_actions", regen_at, true)
+		local resolve_at = src:find("resolve_current_layout_actions", regen_at, true)
 		helpers.assert_true(resolve_at ~= nil,
 			"M.regenerate() must re-resolve the layout-dependent key codes. Without it a "
 				.. "resume after a layout change deploys a config built for the layout that "
@@ -62,7 +62,7 @@ helpers.describe("karabiner.regenerate: resolves against the live layout", funct
 		-- guard: « pause = tout éteint » means a paused script deploys nothing, and
 		-- the guard sits in the function that performs the deploy precisely so
 		-- every path into it is covered.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 
 		local regen_at = src:find("function M.regenerate(", 1, true)

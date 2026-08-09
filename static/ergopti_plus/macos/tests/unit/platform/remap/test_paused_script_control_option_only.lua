@@ -17,10 +17,11 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 helpers.load_with_stubs("infra.logger")
 local Generator = helpers.load_with_stubs("platform.remap.generator")
+local TEST_LEASE_TOKEN = "0123456789abcdef0123456789abcdef"
 
 helpers.describe("paused script-control rules use the real option key, not rcmd", function()
 	helpers.it("every paused rule gates on option and never on right_command", function()
-		local rules = Generator.build_paused_script_control_rules()
+		local rules = Generator.build_paused_script_control_rules(TEST_LEASE_TOKEN)
 		helpers.assert_true(#rules > 0, "expected paused script-control rules")
 		for _, rule in ipairs(rules) do
 			local mand = rule.manipulators[1].from.modifiers.mandatory

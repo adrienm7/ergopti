@@ -49,7 +49,7 @@ helpers.describe("F-LOW-11: HS_BOOT_READY_SETTING_KEY has a single source of tru
 
 	helpers.it('the literal "ergopti_hs_boot_ready_v1" appears exactly once across init.lua + ke_lifecycle.lua', function()
 		local init_src        = read("local function has_common_hotstring_groups") -- init.lua
-		local ke_lifecycle_src = read("local function clear_hs_owned_bridge_marker") -- platform/remap/ke_lifecycle.lua
+		local ke_lifecycle_src = read("local KE_GRABBER_CHECK") -- platform/remap/ke_lifecycle.lua
 
 		local literal = "ergopti_hs_boot_ready_v1"
 		local total = count_occurrences(init_src, literal) + count_occurrences(ke_lifecycle_src, literal)
@@ -60,7 +60,7 @@ helpers.describe("F-LOW-11: HS_BOOT_READY_SETTING_KEY has a single source of tru
 	end)
 
 	helpers.it("ke_lifecycle.lua exports HS_BOOT_READY_SETTING_KEY on its module table", function()
-		local src = read("local function clear_hs_owned_bridge_marker") -- platform/remap/ke_lifecycle.lua
+		local src = read("local KE_GRABBER_CHECK") -- platform/remap/ke_lifecycle.lua
 		helpers.assert_true(src:find("M.HS_BOOT_READY_SETTING_KEY", 1, true) ~= nil,
 			"ke_lifecycle.lua must expose M.HS_BOOT_READY_SETTING_KEY so init.lua can read it (F-LOW-11)")
 	end)

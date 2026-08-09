@@ -30,11 +30,12 @@ helpers.describe("boot: the shutdown teardown is armed before the risky requires
 		-- the assignment, so whichever the scan reached first decided the verdict
 		-- and the same commit produced a green run and a red one. The assignment is
 		-- unique to the boot file, which is the only file this ordering is about.
-		local src, err = helpers.read_driver_unit("hs.shutdownCallback = function")
+		local src, err = helpers.read_driver_unit("local function shutdown_all_resources")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the boot file must be readable or this asserts nothing: " .. tostring(err))
 
-		local armed = src:find("hs.shutdownCallback = function", 1, true)
+		local teardown = src:find("local function shutdown_all_resources", 1, true)
+		local armed = src:find("hs.shutdownCallback = shutdown_all_resources", 1, true)
 
 		-- Matched on the MODULE NAME, not on a call spelling. That require is now
 		-- `pcall(require, "platform.remap")` — the chain below it reaches a
@@ -42,8 +43,11 @@ helpers.describe("boot: the shutdown teardown is armed before the risky requires
 		-- the guarded form, i.e. reject a change that makes this invariant matter
 		-- less rather than more. The ordering it asserts is unaffected either way.
 		local require_kb = src:find('"platform.remap"', 1, true)
-		helpers.assert_not_nil(armed, "the shutdown callback must be armed")
+		helpers.assert_not_nil(teardown, "the complete shutdown function must be declared")
+		helpers.assert_not_nil(armed, "the shutdown callback must be armed with that function")
 		helpers.assert_not_nil(require_kb, "platform.remap must be required")
+		helpers.assert_true(teardown < armed,
+			"the callback must not capture or reference a teardown function declared later")
 		helpers.assert_true(armed < require_kb,
 			"platform/remap/defaults.lua raises at require time when the shared tap-hold "
 			.. "TOML is missing a key — by design. Arming the teardown after that require "

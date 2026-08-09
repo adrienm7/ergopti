@@ -6,7 +6,7 @@
 --- Provides the "Karabiner" submenu in the Hammerspoon menu bar.
 ---
 --- FEATURES & RATIONALE:
---- 1. Status item: 🟢/🟡/🔴 reflects actual process state + click to restart.
+--- 1. Status item: 🟢/🟡/🔴 reflects only Ergopti's exact lease state.
 --- 2. Tap/Hold section: each key shows "Label : tap / hold" inline. Items are
 ---    grayed out when the integration is disabled.
 --- 3. Raccourcis section: modifier combos grouped by key, also grayed when off.
@@ -17,7 +17,8 @@
 local M = {}
 
 local Logger      = require("infra.logger")
-local KeLifecycle = require("platform.remap.ke_lifecycle")
+local Notifications = require("infra.notifications")
+local LeaseController = require("platform.remap.lease_controller")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
 local LOG         = "menu.karabiner"
@@ -47,17 +48,6 @@ local function delay_dialog_script(prompt, default_ms, title, btn_cancel, btn_ok
 		prompt, default_ms, title, btn_cancel, btn_ok, btn_ok)
 end
 
--- Stop all KE launchd services for the current user, then kill any remaining
--- processes. launchctl bootout must run first so launchd does not restart them.
--- osascript quit alone is insufficient: KE daemons are managed by launchd and
--- get restarted immediately unless their service entries are removed first.
-local KARABINER_KILL_CMD =
-	"/bin/launchctl list"
-	.. " | /usr/bin/grep -i karabiner"
-	.. " | /usr/bin/awk '{print $3}'"
-	.. " | /usr/bin/xargs -I{} /bin/launchctl bootout gui/$(/usr/bin/id -u)/{} 2>/dev/null"
-	.. "; /usr/bin/pkill -if karabiner 2>/dev/null"
-
 -- Label displayed when both tap and hold are "none"
 local NONE_DISPLAY = "—"
 
@@ -70,13 +60,13 @@ local NONE_DISPLAY = "—"
 -- =====================================
 -- =====================================
 
---- Returns true when KE is *actually applying* our remappings — i.e. the
---- daemon is detected AND the bridge has been primed in this boot session.
---- This is the honest signal for the green-dot status indicator: it never
---- claims success when remapping is silently inactive.
---- @return boolean
-local function is_remapping_active()
-	return KeLifecycle.is_remapping_active()
+--- Reads exact Ergopti lease state without probing any stock process.
+--- @return string phase Controller lifecycle phase.
+--- @return table snapshot Controller status snapshot.
+local function read_lease_status()
+	local ok, phase, snapshot = pcall(LeaseController.status)
+	if not ok or type(phase) ~= "string" then return "failed", {} end
+	return phase, type(snapshot) == "table" and snapshot or {}
 end
 
 --- Builds an index of action id → action definition for fast lookup.
@@ -697,6 +687,7 @@ end
 -- rebuilds with fresh checkmarks. update_menu is a stable upvalue (set once in
 -- ui.menu.init), so the cached closures stay valid across opens.
 local _picker_cache = nil
+local _toggle_in_flight = false
 
 --- Cheap fingerprint of every input that affects the picker trees. Reads in-memory
 --- config accessors only (no I/O), so it is far cheaper than a rebuild.
@@ -746,85 +737,12 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 	return tap_hold, raccourcis
 end
 
--- KE process-status probes (is_remapping_active / is_grabber_running /
--- is_bridge_running) each spawn a pgrep / CLI-roundtrip subprocess (~30-100 ms,
--- variable), and build() ran ~4 of them on EVERY open — the real ~240-400 ms menu
--- cost (the picker trees above are already memoised). KE process state changes
--- only when the daemon starts/stops, so we serve the last-known status instantly
--- and refresh it OFF the menu-build path (deferred to the next runloop tick). The
--- status icon is at most one open stale; is_priming() stays a live in-memory read.
-local _ke_status = nil          -- { active, grabber, bridge }
-local _ke_status_ts = 0
-local _ke_status_refreshing = false
-local KE_STATUS_REFRESH_THROTTLE = 2  -- min seconds between background refreshes
-
-local function _now_s()
-	return (hs.timer and type(hs.timer.secondsSinceEpoch) == "function") and hs.timer.secondsSinceEpoch() or 0
-end
-
---- Synchronously reads the subprocess-backed KE status bundle. Slow — only ever
---- called off the menu-build path (cold prime or background refresh).
-local function read_ke_status()
-	return {
-		active  = is_remapping_active(),
-		grabber = KeLifecycle.is_grabber_running(),
-		bridge  = KeLifecycle.is_bridge_running(),
-	}
-end
-
---- Schedules a throttled background refresh of the KE status cache so menu opens
---- never block on pgrep. The synchronous probes run on a later runloop tick.
---- @param update_menu function|nil Menubar refresh callback.
-local function refresh_ke_status_async(update_menu)
-	if _ke_status_refreshing then return end
-	if _ke_status and (_now_s() - _ke_status_ts) < KE_STATUS_REFRESH_THROTTLE then return end
-	_ke_status_refreshing = true
-	local function run()
-		local fresh = read_ke_status()
-		_ke_status_refreshing = false
-		local changed = (not _ke_status)
-			or _ke_status.active  ~= fresh.active
-			or _ke_status.grabber ~= fresh.grabber
-			or _ke_status.bridge  ~= fresh.bridge
-		_ke_status    = fresh
-		_ke_status_ts = _now_s()
-		Logger.debug(LOG, "KE status refreshed (active=%s grabber=%s bridge=%s changed=%s).",
-			tostring(fresh.active), tostring(fresh.grabber), tostring(fresh.bridge), tostring(changed))
-		-- Refresh the menubar icon when the status changed; the already-open menu is
-		-- unaffected, but the next open and the icon reflect the new state.
-		if changed and type(update_menu) == "function" then pcall(update_menu) end
-	end
-	if hs.timer and type(hs.timer.doAfter) == "function" then
-		hs.timer.doAfter(0, run)
-	else
-		run()
-	end
-end
-
---- Returns the KE status bundle WITHOUT blocking: serves the cached value (a
---- single cold read if empty) and schedules a background refresh.
---- @param update_menu function|nil Menubar refresh callback.
---- @return table { active, grabber, bridge }
-local function get_ke_status(update_menu)
-	if not _ke_status then
-		_ke_status    = read_ke_status()
-		_ke_status_ts = _now_s()
-	end
-	refresh_ke_status_async(update_menu)
-	return _ke_status
-end
-
 --- Builds the complete Karabiner menu item with its submenu.
 ---
---- **There is no manifest key for this menu.** This docstring used to say the
---- order mirrors `karabiner_menu` in menu_manifest.json; no such key exists, in
---- that file or in the manifest.toml it is generated from, and none ever has.
---- The sequence below — status → gui → start → stop → (warnings) → --- →
---- clear/restore/copy → --- → delays/symmetric/sticky → --- → tap_hold keys →
---- --- → shortcuts — is this file's own, and nothing holds it to anything.
---- Corrected because the reference read as "already migrated" to the next person
---- to open the file, which is the opposite of true: these 36 row sites are the
---- single largest block still built outside the renderer on this driver.
+--- `karabiner_menu` in the shared manifest owns the structural sequence:
+--- status/lifecycle rows, destructive Ergopti configuration commands, timings,
+--- tap/hold bindings, then modifier shortcuts. This module supplies only the
+--- dynamic provider rows and command capabilities consumed by that manifest.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
 function M.build(ctx)
@@ -837,127 +755,70 @@ function M.build(ctx)
 	end
 
 	local enabled = karabiner.get_enabled()
-	-- KE process status (active / grabber / bridge) is served from a cache and
-	-- refreshed in the background — the probes spawn pgrep/CLI subprocesses and
-	-- were the dominant menu-open cost. grabber_only distinguishes "remapping not
-	-- applied because bridge unprimed" (fixable via click) from "KE not installed /
-	-- daemon down". is_priming() stays a live in-memory read (no subprocess).
-	local ke_status    = get_ke_status(update_menu)
-	local active       = ke_status.active
-	local grabber_only = ke_status.grabber
-	local bridge_live  = ke_status.bridge
-	local priming      = KeLifecycle.is_priming() and not bridge_live
+	-- Status is an in-memory lease-controller read. Opening this submenu while
+	-- disabled never probes, launches or otherwise touches stock Karabiner.
+	local phase         = read_lease_status()
+	local active        = enabled and phase == "active"
+	local transitioning = enabled and (phase == "starting" or phase == "pausing"
+		or phase == "resuming" or phase == "stopping")
+	local lease_attached = phase == "starting" or phase == "active" or phase == "paused"
+		or phase == "pausing" or phase == "resuming" or phase == "stopping"
 	local tap_hold, raccourcis = build_picker_trees(karabiner, update_menu, enabled)
 
-	-- Status icon reflects whether KE is *actually applying* our remappings.
-	-- 🟢 daemon detected AND bridge primed — remapping is genuinely active.
-	-- 🔵 prime cycle currently in flight — transient (~2 s); will resolve to 🟢.
-	-- 🟡 daemon detected but bridge not primed — rules are NOT pushed yet,
-	--    cliquer pour amorcer (re-prime) Core-Service via le GUI silencieux.
-	-- 🟡 enabled but daemon not detected — KE not installed or not started.
-	-- 🔴 integration disabled in our config (independent of KE state).
+	-- The icon reports only facts Ergopti owns: exact lease active, transitioning,
+	-- enabled-but-inactive, or disabled. It never infers ownership from a shared PID.
 	local status_title
 	if active then
 		status_title = i18n.get("menu.karabiner.status_active")
-	elseif priming then
+	elseif transitioning then
 		status_title = i18n.get("menu.karabiner.status_priming")
-	elseif enabled and grabber_only then
-		status_title = i18n.get("menu.karabiner.status_not_primed")
 	elseif enabled then
-		status_title = i18n.get("menu.karabiner.status_no_daemon")
+		status_title = i18n.get("menu.karabiner.status_not_primed")
 	else
 		status_title = i18n.get("menu.karabiner.status_inactive")
 	end
 
 	local status_rows = {}
 
-	-- Status item: behavior depends on enabled state.
-	-- When disabled but daemon still running: clicking stops KE (no relaunch — user wants it off).
-	-- Otherwise: stop legacy user agents, force a fresh prime via the silent GUI bridge.
-	local status_fn
-	if not enabled and grabber_only then
-		status_fn = function()
-			Logger.info(LOG, "Status clicked — menu disabled, KE running → stopping all KE services…")
-			local out, status = hs.execute(KARABINER_KILL_CMD)
-			Logger.info(LOG, "Kill done (status=%s, out=%s).", tostring(status), tostring(out))
-			if update_menu then hs.timer.doAfter(2.5, update_menu) end
-		end
-	else
-		status_fn = function()
-			Logger.info(LOG, "Status clicked — stopping legacy agents then forcing a re-prime…")
-			local out, status = hs.execute(KARABINER_KILL_CMD)
-			Logger.info(LOG, "Kill done (status=%s, out=%s).", tostring(status), tostring(out))
-			-- Force re-prime so Core-Service re-ingests the on-disk config,
-			-- ignoring the per-session marker. This is the user's escape
-			-- hatch when the green dot is wrong or KE was restarted by macOS.
-			hs.timer.doAfter(1.0, function()
-				KeLifecycle.prime_ke_for_session(function(ok)
-					Logger.info(LOG, "Re-prime callback: ok=%s.", tostring(ok))
-					if update_menu then hs.timer.doAfter(0.5, update_menu) end
-				end, true)
-			end)
-		end
-	end
-
 	status_rows[#status_rows + 1] = {
-		label = status_title,
-		action    = status_fn,
+		label    = status_title,
+		disabled = not enabled,
+		action   = enabled and function()
+			Logger.info(LOG, "Status clicked — rebuilding inert rules and requesting exact lease activation.")
+			karabiner.regenerate()
+			if update_menu then pcall(update_menu) end
+		end or nil,
 	}
 	status_rows[#status_rows + 1] = {
-		label = i18n.get("menu.karabiner.open_gui"),
-		action    = function() karabiner.open_gui() end,
+		label  = i18n.get("menu.karabiner.open_gui"),
+		action = function() karabiner.open_gui() end,
 	}
 	status_rows[#status_rows + 1] = {
 		label    = i18n.get("menu.karabiner.start"),
-		-- Force a fresh prime even if the session marker already exists.
-		-- Useful when the daemon was killed manually or by macOS.
-		disabled = bridge_live,
-		action       = function()
-			Logger.start(LOG, "User requested KE bridge start…")
-			KeLifecycle.prime_ke_for_session(function(ok)
-				Logger.info(LOG, "Manual start: ok=%s.", tostring(ok))
-				if update_menu then hs.timer.doAfter(0.5, update_menu) end
-			end, true)
+		disabled = not enabled or lease_attached,
+		action   = function()
+			Logger.start(LOG, "User requested exact Ergopti Karabiner lease start…")
+			local requested = karabiner.regenerate()
+			if not requested then Logger.error(LOG, "Exact lease start request failed.") end
+			if update_menu then pcall(update_menu) end
 		end,
 	}
 	status_rows[#status_rows + 1] = {
 		label    = i18n.get("menu.karabiner.stop"),
-		-- Grayed when bridge is not running — nothing to stop.
-		disabled = not bridge_live,
-		action       = function()
-			Logger.start(LOG, "User requested KE bridge stop…")
-			local ok_l, kl = pcall(require, "platform.remap.ke_lifecycle")
-			if ok_l and kl and type(kl.run_total_reset_async) == "function" then
-				local out, ok = kl.run_total_reset_async()
-				Logger.info(LOG, "KE stop async: ok=%s out=%s.", tostring(ok), tostring(out))
-			else
-				pcall(function() hs.execute(KARABINER_KILL_CMD) end)
-			end
-			if update_menu then hs.timer.doAfter(2.5, update_menu) end
+		disabled = not enabled or not lease_attached,
+		action   = function()
+			Logger.start(LOG, "User requested exact Ergopti Karabiner lease stop…")
+			local requested = LeaseController.stop("menu_stop", function(ok, reason)
+				if ok then
+					Logger.success(LOG, "Exact Ergopti Karabiner lease stopped.")
+				else
+					Logger.error(LOG, "Exact lease stop failed: %s.", tostring(reason))
+				end
+				if update_menu then pcall(update_menu) end
+			end)
+			if not requested then Logger.error(LOG, "Exact lease stop request was not accepted.") end
 		end,
 	}
-
-	-- Warning: integration disabled in our config but KE process is still live.
-	-- The user must quit KE (and optionally remove it from Login Items) to fully
-	-- stop its remappings — our toggle alone does not kill the process.
-	if not enabled and grabber_only then
-		status_rows[#status_rows + 1] = {
-			label    = i18n.get("menu.karabiner.disabled_warning_1"),
-			disabled = true,
-		}
-		status_rows[#status_rows + 1] = {
-			label    = i18n.get("menu.karabiner.disabled_warning_2"),
-			disabled = true,
-		}
-		status_rows[#status_rows + 1] = {
-			label    = i18n.get("menu.karabiner.disabled_warning_3"),
-			disabled = true,
-		}
-		status_rows[#status_rows + 1] = {
-			label    = i18n.get("menu.karabiner.disabled_warning_4"),
-			disabled = true,
-		}
-	end
 
 
 	-- The rows this driver still assembles, handed to the SHARED renderer as
@@ -1043,7 +904,27 @@ function M.build(ctx)
 		checked = enabled,
 		-- Clicking the item title toggles enabled state
 		action      = function()
-			karabiner.set_enabled(not karabiner.get_enabled())
+			if _toggle_in_flight then return end
+			_toggle_in_flight = true
+			local target_enabled = not enabled
+			local callback_fired = false
+			local ok_request, accepted_or_err = pcall(karabiner.set_enabled, target_enabled, function(ok)
+				callback_fired = true
+				_toggle_in_flight = false
+				if ok ~= true then
+					local key = target_enabled and "karabiner.enable_failed" or "karabiner.disable_failed"
+					Notifications.notify(i18n.get(key), nil, "error")
+				end
+				if update_menu then update_menu() end
+			end)
+			if not ok_request or accepted_or_err ~= true then
+				if not callback_fired then
+					_toggle_in_flight = false
+					Logger.error(LOG, "Karabiner integration toggle request failed: %s.", tostring(accepted_or_err))
+					local key = target_enabled and "karabiner.enable_failed" or "karabiner.disable_failed"
+					Notifications.notify(i18n.get(key), nil, "error")
+				end
+			end
 			if update_menu then update_menu() end
 		end,
 		items    = submenu,
@@ -1059,9 +940,6 @@ function M.prime(ctx)
 	if not karabiner or type(karabiner.get_enabled) ~= "function" then return end
 	local ok, enabled = pcall(karabiner.get_enabled)
 	pcall(build_picker_trees, karabiner, ctx and ctx.updateMenu, ok and enabled or false)
-	-- Warm the KE process-status cache too (the pgrep/CLI probes were the dominant
-	-- open cost); the cold read happens here, off the menu-open path.
-	pcall(get_ke_status, ctx and ctx.updateMenu)
 end
 
 -- Perf / cache test seams.

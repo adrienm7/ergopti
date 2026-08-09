@@ -41,7 +41,7 @@ helpers.describe("karabiner.watchers: deactivate_capsword is never called bare i
 		return src
 	end
 
-	helpers.it("the eventtap callback body wraps deactivate_capsword() in Logger.pcall", function()
+	helpers.it("the eventtap callback body wraps the per-lease closure in Logger.pcall", function()
 		local src = read_source()
 
 		-- Isolate M.start_gesture_watcher's body (up to its matching top-level
@@ -52,15 +52,15 @@ helpers.describe("karabiner.watchers: deactivate_capsword is never called bare i
 		helpers.assert_true(body_end ~= nil, "M.start_gesture_watcher must have a top-level 'end'")
 		local body = src:sub(body_start, body_end)
 
-		helpers.assert_true(body:find("deactivate_capsword", 1, true) ~= nil,
-			"the callback body must still reference deactivate_capsword")
+		helpers.assert_true(body:find("local function deactivate_current_capsword", 1, true) ~= nil,
+			"each watcher start must capture its exact lease in a private callback closure")
 
 		-- The bug: a bare "deactivate_capsword()" call with no Logger.pcall wrapper.
 		-- A correct fix reads "Logger.pcall(LOG, deactivate_capsword)" instead.
-		helpers.assert_true(body:find("\t\t\tdeactivate_capsword()\n", 1, true) == nil,
-			"deactivate_capsword() must NOT be called bare in the eventtap callback (F-HIGH-7)")
-		helpers.assert_true(body:find("Logger.pcall(LOG, deactivate_capsword)", 1, true) ~= nil,
-			"the eventtap callback must call deactivate_capsword via Logger.pcall(LOG, deactivate_capsword)")
+		helpers.assert_true(body:find("\t\t\tdeactivate_current_capsword()\n", 1, true) == nil,
+			"the per-lease callback must NOT be called bare in the eventtap callback (F-HIGH-7)")
+		helpers.assert_true(body:find("Logger.pcall(LOG, deactivate_current_capsword)", 1, true) ~= nil,
+			"the eventtap callback must invoke the per-lease closure via Logger.pcall")
 	end)
 end)
 
@@ -85,13 +85,19 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	local function make_watchers_with_throwing_task()
 		package.loaded["platform.remap.watchers"] = nil
 		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["platform.remap.ke_variables"] = {
+			supersede_capsword_activation = function() return false, 0 end,
+			capsword_revision = function() return 0 end,
+			set_if_revision = function() return false, 0 end,
+		}
 
 		local captured = { cb = nil }
+		local state = { now = 1000, task_attempts = 0 }
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 			eventtap = {
 				new = function(_types, cb)
 					captured.cb = cb
-					return { start = function() end, stop = function() end }
+					return { start = function() return true end, stop = function() end }
 				end,
 				event = { types = {
 					mouseMoved = 1, scrollWheel = 2, gesture = 3,
@@ -99,21 +105,28 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 				} },
 			},
 			task = {
-				new = function() error("boom: injected hs.task.new failure") end,
+				new = function()
+					state.task_attempts = state.task_attempts + 1
+					error("boom: injected hs.task.new failure")
+				end,
 			},
 			timer = {
-				secondsSinceEpoch = function() return 1000 end,
+				secondsSinceEpoch = function() return state.now end,
 			},
 		})
 
-		return watchers, captured
+		return watchers, captured, state
 	end
 
 	helpers.it("invoking the captured callback does not raise even when deactivate_capsword throws", function()
 		local _watchers, captured = make_watchers_with_throwing_task()
 		local dummy_event = {}
 
-		local ok_start, watcher_or_err = pcall(_watchers.start_gesture_watcher, nil)
+		local ok_start, watcher_or_err = pcall(
+			_watchers.start_gesture_watcher,
+			nil,
+			"0123456789abcdef0123456789abcdef"
+		)
 		helpers.assert_true(ok_start, "start_gesture_watcher itself must not raise: " .. tostring(watcher_or_err))
 		helpers.assert_true(type(captured.cb) == "function",
 			"start_gesture_watcher must register an eventtap callback")
@@ -130,10 +143,22 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 
 	helpers.it("the callback returns false (never consumes the pointer event) even when it throws internally", function()
 		local _watchers, captured = make_watchers_with_throwing_task()
-		_watchers.start_gesture_watcher(nil)
+		_watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
 
 		local ok, result = pcall(captured.cb, {})
 		helpers.assert_true(ok, "callback must not raise")
 		helpers.assert_eq(result, false, "the watcher must never consume the pointer event")
+	end)
+
+	helpers.it("a throwing task constructor releases the probe lock for the next event", function()
+		local watchers, captured, state = make_watchers_with_throwing_task()
+		watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
+
+		captured.cb({})
+		state.now = state.now + 1
+		captured.cb({})
+
+		helpers.assert_eq(state.task_attempts, 2,
+			"each post-throttle pointer event must retry after task creation raises")
 	end)
 end)

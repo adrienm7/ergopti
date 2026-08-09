@@ -67,21 +67,31 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 	helpers.it("read_layout_async handle.start() is called (behaviour spy — H-2)", function()
 		-- Stub ShellRunner at module level so watchers.lua gets it on require
 		local started = false
+		local poll_callback = nil
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				-- Return a fake handle that records whether .start() was invoked
 				return {
-					start     = function() started = true end,
-					terminate = function() end,
+					start     = function() started = true; return true end,
+					terminate = function() return true end,
 				}
 			end,
 			_active_tasks = {},
+		}
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_delay, callback)
+				return { callback = callback, fired = false }
+			end,
+			cancel = function() return true end,
 		}
 		-- Also clear watchers so it re-requires with the stub
 		package.loaded["platform.remap.watchers"] = nil
 
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
-			timer    = { doEvery = function() return { stop = function() end } end,
+			timer    = { doEvery = function(_delay, callback)
+					poll_callback = callback
+					return { stop = function() end }
+				end,
 			          doAfter  = function() return { stop = function() end } end },
 			-- load_with_stubs replaces hs.keycodes wholesale (shallow key
 			-- overwrite, not a merge — see helpers/init.lua), so this override
@@ -96,14 +106,12 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 			execute  = function() return "", true end,
 		})
 
-		-- Invoke read_layout_async via the poll path indirectly: we trigger the
-		-- internal doEvery callback recorded by start_input_source_watcher.
-		-- Because the hs stub doesn't run timers, we drive the internal function
-		-- by reading it from the source and executing it in a controlled way.
-		-- Simpler: just verify the source assertion above is sufficient.
-		-- This spy test validates via the source that .start() is present.
-		helpers.assert_true(started == false or true,
-			"spy test setup complete — source assertion above is the binding guard")
+		helpers.assert_eq(watchers.start_input_source_watcher(function() end), true)
+		helpers.assert_true(type(poll_callback) == "function",
+			"the fallback poll callback must be installed before it can exercise the read")
+		poll_callback()
+		helpers.assert_true(started,
+			"a real fallback poll tick must call the exact ShellRunner handle's start()")
 	end)
 end)
 
@@ -111,4 +119,5 @@ end)
 -- (shell_runner without exec) would otherwise leak through package.loaded
 -- into whichever module the runner loads next
 package.loaded["adapters.shell_runner"] = nil
+package.loaded["adapters.timer_scheduler"] = nil
 package.loaded["platform.remap.watchers"] = nil
