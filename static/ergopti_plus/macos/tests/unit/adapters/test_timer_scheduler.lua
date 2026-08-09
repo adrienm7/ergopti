@@ -170,6 +170,31 @@ helpers.describe("TimerScheduler adapter — cancel()", function()
 		TS.cancel(h)
 		helpers.assert_eq(TS.activeCount(), 0)
 	end)
+
+	helpers.it("retains a timer whose native stop throws, then retries it", function()
+		local timer_stub = make_timer_stub()
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+			{ timer = timer_stub })
+		local h = TS.after(5, function() end)
+		local original_stop = h.timer.stop
+		local attempts = 0
+		function h.timer:stop()
+			attempts = attempts + 1
+			if attempts == 1 then error("synthetic stop failure") end
+			return original_stop(self)
+		end
+
+		helpers.assert_eq(TS.cancel(h), false,
+			"a native stop failure must not be certified as cancellation")
+		helpers.assert_true(not h.fired,
+			"the retry capability must not be marked terminal after failure")
+		helpers.assert_eq(TS.activeCount(), 1,
+			"the scheduler must retain ownership of the live timer")
+		helpers.assert_eq(TS.cancel(h), true)
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_true(h.fired)
+		helpers.assert_eq(TS.activeCount(), 0)
+	end)
 end)
 
 helpers.describe("TimerScheduler adapter — cancelAll()", function()
@@ -191,6 +216,31 @@ helpers.describe("TimerScheduler adapter — cancelAll()", function()
 			{ timer = timer_stub })
 		-- Must not throw
 		TS.cancelAll()
+		helpers.assert_eq(TS.activeCount(), 0)
+	end)
+
+	helpers.it("continues siblings and retains only failed native stops", function()
+		local timer_stub = make_timer_stub()
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+			{ timer = timer_stub })
+		local failed = TS.after(1, function() end)
+		local sibling = TS.after(2, function() end)
+		local original_stop = failed.timer.stop
+		local attempts = 0
+		function failed.timer:stop()
+			attempts = attempts + 1
+			if attempts == 1 then error("synthetic stop failure") end
+			return original_stop(self)
+		end
+
+		helpers.assert_eq(TS.cancelAll(), false)
+		helpers.assert_true(not failed.fired,
+			"the failed timer must stay retryable")
+		helpers.assert_true(sibling.fired,
+			"one failure must not prevent sibling cleanup")
+		helpers.assert_eq(TS.activeCount(), 1)
+		helpers.assert_eq(TS.cancelAll(), true)
+		helpers.assert_eq(attempts, 2)
 		helpers.assert_eq(TS.activeCount(), 0)
 	end)
 end)
