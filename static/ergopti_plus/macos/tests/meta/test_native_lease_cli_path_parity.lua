@@ -25,7 +25,7 @@ helpers.describe("native Karabiner lease uses the canonical CLI only", function(
 		package.loaded["platform.remap.ke_paths"] = nil
 		local paths = require("platform.remap.ke_paths")
 		local worker_path = helpers.driver_root()
-			.. "/launcher/Sources/ErgoptiPlus/KarabinerLeaseWorker.swift"
+			.. "/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift"
 		local file, open_err = io.open(worker_path, "r")
 		helpers.assert_not_nil(file,
 			"the native lease worker must be readable: " .. tostring(open_err))
