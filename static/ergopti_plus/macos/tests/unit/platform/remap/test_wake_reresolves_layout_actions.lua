@@ -197,6 +197,7 @@ local function load_remap(options)
 		clear_managed_set = function()
 			calls.managed_clear = calls.managed_clear + 1
 			append("managed-clear")
+			return true
 		end,
 		refresh_managed_set = function() return true end,
 	}

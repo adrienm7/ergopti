@@ -221,7 +221,10 @@ local function load_enabled_remap(options)
 			if options.classifier_succeeds == false then error("classifier failed") end
 			return true
 		end,
-		clear_managed_set = function() calls.classifier_clears = calls.classifier_clears + 1 end,
+		clear_managed_set = function()
+			calls.classifier_clears = calls.classifier_clears + 1
+			return true
+		end,
 	}
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = {

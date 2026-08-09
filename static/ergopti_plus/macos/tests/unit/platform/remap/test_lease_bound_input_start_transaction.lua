@@ -216,7 +216,10 @@ local function load_remap(options)
 		end,
 	}
 	local classifier = {
-		clear_managed_set = function() calls.classifier_clears = calls.classifier_clears + 1 end,
+		clear_managed_set = function()
+			calls.classifier_clears = calls.classifier_clears + 1
+			return true
+		end,
 	}
 	if not options.classifier_missing then
 		classifier.refresh_managed_set = function()
