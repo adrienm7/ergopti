@@ -40,13 +40,16 @@ requires a built application on macOS.
 
 ## Karabiner lease guardian
 
-The same signed launcher executable also provides three headless modes used by
-the Hammerspoon driver: retained outer and inner roles plus a detached one-shot
-revoker. The outer role owns Hammerspoon's standard-stream protocol and
-wait-supervises one exact inner child over a private socket. The inner role is
-the only process allowed to create, signal and reap transient lease-authority
-`karabiner_cli --set-variables` children. Pipe EOF, outer loss, inner loss and a
-bounded CLI timeout all converge on the same token-scoped fence.
+The same signed launcher executable provides retained outer and private-inner
+roles, a detached one-shot revoker, and an independent per-user LaunchAgent.
+The outer role owns Hammerspoon's standard-stream protocol and wait-supervises
+one exact inner child over a private socket. The inner role is the only process
+allowed to create, signal and reap transient lease-authority
+`karabiner_cli --set-variables` children. The launchd-owned guardian holds no
+Karabiner process authority: it watches a durable, locked exact-token record and
+publishes only that token's OFF+tombstone variables if every private process is
+Force Quit. Pipe EOF, outer loss, inner loss, guardian restart and bounded CLI
+timeouts therefore converge on the same token-scoped fence.
 
 This is deliberately not a Karabiner process watchdog. Karabiner's UI, menubar,
 root Core Service, console user server, user/session agents, observers,

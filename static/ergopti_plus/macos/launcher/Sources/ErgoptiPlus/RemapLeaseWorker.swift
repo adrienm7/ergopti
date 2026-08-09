@@ -3,9 +3,10 @@
 // ==============================================================================
 // MODULE: Karabiner Lease Worker
 // DESCRIPTION:
-// Provides three headless modes inside the signed ErgoptiPlus launcher: outer
-// worker, inner writer, and detached revoker. The outer mode owns Hammerspoon’s
-// stdin/stdout protocol and waitpid-supervises one inner over a private socketpair.
+// Provides the headless modes inside the signed ErgoptiPlus launcher: outer
+// worker, inner writer, detached revoker, and launchd-owned guardian. The outer
+// mode owns Hammerspoon’s stdin/stdout protocol and waitpid-supervises one inner
+// over a private socketpair.
 // The inner exclusively creates, signals, and reaps direct karabiner_cli children.
 //
 // FEATURES & RATIONALE:
@@ -63,11 +64,11 @@ let kCanonicalKarabinerCLIPath =
 let kInnerControlDescriptor: Int32 = 3
 private let kFirstReservedSocketDescriptor: Int32 = 4
 private let kMaximumHeartbeatSeconds: TimeInterval = 86_400
-private let kDefaultHeartbeatSeconds: TimeInterval = 5
-private let kCLITimeoutSeconds: TimeInterval = 1.5
+let kDefaultHeartbeatSeconds: TimeInterval = 5
+let kCLITimeoutSeconds: TimeInterval = 1.5
 private let kPrivateCommandAckTimeoutSeconds: TimeInterval = 1.75
 private let kPrivateFenceAckTimeoutSeconds: TimeInterval = 3.75
-private let kFenceConfirmationGraceSeconds: TimeInterval = 0.25
+let kFenceConfirmationGraceSeconds: TimeInterval = 0.25
 private let kRequiredFenceTransportCount = 2
 private let kMaximumProtocolLineBytes = 128
 let kMaximumProtocolLinesPerRead = 32
@@ -103,6 +104,7 @@ enum LeaseWorkerExit: Int32 {
 	case resumeFailed = 72
 	case innerFailed = 73
 	case malformedProtocol = 74
+	case guardianUnavailable = 75
 }
 
 /// Distinguishes public worker, detached fence, and private inner argv shapes.
@@ -540,6 +542,25 @@ func isLeaseParentLiveLine(_ line: String) -> Bool {
 		&& parseLeasePingSequence(String(parts[1])) != nil
 }
 
+/// Batch-level decisions ordered so explicit user shutdown always wins.
+enum LeaseParentBatchDisposition: Equatable {
+	case stop
+	case malformed
+	case guardianLost
+	case live
+}
+
+/// Classifies one atomic public read before any live line crosses privately.
+func classifyLeaseParentBatch(
+	_ lines: [String],
+	guardianPresent: () -> Bool
+) -> LeaseParentBatchDisposition {
+	if lines.contains("STOP") { return .stop }
+	if lines.contains(where: { !isLeaseParentLiveLine($0) }) { return .malformed }
+	if !lines.isEmpty && !guardianPresent() { return .guardianLost }
+	return .live
+}
+
 /// Defines the complete private outer-to-inner command protocol.
 enum LeaseInnerCommand: Equatable {
 	case activate(Int)
@@ -959,8 +980,22 @@ protocol LeaseCLIExecuting {
 	) -> LeaseCLIResult
 }
 
+/// Production-only hardening seam for parent descriptors that no CLI exec may
+/// inherit. Test doubles can keep the narrower LeaseCLIExecuting contract.
+protocol LeaseCLIExecutingWithDescriptorClosure {
+	func execute(
+		cliPath: String,
+		payload: String,
+		timeout: TimeInterval,
+		interruption: () -> LeaseCLIInterruption,
+		closingDescriptors: [Int32]
+	) -> LeaseCLIResult
+}
+
 /// Spawns, optionally signals, and reaps only its exact direct CLI child.
-final class PosixLeaseCLIExecutor: LeaseCLIExecuting {
+final class PosixLeaseCLIExecutor:
+	LeaseCLIExecuting,
+	LeaseCLIExecutingWithDescriptorClosure {
 	private let initializeFileActions: LeaseSpawnFileActionsInitializer
 	private let addCloseAction: LeaseSpawnCloseAction
 
@@ -987,6 +1022,23 @@ final class PosixLeaseCLIExecutor: LeaseCLIExecuting {
 		payload: String,
 		timeout: TimeInterval,
 		interruption: () -> LeaseCLIInterruption
+	) -> LeaseCLIResult {
+		return execute(
+			cliPath: cliPath,
+			payload: payload,
+			timeout: timeout,
+			interruption: interruption,
+			closingDescriptors: []
+		)
+	}
+
+	/// Runs one exact CLI child while explicitly closing every private lease fd.
+	func execute(
+		cliPath: String,
+		payload: String,
+		timeout: TimeInterval,
+		interruption: () -> LeaseCLIInterruption,
+		closingDescriptors: [Int32]
 	) -> LeaseCLIResult {
 		let initialInterruption = interruption()
 		if initialInterruption != .none {
@@ -1054,11 +1106,15 @@ final class PosixLeaseCLIExecutor: LeaseCLIExecuting {
 			)
 			guard outputStatus == 0 else { return .spawnFailed(outputStatus) }
 		}
-		for descriptor in [
+		let standardChildCloseDescriptors = [
 			nullDescriptor,
 			diagnosticReadDescriptor,
 			diagnosticWriteDescriptor,
-		] where descriptor > STDERR_FILENO {
+		]
+		let childCloseDescriptors = Set(
+			standardChildCloseDescriptors + closingDescriptors
+		).filter { $0 > STDERR_FILENO }.sorted()
+		for descriptor in childCloseDescriptors {
 			let closeStatus = addCloseAction(&fileActions, descriptor)
 			guard closeStatus == 0 else { return .spawnFailed(closeStatus) }
 		}
@@ -1198,14 +1254,15 @@ final class PosixLeaseCLIExecutor: LeaseCLIExecuting {
 ///   - fenceConfirmationGrace: Minimum separation after the first success.
 ///   - uptime: Monotonic clock used to prove that separation.
 ///   - sleep: Retry and confirmation delay primitive.
-private func transportLeaseFenceUntilRepeatedSuccess(
+func transportLeaseFenceUntilRepeatedSuccess(
 	identity: LeaseIdentity,
 	cliPath: String,
 	executor: LeaseCLIExecuting,
 	cliTimeout: TimeInterval,
 	fenceConfirmationGrace: TimeInterval,
 	uptime: () -> TimeInterval,
-	sleep: (useconds_t) -> Void
+	sleep: (useconds_t) -> Void,
+	closingDescriptors: [Int32] = []
 ) {
 	let payload = LeasePayloads.fence(identity: identity)
 	var consecutiveSuccesses = 0
@@ -1223,12 +1280,25 @@ private func transportLeaseFenceUntilRepeatedSuccess(
 				continue
 			}
 		}
-		let result = executor.execute(
-			cliPath: cliPath,
-			payload: payload,
-			timeout: cliTimeout,
-			interruption: { .none }
-		)
+		let result: LeaseCLIResult
+		if closingDescriptors.isEmpty {
+			result = executor.execute(
+				cliPath: cliPath,
+				payload: payload,
+				timeout: cliTimeout,
+				interruption: { .none }
+			)
+		} else if let hardened = executor as? LeaseCLIExecutingWithDescriptorClosure {
+			result = hardened.execute(
+				cliPath: cliPath,
+				payload: payload,
+				timeout: cliTimeout,
+				interruption: { .none },
+				closingDescriptors: closingDescriptors
+			)
+		} else {
+			result = .spawnFailed(ENOTSUP)
+		}
 		if result == .success {
 			consecutiveSuccesses += 1
 			if consecutiveSuccesses == 1 { firstSuccessTime = uptime() }
@@ -1755,8 +1825,19 @@ protocol LeaseInnerSpawning {
 	func spawn(identity: LeaseIdentity) -> SpawnedLeaseInner?
 }
 
+/// Production hardening seam that explicitly closes outer-owned lease records
+/// in the inner's spawn file actions in addition to FD_CLOEXEC.
+protocol LeaseInnerSpawningWithDescriptorClosure {
+	func spawn(
+		identity: LeaseIdentity,
+		closingDescriptors: [Int32]
+	) -> SpawnedLeaseInner?
+}
+
 /// Creates private inner roles without inheriting Hammerspoon standard streams.
-final class PosixLeaseInnerSpawner: LeaseInnerSpawning {
+final class PosixLeaseInnerSpawner:
+	LeaseInnerSpawning,
+	LeaseInnerSpawningWithDescriptorClosure {
 	private let executablePath: String
 	private let expectedExecutableIdentity: LeaseExecutableIdentity?
 	private let executableIdentityReader: (String) -> LeaseExecutableIdentity?
@@ -1804,6 +1885,14 @@ final class PosixLeaseInnerSpawner: LeaseInnerSpawning {
 	/// - Parameter identity: Exact generation passed to the inner parser.
 	/// - Returns: Outer-owned direct child, or nil before activation.
 	func spawn(identity: LeaseIdentity) -> SpawnedLeaseInner? {
+		return spawn(identity: identity, closingDescriptors: [])
+	}
+
+	/// Spawns one inner and explicitly closes every inherited lease capability.
+	func spawn(
+		identity: LeaseIdentity,
+		closingDescriptors: [Int32]
+	) -> SpawnedLeaseInner? {
 		guard let sockets = makeReservedLeaseSocketEndpoints() else { return nil }
 		let outerDescriptor = sockets.outerDescriptor
 		let innerDescriptor = sockets.innerDescriptor
@@ -1862,7 +1951,9 @@ final class PosixLeaseInnerSpawner: LeaseInnerSpawning {
 			_ = Darwin.close(innerDescriptor)
 			return nil
 		}
-		var childCloseDescriptors: [Int32] = []
+		var childCloseDescriptors: [Int32] = closingDescriptors.filter {
+			$0 > STDERR_FILENO && $0 != kInnerControlDescriptor
+		}
 		if outerDescriptor != kInnerControlDescriptor {
 			childCloseDescriptors.append(outerDescriptor)
 		}
@@ -1873,7 +1964,7 @@ final class PosixLeaseInnerSpawner: LeaseInnerSpawning {
 			&& nullDescriptor != kInnerControlDescriptor {
 			childCloseDescriptors.append(nullDescriptor)
 		}
-		for descriptor in childCloseDescriptors {
+		for descriptor in Set(childCloseDescriptors).sorted() {
 			let closeStatus = addCloseAction(&fileActions, descriptor)
 			guard closeStatus == 0 else {
 				_ = Darwin.close(outerDescriptor)
@@ -1966,32 +2057,39 @@ final class KarabinerLeaseOuterRuntime {
 	private let identity: LeaseIdentity
 	private let detached: Bool
 	private let spawner: LeaseInnerSpawning
+	private let guardianRegistration: LeaseGuardianRegistering?
 	private let recoveryExecutor: LeaseCLIExecuting
 	private let parentInputDescriptor: Int32
 	private let parentOutputDescriptor: Int32
 	private let uptime: () -> TimeInterval
 	private let poller: LeasePolling
 	private let boundaryPoller: LeaseDescriptorPolling
+	private let beforeLiveAcknowledgementPublish: () -> Void
 	private var inner: SpawnedLeaseInner?
 	private var parentDecoder = BoundedLeaseLineDecoder()
 	private var machine: LeaseOuterStateMachine
 	private var commandDeadline = LeasePrivateCommandDeadline()
+	private var liveTransportGateHeld = false
 
 	/// Creates the only role allowed to retain Hammerspoon stdin/stdout.
 	/// - Parameters:
 	///   - identity: Exact generation capability.
 	///   - detached: Whether this invocation is a fallback fence only.
 	///   - spawner: Same-executable inner process factory.
+	///   - guardianRegistration: Required durable LaunchAgent handshake for workers;
+	///     nil is valid only for a detached tombstone-only invocation.
 	///   - recoveryExecutor: Exact-child CLI executor retained by the authenticated outer.
 	///   - parentInputDescriptor: Public command stream owned by Hammerspoon.
 	///   - parentOutputDescriptor: Public acknowledgement stream to Hammerspoon.
 	///   - uptime: Monotonic clock used for command and recovery deadlines.
 	///   - poller: Descriptor wait primitive, injectable for boundary-race tests.
 	///   - boundaryPoller: Zero-delay single-descriptor poll seam after private reads.
+	///   - beforeLiveAcknowledgementPublish: Test seam inside the shared transport gate.
 	init(
 		identity: LeaseIdentity,
 		detached: Bool,
 		spawner: LeaseInnerSpawning,
+		guardianRegistration: LeaseGuardianRegistering?,
 		recoveryExecutor: LeaseCLIExecuting = PosixLeaseCLIExecutor(),
 		parentInputDescriptor: Int32 = STDIN_FILENO,
 		parentOutputDescriptor: Int32 = STDOUT_FILENO,
@@ -2003,17 +2101,20 @@ final class KarabinerLeaseOuterRuntime {
 				Darwin.poll(buffer.baseAddress!, nfds_t(buffer.count), timeout)
 			}
 		},
-		boundaryPoller: @escaping LeaseDescriptorPolling = pollLeaseDescriptor
+		boundaryPoller: @escaping LeaseDescriptorPolling = pollLeaseDescriptor,
+		beforeLiveAcknowledgementPublish: @escaping () -> Void = {}
 	) {
 		self.identity = identity
 		self.detached = detached
 		self.spawner = spawner
+		self.guardianRegistration = guardianRegistration
 		self.recoveryExecutor = recoveryExecutor
 		self.parentInputDescriptor = parentInputDescriptor
 		self.parentOutputDescriptor = parentOutputDescriptor
 		self.uptime = uptime
 		self.poller = poller
 		self.boundaryPoller = boundaryPoller
+		self.beforeLiveAcknowledgementPublish = beforeLiveAcknowledgementPublish
 		machine = LeaseOuterStateMachine(initialMode: identity.initialMode)
 	}
 
@@ -2025,7 +2126,13 @@ final class KarabinerLeaseOuterRuntime {
 			return LeaseWorkerExit.success.rawValue
 		}
 
-		guard let spawned = spawner.spawn(identity: identity) else {
+		guard let guardianRegistration,
+			guardianRegistration.arm()
+		else { return LeaseWorkerExit.guardianUnavailable.rawValue }
+		defer { guardianRegistration.closePreservingAbandonment() }
+
+		guard let spawned = spawnInnerWithGuardianDescriptors() else {
+			guardianRegistration.cancelBeforeActivation()
 			return LeaseWorkerExit.innerSpawnFailed.rawValue
 		}
 		inner = spawned
@@ -2108,6 +2215,20 @@ final class KarabinerLeaseOuterRuntime {
 		}
 	}
 
+	/// Creates the inner only through a spawner that can explicitly close the
+	/// durable record and guardian-lock descriptors before exec.
+	private func spawnInnerWithGuardianDescriptors() -> SpawnedLeaseInner? {
+		guard let guardianRegistration else { return spawner.spawn(identity: identity) }
+		let descriptors = guardianRegistration.childCloseDescriptors
+		guard let hardened = spawner as? LeaseInnerSpawningWithDescriptorClosure else {
+			return descriptors.isEmpty ? spawner.spawn(identity: identity) : nil
+		}
+		return hardened.spawn(
+			identity: identity,
+			closingDescriptors: descriptors
+		)
+	}
+
 	/// Reads every complete Hammerspoon command from one bounded chunk.
 	/// - Returns: Terminal result when the event initiates cleanup.
 	private func consumeParentInput() -> Int32? {
@@ -2128,11 +2249,17 @@ final class KarabinerLeaseOuterRuntime {
 	/// - Parameter lines: Complete lines returned by one descriptor read.
 	/// - Returns: Terminal process result when cleanup completes.
 	private func consumeParentBatch(_ lines: [String]) -> Int32? {
-		if lines.contains("STOP") {
+		switch classifyLeaseParentBatch(lines, guardianPresent: {
+			guardianRegistration?.guardianStillPresent() == true
+		}) {
+		case .stop:
 			return perform(machine.receiveParent(line: "STOP"))
-		}
-		if lines.contains(where: { !isLeaseParentLiveLine($0) }) {
+		case .malformed:
 			return perform(machine.receiveParent(line: "MALFORMED"))
+		case .guardianLost:
+			return finishAfterRecovery(machine.innerLost())
+		case .live:
+			break
 		}
 		for line in lines {
 			if let terminal = perform(machine.receiveParent(line: line)) { return terminal }
@@ -2243,6 +2370,14 @@ final class KarabinerLeaseOuterRuntime {
 		for action in actions {
 			switch action {
 			case .send(let command):
+				if command != .stop {
+					guard !liveTransportGateHeld,
+						guardianRegistration?.beginLiveTransport() == true
+					else {
+						return finishAfterRecovery(machine.innerLost())
+					}
+					liveTransportGateHeld = true
+				}
 				guard inner?.send(command) == true else {
 					return finishAfterRecovery(machine.innerLost())
 				}
@@ -2251,25 +2386,52 @@ final class KarabinerLeaseOuterRuntime {
 					now: uptime()
 				)
 			case .publish(let line):
+				if liveTransportGateHeld, isLeaseLiveAcknowledgementLine(line) {
+					guard guardianRegistration?.guardianStillPresent() == true else {
+						return finishAfterRecovery(machine.innerLost())
+					}
+					beforeLiveAcknowledgementPublish()
+				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
 					if let terminal = perform(machine.receiveParentEOF()) { return terminal }
 					return nil
 				}
+				endLiveTransportIfNeeded()
 			case .fenceAndFinish(let exitCode, let publishStopped):
 				commandDeadline.clear()
 				retireCurrentAfterSupervisionLoss()
+				endLiveTransportIfNeeded()
 				recoverFenceUntilSuccess()
 				if publishStopped {
 					_ = writeLeaseLine("STOPPED", to: parentOutputDescriptor)
 				}
+				guardianRegistration?.retireAfterFence()
 				return exitCode
 			case .finish(let exitCode):
 				commandDeadline.clear()
 				retireCurrentAfterFence()
+				endLiveTransportIfNeeded()
+				guardianRegistration?.retireAfterFence()
 				return exitCode
 			}
 		}
 		return nil
+	}
+
+	/// Recognizes public ACKs that prove one live Karabiner CLI transport completed.
+	private func isLeaseLiveAcknowledgementLine(_ line: String) -> Bool {
+		return line == "READY"
+			|| line == "PAUSED"
+			|| line == "RESUMED"
+			|| line.hasPrefix("PONG ")
+			|| line.hasPrefix("PING_FAILED ")
+	}
+
+	/// Releases a live-write gate exactly once on ACK, failure, or teardown.
+	private func endLiveTransportIfNeeded() {
+		guard liveTransportGateHeld else { return }
+		liveTransportGateHeld = false
+		guardianRegistration?.endLiveTransport()
 	}
 
 	/// Completes a recovery action produced outside the normal action executor.
@@ -2302,7 +2464,7 @@ final class KarabinerLeaseOuterRuntime {
 	/// children, whose direct-child ownership cannot reach a stock Karabiner peer.
 	private func recoverFenceUntilSuccess() {
 		while true {
-			guard let replacement = spawner.spawn(identity: identity) else {
+			guard let replacement = spawnInnerWithGuardianDescriptors() else {
 				fenceDirectlyUntilRepeatedSuccess()
 				return
 			}
@@ -2332,7 +2494,8 @@ final class KarabinerLeaseOuterRuntime {
 			cliTimeout: kCLITimeoutSeconds,
 			fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
 			uptime: uptime,
-			sleep: { usleep($0) }
+			sleep: { usleep($0) },
+			closingDescriptors: guardianRegistration?.childCloseDescriptors ?? []
 		)
 	}
 
@@ -2404,12 +2567,16 @@ enum KarabinerLeaseWorker {
 	/// - Returns: Whether the launcher must remain headless.
 	static func handles(arguments: [String]) -> Bool {
 		guard arguments.count > 1 else { return false }
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag { return true }
+		#endif
 		return arguments[1] == kKarabinerLeaseWorkerFlag
 			|| arguments[1] == kKarabinerLeaseRevokeFlag
 			|| arguments[1] == kKarabinerLeaseInnerFlag
+			|| arguments[1] == kKarabinerLeaseGuardianFlag
 	}
 
-	/// Runs one validated outer, revoker, or inner role.
+	/// Runs one validated outer, revoker, private inner, or independent guardian role.
 	/// - Parameter arguments: Complete process argv.
 	/// - Returns: Stable process exit status.
 	static func run(arguments: [String]) -> Int32 {
@@ -2418,6 +2585,26 @@ enum KarabinerLeaseWorker {
 		// exact child whose unreaped PID proves private-group ownership
 		prepareLeaseChildReaping()
 		_ = Darwin.signal(SIGPIPE, SIG_IGN)
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag {
+			guard arguments.count == 3,
+				let paths = validatedGuardianLifetimeTestPaths(arguments[2])
+			else { return LeaseWorkerExit.invalidArguments.rawValue }
+			_ = Darwin.signal(SIGHUP, SIG_IGN)
+			_ = Darwin.signal(SIGINT, SIG_DFL)
+			_ = Darwin.signal(SIGTERM, SIG_DFL)
+			return RemapLeaseGuardianRuntime(paths: paths).run()
+		}
+		#endif
+		if arguments[1] == kKarabinerLeaseGuardianFlag {
+			guard arguments.count == 2 else {
+				return LeaseWorkerExit.invalidArguments.rawValue
+			}
+			_ = Darwin.signal(SIGHUP, SIG_IGN)
+			_ = Darwin.signal(SIGINT, SIG_DFL)
+			_ = Darwin.signal(SIGTERM, SIG_DFL)
+			return RemapLeaseGuardianRuntime().run()
+		}
 
 		if arguments[1] == kKarabinerLeaseInnerFlag {
 			// A private group containing a stopped CLI receives HUP+CONT when
@@ -2464,7 +2651,10 @@ enum KarabinerLeaseWorker {
 			spawner: PosixLeaseInnerSpawner(
 				executablePath: executablePath,
 				expectedExecutableIdentity: expectedExecutableIdentity
-			)
+			),
+			guardianRegistration: detached
+				? nil
+				: LeaseGuardianRegistration(identity: identity)
 		)
 		return runtime.run()
 	}

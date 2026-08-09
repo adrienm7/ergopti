@@ -275,6 +275,7 @@ assemble_app() {
 	mkdir -p "$APP_PATH/Contents/MacOS"
 	mkdir -p "$APP_PATH/Contents/Resources/config"
 	mkdir -p "$APP_PATH/Contents/Frameworks"
+	mkdir -p "$APP_PATH/Contents/Library/LaunchAgents"
 
 	# Move the downloaded Hammerspoon into Frameworks/. We move (not copy) to
 	# keep the build dir small and to avoid duplicating ~250 MB.
@@ -298,6 +299,13 @@ assemble_app() {
 	# Copy the launcher binary into the standard host-executable location.
 	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiPlus"
 	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiPlus"
+	local remap_guardian_plist="$LAUNCHER_DIR/com.ergoptiplus.remap-guardian.plist"
+	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
+	cp "$remap_guardian_plist" \
+		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist"
+	plutil -lint \
+		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist" \
+		>/dev/null || fail "Remap guardian LaunchAgent plist failed plutil -lint."
 
 	# Copy Sparkle.framework into Contents/Frameworks/. The launcher links
 	# against Sparkle via @rpath, and the SPM build leaves the framework in

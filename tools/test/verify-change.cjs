@@ -201,6 +201,7 @@ const RULES = [
 		match: (f) =>
 			f.includes('/adapters/') ||
 			f.includes('_shared/') ||
+			f.startsWith('static/ergopti_plus/macos/launcher/') ||
 			f.startsWith('tools/') ||
 			f.includes('/locales/') ||
 			f.endsWith('.json') ||
@@ -209,6 +210,11 @@ const RULES = [
 			f.endsWith('.cjs') ||
 			f.endsWith('.svelte') ||
 			f.endsWith('.md'),
+	},
+	{
+		gate: 'swift-launcher',
+		why: 'native launcher code must compile and its process-level XCTest must run on macOS; other hosts report the CI deferral explicitly',
+		match: (f) => f.startsWith('static/ergopti_plus/macos/launcher/'),
 	},
 	{
 		gate: 'hs-e2e',
@@ -288,6 +294,7 @@ function runNpm(script) {
 const GATE_COMMANDS = {
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
 	js: { npm: 'test:js' },
+	'swift-launcher': { npm: 'test:macos-swift-launcher' },
 	hs: { npm: 'test:hs' },
 	'hs-e2e': { npm: 'test:hs:e2e' },
 	linux: { npm: 'test:linux' },

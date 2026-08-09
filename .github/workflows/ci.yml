@@ -276,6 +276,9 @@ jobs:
       - name: Report Swift toolchain
         run: swift --version
 
+      - name: Lint remap guardian LaunchAgent
+        run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
+
       - name: Build release launcher
         run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher
         timeout-minutes: 10

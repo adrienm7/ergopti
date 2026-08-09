@@ -23,6 +23,7 @@
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
 // ==============================================================================
 
+import Dispatch
 import XCTest
 @testable import ErgoptiPlus
 
@@ -72,5 +73,27 @@ final class LauncherLogTests: XCTestCase {
 		let contents = try String(contentsOfFile: logPath, encoding: .utf8)
 		XCTAssertTrue(contents.contains(tagA), "an earlier write must not be lost")
 		XCTAssertTrue(contents.contains(tagB), "a later write must be appended, not replace the file")
+	}
+
+	func testConcurrentGuardianDiagnosticsRemainWholeAndVisible() throws {
+		let tags = (0..<32).map { "GuardianLogTests-\($0)-\(UUID().uuidString)" }
+		let group = DispatchGroup()
+		for tag in tags {
+			group.enter()
+			DispatchQueue.global(qos: .userInitiated).async {
+				LauncherLog.write("concurrent guardian diagnostic \(tag)")
+				group.leave()
+			}
+		}
+		XCTAssertEqual(group.wait(timeout: .now() + 3), .success)
+
+		let contents = try String(contentsOfFile: logPath, encoding: .utf8)
+		for tag in tags {
+			XCTAssertEqual(
+				contents.components(separatedBy: tag).count - 1,
+				1,
+				"every async guardian diagnostic must persist exactly once"
+			)
+		}
 	}
 }
