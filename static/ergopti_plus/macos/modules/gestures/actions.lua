@@ -754,19 +754,26 @@ sg("script_quit",                         function()
 	-- The coordinator keeps every F17 consumer and classifier live until the exact
 	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
 	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
+	local exit_requested = false
+	local function request_controlled_exit()
+		if exit_requested then return end
+		exit_requested = true
+		local request_ok, accepted_or_err = xpcall(function()
+			return TerminationCoordinator.request_exit("script_quit", 0)
+		end, debug.traceback)
+		if not request_ok or accepted_or_err ~= true then
+			Logger.error(LOG, "script_quit controlled exit was rejected: %s",
+				tostring(accepted_or_err))
+		end
+	end
 	local scheduled, schedule_result = pcall(function()
-		return hs.timer.doAfter(0, function()
-			local request_ok, accepted_or_err = xpcall(function()
-				return TerminationCoordinator.request_exit("script_quit", 0)
-			end, debug.traceback)
-			if not request_ok or accepted_or_err ~= true then
-				Logger.error(LOG, "script_quit controlled exit was rejected: %s",
-					tostring(accepted_or_err))
-			end
-		end)
+		return hs.timer.doAfter(0, request_controlled_exit)
 	end)
 	if not scheduled or schedule_result == nil then
 		Logger.error(LOG, "script_quit could not schedule controlled exit: %s", tostring(schedule_result))
+		-- request_exit starts the asynchronous root transaction; invoking it here
+		-- never bypasses the exact lease fence or performs a direct process exit.
+		request_controlled_exit()
 	end
 end)
 
