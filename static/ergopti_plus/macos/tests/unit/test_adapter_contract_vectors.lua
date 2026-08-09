@@ -402,17 +402,17 @@ end)
 -- ======================================
 
 helpers.describe("Adapter contract vectors: FileSystem", function()
-	-- Override hs.fs.attributes to use real I/O so exists() works correctly.
-	-- The default stub always returns nil (no filesystem access), which would
-	-- make exists() always return false even after a successful write().
+	local host_fs = hs.fs
+	-- Reuse the faithful host-stub primitives so the private staging directory
+	-- exists on disk and cleanup exercises the same return contracts as production
+	package.loaded["infra.fs_dir"] = nil
 	local adapter = helpers.load_with_stubs("adapters.file_system", {
 		fs = {
-			attributes = function(path)
-				local fh = io.open(path, "r")
-				if fh then fh:close() ; return { mode = "file" } end
-				return nil
-			end,
-			mkdir   = function(_) return true end,
+			dir = host_fs.dir,
+			attributes = host_fs.attributes,
+			symlinkAttributes = host_fs.symlinkAttributes,
+			mkdir = host_fs.mkdir,
+			rmdir = host_fs.rmdir,
 			pathToAbsolute = function(p) return p end,
 		},
 	})

@@ -213,11 +213,26 @@ helpers.describe("file_system.write — parent directory creation (filesystem-ad
 		-- no effect because load_with_stubs() discards the old _G.hs.
 		local mkdir_calls = {}
 		local mock_fs = {
+			dir = function()
+				local directory_state = {}
+				return function(state)
+					helpers.assert_eq(state, directory_state,
+						"the absence-proof iterator must receive hs.fs.dir's state")
+					return nil
+				end, directory_state
+			end,
 			attributes = function(_path, _mode) return nil end,  -- report all dirs missing
-			mkdir      = function(dir) mkdir_calls[#mkdir_calls + 1] = dir end,
+			symlinkAttributes = function() return nil, "missing fixture path" end,
+			mkdir = function(dir)
+				mkdir_calls[#mkdir_calls + 1] = dir
+				return true
+			end,
+			rmdir = function() return true end,
+			pathToAbsolute = function(path) return path end,
 		}
 
 		package.loaded["adapters.file_system"] = nil
+		package.loaded["infra.fs_dir"] = nil
 		package.loaded["infra.logger"] = nil
 		local _ = helpers.load_with_stubs("infra.logger")
 		-- Inject mock hs.fs via hs_overrides so it survives the fresh-stub replacement
