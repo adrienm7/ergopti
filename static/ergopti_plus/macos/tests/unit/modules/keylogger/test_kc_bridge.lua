@@ -87,11 +87,12 @@ local KC = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
 -- ======================================================
 
 helpers.describe("kc_bridge — public surface", function()
-	helpers.it("exposes init, start, is_ke_managed_output_kc, refresh_managed_set, get_stats, stop", function()
+	helpers.it("exposes init, start, is_ke_managed_output_kc, refresh/clear managed set, get_stats, stop", function()
 		helpers.assert_eq(type(KC.init),                    "function")
 		helpers.assert_eq(type(KC.start),                   "function")
 		helpers.assert_eq(type(KC.is_ke_managed_output_kc), "function")
 		helpers.assert_eq(type(KC.refresh_managed_set),     "function")
+		helpers.assert_eq(type(KC.clear_managed_set),       "function")
 		helpers.assert_eq(type(KC.get_stats),               "function")
 		helpers.assert_eq(type(KC.stop),                    "function")
 		helpers.assert_eq(type(KC.set_log_manager),         "function")
@@ -223,6 +224,20 @@ helpers.describe("kc_bridge — refresh_managed_set", function()
 		helpers.assert_eq(kc.is_ke_managed_output_kc(56), true)
 		-- Previous entry must be gone.
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false)
+	end)
+
+	helpers.it("clear_managed_set releases every output keycode claim", function()
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
+		kc.refresh_managed_set(
+			{ k1 = { tap = "act1", hold = "none" } },
+			{ { id = "act1", karabiner_to = { { key_code = "left_command" } } } }
+		)
+		helpers.assert_eq(kc.is_ke_managed_output_kc(55), true)
+
+		kc.clear_managed_set()
+
+		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
+			"an inactive Ergopti lease must not suppress the same keycode from personal Karabiner")
 	end)
 
 	helpers.it("unknown key_code names are silently skipped", function()

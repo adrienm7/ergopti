@@ -19,6 +19,11 @@
 
 local helpers = require("tests.helpers")
 
+package.loaded["platform.remap.lease_controller"] = {
+	status = function() return "active", { phase = "active" } end,
+	stop = function() return true end,
+}
+
 -- Menu titles are produced by string.format(i18n.get(key), delay); the test i18n
 -- stub echoes the key back and neither key carries a format specifier, so the
 -- rendered title is the bare key — that is how the two items are located below.

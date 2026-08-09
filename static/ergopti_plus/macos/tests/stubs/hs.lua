@@ -961,10 +961,16 @@ M.fnutils = {
 
 M.inspect = function(v) return tostring(v) end
 
+local HOST_UUID_COUNTER = 0
+
 M.host = {
 	operatingSystemVersion = function() return { major = 14, minor = 0, patch = 0 } end,
 	operatingSystemVersionString = function() return "macOS 14.0" end,
 	interfaceStyle = function() return "Dark" end,
+	uuid = function()
+		HOST_UUID_COUNTER = HOST_UUID_COUNTER + 1
+		return string.format("00000000-0000-4000-8000-%012x", HOST_UUID_COUNTER)
+	end,
 }
 
 
@@ -979,6 +985,7 @@ M.host = {
 --- Resets all in-memory stub state. Test helpers should call this before each
 --- test to avoid cross-test pollution.
 function M.__reset()
+	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end

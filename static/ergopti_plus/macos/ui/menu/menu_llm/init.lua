@@ -183,7 +183,8 @@ end
 --- script_quit action: script_quit exits via os.exit(0), which bypasses
 --- hs.shutdownCallback, so it must perform the identical teardown. Centralising it
 --- here means the two quit paths can never drift (the bug was that script_quit
---- killed Karabiner + flushed the keylogger but left the MLX server + helpers alive).
+--- revoked the exact remap lease + flushed the keylogger but left the MLX server
+--- + helpers alive). Stock Karabiner processes are never owned by Ergopti.
 function M.terminate_helper_processes()
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)

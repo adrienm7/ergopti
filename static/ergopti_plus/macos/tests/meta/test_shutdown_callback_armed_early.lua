@@ -63,7 +63,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 	helpers.it("is installed before every later boot phase", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
 
-		local shutdown = at(code, "hs.shutdownCallback = function()")
+		local shutdown = at(code, "hs.shutdownCallback = shutdown_all_resources")
 		helpers.assert_true(shutdown ~= nil, "init.lua must install a shutdown callback")
 
 		-- Each of these runs after the requires and can throw: a missing config, a
@@ -95,7 +95,8 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 
 	helpers.it("is installed after the modules it closes over", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
-		local shutdown = at(code, "hs.shutdownCallback = function()")
+		local closure = at(code, "local function shutdown_all_resources()")
+		local shutdown = at(code, "hs.shutdownCallback = shutdown_all_resources")
 
 		-- The callback names these directly. A closure written ABOVE the local it
 		-- uses silently binds a nil global instead, and the error surfaces only in
@@ -112,6 +113,8 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- a forward declaration satisfies exactly as an inline require does.
 		local required = {
 			"local karabiner",
+			"local LauncherGuard",
+			"local ok_lease_controller, LeaseController",
 			"local keymap",
 			"local gestures",
 			"local shortcuts",
@@ -126,7 +129,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 					.. "re-anchor this guard rather than dropping it")
 			if decl_at then
 				checked = checked + 1
-				helpers.assert_true(decl_at < shutdown,
+				helpers.assert_true(decl_at < closure,
 					"'" .. decl .. "' must be declared ABOVE the shutdown callback, which closes "
 						.. "over it. Below, the callback binds a nil global and the teardown fails "
 						.. "silently at the one moment nothing is watching the log")
@@ -135,20 +138,36 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		helpers.assert_eq(checked, #required, "every closed-over module must be checked")
 	end)
 
-	helpers.it("still tears down every subsystem", function()
+	helpers.it("retains complete controlled teardown without running it in native shutdown", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
-		local shutdown = at(code, "hs.shutdownCallback = function()")
-		local body = code:sub(shutdown, shutdown + 4000)
+		local teardown = at(code, "local function teardown_all_resources")
+		local shutdown = at(code, "local function shutdown_all_resources()")
+		local armed = at(code, "hs.shutdownCallback = shutdown_all_resources")
+		helpers.assert_true(teardown ~= nil and shutdown ~= nil and armed ~= nil)
+		local teardown_body = code:sub(teardown, shutdown - 1)
+		local shutdown_body = code:sub(shutdown, armed - 1)
 
 		-- Moving the assignment must not have moved a truncated copy of it: the
 		-- teardown is only worth arming early if it is still the whole teardown.
 		for _, step in ipairs({
 			"keymap.stop", "gestures.stop", "shortcuts.stop",
-			"restore_all_overrides", "karabiner.kill",
+			"LauncherGuard.stop",
+			"restore_all_overrides",
 			"terminate_helper_processes", "script_watchers",
 		}) do
-			helpers.assert_true(body:find(step, 1, true) ~= nil,
-				"the shutdown callback must still perform '" .. step .. "'")
+			helpers.assert_true(teardown_body:find(step, 1, true) ~= nil,
+				"the shared local teardown must still perform '" .. step .. "'")
 		end
+		helpers.assert_true(
+			teardown_body:find("TeardownTransaction.run(_local_teardown_state, steps)", 1, true) ~= nil,
+			"throws and explicit false results must remain visible and retryable per teardown step"
+		)
+		helpers.assert_true(teardown_body:find("_local_teardown_complete", 1, true) == nil,
+			"teardown must never certify itself before resource release has run")
+		helpers.assert_true(shutdown_body:find("request_exact_lease_revoke", 1, true) ~= nil,
+			"the armed callback must request the exact token fence")
+		helpers.assert_true(shutdown_body:find("teardown_all_resources", 1, true) == nil,
+			"the unawaitable callback must keep F17 consumers live until process EOF")
+		helpers.assert_true(shutdown_body:find("shortcuts.stop", 1, true) == nil)
 	end)
 end)

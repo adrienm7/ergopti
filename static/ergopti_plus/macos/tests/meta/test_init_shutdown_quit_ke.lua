@@ -1,50 +1,76 @@
 --- tests/meta/test_init_shutdown_quit_ke.lua
 
 --- ==============================================================================
---- MODULE: Regression — genuine-quit shutdown tears down KE robustly (F-HIGH-3)
+--- MODULE: Root Shutdown Revokes the Exact Karabiner Lease First
 --- DESCRIPTION:
---- On a genuine Cmd+Q quit the shutdown callback ran only KILL_FAST_CMD — a bare
---- pkill with no `launchctl bootout`. launchd's KeepAlive plist respawns the
---- bridge within milliseconds, so the keyboard stayed remapped after HS exited.
---- It also ran unconditionally, ignoring is_hs_owned_bridge, so a user-managed KE
---- was pkilled too. The robust teardown M.kill() (KILL_CMD bootout + ownership
---- gate) existed but was never wired into the shutdown callback.
----
---- Fix: the genuine-quit branch calls karabiner.kill(). This is the macOS twin of
---- project_hs_script_quit_kills_karabiner (the os.exit script_quit path was
---- already robust; the genuine-quit shutdown path was not).
----
---- init.lua boots the whole driver, so it cannot be required headlessly; this
---- test pins the root cause at the source level.
+--- Pins the root ordering and ownership boundary. Controlled reload/quit waits
+--- for the exact token fence; hs.shutdownCallback requests the same fence before
+--- native process exit and relies on native EOF when it cannot wait. The native
+--- callback must not dismantle F17 consumers before that fence.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("init.lua: genuine-quit shutdown KE teardown (F-HIGH-3)", function()
-	local function shutdown_region()
-		-- Selected by a declaration unique to init.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
-		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
-		-- The shutdownCallback closure ends at the first column-0 `end` (its own
-		-- nested if/pcall/for ends are all tab-indented).
-		local sc = src:match("hs%.shutdownCallback%s*=%s*function.-\nend")
-		helpers.assert_true(sc ~= nil, "shutdownCallback closure must be locatable")
-		return sc
-	end
+local function init_source()
+	local source, err = helpers.read_driver_unit("local function has_common_hotstring_groups")
+	helpers.assert_true(source ~= nil, "root init.lua must be unique: " .. tostring(err))
+	return source:gsub("%-%-[^\n]*", "")
+end
 
-	helpers.it("kills KE via karabiner.kill() (bootout), not a bare KILL_FAST_CMD pkill", function()
-		local sc = shutdown_region()
-		helpers.assert_true(sc:find("karabiner.kill()", 1, true) ~= nil,
-			"genuine-quit shutdown must call karabiner.kill() (launchctl bootout, respects is_hs_owned_bridge)")
-		helpers.assert_true(sc:find("hs.execute(kl.KILL_FAST_CMD)", 1, true) == nil,
-			"shutdown must NOT run the bare KILL_FAST_CMD pkill — launchd KeepAlive respawns it within ms")
+helpers.describe("init.lua shutdown uses exact Karabiner lease revocation", function()
+	helpers.it("keeps native reload recovery before the coordinator can own a lease", function()
+		local code = init_source()
+		local wrapper_at = code:find("hs.reload = function", 1, true)
+		local i18n_at = code:find("i18n.set_locale_injector", 1, true)
+		helpers.assert_true(wrapper_at ~= nil and i18n_at ~= nil and wrapper_at < i18n_at)
+		local body = code:sub(wrapper_at, i18n_at - 1)
+		local initialized_at = body:find("TerminationCoordinator.is_initialized", 1, true)
+		local native_at = body:find("return _native_hs_reload(...)", 1, true)
+		local coordinated_at = body:find('TerminationCoordinator.request_reload("hammerspoon_reload", ...)', 1, true)
+		helpers.assert_true(initialized_at ~= nil and native_at ~= nil and coordinated_at ~= nil)
+		helpers.assert_true(initialized_at < native_at and native_at < coordinated_at,
+			"boot errors must retain native reload before the exact lease coordinator is initialized")
 	end)
 
-	helpers.it("keeps the KE teardown gated to a genuine quit (never on reload)", function()
-		local sc = shutdown_region()
-		helpers.assert_true(sc:find("reload_guard.is_reloading()", 1, true) ~= nil,
-			"KE teardown must stay gated behind reload_guard.is_reloading() so a reload never tears KE down")
+	helpers.it("routes only through the remap lease API and controller fallback", function()
+		local code = init_source()
+		local revoke_at = code:find("local function request_exact_lease_revoke", 1, true)
+		local teardown_at = code:find("local function teardown_all_resources", 1, true)
+		helpers.assert_true(revoke_at ~= nil and teardown_at ~= nil and revoke_at < teardown_at)
+		local body = code:sub(revoke_at, teardown_at - 1)
+		helpers.assert_true(body:find("karabiner.revoke(reason, finish)", 1, true) ~= nil)
+		helpers.assert_true(body:find('LeaseController.stop(reason .. "_fallback", finish)', 1, true) ~= nil)
+		helpers.assert_true(body:find("LeaseController.is_initialized", 1, true) ~= nil,
+			"first-run reload must be allowed before any lease generation can exist")
+		helpers.assert_true(body:find("hs.execute", 1, true) == nil)
+		helpers.assert_true(body:find("KILL_CMD", 1, true) == nil)
+	end)
+
+	helpers.it("keeps native shutdown consumers live while requesting revocation", function()
+		local code = init_source()
+		local shutdown_at = code:find("local function shutdown_all_resources()", 1, true)
+		local armed_at = code:find("hs.shutdownCallback = shutdown_all_resources", 1, true)
+		helpers.assert_true(shutdown_at ~= nil and armed_at ~= nil)
+		local body = code:sub(shutdown_at, armed_at - 1)
+		local revoke_at = body:find("request_exact_lease_revoke(lease_reason", 1, true)
+		helpers.assert_true(revoke_at ~= nil, "native shutdown must request the exact fence")
+		helpers.assert_true(body:find("teardown_all_resources", 1, true) == nil,
+			"an unawaitable native callback must not tear down F17 consumers before EOF")
+		helpers.assert_true(body:find("shortcuts.stop", 1, true) == nil)
+		helpers.assert_true(body:find("terminate_helper_processes", 1, true) == nil)
+		helpers.assert_true(body:find('"hammerspoon_reload"', 1, true) ~= nil)
+		helpers.assert_true(body:find('"hammerspoon_quit"', 1, true) ~= nil)
+		helpers.assert_true(body:find("reload_guard.is_reloading()", 1, true) ~= nil)
+	end)
+
+	helpers.it("wires controlled terminal actions behind the shared exact fence", function()
+		local code = init_source()
+		local init_at = code:find("TerminationCoordinator.init", 1, true)
+		helpers.assert_true(init_at ~= nil)
+		local region = code:sub(init_at, init_at + 1400)
+		helpers.assert_true(region:find("request_lease = request_exact_lease_revoke", 1, true) ~= nil)
+		helpers.assert_true(region:find("teardown = teardown_all_resources", 1, true) ~= nil)
+		helpers.assert_true(region:find("reload = function", 1, true) ~= nil)
+		helpers.assert_true(region:find("exit = function", 1, true) ~= nil)
 	end)
 end)

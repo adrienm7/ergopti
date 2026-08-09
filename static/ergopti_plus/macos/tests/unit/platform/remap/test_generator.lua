@@ -50,6 +50,26 @@ package.loaded["infra.keycodes"] = {
 }
 
 local Generator = helpers.load_with_stubs("platform.remap.generator")
+local TEST_LEASE_TOKEN = "0123456789abcdef0123456789abcdef"
+local raw_build_karabiner_json = Generator.build_karabiner_json
+local raw_build_paused_script_control_rules = Generator.build_paused_script_control_rules
+
+-- Existing snapshot cases focus on their own rule shapes. The dedicated
+-- managed-lease suite tests the strict token boundary itself
+Generator.build_karabiner_json = function(state, actions, keys, combos, non_canonical, shared_dir)
+	return raw_build_karabiner_json(
+		state,
+		actions,
+		keys,
+		combos,
+		non_canonical,
+		shared_dir,
+		TEST_LEASE_TOKEN
+	)
+end
+Generator.build_paused_script_control_rules = function()
+	return raw_build_paused_script_control_rules(TEST_LEASE_TOKEN)
+end
 
 
 -- ---------------------------------------------------------------------------
@@ -124,34 +144,38 @@ helpers.describe("Generator.build_karabiner_json: structural skeleton", function
 		helpers.assert_eq(profile.name, "Default profile")
 	end)
 
-	helpers.it("complex_modifications contains parameters and rules", function()
+	helpers.it("complex_modifications contains managed rules without profile-global parameters", function()
 		local result = Generator.build_karabiner_json(
 			make_state(), {NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
 		)
 		local cm = result.profiles[1].complex_modifications
 		helpers.assert_true(type(cm) == "table", "complex_modifications must be a table")
-		helpers.assert_true(type(cm.parameters) == "table", "parameters must be a table")
 		helpers.assert_true(type(cm.rules) == "table", "rules must be a table")
+		helpers.assert_nil(cm.parameters,
+			"managed timings must not alter current or future personal rules at profile scope")
 	end)
 
-	helpers.it("parameters carry the configured timeout values", function()
+	helpers.it("managed tap rules carry the configured timeout locally", function()
 		local state = make_state({
 			tap_hold_timeout_ms       = 175,
 			simultaneous_threshold_ms = 80,
+			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
 		})
 		local result = Generator.build_karabiner_json(
-			state, {NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
 		)
-		local params = result.profiles[1].complex_modifications.parameters
+		local timed_manipulator = nil
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if rule.description:find("Right Command", 1, true) then
+				timed_manipulator = rule.manipulators[1]
+				break
+			end
+		end
+		helpers.assert_not_nil(timed_manipulator, "managed tap/hold rule must exist")
 		helpers.assert_eq(
-			params["basic.to_if_alone_timeout_milliseconds"],
+			timed_manipulator.parameters["basic.to_if_alone_timeout_milliseconds"],
 			175,
-			"tap/hold timeout"
-		)
-		helpers.assert_eq(
-			params["basic.simultaneous_threshold_milliseconds"],
-			80,
-			"simultaneous threshold"
+			"tap/hold timeout must be local to the managed manipulator"
 		)
 	end)
 
@@ -309,8 +333,9 @@ end)
 -- Karabiner honours basic.to_if_alone_timeout_milliseconds at the manipulator
 -- level, overriding the complex_modifications global. The per-key feature stores
 -- an optional timeout_ms on the tap_hold_config entry; when set, the generator
--- must emit it as a manipulator-level parameter, and when unset/non-positive it
--- must emit nothing so the key inherits the single global value (no duplication).
+-- must emit it as a manipulator-level parameter. The generation lease merge
+-- preserves the user's profile-level parameters, so an unset/non-positive
+-- override copies the ErgoptiPlus global value onto the managed manipulator
 helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout override", function()
 	local function rcmd_manipulator(result)
 		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
@@ -335,7 +360,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 			"per-key timeout must override the global at the manipulator level")
 	end)
 
-	helpers.it("omits per-manipulator parameters when no per-key timeout is set (inherits global)", function()
+	helpers.it("copies the managed default when no per-key timeout is set", function()
 		local state = make_state({
 			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
 		})
@@ -344,10 +369,11 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 		)
 		local m = rcmd_manipulator(result)
 		helpers.assert_true(m ~= nil, "expected a Right Command manipulator")
-		helpers.assert_nil(m.parameters, "no per-key parameters when the key inherits the global timeout")
+		helpers.assert_eq(m.parameters["basic.to_if_alone_timeout_milliseconds"], 200,
+			"managed rule must not depend on a preserved personal profile-level timeout")
 	end)
 
-	helpers.it("treats a non-positive per-key timeout as 'inherit global' (no override emitted)", function()
+	helpers.it("treats a non-positive per-key timeout as the managed default", function()
 		local state = make_state({
 			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 0 } },
 		})
@@ -355,10 +381,11 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
 		)
 		local m = rcmd_manipulator(result)
-		helpers.assert_nil(m.parameters, "timeout_ms <= 0 must clear to the global, emitting no override")
+		helpers.assert_eq(m.parameters["basic.to_if_alone_timeout_milliseconds"], 200,
+			"timeout_ms <= 0 must resolve to the managed default at manipulator scope")
 	end)
 
-	helpers.it("keeps the global complex_modifications timeout as the default for other keys", function()
+	helpers.it("does not emit a profile-global timeout beside a per-key override", function()
 		local state = make_state({
 			tap_hold_timeout_ms = 250,
 			tap_hold_config     = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
@@ -366,10 +393,8 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
 		)
-		-- The per-key override does not disturb the global parameter block.
-		helpers.assert_eq(
-			result.profiles[1].complex_modifications.parameters["basic.to_if_alone_timeout_milliseconds"],
-			250, "global timeout stays the inherited default")
+		helpers.assert_nil(result.profiles[1].complex_modifications.parameters,
+			"profile-global timings would also affect personal rules added later")
 	end)
 end)
 
@@ -398,21 +423,28 @@ helpers.describe("Generator.merge_into_existing_config: no existing file", funct
 		local result = Generator.merge_into_existing_config(hs_config, "/nonexistent/karabiner.json")
 		helpers.assert_true(type(result) == "table", "must return a table")
 		helpers.assert_true(type(result.profiles) == "table", "must have profiles")
-		-- Headless global flags must be enforced even on fresh configs
-		helpers.assert_true(type(result.global) == "table", "global section must be injected")
-		helpers.assert_eq(result.global.show_in_menu_bar, false)
+		helpers.assert_nil(result.global,
+			"a fresh managed config must not invent stock Karabiner UI preferences")
 	end)
 end)
 
 helpers.describe("Generator.merge_into_existing_config: existing file preservation", function()
-	helpers.it("overwrites only complex_modifications, preserving other fields", function()
+	helpers.it("replaces only managed rules while preserving every personal field", function()
 		-- Provide a fake existing karabiner.json via the FileSystem stub.
 		local existing_path = "/fake/karabiner.json"
 		local existing_config = {
-			global   = { show_in_menu_bar = true },  -- should be overridden to false
+			global   = { show_in_menu_bar = true, ask_for_confirmation_before_quitting = true },
 			profiles = {
 				{
-					complex_modifications = { parameters = {}, rules = {} },
+					complex_modifications = {
+						parameters = { personal_parameter = 777 },
+						rules = {
+							{
+								description = "Personal rule",
+								manipulators = { { type = "basic" } },
+							},
+						},
+					},
 					devices               = { { identifiers = { is_keyboard = true } } },
 					fn_function_keys      = { { from = { key_code = "f1" } } },
 					name                  = "My Custom Profile",
@@ -425,7 +457,18 @@ helpers.describe("Generator.merge_into_existing_config: existing file preservati
 		_fs_data[existing_path] = _G.hs.json.encode(existing_config)
 
 		local new_rules = {
-			{ description = "New rule", manipulators = { { type = "basic" } } },
+			{
+				description = "[ErgoptiPlus managed:" .. TEST_LEASE_TOKEN .. ":normal] New rule",
+				manipulators = {
+					{
+						type = "basic",
+						conditions = {
+							{ type = "variable_if", name = "ergopti_mode_" .. TEST_LEASE_TOKEN, value = 1 },
+							{ type = "variable_if", name = "ergopti_revoked_" .. TEST_LEASE_TOKEN, value = 0 },
+						},
+					},
+				},
+			},
 		}
 		local hs_config = {
 			profiles = {
@@ -454,23 +497,24 @@ helpers.describe("Generator.merge_into_existing_config: existing file preservati
 			"fn_function_keys must be preserved"
 		)
 
-		-- complex_modifications must be the new one
+		-- Personal rules stay first and the managed block is appended
 		local cm = result.profiles[1].complex_modifications
 		helpers.assert_true(type(cm) == "table", "complex_modifications must be a table")
-		helpers.assert_eq(#cm.rules, 1, "rules count must match hs_config")
-		helpers.assert_eq(
-			cm.parameters["basic.to_if_alone_timeout_milliseconds"],
-			200,
-			"parameters must come from hs_config"
-		)
+		helpers.assert_eq(#cm.rules, 2, "personal and managed rules must coexist")
+		helpers.assert_eq(cm.rules[1].description, "Personal rule")
+		helpers.assert_true(cm.rules[2].description:find("New rule", 1, true) ~= nil)
+		helpers.assert_eq(cm.parameters.personal_parameter, 777,
+			"complex-modification parameters must remain personal")
+		helpers.assert_nil(cm.parameters["basic.to_if_alone_timeout_milliseconds"],
+			"generated profile parameters must not replace personal parameters")
 
-		-- Headless global flags
-		helpers.assert_eq(result.global.show_in_menu_bar, false, "show_in_menu_bar must be forced to false")
-		helpers.assert_eq(result.global.ask_for_confirmation_before_quitting, false)
-		helpers.assert_eq(result.global.check_for_updates_on_startup, false)
+		-- Stock Karabiner UI preferences belong to the user
+		helpers.assert_eq(result.global.show_in_menu_bar, true)
+		helpers.assert_eq(result.global.ask_for_confirmation_before_quitting, true)
+		helpers.assert_nil(result.global.check_for_updates_on_startup)
 	end)
 
-	helpers.it("falls back to hs_config when existing JSON is invalid", function()
+	helpers.it("fails closed when existing JSON is invalid", function()
 		local bad_path = "/fake/corrupt.json"
 		_fs_data[bad_path] = "{ this is not valid json !!!"
 
@@ -483,10 +527,9 @@ helpers.describe("Generator.merge_into_existing_config: existing file preservati
 				}
 			}
 		}
-		local result = Generator.merge_into_existing_config(hs_config, bad_path)
-		helpers.assert_true(type(result) == "table")
-		helpers.assert_eq(result.profiles[1].name, "Default profile",
-			"must fall back to hs_config profile name on corrupt existing file")
+		local result, err = Generator.merge_into_existing_config(hs_config, bad_path)
+		helpers.assert_nil(result, "corrupt personal JSON must never be overwritten")
+		helpers.assert_true(type(err) == "string" and err:find("JSON", 1, true) ~= nil)
 	end)
 end)
 
@@ -532,7 +575,7 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 	-- longer produced the F13/F14/F15 sentinel and the user could not un-pause from
 	-- the keyboard. These self-contained, modifier-gated rules are now retained in
 	-- the paused config so the script-management shortcuts stay exempt from pause.
-	local rules = Generator.build_paused_script_control_rules()
+		local rules = Generator.build_paused_script_control_rules(TEST_LEASE_TOKEN)
 
 	helpers.it("emits 3 rules — one per script-control slot", function()
 		-- While paused the remap is off, so the user reaches these with the REAL option
@@ -543,13 +586,20 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		helpers.assert_eq(#rules, 3)
 	end)
 
-	helpers.it("each rule is self-contained: option-gated, NO variable_if condition", function()
-		-- The paused config strips the holder tap/hold rule, so the sentinels must NOT
-		-- depend on ke_held_* — they gate directly on the real option key.
+	helpers.it("each rule is option-gated with the exact generation fence variables", function()
+		-- Pause disables the normal holder rule, so pause-only sentinels must not
+		-- depend on ke_held_* — they gate directly on the real option key
 		for _, rule in ipairs(rules) do
 			local m = rule.manipulators[1]
 			helpers.assert_true(type(m) == "table", "rule must have a manipulator")
-			helpers.assert_nil(m.conditions, "paused rule must not use a variable_if holder condition")
+			local condition_values = {}
+			for _, condition in ipairs(m.conditions or {}) do
+				condition_values[condition.name] = condition.value
+				helpers.assert_true(condition.name ~= "ke_held_right_command",
+					"paused rule must not depend on the stripped holder rule")
+			end
+			helpers.assert_eq(condition_values["ergopti_mode_" .. TEST_LEASE_TOKEN], 2)
+			helpers.assert_eq(condition_values["ergopti_revoked_" .. TEST_LEASE_TOKEN], 0)
 			helpers.assert_true(type(m.from.modifiers) == "table"
 				and type(m.from.modifiers.mandatory) == "table"
 				and #m.from.modifiers.mandatory == 1

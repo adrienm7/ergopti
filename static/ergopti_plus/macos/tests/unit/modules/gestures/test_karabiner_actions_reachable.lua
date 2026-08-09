@@ -17,7 +17,7 @@
 --- observable:
 ---   keystrokes        — callback-returned exact-tag action pairs
 ---   Karabiner writes  — layer_on / layer_off / capsword go out over
----                       `karabiner_cli --set-variable`, the only IPC that exists
+---                       the serialized Karabiner variable bridge
 ---   sticky modifiers  — the 15 sticky_* arm the injector, since
 ---                       `sticky_modifier` has no IPC at all
 ---
@@ -46,20 +46,40 @@ local STICKY_TIMEOUT_MS = 2500
 
 --- Loads the registry with the two lazily-required collaborators stubbed, and
 --- returns recorders for everything a handler can observably do.
+--- @param variable_write_result boolean|nil Result returned by the variable bridge.
 --- @return table Actions module, table recorder.
-local function fresh_registry()
-	local seen = { variables = {}, sticky = {}, capslock = nil }
+local function fresh_registry(variable_write_result)
+	local seen = {
+		variables = {},
+		sticky = {},
+		capslock = nil,
+		current_revision = 0,
+		lease_phase = "active",
+	}
+	if variable_write_result == nil then variable_write_result = true end
+	function seen.complete(index, ok, reason)
+		local write = seen.variables[index]
+		helpers.assert_true(type(write) == "table" and type(write.callback) == "function",
+			"the write must expose its real asynchronous settlement callback")
+		write.callback(ok, reason or (ok and "written" or "failed"), write.revision)
+	end
 
 	package.loaded["platform.remap.ke_variables"] = {
-		set = function(name, value)
-			seen.variables[#seen.variables + 1] = { name = name, value = value }
-			return true
+		set = function(name, value, callback)
+			seen.current_revision = seen.current_revision + 1
+			seen.variables[#seen.variables + 1] = {
+				name = name,
+				value = value,
+				callback = callback,
+				revision = seen.current_revision,
+			}
+			return variable_write_result, seen.current_revision
 		end,
-		set_all = function(pairs_list)
-			for _, entry in ipairs(pairs_list) do
-				seen.variables[#seen.variables + 1] = { name = entry[1], value = entry[2] }
-			end
-			return true
+		capsword_revision = function() return seen.current_revision end,
+	}
+	package.loaded["platform.remap.lease_controller"] = {
+		status = function()
+			return seen.lease_phase, { phase = seen.lease_phase, token = "test-token" }
 		end,
 	}
 	package.loaded["platform.remap"] = {
@@ -179,16 +199,55 @@ helpers.describe("Karabiner catalogue actions: engine variables", function()
 		helpers.assert_eq(seen.variables[1].value, 0)
 	end)
 
-	helpers.it("capsword sets the variable AND locks CapsLock", function()
+	helpers.it("capsword locks CapsLock only after the variable write settles", function()
 		local Actions, seen = fresh_registry()
 		helpers.assert_true(Actions.execute_single("capsword"))
 		helpers.assert_eq(#seen.variables, 1)
 		helpers.assert_eq(seen.variables[1].name, "capsword")
 		helpers.assert_eq(seen.variables[1].value, 1)
+		helpers.assert_eq(seen.capslock, nil,
+			"acceptance only means the asynchronous CLI write was queued")
+		seen.complete(1, true)
 		helpers.assert_eq(seen.capslock, true,
-			"the catalogue entry presses caps_lock as well as setting the variable. macOS "
+			"the catalogue entry locks CapsLock after setting the variable. macOS "
 			.. "delivers CapsLock as flagsChanged, so a keystroke would fail silently — the "
 			.. "variable would be set with no visible effect and CapsWord would look broken")
+	end)
+
+	helpers.it("capsword leaves CapsLock unchanged when the variable write is refused", function()
+		local Actions, seen = fresh_registry(false)
+		helpers.assert_true(Actions.execute_single("capsword"))
+		helpers.assert_eq(#seen.variables, 1,
+			"the gesture must ask the lease-gated bridge to activate CapsWord")
+		helpers.assert_eq(seen.capslock, nil,
+			"an idle or disabled lease refuses the variable write; locking CapsLock anyway would "
+			.. "expose a partial Ergopti feature while the remap layer is off")
+	end)
+
+	helpers.it("capsword leaves CapsLock unchanged when an accepted write fails", function()
+		local Actions, seen = fresh_registry()
+		helpers.assert_true(Actions.execute_single("capsword"))
+		seen.complete(1, false, "nonzero-exit")
+		helpers.assert_eq(seen.capslock, nil,
+			"a queued write is not an activation; the LED must follow the settled engine state")
+	end)
+
+	helpers.it("capsword discards a successful callback superseded by newer intent", function()
+		local Actions, seen = fresh_registry()
+		helpers.assert_true(Actions.execute_single("capsword"))
+		seen.current_revision = seen.current_revision + 1
+		seen.complete(1, true)
+		helpers.assert_eq(seen.capslock, nil,
+			"an older successful child must not turn CapsLock on after a newer clear")
+	end)
+
+	helpers.it("capsword discards a successful callback after the lease pauses", function()
+		local Actions, seen = fresh_registry()
+		helpers.assert_true(Actions.execute_single("capsword"))
+		seen.lease_phase = "paused"
+		seen.complete(1, true)
+		helpers.assert_eq(seen.capslock, nil,
+			"pause must not expose a half-active ErgoptiPlus feature through the system LED")
 	end)
 
 end)

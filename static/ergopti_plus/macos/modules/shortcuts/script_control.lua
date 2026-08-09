@@ -81,6 +81,9 @@ local TAP_WATCHDOG_INTERVAL_SEC = 2
 
 -- Module-level state
 local _is_paused       = false
+local _pause_transition = nil
+local _queued_pause_target = nil
+local _pause_transition_serial = 0
 local _tap             = nil
 local _tap_watchdog    = nil
 local _key_actions     = {return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit"}
@@ -257,48 +260,119 @@ local function pause_all()
 	elseif _gestures and type(_gestures.disable_all) == "function" then
 		pcall(function() _gestures.disable_all() end)
 	end
-	-- Deferred for the same reason schedule_pause_layout_switch is: pause_all() runs
-	-- SYNCHRONOUSLY inside the script-control eventtap callback, and karabiner.pause()
-	-- encodes and writes a 100 kB+ karabiner.json (plus a /bin/mkdir subprocess on the
-	-- fallback path). Blocking the tap that long lets macOS disable it with
-	-- kCGEventTapDisabledByTimeout — which kills AltGr+Enter itself, leaving the user
-	-- unable to un-pause. This is the last step of pause_all(), so deferring it
-	-- reorders nothing.
-	if _karabiner and type(_karabiner.pause) == "function" then
-		hs.timer.doAfter(0, function() pcall(function() _karabiner.pause() end) end)
-	end
 end
 
---- Resumes all registered modules gracefully.
---- Only re-enables sub-systems that were active before pause_all() was called.
-local function resume_all()
-	if _keymap and type(_keymap.resume_processing) == "function" then
-		pcall(function() _keymap.resume_processing() end)
+--- Calls one resume or rollback operation without swallowing a thrown error or
+--- an explicit false result. Legacy lifecycle functions return nil on success,
+--- so only the explicit false sentinel is a rejected operation.
+--- @param label string Stable operation name for diagnostics.
+--- @param action function Operation to call.
+--- @return boolean ok
+--- @return string|nil reason
+local function call_resume_operation(label, action)
+	local ok_call, result, detail = pcall(action)
+	if not ok_call then
+		return false, string.format("%s raised: %s", label, tostring(result))
 	end
-	if _shortcuts_were_running then
-		if _shortcuts and type(_shortcuts.resume_bindings) == "function" then
-			pcall(function() _shortcuts.resume_bindings() end)
-		elseif _shortcuts and type(_shortcuts.start) == "function" then
-			pcall(function() _shortcuts.start() end)
+	if result == false then
+		return false, string.format("%s returned false: %s", label, tostring(detail))
+	end
+	return true, nil
+end
+
+--- Rolls back every resume operation that could already have mutated state.
+--- The failing operation itself is included because it may mutate before it
+--- throws or returns false. Inverses run in strict reverse order.
+--- @param applied table[] Applied resume descriptors.
+--- @return string|nil Joined rollback failures, if any.
+local function rollback_resume_operations(applied)
+	local failures = {}
+	for index = #applied, 1, -1 do
+		local step = applied[index]
+		local ok_rollback, rollback_reason = call_resume_operation(
+			step.label .. " rollback",
+			step.rollback
+		)
+		if not ok_rollback then
+			failures[#failures + 1] = rollback_reason
+			Logger.error(LOG, "Resume rollback failed: %s.", tostring(rollback_reason))
 		end
+	end
+	if #failures == 0 then return nil end
+	return table.concat(failures, "; ")
+end
+
+--- Resumes all registered modules as one local transaction.
+--- Only re-enables sub-systems that were active before pause_all() was called.
+--- @return boolean True only when every required activation committed.
+--- @return string|nil Failure detail.
+local function resume_all()
+	-- The public API is deliberately safe before M.start() (covered by
+	-- test_script_control.lua). Optional lazy modules are still re-armed there,
+	-- but only an initialized driver has local activation state to roll back.
+	local enforce_transaction = _tap ~= nil
+	local steps = {}
+
+	local function add_reversible_step(label, action, rollback)
+		if type(action) ~= "function" then return true, nil end
+		if type(rollback) ~= "function" then
+			return false, label .. " has no inverse rollback"
+		end
+		steps[#steps + 1] = { label = label, action = action, rollback = rollback }
+		return true, nil
+	end
+
+	local ok_step, step_reason = add_reversible_step(
+		"keymap.resume_processing",
+		_keymap and _keymap.resume_processing,
+		_keymap and _keymap.pause_processing
+	)
+	if not ok_step then return false, step_reason end
+
+	if _shortcuts_were_running then
+		local shortcut_action = _shortcuts and (
+			type(_shortcuts.resume_bindings) == "function" and _shortcuts.resume_bindings
+			or _shortcuts.start
+		) or nil
+		local shortcut_label = _shortcuts and type(_shortcuts.resume_bindings) == "function"
+			and "shortcuts.resume_bindings" or "shortcuts.start"
+		local shortcut_rollback = _shortcuts and (
+			type(_shortcuts.pause_bindings) == "function" and _shortcuts.pause_bindings
+			or _shortcuts.stop
+		) or nil
+		if type(shortcut_action) ~= "function" then
+			return false, "shortcuts resume API unavailable"
+		end
+		ok_step, step_reason = add_reversible_step(
+			shortcut_label,
+			shortcut_action,
+			shortcut_rollback
+		)
+		if not ok_step then return false, step_reason end
 	end
 	-- resume() clears CoreState.suspended so the engine gate re-uses
 	-- CoreState.enabled (the user feature flag). No snapshot needed: whatever
 	-- the user toggled during pause is already in enabled, and resume never
 	-- overrides it.
 	if _gestures and type(_gestures.resume) == "function" then
-		pcall(function() _gestures.resume() end)
+		local gesture_rollback = type(_gestures.suspend) == "function"
+			and _gestures.suspend or _gestures.disable_all
+		ok_step, step_reason = add_reversible_step(
+			"gestures.resume",
+			_gestures.resume,
+			gesture_rollback
+		)
+		if not ok_step then return false, step_reason end
 	elseif _gestures_were_enabled then
-		if _gestures and type(_gestures.enable_all) == "function" then
-			pcall(function() _gestures.enable_all() end)
+		if not _gestures or type(_gestures.enable_all) ~= "function" then
+			return false, "gestures enable API unavailable"
 		end
-	end
-	-- Deferred for the same reason as the pause side, and more urgently: resume()
-	-- calls regenerate(), which rebuilds the FULL Ergopti config rather than the
-	-- reduced paused one, so it is the heavier of the two. Nothing below depends on
-	-- the redeploy having landed.
-	if _karabiner and type(_karabiner.resume) == "function" then
-		hs.timer.doAfter(0, function() pcall(function() _karabiner.resume() end) end)
+		ok_step, step_reason = add_reversible_step(
+			"gestures.enable_all",
+			_gestures.enable_all,
+			_gestures.disable_all
+		)
+		if not ok_step then return false, step_reason end
 	end
 	-- Symmetric to the pause-side stop_warmup()/wc.stop() pair: re-arm both warmup
 	-- drivers. resume_warmup() clears the _warmup_stopped short-circuit so that
@@ -307,12 +381,34 @@ local function resume_all()
 	-- backend is already ready — so it never fires from anything but a genuinely cold,
 	-- enabled backend (never from profile restoration alone).
 	local ok_api, api = pcall(require, "modules.llm.api_mlx")
-	if ok_api and api and type(api.resume_warmup) == "function" then
-		pcall(function() api.resume_warmup() end)
+	if not ok_api then
+		if enforce_transaction then
+			return false, "require(modules.llm.api_mlx) raised: " .. tostring(api)
+		end
+		api = nil
+	end
+	if api and type(api.resume_warmup) == "function" then
+		ok_step, step_reason = add_reversible_step(
+			"api_mlx.resume_warmup",
+			api.resume_warmup,
+			api.stop_warmup
+		)
+		if not ok_step then return false, step_reason end
 	end
 	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
-	if ok_wc and wc and type(wc.schedule_warmup_with_retry) == "function" then
-		pcall(function() wc.schedule_warmup_with_retry("script resume") end)
+	if not ok_wc then
+		if enforce_transaction then
+			return false, "require(modules.llm.warmup_controller) raised: " .. tostring(wc)
+		end
+		wc = nil
+	end
+	if wc and type(wc.schedule_warmup_with_retry) == "function" then
+		ok_step, step_reason = add_reversible_step(
+			"warmup_controller.schedule_warmup_with_retry",
+			function() return wc.schedule_warmup_with_retry("script resume") end,
+			wc.stop
+		)
+		if not ok_step then return false, step_reason end
 	end
 	-- The context tracker is pause-gated at its entry points, so an app switch made
 	-- DURING the pause never updated the cached context and nothing else re-syncs it:
@@ -321,10 +417,278 @@ local function resume_all()
 	-- weakening the pause guard, so « pause = tout éteint » still holds exactly.
 	-- Lazy require, like the two warmup drivers above: script_control is not wired to
 	-- the keylogger module and does not need to be for a one-shot resume call.
+	-- This one-shot refresh is deliberately best-effort: metrics OFF leaves the
+	-- keylogger uninitialized, and resync_context() then returns false even though
+	-- resume is otherwise valid. It activates nothing and therefore needs no inverse.
 	local ok_kl, kl = pcall(require, "modules.keylogger")
-	if ok_kl and kl and type(kl.resync_context) == "function" then
-		pcall(function() kl.resync_context() end)
+	if not ok_kl then
+		Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
+			"require(modules.keylogger) raised: " .. tostring(kl))
+		kl = nil
 	end
+	if kl and type(kl.resync_context) == "function" then
+		steps[#steps + 1] = {
+			label = "keylogger.resync_context",
+			action = kl.resync_context,
+			rollback = nil,
+			best_effort = true,
+		}
+	end
+
+	local applied = {}
+	for _, step in ipairs(steps) do
+		-- Register the inverse before calling the operation: a throwing function
+		-- can already have mutated its first field before raising.
+		if step.rollback then applied[#applied + 1] = step end
+		local ok_action, action_reason = call_resume_operation(step.label, step.action)
+		if not ok_action then
+			if step.best_effort then
+				Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
+					tostring(action_reason))
+			elseif not enforce_transaction then
+				Logger.warn(LOG, "Pre-start resume operation ignored: %s.", tostring(action_reason))
+			else
+				local rollback_reason = rollback_resume_operations(applied)
+				if rollback_reason then
+					action_reason = action_reason .. "; rollback failures: " .. rollback_reason
+				end
+				return false, action_reason
+			end
+		end
+	end
+	return true, nil
+end
+
+--- Returns the most recent requested pause state, including a queued reversal.
+--- @return boolean Desired pause state.
+local function desired_pause_state()
+	if _queued_pause_target ~= nil then return _queued_pause_target end
+	if _pause_transition then return _pause_transition.target end
+	return _is_paused
+end
+
+--- Publishes one already-committed pause state to listeners and the user.
+--- @param target_paused boolean Settled pause state.
+local function publish_pause_state(target_paused)
+	if type(_on_pause_change) == "function" then
+		local ok_listener, listener_err = pcall(_on_pause_change, target_paused)
+		if not ok_listener then
+			Logger.error(LOG, "Pause-change listener failed after commit: %s.", tostring(listener_err))
+		end
+	end
+	if target_paused then
+		notifications.notify(i18n.get("script_control.paused"), nil, "warning")
+	else
+		notifications.notify(i18n.get("script_control.resumed"), nil, "success")
+	end
+end
+
+--- Commits one Hammerspoon-side pause state. Resume remains privately paused
+--- until every local activation step succeeds; a failed step rolls all earlier
+--- steps back and returns without notifying listeners or the user.
+--- @param target_paused boolean Settled pause state.
+--- @return boolean committed
+--- @return string|nil reason
+local function commit_pause_state(target_paused)
+	if _is_paused == target_paused then return true, nil end
+	if target_paused then
+		_is_paused = true
+		Logger.info(LOG, "Pausing all script operations after PAUSED acknowledgement.")
+		pause_all()
+	else
+		Logger.info(LOG, "Resuming all script operations after Karabiner regeneration committed.")
+		local ok_resume, resume_reason = resume_all()
+		if not ok_resume then return false, resume_reason end
+		_is_paused = false
+	end
+	publish_pause_state(target_paused)
+	return true, nil
+end
+
+--- Surfaces a failed native transition without changing the last settled state.
+--- @param target_paused boolean Requested pause state.
+--- @param reason any Failure detail for logs.
+local function report_pause_transition_failure(target_paused, reason)
+	local operation = target_paused and "pause" or "resume"
+	Logger.error(LOG, "Script %s transaction failed; settled state preserved: %s.",
+		operation, tostring(reason))
+	local key = target_paused and "script_control.pause_failed" or "script_control.resume_failed"
+	notifications.notify(i18n.get(key), nil, "error")
+end
+
+local request_pause_transition
+
+--- Completes one request once and then applies the latest queued user intent.
+--- @param transaction table Captured transition descriptor.
+--- @param ok boolean Whether the complete transaction committed.
+--- @param reason any Failure detail.
+local function complete_pause_transition(transaction, ok, reason)
+	if _pause_transition ~= transaction then return end
+	_pause_transition = nil
+	if ok ~= true then
+		report_pause_transition_failure(transaction.target, reason)
+	end
+
+	local queued = _queued_pause_target
+	_queued_pause_target = nil
+	if queued ~= nil and queued ~= _is_paused then
+		request_pause_transition(queued)
+	end
+end
+
+--- Restores native PAUSED after a local Hammerspoon resume step failed. The
+--- failure remains unpublished until the platform layer reports PAUSED or a
+--- fail-closed fence/no-live-lease result through the callback.
+--- @param transaction table Captured resume transaction.
+--- @param resume_reason string Local root-cause detail.
+local function rollback_native_resume(transaction, resume_reason)
+	if _pause_transition ~= transaction then return end
+	transaction.stage = "native-resume-rollback"
+	Logger.error(LOG, "Local resume activation failed; restoring native PAUSED before publication: %s.",
+		tostring(resume_reason))
+	local method = _karabiner and _karabiner.pause or nil
+	if type(method) ~= "function" then
+		Logger.error(LOG,
+			"Local resume failed (%s), but native re-pause API is unavailable; failure remains unpublished.",
+			tostring(resume_reason))
+		return
+	end
+
+	local callback_fired = false
+	local function finish_rollback(ok, rollback_reason)
+		if callback_fired then return end
+		callback_fired = true
+		if _pause_transition ~= transaction then return end
+		local final_reason = resume_reason
+		if ok ~= true then
+			-- The platform contract settles a failed pause callback only after the
+			-- exact lease has been fenced or when no live lease exists.
+			final_reason = string.format("%s; native re-pause settled fail-closed: %s",
+				tostring(resume_reason), tostring(rollback_reason))
+		end
+		complete_pause_transition(transaction, false, final_reason)
+	end
+
+	local ok_call, accepted_or_err = pcall(method, finish_rollback)
+	if not ok_call then
+		Logger.error(LOG,
+			"Local resume failed (%s), and native re-pause raised (%s); failure remains unpublished.",
+			tostring(resume_reason), tostring(accepted_or_err))
+	elseif accepted_or_err ~= true and not callback_fired then
+		Logger.error(LOG,
+			"Local resume failed (%s), and native re-pause was rejected without a safety callback; failure remains unpublished.",
+			tostring(resume_reason))
+	end
+end
+
+--- Handles the native result, then commits the Hammerspoon half atomically.
+--- @param transaction table Captured transition descriptor.
+--- @param ok boolean Whether the native transaction committed.
+--- @param reason any Controller result detail.
+local function settle_pause_transition(transaction, ok, reason)
+	if _pause_transition ~= transaction then return end
+	if transaction.stage == "native-resume-rollback" then return end
+	if ok ~= true then
+		complete_pause_transition(transaction, false, reason)
+		return
+	end
+
+	local committed, commit_reason = commit_pause_state(transaction.target)
+	if committed then
+		complete_pause_transition(transaction, true, reason)
+	elseif transaction.target == false then
+		rollback_native_resume(transaction, commit_reason)
+	else
+		complete_pause_transition(transaction, false, commit_reason)
+	end
+end
+
+--- Calls the asynchronous Karabiner transition outside the eventtap callback.
+--- @param transaction table Captured transition descriptor.
+local function dispatch_native_pause_transition(transaction)
+	if _pause_transition ~= transaction then return end
+	transaction.timer = nil
+	local method_name = transaction.target and "pause" or "resume"
+	local method = _karabiner and _karabiner[method_name] or nil
+	if type(method) ~= "function" then
+		settle_pause_transition(transaction, false, "Karabiner transition API unavailable")
+		return
+	end
+
+	local callback_fired = false
+	local ok_call, accepted_or_err = pcall(method, function(ok, reason)
+		if callback_fired then return end
+		callback_fired = true
+		settle_pause_transition(transaction, ok == true, reason)
+	end)
+	if not ok_call then
+		settle_pause_transition(transaction, false, accepted_or_err)
+	elseif accepted_or_err ~= true and not callback_fired then
+		settle_pause_transition(transaction, false, "Karabiner transition request rejected")
+	end
+end
+
+--- Requests a transactional pause-state change.
+---
+--- PAUSED is the pause commit point. Resume commits later: only after RESUMED,
+--- config regeneration/publication and lease-bound input startup all succeed.
+--- Until the relevant completion callback, is_paused(), listeners, notifications
+--- and every Hammerspoon submodule retain their last settled state. Requests are
+--- deferred so the physical shortcut's eventtap can always return immediately,
+--- and a second toggle is coalesced as latest intent.
+--- @param target_paused boolean Desired state.
+--- @return boolean True when accepted or already satisfied.
+request_pause_transition = function(target_paused)
+	target_paused = target_paused == true
+	if _pause_transition then
+		local desired = desired_pause_state()
+		if desired ~= target_paused then
+			_queued_pause_target = target_paused
+			Logger.debug(LOG, "Queued script pause target: %s.", tostring(target_paused))
+		end
+		return true
+	end
+	if _is_paused == target_paused then return true end
+
+	local integration_enabled = false
+	if _karabiner and type(_karabiner.get_enabled) ~= "function" then
+		report_pause_transition_failure(target_paused, "Karabiner enabled-state API unavailable")
+		return false
+	end
+	if _karabiner then
+		local ok_enabled, enabled_or_err = pcall(_karabiner.get_enabled)
+		if not ok_enabled then
+			report_pause_transition_failure(target_paused, enabled_or_err)
+			return false
+		end
+		integration_enabled = enabled_or_err == true
+	end
+	if not integration_enabled then
+		local committed, commit_reason = commit_pause_state(target_paused)
+		if not committed then
+			report_pause_transition_failure(target_paused, commit_reason)
+			return false
+		end
+		return true
+	end
+
+	_pause_transition_serial = _pause_transition_serial + 1
+	local transaction = {
+		id = _pause_transition_serial,
+		target = target_paused,
+		timer = nil,
+	}
+	_pause_transition = transaction
+	local ok_timer, timer_or_err = pcall(hs.timer.doAfter, 0, function()
+		dispatch_native_pause_transition(transaction)
+	end)
+	if not ok_timer or not timer_or_err then
+		settle_pause_transition(transaction, false,
+			ok_timer and "could not schedule native transition" or timer_or_err)
+		return false
+	end
+	transaction.timer = timer_or_err
+	return true
 end
 
 --- Dispatches a configured action by its identifier.
@@ -348,21 +712,9 @@ local function dispatch_action(action, binding)
 	if type(action) ~= "string" or action == "none" or action == "--" then return false end
 
 	if action == "script_pause_toggle" then
-		_is_paused = not _is_paused
-
-		if type(_on_pause_change) == "function" then
-			pcall(_on_pause_change, _is_paused)
-		end
-
-		if _is_paused then
-			Logger.info(LOG, "Pausing all script operations.")
-			pause_all()
-			notifications.notify(i18n.get("script_control.paused"), nil, "warning")
-		else
-			Logger.info(LOG, "Resuming all script operations.")
-			resume_all()
-			notifications.notify(i18n.get("script_control.resumed"), nil, "success")
-		end
+		local target_paused = not desired_pause_state()
+		Logger.info(LOG, "Requesting script %s transaction.", target_paused and "pause" or "resume")
+		request_pause_transition(target_paused)
 		return true
 	end
 
@@ -565,6 +917,12 @@ end
 
 --- Stops the script-control eventtap.
 function M.stop()
+	if _pause_transition and _pause_transition.timer then
+		pcall(function() _pause_transition.timer:stop() end)
+	end
+	_pause_transition = nil
+	_queued_pause_target = nil
+	_pause_transition_serial = _pause_transition_serial + 1
 	Logger.start(LOG, "Stopping script control…")
 
 	if not _tap then
@@ -643,23 +1001,18 @@ function M.toggle()
 	pcall(dispatch_action, "script_pause_toggle")
 end
 
---- Programmatic pause — identical contract to pressing the pause key: sets the
---- flag, fires listeners, AND suspends all modules via the shared internal path.
+--- Requests the same transactional pause as the pause key. State, listeners,
+--- notifications, and Hammerspoon submodules change only after exact PAUSED.
 function M.pause_all()
-	if _is_paused then return end
-	_is_paused = true
-	if type(_on_pause_change) == "function" then pcall(_on_pause_change, true) end
-	pause_all()
-	Logger.info(LOG, "pause_all() called programmatically.")
+	Logger.info(LOG, "Programmatic pause transaction requested.")
+	return request_pause_transition(true)
 end
 
---- Programmatic resume — symmetric to M.pause_all(); resumes all modules.
+--- Requests the symmetric resume transaction; commits only after RESUMED and the
+--- subsequent config publication plus lease-bound input startup have succeeded.
 function M.resume_all()
-	if not _is_paused then return end
-	_is_paused = false
-	if type(_on_pause_change) == "function" then pcall(_on_pause_change, false) end
-	resume_all()
-	Logger.info(LOG, "resume_all() called programmatically.")
+	Logger.info(LOG, "Programmatic resume transaction requested.")
+	return request_pause_transition(false)
 end
 
 return M

@@ -370,7 +370,7 @@ helpers.describe("Karabiner layout-change must NOT kill the script-control event
 		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 
@@ -398,19 +398,23 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 	-- Regression: the pause-layout feature switches the macOS layout on every pause,
 	-- which fires the karabiner input-source watcher. That handler would M.regenerate()
 	-- the FULL Ergopti config and re-arm the binding hotkeys — silently undoing the
-	-- pause (full remapping back, user-facing shortcuts live mid-pause). It must
-	-- short-circuit while the script is paused.
-	helpers.it("karabiner/init.lua skips the layout rebuild while the script is paused", function()
+	-- pause (full remapping back, user-facing shortcuts live mid-pause). It may
+	-- re-resolve the in-memory layout cache for the later resume, but must return
+	-- before deploy/rebind while the script is paused. The behavioral wake/layout
+	-- suite proves the absence of those side effects.
+	helpers.it("karabiner/init.lua keeps paused layout refresh in memory only", function()
 		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
 			"layout-change handler must consult the pause state")
-		helpers.assert_true(src:find("Layout change ignored", 1, true) ~= nil,
-			"layout-change handler must short-circuit (and log) while paused")
+		helpers.assert_true(src:find("if paused then", 1, true) ~= nil,
+			"layout-change handler must branch on the settled pause state")
+		helpers.assert_true(src:find("not redeploying", 1, true) ~= nil,
+			"paused layout refresh must explicitly return without redeploying")
 	end)
 end)
 
@@ -668,7 +672,19 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 			enable_all  = rec("g_enable"),
 			is_enabled  = function() return true end,
 		}
-		local karabiner_spy = { pause = rec("k_pause"), resume = rec("k_resume") }
+		local karabiner_spy = {
+			get_enabled = function() return true end,
+			pause = function(on_done)
+				rec("k_pause")()
+				on_done(true, "paused")
+				return true
+			end,
+			resume = function(on_done)
+				rec("k_resume")()
+				on_done(true, "resumed")
+				return true
+			end,
+		}
 
 		SC.stop()  -- release any tap from an earlier describe
 		SC.start(keymap_spy, shortcuts_spy, gestures_spy, karabiner_spy)

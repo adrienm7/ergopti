@@ -1,46 +1,38 @@
 --- tests/unit/platform/remap/test_boot_timestamp_memoised.lua
 
 --- ==============================================================================
---- MODULE: Regression — the boot timestamp is read once, not once per check
+--- MODULE: Karabiner Status Has No Process-Derived Ownership
 --- DESCRIPTION:
---- get_boot_timestamp() forked /usr/sbin/sysctl on every call, and every
---- ownership check and prime-marker check calls it. The value is the machine's
---- boot time: it cannot change while this Lua state exists, so every fork after
---- the first blocked the run loop to re-learn a constant.
----
---- ROOT CAUSE ENCODED:
---- A per-call subprocess for a per-process constant. The test counts sysctl
---- invocations rather than timing them, because the cost is proportional to the
---- fork count and this machine has no macOS runtime to measure on.
+--- Replaces the former boot-timestamp owner-marker optimization with the stronger
+--- invariant: repeated status reads are pure in-memory lease reads and fork zero
+--- subprocesses. A shared process or boot timestamp can never identify Ergopti's
+--- rules safely.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("karabiner: the boot timestamp is fetched at most once", function()
-
-	helpers.it("repeated ownership checks fork sysctl only once", function()
+helpers.describe("karabiner status never consults process or boot identity", function()
+	helpers.it("repeated status checks execute zero shell commands", function()
 		local calls = 0
-		local hs_overrides = {
-			execute = function(cmd)
-				if type(cmd) == "string" and cmd:find("kern.boottime", 1, true) then
-					calls = calls + 1
-					return "{ sec = 1700000000, usec = 0 }", true
-				end
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function() return "active", { phase = "active", token = "abc" } end,
+		}
+		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["platform.remap.ke_lifecycle"] = nil
+
+		local KE = helpers.load_with_stubs("platform.remap.ke_lifecycle", {
+			execute = function()
+				calls = calls + 1
 				return "", true
 			end,
-		}
+		})
 
-		package.loaded["platform.remap.ke_lifecycle"] = nil
-		local KE = helpers.load_with_stubs("platform.remap.ke_lifecycle", hs_overrides)
+		for _ = 1, 5 do
+			helpers.assert_eq(KE.is_remapping_active(), true)
+		end
 
-		-- Any public entry point that consults the boot session works; call the
-		-- ownership predicate several times, which is what the teardown paths do.
-		for _ = 1, 5 do pcall(KE.is_hs_owned_bridge) end
-
-		helpers.assert_true(calls <= 1,
-			"the boot timestamp cannot change while the process lives, so re-forking sysctl "
-			.. "for it on every ownership check is a blocking subprocess spent on a known "
-			.. "constant; observed " .. tostring(calls) .. " fork(s)")
+		helpers.assert_eq(calls, 0,
+			"status must derive from the exact lease token, never sysctl/pgrep/PID ownership")
 	end)
-
 end)

@@ -3,15 +3,16 @@
 --- ==============================================================================
 --- MODULE: Regression — M.regenerate() must not redeploy the full config mid-pause
 --- DESCRIPTION:
---- « pause = tout éteint ». M.pause() deploys a reduced karabiner.json that keeps
---- only the script-control rules, so the keyboard stops being remapped. Deploying
---- the FULL Ergopti config afterwards hands every one of those remaps straight
---- back — the keyboard silently un-pauses while the UI still says "paused".
+--- « pause = tout éteint ». The exact lease controller flips a pause variable
+--- without replacing the generated config. M.regenerate() must nevertheless stay
+--- quiescent while paused: settings edits are deferred until resume instead of
+--- performing config I/O and restarting a lease generation behind a paused UI.
 ---
 --- ROOT CAUSE ENCODED — the invariant was enforced per call site:
 --- The layout-change watcher guards its own call and its comment states the rule
 --- in general terms: "Redeploying the full remapping … would silently undo the
---- pause (« pause = tout éteint »)". That reasoning is true of EVERY caller, but
+--- pause (« pause = tout éteint »)". The generator now also gates normal rules on
+--- the pause variable, but the no-work-under-pause invariant is still transitive:
 --- the guard sat at that one site while every menu path that regenerates — the
 --- tap/hold and sticky delay editors, layout changes, action edits — reached
 --- M.regenerate() unguarded. This is `project-ahk-invariant-incomplete-application`
@@ -20,10 +21,12 @@
 --- The guard now lives in the function that performs the deploy, so a new caller
 --- inherits it instead of having to remember it.
 ---
---- RESUME MUST STILL WORK: script_control clears _is_paused BEFORE calling
---- resume_all(), so M.resume() -> M.regenerate() passes the guard and a setting
---- changed during the pause lands on the resume rebuild rather than being lost.
---- Both directions are asserted below.
+--- RESUME MUST STILL WORK: the public path holds a private capability that may
+--- regenerate after RESUMED while script_control deliberately remains paused.
+--- It commits _is_paused=false only after publication, READY and lease-bound
+--- input startup succeed. The ordinary paused and unpaused cases are asserted
+--- below; the private transactional exception is behavioral coverage in
+--- test_set_enabled_lease_transaction.lua.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -44,6 +47,25 @@ local helpers = require("tests.helpers")
 --- @return table karabiner, table deploys
 local function load_karabiner(paused)
 	package.loaded["modules.shortcuts"] = { is_paused = function() return paused end }
+	package.loaded["platform.remap.config"] = {
+		load_available_actions = function() return { { id = "none" } } end,
+		load_tap_hold_keys = function() return { { id = "left_shift" } } end,
+		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
+		compute_non_canonical_combos = function() return {} end,
+		load_user_config = function()
+			return {
+				enabled = true,
+				tap_hold_config = {},
+				mod_combos_config = {},
+				tap_hold_timeout_ms = 200,
+				sticky_timeout_ms = 1000,
+				simultaneous_threshold_ms = 50,
+				combo_symmetric = false,
+			}
+		end,
+		save_user_config = function() return true end,
+		resolve_layout_actions = function() return 0 end,
+	}
 
 	local deploys = { count = 0 }
 	-- The counter sits on build_karabiner_json: it is the first thing regenerate()
@@ -51,11 +73,35 @@ local function load_karabiner(paused)
 	package.loaded["platform.remap.generator"] = {
 		build_karabiner_json      = function()
 			deploys.count = deploys.count + 1
-			return {}
+			return {}, nil, { "legacy-ergopti-rule" }
 		end,
-		merge_into_existing_config = function(built, _dst) return built end,
-		deploy_string              = function() return true, "ok" end,
+		merge_and_deploy_config = function(_built, _dst, legacy_rules)
+			deploys.merge_legacy_rules = legacy_rules
+			return true, "ok"
+		end,
 		KE_PHYSICAL_KC_LOG         = nil,
+	}
+	package.loaded["platform.remap.lease_controller"] = {
+		init = function() return true end,
+		token = function() return "0123456789abcdef0123456789abcdef" end,
+		start = function(callback)
+			if callback then callback(true, "ready") end
+			return true
+		end,
+		stop = function() return true end,
+		pause = function() return true end,
+		resume = function() return true end,
+		status = function()
+			return "active", {
+				phase = "active",
+				token = "0123456789abcdef0123456789abcdef",
+			}
+		end,
+	}
+	package.loaded["platform.remap.ke_lifecycle"] = {
+		open_gui = function() return true end,
+		stop = function() end,
+		notify_ready = function() end,
 	}
 
 	package.loaded["platform.remap"] = nil
@@ -108,15 +154,15 @@ helpers.describe("karabiner.regenerate honours the pause invariant", function()
 	helpers.it("does not build or deploy while the script is paused", function()
 		local K, deploys = load_karabiner(true)
 
+		-- Reach the pause guard instead of passing on the earlier disabled guard.
 		K.regenerate()
 
 		helpers.assert_eq(deploys.count, 0,
-			"regenerate() must not rebuild the full config while paused — deploying it hands "
-			.. "KE back every remap the pause removed, silently un-pausing the keyboard while "
-			.. "the UI still reports paused")
+			"regenerate() must not rebuild the config while paused — edits remain deferred "
+			.. "until resume, with no config I/O or lease restart behind the paused UI")
 	end)
 
-	helpers.it("builds and deploys normally when not paused", function()
+	helpers.it("builds and deploys normally when enabled and not paused", function()
 		-- The opposite failure: a guard that always blocked would break every menu
 		-- edit and the resume rebuild itself.
 		local K, deploys = load_karabiner(false)
@@ -124,7 +170,9 @@ helpers.describe("karabiner.regenerate honours the pause invariant", function()
 		K.regenerate()
 
 		helpers.assert_true(deploys.count >= 1,
-			"regenerate() must still work when the script is not paused — script_control "
-			.. "clears the paused flag before resume_all(), so the resume rebuild depends on it")
+			"regenerate() must still work for ordinary menu edits when the script is not paused")
+		helpers.assert_eq(deploys.merge_legacy_rules[1], "legacy-ergopti-rule",
+			"regenerate() must forward the generator's legacy-rule inventory to merge — "
+			.. "otherwise the first lease upgrade leaves old ungated Ergopti rules active")
 	end)
 end)
