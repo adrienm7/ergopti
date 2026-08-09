@@ -27,6 +27,7 @@
 // ==============================================================================
 
 import Cocoa
+import Darwin
 import Sparkle
 
 
@@ -48,6 +49,41 @@ let kErgoptiBundleId = "com.ergoptiplus.app"
 // Hammerspoon reads MJConfigFile (full path to init.lua), not MJConfigDir.
 // MJConfigDir is a community myth — variables.m uses MJConfigFile exclusively.
 let kHammerspoonConfigKey = "MJConfigFile"
+
+/// Returns the inherited child environment with the exact live launcher
+/// identity replacing any stale values inherited from an ancestor process.
+/// - Parameters:
+///   - base: Environment inherited by the Swift launcher.
+///   - launcherPid: Current Swift launcher process identifier.
+///   - launcherBundleId: Current launcher bundle identifier when observable.
+/// - Returns: Environment safe to assign to the embedded Hammerspoon child.
+func launcherChildEnvironment(
+	base: [String: String],
+	launcherPid: Int32,
+	launcherBundleId: String?
+) -> [String: String] {
+	var environment = base
+	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
+	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
+	if let launcherBundleId, !launcherBundleId.isEmpty {
+		environment["ERGOPTI_LAUNCHER_BUNDLE_ID"] = launcherBundleId
+	}
+	return environment
+}
+
+/// Captures the exact on-disk identity of the running launcher executable.
+/// Hammerspoon rechecks these values before it may spawn a headless lease role,
+/// so a same-named developer wrapper or replaced helper path fails closed.
+/// - Parameter path: Current launcher executable path.
+/// - Returns: Decimal device/inode strings, or nil when lstat fails.
+func launcherExecutableFileIdentity(
+	at path: String?
+) -> (device: String, inode: String)? {
+	guard let path, !path.isEmpty else { return nil }
+	var attributes = stat()
+	guard path.withCString({ Darwin.lstat($0, &attributes) }) == 0 else { return nil }
+	return (String(attributes.st_dev), String(attributes.st_ino))
+}
 
 
 
@@ -116,6 +152,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsProcess: Process?
 	private var updaterController: SPUStandardUpdaterController?
+	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
+	private let processRunner: (Process) throws -> Void
+	private let fatalReporter: ((String) -> Void)?
+
+	/// Creates the production delegate or an injected launcher boundary for tests.
+	/// - Parameters:
+	///   - launcherIdentityReader: Captures the running launcher's exact file identity.
+	///   - processRunner: Performs the sole embedded-Hammerspoon child start.
+	///   - fatalReporter: Test-only observer replacing the modal fatal UI.
+	init(
+		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
+			launcherExecutableFileIdentity,
+		processRunner: @escaping (Process) throws -> Void = { try $0.run() },
+		fatalReporter: ((String) -> Void)? = nil
+	) {
+		self.launcherIdentityReader = launcherIdentityReader
+		self.processRunner = processRunner
+		self.fatalReporter = fatalReporter
+		super.init()
+	}
 
 
 
@@ -254,17 +310,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// Launch the embedded Hammerspoon as a child Process. We use Process
 	// rather than NSWorkspace.open so terminating the launcher also terminates
 	// Hammerspoon — keeping the two visually fused for the user.
-	private func launchHammerspoon(at binaryPath: String) {
+	func launchHammerspoon(at binaryPath: String) {
+		guard let launcherPath = Bundle.main.executablePath,
+			!launcherPath.isEmpty,
+			let launcherIdentity = launcherIdentityReader(launcherPath)
+		else {
+			fail("Running launcher executable identity is unavailable.")
+			return
+		}
+
 		let proc = Process()
 		proc.executableURL = URL(fileURLWithPath: binaryPath)
 
 		// Inherit our environment and add a marker the bundled Lua config can
 		// optionally read to know it is running under the Ergopti launcher.
-		var env = ProcessInfo.processInfo.environment
+		var env = launcherChildEnvironment(
+			base: ProcessInfo.processInfo.environment,
+			launcherPid: ProcessInfo.processInfo.processIdentifier,
+			launcherBundleId: Bundle.main.bundleIdentifier
+		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
 		env["ERGOPTI_KARABINER_INSTALLER"]    = bundledKarabinerInstallerPath()
 		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
+		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath
+		env.removeValue(forKey: "ERGOPTI_LAUNCHER_DEVICE")
+		env.removeValue(forKey: "ERGOPTI_LAUNCHER_INODE")
+		env["ERGOPTI_LAUNCHER_DEVICE"] = launcherIdentity.device
+		env["ERGOPTI_LAUNCHER_INODE"] = launcherIdentity.inode
 		proc.environment = env
 
 		proc.terminationHandler = { [weak self] terminated in
@@ -279,7 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 
 		do {
-			try proc.run()
+			try processRunner(proc)
 			hsProcess = proc
 			LauncherLog.write("embedded Hammerspoon launched at \(binaryPath)")
 		} catch {
@@ -304,6 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// wrapping the app) never sees it. Without a durable artifact a failure in
 	// that context left literally nothing to investigate after the fact.
 	private func fail(_ message: String) {
+		if let fatalReporter {
+			fatalReporter(message)
+			return
+		}
+
 		LauncherLog.write("FATAL: \(message)")
 
 		let alert = NSAlert()
@@ -332,7 +410,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // =====================================
 // =====================================
 
-// Write MJConfigDir via CFPreferences before NSApplication.run() so Hammerspoon
+// The launcher binary also serves all three headless native lease roles.
+// Branch before touching NSApplication, CFPreferences or Sparkle so a helper
+// spawned by Hammerspoon owns no GUI/application lifecycle.
+if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(KarabinerLeaseWorker.run(arguments: CommandLine.arguments))
+}
+
+// Write MJConfigFile via CFPreferences before NSApplication.run() so Hammerspoon
 // always sees the correct config path, even if applicationDidFinishLaunching is
 // never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
 // CFPreferencesSynchronize flushes synchronously to disk before app.run().
