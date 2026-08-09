@@ -1,0 +1,121 @@
+// tools/test/test-macos-swift-launcher-ci.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: macOS Swift Launcher CI Guard
+ * DESCRIPTION:
+ * Proves that the native ErgoptiPlus launcher is built and its XCTest target is
+ * executed on a real macOS runner, and that this result participates in the
+ * required macOS aggregate gate.
+ *
+ * ROOT CAUSE ENCODED:
+ * The Hammerspoon unit and virtual-keyboard jobs both run on Ubuntu. The native
+ * Swift lease guardian could therefore fail to compile, or every process-level
+ * XCTest could go red, while `macos-ok` still reported success. The aggregate
+ * also treated `skipped` as green and repeated dependency names outside `needs`,
+ * so adding a job at only one of those sites created another false green.
+ *
+ * FEATURES & RATIONALE:
+ * 1. Requires release compilation and XCTest execution on `macos-*`; an Ubuntu
+ *    source grep cannot substitute for Darwin process and signal semantics.
+ * 2. Requires `macos-ok` to consume `toJSON(needs)` and accept only `success`,
+ *    so every declared dependency is gated and skipped work is never green.
+ * 3. Floors the dependency count and checks Package.swift's test target, which
+ *    prevents a syntactically present but vacuous `swift test` step.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+const PACKAGE = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher', 'Package.swift'),
+	'utf8'
+);
+
+const failures = [];
+
+function check(condition, message) {
+	if (!condition) failures.push(message);
+}
+
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function jobBody(name) {
+	const marker = new RegExp(`^  ${escapeRegExp(name)}:\\s*\\r?$`, 'm');
+	const match = marker.exec(WORKFLOW);
+	if (!match) return '';
+	const rest = WORKFLOW.slice(match.index + match[0].length);
+	const nextJob = /\r?\n  [A-Za-z0-9][A-Za-z0-9_-]*:\s*(?:\r?\n|$)/.exec(rest);
+	return nextJob ? rest.slice(0, nextJob.index) : rest;
+}
+
+function withoutFullLineComments(source) {
+	return source.replace(/^\s*#.*$/gm, '');
+}
+
+check(WORKFLOW.length > 10000, 'ci.yml is missing or truncated; refusing to inspect an empty workflow');
+check(
+	(WORKFLOW.match(/^  test-swift-launcher:\s*$/gm) || []).length === 1,
+	'ci.yml must define exactly one `test-swift-launcher` job'
+);
+
+const swiftJob = withoutFullLineComments(jobBody('test-swift-launcher'));
+check(swiftJob.length > 100, '`test-swift-launcher` is absent or empty');
+check(/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
+	'`test-swift-launcher` must run on a real macOS runner');
+check(!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
+	'`test-swift-launcher` must be gating, not continue-on-error');
+
+const buildLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift build\b/.test(line)) || '';
+check(buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
+	'the Swift build step must compile the packaged launcher directory');
+check(/(?:^|\s)(?:-c|--configuration)\s+release(?:\s|$)/.test(buildLine),
+	'the Swift build step must compile the release configuration that ships');
+check(/(?:^|\s)--product\s+ErgoptiPlus(?:\s|$)/.test(buildLine),
+	'the Swift build step must compile the ErgoptiPlus executable product');
+check(!buildLine.includes('|| true'), 'the Swift build step must not swallow compilation failure');
+
+const testLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift test\b/.test(line)) || '';
+check(testLine.includes('--package-path static/ergopti_plus/macos/launcher'),
+	'the Swift test step must execute the packaged launcher test target');
+check(!testLine.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
+check(
+	/\.testTarget\s*\(\s*name:\s*"ErgoptiPlusTests"/s.test(PACKAGE),
+	'Package.swift must register the ErgoptiPlusTests target that CI claims to run'
+);
+
+const macosGate = withoutFullLineComments(jobBody('macos-ok'));
+check(macosGate.length > 100, '`macos-ok` is absent or empty');
+check(/\bneeds\s*:[\s\S]*?\btest-swift-launcher\b/.test(macosGate),
+	'`macos-ok.needs` must include `test-swift-launcher`');
+check(/^\s+if:\s*always\(\)\s*$/m.test(macosGate),
+	'`macos-ok` must run under `always()` so it can reject failed, cancelled, or skipped dependencies');
+check(/NEEDS:\s*\$\{\{\s*toJSON\(needs\)\s*\}\}/.test(macosGate),
+	'`macos-ok` must derive its verdict from `toJSON(needs)`, not a second hardcoded job list');
+check(/to_entries\[\]/.test(macosGate),
+	'`macos-ok` must iterate every entry in the GitHub `needs` object');
+check(/if \[ "\$total" -lt 3 \]/.test(macosGate),
+	'`macos-ok` must fail closed if fewer than its three current dependencies are visible');
+check(
+	/case\s+"\$result"\s+in[\s\S]*?success\)\s*;;[\s\S]*?\*\)\s*failed=1\s*;;[\s\S]*?esac/.test(macosGate),
+	'`macos-ok` must accept only success; failure, cancelled, skipped, and unknown results must fail'
+);
+check(!/failure\|cancelled/.test(macosGate),
+	'`macos-ok` must not use the old failure|cancelled allow-list that treated skipped as green');
+check(!/passed \(or skipped\)/i.test(macosGate),
+	'`macos-ok` must not describe skipped native verification as a passing macOS gate');
+
+if (failures.length > 0) {
+	console.error('[FAIL] macOS Swift launcher CI coverage:');
+	for (const failure of failures) console.error(`  - ${failure}`);
+	process.exit(1);
+}
+
+console.log('[OK] macOS CI builds the release Swift launcher, runs XCTest, and gates every dependency success-only.');
