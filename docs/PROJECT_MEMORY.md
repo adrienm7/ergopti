@@ -56,7 +56,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-hotstring-engine-internals](#project-hotstring-engine-internals) — OnChar doit alimenter chaque caractere une seule fois ; la divergence de cadrage des frontieres de mot AHK vs Hammerspoon est intentionnelle
 - [project-hs-perf-profilers-and-case-conform](#project-hs-perf-profilers-and-case-conform) — Profilers boot/hot-path macOS, chemin rapide case-conform, cache du menubar, snapshot TOML, et le piege Escape arme au premier affichage
 - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip visual style is shared across drivers via _shared/modules/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different
-- [project-hs-script-quit-kills-karabiner](#project-hs-script-quit-kills-karabiner) — The quit shortcut os.exit()s and bypasses the shutdown callback, so it must kill Karabiner itself
+- [project-hs-karabiner-exact-lease-isolation](#project-hs-karabiner-exact-lease-isolation) — Ergopti owns token-scoped Karabiner rules and variables, never Karabiner's shared UI, services, grabber, or VirtualHID processes
 - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — The first-run wizard must write the canonical HS config schema, and the "ready" notification was removed
 - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Ou vivent les defauts du module keymap, et pourquoi une seule place
 - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — Every macOS keyboard injector uses one exact-tag transaction adapter; source PID, timing and character equality are never synthetic identity
@@ -2117,15 +2117,21 @@ The cross-driver tooltip look is defined ONCE in `_shared/modules/tooltip/consta
 
 **Rounding the stacked colored rectangle — DO NOT use an `action="clip"` element.** The single tooltip (`renderer.M.canvas`) always rounded its background, but the stacked canvas drew one sharp-cornered fill rectangle PER ROW under a rounded border — a colored rectangle poking outside the rounded border. A first fix attempt added a leading rounded `action="clip"` element (+ trailing `resetClip`) with a load-time probe and a `CLIP_OFFSET` index shift. **This was WRONG and shipped a regression:** on the user's Hammerspoon the clip action was not honored, so the element rendered with the hs.canvas DEFAULT `fillColor` — which is RED — turning the ENTIRE tooltip solid bright red instead of a translucent red tint. The probe (just `pcall(appendElements{action="clip"})`) passes regardless because appendElements accepts any action string; it does NOT prove the clip clips. **Working fix:** draw ONE rounded background rectangle (element 1) spanning the whole stack, `apply_tint()`-ed from the firing (first) row — that single rounded rect IS the colored rectangle and shares the border's corners. Per-row background overrides stay available (rounded) but are drawn only when a row's tint differs from the panel's (rare — alternatives usually share the firing row's category color), so the common case is one clean rounded panel. Element layout: `[1]` panel bg, row i `base=(i-1)*3+2` (bg/text/label), separators `sep_base=row_count*3+2`, border `row_count*4+1`. The element list is built by the PURE `renderer.M._build_stacked_elements(n)` so the structure (rounded panel, NO clip, rounded border) is unit-testable even though the stub `hs.canvas` is a no-op mock (`tests/unit/ui/test_tooltip_stacked_panel.lua`). Pixel/translucency still needs a real-Mac check, but "all red" can never silently return.
 
-### project-hs-script-quit-kills-karabiner
+### project-hs-karabiner-exact-lease-isolation
 
-_The quit shortcut os.exit()s and bypasses the shutdown callback, so it must kill Karabiner itself_
+_Ergopti owns token-scoped Karabiner rules and variables, never Karabiner's shared UI, services, grabber, or VirtualHID processes_
 
-<sub>slug: `project_hs_script_quit_kills_karabiner`</sub>
+<sub>slug: `project_hs_karabiner_exact_lease_isolation`</sub>
 
-The `script_quit` action (`modules/gestures/actions.lua`, bound by default to **rcmd+Escape** via `script_control.lua`'s `escape` slot) quits Hammerspoon with `os.exit(0)`. `os.exit` terminates the Lua VM abruptly and **does NOT trigger `hs.shutdownCallback`** (`init.lua`) — where the normal Karabiner-Elements teardown lives (step 3, `KILL_FAST_CMD`). So on the quit-shortcut path, KE kept running with the Ergopti complex-modification rules and the **physical keyboard stayed remapped after HS was gone** (2026-06-16 user report, "ultra important"). Fix: `script_quit` now calls `karabiner.kill()` itself, synchronously, before scheduling the exit. `karabiner.kill()` (`platform/remap/init.lua`) runs the robust `KILL_CMD` (`ke_lifecycle.lua`) which does a `launchctl bootout` of every user-level karabiner/pqrs agent — NOT just `KILL_FAST_CMD`'s `pkill`, because a bare pkill of `karabiner_console_user_server` lets launchd respawn it and re-grab the keyboard. `kill()` also respects a user-managed KE (leaves it untouched when HS did not own the bridge via `is_hs_owned_bridge()`). It is synchronous (blocking `hs.execute`), so KE is provably down before `os.exit`. Same reasoning applies to ANY future "quit HS" code path that uses `os.exit`: it must tear KE down explicitly. Regression: `tests/unit/modules/gestures/test_script_quit_kills_karabiner.lua`.
+The earlier process-ownership design was unsafe. Karabiner-Elements runs several shared components — the UI/menubar process, root Core Service, legacy grabber, console user server, user/session agents, observers, watchers, extensions, and VirtualHID helpers — and the same components execute both Ergopti rules and the user's personal Karabiner configuration. A PID, bundle ID, launchd label, or "Hammerspoon launched it" marker therefore cannot prove that a process belongs exclusively to Ergopti. Killing, `pkill`ing, unloading, disabling, launching, or restarting any stock Karabiner component can destroy unrelated user behavior and can make launchd respawn or cascade other components. **Production Karabiner integration must never perform those operations.** The user can hide or disable Ergopti remapping while keeping personal Karabiner rules live.
 
-**The shutdown KE teardown must NOT run on a RELOAD — only on a genuine quit (2026-06-16).** `hs.shutdownCallback` fires for BOTH `hs.reload()` and a real quit, with no built-in flag to tell them apart. Its step 3 ran `KILL_FAST_CMD` unconditionally, so EVERY reload killed the user-level KE bridge (`karabiner_console_user_server` + `session_monitor`). `KILL_FAST_CMD` never names `karabiner_grabber`, but on the user's KE version killing the bridge **cascades the root grabber daemon down** — so the next boot's health check found no grabber and popped the **native "install Karabiner" prompt** (user report: "dès le reload … c'est karabiner_grabber … UI native qui me propose de télécharger karabiner", no logs because it's a UI path). This contradicts the deliberate design (`karabiner/init.lua` comments: "KE reloads via FSEvents — daemons stay alive across reloads, no Space switch"). Fix: a reload-vs-quit guard. `lib/reload_guard.lua` drops a short-lived timestamp sentinel in the Storage adapter; `init.lua` **wraps `hs.reload` once at boot** to call `reload_guard.mark_reload()` before delegating (captures every reload path — file-watcher auto-reload, locale/paths change, menu "reload", the `script_reload` shortcut — since they all read the global `hs.reload` at call time), and `reload_guard.clear()` runs once at boot so the sentinel can only be true because a reload was initiated in the live session. The shutdown handler now skips the KE kill when `reload_guard.is_reloading()` (60 s TTL guards against a stale sentinel from a crash mid-reload). The quit-shortcut path is unaffected (it `os.exit`s, bypassing the callback, and kills KE itself — see above); a genuine Cmd+Q still tears KE down (no sentinel → kill runs). `reload_guard` routes persistence through `adapters.storage` and time through `os.time` so it adds ZERO `hs.*` to the lib baseline — **but the gate counts `hs.` even in comments**, so its docstrings deliberately say "a Hammerspoon reload"/"the Hammerspoon shutdown callback" instead of the literal API token. Regression: `tests/unit/lib/test_reload_guard.lua` (marked → reloading; cleared/fresh → quit; stale/non-numeric sentinel → quit). Real-Mac check still needed to confirm the grabber survives a reload end-to-end.
+The owned capability is now an exact generation, not a process. Every generated Ergopti rule carries a canonical marker and requires `ergopti_mode_<32-lowercase-hex-token>` to be active/paused plus `ergopti_revoked_<same-token>` to remain zero. Revocation writes mode `0` and the monotone tombstone `1`; no later live writer is allowed to clear that tombstone. Non-authority runtime state follows the same boundary: logical `layer_active`, `capsword`, and `ke_held_*` names are rewritten in every generated producer/consumer and Hammerspoon CLI writer as `ergopti_<logical-name>_<same-token>`, while stock variables such as `system.use_fkeys_as_standard_function_keys` remain shared. New rules are deployed inert; Hammerspoon publishes active state and starts lease-dependent watchers, F17 hotkeys, and keylogger suppression only after `READY`. Pause, resume, and stop commit only after their matching acknowledgement. A stale callback or native worker can mutate only its captured token, never a replacement generation or an untagged personal rule.
+
+This also closes the single-component abrupt-death case without stock-process control. The signed `ErgoptiPlus` executable has an outer headless role that owns Hammerspoon's pipes and wait-supervises one exact inner child over a private socket. The inner exclusively creates, signals, and reaps its own transient **lease-authority** `karabiner_cli` children; separate Hammerspoon runtime writers carry only exact generation-scoped non-authority names. Hammerspoon EOF, outer loss, inner loss, STOP, and bounded CLI timeout all converge on repeated exact-variable fencing; neither role enumerates or signals a stock Karabiner PID. The `script_quit` path calls `karabiner.shutdown("script_quit")` before `os.exit()` because that API bypasses the shutdown callback. A heartbeat reasserts the desired exact mode when the shared Core Service restarts and loses in-memory variables. If Hammerspoon and both private guardians are all killed before any survivor observes peer loss, or if the canonical `karabiner_cli` remains unavailable, no process can publish the tombstone; that stronger fault model requires an additional independent `launchd` guardian. Real-Mac validation remains required for physical Activity Monitor Force Quit, Core Service restart, APFS process/pipe behavior, and observable keyboard release; Windows tests prove only the Lua protocol and deterministic models.
+
+Generated configuration is merged rather than replacing the user's document. Profiles, devices, parameters, virtual-HID settings, and untagged complex modifications remain personal data. Current managed rules are removed only by exact marker. Historical unleased blocks are migrated only when the complete canonical structure is provable; ambiguity must fail closed without deleting or rewriting a personal rule. Disabled boot may clean a proven historical block but must not start a lease, watcher, hotkey, UI, or Karabiner process.
+
+Regression coverage: `tests/meta/test_karabiner_stock_process_isolation.lua` scans every production runtime source for stock-process mutations and legacy ownership markers; `tests/unit/platform/remap/test_lease_controller.lua`, native `KarabinerLeaseWorkerTests`, `test_generator_managed_lease.lua`, `test_disabled_legacy_cleanup.lua`, and `test_kc_suppression_requires_live_lease.lua` exercise token isolation, abrupt EOF, outer/inner loss, direct-child timeouts, heartbeat recovery, migration, disabled mode, and lease-bound resources. A source grep alone is insufficient for async cleanup: the Swift behavior tests also keep unrelated sibling processes alive through every modeled fence path.
 
 ### project-hs-onboarding-config-schema
 
@@ -3438,9 +3444,11 @@ exactement celle ou personne ne regarde.
 - **Une garde qui epingle l'orthographe transforme un durcissement en regression.**
   `test_gestures_ghost_timer_guard` matchait le texte exact du garde ; l'elargir a l'invariant
   etait la correction, pas l'affaiblissement.
-- **Verifier avant d'agir sur un finding.** `is_hs_owned_bridge()` renvoie `false` quand le
-  marqueur est simplement absent, donc le garde « evident » sur le marquage de propriete KE
-  aurait casse le tout premier amorcage. Ce finding est reste ouvert exprès.
+- **Superseded ownership lesson.** This pass once kept the KE process-ownership finding open
+  because `is_hs_owned_bridge()` could not distinguish first boot from a foreign bridge. New
+  user evidence resolved the ambiguity differently: a shared Karabiner process is never an
+  Ergopti-owned resource. See `project-hs-karabiner-exact-lease-isolation`; only exact rules
+  and generation variables may be claimed or revoked.
 - **G4 reste non mesurable ici** : `<config_dir>/hammerspoon/` n'a pas de `logs/`. Les seuls
   chiffres citables viennent d'artefacts executes (suite, e2e, banc), jamais du raisonnement.
 
@@ -4004,22 +4012,13 @@ evidence overturns one, say what the evidence is — do not simply re-do it.
 
 Evidence in `docs/PROJECT_MEMORY.md`.
 
-- **Moving the KE ownership mark into `launch_headless_once()`** (the last leg of
-  `ke-prime-force-claims-and-kills-unowned-bridge`): everything else in that finding
-  shipped — the read-only status probe no longer claims the bridge, the poll timeout
-  no longer disowns one we launched, and the settle path's pkill is ownership-gated
-  like every other kill in the driver.
-  What is left is moving `mark_hs_owned_bridge()` from the top of
-  `prime_ke_for_session` into the branch where a headless launch actually ran, plus
-  the two force-path re-marks. It stays undone deliberately. Ownership is what
-  authorises the quit-time bootout, so narrowing it narrows teardown too: a force
-  prime that finds a live, responsive bridge would stop claiming it and would
-  therefore stop tearing it down at quit — which may be right, or may reopen the
-  post-quit-remapping class recorded in PROJECT_MEMORY. The two readings cannot be
-  separated by a unit test, and a previous attempt in this exact area was reverted
-  for precisely that kind of unverifiable side effect. It needs one session on a real
-  machine: force-prime with a foreign bridge alive, quit, and check whether the
-  keyboard is still remapped.
+- **Moving the KE ownership mark into `launch_headless_once()`** is superseded by
+  [project-hs-karabiner-exact-lease-isolation](#project-hs-karabiner-exact-lease-isolation).
+  New user evidence established that the same stock Karabiner processes can serve
+  an enabled personal configuration while Ergopti remapping is disabled. Process
+  ownership was therefore the wrong abstraction, not a marker-placement problem.
+  No stock Karabiner process is now claimed or torn down; only token-scoped Ergopti
+  variables and exactly marked rules are owned.
 - **Moving the clipboard transaction off the keystroke tap** (raised as
   `perform-paste-clipboard-io-inside-eventtap`): the deferral was tried and reverted
   because it breaks the paste-ordering contract pinned by
