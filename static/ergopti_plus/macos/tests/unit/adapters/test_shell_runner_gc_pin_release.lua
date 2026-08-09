@@ -75,7 +75,7 @@ helpers.describe("ShellRunner: GC pin release", function()
 		)
 	end)
 
-	helpers.it("_safe_terminate releases GC pin before terminating", function()
+	helpers.it("_safe_terminate retains the exact task until native termination succeeds", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
 		local src_file = base .. "/adapters/shell_runner.lua"
@@ -88,12 +88,42 @@ helpers.describe("ShellRunner: GC pin release", function()
 		-- Find _safe_terminate and verify it clears the GC pin
 		local fn_start = src:find("local function _safe_terminate", 1, true)
 		helpers.assert_true(fn_start ~= nil, "_safe_terminate not found")
-		local region = src:sub(fn_start, fn_start + 500)
+		local region = src:sub(fn_start, fn_start + 1200)
 		helpers.assert_true(
 			region:find("local task = _task", 1, true) ~= nil
 				and region:find("M._active_tasks[task]", 1, true) ~= nil,
-			"_safe_terminate must release the exact captured task to prevent a GC pin leak"
+			"_safe_terminate must retain and then release the exact captured task"
 		)
+	end)
+
+	helpers.it("terminate failure keeps the native task pinned and retryable", function()
+		local attempts = 0
+		local fake_task
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function()
+					fake_task = {
+						start = function(self) return self end,
+						terminate = function(self)
+							attempts = attempts + 1
+							if attempts == 1 then error("synthetic terminate failure") end
+							return self
+						end,
+					}
+					return fake_task
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/usr/bin/defaults", {}, function() end)
+		helpers.assert_true(handle.start())
+		helpers.assert_eq(handle.terminate(), false,
+			"a native exception must not be reported as settled")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"the exact retry capability must remain GC-pinned after failure")
+		helpers.assert_eq(handle.terminate(), true)
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_nil(ShellRunner._active_tasks[fake_task])
 	end)
 
 	-- Behavioural regression for the streaming-supersede crash: terminate() nils the
