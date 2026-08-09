@@ -18,14 +18,15 @@ local helpers = require("tests.helpers")
 
 helpers.describe("karabiner: layout-settle delay is a registry constant, not a magic number (F-LOW-3)", function()
 	helpers.it("init.lua sources the layout rebuild delay from Timings, not a bare 0.5", function()
-		local path = helpers.driver_root() .. "platform/remap/init.lua"
-		local fh = io.open(path, "r"); helpers.assert_true(fh ~= nil, "cannot open karabiner/init.lua")
-		local src = fh:read("*a"); fh:close()
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
+		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find('Timings.sec("debounce", "layout_tis_settle_ms")', 1, true) ~= nil,
 			"the layout-settle delay must be sourced from Timings.sec(debounce, layout_tis_settle_ms)")
-		helpers.assert_true(src:find("pcall(hs.timer.doAfter, LAYOUT_TIS_SETTLE_SEC", 1, true) ~= nil,
-			"the guarded layout rebuild timer must use the named LAYOUT_TIS_SETTLE_SEC constant")
+		helpers.assert_true(
+			src:find("pending.tis_settled and 0 or LAYOUT_TIS_SETTLE_SEC", 1, true) ~= nil,
+			"new events must use the registry delay while already-settled replays run next-turn")
 		helpers.assert_true(src:find("_layout_rebuild_timer = hs.timer.doAfter(0.5,", 1, true) == nil,
 			"the bare inline 0.5 literal for the layout rebuild must be gone")
 	end)

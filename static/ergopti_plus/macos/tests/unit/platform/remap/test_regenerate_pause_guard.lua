@@ -67,7 +67,7 @@ local function load_karabiner(paused)
 		resolve_layout_actions = function() return 0 end,
 	}
 
-	local deploys = { count = 0 }
+	local deploys = { count = 0, phase = "active" }
 	-- The counter sits on build_karabiner_json: it is the first thing regenerate()
 	-- does after the guard, so a non-zero count means the paused deploy went ahead.
 	package.loaded["platform.remap.generator"] = {
@@ -82,40 +82,61 @@ local function load_karabiner(paused)
 		KE_PHYSICAL_KC_LOG         = nil,
 	}
 	package.loaded["platform.remap.lease_controller"] = {
-		init = function() return true end,
+		init = function(listener)
+			deploys.phase_listener = listener
+			return true
+		end,
 		token = function() return "0123456789abcdef0123456789abcdef" end,
-		start = function(callback)
+		start_paused = function(callback)
 			if callback then callback(true, "ready") end
 			return true
 		end,
 		stop = function() return true end,
-		pause = function() return true end,
-		resume = function() return true end,
+		stop_exact = function() return true end,
+		pause = function(callback)
+			deploys.phase = "paused"
+			if deploys.phase_listener then deploys.phase_listener("paused") end
+			if callback then callback(true, "paused") end
+			return true
+		end,
+		resume = function(callback)
+			deploys.phase = "active"
+			if deploys.phase_listener then deploys.phase_listener("active") end
+			if callback then callback(true, "resumed") end
+			return true
+		end,
 		status = function()
-			return "active", {
-				phase = "active",
+			return deploys.phase, {
+				phase = deploys.phase,
 				token = "0123456789abcdef0123456789abcdef",
+				activation_blocked = false,
 			}
 		end,
 	}
 	package.loaded["platform.remap.ke_lifecycle"] = {
 		open_gui = function() return true end,
-		stop = function() end,
+		stop = function() return true end,
 		notify_ready = function() end,
 	}
+	package.loaded["platform.remap.watchers"] = {
+		start_gesture_watcher = function() return { id = "gesture" } end,
+		stop_gesture_watcher = function() return true end,
+		start_cycle_windows_hotkey = function() return "cycle" end,
+		start_alt_tab_windows_hotkey = function() return "windows" end,
+		start_alt_tab_monitor_hotkey = function() return "monitor" end,
+		start_alt_tab_apps_hotkey = function() return "apps" end,
+		stop_alt_tab_apps_tracker = function() return true end,
+		start_input_source_watcher = function() end,
+		stop_input_source_watcher = function() return true end,
+	}
+	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		clear_managed_set = function() return true end,
+		refresh_managed_set = function() return true end,
+	}
+	package.loaded["modules.gestures.engine"] = {}
 
 	package.loaded["platform.remap"] = nil
-	-- The layout watcher too. platform/remap/watchers.lua:28 does `local hs = hs`,
-	-- so it keeps whatever stub was global when it was FIRST required — and
-	-- load_with_stubs clears only the module it is given, by design (clearing the
-	-- subtree throws away stubs other tests deliberately place there).
-	--
-	-- Left cached, it reaches start_input_source_watcher holding an `hs` whose
-	-- keycodes table has no inputSourceChanged, and the two cases below fail with
-	-- "attempt to call a nil value". That happened in CI and not locally, because
-	-- test discovery uses lfs when installed and `find` when not, the two orders
-	-- differ, and the failure needs something else to have loaded watchers first.
-	package.loaded["platform.remap.watchers"] = nil
 	-- load_with_stubs replaces hs.keycodes wholesale, so the override must carry its
 	-- own .map: the layout watcher resolves a key name at load time via
 	-- Keycodes.to_name(), which iterates hs.keycodes.map.

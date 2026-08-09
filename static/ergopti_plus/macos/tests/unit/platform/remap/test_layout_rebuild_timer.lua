@@ -60,7 +60,7 @@ helpers.describe("karabiner/init.lua: layout rebuild timer stored and cancellabl
 		local src = strip_comments(read_source("local KARABINER_KE_TILDE_PATH"))
 		-- Scope the ordering check to the layout helper: another guarded timer
 		-- intentionally exists earlier for the deferred F17 bindings.
-		local helper_pos = src:find("local function schedule_layout_refresh", 1, true)
+		local helper_pos = src:find("schedule_layout_refresh = function", 1, true)
 		local cancel_pos = helper_pos and src:find("_layout_rebuild_timer:stop()", helper_pos, true)
 		local arm_pos    = helper_pos and src:find("pcall%(hs%.timer%.doAfter", helper_pos)
 		local retain_pos = helper_pos and src:find("_layout_rebuild_timer%s*=%s*timer_or_err", helper_pos)
@@ -73,8 +73,9 @@ helpers.describe("karabiner/init.lua: layout rebuild timer stored and cancellabl
 	helpers.it("a cancelled queued callback cannot erase its replacement", function()
 		local src = strip_comments(read_source("local KARABINER_KE_TILDE_PATH"))
 		helpers.assert_true(
-			src:find("if _layout_rebuild_timer ~= timer then return end", 1, true) ~= nil,
-			"the callback must prove exact retained-handle ownership before clearing state")
+			src:find("if _layout_rebuild_timer ~= timer or _pending_layout_refresh ~= pending then return end",
+				1, true) ~= nil,
+			"the callback must prove both exact timer and durable-record ownership before clearing state")
 	end)
 
 	helpers.it("the fenced local teardown cancels the pending rebuild timer", function()
