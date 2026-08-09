@@ -309,6 +309,56 @@ helpers.describe("adapters.file_system: write() preserves observed symlink paths
 		os.remove(REAL_TARGET)
 	end)
 
+	helpers.it("resolves dot-dot after a preceding symlink with POSIX ordering", function()
+		local request_root = os.tmpname():gsub("\\", "/")
+		local target_root = os.tmpname():gsub("\\", "/")
+		local target_subdirectory = target_root .. "/sub"
+		local link_path = request_root .. "/link"
+		local requested_path = link_path .. "/../karabiner.json"
+		local kernel_target = target_root .. "/karabiner.json"
+		local lexically_collapsed_target = request_root .. "/karabiner.json"
+		local staging_locks = {}
+		local write_ok = nil
+		local kernel_content = nil
+		local collapsed_content = nil
+		local call_ok, call_err = xpcall(function()
+			os.remove(request_root)
+			os.remove(target_root)
+			assert(HOST_MKDIR(request_root))
+			assert(HOST_MKDIR(target_root))
+			assert(HOST_MKDIR(target_subdirectory))
+			local adapter = nil
+			adapter, staging_locks = make_adapter({ [link_path] = target_subdirectory })
+			write_ok = adapter.write(requested_path, "posix symlink ordering")
+
+			local function read_all(path)
+				local fh = io.open(path, "r")
+				if not fh then return nil end
+				local content = fh:read("*a")
+				fh:close()
+				return content
+			end
+			kernel_content = read_all(kernel_target)
+			collapsed_content = read_all(lexically_collapsed_target)
+		end, debug.traceback)
+		os.remove(kernel_target)
+		os.remove(lexically_collapsed_target)
+		for lock_path in pairs(staging_locks) do
+			os.remove(lock_path .. "/payload")
+			HOST_RMDIR(lock_path)
+		end
+		HOST_RMDIR(target_subdirectory)
+		HOST_RMDIR(target_root)
+		HOST_RMDIR(request_root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_true(write_ok, "the legitimate dot-dot destination must remain writable")
+		helpers.assert_eq(kernel_content, "posix symlink ordering",
+			"dot-dot must apply to the symlink target, as the kernel resolves it")
+		helpers.assert_nil(collapsed_content,
+			"lexical normalization must not bypass the preceding symlink")
+	end)
+
 	helpers.it("fails before staging when a dangling final symlink has no readable target", function()
 		local symlink_path = os.tmpname():gsub("\\", "/")
 		os.remove(symlink_path)
