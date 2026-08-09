@@ -192,84 +192,14 @@ end
 -- ==============================
 -- ==============================
 
---- Suspends all registered modules gracefully.
---- Uses pause_processing() on keymap so the script-control tap stays alive,
---- allowing the user to un-pause without reloading.
-local function pause_all()
-	-- Snapshot which sub-systems are active so resume_all() can restore exactly
-	-- the pre-pause state rather than unconditionally re-enabling everything.
-	_gestures_were_enabled  = _gestures  and type(_gestures.is_enabled) == "function"  and _gestures.is_enabled()  or false
-	_shortcuts_were_running = _shortcuts and type(_shortcuts.is_bindings_started) == "function" and _shortcuts.is_bindings_started() or false
-
-	if _keymap and type(_keymap.pause_processing) == "function" then
-		pcall(function() _keymap.pause_processing() end)
-	end
-	-- Quiesce the LLM engine and tear down any visible tooltip. pause_processing
-	-- only gates the keymap eventtap; the prediction engine's inactivity/chain
-	-- timers and an in-flight streaming response are independent of it, so a
-	-- prediction armed in the moment before pause would still paint and hit the
-	-- backend. reset_predictions() hides the tooltip, stops those timers and
-	-- bumps the fetch counter so stale streaming callbacks self-discard. This
-	-- mirrors the AHK Ergopti_OnSuspendEnter reactor (« pause = tout éteint »).
-	if _keymap and type(_keymap.reset_predictions) == "function" then
-		pcall(function() _keymap.reset_predictions() end)
-	end
-	-- Stop BOTH warmup drivers: warmup_controller's scheduled retry chain AND
-	-- api_mlx's own self-rescheduling retry (which is gated only on the LLM
-	-- feature toggle, not on pause). Without api_mlx.stop_warmup() a cold-start
-	-- warmup keeps POSTing through the pause and fires the "server ready"
-	-- notification mid-pause (M-3).
-	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
-	if ok_wc and wc and type(wc.stop) == "function" then
-		pcall(function() wc.stop() end)
-	end
-	local ok_api, api = pcall(require, "modules.llm.api_mlx")
-	if ok_api and api and type(api.stop_warmup) == "function" then
-		pcall(function() api.stop_warmup() end)
-	end
-	-- Ollama's warmup needs parking for the same reason MLX's does, and its
-	-- stop_warmup was added for the disable path without being wired here: an
-	-- in-flight warmup POST kept its callbacks live across the pause and could
-	-- flip readiness or fire the user-facing "server ready" notification while
-	-- the script was supposed to be entirely off. No resume counterpart, per its
-	-- own contract — it has no self-rescheduling retry chain to short-circuit
-	-- and does not clear readiness, so a resume must not force a pointless
-	-- re-warm of weights that are still loaded.
-	local ok_oll, oll = pcall(require, "modules.llm.api_ollama")
-	if ok_oll and oll and type(oll.stop_warmup) == "function" then
-		pcall(function() oll.stop_warmup() end)
-	end
-	local ok_tt, tt = pcall(require, "ui.tooltip")
-	if ok_tt and tt and type(tt.hide_forced) == "function" then
-		pcall(function() tt.hide_forced() end)
-	end
-	-- Use pause_bindings() rather than stop() so the script-control eventtap
-	-- itself stays alive — stop() would also call ScriptControl.stop() and
-	-- kill this very tap, making AltGr+Enter unable to un-pause.
-	if _shortcuts and type(_shortcuts.pause_bindings) == "function" then
-		pcall(function() _shortcuts.pause_bindings() end)
-	elseif _shortcuts and type(_shortcuts.stop) == "function" then
-		pcall(function() _shortcuts.stop() end)
-	end
-	-- suspend() sets CoreState.suspended=true while leaving CoreState.enabled
-	-- untouched. This means a menu toggle of gestures ON/OFF during pause
-	-- changes the right axis and is honoured correctly at resume, instead of
-	-- being overwritten by a stale snapshot-based enable_all() call.
-	if _gestures and type(_gestures.suspend) == "function" then
-		pcall(function() _gestures.suspend() end)
-	elseif _gestures and type(_gestures.disable_all) == "function" then
-		pcall(function() _gestures.disable_all() end)
-	end
-end
-
---- Calls one resume or rollback operation without swallowing a thrown error or
---- an explicit false result. Legacy lifecycle functions return nil on success,
+--- Calls one lifecycle operation without swallowing a thrown error or an
+--- explicit false result. Legacy lifecycle functions return nil on success,
 --- so only the explicit false sentinel is a rejected operation.
 --- @param label string Stable operation name for diagnostics.
 --- @param action function Operation to call.
 --- @return boolean ok
 --- @return string|nil reason
-local function call_resume_operation(label, action)
+local function call_lifecycle_operation(label, action)
 	local ok_call, result, detail = pcall(action)
 	if not ok_call then
 		return false, string.format("%s raised: %s", label, tostring(result))
@@ -280,26 +210,256 @@ local function call_resume_operation(label, action)
 	return true, nil
 end
 
---- Rolls back every resume operation that could already have mutated state.
---- The failing operation itself is included because it may mutate before it
---- throws or returns false. Inverses run in strict reverse order.
---- @param applied table[] Applied resume descriptors.
+--- Rolls back every reversible lifecycle operation that may already have
+--- mutated state. The failing operation is registered before it is called, so
+--- mutate-then-throw and mutate-then-false implementations are covered too.
+--- @param operation string Human-readable transaction name.
+--- @param applied table[] Applied descriptors in forward order.
 --- @return string|nil Joined rollback failures, if any.
-local function rollback_resume_operations(applied)
+local function rollback_lifecycle_operations(operation, applied)
 	local failures = {}
 	for index = #applied, 1, -1 do
 		local step = applied[index]
-		local ok_rollback, rollback_reason = call_resume_operation(
+		local ok_rollback, rollback_reason = call_lifecycle_operation(
 			step.label .. " rollback",
 			step.rollback
 		)
 		if not ok_rollback then
 			failures[#failures + 1] = rollback_reason
-			Logger.error(LOG, "Resume rollback failed: %s.", tostring(rollback_reason))
+			Logger.error(LOG, "%s rollback failed: %s.", operation, tostring(rollback_reason))
 		end
 	end
 	if #failures == 0 then return nil end
 	return table.concat(failures, "; ")
+end
+
+--- Reads one boolean lifecycle snapshot without letting a dependency throw out
+--- of the pause callback. A false value is valid state, not operation failure.
+--- @param label string Stable snapshot name.
+--- @param action function Snapshot getter.
+--- @return boolean ok
+--- @return boolean|nil value
+--- @return string|nil reason
+local function read_lifecycle_snapshot(label, action)
+	local ok_call, value = pcall(action)
+	if not ok_call then
+		return false, nil, string.format("%s raised: %s", label, tostring(value))
+	end
+	if type(value) ~= "boolean" then
+		return false, nil, string.format("%s returned non-boolean: %s", label, tostring(value))
+	end
+	return true, value, nil
+end
+
+--- Suspends all registered modules as one local transaction.
+---
+--- Every required API and inverse is preflighted before the first mutation.
+--- Required one-way cleanups are explicitly marked: restoring a stale tooltip
+--- or prediction would be incorrect, while Ollama's stop only invalidates one
+--- in-flight generation and deliberately has no resume counterpart. A failure
+--- in any step still rolls every reversible module back and prevents PAUSED
+--- from being published.
+--- @return boolean True only when every required quiescence step committed.
+--- @return string|nil Failure detail.
+local function pause_all()
+	-- The legacy public API remains callable before M.start() (covered by
+	-- test_script_control.lua). Once the eventtap exists, every injected driver
+	-- dependency is required; a partial pause would be a false PAUSED state.
+	local enforce_dependencies = _tap ~= nil
+	local steps = {}
+	local shortcuts_were_running = false
+	local gestures_were_enabled = false
+
+	local function dependency_failure(reason)
+		if enforce_dependencies then return false, reason end
+		Logger.warn(LOG, "Pre-start pause dependency skipped: %s.", tostring(reason))
+		return true, nil
+	end
+
+	local function add_required_step(label, action, rollback, one_way_contract)
+		if type(action) ~= "function" then
+			return dependency_failure(label .. " API unavailable")
+		end
+		if rollback ~= nil and type(rollback) ~= "function" then
+			return dependency_failure(label .. " has no inverse rollback")
+		end
+		if rollback == nil and type(one_way_contract) ~= "string" then
+			return dependency_failure(label .. " has no inverse rollback or one-way contract")
+		end
+		steps[#steps + 1] = {
+			label = label,
+			action = action,
+			rollback = rollback,
+			one_way_contract = one_way_contract,
+		}
+		return true, nil
+	end
+
+	local function require_pause_module(module_name)
+		local ok_require, module_or_err = pcall(require, module_name)
+		if not ok_require or type(module_or_err) ~= "table" then
+			local reason = ok_require
+				and string.format("require(%s) returned %s", module_name, type(module_or_err))
+				or string.format("require(%s) raised: %s", module_name, tostring(module_or_err))
+			local ok_dependency, dependency_reason = dependency_failure(reason)
+			if not ok_dependency then return nil, dependency_reason end
+			return nil, nil
+		end
+		return module_or_err, nil
+	end
+
+	if enforce_dependencies and not _keymap then return false, "keymap dependency unavailable" end
+	if enforce_dependencies and not _shortcuts then return false, "shortcuts dependency unavailable" end
+	if enforce_dependencies and not _gestures then return false, "gestures dependency unavailable" end
+
+	if _shortcuts then
+		if type(_shortcuts.is_bindings_started) ~= "function" then
+			local ok_dependency, dependency_reason = dependency_failure(
+				"shortcuts.is_bindings_started API unavailable")
+			if not ok_dependency then return false, dependency_reason end
+		else
+			local ok_snapshot, snapshot_value, snapshot_reason = read_lifecycle_snapshot(
+				"shortcuts.is_bindings_started", _shortcuts.is_bindings_started)
+			if not ok_snapshot then return false, snapshot_reason end
+			shortcuts_were_running = snapshot_value
+		end
+	end
+	if _gestures and type(_gestures.is_enabled) == "function" then
+		local ok_snapshot, snapshot_value, snapshot_reason = read_lifecycle_snapshot(
+			"gestures.is_enabled", _gestures.is_enabled)
+		if not ok_snapshot then return false, snapshot_reason end
+		gestures_were_enabled = snapshot_value
+	elseif _gestures and type(_gestures.suspend) ~= "function" then
+		local ok_dependency, dependency_reason = dependency_failure(
+			"gestures.is_enabled API unavailable for disable_all fallback")
+		if not ok_dependency then return false, dependency_reason end
+	end
+
+	local ok_step, step_reason = add_required_step(
+		"keymap.pause_processing",
+		_keymap and _keymap.pause_processing,
+		_keymap and _keymap.resume_processing
+	)
+	if not ok_step then return false, step_reason end
+
+	if shortcuts_were_running then
+		local shortcut_action = _shortcuts and (
+			type(_shortcuts.pause_bindings) == "function" and _shortcuts.pause_bindings
+			or _shortcuts.stop
+		) or nil
+		local shortcut_label = _shortcuts and type(_shortcuts.pause_bindings) == "function"
+			and "shortcuts.pause_bindings" or "shortcuts.stop"
+		local shortcut_rollback = _shortcuts and (
+			type(_shortcuts.resume_bindings) == "function" and _shortcuts.resume_bindings
+			or _shortcuts.start
+		) or nil
+		ok_step, step_reason = add_required_step(
+			shortcut_label,
+			shortcut_action,
+			shortcut_rollback
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	-- suspend() preserves CoreState.enabled while gating every gesture. The
+	-- fallback is only reversible when gestures were enabled before pause.
+	if _gestures and type(_gestures.suspend) == "function" then
+		ok_step, step_reason = add_required_step(
+			"gestures.suspend",
+			_gestures.suspend,
+			_gestures.resume
+		)
+		if not ok_step then return false, step_reason end
+	elseif gestures_were_enabled then
+		ok_step, step_reason = add_required_step(
+			"gestures.disable_all",
+			_gestures and _gestures.disable_all,
+			_gestures and _gestures.enable_all
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	local api, api_reason = require_pause_module("modules.llm.api_mlx")
+	if api_reason then return false, api_reason end
+	if api then
+		ok_step, step_reason = add_required_step(
+			"api_mlx.stop_warmup",
+			api.stop_warmup,
+			api.resume_warmup
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	local wc, wc_reason = require_pause_module("modules.llm.warmup_controller")
+	if wc_reason then return false, wc_reason end
+	if wc then
+		local warmup_rollback = nil
+		if type(wc.schedule_warmup_with_retry) == "function" then
+			warmup_rollback = function()
+				return wc.schedule_warmup_with_retry("script pause rollback")
+			end
+		end
+		ok_step, step_reason = add_required_step(
+			"warmup_controller.stop",
+			wc.stop,
+			warmup_rollback
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	local oll, oll_reason = require_pause_module("modules.llm.api_ollama")
+	if oll_reason then return false, oll_reason end
+	if oll then
+		ok_step, step_reason = add_required_step(
+			"api_ollama.stop_warmup",
+			oll.stop_warmup,
+			nil,
+			"invalidates one in-flight generation; readiness and retry policy stay enabled"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	-- reset_predictions is required and intentionally one-way: re-arming a stale
+	-- streaming generation after rollback would let an obsolete response paint.
+	ok_step, step_reason = add_required_step(
+		"keymap.reset_predictions",
+		_keymap and _keymap.reset_predictions,
+		nil,
+		"stale prediction generations must never be restored"
+	)
+	if not ok_step then return false, step_reason end
+
+	local tt, tt_reason = require_pause_module("ui.tooltip")
+	if tt_reason then return false, tt_reason end
+	if tt then
+		ok_step, step_reason = add_required_step(
+			"tooltip.hide_forced",
+			tt.hide_forced,
+			nil,
+			"reopening stale visual output after rollback would lie"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	local applied = {}
+	for _, step in ipairs(steps) do
+		-- Register before invoking: the operation may mutate and then throw/false.
+		if step.rollback then applied[#applied + 1] = step end
+		local ok_action, action_reason = call_lifecycle_operation(step.label, step.action)
+		if not ok_action then
+			local rollback_reason = rollback_lifecycle_operations("Pause", applied)
+			if rollback_reason then
+				action_reason = action_reason .. "; rollback failures: " .. rollback_reason
+			end
+			return false, action_reason
+		end
+	end
+
+	-- Publish snapshots only after the transaction itself committed. A failed
+	-- attempt must not poison the next clean retry's resume contract.
+	_shortcuts_were_running = shortcuts_were_running
+	_gestures_were_enabled = gestures_were_enabled
+	return true, nil
 end
 
 --- Resumes all registered modules as one local transaction.
@@ -440,7 +600,7 @@ local function resume_all()
 		-- Register the inverse before calling the operation: a throwing function
 		-- can already have mutated its first field before raising.
 		if step.rollback then applied[#applied + 1] = step end
-		local ok_action, action_reason = call_resume_operation(step.label, step.action)
+		local ok_action, action_reason = call_lifecycle_operation(step.label, step.action)
 		if not ok_action then
 			if step.best_effort then
 				Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
@@ -448,7 +608,7 @@ local function resume_all()
 			elseif not enforce_transaction then
 				Logger.warn(LOG, "Pre-start resume operation ignored: %s.", tostring(action_reason))
 			else
-				local rollback_reason = rollback_resume_operations(applied)
+				local rollback_reason = rollback_lifecycle_operations("Resume", applied)
 				if rollback_reason then
 					action_reason = action_reason .. "; rollback failures: " .. rollback_reason
 				end
@@ -492,9 +652,10 @@ end
 local function commit_pause_state(target_paused)
 	if _is_paused == target_paused then return true, nil end
 	if target_paused then
-		_is_paused = true
 		Logger.info(LOG, "Pausing all script operations after PAUSED acknowledgement.")
-		pause_all()
+		local ok_pause, pause_reason = pause_all()
+		if not ok_pause then return false, pause_reason end
+		_is_paused = true
 	else
 		Logger.info(LOG, "Resuming all script operations after Karabiner regeneration committed.")
 		local ok_resume, resume_reason = resume_all()
@@ -581,13 +742,61 @@ local function rollback_native_resume(transaction, resume_reason)
 	end
 end
 
+--- Restores native RESUMED after a local Hammerspoon pause step failed. Local
+--- reversible modules have already been rolled back before this function runs;
+--- the failure remains unpublished until the native layer confirms RESUMED or
+--- reports that its fail-closed PAUSED state has settled.
+--- @param transaction table Captured pause transaction.
+--- @param pause_reason string Local root-cause detail.
+local function rollback_native_pause(transaction, pause_reason)
+	if _pause_transition ~= transaction then return end
+	transaction.stage = "native-pause-rollback"
+	Logger.error(LOG, "Local pause quiescence failed; restoring native RESUMED before publication: %s.",
+		tostring(pause_reason))
+	local method = _karabiner and _karabiner.resume or nil
+	if type(method) ~= "function" then
+		Logger.error(LOG,
+			"Local pause failed (%s), but native resume API is unavailable; failure remains unpublished.",
+			tostring(pause_reason))
+		return
+	end
+
+	local callback_fired = false
+	local function finish_rollback(ok, rollback_reason)
+		if callback_fired then return end
+		callback_fired = true
+		if _pause_transition ~= transaction then return end
+		local final_reason = pause_reason
+		if ok ~= true then
+			-- Native resume is fail-closed: a failed completion remains PAUSED.
+			-- Local modules are running again, so never publish a false PAUSED state;
+			-- surface the split-state failure and leave a fresh pause retry reachable.
+			final_reason = string.format("%s; native resume rollback settled fail-closed: %s",
+				tostring(pause_reason), tostring(rollback_reason))
+		end
+		complete_pause_transition(transaction, false, final_reason)
+	end
+
+	local ok_call, accepted_or_err = pcall(method, finish_rollback)
+	if not ok_call then
+		Logger.error(LOG,
+			"Local pause failed (%s), and native resume raised (%s); failure remains unpublished.",
+			tostring(pause_reason), tostring(accepted_or_err))
+	elseif accepted_or_err ~= true and not callback_fired then
+		Logger.error(LOG,
+			"Local pause failed (%s), and native resume was rejected without a safety callback; failure remains unpublished.",
+			tostring(pause_reason))
+	end
+end
+
 --- Handles the native result, then commits the Hammerspoon half atomically.
 --- @param transaction table Captured transition descriptor.
 --- @param ok boolean Whether the native transaction committed.
 --- @param reason any Controller result detail.
 local function settle_pause_transition(transaction, ok, reason)
 	if _pause_transition ~= transaction then return end
-	if transaction.stage == "native-resume-rollback" then return end
+	if transaction.stage == "native-resume-rollback"
+		or transaction.stage == "native-pause-rollback" then return end
 	if ok ~= true then
 		complete_pause_transition(transaction, false, reason)
 		return
@@ -599,7 +808,7 @@ local function settle_pause_transition(transaction, ok, reason)
 	elseif transaction.target == false then
 		rollback_native_resume(transaction, commit_reason)
 	else
-		complete_pause_transition(transaction, false, commit_reason)
+		rollback_native_pause(transaction, commit_reason)
 	end
 end
 
