@@ -79,15 +79,23 @@ function M.spawn(executable, args, on_done, on_chunk)
 	local _lifecycle = "constructing"
 
 	local function _safe_terminate()
-		if _task then
-			local task = _task
-			_task = nil
-			_input_closed = true
-			_lifecycle = "terminated"
-			-- Release the GC pin before terminate() in case on_done never fires.
-			M._active_tasks[task] = nil
-			pcall(function() task:terminate() end)
+		if not _task then return true end
+		local task = _task
+		local stopped, stop_err = pcall(function() task:terminate() end)
+		if not stopped then
+			-- Keep both the native task and its GC pin: this handle is the only exact
+			-- capability that can retry termination without process discovery.
+			Logger.error(LOG, "spawn.terminate(): native task stop failed; retained for retry — %s",
+				tostring(stop_err))
+			return false
 		end
+		if _task == task then _task = nil end
+		_input_closed = true
+		if _lifecycle ~= "completed" then _lifecycle = "terminated" end
+		-- A successful terminate request may never receive on_done, so release its
+		-- pin here as well as in the completion callback.
+		M._active_tasks[task] = nil
+		return true
 	end
 
 	--- Starts the underlying task, reporting the outcome to the caller.
@@ -281,7 +289,8 @@ function M.spawn(executable, args, on_done, on_chunk)
 	--- Closes the subprocess input so a supervised helper observes EOF.
 	handle.close_input = _safe_close_input
 
-	--- Terminates the subprocess if it is still running. Idempotent.
+	--- Terminates the subprocess if it is still running. Idempotent and retryable.
+	--- @return boolean settled True when no native task remains live.
 	handle.terminate = _safe_terminate
 
 	return handle
