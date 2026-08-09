@@ -324,3 +324,99 @@ helpers.describe("adapters.file_system: failed rename is non-destructive", funct
 		helpers.assert_eq(live_content, "personal-karabiner-config")
 	end)
 end)
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 3/ File-handle failure values =======
+-- =============================================
+-- =============================================
+
+helpers.describe("adapters.file_system: file-handle failures are fail-closed", function()
+	local function run_handle_failure_case(failing_method, failure_kind)
+		local path = os.tmpname():gsub("\\", "/")
+		local adapter, state = make_adapter(false)
+		local original_open = io.open
+		local original_rename = os.rename
+		local rename_calls = 0
+		local staged_path = nil
+		os.remove(path)
+
+		local function injected_failure()
+			local message = "injected " .. failing_method .. " " .. failure_kind
+			if failure_kind == "false" then return false, message end
+			if failure_kind == "nil" then return nil, message end
+			error(message)
+		end
+
+		io.open = function(open_path, mode)
+			if mode == "w" and open_path ~= path then
+				staged_path = open_path
+				local handle = {}
+				handle.write = function()
+					if failing_method == "write" then return injected_failure() end
+					return handle
+				end
+				handle.close = function()
+					if failing_method == "close" then return injected_failure() end
+					return true
+				end
+				return handle
+			end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if old_path ~= new_path then rename_calls = rename_calls + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "must not publish")
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+
+		local lock_path = staged_path and staging_lock_path(staged_path) or nil
+		local retained_owner = lock_path and state.locks[lock_path] or nil
+		local removed_lock_count = #state.removed_locks
+		local removed_lock_path = state.removed_locks[1]
+		local lock_still_exists = lock_path and HOST_ATTRIBUTES(lock_path) ~= nil or false
+		local destination = original_open(path, "r")
+		if destination then destination:close() end
+		os.remove(path)
+		if lock_still_exists then
+			if staged_path then os.remove(staged_path) end
+			HOST_RMDIR(lock_path)
+		end
+		if not call_ok then error(write_ok) end
+
+		local label = failing_method .. " " .. failure_kind
+		helpers.assert_eq(write_ok, false, label .. " must reject the write")
+		helpers.assert_eq(rename_calls, 0, label .. " must precede publication")
+		helpers.assert_true(staged_path ~= nil, label .. " must exercise a reserved staging area")
+		helpers.assert_nil(retained_owner, label .. " must release owned staging when cleanup succeeds")
+		helpers.assert_eq(removed_lock_count, 1, label .. " must remove exactly one owned lock")
+		helpers.assert_eq(removed_lock_path, lock_path, label .. " must remove its own lock")
+		helpers.assert_eq(lock_still_exists, false, label .. " must leave no lock directory")
+		helpers.assert_nil(destination, label .. " must not create the destination")
+	end
+
+	local cases = {
+		{ method = "write", kind = "false" },
+		{ method = "write", kind = "nil" },
+		{ method = "write", kind = "throw" },
+		{ method = "close", kind = "false" },
+		{ method = "close", kind = "nil" },
+		{ method = "close", kind = "throw" },
+	}
+	local function register_case(case)
+		local method = case.method
+		local kind = case.kind
+		helpers.it("rejects fh:" .. method .. "() " .. kind .. " failure", function()
+			run_handle_failure_case(method, kind)
+		end)
+	end
+	for _, case in ipairs(cases) do register_case(case) end
+end)
