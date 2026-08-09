@@ -43,7 +43,10 @@ helpers.describe("pause_all: every backend's warmup is parked", function()
 		local at = code:find("local function pause_all", 1, true)
 		helpers.assert_true(at ~= nil, "pause_all must exist")
 
-		local body = code:sub(at, at + 3000)
+		local resume_at = code:find("\nlocal function resume_all", at, true)
+		helpers.assert_true(resume_at ~= nil,
+			"pause_all must be bounded by the sibling resume_all declaration")
+		local body = code:sub(at, resume_at and (resume_at - 1) or #code)
 
 		helpers.assert_true(body:find("modules.llm.api_mlx", 1, true) ~= nil,
 			"the MLX warmup must still be stopped")

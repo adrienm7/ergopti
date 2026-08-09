@@ -637,7 +637,10 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
-		package.loaded["modules.llm.warmup_controller"] = { stop = function() stopped = stopped + 1 end }
+		package.loaded["modules.llm.warmup_controller"] = {
+			stop = function() stopped = stopped + 1 end,
+			schedule_warmup_with_retry = function() end,
+		}
 
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
@@ -657,6 +660,9 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 	helpers.it("pause_all invokes the real quiescence calls, resume_all the symmetric restores", function()
 		local calls = {}
 		local function rec(name) return function() calls[name] = (calls[name] or 0) + 1 end end
+		-- pause now treats tooltip teardown as required. Keep this unit test
+		-- behavioral and deterministic instead of loading the real TOML-backed UI.
+		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }
 		local keymap_spy = {
 			pause_processing  = rec("km_pause"),
 			resume_processing = rec("km_resume"),
@@ -703,6 +709,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.km_reset or 0) >= 1, "pause must call keymap.reset_predictions")
 		helpers.assert_true((calls.sc_pause or 0) >= 1, "pause must call shortcuts.pause_bindings")
 		helpers.assert_true((calls.g_disable or 0) >= 1, "pause must call gestures.disable_all")
+		helpers.assert_true((calls.tt_hide or 0) >= 1, "pause must hide every visible tooltip")
 		helpers.assert_true((calls.k_pause or 0) >= 1, "pause must call karabiner.pause")
 
 		SC.resume_all()
@@ -713,6 +720,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
 
 		SC.stop()
+		package.loaded["ui.tooltip"] = nil
 	end)
 end)
 
