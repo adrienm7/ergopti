@@ -39,6 +39,8 @@ local function load_remap(options)
 		classifier_refreshes = 0,
 		classifier_clears = 0,
 		deploys = 0,
+		deploy_failure = options.deploy_failure,
+		payload_published = false,
 		public_results = {},
 		timer_delays = {},
 	}
@@ -78,7 +80,13 @@ local function load_remap(options)
 		merge_and_deploy_config = function()
 			calls.deploys = calls.deploys + 1
 			calls.order[#calls.order + 1] = "deploy"
-			if options.deploy_failure then return false, "synthetic-deploy-failure" end
+			calls.payload_published = true
+			if calls.deploy_failure == "throw" then
+				error("synthetic deploy failure")
+			end
+			if calls.deploy_failure == "false" then
+				return false, "synthetic-deploy-failure"
+			end
 			return true, "ok"
 		end,
 		KE_PHYSICAL_KC_LOG = nil,
@@ -286,10 +294,50 @@ local function load_remap(options)
 	end
 
 	function calls.set_shortcuts_paused(value) shortcuts_paused = value == true end
+	function calls.set_deploy_failure(mode) calls.deploy_failure = mode end
 	return remap, calls
 end
 
 helpers.describe("lease-bound input activation transaction", function()
+	for _, mode in ipairs({ "throw", "false" }) do
+		helpers.it("contains a deploy " .. mode .. " before starting the lease", function()
+			local _, calls = load_remap({ deploy_failure = mode })
+			local call_ok, accepted = pcall(calls.regenerate)
+			helpers.assert_true(call_ok, "deploy failure escaped the public regeneration boundary")
+			helpers.assert_true(accepted == false)
+			helpers.assert_eq(calls.deploys, 1)
+			helpers.assert_eq(calls.start_paused, 0)
+			helpers.assert_eq(#calls.public_results, 1)
+			helpers.assert_true(calls.public_results[1].ok == false)
+			helpers.assert_eq(calls.public_results[1].reason, "deploy-failed")
+		end)
+
+		helpers.it("fences the exact ACTIVE generation after a deploy " .. mode, function()
+			local _, calls = load_remap()
+			helpers.assert_true(calls.regenerate())
+			calls.deliver_ready()
+			calls.deliver_resumed()
+			calls.public_results = {}
+			calls.deploys = 0
+			calls.payload_published = false
+			calls.set_deploy_failure(mode)
+
+			local call_ok, accepted = pcall(calls.regenerate)
+			helpers.assert_true(call_ok, "ACTIVE deploy failure escaped regeneration")
+			helpers.assert_true(accepted == false)
+			helpers.assert_eq(calls.deploys, 1)
+			helpers.assert_true(calls.payload_published,
+				"the failure is injected after the replacement may already be visible")
+			helpers.assert_eq(#calls.stop_exact, 1,
+				"publication is ambiguous, so only the captured token may remain authoritative")
+			helpers.assert_eq(calls.stop_exact[1].token, TOKEN_A)
+			helpers.assert_eq(calls.stop_generic, 0)
+			helpers.assert_eq(#calls.public_results, 1)
+			helpers.assert_true(calls.public_results[1].ok == false)
+			helpers.assert_eq(calls.public_results[1].reason, "deploy-failed")
+		end)
+	end
+
 	helpers.it("prepares every consumer under PAUSED and publishes only after RESUMED", function()
 		local _, calls = load_remap()
 		helpers.assert_true(calls.regenerate())
