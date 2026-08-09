@@ -59,11 +59,16 @@ helpers.describe("adapters/shell_runner.lua: GC protection", function()
 
 	helpers.it("wrapped_on_done removes the task from M._active_tasks", function()
 		local src = strip_comments(read_source("local function invoke_guarded"))
-		-- The GC pin must be released via the closure upvalue _task (not the first
-		-- callback arg, which is exit_code since hs.task passes no task object).
+		local done_start = assert(src:find("local function wrapped_on_done", 1, true))
+		local done_end = assert(src:find("local function wrapped_on_chunk", done_start, true))
+		local done_body = src:sub(done_start, done_end - 1)
+		-- Capture the closure upvalue before clearing it. The first callback arg is
+		-- only exit_code, and indexing the GC root with that integer leaks the task.
 		helpers.assert_true(
-			src:find("M%._active_tasks%[_task%]%s*=%s*nil") ~= nil,
-			"spawn() on_done wrapper must set M._active_tasks[_task] = nil (closure upvalue, not callback arg) to release the GC root")
+			done_body:find("local%s+completed_task%s*=%s*_task") ~= nil
+				and done_body:find("M%._active_tasks%[completed_task%]%s*=%s*nil") ~= nil
+				and done_body:find("_task%s*=%s*nil") ~= nil,
+			"wrapped_on_done must capture and release the exact closure task before clearing it")
 	end)
 
 	helpers.it("hs.task.new uses wrapped_on_done, not the raw on_done", function()

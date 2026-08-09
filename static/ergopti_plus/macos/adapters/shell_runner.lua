@@ -12,9 +12,9 @@
 ---    string. Best-effort — failures return "" rather than raising. Used for
 ---    fire-and-forget operations (mkdir, pkill, nohup daemon starts, stat calls).
 --- 2. spawn(): async subprocess via hs.task. Returns an opaque handle with
----    start() and terminate() methods. Supports both the 3-arg form (no streaming
----    callback) and the 4-arg form (streaming chunk callback). Used for curl
----    streaming, zombie-kill bash tasks, and discovery probes.
+---    lifecycle and streaming-input methods. Supports both the 3-arg form (no
+---    streaming callback) and the 4-arg form (streaming chunk callback). Used
+---    for curl streaming, supervised helpers, and discovery probes.
 --- 3. All hs.task interactions are wrapped in pcall so a task failure never
 ---    propagates to the caller as an unhandled exception.
 --- ==============================================================================
@@ -75,13 +75,18 @@ end
 function M.spawn(executable, args, on_done, on_chunk)
 	local handle = {}
 	local _task  = nil
+	local _input_closed = false
+	local _lifecycle = "constructing"
 
 	local function _safe_terminate()
 		if _task then
-			-- Release the GC pin before terminate() in case on_done never fires.
-			M._active_tasks[_task] = nil
-			pcall(function() _task:terminate() end)
+			local task = _task
 			_task = nil
+			_input_closed = true
+			_lifecycle = "terminated"
+			-- Release the GC pin before terminate() in case on_done never fires.
+			M._active_tasks[task] = nil
+			pcall(function() task:terminate() end)
 		end
 	end
 
@@ -91,15 +96,18 @@ function M.spawn(executable, args, on_done, on_chunk)
 	--- invisible to pcall and would leave such a flag set for the process lifetime.
 	--- @return boolean True when the subprocess was started, false on any failure.
 	local function _safe_start()
+		if _lifecycle == "starting" or _lifecycle == "started" then return true end
 		if not _task then
 			Logger.error(LOG, "spawn.start(): task was not created for %s", tostring(executable))
 			return false
 		end
+		local task = _task
+		_lifecycle = "starting"
 		-- The closure MUST return the value: hs.task:start() reports a refused launch
 		-- by RETURNING false, not by raising, so a pcall that only captures the raise
 		-- reported success for the most common real failure (missing or non-executable
 		-- binary) — exactly the case this function's contract exists to surface.
-		local ok, started = pcall(function() return _task:start() end)
+		local ok, started = pcall(function() return task:start() end)
 		-- Release the GC pin on BOTH failure paths. The pin is taken at
 		-- construction so the task cannot be collected mid-run, and is released by
 		-- the completion callback — which never fires for a task that never
@@ -107,15 +115,68 @@ function M.spawn(executable, args, on_done, on_chunk)
 		-- captured closures in the GC root for the life of the process, and the
 		-- root is the one table that is never pruned.
 		if not ok then
-			if _task then M._active_tasks[_task] = nil end
+			if _lifecycle ~= "completed" then
+				M._active_tasks[task] = nil
+				if _task == task then _task = nil end
+				_input_closed = true
+				_lifecycle = "start_failed"
+			end
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
 			return false
 		end
 		if not started then
-			if _task then M._active_tasks[_task] = nil end
+			if _lifecycle ~= "completed" then
+				M._active_tasks[task] = nil
+				if _task == task then _task = nil end
+				_input_closed = true
+				_lifecycle = "start_failed"
+			end
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 			return false
 		end
+		if _lifecycle == "starting" then _lifecycle = "started" end
+		return true
+	end
+
+	--- Writes bytes to a live streaming task without exposing its native handle.
+	--- Multiple native writes are deliberately not queued here because the task
+	--- API discards input that has not yet drained. Protocol owners must serialize
+	--- writes with acknowledgements before calling this method again.
+	--- @param data string Bytes to forward to the task's standard input.
+	--- @return boolean True when the native task accepted the input.
+	local function _safe_set_input(data)
+		if not _task or _input_closed then
+			Logger.error(LOG, "spawn.set_input(): no writable task exists for %s.", tostring(executable))
+			return false
+		end
+		if type(data) ~= "string" or data == "" then
+			Logger.error(LOG, "spawn.set_input(): input must be a non-empty string for %s.", tostring(executable))
+			return false
+		end
+		local ok, result = pcall(function() return _task:setInput(data) end)
+		if not ok or result == false or result == nil then
+			Logger.error(LOG, "spawn.set_input(): task input failed for %s — %s",
+				tostring(executable), tostring(result))
+			return false
+		end
+		return true
+	end
+
+	--- Closes a streaming task's standard input, delivering EOF exactly once.
+	--- @return boolean True when EOF was delivered or had already been delivered.
+	local function _safe_close_input()
+		if _input_closed then return true end
+		if not _task then
+			Logger.error(LOG, "spawn.close_input(): no live task exists for %s.", tostring(executable))
+			return false
+		end
+		local ok, result = pcall(function() return _task:closeInput() end)
+		if not ok or result == false or result == nil then
+			Logger.error(LOG, "spawn.close_input(): closing task input failed for %s — %s",
+				tostring(executable), tostring(result))
+			return false
+		end
+		_input_closed = true
 		return true
 	end
 
@@ -148,7 +209,15 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- the SIGTERM completion callback, so without it this fires `M._active_tasks[nil]`
 	-- — a "table index is nil" error on every superseded/cancelled stream.
 	local function wrapped_on_done(exit_code, stdout, stderr)
-		if _task then M._active_tasks[_task] = nil end
+		if _lifecycle == "completed" then
+			Logger.warn(LOG, "Ignoring duplicate completion callback for '%s'.", tostring(executable))
+			return
+		end
+		local completed_task = _task
+		if completed_task then M._active_tasks[completed_task] = nil end
+		_task = nil
+		_input_closed = true
+		_lifecycle = "completed"
 		if type(on_done) == "function" then
 			-- xpcall instead of pcall so a throw in on_done is surfaced (not swallowed).
 			-- A silently-swallowed throw here is the root cause of the "vert mais aucune
@@ -197,6 +266,7 @@ function M.spawn(executable, args, on_done, on_chunk)
 		Logger.error(LOG, "spawn(): hs.task.new('%s') returned no task — %s", tostring(executable), tostring(task_or_err))
 	else
 		_task = task_or_err
+		_lifecycle = "prepared"
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
 		-- the subprocess is still running (shell-runner-gc-kill fix).
 		M._active_tasks[_task] = true
@@ -204,6 +274,12 @@ function M.spawn(executable, args, on_done, on_chunk)
 
 	--- Starts the spawned subprocess. Returns true on success, false on failure.
 	handle.start = _safe_start
+
+	--- Writes one already-framed input payload to a streaming subprocess.
+	handle.set_input = _safe_set_input
+
+	--- Closes the subprocess input so a supervised helper observes EOF.
+	handle.close_input = _safe_close_input
 
 	--- Terminates the subprocess if it is still running. Idempotent.
 	handle.terminate = _safe_terminate
