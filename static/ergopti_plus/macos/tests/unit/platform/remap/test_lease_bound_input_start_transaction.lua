@@ -215,7 +215,10 @@ local function load_remap(options)
 			calls.classifier_refreshes = calls.classifier_refreshes + 1
 			calls.order[#calls.order + 1] = "classifier"
 			helpers.assert_eq(calls.phase, "paused", "classifier must publish under PAUSED")
-			if options.classifier_failure then error("synthetic classifier failure") end
+			if options.classifier_failure == "throw" then
+				error("synthetic classifier failure")
+			end
+			if options.classifier_failure == "false" then return false end
 			return true
 		end
 	end
@@ -349,17 +352,20 @@ helpers.describe("lease-bound input activation transaction", function()
 		end
 	end
 
-	helpers.it("rolls back all inputs and sends no RESUME when KC refresh throws", function()
-		local _, calls = load_remap({ classifier_failure = true })
-		helpers.assert_true(calls.regenerate())
-		calls.deliver_ready()
-		helpers.assert_eq(#calls.bind_attempts, 4)
-		helpers.assert_eq(#calls.resume_callbacks, 0)
-		helpers.assert_eq(#calls.unbound, 4)
-		helpers.assert_eq(calls.gesture_stops, 1)
-		helpers.assert_eq(#calls.stop_exact, 1)
-		helpers.assert_true(calls.public_results[1].ok == false)
-	end)
+	for _, mode in ipairs({ "throw", "false" }) do
+		helpers.it("rolls back all inputs and sends no RESUME when KC refresh returns " .. mode,
+			function()
+				local _, calls = load_remap({ classifier_failure = mode })
+				helpers.assert_true(calls.regenerate())
+				calls.deliver_ready()
+				helpers.assert_eq(#calls.bind_attempts, 4)
+				helpers.assert_eq(#calls.resume_callbacks, 0)
+				helpers.assert_eq(#calls.unbound, 4)
+				helpers.assert_eq(calls.gesture_stops, 1)
+				helpers.assert_eq(#calls.stop_exact, 1)
+				helpers.assert_true(calls.public_results[1].ok == false)
+			end)
+	end
 
 	helpers.it("keeps the generation PAUSED and fences it when the KC API is absent", function()
 		local _, calls = load_remap({ classifier_missing = true })

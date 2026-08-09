@@ -350,12 +350,14 @@ end
 --- Should be called by platform/remap/init.lua after M.apply_config().
 --- @param tap_hold_config table Map of key_id → {tap, hold} action ids.
 --- @param available_actions table List of action definitions from actions.json.
+--- @return boolean refreshed True only after the replacement set is published.
 function M.refresh_managed_set(tap_hold_config, available_actions)
 	if type(tap_hold_config) ~= "table" or type(available_actions) ~= "table" then
 		Logger.warn(LOG, "refresh_managed_set: invalid arguments — skipping rebuild.")
-		return
+		return false
 	end
 	build_managed_output_set(tap_hold_config, available_actions)
+	return true
 end
 
 --- Releases every output-keycode claim without stopping the physical ledger.
@@ -363,6 +365,7 @@ end
 --- therefore an inert, disabled or failed Ergopti lease must leave this set empty.
 function M.clear_managed_set()
 	_managed_output_kcs = {}
+	return true
 end
 
 --- Arms the path watcher and backup poll timer. Idempotent: skips creation when

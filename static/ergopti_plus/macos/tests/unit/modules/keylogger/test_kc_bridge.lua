@@ -152,14 +152,14 @@ helpers.describe("kc_bridge — refresh_managed_set", function()
 	-- keystrokes as if the driver had synthesised them.
 	helpers.it("a non-table tap_hold_config leaves no keycode marked managed", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		kc.refresh_managed_set(nil, {})
+		helpers.assert_true(kc.refresh_managed_set(nil, {}) == false)
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
 			"a refused refresh must leave the managed set empty, not partially built")
 	end)
 
 	helpers.it("a non-table available_actions leaves no keycode marked managed", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		kc.refresh_managed_set({}, nil)
+		helpers.assert_true(kc.refresh_managed_set({}, nil) == false)
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
 			"same on the other argument — half a set is worse than none, because the half "
 				.. "that is there looks authoritative")
@@ -179,7 +179,7 @@ helpers.describe("kc_bridge — refresh_managed_set", function()
 			},
 		}
 
-		kc.refresh_managed_set(tap_hold_config, available_actions)
+		helpers.assert_true(kc.refresh_managed_set(tap_hold_config, available_actions))
 
 		-- left_command → hs name "cmd" → keycodes.map["cmd"] = 55
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), true)
@@ -234,7 +234,7 @@ helpers.describe("kc_bridge — refresh_managed_set", function()
 		)
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), true)
 
-		kc.clear_managed_set()
+		helpers.assert_true(kc.clear_managed_set())
 
 		helpers.assert_eq(kc.is_ke_managed_output_kc(55), false,
 			"an inactive Ergopti lease must not suppress the same keycode from personal Karabiner")
