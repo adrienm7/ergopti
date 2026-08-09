@@ -402,11 +402,11 @@ end
 -- The 19 hold-only actions of the catalogue are deliberately absent: a gesture
 -- has no duration, so "hold Shift" cannot be expressed as one.
 
--- Karabiner reads these two variables to decide whether the navigation layer is
--- live; `layer_toggle` is the latched half and `layer_active` the one the
--- manipulators test, and writing only one leaves the engine half-switched.
-local KE_LAYER_ON_VARIABLES  = { { "layer_toggle", 1 }, { "layer_active", 1 } }
-local KE_LAYER_OFF_VARIABLES = { { "layer_toggle", 0 }, { "layer_active", 0 } }
+-- `layer_active` is the one navigation-layer authority read by manipulators.
+-- Mirror variables add asynchronous writers without adding observable state.
+local KE_LAYER_VARIABLE = "layer_active"
+local KE_LAYER_ON       = 1
+local KE_LAYER_OFF      = 0
 local KE_CAPSWORD_VARIABLE   = "capsword"
 local KE_CAPSWORD_ACTIVE     = 1
 
@@ -454,11 +454,11 @@ end
 
 sg("layer_on", function()
 	local ke = ke_variables()
-	if ke then ke.set_all(KE_LAYER_ON_VARIABLES) end
+	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_ON) end
 end)
 sg("layer_off", function()
 	local ke = ke_variables()
-	if ke then ke.set_all(KE_LAYER_OFF_VARIABLES) end
+	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_OFF) end
 end)
 sg("capsword", function()
 	local ke = ke_variables()

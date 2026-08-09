@@ -17,24 +17,12 @@
 		"karabiner_to": [
 			{
 				"set_variable": {
-					"name": "layer_hold",
-					"value": 1
-				}
-			},
-			{
-				"set_variable": {
 					"name": "layer_active",
 					"value": 1
 				}
 			}
 		],
 		"karabiner_to_after_key_up": [
-			{
-				"set_variable": {
-					"name": "layer_hold",
-					"value": 0
-				}
-			},
 			{
 				"set_variable": {
 					"name": "layer_active",
@@ -52,12 +40,6 @@
 		"karabiner_to": [
 			{
 				"set_variable": {
-					"name": "layer_toggle",
-					"value": 1
-				}
-			},
-			{
-				"set_variable": {
 					"name": "layer_active",
 					"value": 1
 				}
@@ -71,12 +53,6 @@
 		"holdable": false,
 		"category": "Layer de navigation",
 		"karabiner_to": [
-			{
-				"set_variable": {
-					"name": "layer_toggle",
-					"value": 0
-				}
-			},
 			{
 				"set_variable": {
 					"name": "layer_active",

@@ -162,25 +162,21 @@ end)
 
 helpers.describe("Karabiner catalogue actions: engine variables", function()
 
-	helpers.it("layer_on switches BOTH variables on", function()
+	helpers.it("layer_on writes only the live layer authority", function()
 		local Actions, seen = fresh_registry()
 		helpers.assert_true(Actions.execute_single("layer_on"))
-		helpers.assert_eq(#seen.variables, 2,
-			"the navigation layer is two variables — writing only one leaves the engine "
-			.. "half-switched, with the layer latched but no manipulator testing it")
-		local written = {}
-		for _, v in ipairs(seen.variables) do written[v.name] = v.value end
-		helpers.assert_eq(written.layer_toggle, 1)
-		helpers.assert_eq(written.layer_active, 1)
+		helpers.assert_eq(#seen.variables, 1,
+			"a mirror variable with no reader creates an extra asynchronous writer")
+		helpers.assert_eq(seen.variables[1].name, "layer_active")
+		helpers.assert_eq(seen.variables[1].value, 1)
 	end)
 
-	helpers.it("layer_off switches BOTH variables off", function()
+	helpers.it("layer_off writes only the live layer authority", function()
 		local Actions, seen = fresh_registry()
 		helpers.assert_true(Actions.execute_single("layer_off"))
-		local written = {}
-		for _, v in ipairs(seen.variables) do written[v.name] = v.value end
-		helpers.assert_eq(written.layer_toggle, 0)
-		helpers.assert_eq(written.layer_active, 0)
+		helpers.assert_eq(#seen.variables, 1)
+		helpers.assert_eq(seen.variables[1].name, "layer_active")
+		helpers.assert_eq(seen.variables[1].value, 0)
 	end)
 
 	helpers.it("capsword sets the variable AND locks CapsLock", function()
