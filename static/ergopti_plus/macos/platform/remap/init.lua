@@ -310,6 +310,35 @@ local function exact_generation_phase(expected_token)
 	return phase
 end
 
+--- Fences only the captured generation when config publication may already
+--- have happened while its normal rules were live. A proven PAUSED/PREPARED
+--- generation is inert and can safely be retried without destroying its lease.
+--- @param expected_token string Exact generation embedded in the attempted file.
+--- @param detail any Deployment failure detail for diagnostics.
+--- @return boolean safe True when no fence is needed or exact fencing was accepted.
+local function contain_ambiguous_deploy_failure(expected_token, detail)
+	local exact_phase = exact_generation_phase(expected_token)
+	if exact_phase == "paused" or exact_phase == "prepared" then return true end
+	if type(LeaseController.stop_exact) ~= "function" then
+		Logger.error(LOG,
+			"Cannot fence ambiguous Karabiner deployment for token %s — exact stop API is unavailable.",
+			tostring(expected_token))
+		return false
+	end
+	local stop_ok, stopped_or_err = xpcall(function()
+		return LeaseController.stop_exact(expected_token, "deploy_publication_ambiguous")
+	end, debug.traceback)
+	if not stop_ok or stopped_or_err ~= true then
+		Logger.error(LOG, "Exact fence after ambiguous Karabiner deployment failed: %s.",
+			tostring(stopped_or_err))
+		return false
+	end
+	Logger.warn(LOG,
+		"Exact Karabiner generation %s is being fenced after ambiguous deployment: %s.",
+		tostring(expected_token), tostring(detail))
+	return true
+end
+
 --- Rolls back a failed input mount and, unless the caller can prove the same
 --- generation remains PAUSED, fences only the exact Ergopti lease. The KC
 --- classifier remains live while an ACTIVE generation is still being fenced so
@@ -1556,15 +1585,19 @@ function M.regenerate(on_done, recovery_capability)
 		return fail("generation-failed")
 	end
 
-	local deployed, deploy_detail = Generator.merge_and_deploy_config(
-		result,
-		KARABINER_OUT,
-		legacy_rules,
-		legacy_context
-	)
-	if not deployed then
+	local deploy_ok, deployed, deploy_detail = xpcall(function()
+		return Generator.merge_and_deploy_config(
+			result,
+			KARABINER_OUT,
+			legacy_rules,
+			legacy_context
+		)
+	end, debug.traceback)
+	if not deploy_ok or deployed ~= true then
+		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
-			KARABINER_OUT, tostring(deploy_detail))
+			KARABINER_OUT, tostring(deploy_failure))
+		contain_ambiguous_deploy_failure(lease_token, deploy_failure)
 		return fail("deploy-failed")
 	end
 
