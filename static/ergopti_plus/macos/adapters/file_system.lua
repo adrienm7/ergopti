@@ -511,16 +511,26 @@ function M.write(path, content)
 			cleanup_staging_if_safe("open failure")
 			return false
 		end
-		local write_ok, write_err = pcall(function() fh:write(content) end)
-		fh:close()
-		if not write_ok then
+		local write_ok, write_result, write_err = pcall(function() return fh:write(content) end)
+		local close_ok, close_result, close_err = pcall(function() return fh:close() end)
+		if not write_ok or write_result == nil or write_result == false then
 			Logger.error(
 				LOG,
 				"write(): write failed for '%s' — %s",
 				tmp_path,
-				tostring(write_err)
+				tostring(write_ok and write_err or write_result)
 			)
 			cleanup_staging_if_safe("write failure")
+			return false
+		end
+		if not close_ok or close_result == nil or close_result == false then
+			Logger.error(
+				LOG,
+				"write(): close failed for '%s' — %s",
+				tmp_path,
+				tostring(close_ok and close_err or close_result)
+			)
+			cleanup_staging_if_safe("close failure")
 			return false
 		end
 
