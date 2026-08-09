@@ -67,6 +67,7 @@ local _poisoned_tokens = {}
 local _fence_retries = {}
 local _poison_settlements = {}
 local _timer_cleanup_backlog = {}
+local _child_cleanup_backlog = {}
 local _fence_requested_tokens = {}
 
 -- Revisions describe logical user intent, not subprocess completion. They stay
@@ -364,6 +365,61 @@ local function cancel_timer_safely(timer, label)
 	return false
 end
 
+--- Terminates one exact child through the ShellRunner strict boolean contract.
+--- @param handle table|nil Opaque ShellRunner child handle.
+--- @param label string Diagnostic child role.
+--- @return boolean terminated True only when no native task remains live.
+local function terminate_child_handle(handle, label)
+	if not handle then return true end
+	if type(handle) ~= "table" or type(handle.terminate) ~= "function" then
+		Logger.error(LOG, "Could not terminate Karabiner variable %s child; invalid exact handle.",
+			tostring(label))
+		return false
+	end
+	local call_ok, terminated_or_err = pcall(handle.terminate)
+	if call_ok and terminated_or_err == true then return true end
+	Logger.error(LOG,
+		"Could not terminate Karabiner variable %s child; retaining the exact handle for retry: %s",
+		tostring(label), tostring(terminated_or_err))
+	return false
+end
+
+--- Retains one failed exact child capability without duplicating it.
+--- @param handle table Opaque ShellRunner child handle.
+--- @param label string Diagnostic child role.
+local function retain_child_cleanup(handle, label)
+	for _, entry in ipairs(_child_cleanup_backlog) do
+		if entry.handle == handle then return end
+	end
+	_child_cleanup_backlog[#_child_cleanup_backlog + 1] = {
+		handle = handle,
+		label = label,
+	}
+end
+
+--- Retries every exact child termination not previously proven complete.
+--- @return boolean complete Whether the cleanup backlog is empty.
+local function retry_child_cleanup()
+	for index = #_child_cleanup_backlog, 1, -1 do
+		local entry = _child_cleanup_backlog[index]
+		if terminate_child_handle(entry.handle, entry.label) then
+			table.remove(_child_cleanup_backlog, index)
+		end
+	end
+	return #_child_cleanup_backlog == 0
+end
+
+--- Retries older cleanup first, then terminates or retains this exact child.
+--- @param handle table|nil Opaque ShellRunner child handle.
+--- @param label string Diagnostic child role.
+--- @return boolean terminated True only when this child termination settled.
+local function terminate_child_safely(handle, label)
+	retry_child_cleanup()
+	if terminate_child_handle(handle, label) then return true end
+	retain_child_cleanup(handle, label)
+	return false
+end
+
 --- Detaches the exact active batch before any cancellation side effect can
 --- synchronously deliver its completion callback. Batch identity is the
 --- serializer authority; a late callback therefore observes a mismatch and is
@@ -381,12 +437,7 @@ local function detach_active(batch, terminate_child)
 	_active_timeout = nil
 
 	cancel_timer_safely(timeout, "watchdog")
-	if terminate_child and type(handle) == "table" and type(handle.terminate) == "function" then
-		local ok, err = pcall(handle.terminate)
-		if not ok then
-			Logger.error(LOG, "Could not terminate detached Karabiner variable writer: %s", tostring(err))
-		end
-	end
+	if terminate_child then terminate_child_safely(handle, "writer") end
 	return true
 end
 
@@ -574,6 +625,10 @@ end
 --- @return string|nil reason Stable failure reason.
 --- @return boolean fatal Whether an accepted batch must fence instead of retry.
 local function start_batch(batch)
+	-- A failed native terminate keeps its exact ShellRunner capability here. Retry
+	-- it before exposing another writer instead of losing the only safe handle and
+	-- falling back to process-name discovery, which could target personal Karabiner.
+	retry_child_cleanup()
 	if batch.attempts >= VARIABLE_WRITER_MAX_ATTEMPTS then
 		return false, "retry-exhausted", true
 	end
@@ -608,7 +663,9 @@ local function start_batch(batch)
 		{ SET_VARIABLES_FLAG, payload },
 		on_done
 	)
-	if not spawn_ok or type(handle_or_err) ~= "table" or type(handle_or_err.start) ~= "function" then
+	if not spawn_ok or type(handle_or_err) ~= "table"
+		or type(handle_or_err.start) ~= "function"
+		or type(handle_or_err.terminate) ~= "function" then
 		Logger.error(LOG, "Could not create Karabiner variable writer: %s", tostring(handle_or_err))
 		return false, "spawn-failed", false
 	end
