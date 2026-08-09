@@ -107,23 +107,35 @@ end
 --- Cancels a previously scheduled timer. Safe to call on a nil or already-fired
 --- handle — matches the contract's "ignore" error behavior.
 --- @param handle table|nil Cancellation token returned by after() or every().
+--- @return boolean settled True when no live native timer remains.
 function M.cancel(handle)
-	if type(handle) ~= "table" or not handle.timer then return end
-	pcall(function() handle.timer:stop() end)
+	if type(handle) ~= "table" or not handle.timer or handle.fired == true then return true end
+	local stopped, stop_err = pcall(function() handle.timer:stop() end)
+	if not stopped then
+		-- Retain both the public handle and its live-set entry. A later teardown is
+		-- the only owner that can retry this exact native timer capability.
+		Logger.error(LOG, "cancel(): native timer stop failed; retained for retry — %s.",
+			tostring(stop_err))
+		return false
+	end
 	handle.fired = true
 	if handle.id then _live_timers[handle.id] = nil end
+	return true
 end
 
 --- Cancels every timer owned by this scheduler instance.
 --- Safe to call at any time, including before any timers are scheduled.
+--- @return boolean settled True only when every native timer stopped.
 function M.cancelAll()
-	for id, handle in pairs(_live_timers) do
-		if handle and handle.timer then
-			pcall(function() handle.timer:stop() end)
-			handle.fired = true
-		end
-		_live_timers[id] = nil
+	local snapshot = {}
+	for _, handle in pairs(_live_timers) do
+		snapshot[#snapshot + 1] = handle
 	end
+	local all_stopped = true
+	for _, handle in ipairs(snapshot) do
+		if M.cancel(handle) ~= true then all_stopped = false end
+	end
+	return all_stopped
 end
 
 --- Returns the number of currently live (non-cancelled, non-fired) timers
