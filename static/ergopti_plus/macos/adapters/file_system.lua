@@ -208,8 +208,9 @@ local function inspect_path(path, known_parent, known_basename)
 	return nil, "cannot inspect '" .. path .. "': " .. details
 end
 
---- Splits a normalized slash-separated path into its root and components.
---- @param path string Normalized filesystem path.
+--- Splits a slash-separated path into its root and ordered components.
+--- Dot segments are deliberately preserved until preceding symlinks resolve.
+--- @param path string Filesystem path.
 --- @return string root Empty, `/`, or a Windows drive root used by tests.
 --- @return table components Ordered path components.
 local function split_path(path)
@@ -241,7 +242,11 @@ end
 --- @return table chain Symlink path/target observations.
 --- @return string|nil error_message
 local function resolve_write_path(path)
-	local current = normalize_path(path)
+	-- POSIX resolves components from left to right: in `link/../file`, `..`
+	-- applies to the link target, not to the directory containing the link.
+	-- Keep the caller's initial component order and normalize only after a
+	-- symlink substitution has made that ordering explicit.
+	local current = path
 	local chain = {}
 	local visited_links = {}
 	local hop_count = 0
