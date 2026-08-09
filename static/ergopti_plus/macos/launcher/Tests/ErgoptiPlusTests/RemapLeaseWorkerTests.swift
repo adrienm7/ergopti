@@ -32,6 +32,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import ServiceManagement
 import XCTest
 @testable import ErgoptiPlus
 
@@ -56,9 +57,248 @@ private struct ProgressingTestSibling {
 	let progressFile: URL
 }
 
+/// Deterministic independent-guardian boundary for outer protocol tests.
+private final class ScriptedLeaseGuardianRegistration: LeaseGuardianRegistering {
+	let armResult: Bool
+	var present = true
+	var armCalls = 0
+	var beginLiveTransportCalls = 0
+	var endLiveTransportCalls = 0
+	var liveTransportAllowed = true
+	var loseGuardianAfterSuccessfulBegin = false
+	var endLiveTransportHook: (() -> Void)?
+	var retireCalls = 0
+	var closeCalls = 0
+	var childCloseDescriptors: [Int32] = []
+
+	init(armResult: Bool) {
+		self.armResult = armResult
+	}
+
+	func arm() -> Bool {
+		armCalls += 1
+		return armResult
+	}
+
+	func guardianStillPresent() -> Bool { return present }
+	func beginLiveTransport() -> Bool {
+		beginLiveTransportCalls += 1
+		let allowed = present && liveTransportAllowed
+		if allowed && loseGuardianAfterSuccessfulBegin { present = false }
+		return allowed
+	}
+	func endLiveTransport() {
+		endLiveTransportCalls += 1
+		endLiveTransportHook?()
+	}
+	func cancelBeforeActivation() { retireCalls += 1 }
+	func retireAfterFence() { retireCalls += 1 }
+	func closePreservingAbandonment() { closeCalls += 1 }
+}
+
+/// Counts attempts without creating an inner process.
+private final class CountingLeaseInnerSpawner: LeaseInnerSpawning {
+	var spawnCalls = 0
+	func spawn(identity: LeaseIdentity) -> SpawnedLeaseInner? {
+		spawnCalls += 1
+		return nil
+	}
+}
+
+/// Records the exact repeated fence requested by an abandoned durable record.
+private final class GuardianRecordingLeaseCLIExecutor:
+	LeaseCLIExecuting,
+	LeaseCLIExecutingWithDescriptorClosure {
+	private let lock = NSLock()
+	private let started = DispatchSemaphore(value: 0)
+	private let completed = DispatchSemaphore(value: 0)
+	private let blockedCallReached = DispatchSemaphore(value: 0)
+	private let blockedCallMayReturn = DispatchSemaphore(value: 0)
+	private let blockAfterCall: Int?
+	private var results: [LeaseCLIResult]
+	private(set) var cliPaths: [String] = []
+	private(set) var payloads: [String] = []
+	private(set) var closedDescriptors: [[Int32]] = []
+
+	/// Creates a recorder with optional child results and one controllable call.
+	init(results: [LeaseCLIResult] = [], blockAfterCall: Int? = nil) {
+		self.results = results
+		self.blockAfterCall = blockAfterCall
+	}
+
+	/// Records one ordinary executor call through the descriptor-aware boundary.
+	func execute(
+		cliPath: String,
+		payload: String,
+		timeout: TimeInterval,
+		interruption: () -> LeaseCLIInterruption
+	) -> LeaseCLIResult {
+		return execute(
+			cliPath: cliPath,
+			payload: payload,
+			timeout: timeout,
+			interruption: interruption,
+			closingDescriptors: []
+		)
+	}
+
+	/// Records one hardened executor call and returns its scripted result.
+	func execute(
+		cliPath: String,
+		payload: String,
+		timeout: TimeInterval,
+		interruption: () -> LeaseCLIInterruption,
+		closingDescriptors: [Int32]
+	) -> LeaseCLIResult {
+		lock.lock()
+		cliPaths.append(cliPath)
+		payloads.append(payload)
+		closedDescriptors.append(closingDescriptors)
+		let callCount = payloads.count
+		let shouldSignalStart = payloads.count == 1
+		let shouldSignal = payloads.count == 2
+		let result = results.isEmpty ? LeaseCLIResult.success : results.removeFirst()
+		lock.unlock()
+		if shouldSignalStart { started.signal() }
+		if shouldSignal { completed.signal() }
+		if let blockAfterCall, callCount == blockAfterCall {
+			blockedCallReached.signal()
+			blockedCallMayReturn.wait()
+		}
+		return result
+	}
+
+	/// Waits until the first exact fence transport begins.
+	func waitForAnyFence(timeout: TimeInterval) -> Bool {
+		return started.wait(timeout: .now() + timeout) == .success
+	}
+
+	/// Waits until at least two transport attempts have been observed.
+	func waitForRepeatedFence(timeout: TimeInterval) -> Bool {
+		return completed.wait(timeout: .now() + timeout) == .success
+	}
+
+	/// Waits until the configured call reaches its pre-return barrier.
+	func waitForBlockedCall(timeout: TimeInterval) -> Bool {
+		return blockedCallReached.wait(timeout: .now() + timeout) == .success
+	}
+
+	/// Releases the configured pre-return barrier without touching any process.
+	func resumeBlockedCall() {
+		blockedCallMayReturn.signal()
+	}
+
+	/// Returns one lock-protected copy of every recorded executor argument.
+	func snapshot() -> (paths: [String], payloads: [String], descriptors: [[Int32]]) {
+		lock.lock()
+		defer { lock.unlock() }
+		return (cliPaths, payloads, closedDescriptors)
+	}
+}
+
+/// Thread-safe capture of the guardian's process-termination boundary.
+private final class GuardianTerminationRecorder {
+	private let lock = NSLock()
+	private let completed = DispatchSemaphore(value: 0)
+	private var status: Int32?
+
+	func terminate(_ value: Int32) {
+		lock.lock()
+		status = value
+		lock.unlock()
+		completed.signal()
+	}
+
+	func wait(timeout: TimeInterval) -> Int32? {
+		guard completed.wait(timeout: .now() + timeout) == .success else { return nil }
+		lock.lock()
+		defer { lock.unlock() }
+		return status
+	}
+}
+
+/// Thread-safe capture for a startup call executed beside a real flock holder.
+private final class GuardianStartupRecorder {
+	private let lock = NSLock()
+	private var result: Bool?
+
+	/// Stores one startup result under the recorder lock.
+	func store(_ value: Bool) {
+		lock.lock()
+		result = value
+		lock.unlock()
+	}
+
+	/// Returns the current startup result under the recorder lock.
+	func snapshot() -> Bool? {
+		lock.lock()
+		defer { lock.unlock() }
+		return result
+	}
+}
+
+/// Signals immediately before delegating to the real blocking activation drain.
+private final class ObservedActivationGateLocker {
+	private let attempted = DispatchSemaphore(value: 0)
+
+	/// Announces the attempt, then performs the production blocking flock.
+	func callAsFunction(_ descriptor: Int32) -> LeaseGuardianGateLockResult {
+		attempted.signal()
+		return lockGuardianActivationGate(descriptor)
+	}
+
+	/// Waits a bounded interval until the guardian reaches activation drain.
+	func wait(timeout: TimeInterval) -> DispatchTimeoutResult {
+		return attempted.wait(timeout: .now() + timeout)
+	}
+}
+
+/// Deterministic launchctl boundary for legacy registration ordering tests.
+private final class ScriptedGuardianLaunchctlRunner: GuardianLaunchctlRunning {
+	private var results: [Bool]
+	private(set) var calls: [[String]] = []
+
+	init(results: [Bool]) {
+		self.results = results
+	}
+
+	func run(arguments: [String]) -> Bool {
+		calls.append(arguments)
+		return results.isEmpty ? false : results.removeFirst()
+	}
+}
+
+/// Models one modern Background Item service without touching system settings.
+@available(macOS 13.0, *)
+private final class ScriptedModernGuardianService: RemapGuardianModernService {
+	var status: SMAppService.Status
+	private let statusAfterRegister: SMAppService.Status
+	private let registrationError: Error?
+	private(set) var registerCalls = 0
+
+	/// Creates one scripted status transition or registration error.
+	init(
+		status: SMAppService.Status = .notRegistered,
+		statusAfterRegister: SMAppService.Status = .enabled,
+		registrationError: Error? = nil
+	) {
+		self.status = status
+		self.statusAfterRegister = statusAfterRegister
+		self.registrationError = registrationError
+	}
+
+	/// Records registration and applies the configured result.
+	func register() throws {
+		registerCalls += 1
+		if let registrationError { throw registrationError }
+		status = statusAfterRegister
+	}
+}
+
 /// Verifies the native lease guardian’s loss, ordering, and PID-isolation contracts.
 final class KarabinerLeaseWorkerTests: XCTestCase {
 	private let token = "00112233445566778899aabbccddeeff"
+	private let guardianGeneration = "1234567890abcdef1234567890abcdef"
 
 	/// Builds one canonical generation without exercising argv parsing.
 	/// - Parameter initialMode: Active or paused starting mode.
@@ -72,6 +312,1901 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			initialMode: initialMode,
 			heartbeatSeconds: 5
 		)
+	}
+
+	/// Creates one unlocked durable record as if every private worker was killed.
+	private func makeAbandonedGuardianRecord(
+		token: String
+	) throws -> (home: URL, paths: LeaseGuardianPaths, record: LeaseGuardianRecord) {
+		let home = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+			.appendingPathComponent("ergopti-guardian-\(UUID().uuidString)", isDirectory: true)
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		try FileManager.default.createDirectory(
+			atPath: paths.records,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		try FileManager.default.createDirectory(
+			atPath: paths.acknowledgements,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		let record = LeaseGuardianRecord(
+			token: token,
+			nonce: "ffeeddccbbaa99887766554433221100",
+			ownerPID: getpid(),
+			state: .live
+		)
+		try XCTUnwrap(record.encoded).write(
+			to: URL(fileURLWithPath: paths.recordPath(token: token))
+		)
+		XCTAssertEqual(Darwin.chmod(paths.recordPath(token: token), 0o600), 0)
+		return (home, paths, record)
+	}
+
+	/// Resolves the real SwiftPM executable beside the XCTest bundle.
+	private func guardianTestExecutable() throws -> URL {
+		let productsDirectory = Bundle(for: KarabinerLeaseWorkerTests.self)
+			.bundleURL
+			.deletingLastPathComponent()
+		let candidates = [
+			productsDirectory.appendingPathComponent("ErgoptiPlus"),
+			productsDirectory
+				.deletingLastPathComponent()
+				.appendingPathComponent("ErgoptiPlus"),
+		]
+		guard let executable = candidates.first(where: {
+			FileManager.default.isExecutableFile(atPath: $0.path)
+		}) else {
+			XCTFail("the real ErgoptiPlus SwiftPM product is required for the lifetime test")
+			throw NSError(domain: "ErgoptiGuardianTests", code: Int(ENOENT))
+		}
+		return executable
+	}
+
+	/// Stops and observes only the exact Process created by the lifetime test.
+	private func stopExactGuardianTestProcess(
+		_ process: Process,
+		completion: DispatchSemaphore
+	) {
+		if process.isRunning { process.terminate() }
+		if completion.wait(timeout: .now() + 0.5) == .success { return }
+		if process.isRunning {
+			_ = Darwin.kill(process.processIdentifier, SIGKILL)
+		}
+		XCTAssertEqual(
+			completion.wait(timeout: .now() + 0.5),
+			.success,
+			"the exact guardian lifetime-test child must terminate within its bound"
+		)
+	}
+
+	/// Reaps one exact raw-fork test child without an unbounded XCTest wait.
+	private func stopExactForkedTestChild(_ processID: pid_t) {
+		_ = Darwin.kill(processID, SIGTERM)
+		let deadline = ProcessInfo.processInfo.systemUptime + 0.5
+		var status: Int32 = 0
+		while ProcessInfo.processInfo.systemUptime < deadline {
+			let waited = Darwin.waitpid(processID, &status, WNOHANG)
+			if waited == processID || (waited == -1 && errno == ECHILD) { return }
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		_ = Darwin.kill(processID, SIGKILL)
+		while Darwin.waitpid(processID, &status, 0) == -1 && errno == EINTR {}
+	}
+
+	/// Refuses every inner spawn when the independent survivor did not ACK ARM.
+	func testGuardianRefusesActivationBeforeArmed() {
+		let guardian = ScriptedLeaseGuardianRegistration(armResult: false)
+		let spawner = CountingLeaseInnerSpawner()
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: makeIdentity(),
+			detached: false,
+			spawner: spawner,
+			guardianRegistration: guardian
+		)
+
+		XCTAssertEqual(runtime.run(), LeaseWorkerExit.guardianUnavailable.rawValue)
+		XCTAssertEqual(guardian.armCalls, 1)
+		XCTAssertEqual(spawner.spawnCalls, 0,
+			"no inner or active variable write may precede durable ARMED")
+	}
+
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Starts the real headless product and proves its singleton stays locked.
+	func testGuardianProcessRemainsAliveAfterStartup() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-lifetime-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		try FileManager.default.createDirectory(
+			at: home,
+			withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700]
+		)
+		XCTAssertEqual(Darwin.chmod(home.path, 0o700), 0)
+		defer { try? FileManager.default.removeItem(at: home) }
+
+		let process = Process()
+		process.executableURL = try guardianTestExecutable()
+		process.arguments = [kKarabinerLeaseGuardianLifetimeTestFlag, home.path]
+		process.standardInput = FileHandle.nullDevice
+		process.standardOutput = FileHandle.nullDevice
+		process.standardError = FileHandle.nullDevice
+		let completion = DispatchSemaphore(value: 0)
+		process.terminationHandler = { _ in completion.signal() }
+		try process.run()
+		var observedCleanSIGTERM = false
+		defer {
+			if !observedCleanSIGTERM {
+				stopExactGuardianTestProcess(process, completion: completion)
+			}
+		}
+
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let deadline = ProcessInfo.processInfo.systemUptime + 3
+		var observedExclusiveLock = false
+		while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline {
+			let descriptor = Darwin.open(
+				paths.singletonLock,
+				O_RDWR | O_CLOEXEC | O_NOFOLLOW
+			)
+			if descriptor >= 0 {
+				let result = Darwin.flock(descriptor, LOCK_EX | LOCK_NB)
+				observedExclusiveLock = result == -1 && errno == EWOULDBLOCK
+				if result == 0 { _ = Darwin.flock(descriptor, LOCK_UN) }
+				Darwin.close(descriptor)
+				if observedExclusiveLock { break }
+			}
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		XCTAssertTrue(observedExclusiveLock,
+			"the real guardian process must own the singleton before the test proceeds")
+		usleep(350_000)
+		XCTAssertTrue(process.isRunning,
+			"a guardian backed only by GCD sources must not fall out of an empty RunLoop")
+
+		XCTAssertEqual(Darwin.kill(process.processIdentifier, SIGTERM), 0)
+		guard completion.wait(timeout: .now() + 3) == .success else {
+			XCTFail("the real launchd role must drain and exit from SIGTERM without SIGKILL cleanup")
+			return
+		}
+		observedCleanSIGTERM = true
+		XCTAssertEqual(process.terminationReason, .exit)
+		XCTAssertEqual(process.terminationStatus, LeaseWorkerExit.success.rawValue)
+	}
+
+	/// Replacing the durable namespace drains every known token before restart.
+	func testGuardianDrainsReplacedRecordsDirectoryBeforeRestart() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-lifetime-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		try FileManager.default.createDirectory(
+			at: home,
+			withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700]
+		)
+		XCTAssertEqual(Darwin.chmod(home.path, 0o700), 0)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let fixtureRecord = LeaseGuardianRecord(
+			token: token,
+			nonce: "ffeeddccbbaa99887766554433221100",
+			ownerPID: getpid(),
+			state: .live
+		)
+		try FileManager.default.createDirectory(
+			atPath: paths.records,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		try FileManager.default.createDirectory(
+			atPath: paths.acknowledgements,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		try XCTUnwrap(fixtureRecord.encoded).write(to: URL(
+			fileURLWithPath: paths.recordPath(token: token)
+		))
+		let owner = Darwin.open(
+			paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		let termination = GuardianTerminationRecorder()
+		var firstRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: executor,
+			terminateProcess: termination.terminate,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(firstRuntime?.startObservingForTesting() == true)
+
+		let displaced = paths.root + "/records.displaced"
+		try FileManager.default.moveItem(atPath: paths.records, toPath: displaced)
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		XCTAssertEqual(
+			termination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue,
+			"namespace loss must fence before the old guardian exits"
+		)
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
+		let retiredRecord = LeaseGuardianRecord(
+			token: fixtureRecord.token,
+			nonce: fixtureRecord.nonce,
+			ownerPID: fixtureRecord.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(retiredRecord.encoded),
+			descriptor: owner
+		))
+		Darwin.close(owner)
+		firstRuntime = nil
+
+		let replacementGeneration = "abcdef1234567890abcdef1234567890"
+		var secondRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: replacementGeneration
+		)
+		XCTAssertTrue(secondRuntime?.startObservingForTesting() == true)
+		let freshIdentity = LeaseIdentity(
+			cliPath: kCanonicalKarabinerCLIPath,
+			token: "abcdefabcdefabcdefabcdefabcdefab",
+			modeName: "ergopti_mode_abcdefabcdefabcdefabcdefabcdefab",
+			revokedName: "ergopti_revoked_abcdefabcdefabcdefabcdefabcdefab",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		let registration = LeaseGuardianRegistration(identity: freshIdentity, paths: paths)
+		XCTAssertTrue(registration.arm(),
+			"a launchd replacement must durably ACK a fresh exact generation")
+		registration.cancelBeforeActivation()
+		secondRuntime = nil
+	}
+	#endif
+
+	/// A shared probe held by another outer must not look like the exclusive agent.
+	func testGuardianPresenceProbesDoNotImpersonateGuardian() throws {
+		let fixture = try makeAbandonedGuardianRecord(
+			token: "abcdefabcdefabcdefabcdefabcdefab"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let inheritedDescriptor = Darwin.open(
+			fixture.paths.singletonLock,
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(inheritedDescriptor, 0)
+		guard inheritedDescriptor >= 0 else { return }
+
+		var ready = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(Darwin.pipe(&ready), 0)
+		guard ready.allSatisfy({ $0 >= 0 }) else {
+			Darwin.close(inheritedDescriptor)
+			return
+		}
+		let holderPID = Darwin.fork()
+		if holderPID == 0 {
+			Darwin.close(ready[0])
+			_ = Darwin.signal(SIGTERM, SIG_DFL)
+			var result: UInt8 = Darwin.flock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
+			_ = Darwin.write(ready[1], &result, 1)
+			while true { _ = Darwin.pause() }
+		}
+		XCTAssertGreaterThan(holderPID, 0)
+		Darwin.close(inheritedDescriptor)
+		Darwin.close(ready[1])
+		guard holderPID > 0 else {
+			Darwin.close(ready[0])
+			return
+		}
+		defer {
+			Darwin.close(ready[0])
+			stopExactForkedTestChild(holderPID)
+		}
+
+		var readyPoll = pollfd(fd: ready[0], events: Int16(POLLIN), revents: 0)
+		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
+			XCTFail("the exact shared-lock child did not become ready within its bound")
+			return
+		}
+		var childLocked: UInt8 = 0
+		XCTAssertEqual(Darwin.read(ready[0], &childLocked, 1), 1)
+		XCTAssertEqual(childLocked, 1)
+
+		let probe = Darwin.open(
+			fixture.paths.singletonLock,
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(probe, 0)
+		guard probe >= 0 else { return }
+		defer { Darwin.close(probe) }
+		XCTAssertFalse(
+			guardianSingletonIsExclusivelyHeld(descriptor: probe),
+			"another outer's compatible shared probe is not the exclusive guardian"
+		)
+	}
+
+	/// A transient shared health probe cannot make the replacement guardian exit.
+	func testGuardianStartupWaitsOutSharedPresenceProbe() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-start-probe-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		try FileManager.default.createDirectory(
+			atPath: paths.root,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		let inheritedDescriptor = Darwin.open(
+			paths.singletonLock,
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(inheritedDescriptor, 0)
+		guard inheritedDescriptor >= 0 else { return }
+		var ready = [Int32](repeating: -1, count: 2)
+		var release = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(Darwin.pipe(&ready), 0)
+		XCTAssertEqual(Darwin.pipe(&release), 0)
+		guard ready.allSatisfy({ $0 >= 0 }), release.allSatisfy({ $0 >= 0 }) else {
+			Darwin.close(inheritedDescriptor)
+			for descriptor in ready + release where descriptor >= 0 { Darwin.close(descriptor) }
+			return
+		}
+		let readyReadDescriptor = ready[0]
+		let readyWriteDescriptor = ready[1]
+		let releaseReadDescriptor = release[0]
+		let releaseWriteDescriptor = release[1]
+		let holderPID = Darwin.fork()
+		if holderPID == 0 {
+			Darwin.close(readyReadDescriptor)
+			Darwin.close(releaseWriteDescriptor)
+			_ = Darwin.signal(SIGTERM, SIG_DFL)
+			var locked: UInt8 = Darwin.flock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
+			_ = Darwin.write(readyWriteDescriptor, &locked, 1)
+			if locked == 1 {
+				var released: UInt8 = 0
+				while Darwin.read(releaseReadDescriptor, &released, 1) == -1 && errno == EINTR {}
+			}
+			Darwin._exit(locked == 1 ? 0 : 1)
+		}
+		Darwin.close(inheritedDescriptor)
+		Darwin.close(readyWriteDescriptor)
+		Darwin.close(releaseReadDescriptor)
+		XCTAssertGreaterThan(holderPID, 0)
+		guard holderPID > 0 else {
+			Darwin.close(readyReadDescriptor)
+			Darwin.close(releaseWriteDescriptor)
+			return
+		}
+		var holderReaped = false
+		defer {
+			Darwin.close(readyReadDescriptor)
+			Darwin.close(releaseWriteDescriptor)
+			if !holderReaped { stopExactForkedTestChild(holderPID) }
+		}
+		var readyPoll = pollfd(fd: readyReadDescriptor, events: Int16(POLLIN), revents: 0)
+		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
+			XCTFail("the shared presence probe did not acquire its cross-process lock")
+			return
+		}
+		var childLocked: UInt8 = 0
+		XCTAssertEqual(Darwin.read(readyReadDescriptor, &childLocked, 1), 1)
+		guard childLocked == 1 else {
+			XCTFail("the cross-process presence probe failed to acquire LOCK_SH")
+			return
+		}
+
+		let contentionObserved = DispatchSemaphore(value: 0)
+		let runtime = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			singletonContentionObserved: { contentionObserved.signal() },
+			generation: guardianGeneration
+		)
+		let result = GuardianStartupRecorder()
+		let completed = DispatchSemaphore(value: 0)
+		DispatchQueue.global(qos: .userInitiated).async {
+			result.store(runtime.startObservingForTesting())
+			completed.signal()
+		}
+		XCTAssertEqual(
+			contentionObserved.wait(timeout: .now() + 2),
+			.success,
+			"the startup call must reach and classify the compatible shared contention"
+		)
+		XCTAssertEqual(
+			completed.wait(timeout: .now() + 0.1),
+			.timedOut,
+			"a compatible shared probe must make startup retry, not report a duplicate guardian"
+		)
+		var releaseByte: UInt8 = 1
+		var releaseResult: Int
+		repeat {
+			releaseResult = Darwin.write(releaseWriteDescriptor, &releaseByte, 1)
+		} while releaseResult == -1 && errno == EINTR
+		guard releaseResult == 1 else {
+			XCTFail("the shared-lock child release byte must be delivered exactly once")
+			return
+		}
+		var holderStatus: Int32 = 0
+		let reapDeadline = ProcessInfo.processInfo.systemUptime + 1
+		var waited: pid_t = 0
+		var waitError: Int32 = 0
+		repeat {
+			waited = Darwin.waitpid(holderPID, &holderStatus, WNOHANG)
+			if waited == -1 { waitError = errno }
+			if waited == holderPID || (waited == -1 && waitError != EINTR) { break }
+			usleep(kSiblingProgressPollMicroseconds)
+		} while ProcessInfo.processInfo.systemUptime < reapDeadline
+		if waited == -1, waitError == ECHILD {
+			holderReaped = true
+			XCTFail("the exact shared-lock child was reaped outside this test's ownership")
+			return
+		}
+		guard waited == holderPID else {
+			XCTFail("the released shared-lock child must be reaped within its bound")
+			return
+		}
+		holderReaped = true
+		XCTAssertEqual(holderStatus & 0x7F, 0)
+		XCTAssertEqual((holderStatus >> 8) & 0xFF, 0)
+		XCTAssertEqual(completed.wait(timeout: .now() + 2), .success)
+		XCTAssertEqual(result.snapshot(), true)
+	}
+
+	/// A real exclusive owner still rejects a duplicate guardian immediately.
+	func testGuardianStartupRejectsExclusiveGuardianOwner() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-start-owner-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		try FileManager.default.createDirectory(
+			atPath: paths.root,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		let owner = Darwin.open(
+			paths.singletonLock,
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		defer { Darwin.close(owner) }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX), 0)
+		let runtime = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: guardianGeneration
+		)
+
+		XCTAssertFalse(runtime.startObservingForTesting())
+	}
+
+	/// A user denial on macOS 13+ must never fall through to manual launchctl.
+	func testModernGuardianRegistrationNeverBypassesUserDenial() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let denial = NSError(
+			domain: kRemapGuardianServiceErrorDomain,
+			code: kSMErrorLaunchDeniedByUser
+		)
+		let authorizationFailure = NSError(
+			domain: kRemapGuardianServiceErrorDomain,
+			code: kSMErrorAuthorizationFailure
+		)
+		XCTAssertFalse(shouldUseLegacyGuardianAfterModernRegistrationError(denial))
+		XCTAssertFalse(shouldUseLegacyGuardianAfterModernRegistrationError(
+			authorizationFailure
+		))
+		XCTAssertFalse(shouldUseLegacyGuardianAfterModernRegistrationError(NSError(
+			domain: "UnexpectedDomain",
+			code: kSMErrorInvalidSignature
+		)))
+		XCTAssertTrue(shouldUseLegacyGuardianAfterModernRegistrationError(NSError(
+			domain: kRemapGuardianServiceErrorDomain,
+			code: kSMErrorInvalidSignature
+		)))
+
+		for (error, expected) in [
+			(denial, RemapGuardianRegistrationStatus.requiresApproval),
+			(authorizationFailure, RemapGuardianRegistrationStatus.unavailable),
+		] {
+			let service = ScriptedModernGuardianService(registrationError: error)
+			var healthCalls = 0
+			var legacyCalls = 0
+			let result = resolveModernRemapGuardianRegistration(
+				service: service,
+				guardianHealth: {
+					healthCalls += 1
+					return true
+				},
+				legacyInvalidSignatureFallback: {
+					legacyCalls += 1
+					return true
+				}
+			)
+			XCTAssertEqual(result, expected)
+			XCTAssertEqual(service.registerCalls, 1)
+			XCTAssertEqual(healthCalls, 0)
+			XCTAssertEqual(legacyCalls, 0,
+				"denial and authorization failures must never bootstrap around Background Items")
+		}
+
+		let invalidSignatureService = ScriptedModernGuardianService(
+			registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorInvalidSignature
+			)
+		)
+		var invalidSignatureFallbackCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: invalidSignatureService,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				invalidSignatureFallbackCalls += 1
+				return true
+			}
+		), .ready)
+		XCTAssertEqual(invalidSignatureFallbackCalls, 1)
+	}
+
+	/// A healthy exact legacy job is reused without any destructive handoff.
+	func testLegacyRegistrationPreservesAlreadyRunningGuardian() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-legacy-guardian-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		try FileManager.default.createDirectory(
+			at: home,
+			withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700]
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let launchAgents = home.appendingPathComponent("Library/LaunchAgents")
+		try FileManager.default.createDirectory(
+			at: launchAgents,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let expectedPlist = try XCTUnwrap(legacyGuardianPlist(
+			executablePath: executable
+		).data(using: .utf8))
+		try assertLegacyGuardianPlistContract(expectedPlist, executablePath: executable)
+		let plistURL = launchAgents.appendingPathComponent(kRemapGuardianPlistName)
+		try expectedPlist.write(to: plistURL)
+		let runner = ScriptedGuardianLaunchctlRunner(results: [true])
+
+		XCTAssertTrue(ensureLegacyRemapGuardianRegistered(
+			executablePath: executable,
+			runner: runner,
+			homeDirectory: home.path,
+			guardianHealth: { _ in true }
+		))
+		let serviceTarget = "gui/\(getuid())/\(kRemapGuardianLabel)"
+		XCTAssertEqual(runner.calls, [["print", serviceTarget]])
+		XCTAssertEqual(try Data(contentsOf: plistURL), expectedPlist,
+			"a healthy current guardian must not rewrite its registration")
+	}
+
+	/// A loaded legacy label with an obsolete app path is replaced, never trusted.
+	func testLegacyRegistrationReplacesStaleExecutablePathBeforeReady() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-legacy-stale-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let launchAgents = home.appendingPathComponent("Library/LaunchAgents")
+		try FileManager.default.createDirectory(
+			at: launchAgents,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+		let staleExecutable = "/Applications/ErgoptiPlus-old.app/Contents/MacOS/ErgoptiPlus"
+		let currentExecutable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let plistURL = launchAgents.appendingPathComponent(kRemapGuardianPlistName)
+		try XCTUnwrap(legacyGuardianPlist(
+			executablePath: staleExecutable
+		).data(using: .utf8)).write(to: plistURL)
+		let runner = ScriptedGuardianLaunchctlRunner(
+			results: [true, true, true, true]
+		)
+
+		XCTAssertTrue(ensureLegacyRemapGuardianRegistered(
+			executablePath: currentExecutable,
+			runner: runner,
+			homeDirectory: home.path,
+			guardianHealth: { _ in true }
+		))
+		let domain = "gui/\(getuid())"
+		let serviceTarget = domain + "/" + kRemapGuardianLabel
+		XCTAssertEqual(runner.calls, [
+			["print", serviceTarget],
+			["bootout", serviceTarget],
+			["bootstrap", domain, plistURL.path],
+			["print", serviceTarget],
+		])
+		let installedPlist = try Data(contentsOf: plistURL)
+		try assertLegacyGuardianPlistContract(
+			installedPlist,
+			executablePath: currentExecutable
+		)
+		XCTAssertFalse(runner.calls.flatMap { $0 }.contains(where: {
+			$0.localizedCaseInsensitiveContains("karabiner")
+		}), "legacy replacement may target only the ErgoptiPlus LaunchAgent label")
+	}
+
+	/// Proves the real handshake publishes and locks the record before accepting ACK.
+	func testGuardianRegistrationPublishesLockedDurableRecordBeforeArmed() throws {
+		let fixture = try makeAbandonedGuardianRecord(
+			token: "abcdefabcdefabcdefabcdefabcdefab"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		// The fixture helper models abandonment; remove it so the registration can
+		// publish the same unique token through its atomic locked-temp path.
+		try FileManager.default.removeItem(
+			atPath: fixture.paths.recordPath(token: fixture.record.token)
+		)
+
+		let singleton = Darwin.open(
+			fixture.paths.singletonLock,
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(singleton, 0)
+		guard singleton >= 0 else { return }
+		defer { Darwin.close(singleton) }
+		XCTAssertEqual(Darwin.flock(singleton, LOCK_EX | LOCK_NB), 0)
+		let activationGate = Darwin.open(
+			fixture.paths.activationGate,
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(activationGate, 0)
+		guard activationGate >= 0 else { return }
+		defer { Darwin.close(activationGate) }
+		var activationAttributes = stat()
+		XCTAssertEqual(Darwin.fstat(activationGate, &activationAttributes), 0)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(LeaseGuardianSingletonRecord(
+				generation: guardianGeneration,
+				state: .active,
+				activationDevice: Int64(activationAttributes.st_dev),
+				activationInode: UInt64(activationAttributes.st_ino)
+			).encoded),
+			descriptor: singleton
+		))
+
+		let identity = LeaseIdentity(
+			cliPath: kCanonicalKarabinerCLIPath,
+			token: fixture.record.token,
+			modeName: "ergopti_mode_\(fixture.record.token)",
+			revokedName: "ergopti_revoked_\(fixture.record.token)",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		let registration = LeaseGuardianRegistration(
+			identity: identity,
+			paths: fixture.paths
+		)
+		let observerFinished = DispatchSemaphore(value: 0)
+		DispatchQueue.global(qos: .userInitiated).async {
+			defer { observerFinished.signal() }
+			let recordURL = URL(fileURLWithPath: fixture.paths.recordPath(token: identity.token))
+			let deadline = ProcessInfo.processInfo.systemUptime + 2
+			while ProcessInfo.processInfo.systemUptime < deadline {
+				guard let data = try? Data(contentsOf: recordURL),
+					let observed = LeaseGuardianRecord.parse(data)
+				else {
+					usleep(5_000)
+					continue
+				}
+				let descriptor = Darwin.open(recordURL.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+				guard descriptor >= 0 else { return }
+				defer { Darwin.close(descriptor) }
+				guard Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == -1,
+					errno == EWOULDBLOCK,
+					let acknowledgement = observed.acknowledgement(
+						guardianGeneration: self.guardianGeneration
+					)
+				else { return }
+				try? acknowledgement.write(
+					to: URL(fileURLWithPath: fixture.paths.acknowledgementPath(token: identity.token)),
+					options: .atomic
+				)
+				return
+			}
+		}
+
+		XCTAssertTrue(registration.arm())
+		XCTAssertEqual(observerFinished.wait(timeout: .now() + 2), .success)
+		XCTAssertEqual(registration.childCloseDescriptors.count, 3)
+		registration.cancelBeforeActivation()
+	}
+
+	/// A duplicate token cannot delete the first owner's record or exact ACK.
+	func testGuardianRegistrationCollisionPreservesExistingRecordAndAcknowledgement() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let acknowledgement = try XCTUnwrap(fixture.record.acknowledgement(
+			guardianGeneration: guardianGeneration
+		))
+		try acknowledgement.write(to: URL(
+			fileURLWithPath: fixture.paths.acknowledgementPath(token: token)
+		))
+		var before = stat()
+		XCTAssertEqual(fixture.paths.recordPath(token: token).withCString {
+			Darwin.lstat($0, &before)
+		}, 0)
+
+		let collision = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: fixture.paths
+		)
+		XCTAssertFalse(collision.arm())
+
+		var after = stat()
+		XCTAssertEqual(fixture.paths.recordPath(token: token).withCString {
+			Darwin.lstat($0, &after)
+		}, 0)
+		XCTAssertEqual(before.st_dev, after.st_dev)
+		XCTAssertEqual(before.st_ino, after.st_ino)
+		XCTAssertEqual(
+			try Data(contentsOf: URL(fileURLWithPath: fixture.paths.recordPath(token: token))),
+			try XCTUnwrap(fixture.record.encoded)
+		)
+		XCTAssertEqual(
+			try Data(contentsOf: URL(
+				fileURLWithPath: fixture.paths.acknowledgementPath(token: token)
+			)),
+			acknowledgement
+		)
+	}
+
+	/// A visible ACK whose directory entry was not durably synced is removed again.
+	func testGuardianAcknowledgementRollsBackAfterPostRenameDirectorySyncFailure() throws {
+		let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-ack-rollback-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		try FileManager.default.createDirectory(
+			at: directory,
+			withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700]
+		)
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let acknowledgement = directory.appendingPathComponent("exact.armed")
+		var directorySyncCalls = 0
+
+		XCTAssertFalse(writeGuardianFileAtomically(
+			data: Data("ack".utf8),
+			path: acknowledgement.path,
+			directory: directory.path,
+			directorySync: { _ in
+				directorySyncCalls += 1
+				return directorySyncCalls > 1
+			}
+		))
+		XCTAssertEqual(directorySyncCalls, 2,
+			"publication failure must be followed by a best-effort unlink sync")
+		XCTAssertFalse(FileManager.default.fileExists(atPath: acknowledgement.path),
+			"a rejected but visible ACK would let ARM authorize an unsafe lease")
+	}
+
+	/// ARM cannot observe an ACK rejected after its rename became visible.
+	func testRegistrationCannotArmFromPostRenameDirectorySyncFailure() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-ack-arm-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let acknowledgementVisible = DispatchSemaphore(value: 0)
+		let rejectPublication = DispatchSemaphore(value: 0)
+		defer { rejectPublication.signal() }
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			acknowledgementWriter: { data, path, directory in
+				var syncCalls = 0
+				return writeGuardianFileAtomically(
+					data: data,
+					path: path,
+					directory: directory,
+					directorySync: { _ in
+						syncCalls += 1
+						if syncCalls == 1 {
+							acknowledgementVisible.signal()
+							_ = rejectPublication.wait(timeout: .now() + 5)
+						}
+						return syncCalls > 1
+					}
+				)
+			},
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		let armResult = GuardianStartupRecorder()
+		let armFinished = DispatchSemaphore(value: 0)
+		DispatchQueue.global(qos: .userInitiated).async {
+			armResult.store(registration.arm())
+			armFinished.signal()
+		}
+
+		XCTAssertEqual(acknowledgementVisible.wait(timeout: .now() + 2), .success)
+		XCTAssertTrue(FileManager.default.fileExists(
+			atPath: paths.acknowledgementPath(token: token)
+		), "the repro must pause after rename made the rejected ACK visible")
+		XCTAssertEqual(armFinished.wait(timeout: .now() + 0.2), .timedOut,
+			"ARM must not cross the gate while ACK durability is unresolved")
+		rejectPublication.signal()
+		XCTAssertEqual(armFinished.wait(timeout: .now() + 4), .success)
+		XCTAssertEqual(armResult.snapshot(), false,
+			"ARM must time out rather than consume a non-durable visible ACK")
+		XCTAssertFalse(FileManager.default.fileExists(
+			atPath: paths.acknowledgementPath(token: token)
+		))
+		runtime = nil
+	}
+
+	/// One token's ACK fsync never blocks another armed token's live transport.
+	func testGuardianAcknowledgementDurabilityLockIsTokenLocal() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-ack-token-local-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let tokenB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		let tokenBAcknowledgementVisible = DispatchSemaphore(value: 0)
+		let syncTokenBAcknowledgement = DispatchSemaphore(value: 0)
+		defer { syncTokenBAcknowledgement.signal() }
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			acknowledgementWriter: { data, path, directory in
+				guard path == paths.acknowledgementPath(token: tokenB) else {
+					return writeGuardianFileAtomically(
+						data: data,
+						path: path,
+						directory: directory
+					)
+				}
+				return writeGuardianFileAtomically(
+					data: data,
+					path: path,
+					directory: directory,
+					directorySync: { directoryPath in
+						tokenBAcknowledgementVisible.signal()
+						_ = syncTokenBAcknowledgement.wait(timeout: .now() + 5)
+						let descriptor = Darwin.open(
+							directoryPath,
+							O_RDONLY | O_CLOEXEC | O_NOFOLLOW
+						)
+						guard descriptor >= 0 else { return false }
+						defer { Darwin.close(descriptor) }
+						return Darwin.fsync(descriptor) == 0
+					}
+				)
+			},
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		let registrationA = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		XCTAssertTrue(registrationA.arm())
+		XCTAssertTrue(registrationA.beginLiveTransport())
+		registrationA.endLiveTransport()
+		let identityB = LeaseIdentity(
+			cliPath: kCanonicalKarabinerCLIPath,
+			token: tokenB,
+			modeName: "ergopti_mode_\(tokenB)",
+			revokedName: "ergopti_revoked_\(tokenB)",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		let registrationB = LeaseGuardianRegistration(identity: identityB, paths: paths)
+		let armBResult = GuardianStartupRecorder()
+		let armBFinished = DispatchSemaphore(value: 0)
+		DispatchQueue.global(qos: .userInitiated).async {
+			armBResult.store(registrationB.arm())
+			armBFinished.signal()
+		}
+		XCTAssertEqual(tokenBAcknowledgementVisible.wait(timeout: .now() + 2), .success)
+		let liveAResult = GuardianStartupRecorder()
+		let liveAFinished = DispatchSemaphore(value: 0)
+		DispatchQueue.global(qos: .userInitiated).async {
+			liveAResult.store(registrationA.beginLiveTransport())
+			liveAFinished.signal()
+		}
+
+		XCTAssertEqual(liveAFinished.wait(timeout: .now() + 0.2), .success,
+			"token B's visible-but-locked ACK must not serialize token A")
+		XCTAssertEqual(liveAResult.snapshot(), true)
+		registrationA.endLiveTransport()
+		XCTAssertEqual(armBFinished.wait(timeout: .now() + 0.1), .timedOut)
+
+		syncTokenBAcknowledgement.signal()
+		XCTAssertEqual(armBFinished.wait(timeout: .now() + 2), .success)
+		XCTAssertEqual(armBResult.snapshot(), true)
+		registrationB.cancelBeforeActivation()
+		registrationA.cancelBeforeActivation()
+		runtime = nil
+	}
+
+	/// A crash-left ACK staging file for the same record nonce cannot block restart.
+	func testGuardianRestartRecoversStaleAcknowledgementTemporary() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let staleTemporary = fixture.paths.acknowledgements
+			+ "/." + fixture.record.nonce + ".tmp"
+		try Data("partial".utf8).write(to: URL(fileURLWithPath: staleTemporary))
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		let acknowledgement = try Data(contentsOf: URL(
+			fileURLWithPath: fixture.paths.acknowledgementPath(token: token)
+		))
+		XCTAssertEqual(
+			acknowledgement,
+			fixture.record.acknowledgement(
+				guardianGeneration: guardianGeneration
+			)
+		)
+
+		let retired = LeaseGuardianRecord(
+			token: fixture.record.token,
+			nonce: fixture.record.nonce,
+			ownerPID: fixture.record.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(retired.encoded),
+			descriptor: owner
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+		runtime = nil
+	}
+
+	/// A lexically earlier unarmed record cannot consume an active lease's slot.
+	func testGuardianRestartPrioritizesAcknowledgedRecordsBeyondUnarmedCap() throws {
+		let unarmedToken = "00000000000000000000000000000000"
+		let acknowledgedTokens = [
+			"00000000000000000000000000000001",
+			"00000000000000000000000000000002",
+		]
+		let fixture = try makeAbandonedGuardianRecord(token: unarmedToken)
+		var owners: [String: Int32] = [:]
+		var runtime: RemapLeaseGuardianRuntime?
+		defer {
+			for descriptor in owners.values { Darwin.close(descriptor) }
+			runtime = nil
+			try? FileManager.default.removeItem(at: fixture.home)
+		}
+
+		var records = [fixture.record]
+		for (index, acknowledgedToken) in acknowledgedTokens.enumerated() {
+			let record = LeaseGuardianRecord(
+				token: acknowledgedToken,
+				nonce: String(format: "%032x", index + 100),
+				ownerPID: getpid(),
+				state: .live
+			)
+			try XCTUnwrap(record.encoded).write(to: URL(
+				fileURLWithPath: fixture.paths.recordPath(token: acknowledgedToken)
+			))
+			try XCTUnwrap(record.acknowledgement(
+				guardianGeneration: guardianGeneration
+			)).write(to: URL(
+				fileURLWithPath: fixture.paths.acknowledgementPath(token: acknowledgedToken)
+			))
+			records.append(record)
+		}
+		for record in records {
+			let descriptor = Darwin.open(
+				fixture.paths.recordPath(token: record.token),
+				O_RDWR | O_CLOEXEC | O_NOFOLLOW
+			)
+			XCTAssertGreaterThanOrEqual(descriptor, 0)
+			guard descriptor >= 0 else { return }
+			XCTAssertEqual(Darwin.flock(descriptor, LOCK_EX | LOCK_NB), 0)
+			owners[record.token] = descriptor
+		}
+
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		runtime = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			maximumUnacknowledgedRecords: 1,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		let targetToken = try XCTUnwrap(acknowledgedTokens.last)
+		let targetOwner = try XCTUnwrap(owners.removeValue(forKey: targetToken))
+		Darwin.close(targetOwner)
+		let expected = "{\"ergopti_mode_\(targetToken)\":0,"
+			+ "\"ergopti_revoked_\(targetToken)\":1}"
+		let fenceDeadline = ProcessInfo.processInfo.systemUptime + 2
+		while executor.snapshot().payloads.filter({ $0 == expected }).count < 2
+			&& ProcessInfo.processInfo.systemUptime < fenceDeadline {
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		XCTAssertEqual(
+			executor.snapshot().payloads.filter { $0 == expected }.count,
+			2,
+			"every already-ACKed lease must remain watched beyond the unarmed cap"
+		)
+
+		for record in records where record.token != targetToken {
+			guard let descriptor = owners.removeValue(forKey: record.token) else { continue }
+			let retired = LeaseGuardianRecord(
+				token: record.token,
+				nonce: record.nonce,
+				ownerPID: record.ownerPID,
+				state: .retired
+			)
+			if let encoded = retired.encoded {
+				_ = replaceGuardianData(encoded, descriptor: descriptor)
+			}
+			_ = Darwin.unlink(fixture.paths.recordPath(token: record.token))
+			Darwin.close(descriptor)
+		}
+		usleep(100_000)
+		runtime = nil
+	}
+
+	/// Replays one unlocked durable record as two exact tombstone transports.
+	func testGuardianFencesAbandonedRecord() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+
+		let snapshot = executor.snapshot()
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(snapshot.payloads, [exactFence, exactFence])
+		XCTAssertEqual(snapshot.paths, [kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath])
+		XCTAssertTrue(snapshot.descriptors.allSatisfy { !$0.isEmpty },
+			"every guardian CLI child must explicitly close inherited lease locks")
+		runtime = nil
+	}
+
+	/// Force Quit of the exact LIVE owner releases flock and triggers the fence.
+	func testGuardianFencesLiveOwnerAfterSIGKILL() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let recordDescriptor = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(recordDescriptor, 0)
+		guard recordDescriptor >= 0 else { return }
+		var ready = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(Darwin.pipe(&ready), 0)
+		guard ready.allSatisfy({ $0 >= 0 }) else {
+			Darwin.close(recordDescriptor)
+			return
+		}
+		let ownerPID = Darwin.fork()
+		if ownerPID == 0 {
+			Darwin.close(ready[0])
+			var armed: UInt8 = Darwin.flock(recordDescriptor, LOCK_EX | LOCK_NB) == 0
+				? 1
+				: 0
+			_ = Darwin.write(ready[1], &armed, 1)
+			while armed == 1 { _ = Darwin.pause() }
+			Darwin._exit(1)
+		}
+		Darwin.close(recordDescriptor)
+		XCTAssertGreaterThan(ownerPID, 0)
+		Darwin.close(ready[1])
+		guard ownerPID > 0 else {
+			Darwin.close(ready[0])
+			return
+		}
+		defer { Darwin.close(ready[0]) }
+		var readyPoll = pollfd(fd: ready[0], events: Int16(POLLIN), revents: 0)
+		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
+			stopExactForkedTestChild(ownerPID)
+			XCTFail("the exact LIVE owner did not acquire flock within its bound")
+			return
+		}
+		var childArmed: UInt8 = 0
+		XCTAssertEqual(Darwin.read(ready[0], &childArmed, 1), 1)
+		guard childArmed == 1 else {
+			stopExactForkedTestChild(ownerPID)
+			XCTFail("the exact LIVE owner failed to acquire its inherited record descriptor")
+			return
+		}
+
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(FileManager.default.fileExists(
+			atPath: fixture.paths.acknowledgementPath(token: token)
+		))
+		XCTAssertEqual(Darwin.kill(ownerPID, SIGKILL), 0)
+		var status: Int32 = 0
+		while Darwin.waitpid(ownerPID, &status, 0) == -1 && errno == EINTR {}
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
+		runtime = nil
+	}
+
+	/// Deleting a live pathname cannot impersonate the owner's fenced retirement.
+	func testGuardianFencesExternallyUnlinkedLiveRecord() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(FileManager.default.fileExists(
+			atPath: fixture.paths.acknowledgementPath(token: token)
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
+		runtime = nil
+	}
+
+	/// A restart recovers a detached live token from its durable ARMED journal.
+	func testGuardianRestartFencesOrphanedAcknowledgementAfterRecordLoss() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let oldGeneration = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		try XCTUnwrap(fixture.record.acknowledgement(
+			guardianGeneration: oldGeneration
+		)).write(to: URL(
+			fileURLWithPath: fixture.paths.acknowledgementPath(token: token)
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+
+		let executor = GuardianRecordingLeaseCLIExecutor(
+			results: [.success, .spawnFailed(EIO), .success, .success],
+			blockAfterCall: 3
+		)
+		defer { executor.resumeBlockedCall() }
+		var replacement: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(replacement?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(executor.waitForBlockedCall(timeout: 2))
+		let acknowledgementPath = fixture.paths.acknowledgementPath(token: token)
+		XCTAssertTrue(
+			FileManager.default.fileExists(atPath: acknowledgementPath),
+			"a failed intermediate fence must retain the orphan recovery journal"
+		)
+		executor.resumeBlockedCall()
+		let transportDeadline = ProcessInfo.processInfo.systemUptime + 2
+		while executor.snapshot().payloads.count < 4
+			&& ProcessInfo.processInfo.systemUptime < transportDeadline {
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [
+			exactFence,
+			exactFence,
+			exactFence,
+			exactFence,
+		])
+		let cleanupDeadline = ProcessInfo.processInfo.systemUptime + 2
+		while FileManager.default.fileExists(atPath: acknowledgementPath)
+			&& ProcessInfo.processInfo.systemUptime < cleanupDeadline {
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		XCTAssertFalse(FileManager.default.fileExists(atPath: acknowledgementPath),
+			"the exact orphan journal may be removed only after repeated fencing")
+		replacement = nil
+	}
+
+	/// Only the durable marker written under the owner's lock suppresses refencing.
+	func testGuardianSkipsExplicitlyRetiredRecord() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+
+		let retired = LeaseGuardianRecord(
+			token: fixture.record.token,
+			nonce: fixture.record.nonce,
+			ownerPID: fixture.record.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(retired.encoded),
+			descriptor: owner
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+
+		let acknowledgement = fixture.paths.acknowledgementPath(token: token)
+		let deadline = ProcessInfo.processInfo.systemUptime + 2
+		while FileManager.default.fileExists(atPath: acknowledgement)
+			&& ProcessInfo.processInfo.systemUptime < deadline {
+			usleep(kSiblingProgressPollMicroseconds)
+		}
+		XCTAssertFalse(FileManager.default.fileExists(atPath: acknowledgement))
+		XCTAssertTrue(executor.snapshot().payloads.isEmpty,
+			"a canonical RETIRED record was already fenced by its exact owner")
+		runtime = nil
+	}
+
+	/// A canonical RETIRED payload from a different nonce cannot impersonate its owner.
+	func testGuardianFencesRetirementFromDifferentRecordNonce() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		let forgedRetirement = LeaseGuardianRecord(
+			token: fixture.record.token,
+			nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			ownerPID: fixture.record.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(forgedRetirement.encoded),
+			descriptor: owner
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
+		runtime = nil
+	}
+
+	/// Disabling the Background Item revokes live leases before its process exits.
+	func testGuardianTerminationFencesLockedActiveRecordBeforeExit() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		let termination = GuardianTerminationRecorder()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			terminateProcess: termination.terminate
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		runtime?.terminateForTesting()
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		XCTAssertEqual(
+			termination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue,
+			"the guardian may exit only after every active token is tombstoned"
+		)
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0,
+			"termination fencing must not wait for or take the active owner's lock")
+
+		let retired = LeaseGuardianRecord(
+			token: fixture.record.token,
+			nonce: fixture.record.nonce,
+			ownerPID: fixture.record.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(retired.encoded),
+			descriptor: owner
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+		runtime = nil
+	}
+
+	/// A persistent drain-lock error fences repeatedly but cannot authorize exit.
+	func testGuardianPermanentDrainErrorFencesUntilExactGateCanBeTaken() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let owner = Darwin.open(
+			fixture.paths.recordPath(token: token),
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(owner, 0)
+		guard owner >= 0 else { return }
+		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		let termination = GuardianTerminationRecorder()
+		var gateCalls = 0
+		var simulatedUptime: TimeInterval = 0
+		var retryDelays: [useconds_t] = []
+		let firstGateFailurePaused = DispatchSemaphore(value: 0)
+		let continueGateFailures = DispatchSemaphore(value: 0)
+		defer { continueGateFailures.signal() }
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			terminateProcess: termination.terminate,
+			activationGateLocker: { descriptor in
+				gateCalls += 1
+				if gateCalls <= 13 { return .failed(EINVAL) }
+				return lockGuardianActivationGate(descriptor)
+			},
+			activationGateRetrySleep: { delay in
+				retryDelays.append(delay)
+				simulatedUptime += Double(delay) / 1_000_000
+				if retryDelays.count == 1 {
+					firstGateFailurePaused.signal()
+					_ = continueGateFailures.wait(timeout: .now() + 5)
+				}
+			},
+			terminationUptime: { simulatedUptime }
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		runtime?.terminateForTesting()
+		XCTAssertEqual(firstGateFailurePaused.wait(timeout: .now() + 2), .success)
+		let singletonProbe = Darwin.open(
+			fixture.paths.singletonLock,
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(singletonProbe, 0)
+		if singletonProbe >= 0 {
+			XCTAssertFalse(guardianSingletonIsExclusivelyHeld(descriptor: singletonProbe),
+				"a broken drain primitive must immediately invalidate singleton authority")
+			Darwin.close(singletonProbe)
+		}
+		let staleData = try Data(contentsOf: URL(fileURLWithPath: fixture.paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(staleData)?.state, .active,
+			"stale ACTIVE bytes are safe only while no process owns their singleton lock")
+		continueGateFailures.signal()
+		XCTAssertEqual(
+			termination.wait(timeout: 3),
+			LeaseWorkerExit.success.rawValue
+		)
+		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
+		let payloads = executor.snapshot().payloads
+		XCTAssertEqual(gateCalls, 14)
+		XCTAssertEqual(retryDelays.count, 13)
+		XCTAssertEqual(Array(retryDelays.prefix(2)), [10_000, 10_000])
+		XCTAssertTrue(retryDelays.dropFirst(2).allSatisfy { $0 == 100_000 })
+		XCTAssertEqual(payloads.count, 6,
+			"only two one-second-spaced emergency pairs plus the final pair are allowed")
+		XCTAssertTrue(payloads.allSatisfy { $0 == exactFence })
+		let finalSingletonProbe = Darwin.open(
+			fixture.paths.singletonLock,
+			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		)
+		XCTAssertGreaterThanOrEqual(finalSingletonProbe, 0)
+		if finalSingletonProbe >= 0 {
+			XCTAssertTrue(guardianSingletonIsExclusivelyHeld(
+				descriptor: finalSingletonProbe
+			), "successful drain recovery must reacquire singleton authority")
+			Darwin.close(finalSingletonProbe)
+		}
+		let drainingData = try Data(contentsOf: URL(
+			fileURLWithPath: fixture.paths.singletonLock
+		))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(drainingData)?.state, .draining)
+
+		let retired = LeaseGuardianRecord(
+			token: fixture.record.token,
+			nonce: fixture.record.nonce,
+			ownerPID: fixture.record.ownerPID,
+			state: .retired
+		)
+		XCTAssertTrue(replaceGuardianData(
+			try XCTUnwrap(retired.encoded),
+			descriptor: owner
+		))
+		XCTAssertEqual(Darwin.unlink(fixture.paths.recordPath(token: token)), 0)
+		Darwin.close(owner)
+		runtime = nil
+	}
+
+	/// A completed live transport releases ordering without severing identity.
+	func testRegistrationStillRecognizesHealthyGuardianAfterActivationCompletes() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-presence-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		XCTAssertTrue(registration.arm())
+		XCTAssertTrue(registration.guardianStillPresent())
+		XCTAssertTrue(registration.beginLiveTransport())
+
+		registration.endLiveTransport()
+
+		XCTAssertTrue(
+			registration.guardianStillPresent(),
+			"unlocking the activation gate must retain its exact-generation identity descriptor"
+		)
+		runtime = nil
+		XCTAssertFalse(
+			registration.guardianStillPresent(),
+			"the retained descriptor must still detect loss of the exact singleton owner"
+		)
+		registration.retireAfterFence()
+	}
+
+	/// A replacement guardian drains an old live transport before publishing ACTIVE.
+	func testReplacementGuardianWaitsForPriorGenerationTransportGate() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-replacement-gate-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let priorGeneration = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		var priorRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: priorGeneration
+		)
+		XCTAssertTrue(priorRuntime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		XCTAssertTrue(registration.arm())
+		XCTAssertTrue(registration.beginLiveTransport())
+		priorRuntime = nil
+
+		let singletonProbeEntered = DispatchSemaphore(value: 0)
+		let releaseSingletonProbe = DispatchSemaphore(value: 0)
+		defer { releaseSingletonProbe.signal() }
+		let replacement = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			singletonProbeObserved: {
+				singletonProbeEntered.signal()
+				_ = releaseSingletonProbe.wait(timeout: .now() + 5)
+			},
+			generation: guardianGeneration
+		)
+		let startupFinished = DispatchSemaphore(value: 0)
+		let startupResult = GuardianStartupRecorder()
+		DispatchQueue.global(qos: .userInitiated).async {
+			startupResult.store(replacement.startObservingForTesting())
+			startupFinished.signal()
+		}
+
+		XCTAssertEqual(singletonProbeEntered.wait(timeout: .now() + 2), .success)
+		let staleData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		let staleState = LeaseGuardianSingletonRecord.parse(staleData)
+		XCTAssertEqual(staleState?.state, .active,
+			"the repro must retain prior-generation ACTIVE bytes during replacement")
+		XCTAssertEqual(staleState?.generation, priorGeneration)
+		XCTAssertFalse(registration.guardianStillPresent(),
+			"a replacement's preflight probe must never impersonate the dead generation")
+		XCTAssertEqual(startupFinished.wait(timeout: .now() + 0.2), .timedOut)
+
+		releaseSingletonProbe.signal()
+		XCTAssertEqual(startupFinished.wait(timeout: .now() + 0.2), .timedOut,
+			"replacement ACTIVE must not overtake the prior generation's live write")
+		XCTAssertFalse(registration.guardianStillPresent())
+		registration.endLiveTransport()
+		XCTAssertEqual(startupFinished.wait(timeout: .now() + 2), .success)
+		XCTAssertEqual(startupResult.snapshot(), true)
+		let activeData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		let activeState = LeaseGuardianSingletonRecord.parse(activeData)
+		XCTAssertEqual(activeState?.state, .active)
+		XCTAssertEqual(activeState?.generation, guardianGeneration)
+		registration.cancelBeforeActivation()
+	}
+
+	/// Drain publication must wait for an already-authorized activation boundary.
+	func testGuardianTerminationCannotFenceBeforeArmedActivationCompletes() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-gate-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		let termination = GuardianTerminationRecorder()
+		let gateLocker = ObservedActivationGateLocker()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: executor,
+			terminateProcess: termination.terminate,
+			activationGateLocker: gateLocker.callAsFunction,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		XCTAssertTrue(registration.arm())
+		XCTAssertTrue(registration.beginLiveTransport())
+
+		runtime?.terminateForTesting()
+		XCTAssertEqual(gateLocker.wait(timeout: 2), .success)
+		let blockedData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(blockedData)?.state, .active,
+			"DRAINING cannot cross an already-authorized activation transport")
+		XCTAssertTrue(registration.guardianStillPresent())
+		XCTAssertFalse(
+			executor.waitForAnyFence(timeout: 0.2),
+			"the guardian cannot fence past an accepted activation"
+		)
+
+		registration.endLiveTransport()
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		XCTAssertEqual(
+			termination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue
+		)
+		let drainingData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(drainingData)?.state, .draining)
+		XCTAssertFalse(registration.guardianStillPresent())
+		registration.retireAfterFence()
+		runtime = nil
+	}
+
+	/// Every post-READY live transport remains ahead of the guardian's final fence.
+	func testGuardianTerminationWaitsForPostReadyLiveTransportAcknowledgement() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-live-gate-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		let termination = GuardianTerminationRecorder()
+		let gateLocker = ObservedActivationGateLocker()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: executor,
+			terminateProcess: termination.terminate,
+			activationGateLocker: gateLocker.callAsFunction,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		XCTAssertTrue(registration.arm())
+		XCTAssertTrue(registration.beginLiveTransport())
+		registration.endLiveTransport()
+		XCTAssertTrue(registration.beginLiveTransport(),
+			"a post-READY PING/PAUSE/RESUME must take the same drain gate")
+
+		runtime?.terminateForTesting()
+		XCTAssertEqual(gateLocker.wait(timeout: 2), .success)
+		let blockedData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(blockedData)?.state, .active,
+			"DRAINING cannot cross a post-READY live transport awaiting acknowledgement")
+		XCTAssertTrue(registration.guardianStillPresent())
+		XCTAssertFalse(executor.waitForAnyFence(timeout: 0.2),
+			"the guardian cannot overtake an already-authorized live CLI write")
+		XCTAssertNil(termination.wait(timeout: 0.1))
+
+		registration.endLiveTransport()
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+		XCTAssertEqual(
+			termination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue
+		)
+		let drainingData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(drainingData)?.state, .draining)
+		registration.retireAfterFence()
+		runtime = nil
+	}
+
+	/// DRAINING cannot linearize between a live ACK's final check and public write.
+	func testGuardianCannotPublishDrainingBetweenRevalidationAndLiveAcknowledgement() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-ack-linearization-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let guardianExecutor = GuardianRecordingLeaseCLIExecutor()
+		let guardianTermination = GuardianTerminationRecorder()
+		let gateLocker = ObservedActivationGateLocker()
+		var guardian: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: guardianExecutor,
+			terminateProcess: guardianTermination.terminate,
+			activationGateLocker: gateLocker.callAsFunction,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(guardian?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths
+		)
+		let fixture = try makeExecutableFixture(
+			body: "IFS= read -r command <&3 || exit 40\n"
+				+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
+				+ "printf 'READY 1\\n' >&3\n"
+				+ "IFS= read -r command <&3 || exit 42\n"
+				+ "[ \"$command\" = STOP ] || exit 43\n"
+				+ "printf 'FENCED\\n' >&3\n"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(parentPipe.withUnsafeMutableBufferPointer {
+			Darwin.pipe($0.baseAddress!)
+		}, 0)
+		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		defer {
+			for descriptor in parentPipe where descriptor >= 0 { Darwin.close(descriptor) }
+		}
+		let publicOutput = fixture.deletingLastPathComponent()
+			.appendingPathComponent("public-output")
+		let outputDescriptor = Darwin.open(
+			publicOutput.path,
+			O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(outputDescriptor, 0)
+		guard outputDescriptor >= 0 else { return }
+		defer { Darwin.close(outputDescriptor) }
+		let acknowledgementChecked = DispatchSemaphore(value: 0)
+		let publishAcknowledgement = DispatchSemaphore(value: 0)
+		defer { publishAcknowledgement.signal() }
+		let outerResult = GuardianTerminationRecorder()
+		let outer = KarabinerLeaseOuterRuntime(
+			identity: makeIdentity(),
+			detached: false,
+			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: registration,
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: outputDescriptor,
+			beforeLiveAcknowledgementPublish: {
+				acknowledgementChecked.signal()
+				_ = publishAcknowledgement.wait(timeout: .now() + 5)
+			}
+		)
+		DispatchQueue.global(qos: .userInitiated).async {
+			outerResult.terminate(outer.run())
+		}
+
+		XCTAssertEqual(acknowledgementChecked.wait(timeout: .now() + 2), .success)
+		guardian?.terminateForTesting()
+		XCTAssertEqual(gateLocker.wait(timeout: 2), .success)
+		let blockedData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(blockedData)?.state, .active)
+		XCTAssertEqual(try Data(contentsOf: publicOutput), Data(),
+			"the test must pause after revalidation but before public READY")
+		XCTAssertFalse(guardianExecutor.waitForAnyFence(timeout: 0.2))
+
+		publishAcknowledgement.signal()
+		XCTAssertEqual(
+			guardianTermination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue
+		)
+		XCTAssertEqual(
+			try String(contentsOf: publicOutput, encoding: .utf8),
+			"READY\n",
+			"the accepted live ACK must linearize before DRAINING and its fence"
+		)
+		let drainingData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(drainingData)?.state, .draining)
+		Darwin.close(parentPipe[1])
+		parentPipe[1] = -1
+		XCTAssertEqual(outerResult.wait(timeout: 3), LeaseWorkerExit.success.rawValue)
+		guardian = nil
+	}
+
+	/// The exact-token fence never enumerates or signals unrelated Karabiner peers.
+	func testGuardianLeavesPersonalKarabinerProcesses() throws {
+		let stockFamilies = [
+			"Karabiner-Core-Service",
+			"karabiner_grabber",
+			"karabiner_console_user_server",
+			"Karabiner-Menu",
+			"karabiner_observer",
+			"VirtualHIDDevice-Daemon",
+		]
+		var siblings: [ProgressingTestSibling] = []
+		do {
+			for family in stockFamilies {
+				siblings.append(try startUnrelatedSibling(executableName: family))
+			}
+		} catch {
+			siblings.forEach(stopTestOwnedSibling)
+			throw error
+		}
+		defer { siblings.forEach(stopTestOwnedSibling) }
+		for (family, sibling) in zip(stockFamilies, siblings) {
+			let observedCommand = try observedProcessCommand(processID: sibling.process.processIdentifier)
+			XCTAssertEqual(
+				URL(fileURLWithPath: observedCommand).lastPathComponent,
+				family,
+				"the OS process table must expose the stock Karabiner family used by the isolation repro"
+			)
+		}
+		let otherToken = "ffeeddccbbaa99887766554433221100"
+		let fixture = try makeAbandonedGuardianRecord(token: otherToken)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let cli = try makeExecutableFixture(
+			body: "printf '%s\\n' \"$2\" >> \"$0.calls\"\n"
+		)
+		defer { try? FileManager.default.removeItem(at: cli.deletingLastPathComponent()) }
+		let calls = URL(fileURLWithPath: cli.path + ".calls")
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: PosixLeaseCLIExecutor(),
+			cliPath: cli.path
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		let fenceDeadline = ProcessInfo.processInfo.systemUptime + 2
+		var payloads: [String] = []
+		repeat {
+			if let text = try? String(contentsOf: calls, encoding: .utf8) {
+				payloads = text.split(separator: "\n").map(String.init)
+			}
+			if payloads.count >= 2 { break }
+			usleep(kSiblingProgressPollMicroseconds)
+		} while ProcessInfo.processInfo.systemUptime < fenceDeadline
+		let exactFence = "{\"ergopti_mode_\(otherToken)\":0,\"ergopti_revoked_\(otherToken)\":1}"
+		XCTAssertEqual(payloads, [exactFence, exactFence],
+			"the real POSIX executor must invoke only the exact token fence twice")
+		for sibling in siblings {
+			assertSiblingStillExecuting(
+				sibling,
+				"personal Karabiner UI, daemons, watchers, and peers must remain user-managed"
+			)
+		}
+		runtime = nil
+	}
+
+	/// Reads the command path published by the kernel process table for one child.
+	private func observedProcessCommand(processID: pid_t) throws -> String {
+		let process = Process()
+		let output = Pipe()
+		process.executableURL = URL(fileURLWithPath: "/bin/ps")
+		process.arguments = ["-p", String(processID), "-o", "command="]
+		process.standardInput = FileHandle.nullDevice
+		process.standardOutput = output
+		process.standardError = FileHandle.nullDevice
+		try process.run()
+		process.waitUntilExit()
+		guard process.terminationStatus == 0,
+			let commandLine = String(
+				data: output.fileHandleForReading.readDataToEndOfFile(),
+				encoding: .utf8
+			)?.trimmingCharacters(in: .whitespacesAndNewlines),
+			let command = commandLine.split(whereSeparator: { $0.isWhitespace }).first,
+			!command.isEmpty
+		else {
+			throw NSError(domain: "ErgoptiLeaseHarness", code: Int(ESRCH))
+		}
+		return String(command)
+	}
+
+	/// Parses legacy XML independently and pins every launchd capability and target.
+	private func assertLegacyGuardianPlistContract(
+		_ data: Data,
+		executablePath: String,
+		file: StaticString = #filePath,
+		line: UInt = #line
+	) throws {
+		let object = try PropertyListSerialization.propertyList(
+			from: data,
+			options: [],
+			format: nil
+		)
+		let dictionary = try XCTUnwrap(
+			object as? [String: Any],
+			"legacy guardian plist must be one dictionary",
+			file: file,
+			line: line
+		)
+		XCTAssertEqual(Set(dictionary.keys), Set([
+			"Label",
+			"ProgramArguments",
+			"RunAtLoad",
+			"KeepAlive",
+			"ProcessType",
+			"ThrottleInterval",
+			"AssociatedBundleIdentifiers",
+		]), file: file, line: line)
+		XCTAssertEqual(dictionary["Label"] as? String, kRemapGuardianLabel,
+			file: file, line: line)
+		XCTAssertEqual(dictionary["ProgramArguments"] as? [String], [
+			executablePath,
+			kKarabinerLeaseGuardianFlag,
+		], file: file, line: line)
+		XCTAssertEqual(dictionary["RunAtLoad"] as? Bool, true, file: file, line: line)
+		XCTAssertEqual(dictionary["KeepAlive"] as? Bool, true, file: file, line: line)
+		XCTAssertEqual(dictionary["ProcessType"] as? String, "Background",
+			file: file, line: line)
+		XCTAssertEqual(dictionary["ThrottleInterval"] as? Int,
+			kGuardianThrottleIntervalSeconds, file: file, line: line)
+		XCTAssertEqual(dictionary["AssociatedBundleIdentifiers"] as? [String],
+			[kErgoptiBundleId], file: file, line: line)
 	}
 
 	/// Runs the inner runtime with a scripted channel and child executor.
@@ -471,9 +2606,16 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			kKarabinerLeaseWorkerFlag,
 			kKarabinerLeaseRevokeFlag,
 			kKarabinerLeaseInnerFlag,
+			kKarabinerLeaseGuardianFlag,
 		] {
 			XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: ["ErgoptiPlus", flag]))
 		}
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: [
+			"ErgoptiPlus",
+			kKarabinerLeaseGuardianLifetimeTestFlag,
+		]))
+		#endif
 		XCTAssertFalse(KarabinerLeaseWorker.handles(arguments: ["ErgoptiPlus"]))
 	}
 
@@ -1478,6 +3620,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				identity: identity,
 				detached: false,
 				spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+				guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 				parentInputDescriptor: parentPipe[0],
 				parentOutputDescriptor: nullDescriptor,
 				uptime: {
@@ -1557,6 +3700,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: outputDescriptor
 		)
@@ -1623,6 +3767,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: outputDescriptor,
 			poller: { descriptors, timeoutMilliseconds in
@@ -1705,6 +3850,21 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		])
 	}
 
+	/// A buffered live line cannot turn same-read STOP into guardian-loss failure.
+	func testGuardianLossDoesNotOutrankStopSameParentBatch() {
+		var presenceProbeCalls = 0
+		let disposition = classifyLeaseParentBatch(
+			["PING 41", "STOP"],
+			guardianPresent: {
+				presenceProbeCalls += 1
+				return false
+			}
+		)
+		XCTAssertEqual(disposition, .stop)
+		XCTAssertEqual(presenceProbeCalls, 0,
+			"terminal STOP must be classified before probing guardian liveness")
+	}
+
 	/// Proves an ACK already pending in the kernel clears its expired command first.
 	func testPendingInnerAcknowledgementOutranksCommandDeadline() throws {
 		let fixture = try makeExecutableFixture(
@@ -1749,6 +3909,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: nullDescriptor,
 			uptime: {
@@ -1928,6 +4089,124 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 	}
 
+	/// A guardian lost after authorization suppresses the stale live ACK and fences.
+	func testOuterRevalidatesGuardianAfterLiveTransportBeforePublishingReady() throws {
+		let fixture = try makeExecutableFixture(
+			body: "IFS= read -r command <&3 || exit 40\n"
+				+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
+				+ "printf 'READY 1\\n' >&3\n"
+				+ "while :; do /bin/sleep 1; done\n"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
+		let publicOutput = fixture.deletingLastPathComponent()
+			.appendingPathComponent("public-output")
+		let outputDescriptor = Darwin.open(
+			publicOutput.path,
+			O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC,
+			S_IRUSR | S_IWUSR
+		)
+		XCTAssertGreaterThanOrEqual(outputDescriptor, 0)
+		guard outputDescriptor >= 0 else { return }
+		defer { Darwin.close(outputDescriptor) }
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(parentPipe.withUnsafeMutableBufferPointer {
+			Darwin.pipe($0.baseAddress!)
+		}, 0)
+		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		defer {
+			Darwin.close(parentPipe[0])
+			Darwin.close(parentPipe[1])
+		}
+		let registration = ScriptedLeaseGuardianRegistration(armResult: true)
+		registration.loseGuardianAfterSuccessfulBegin = true
+		let spawner = InitialThenUnavailableLeaseInnerSpawner(
+			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
+		)
+		let recovery = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
+		let identity = makeIdentity()
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: identity,
+			detached: false,
+			spawner: spawner,
+			guardianRegistration: registration,
+			recoveryExecutor: recovery,
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: outputDescriptor
+		)
+
+		XCTAssertEqual(runtime.run(), LeaseWorkerExit.innerFailed.rawValue)
+		XCTAssertEqual(registration.beginLiveTransportCalls, 1)
+		XCTAssertEqual(registration.endLiveTransportCalls, 1)
+		XCTAssertEqual(try Data(contentsOf: publicOutput), Data(),
+			"READY must not outlive the exact guardian generation that authorized its write")
+		let exactFence = LeasePayloads.fence(identity: identity)
+		XCTAssertEqual(recovery.payloads, [exactFence, exactFence])
+	}
+
+	/// Recovery confines the exact writer group before releasing the guardian gate.
+	func testOuterRetiresLiveWriterBeforeReleasingGuardianDrainGate() throws {
+		let fixture = try makeExecutableFixture(
+			body: "echo $$ > \"$3\"\n"
+				+ "IFS= read -r command <&3 || exit 40\n"
+				+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
+				+ "printf 'MALFORMED\\n' >&3\n"
+				+ "trap '' TERM\nwhile :; do /bin/sleep 1; done\n"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
+		let writerPIDFile = fixture.deletingLastPathComponent()
+			.appendingPathComponent("live-writer.pid")
+		let identity = LeaseIdentity(
+			cliPath: kCanonicalKarabinerCLIPath,
+			token: token,
+			modeName: writerPIDFile.path,
+			revokedName: "ergopti_revoked_\(token)",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(parentPipe.withUnsafeMutableBufferPointer {
+			Darwin.pipe($0.baseAddress!)
+		}, 0)
+		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		defer {
+			Darwin.close(parentPipe[0])
+			Darwin.close(parentPipe[1])
+		}
+		let nullDescriptor = Darwin.open("/dev/null", O_WRONLY | O_CLOEXEC)
+		XCTAssertGreaterThanOrEqual(nullDescriptor, 0)
+		guard nullDescriptor >= 0 else { return }
+		defer { Darwin.close(nullDescriptor) }
+		let registration = ScriptedLeaseGuardianRegistration(armResult: true)
+		var writerWasGoneAtGateRelease = false
+		registration.endLiveTransportHook = {
+			guard let rawPID = try? String(contentsOf: writerPIDFile, encoding: .utf8)
+				.trimmingCharacters(in: .whitespacesAndNewlines),
+				let writerPID = pid_t(rawPID)
+			else { return }
+			writerWasGoneAtGateRelease = Darwin.kill(writerPID, 0) == -1 && errno == ESRCH
+		}
+		let spawner = InitialThenUnavailableLeaseInnerSpawner(
+			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
+		)
+		let recovery = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: identity,
+			detached: false,
+			spawner: spawner,
+			guardianRegistration: registration,
+			recoveryExecutor: recovery,
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: nullDescriptor
+		)
+
+		XCTAssertEqual(runtime.run(), LeaseWorkerExit.innerFailed.rawValue)
+		XCTAssertTrue(writerWasGoneAtGateRelease,
+			"DRAINING must not overtake a stopped or late exact live writer")
+		XCTAssertEqual(registration.endLiveTransportCalls, 1)
+		let exactFence = LeasePayloads.fence(identity: identity)
+		XCTAssertEqual(recovery.payloads, [exactFence, exactFence])
+	}
+
 	/// Proves a replaced launcher path cannot strand a READY generation forever.
 	func testAuthenticatedOuterFencesDirectlyWhenReplacementSpawnerStaysUnavailable() throws {
 		let fixture = try makeExecutableFixture(
@@ -1979,6 +4258,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: unavailableSpawner,
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			recoveryExecutor: recoveryExecutor,
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: outputPipe[1]
@@ -2486,6 +4766,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: nullDescriptor,
 			uptime: {
@@ -2585,6 +4866,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentSockets[0],
 			parentOutputDescriptor: nullDescriptor
 		)
@@ -2770,7 +5052,9 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 	/// Starts an unrelated process that appends proof of continued execution.
 	/// - Returns: Test-owned sibling plus its monotonic progress marker.
-	private func startUnrelatedSibling() throws -> ProgressingTestSibling {
+	private func startUnrelatedSibling(
+		executableName: String? = nil
+	) throws -> ProgressingTestSibling {
 		let directory = FileManager.default.temporaryDirectory
 			.appendingPathComponent("ErgoptiSibling-\(UUID().uuidString)")
 		try FileManager.default.createDirectory(
@@ -2778,8 +5062,19 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			withIntermediateDirectories: true
 		)
 		let progressFile = directory.appendingPathComponent("progress")
+		let executableURL: URL
+		if let executableName {
+			executableURL = directory.appendingPathComponent(executableName)
+			try FileManager.default.copyItem(
+				at: URL(fileURLWithPath: "/bin/sh"),
+				to: executableURL
+			)
+			XCTAssertEqual(Darwin.chmod(executableURL.path, 0o700), 0)
+		} else {
+			executableURL = URL(fileURLWithPath: "/bin/sh")
+		}
 		let process = Process()
-		process.executableURL = URL(fileURLWithPath: "/bin/sh")
+		process.executableURL = executableURL
 		process.arguments = [
 			"-c",
 			kSiblingProgressCommand,

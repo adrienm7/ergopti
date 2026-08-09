@@ -28,6 +28,7 @@
 
 import Cocoa
 import Darwin
+import Dispatch
 import Sparkle
 
 
@@ -106,6 +107,7 @@ enum LauncherLog {
 	// launch event) so unbounded growth is not a practical concern.
 	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
 	private static let logPath = logDirectory + "/launcher.log"
+	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
 
 	private static let dateFormatter: DateFormatter = {
 		let f = DateFormatter()
@@ -117,6 +119,10 @@ enum LauncherLog {
 	/// Best-effort: a logging failure must never prevent the launcher from
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {
+		queue.sync { writeUnlocked(message) }
+	}
+
+	private static func writeUnlocked(_ message: String) {
 		let timestamp = dateFormatter.string(from: Date())
 		let line = "[\(timestamp)] \(message)\n"
 
@@ -155,21 +161,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let processRunner: (Process) throws -> Void
 	private let fatalReporter: ((String) -> Void)?
+	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
+	private let guardianRegistrationQueue = DispatchQueue(
+		label: "com.ergoptiplus.remap-guardian.registration",
+		qos: .userInitiated
+	)
+	private var applicationIsTerminating = false
 
 	/// Creates the production delegate or an injected launcher boundary for tests.
 	/// - Parameters:
 	///   - launcherIdentityReader: Captures the running launcher's exact file identity.
 	///   - processRunner: Performs the sole embedded-Hammerspoon child start.
 	///   - fatalReporter: Test-only observer replacing the modal fatal UI.
+	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
 		processRunner: @escaping (Process) throws -> Void = { try $0.run() },
-		fatalReporter: ((String) -> Void)? = nil
+		fatalReporter: ((String) -> Void)? = nil,
+		guardianRegistrar: @escaping (String) -> RemapGuardianRegistrationStatus =
+			remapGuardianRegistrationStatus
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.processRunner = processRunner
 		self.fatalReporter = fatalReporter
+		self.guardianRegistrar = guardianRegistrar
 		super.init()
 	}
 
@@ -215,10 +231,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		launchHammerspoon(at: hsBinary)
+		// Service registration can execute bounded launchctl children on macOS
+		// 11/12. Keep that work off AppKit's main thread, but do not launch
+		// Hammerspoon until its result is known: remapping remains fail-closed.
+		guard let launcherPath = Bundle.main.executablePath else {
+			fail("Running launcher executable path is unavailable.")
+			return
+		}
+		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
+	}
+
+	/// Starts Hammerspoon only after the independent guardian result is known.
+	func startManagedHammerspoon(at hsBinary: String, launcherPath: String) {
+		beginRemapGuardianRegistration(executablePath: launcherPath) { [weak self] status in
+			guard let self, !self.applicationIsTerminating else { return }
+			if status != .ready {
+				LauncherLog.write(
+					"remap guardian \(status.rawValue); ErgoptiPlus rules remain inert"
+				)
+			}
+			self.launchHammerspoon(at: hsBinary, remapGuardianStatus: status)
+		}
+	}
+
+	/// Resolves bounded service work away from AppKit and returns on the main queue.
+	func beginRemapGuardianRegistration(
+		executablePath: String,
+		completion: @escaping (RemapGuardianRegistrationStatus) -> Void
+	) {
+		let registrar = guardianRegistrar
+		guardianRegistrationQueue.async {
+			let status = registrar(executablePath)
+			DispatchQueue.main.async { completion(status) }
+		}
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
+		applicationIsTerminating = true
 		// Forward the quit to the child so Hammerspoon shuts down cleanly.
 		if let proc = hsProcess, proc.isRunning {
 			proc.terminate()
@@ -310,7 +359,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// Launch the embedded Hammerspoon as a child Process. We use Process
 	// rather than NSWorkspace.open so terminating the launcher also terminates
 	// Hammerspoon — keeping the two visually fused for the user.
-	func launchHammerspoon(at binaryPath: String) {
+	func launchHammerspoon(
+		at binaryPath: String,
+		remapGuardianStatus: RemapGuardianRegistrationStatus = .ready
+	) {
 		guard let launcherPath = Bundle.main.executablePath,
 			!launcherPath.isEmpty,
 			let launcherIdentity = launcherIdentityReader(launcherPath)
@@ -334,6 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		env["ERGOPTI_KARABINER_INSTALLER"]    = bundledKarabinerInstallerPath()
 		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath
+		env["ERGOPTI_REMAP_GUARDIAN_STATUS"]  = remapGuardianStatus.rawValue
 		env.removeValue(forKey: "ERGOPTI_LAUNCHER_DEVICE")
 		env.removeValue(forKey: "ERGOPTI_LAUNCHER_INODE")
 		env["ERGOPTI_LAUNCHER_DEVICE"] = launcherIdentity.device
@@ -410,7 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // =====================================
 // =====================================
 
-// The launcher binary also serves all three headless native lease roles.
+// The launcher binary also serves every headless native lease role.
 // Branch before touching NSApplication, CFPreferences or Sparkle so a helper
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {

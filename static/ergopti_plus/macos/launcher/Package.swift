@@ -5,9 +5,9 @@
 // DESCRIPTION:
 // Builds the tiny native binary that lives at ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus.
 // Its interactive role hosts Sparkle and spawns embedded Hammerspoon with our
-// config-dir override. The same signed executable also provides three headless
-// modes (outer worker, inner guardian, and one-shot revoker) that guard exact
-// ErgoptiPlus Karabiner generation variables.
+// config-dir override. The same signed executable also provides four headless
+// modes (outer worker, private inner, one-shot revoker, and launchd guardian)
+// that guard exact ErgoptiPlus Karabiner generation variables.
 // Hammerspoon itself stays untouched as a vendored .app inside Contents/Frameworks.
 //
 // FEATURES & RATIONALE:
@@ -38,6 +38,9 @@ let package = Package(
 				.product(name: "Sparkle", package: "Sparkle")
 			],
 			path: "Sources/ErgoptiPlus",
+			swiftSettings: [
+				.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))
+			],
 			linkerSettings: [
 				// dyld resolves @rpath by walking each entry in LC_RPATH; without
 				// this entry the loader cannot find Sparkle.framework at runtime
@@ -49,7 +52,10 @@ let package = Package(
 		.testTarget(
 			name: "ErgoptiPlusTests",
 			dependencies: ["ErgoptiPlus"],
-			path: "Tests/ErgoptiPlusTests"
+			path: "Tests/ErgoptiPlusTests",
+			swiftSettings: [
+				.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))
+			]
 		)
 	]
 )

@@ -19,6 +19,7 @@
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
 // ==============================================================================
 
+import Dispatch
 import XCTest
 @testable import ErgoptiPlus
 
@@ -86,5 +87,103 @@ final class LauncherEnvironmentTests: XCTestCase {
 			fatalMessages,
 			["Running launcher executable identity is unavailable."]
 		)
+	}
+
+	/// The Lua child receives the exact fail-closed reason for localized recovery UI.
+	func testGuardianRegistrationStatusIsExportedToHammerspoon() {
+		var childEnvironment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			processRunner: { process in childEnvironment = process.environment ?? [:] }
+		)
+
+		delegate.launchHammerspoon(
+			at: "/tmp/embedded-hammerspoon",
+			remapGuardianStatus: .requiresApproval
+		)
+
+		XCTAssertEqual(
+			childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"],
+			"requires_approval"
+		)
+	}
+
+	/// The composed startup cannot create the child before registration resolves.
+	func testManagedHammerspoonWaitsForGuardianRegistrationResultBeforeChildStart() {
+		let entered = DispatchSemaphore(value: 0)
+		let release = DispatchSemaphore(value: 0)
+		let childStarted = expectation(description: "managed Hammerspoon child started")
+		let stateLock = NSLock()
+		var childStartCount = 0
+		var childEnvironment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			processRunner: { process in
+				stateLock.lock()
+				childStartCount += 1
+				childEnvironment = process.environment ?? [:]
+				stateLock.unlock()
+				childStarted.fulfill()
+			},
+			guardianRegistrar: { _ in
+				entered.signal()
+				guard release.wait(timeout: .now() + 2) == .success
+				else { return .unavailable }
+				return .requiresApproval
+			}
+		)
+
+		withExtendedLifetime(delegate) {
+			delegate.startManagedHammerspoon(
+				at: "/tmp/embedded-hammerspoon",
+				launcherPath: "/tmp/ErgoptiPlus"
+			)
+			XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
+			stateLock.lock()
+			let startsBeforeRegistration = childStartCount
+			stateLock.unlock()
+			XCTAssertEqual(startsBeforeRegistration, 0)
+			release.signal()
+			wait(for: [childStarted], timeout: 2)
+			stateLock.lock()
+			let finalStartCount = childStartCount
+			let exportedStatus = childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"]
+			stateLock.unlock()
+			XCTAssertEqual(finalStartCount, 1)
+			XCTAssertEqual(exportedStatus, "requires_approval")
+		}
+	}
+
+	/// A blocked legacy launchctl path cannot park AppKit's startup callback.
+	func testGuardianRegistrationRunsOffTheMainThread() {
+		let entered = DispatchSemaphore(value: 0)
+		let release = DispatchSemaphore(value: 0)
+		let resultLock = NSLock()
+		var registrarObservedRelease = false
+		let completed = expectation(description: "registration delivered on main")
+		let delegate = AppDelegate(guardianRegistrar: { _ in
+			entered.signal()
+			let result = release.wait(timeout: .now() + 1)
+			resultLock.lock()
+			registrarObservedRelease = result == .success
+			resultLock.unlock()
+			return .ready
+		})
+
+		delegate.beginRemapGuardianRegistration(executablePath: "/tmp/ErgoptiPlus") {
+			status in
+			XCTAssertTrue(Thread.isMainThread)
+			XCTAssertEqual(status, .ready)
+			resultLock.lock()
+			let ranAsynchronously = registrarObservedRelease
+			resultLock.unlock()
+			XCTAssertTrue(ranAsynchronously,
+				"a synchronous registrar would time out before this test can release it")
+			completed.fulfill()
+		}
+
+		XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
+		release.signal()
+		wait(for: [completed], timeout: 2)
 	}
 }

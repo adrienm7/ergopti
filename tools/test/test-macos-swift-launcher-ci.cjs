@@ -73,6 +73,14 @@ check(/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
 check(!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
 	'`test-swift-launcher` must be gating, not continue-on-error');
 
+const plistLintLine = swiftJob.split(/\r?\n/).find((line) =>
+	/\brun:\s*plutil\s+-lint\b/.test(line)) || '';
+check(plistLintLine.includes(
+	'static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist'
+), 'the macOS job must plutil-lint the exact bundled guardian LaunchAgent');
+check(!plistLintLine.includes('|| true'),
+	'the guardian plist lint step must not swallow malformed XML');
+
 const buildLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift build\b/.test(line)) || '';
 check(buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
 	'the Swift build step must compile the packaged launcher directory');
