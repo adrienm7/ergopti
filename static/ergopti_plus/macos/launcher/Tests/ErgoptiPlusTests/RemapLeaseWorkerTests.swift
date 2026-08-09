@@ -1,4 +1,4 @@
-// Tests/ErgoptiPlusTests/KarabinerLeaseWorkerTests.swift
+// Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift
 
 // ==============================================================================
 // MODULE: Karabiner Lease Worker Tests
@@ -878,7 +878,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			.deletingLastPathComponent()
 			.deletingLastPathComponent()
 		let sourceURL = launcherRoot
-			.appendingPathComponent("Sources/ErgoptiPlus/KarabinerLeaseWorker.swift")
+			.appendingPathComponent("Sources/ErgoptiPlus/RemapLeaseWorker.swift")
 		let source = try String(contentsOf: sourceURL, encoding: .utf8)
 		XCTAssertEqual(
 			source.components(separatedBy: "posix_spawn_file_actions_addclose").count - 1,
