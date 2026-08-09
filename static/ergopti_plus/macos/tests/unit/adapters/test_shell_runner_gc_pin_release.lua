@@ -53,7 +53,7 @@ helpers.describe("ShellRunner: GC pin release", function()
 		)
 	end)
 
-	helpers.it("wrapped_on_done releases pin via closure _task, not the first arg", function()
+	helpers.it("wrapped_on_done captures and releases the exact closure task", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
 		local src_file = base .. "/adapters/shell_runner.lua"
@@ -63,13 +63,15 @@ helpers.describe("ShellRunner: GC pin release", function()
 		local src = fh:read("*a")
 		fh:close()
 
-		-- Find wrapped_on_done function body and verify it uses _task for the pin
+		-- Capture the closure task before clearing the mutable upvalue. The callback's
+		-- first argument is only an exit code, never the native task object.
 		local fn_start = src:find("local function wrapped_on_done", 1, true)
 		helpers.assert_true(fn_start ~= nil, "wrapped_on_done not found")
-		local region = src:sub(fn_start, fn_start + 200)
+		local region = src:sub(fn_start, fn_start + 500)
 		helpers.assert_true(
-			region:find("M._active_tasks[_task]", 1, true) ~= nil,
-			"wrapped_on_done must release pin via M._active_tasks[_task], not M._active_tasks[task]"
+			region:find("local completed_task = _task", 1, true) ~= nil
+				and region:find("M._active_tasks[completed_task]", 1, true) ~= nil,
+			"wrapped_on_done must release the exact task captured from its closure"
 		)
 	end)
 
@@ -86,10 +88,11 @@ helpers.describe("ShellRunner: GC pin release", function()
 		-- Find _safe_terminate and verify it clears the GC pin
 		local fn_start = src:find("local function _safe_terminate", 1, true)
 		helpers.assert_true(fn_start ~= nil, "_safe_terminate not found")
-		local region = src:sub(fn_start, fn_start + 300)
+		local region = src:sub(fn_start, fn_start + 500)
 		helpers.assert_true(
-			region:find("M._active_tasks[_task]", 1, true) ~= nil,
-			"_safe_terminate must remove M._active_tasks[_task] to prevent GC pin leak"
+			region:find("local task = _task", 1, true) ~= nil
+				and region:find("M._active_tasks[task]", 1, true) ~= nil,
+			"_safe_terminate must release the exact captured task to prevent a GC pin leak"
 		)
 	end)
 
@@ -99,25 +102,33 @@ helpers.describe("ShellRunner: GC pin release", function()
 	-- "table index is nil" on every superseded/cancelled stream (seen on each LLM
 	-- prediction in the field logs).
 	helpers.it("wrapped_on_done tolerates a nil _task after terminate (no 'table index is nil')", function()
-		local captured_done
+		local captured_done, fake_task
 		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
 			task = {
 				new = function(_exe, done_cb, _a3, _a4)
 					captured_done = done_cb
-					return { start = function() end, terminate = function() end }
+					fake_task = {
+						start = function(self) return self end,
+						terminate = function(self) return self end,
+					}
+					return fake_task
 				end,
 			},
 		})
 
 		local handle = ShellRunner.spawn("/usr/bin/curl", { "-s", "-N" }, function() end)
-		handle.start()
+		helpers.assert_true(handle.start(), "the fake task must reach the live state")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"the live task must be pinned before termination")
 		handle.terminate()  -- supersede: clears the closure `_task`
+		helpers.assert_nil(ShellRunner._active_tasks[fake_task],
+			"terminate must release the exact task pin before the callback arrives")
 
 		helpers.assert_true(type(captured_done) == "function",
 			"the spawn wrapper must register a completion callback")
 		-- The OS fires the completion callback for the terminated task AFTER _task was nilled.
 		captured_done(15, "", "")  -- 15 = SIGTERM
-		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
+		helpers.assert_nil(ShellRunner._active_tasks[fake_task],
 			"a completion arriving after terminate() must still RELEASE the pin — a task "
 				.. "left pinned is never collected, and the process holds its pipes for the "
 				.. "rest of the session")
