@@ -1063,16 +1063,6 @@ final class PosixLeaseCLIExecutor: LeaseCLIExecuting {
 			guard closeStatus == 0 else { return .spawnFailed(closeStatus) }
 		}
 
-		// Reject replacements already visible before argument publication and
-		// spawn. A second check below handles a one-way replacement that lands
-		// after this observation.
-		guard let expectedExecutableIdentity,
-			executableIdentityReader(executablePath) == expectedExecutableIdentity
-		else {
-			_ = Darwin.close(outerDescriptor)
-			_ = Darwin.close(innerDescriptor)
-			return nil
-		}
 		guard let rawArguments = duplicateLeaseArguments([
 			cliPath,
 			"--set-variables",
@@ -1892,6 +1882,16 @@ final class PosixLeaseInnerSpawner: LeaseInnerSpawning {
 			}
 		}
 
+		// Reject replacements already visible before argument publication and
+		// spawn. A second check below handles a one-way replacement that lands
+		// after this observation.
+		guard let expectedExecutableIdentity,
+			executableIdentityReader(executablePath) == expectedExecutableIdentity
+		else {
+			_ = Darwin.close(outerDescriptor)
+			_ = Darwin.close(innerDescriptor)
+			return nil
+		}
 		guard let rawArguments = duplicateLeaseArguments([
 			executablePath,
 			kKarabinerLeaseInnerFlag,
