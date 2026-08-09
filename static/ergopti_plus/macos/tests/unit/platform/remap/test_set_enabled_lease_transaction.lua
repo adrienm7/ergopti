@@ -144,6 +144,8 @@ local function load_enabled_remap(options)
 			return true
 		end,
 		pause = function(on_done)
+			if options.pause_mode == "throw" then error("synthetic pause request failure") end
+			if options.pause_mode == "false" then return false end
 			calls.pause_callbacks[#calls.pause_callbacks + 1] = on_done
 			calls.pause_callback = on_done
 			return true
@@ -643,6 +645,24 @@ end)
 -- =================================================
 
 helpers.describe("karabiner pause/resume API exposes the complete transaction boundary", function()
+	for _, mode in ipairs({ "throw", "false" }) do
+		helpers.it("contains a PAUSE request returning " .. mode, function()
+			local remap, calls = load_enabled_remap({ pause_mode = mode })
+			local results = {}
+			local call_ok, accepted = pcall(remap.pause, function(ok, reason)
+				results[#results + 1] = { ok = ok, reason = reason }
+			end)
+
+			helpers.assert_true(call_ok, "PAUSE request failure escaped the public boundary")
+			helpers.assert_true(accepted == false)
+			helpers.assert_eq(#calls.pause_callbacks, 0)
+			helpers.assert_eq(#results, 1, "the public callback must settle exactly once")
+			helpers.assert_true(results[1].ok == false)
+			helpers.assert_eq(results[1].reason,
+				mode == "throw" and "request-raised" or "request-rejected")
+		end)
+	end
+
 	helpers.it("settles pause only when the controller reports PAUSED", function()
 		local remap, calls = load_enabled_remap()
 		local result = nil
