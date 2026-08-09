@@ -200,7 +200,7 @@ local function clear_managed_output_set()
 		return false
 	end
 	local ok, result = xpcall(KcBridge.clear_managed_set, debug.traceback)
-	if not ok then
+	if not ok or result ~= true then
 		Logger.error(LOG, "Managed-output classifier clear failed: %s.", tostring(result))
 		return false
 	end

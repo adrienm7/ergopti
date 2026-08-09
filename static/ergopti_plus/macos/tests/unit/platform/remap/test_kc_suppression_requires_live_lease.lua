@@ -74,7 +74,7 @@ local function load_remap(initially_enabled, options)
 	}
 	package.loaded["platform.remap.ke_lifecycle"] = {
 		open_gui = function() return true end,
-		stop = function() end,
+		stop = function() return true end,
 		notify_ready = function() end,
 	}
 	package.loaded["platform.remap.lease_controller"] = {
@@ -167,7 +167,10 @@ local function load_remap(initially_enabled, options)
 			return true
 		end,
 		clear_managed_set = function()
+			if options.clear_mode == "throw" then error("synthetic classifier clear failure") end
+			if options.clear_mode == "false" then return false end
 			ctx.suppresses_personal_output = false
+			return true
 		end,
 	}
 	package.loaded["modules.gestures.engine"] = {}
@@ -233,6 +236,20 @@ end
 -- =============================================
 
 helpers.describe("karabiner keycode suppression follows the exact live lease", function()
+	for _, mode in ipairs({ "throw", "false" }) do
+		helpers.it("reports local teardown failure when classifier clear returns " .. mode, function()
+			local remap, ctx = load_remap(false, { clear_mode = mode })
+			ctx.suppresses_personal_output = true
+
+			local call_ok, stopped = pcall(remap.teardown_local)
+			helpers.assert_true(call_ok, "classifier clear failure escaped local teardown")
+			helpers.assert_true(stopped == false,
+				"teardown must not claim personal Karabiner output classification was released")
+			helpers.assert_true(ctx.suppresses_personal_output,
+				"the double proves the classifier still owns the personal output keycode")
+		end)
+	end
+
 	helpers.it("never suppresses personal Karabiner output while integration is disabled", function()
 		local _, ctx = load_remap(false)
 
