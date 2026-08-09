@@ -777,14 +777,61 @@ M.dialog = {
 	chooseFromList = function() return nil end,
 }
 
+local APPLICATIONS_BY_PID = {}
+local APPLICATION_QUERIES = {}
+local APPLICATION_QUERY_WATCHER_COUNTS = {}
+-- Real application watchers die when Lua releases the userdata. Keep only weak
+-- test-hook values so the stub cannot conceal a missing production GC root
+local APPLICATION_WATCHERS = setmetatable({}, { __mode = "v" })
+local APPLICATION_WATCHER_COUNT = 0
+
 M.application = {
 	frontmostApplication = function() return { name = function() return "Test" end, bundleID = function() return "test.bundle" end } end,
 	get = function(_) return nil end,
 	launchOrFocus = function(_) end,
 	open = function(_) end,
 	applicationsForBundleID = function(_) return {} end,
+	applicationForPID = function(pid)
+		APPLICATION_QUERIES[#APPLICATION_QUERIES + 1] = pid
+		local active_watchers = 0
+		for _, watcher in pairs(APPLICATION_WATCHERS) do
+			if watcher.running then active_watchers = active_watchers + 1 end
+		end
+		APPLICATION_QUERY_WATCHER_COUNTS[#APPLICATION_QUERY_WATCHER_COUNTS + 1] = active_watchers
+		return APPLICATIONS_BY_PID[pid]
+	end,
+	__set_for_pid = function(pid, app) APPLICATIONS_BY_PID[pid] = app end,
+	__remove_for_pid = function(pid) APPLICATIONS_BY_PID[pid] = nil end,
+	__queries = APPLICATION_QUERIES,
+	__query_watcher_counts = APPLICATION_QUERY_WATCHER_COUNTS,
+	__emit = function(app_name, event_type, app)
+		for _, watcher in pairs(APPLICATION_WATCHERS) do
+			if watcher.running then watcher.fn(app_name, event_type, app) end
+		end
+	end,
 	watcher = {
-		new = function(_) return { start = function(self) return self end, stop = function() end } end,
+		new = function(fn)
+			local watcher = {
+				fn = fn,
+				started = 0,
+				stopped = 0,
+				running = false,
+			}
+			function watcher:start()
+				self.started = self.started + 1
+				self.running = true
+				return self
+			end
+			function watcher:stop()
+				self.stopped = self.stopped + 1
+				self.running = false
+				return self
+			end
+			APPLICATION_WATCHER_COUNT = APPLICATION_WATCHER_COUNT + 1
+			APPLICATION_WATCHERS[APPLICATION_WATCHER_COUNT] = watcher
+			return watcher
+		end,
+		__watchers = APPLICATION_WATCHERS,
 		activated = "activated",
 		deactivated = "deactivated",
 		launched = "launched",
@@ -937,6 +984,11 @@ function M.__reset()
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end
 	for k in pairs(EXEC_RESPONSES) do EXEC_RESPONSES[k] = nil end
+	for pid in pairs(APPLICATIONS_BY_PID) do APPLICATIONS_BY_PID[pid] = nil end
+	for i = #APPLICATION_QUERIES, 1, -1 do APPLICATION_QUERIES[i] = nil end
+	for i = #APPLICATION_QUERY_WATCHER_COUNTS, 1, -1 do APPLICATION_QUERY_WATCHER_COUNTS[i] = nil end
+	for id in pairs(APPLICATION_WATCHERS) do APPLICATION_WATCHERS[id] = nil end
+	APPLICATION_WATCHER_COUNT = 0
 	M.http.__reset()
 	if M.fs and M.fs.__reset_entries then M.fs.__reset_entries() end
 	-- Rebuild the canonical keycodes.map: tests like test_keycodes deliberately
