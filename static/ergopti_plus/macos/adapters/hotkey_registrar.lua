@@ -90,15 +90,30 @@ function M.bind(chord, callback)
 	-- expects the key in the spelling the OS uses, which is the lower-cased form
 	-- the notation core already produces for multi-character names.
 	local hs_key = parsed.key:lower()
+	-- Keep a Lua-side delivery fence in front of the native callback. Native
+	-- :disable()/:delete() can raise during teardown; without this independent
+	-- fence, a retained Hammerspoon hotkey could still execute an Ergopti action
+	-- after the owning feature had reported itself disabled.
+	local entry = {
+		hotkey = nil,
+		chord = Chord.format(parsed.mods, parsed.key),
+		enabled = true,
+		native_settled = true,
+	}
+	local function deliver_if_enabled(...)
+		if entry.enabled ~= true then return nil end
+		return callback(...)
+	end
 
-	local ok, hotkey = pcall(hs.hotkey.bind, parsed.mods, hs_key, callback)
+	local ok, hotkey = pcall(hs.hotkey.bind, parsed.mods, hs_key, deliver_if_enabled)
 	if not ok or not hotkey then
 		Logger.warn(LOG, "bind(): the OS refused '%s' — %s.", tostring(chord), tostring(hotkey))
 		return nil
 	end
 
 	local handle = next_handle()
-	_bindings[handle] = { hotkey = hotkey, chord = Chord.format(parsed.mods, parsed.key), enabled = true }
+	entry.hotkey = hotkey
+	_bindings[handle] = entry
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle
 end
@@ -115,13 +130,26 @@ function M.unbind(handle)
 		return false
 	end
 
-	_bindings[handle] = nil
+	-- Close delivery before touching the native object. This assignment cannot
+	-- fail, so even a double native failure remains a fail-closed no-op.
+	entry.enabled = false
 	local ok, err = pcall(function() entry.hotkey:delete() end)
 	if not ok then
-		Logger.error(LOG, "unbind(): %s failed to release — %s.", entry.chord, tostring(err))
+		-- Keep the opaque handle retryable. Forgetting it here leaves a globally
+		-- captured chord with no remaining owner capable of deleting it. Disable is
+		-- a fail-safe best effort so personal bindings are not intercepted while a
+		-- later teardown retries the actual delete.
+		local disabled_ok, disable_err = pcall(function() entry.hotkey:disable() end)
+		entry.native_settled = disabled_ok
+		Logger.error(LOG, "unbind(): %s failed to release — %s; retained for retry (disabled=%s%s).",
+			entry.chord,
+			tostring(err),
+			tostring(disabled_ok),
+			disabled_ok and "" or ", disable error=" .. tostring(disable_err))
 		return false
 	end
 
+	_bindings[handle] = nil
 	Logger.debug(LOG, "Released %s (%s).", entry.chord, tostring(handle))
 	return true
 end
@@ -138,17 +166,24 @@ function M.setEnabled(handle, enabled)
 	end
 
 	local want = enabled and true or false
-	if entry.enabled == want then return true end
+	if entry.enabled == want and entry.native_settled == true then return true end
+
+	-- Disabling must become effective at the adapter boundary before the native
+	-- call. If Hammerspoon raises, delivery stays fenced while native_settled=false
+	-- keeps a later call retryable.
+	if not want then entry.enabled = false end
 
 	local ok, err = pcall(function()
 		if want then entry.hotkey:enable() else entry.hotkey:disable() end
 	end)
 	if not ok then
+		entry.native_settled = false
 		Logger.error(LOG, "setEnabled(): %s failed to reach %s — %s.", entry.chord, tostring(want), tostring(err))
 		return false
 	end
 
 	entry.enabled = want
+	entry.native_settled = true
 	Logger.debug(LOG, "%s enabled=%s.", entry.chord, tostring(want))
 	return true
 end
