@@ -250,32 +250,77 @@ jobs:
         timeout-minutes: 5
 
   # ─────────────────────────────────────────────────
-  # 2.3) Gate: macOS driver fully green
+  # 2.3) Native launcher build + process-level XCTest on macOS
+  # ─────────────────────────────────────────────────
+  test-swift-launcher:
+    name: 'macOS · Swift launcher build + tests'
+    runs-on: macos-latest
+    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            static/ergopti_plus/macos/launcher/.build/artifacts
+            static/ergopti_plus/macos/launcher/.build/checkouts
+            static/ergopti_plus/macos/launcher/.build/repositories
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift', 'static/ergopti_plus/macos/launcher/Package.resolved') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Report Swift toolchain
+        run: swift --version
+
+      - name: Build release launcher
+        run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher
+        timeout-minutes: 10
+
+      # Keep XCTest serial: the lease tests install process-wide signal handlers
+      # and fork/reap real children, so parallel workers would race each other.
+      - name: Run Swift launcher tests
+        run: swift test --package-path static/ergopti_plus/macos/launcher
+        timeout-minutes: 10
+
+  # ─────────────────────────────────────────────────
+  # 2.4) Gate: macOS driver fully green
   # ─────────────────────────────────────────────────
   macos-ok:
     name: 'macOS · ✅ all green'
     runs-on: ubuntu-latest
-    needs: [test-hs, e2e-hs]
+    needs: [test-hs, e2e-hs, test-swift-launcher]
     if: always()
 
     steps:
       - name: Assert all macOS jobs passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          failed=0
-          for job_result in "${{ needs.test-hs.result }}" "${{ needs.e2e-hs.result }}"; do
-              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
-                  failed=1
-              fi
-          done
-          if [[ $failed -eq 1 ]]; then
-              echo "macOS driver: one or more jobs failed."
-              echo "  test-hs : ${{ needs.test-hs.result }}"
-              echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+          set -euo pipefail
+          total=$(echo "$NEEDS" | jq -r 'length')
+          if [ "$total" -lt 3 ]; then
+              echo "::error::macos-ok read $total dependency result(s) — this gate is asserting too little."
               exit 1
           fi
-          echo "macOS driver: all jobs passed (or skipped)."
-          echo "  test-hs : ${{ needs.test-hs.result }}"
-          echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+
+          failed=0
+          while read -r job result; do
+              printf '  %-24s: %s\n' "$job" "$result"
+              case "$result" in
+                  success) ;;
+                  *) failed=1 ;;
+              esac
+          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
+
+          if [ "$failed" -eq 1 ]; then
+              echo "macOS driver: one or more of the $total jobs did not succeed."
+              exit 1
+          fi
+          echo "macOS driver: all $total job(s) passed."
 
   # =============================================
   # =============================================

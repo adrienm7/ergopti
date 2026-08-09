@@ -81,6 +81,7 @@
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
 		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
+		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
 		"test:dynamic-hs-labels": "node ./tools/test/test-dynamic-hotstrings-menu-labels.cjs",
