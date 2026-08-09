@@ -1730,19 +1730,25 @@ function M.pause(on_done)
 	end
 	Logger.start(LOG, "Pausing ErgoptiPlus Karabiner remapping…")
 	local callback_fired = false
-	local requested = LeaseController.pause(function(ok, reason)
-		callback_fired = true
-		if ok then
-			Logger.success(LOG, "ErgoptiPlus Karabiner remapping paused (script-control rules retained).")
-		else
-			Logger.error(LOG, "Karabiner pause variable update failed: %s.", tostring(reason))
+	local request_ok, requested_or_err = xpcall(function()
+		return LeaseController.pause(function(ok, reason)
+			callback_fired = true
+			if ok then
+				Logger.success(LOG, "ErgoptiPlus Karabiner remapping paused (script-control rules retained).")
+			else
+				Logger.error(LOG, "Karabiner pause variable update failed: %s.", tostring(reason))
+			end
+			invoke_public_callback("pause", on_done, ok == true, reason)
+		end)
+	end, debug.traceback)
+	if not request_ok or requested_or_err ~= true then
+		if not request_ok then
+			Logger.error(LOG, "Karabiner pause request raised: %s.", tostring(requested_or_err))
 		end
-		invoke_public_callback("pause", on_done, ok == true, reason)
-	end)
-	if not requested then
 		Logger.error(LOG, "Karabiner pause could not be requested.")
 		if not callback_fired then
-			invoke_public_callback("pause", on_done, false, "request-rejected")
+			invoke_public_callback("pause", on_done, false,
+				request_ok and "request-rejected" or "request-raised")
 		end
 		return false
 	end
