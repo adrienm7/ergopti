@@ -344,6 +344,99 @@ local function probe_fs_without_lfs(path)
 	return nil
 end
 
+--- Resolves an optional LuaFileSystem method without fabricating host support.
+--- @param method_name string LuaFileSystem method name.
+--- @return function|nil method
+--- @return string|nil error_message
+local function optional_lfs_method(method_name)
+	local ok_lfs, lfs = pcall(require, "lfs")
+	if ok_lfs and type(lfs) == "table" and type(lfs[method_name]) == "function" then
+		return lfs[method_name]
+	end
+	return nil, "LuaFileSystem does not expose " .. tostring(method_name)
+end
+
+local function pack_results(...)
+	return { n = select("#", ...), ... }
+end
+
+--- Reads lstat-style attributes when the host test runtime supports them.
+--- @param path string Filesystem path.
+--- @param attribute string|nil Optional single attribute name.
+--- @return table|any|nil attributes
+--- @return string|nil error_message
+local function fs_symlink_attributes(path, attribute)
+	-- Mirror Hammerspoon's Lua wrapper, not bare lfs.symlinkattributes: the
+	-- synthetic "target" attribute bypasses lstat, while a one-table lstat
+	-- result gains the resolved target. Multi-result failures stay untouched.
+	if attribute == "target" then return M.fs.pathToAbsolute(path) end
+	local method, method_err = optional_lfs_method("symlinkattributes")
+	if not method then return nil, method_err end
+	local results = attribute ~= nil
+		and pack_results(method(path, attribute))
+		or pack_results(method(path))
+	if results.n == 1 and type(results[1]) == "table" then
+		results[1].target = M.fs.pathToAbsolute(path)
+	end
+	return (table.unpack or unpack)(results, 1, results.n)
+end
+
+--- Creates a hard or symbolic link when LuaFileSystem exposes the operation.
+--- @param source_path string Existing source path.
+--- @param destination_path string New destination path.
+--- @param is_symlink boolean|nil Whether to create a symbolic link.
+--- @return boolean|nil linked
+--- @return string|nil error_message
+local function fs_link(source_path, destination_path, is_symlink)
+	if type(source_path) ~= "string" or source_path == "" then return nil, "invalid source path" end
+	if type(destination_path) ~= "string" or destination_path == "" then
+		return nil, "invalid destination path"
+	end
+	local method, method_err = optional_lfs_method("link")
+	if not method then return nil, method_err end
+	return method(source_path, destination_path, is_symlink == true)
+end
+
+--- Encodes bytes as shell-inert hexadecimal for the Windows test fallback.
+--- @param value string Raw UTF-8 pathname.
+--- @return string hexadecimal
+local function hex_encode(value)
+	return (value:gsub(".", function(character)
+		return string.format("%02X", string.byte(character))
+	end))
+end
+
+--- Removes an empty directory when LuaFileSystem exposes the operation.
+--- @param path string Directory path.
+--- @return boolean|nil removed
+--- @return string|nil error_message
+local function fs_rmdir(path)
+	if type(path) ~= "string" or path == "" then return nil, "invalid path" end
+	local method, method_err = optional_lfs_method("rmdir")
+	if method then return method(path) end
+
+	-- Never interpolate a caller-controlled pathname into a shell command. Lua's
+	-- os.remove handles empty directories on POSIX. Stock Windows Lua does not,
+	-- so pass only hexadecimal bytes to a fixed PowerShell Directory.Delete call.
+	local call_ok, removed, remove_err = pcall(os.remove, path)
+	if call_ok and removed == true and probe_fs_without_lfs(path) == nil then return true end
+	if probe_fs_without_lfs(path) == nil then return true end
+	if package.config:sub(1, 1) == "\\" then
+		local path_hex = hex_encode(path)
+		local script = "$h='" .. path_hex .. "';"
+			.. "$b=New-Object byte[] ($h.Length/2);"
+			.. "for($i=0;$i -lt $b.Length;$i++){$b[$i]=[Convert]::ToByte($h.Substring($i*2,2),16)};"
+			.. "$p=[Text.Encoding]::UTF8.GetString($b);"
+			.. "try{[IO.Directory]::Delete($p,$false)}catch{}"
+		pcall(
+			os.execute,
+			'powershell.exe -NoLogo -NoProfile -NonInteractive -Command "' .. script .. '"'
+		)
+		if probe_fs_without_lfs(path) == nil then return true end
+	end
+	return nil, tostring(call_ok and remove_err or removed or method_err)
+end
+
 M.fs = {
 	-- Returns (iterator, dirObject) like real Hammerspoon — see make_fs_dir_iterator.
 	dir = function(path) return make_fs_dir_iterator(FS_ENTRIES[path]) end,
@@ -381,6 +474,9 @@ M.fs = {
 		os.execute(cmd)
 		return M.fs.attributes(path) ~= nil
 	end,
+	symlinkAttributes = fs_symlink_attributes,
+	link = fs_link,
+	rmdir = fs_rmdir,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
 	-- Test hook: register the names a given absolute path should list.

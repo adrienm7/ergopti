@@ -36,12 +36,14 @@ local LOG = "fs_dir"
 -- ====================================
 -- ====================================
 
---- Lists the entry names of a directory, surviving an unreadable folder.
+--- Collects entry names while preserving whether enumeration succeeded.
 --- @param dir string Absolute directory path.
---- @return table Array of entry names; empty when the directory is unreadable.
-function M.entries(dir)
+--- @return table names Array of entry names.
+--- @return boolean listed Whether the whole directory was enumerated.
+--- @return string|nil error_message
+local function collect_entries(dir)
 	local names = {}
-	if type(dir) ~= "string" or dir == "" then return names end
+	if type(dir) ~= "string" or dir == "" then return names, false, "invalid directory path" end
 	local ok, err = pcall(function()
 		for name in hs.fs.dir(dir) do
 			names[#names + 1] = name
@@ -49,9 +51,28 @@ function M.entries(dir)
 	end)
 	if not ok then
 		Logger.error(LOG, "Cannot iterate directory '%s' — %s.", tostring(dir), tostring(err))
-		return {}
+		return {}, false, tostring(err)
 	end
+	return names, true
+end
+
+--- Lists the entry names of a directory, surviving an unreadable folder.
+--- @param dir string Absolute directory path.
+--- @return table Array of entry names; empty when the directory is unreadable.
+function M.entries(dir)
+	local names = collect_entries(dir)
 	return names
+end
+
+--- Lists a directory and reports whether an empty result is authoritative.
+--- Callers making safety decisions must use this form so an unreadable parent
+--- cannot be confused with a successfully listed empty directory.
+--- @param dir string Absolute directory path.
+--- @return table names Array of entry names.
+--- @return boolean listed Whether the whole directory was enumerated.
+--- @return string|nil error_message
+function M.try_entries(dir)
+	return collect_entries(dir)
 end
 
 return M

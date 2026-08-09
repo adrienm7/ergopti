@@ -13,38 +13,108 @@
 ---
 --- Coverage:
 ---   1. write() creates a real, complete file (behavioral, real I/O).
----   2. write() never leaves a stray ".tmp" file behind after a successful call.
----   3. write() is symlink-safe: writing through a symlinked path replaces the
----      REAL target file's content, and the symlink itself survives (renaming
----      directly over a symlink path would instead replace the symlink with a
+---   2. write() releases its dynamic staging payload and ownership lock.
+---   3. write() preserves a pre-existing symlink: writing through that path
+---      replaces the REAL target file's content, and the symlink itself
+---      survives (renaming directly over a symlink path would replace it with a
 ---      plain file, breaking deploy_string's documented symlink support).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
+local HOST_ATTRIBUTES = hs.fs.attributes
+local HOST_SYMLINK_ATTRIBUTES = hs.fs.symlinkAttributes
+local HOST_MKDIR = hs.fs.mkdir
+local HOST_RMDIR = hs.fs.rmdir
+
+local function make_directory_iterator(entries)
+	local index = 0
+	local directory_state = {}
+	return function(state)
+		helpers.assert_eq(state, directory_state, "hs.fs.dir iterator state must be forwarded")
+		index = index + 1
+		return entries[index]
+	end, directory_state
+end
+
+local function split_parent(path)
+	local parent, basename = path:match("^(.+)/([^/]+)$")
+	if parent == nil then return ".", path end
+	if parent:match("^%a:$") then parent = parent .. "/" end
+	return parent, basename
+end
 
 -- Real I/O, mirroring the existing FileSystem contract-vector test: stub only
--- hs.fs.attributes/mkdir/pathToAbsolute so exists()/ensure_dir() work against
--- the real filesystem without a live Hammerspoon runtime.
--- @param resolve_map table|nil Optional {[path] = resolved_path} overrides for
---   pathToAbsolute, simulating a symlink resolving to a different real target.
-local function make_adapter(resolve_map)
+-- the filesystem primitives needed to model lstat, listing, and atomic staging
+-- without a live Hammerspoon runtime.
+-- @param symlink_targets table|nil Optional final-link targets returned by lstat.
+-- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
+-- @param confirmed_absences table|nil Optional paths absent from their listed parent.
+local function make_adapter(symlink_targets, lstat_failures, confirmed_absences)
+	local staging_locks = {}
 	package.loaded["adapters.file_system"] = nil
-	return helpers.load_with_stubs("adapters.file_system", {
+	package.loaded["infra.fs_dir"] = nil
+	local adapter = helpers.load_with_stubs("adapters.file_system", {
 		fs = {
-			attributes = function(path)
-				local fh = io.open(path, "r")
-				if fh then fh:close(); return { mode = "file" } end
-				return nil
-			end,
-			mkdir = function(_) return true end,
-			pathToAbsolute = function(p)
-				if type(resolve_map) == "table" and resolve_map[p] then
-					return resolve_map[p]
+			dir = function(parent)
+				local listed_parent = parent
+				local target = type(symlink_targets) == "table" and symlink_targets[parent]
+				if type(target) == "function" then target = target(parent) end
+				if type(target) == "string" then listed_parent = target end
+				if type(target) == "table" and type(target.target) == "string" then
+					listed_parent = target.target
 				end
-				return p
+				local parent_attributes = HOST_ATTRIBUTES(listed_parent)
+				if type(parent_attributes) ~= "table" or parent_attributes.mode ~= "directory" then
+					error("cannot list missing fixture parent " .. parent)
+				end
+				local entries = {}
+				for failed_path in pairs(lstat_failures or {}) do
+					local failed_parent, basename = split_parent(failed_path)
+					if failed_parent == parent then entries[#entries + 1] = basename end
+				end
+				return make_directory_iterator(entries)
+			end,
+			attributes = function(path)
+				if staging_locks[path] then return { mode = "directory" } end
+				return HOST_ATTRIBUTES(path)
+			end,
+			symlinkAttributes = function(path)
+				if type(lstat_failures) == "table" and lstat_failures[path] then
+					error("injected lstat failure for " .. path)
+				end
+				if type(confirmed_absences) == "table" and confirmed_absences[path] then
+					return nil, "injected missing path"
+				end
+				if staging_locks[path] then return { mode = "directory" } end
+				local target = type(symlink_targets) == "table" and symlink_targets[path]
+				if type(target) == "function" then target = target(path) end
+				if type(target) == "string" then return { mode = "link", target = target } end
+				if type(target) == "table" then return target end
+				local attributes, attributes_err = HOST_SYMLINK_ATTRIBUTES(path)
+				if type(attributes) == "table" then return attributes end
+				attributes = HOST_ATTRIBUTES(path)
+				if type(attributes) == "table" then return attributes end
+				return nil, attributes_err or "lstat failed"
+			end,
+			mkdir = function(path)
+				if path:sub(-#STAGING_LOCK_SUFFIX) ~= STAGING_LOCK_SUFFIX then return HOST_MKDIR(path) end
+				if staging_locks[path] then return nil, "File exists" end
+				local created, create_err = HOST_MKDIR(path)
+				if created ~= true then return created, create_err end
+				staging_locks[path] = true
+				return true
+			end,
+			rmdir = function(path)
+				if not staging_locks[path] then return nil, "No such directory" end
+				local removed, remove_err = HOST_RMDIR(path)
+				if removed ~= true then return removed, remove_err end
+				staging_locks[path] = nil
+				return true
 			end,
 		},
 	})
+	return adapter, staging_locks
 end
 
 
@@ -72,27 +142,123 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		os.remove(TMP)
 	end)
 
-	helpers.it("write() does not leave a stray .tmp file behind after success", function()
-		local adapter = make_adapter()
+	helpers.it("write() removes its dynamic staging payload and lock after success", function()
+		local adapter, staging_locks = make_adapter()
 		os.remove(TMP)
-		os.remove(TMP .. ".tmp")
-		adapter.write(TMP, "no leftovers")
-		local tmp_fh = io.open(TMP .. ".tmp", "r")
-		helpers.assert_true(tmp_fh == nil, "the .tmp staging file must be renamed away, not left behind")
-		if tmp_fh then tmp_fh:close() end
+		local original_open = io.open
+		local staged_paths = {}
+		io.open = function(path, mode)
+			if mode == "w" and path ~= TMP then staged_paths[#staged_paths + 1] = path end
+			return original_open(path, mode)
+		end
+		local call_ok, write_ok = pcall(adapter.write, TMP, "no leftovers")
+		io.open = original_open
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_true(write_ok, "the success-path cleanup repro must publish")
+		helpers.assert_eq(#staged_paths, 1, "write() must open exactly one private staging payload")
+		local staged_path = staged_paths[1]
+		helpers.assert_true(
+			staged_path:match("%.tmp%.[%w]+%.%d+%.ergoptiplus%-stage%-lock/payload$") ~= nil,
+			"the observed payload must use the dynamic adjacent staging namespace")
+		local staged_fh = original_open(staged_path, "r")
+		helpers.assert_nil(staged_fh, "the dynamic staging payload must not survive publication")
+		if staged_fh then staged_fh:close() end
+		helpers.assert_nil(next(staging_locks), "the dynamic staging ownership lock must be released")
 		os.remove(TMP)
+	end)
+
+	helpers.it("write() never unlinks the payload pathname after successful rename", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local adapter, staging_locks = make_adapter()
+		local original_open = io.open
+		local original_rename = os.rename
+		local staged_payload = nil
+		os.remove(path)
+
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if renamed and old_path ~= new_path then
+				staged_payload = old_path
+				local foreign = assert(original_open(old_path, "w"))
+				foreign:write("foreign post-rename bytes")
+				foreign:close()
+			end
+			return renamed, rename_err, rename_code
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "published bytes")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_true(write_ok, "foreign bytes at the consumed source path do not undo publication")
+		local foreign = staged_payload and original_open(staged_payload, "r") or nil
+		helpers.assert_true(foreign ~= nil, "published-payload cleanup must never call os.remove on that pathname")
+		local foreign_content = foreign and foreign:read("*a") or nil
+		if foreign then foreign:close() end
+		helpers.assert_eq(foreign_content, "foreign post-rename bytes")
+		local lock_path = staged_payload and staged_payload:match("^(.*)/payload$") or nil
+		helpers.assert_eq(staging_locks[lock_path], true,
+			"a non-empty sidecar must remain owned when its payload pathname is reused")
+		local published = original_open(path, "r")
+		helpers.assert_true(published ~= nil, "the destination must contain the published file")
+		local published_content = published and published:read("*a") or nil
+		if published then published:close() end
+		helpers.assert_eq(published_content, "published bytes")
+		if staged_payload then os.remove(staged_payload) end
+		if lock_path then HOST_RMDIR(lock_path) end
+		os.remove(path)
 	end)
 
 	helpers.it("write() overwrites existing content atomically (old content never partially visible)", function()
 		local adapter = make_adapter()
 		os.remove(TMP)
 		adapter.write(TMP, "first version — long enough to detect truncation if the write were not atomic")
-		adapter.write(TMP, "second version")
+		local original_rename = os.rename
+		-- Lua on Windows does not implement POSIX rename-over-existing semantics.
+		-- Model the target macOS primitive here; destructive failure behavior has
+		-- its own regression test in test_file_system_staging_isolation.lua.
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if old_path == new_path or renamed or package.config:sub(1, 1) ~= "\\" then
+				return renamed, rename_err, rename_code
+			end
+			os.remove(new_path)
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = pcall(adapter.write, TMP, "second version")
+		os.rename = original_rename
+		if not call_ok then error(write_ok) end
+		helpers.assert_true(write_ok, "the macOS rename-over-existing model must publish the second version")
 		local fh = io.open(TMP, "r")
 		local content = fh:read("*a"); fh:close()
 		helpers.assert_eq(content, "second version",
 			"the file must contain exactly the new content, with no leftover bytes from the old version")
 		os.remove(TMP)
+	end)
+
+	helpers.it("write() creates multiple missing parent levels under an existing ancestor", function()
+		local ancestor = os.tmpname():gsub("\\", "/")
+		os.remove(ancestor)
+		assert(HOST_MKDIR(ancestor))
+		local first_parent = ancestor .. "/missing-one"
+		local second_parent = first_parent .. "/missing-two"
+		local path = second_parent .. "/managed.json"
+		local adapter = make_adapter()
+
+		local write_ok = adapter.write(path, "complete nested bytes")
+
+		helpers.assert_true(write_ok, "write() must retain its recursive parent-creation contract")
+		local fh = io.open(path, "r")
+		helpers.assert_true(fh ~= nil, "the nested destination must exist after a successful write")
+		local content = fh and fh:read("*a") or nil
+		if fh then fh:close() end
+		helpers.assert_eq(content, "complete nested bytes", "the nested file must contain every byte")
+		os.remove(path)
+		HOST_RMDIR(second_parent)
+		HOST_RMDIR(first_parent)
+		HOST_RMDIR(ancestor)
 	end)
 end)
 
@@ -101,7 +267,7 @@ end)
 
 -- =====================================================
 -- =====================================================
--- ======= 2/ Symlink-safe atomic write ================
+-- ======= 2/ Pre-existing symlink resolution ==========
 -- =====================================================
 -- =====================================================
 
@@ -109,11 +275,10 @@ end)
 -- would replace the symlink itself with a plain file, breaking deploy_string's
 -- documented "works for regular paths and Unix symlinks" contract for
 -- karabiner.json (a common deployment where ~/.config/karabiner is itself a
--- symlink, or the file is manually symlinked elsewhere). write() must resolve
--- the destination via pathToAbsolute (which follows symlinks) BEFORE deciding
--- where to stage and rename the temp file, so the write lands on the REAL
--- target file and the symlink is left untouched.
-helpers.describe("adapters.file_system: write() through a symlinked path is symlink-safe (F-MED-16)", function()
+-- symlink, or the file is manually symlinked elsewhere). write() must walk and
+-- record every symlink component BEFORE deciding where to stage and rename the
+-- temp file, so the write lands on the REAL target and the link is untouched.
+helpers.describe("adapters.file_system: write() preserves observed symlink paths (F-MED-16)", function()
 	local SYMLINK_PATH = os.tmpname()
 	local REAL_TARGET  = os.tmpname()
 
@@ -121,8 +286,8 @@ helpers.describe("adapters.file_system: write() through a symlinked path is syml
 		os.remove(SYMLINK_PATH)
 		os.remove(REAL_TARGET)
 
-		-- Simulate a symlink: pathToAbsolute(SYMLINK_PATH) resolves to REAL_TARGET,
-		-- exactly as hs.fs.pathToAbsolute does for a real Unix symlink.
+		-- Hammerspoon's symlinkAttributes() adds the realpath result as `.target`
+		-- for an existing link whose target exists.
 		local adapter = make_adapter({ [SYMLINK_PATH] = REAL_TARGET })
 
 		local ok = adapter.write(SYMLINK_PATH, "deployed via symlink")
@@ -142,6 +307,347 @@ helpers.describe("adapters.file_system: write() through a symlinked path is syml
 
 		os.remove(SYMLINK_PATH)
 		os.remove(REAL_TARGET)
+	end)
+
+	helpers.it("fails before staging when a dangling final symlink has no readable target", function()
+		local symlink_path = os.tmpname():gsub("\\", "/")
+		os.remove(symlink_path)
+		local adapter = make_adapter({ [symlink_path] = { mode = "link" } })
+		local original_open = io.open
+		local original_rename = os.rename
+		local staging_opens = 0
+		local rename_calls = 0
+		io.open = function(path, mode)
+			if mode == "w" then staging_opens = staging_opens + 1 end
+			return original_open(path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if old_path ~= new_path then rename_calls = rename_calls + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(symlink_path, "must not replace link")
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_eq(write_ok, false,
+			"without a readlink target, replacing the dangling link would be unsafe")
+		helpers.assert_eq(staging_opens, 0, "an unresolved dangling link must fail before staging")
+		helpers.assert_eq(rename_calls, 0, "an unresolved dangling link must fail before publication")
+		local link_path_fh = original_open(symlink_path, "r")
+		helpers.assert_nil(link_path_fh, "the dangling symlink pathname must not become a regular file")
+		if link_path_fh then link_path_fh:close() end
+		os.remove(symlink_path)
+	end)
+
+	helpers.it("revalidates a symlinked config directory while the final file is absent", function()
+		local unique = os.tmpname():gsub("\\", "/"):match("([^/]+)$")
+		local virtual_parent = "ergopti-parent-link-" .. unique
+		local file_name = "karabiner-" .. unique .. ".json"
+		local first_directory = os.tmpname():gsub("\\", "/")
+		local second_directory = os.tmpname():gsub("\\", "/")
+		os.remove(first_directory)
+		os.remove(second_directory)
+		assert(HOST_MKDIR(first_directory))
+		assert(HOST_MKDIR(second_directory))
+		local first_target = first_directory .. "/" .. file_name
+		local second_target = second_directory .. "/" .. file_name
+		local current_parent_target = first_directory
+		local adapter, staging_locks = make_adapter({
+			[virtual_parent] = function() return current_parent_target end,
+		})
+		local original_rename = os.rename
+		os.remove(first_target)
+		os.remove(second_target)
+
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if renamed and new_path == first_target then current_parent_target = second_directory end
+			return renamed, rename_err, rename_code
+		end
+		local write_ok = nil
+		local call_ok, call_err = xpcall(function()
+			write_ok = adapter.write(virtual_parent .. "/" .. file_name, "prior-directory-target")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(write_ok, false,
+			"retargeting the official directory-symlink layout must not return success")
+		local old_target_fh = io.open(first_target, "r")
+		helpers.assert_true(old_target_fh ~= nil,
+			"content already published before the retarget must remain recoverable")
+		local old_content = old_target_fh:read("*a")
+		old_target_fh:close()
+		helpers.assert_eq(old_content, "prior-directory-target")
+		local new_target_fh = io.open(second_target, "r")
+		helpers.assert_nil(new_target_fh, "the newly selected directory must remain untouched")
+		if new_target_fh then new_target_fh:close() end
+		os.remove(first_target)
+		os.remove(second_target)
+		for lock_path in pairs(staging_locks) do HOST_RMDIR(lock_path) end
+		HOST_RMDIR(first_directory)
+		HOST_RMDIR(second_directory)
+	end)
+
+	helpers.it("returns false if the symlink retargets inside publication", function()
+		local symlink_path = os.tmpname():gsub("\\", "/")
+		local parent = assert(symlink_path:match("^(.+)/[^/]+$"))
+		local first_name = "ergopti-write-old-target-" .. symlink_path:match("([^/]+)$")
+		local second_name = "ergopti-write-new-target-" .. symlink_path:match("([^/]+)$")
+		local first_target = parent .. "/" .. first_name
+		local second_target = parent .. "/" .. second_name
+		local current_target = first_target
+		local adapter, staging_locks = make_adapter({
+			[symlink_path] = function() return current_target end,
+		})
+		local original_rename = os.rename
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if renamed and new_path == first_target then current_target = second_target end
+			return renamed, rename_err, rename_code
+		end
+		local write_ok = nil
+		local call_ok, call_err = xpcall(function()
+			write_ok = adapter.write(symlink_path, "managed-on-prior-target")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(write_ok, false, "write() must not report success for a now-unreachable old target")
+		local old_target_fh = io.open(first_target, "r")
+		helpers.assert_true(old_target_fh ~= nil, "the already-published old target must remain recoverable")
+		local old_content = old_target_fh:read("*a")
+		old_target_fh:close()
+		helpers.assert_eq(old_content, "managed-on-prior-target")
+		local new_target_fh = io.open(second_target, "r")
+		helpers.assert_nil(new_target_fh, "the new target remains untouched for the caller's retry")
+		if new_target_fh then new_target_fh:close() end
+		for lock_path in pairs(staging_locks) do HOST_RMDIR(lock_path) end
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+	end)
+
+	helpers.it("preserves a foreign payload if the symlink retargets immediately after publication", function()
+		local symlink_path = os.tmpname():gsub("\\", "/")
+		local first_target = os.tmpname():gsub("\\", "/")
+		local second_target = os.tmpname():gsub("\\", "/")
+		local current_target = first_target
+		local adapter, staging_locks = make_adapter({
+			[symlink_path] = function() return current_target end,
+		})
+		local original_open = io.open
+		local original_rename = os.rename
+		local staged_payload = nil
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if renamed and new_path == first_target then
+				staged_payload = old_path
+				current_target = second_target
+				local foreign = assert(original_open(old_path, "w"))
+				foreign:write("foreign payload bytes")
+				foreign:close()
+			end
+			return renamed, rename_err, rename_code
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(symlink_path, "published before retarget")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_eq(write_ok, false, "a post-publication retarget must remain visible to the caller")
+		helpers.assert_type(staged_payload, "string", "the publication hook must observe the payload pathname")
+		local foreign = staged_payload and original_open(staged_payload, "r") or nil
+		helpers.assert_true(foreign ~= nil,
+			"cleanup must never remove a payload pathname after rename has published ours")
+		local foreign_content = foreign and foreign:read("*a") or nil
+		if foreign then foreign:close() end
+		helpers.assert_eq(foreign_content, "foreign payload bytes",
+			"bytes placed at the old pathname by another owner must survive")
+		local lock_path = staged_payload and staged_payload:match("^(.*)/payload$") or nil
+		helpers.assert_eq(staging_locks[lock_path], true,
+			"a changed resolution chain must preserve the staging sidecar instead of deleting through it")
+		local published = original_open(first_target, "r")
+		helpers.assert_true(published ~= nil, "the already-published content must remain recoverable")
+		local published_content = published and published:read("*a") or nil
+		if published then published:close() end
+		helpers.assert_eq(published_content, "published before retarget")
+		local new_target = original_open(second_target, "r")
+		helpers.assert_nil(new_target, "the new symlink target must remain untouched")
+		if new_target then new_target:close() end
+		if staged_payload then os.remove(staged_payload) end
+		if lock_path then HOST_RMDIR(lock_path) end
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+	end)
+
+	helpers.it("preserves a foreign payload if the symlink retargets before failure cleanup", function()
+		local symlink_path = os.tmpname():gsub("\\", "/")
+		local first_target = os.tmpname():gsub("\\", "/")
+		local second_target = os.tmpname():gsub("\\", "/")
+		local current_target = first_target
+		local adapter, staging_locks = make_adapter({
+			[symlink_path] = function() return current_target end,
+		})
+		local original_open = io.open
+		local staged_payload = nil
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+
+		io.open = function(open_path, mode)
+			if mode == "w" and open_path:match("/payload$") then
+				staged_payload = open_path
+				local raw_handle = assert(original_open(open_path, mode))
+				local handle = {}
+				handle.write = function(_, bytes) return raw_handle:write(bytes) and handle end
+				handle.close = function()
+					raw_handle:close()
+					current_target = second_target
+					local foreign = assert(original_open(open_path, "w"))
+					foreign:write("foreign pre-cleanup bytes")
+					foreign:close()
+					return false, "injected close refusal after retarget"
+				end
+				return handle
+			end
+			return original_open(open_path, mode)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(symlink_path, "managed bytes")
+		end, debug.traceback)
+		io.open = original_open
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_eq(write_ok, false, "the injected close failure must reject publication")
+		local foreign = staged_payload and original_open(staged_payload, "r") or nil
+		helpers.assert_true(foreign ~= nil,
+			"failure cleanup must preserve the payload when the resolution chain changed")
+		local foreign_content = foreign and foreign:read("*a") or nil
+		if foreign then foreign:close() end
+		helpers.assert_eq(foreign_content, "foreign pre-cleanup bytes",
+			"failure cleanup must not unlink bytes at a pathname it can no longer prove owned")
+		local lock_path = staged_payload and staged_payload:match("^(.*)/payload$") or nil
+		helpers.assert_eq(staging_locks[lock_path], true,
+			"the ownership sidecar must remain when failure cleanup cannot revalidate its path")
+		local first = original_open(first_target, "r")
+		helpers.assert_nil(first, "a close failure must not publish to the original target")
+		if first then first:close() end
+		local second = original_open(second_target, "r")
+		helpers.assert_nil(second, "a close failure must not publish to the new target")
+		if second then second:close() end
+		if staged_payload then os.remove(staged_payload) end
+		if lock_path then HOST_RMDIR(lock_path) end
+		os.remove(symlink_path)
+		os.remove(first_target)
+		os.remove(second_target)
+	end)
+
+	helpers.it("fails closed when lstat cannot inspect the final destination", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local original_open = io.open
+		local original_rename = os.rename
+		os.remove(path)
+		local seed = assert(original_open(path, "w"))
+		seed:write("live destination bytes")
+		seed:close()
+		local adapter = make_adapter(nil, { [path] = true })
+		local staging_opens = 0
+		local rename_calls = 0
+
+		io.open = function(open_path, mode)
+			if mode == "w" then staging_opens = staging_opens + 1 end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if old_path ~= new_path then rename_calls = rename_calls + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "must not publish")
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		if not call_ok then error(write_ok) end
+
+		helpers.assert_eq(write_ok, false, "an unknown final pathname is not proven absent")
+		helpers.assert_eq(staging_opens, 0, "resolution failure must precede every staging write")
+		helpers.assert_eq(rename_calls, 0, "resolution failure must precede publication")
+		local live = assert(original_open(path, "r"))
+		helpers.assert_eq(live:read("*a"), "live destination bytes",
+			"an lstat failure must leave the live destination untouched")
+		live:close()
+		os.remove(path)
+	end)
+
+	helpers.it("fails closed when lstat cannot inspect an intermediate symlink", function()
+		local virtual_parent_seed = os.tmpname():gsub("\\", "/")
+		os.remove(virtual_parent_seed)
+		local virtual_parent = virtual_parent_seed .. ".ergopti-lstat-link"
+		local real_target = os.tmpname():gsub("\\", "/")
+		local link_target, file_name = split_parent(real_target)
+		local requested_path = virtual_parent .. "/" .. file_name
+		local original_open = io.open
+		local original_rename = os.rename
+		local body_ok, body_err = xpcall(function()
+			os.remove(requested_path)
+			os.remove(real_target)
+			HOST_RMDIR(virtual_parent)
+			assert(HOST_MKDIR(virtual_parent))
+			local seed = assert(original_open(real_target, "w"))
+			seed:write("live symlink target bytes")
+			seed:close()
+			local adapter = make_adapter({
+				[virtual_parent] = function() return link_target end,
+			}, { [virtual_parent] = true }, { [requested_path] = true })
+			local staging_opens = 0
+			local rename_calls = 0
+
+			io.open = function(open_path, mode)
+				if mode == "w" then staging_opens = staging_opens + 1 end
+				return original_open(open_path, mode)
+			end
+			os.rename = function(old_path, new_path)
+				if old_path ~= new_path then rename_calls = rename_calls + 1 end
+				return original_rename(old_path, new_path)
+			end
+			local write_ok = adapter.write(requested_path, "must not publish")
+
+			helpers.assert_eq(write_ok, false, "an unreadable intermediate component is not absent")
+			helpers.assert_eq(staging_opens, 0, "component resolution must precede every staging write")
+			helpers.assert_eq(rename_calls, 0, "component resolution must precede publication")
+			helpers.assert_type(link_target, "string", "the simulated absolute symlink target must remain available")
+			local live = assert(original_open(real_target, "r"))
+			helpers.assert_eq(live:read("*a"), "live symlink target bytes",
+				"an intermediate lstat failure must leave the live target untouched")
+			live:close()
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		os.remove(requested_path)
+		os.remove(real_target)
+		local removed, remove_err = HOST_RMDIR(virtual_parent)
+		local cleanup_ok = removed == true or HOST_ATTRIBUTES(virtual_parent) == nil
+		if not body_ok then
+			if not cleanup_ok then
+				error(body_err .. "\nfixture cleanup failed: " .. tostring(remove_err))
+			end
+			error(body_err)
+		end
+		helpers.assert_true(cleanup_ok, "fixture directory cleanup must succeed: " .. tostring(remove_err))
 	end)
 end)
 
@@ -167,27 +673,33 @@ helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-1
 		return src
 	end
 
-	helpers.it("write() builds a .tmp path and writes to it, not directly to the destination", function()
+	helpers.it("write() reserves a private adjacent staging path before publication", function()
 		local src = read_source()
 		local fn_start = src:find("function M.write", 1, true)
 		helpers.assert_true(fn_start ~= nil, "M.write must exist")
-		local fn_end = src:find("\nend\n", fn_start, true)
+		local fn_end = src:find("\nfunction M.append", fn_start, true)
 		local body = src:sub(fn_start, fn_end)
 
-		helpers.assert_true(body:find('".tmp"', 1, true) ~= nil,
-			"write() must stage content in a '.tmp' file before publishing it (F-MED-16)")
+		helpers.assert_true(body:find("reserve_staging_area(resolved_path)", 1, true) ~= nil,
+			"write() must exclusively reserve its staging pathname before opening it (F-MED-16)")
 		helpers.assert_true(body:find("os.rename(", 1, true) ~= nil,
 			"write() must publish the staged content via os.rename (F-MED-16)")
 	end)
 
-	helpers.it("write() resolves the real path via pathToAbsolute before renaming (symlink safety)", function()
+	helpers.it("write() delegates final-link resolution to the symlink-aware resolver", function()
 		local src = read_source()
 		local fn_start = src:find("function M.write", 1, true)
-		local fn_end   = src:find("\nend\n", fn_start, true)
+		local fn_end   = src:find("\nfunction M.append", fn_start, true)
 		local body = src:sub(fn_start, fn_end)
+		local resolver_start = src:find("local function resolve_write_path(path)", 1, true)
+		local resolver_end = src:find("local function revalidate_write_path", resolver_start, true)
+		local resolver = src:sub(resolver_start, resolver_end)
 
-		helpers.assert_true(body:find("pathToAbsolute", 1, true) ~= nil,
-			"write() must resolve symlinks via pathToAbsolute before renaming — renaming directly over a "
-			.. "symlink path would replace the symlink itself, breaking deploy_string's documented symlink support")
+		helpers.assert_true(body:find("resolve_write_path(path)", 1, true) ~= nil,
+			"write() must invoke the shared resolver before it creates or renames the staging file")
+		helpers.assert_true(resolver:find("inspect_path(prefix, component_parent, component)", 1, true) ~= nil,
+			"the resolver must classify every component, including the final pathname")
+		helpers.assert_nil(resolver:find("inspect_path(current)", 1, true),
+			"a duplicate full-path probe must not reject a destination whose parent is meant to be created")
 	end)
 end)
