@@ -42,7 +42,7 @@ local LOG = "karabiner"
 -- KE version. Pre-v16, the daemon was karabiner_grabber. From v16 (May 2026),
 -- the daemon was renamed to Karabiner-Core-Service, and additional helpers
 -- may run under different binary names in future releases. Every KE binary
--- lives under /Library/Application Support/org.pqrs/Karabiner-Elements/, so
+-- lives under Karabiner's shared package support directory, so
 -- matching that install-path substring is the most version-tolerant signal.
 local KE_GRABBER_CHECK = "/usr/bin/pgrep -fq 'org.pqrs/Karabiner-Elements'"
 

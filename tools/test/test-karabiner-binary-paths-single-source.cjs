@@ -11,8 +11,8 @@
  * `karabiner_cli` was written out as a literal in three separate files —
  * ke_lifecycle.lua (the IPC probe), onboarding.lua (the "is it installed?"
  * check) and watchers.lua (the CapsWord reset) — and the gesture bridge was
- * about to make it four. Karabiner v16 (May 2026) already renamed one binary in
- * that same directory once. A rename that reaches two copies out of four gives a
+ * about to make it four. Karabiner v15.7 moved one binary from bin/ into an app
+ * bundle under the same package root. A rename that reaches two copies out of four gives a
  * driver that reports Karabiner as installed, passes its onboarding, and then
  * cannot set a single variable: three subsystems disagreeing about whether the
  * software exists, each of them individually correct.
@@ -34,13 +34,14 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const OWNER = path.join(MACOS, 'platform', 'remap', 'ke_paths.lua');
 
-// The PKG install directory. Every Karabiner binary lives under it, so a literal
-// containing it is a hardcoded path by definition.
-const INSTALL_DIR = '/Library/Application Support/org.pqrs/Karabiner-Elements/bin/';
+// The PKG install root. Command-line helpers live under bin/, while current
+// Core Service releases use an app bundle beside it. A literal containing this
+// root outside the owner module is therefore a hardcoded path by definition.
+const INSTALL_ROOT = '/Library/Application Support/org.pqrs/Karabiner-Elements/';
 
 // The names ke_paths.lua must expose. A binary the driver uses but the module
 // does not name is how the fourth copy gets written.
-const REQUIRED_EXPORTS = ['CLI', 'CONSOLE_USER_SERVER', 'GRABBER', 'GRABBER_V16'];
+const REQUIRED_EXPORTS = ['CLI', 'CONSOLE_USER_SERVER', 'GRABBER', 'CORE_SERVICE'];
 
 // Trees excluded from the scan. Tests may name the path when asserting against
 // it, and vendored code is not ours to change.
@@ -54,9 +55,9 @@ if (!fs.existsSync(OWNER)) {
 }
 
 const ownerSrc = fs.readFileSync(OWNER, 'utf8');
-if (!ownerSrc.includes(INSTALL_DIR)) {
+if (!ownerSrc.includes(INSTALL_ROOT)) {
 	errors.push(
-		`ke_paths.lua no longer contains the install directory "${INSTALL_DIR}". Either the path ` +
+		`ke_paths.lua no longer contains the install root "${INSTALL_ROOT}". Either the path ` +
 			'changed and this gate is stale, or the module stopped being the source of truth.'
 	);
 }
@@ -92,10 +93,10 @@ const offenders = [];
 for (const file of files) {
 	if (path.resolve(file) === path.resolve(OWNER)) continue;
 	const src = fs.readFileSync(file, 'utf8');
-	if (!src.includes(INSTALL_DIR)) continue;
+	if (!src.includes(INSTALL_ROOT)) continue;
 	const lines = src.split(/\r?\n/);
 	for (let i = 0; i < lines.length; i++) {
-		if (lines[i].includes(INSTALL_DIR)) {
+		if (lines[i].includes(INSTALL_ROOT)) {
 			offenders.push(`${path.relative(ROOT, file).split(path.sep).join('/')}:${i + 1}`);
 		}
 	}
@@ -119,5 +120,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] the ${REQUIRED_EXPORTS.length} Karabiner binary path(s) are declared once, in ` +
-		`ke_paths.lua; ${files.length} driver file(s) scanned, none hardcodes the install directory.\x1b[0m`
+		`ke_paths.lua; ${files.length} driver file(s) scanned, none hardcodes the install root.\x1b[0m`
 );
