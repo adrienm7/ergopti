@@ -111,10 +111,35 @@ helpers.describe("tooltip facade: on-show callback failures are visible", functi
 		end)
 	end
 
-	helpers.it("keeps a successful callback on the normal committed path", function()
+	helpers.it("fails closed when a callback returns false without raising", function()
+		local fixture = load_fixture()
+		fixture.tooltip.set_on_show_callback(function() return false end)
+
+		helpers.assert_eq(fixture.tooltip.show("preview", false, true, nil), false)
+		helpers.assert_eq(fixture.llm_hides, 2)
+		helpers.assert_eq(fixture.hotstring_hides, 1)
+		helpers.assert_eq(#fixture.errors, 1)
+		helpers.assert_contains(fixture.errors[1], "result: false")
+	end)
+
+	helpers.it("fails closed when a callback returns nil without raising", function()
+		local fixture = load_fixture()
+		fixture.tooltip.set_on_show_callback(function() return nil end)
+
+		helpers.assert_eq(fixture.tooltip.show("preview", false, true, nil), false)
+		helpers.assert_eq(fixture.llm_hides, 2)
+		helpers.assert_eq(fixture.hotstring_hides, 1)
+		helpers.assert_eq(#fixture.errors, 1)
+		helpers.assert_contains(fixture.errors[1], "result: nil")
+	end)
+
+	helpers.it("keeps a strictly successful callback on the normal committed path", function()
 		local fixture = load_fixture()
 		local callbacks = 0
-		fixture.tooltip.set_on_show_callback(function() callbacks = callbacks + 1 end)
+		fixture.tooltip.set_on_show_callback(function()
+			callbacks = callbacks + 1
+			return true
+		end)
 
 		helpers.assert_eq(fixture.tooltip.show("preview", false, true, nil), true)
 		helpers.assert_eq(callbacks, 1)

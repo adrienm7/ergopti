@@ -19,7 +19,6 @@
 local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local km_utils   = require("modules.keymap.utils")
@@ -1153,10 +1152,6 @@ end
 --- @param e table Event parameters.
 --- @return boolean Pass-through result from the inner handler.
 local function onKeyDown(e)
-	-- First line of the hottest callback in the driver: macOS reports a tap it
-	-- disabled THROUGH the callback, and a disabled typing tap is the whole
-	-- driver going silent mid-sentence with nothing logged anywhere.
-	if EventTapGuard.handle_disabled(e, tap, "keymap.main") then return false end
 	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
 	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
 	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
@@ -1272,9 +1267,6 @@ tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 -- consumes the down phase; this minimal sibling consumes the exact tagged up
 -- phase so an application/hotkey cannot observe an orphan F16 release.
 loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
-	if EventTapGuard.handle_disabled(e, loopback_keyup_tap, "keymap.loopback_keyup") then
-		return false
-	end
 	local provenance, _, fence = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
 	local fence_events = fence and fence.events or nil
@@ -1312,7 +1304,6 @@ end
 shift_tap = eventtap.new(
 	{ eventtap.event.types.flagsChanged },
 	function(e)
-		if EventTapGuard.handle_disabled(e, shift_tap, "keymap.shift") then return false end
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.shift")
 		local fence_events = fence and fence.events or nil
@@ -1376,7 +1367,6 @@ mouse_tap = eventtap.new(
 		eventtap.event.types.middleMouseDown,
 	},
 	function(e)
-		if EventTapGuard.handle_disabled(e, mouse_tap, "keymap.mouse") then return false end
 		-- A click can move focus to another app before the deferred broker runs.
 		-- Claim older output here and return it ahead of the original mouseDown, even
 		-- when the optional keylogger tap is disabled. Otherwise an Ergopti shortcut
@@ -1415,13 +1405,12 @@ mouse_tap = eventtap.new(
 	end
 )
 
--- macOS silently disables an event tap whose callback exceeds the system
--- timeout (~300 ms). Once disabled, all keystrokes pass through but no
--- expansion fires — from the user's perspective, letters are "swallowed".
--- This watchdog checks the three taps and re-arms any that the OS killed.
+-- Bundled Hammerspoon normally re-enables a tap in native code when
+-- CoreGraphics reports a callback timeout, before returning to Lua. Keep an
+-- independent watchdog for any tap that remains disabled after another native
+-- or lifecycle failure; otherwise keystrokes pass through without expansions.
 --
--- The interval IS the length of the outage, not a sampling nicety: nothing else
--- can notice a dead tap, because a dead tap delivers no events to notice WITH.
+-- The interval bounds the outage when native recovery does not restore the tap.
 -- It was 5 s — several sentences of typing during which no expansion fires and
 -- the buffer stops tracking the screen. The check is three CGEventTapIsEnabled
 -- reads on a timer, nowhere near the keystroke path, so buying back four
@@ -1488,7 +1477,7 @@ function M.start()
 	shift_tap:start()
 	mouse_tap:start()
 
-	-- Arm the watchdog that re-enables taps killed by macOS
+	-- Arm the independent backstop for any tap still observed disabled.
 	if _watchdog_timer then _watchdog_timer:stop() end
 	_watchdog_timer = hs.timer.new(TAP_WATCHDOG_SEC, tap_watchdog)
 	_watchdog_timer:start()
@@ -1533,10 +1522,18 @@ function M.stop()
 	loopback_keyup_tap:stop()
 	shift_tap:stop()
 	mouse_tap:stop()
-	LLMBridge.reset_predictions()
+	local reset_ok, reset_result = xpcall(LLMBridge.reset_for_teardown, debug.traceback)
+	local predictions_reset = reset_ok and reset_result == true
+	if not predictions_reset then
+		Logger.error(LOG, "LLM teardown reset did not commit (result: %s).", tostring(reset_result))
+	end
 	-- Stop the escape trap so it does not intercept Escape after reload
 	-- (escape-trap-ghost-tap).
-	LLMBridge.stop()
+	local trap_ok, trap_result = xpcall(LLMBridge.stop, debug.traceback)
+	local escape_trap_stopped = trap_ok and trap_result == true
+	if not escape_trap_stopped then
+		Logger.error(LOG, "LLM Escape-trap teardown did not commit (result: %s).", tostring(trap_result))
+	end
 	-- Unsubscribe focus-change watchers so callbacks do not accumulate across
 	-- reloads (watcher-leak-on-reload).
 	km_utils.stop()
@@ -1552,7 +1549,13 @@ function M.stop()
 	-- They are already inert while stopped: both are only consulted from
 	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
-	Logger.success(LOG, "Keymap engine stopped.")
+	local stopped = predictions_reset and escape_trap_stopped
+	if stopped then
+		Logger.success(LOG, "Keymap engine stopped.")
+	else
+		Logger.error(LOG, "Keymap engine teardown remains incomplete and retryable.")
+	end
+	return stopped
 end
 
 return M

@@ -484,9 +484,19 @@ end
 --- subsequent requests and causes a deadlock where no prediction ever completes.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
+	local cancelled = true
 	if _stream.timeout then
-		TimerScheduler.cancel(_stream.timeout)
-		_stream.timeout = nil
+		local timeout = _stream.timeout
+		local cancel_ok, cancel_result = xpcall(function()
+			return TimerScheduler.cancel(timeout)
+		end, debug.traceback)
+		if cancel_ok and cancel_result == true then
+			_stream.timeout = nil
+		else
+			cancelled = false
+			Logger.error(LOG, "MLX stream timeout cancellation failed; retained for retry: %s",
+				tostring(cancel_result))
+		end
 	end
 	-- Bump generation so all callbacks from the old stream become no-ops
 	_stream.generation = _stream.generation + 1
@@ -494,12 +504,20 @@ function M.cancel_streaming()
 	if _stream.task then
 		-- Always terminate to free the MLX server connection; leaving prefill-phase
 		-- curls running blocks the server from answering the next request
-		_stream.task.terminate()
-		local phase = _stream.has_chunks and "mid-flight" or "prefill"
-		Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
-		_stream.task    = nil
-		_stream.has_chunks = false
+		local task = _stream.task
+		local terminated, terminate_result = xpcall(function() return task.terminate() end, debug.traceback)
+		if terminated and terminate_result == true then
+			local phase = _stream.has_chunks and "mid-flight" or "prefill"
+			Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
+			_stream.task       = nil
+			_stream.has_chunks = false
+		else
+			cancelled = false
+			Logger.error(LOG, "Active MLX stream termination failed; retained for retry: %s",
+				tostring(terminate_result))
+		end
 	end
+	return cancelled
 end
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
@@ -800,6 +818,7 @@ ApiMlxInference.init({
 	model_hf_path         = ApiMlxDiscovery.get_model_hf_path,
 	read_active_model_arg = ApiMlxDiscovery.read_active_model_arg,
 	stream                = _stream,
+	cancel_streaming      = M.cancel_streaming,
 })
 
 ApiMlxFetch.init({

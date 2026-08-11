@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 
-local function load_fixture()
+local function load_fixture(reset_result)
 	helpers.load_with_stubs("infra.logger")
 
 	local initial = { id = "initial" }
@@ -30,18 +30,15 @@ local function load_fixture()
 	local reset_hook
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return current_token end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(delay, callback)
-			local handle = { delay = delay, callback = callback, timer = {} }
-			scheduled[#scheduled + 1] = handle
-			return handle
-		end,
+			after = function(delay, callback)
+				local handle = { delay = delay, callback = callback, timer = {} }
+				scheduled[#scheduled + 1] = handle
+				return handle, true
+			end,
 	}
 	package.loaded["modules.keymap.utils"] = {
 		plain_text = function(value) return tostring(value or "") end,
@@ -81,10 +78,11 @@ local function load_fixture()
 		show_stacked = function(rows)
 			effects.stacked = effects.stacked + 1
 			effects.stacked_rows = rows
+			return true
 		end,
-		hide = function() effects.hide = effects.hide + 1 end,
-		hide_forced = function() effects.hide = effects.hide + 1 end,
-		hide_forced_silent = function() effects.hide = effects.hide + 1 end,
+		hide = function() effects.hide = effects.hide + 1; return true end,
+		hide_forced = function() effects.hide = effects.hide + 1; return true end,
+		hide_forced_silent = function() effects.hide = effects.hide + 1; return true end,
 		is_visible = function() return false end,
 		tint = function() return nil end,
 		set_colorization_enabled = function() end,
@@ -96,12 +94,15 @@ local function load_fixture()
 		set_runtime_guard = function(guard) engine_guard = guard end,
 		init = function() end,
 		get_llm_enabled = function() return true end,
-		stop_timer = function() effects.engine_stop = effects.engine_stop + 1 end,
+		stop_timer = function() effects.engine_stop = effects.engine_stop + 1; return true end,
 		start_timer = function() effects.engine_start = effects.engine_start + 1 end,
 		start_timer_word_end = function() effects.engine_start = effects.engine_start + 1 end,
 		reset = function()
 			effects.engine_reset = effects.engine_reset + 1
 			if reset_hook then reset_hook() end
+			if type(reset_result) == "function" then return reset_result() end
+			if reset_result ~= nil then return reset_result end
+			return true
 		end,
 	}, {
 		__index = function()
@@ -218,5 +219,59 @@ helpers.describe("llm_bridge: exact action-token quarantine", function()
 		helpers.assert_eq(Bridge.is_runtime_available(), false,
 			"rendering a hotstring must not reopen the quarantined LLM runtime")
 	end)
-end)
 
+	helpers.it("force-full teardown commits while runtime quarantine stays closed", function()
+		local Bridge, effects, publish = load_fixture()
+		local token = publish("teardown")
+		helpers.assert_true(Bridge.observe_action_epoch(token))
+		helpers.assert_eq(Bridge.is_runtime_available(), false)
+
+		helpers.assert_eq(Bridge.reset_for_teardown(), true,
+			"teardown cannot wait for a listener that is itself being removed")
+		helpers.assert_eq(effects.engine_reset, 1)
+		helpers.assert_eq(Bridge.is_runtime_available(), false,
+			"resource teardown must not reopen an interaction gate")
+	end)
+
+	helpers.it("keeps a failed teardown reset retryable under quarantine", function()
+		local attempts = 0
+		local Bridge, effects, publish = load_fixture(function()
+			attempts = attempts + 1
+			return attempts > 1
+		end)
+		local token = publish("teardown-retry")
+		Bridge.observe_action_epoch(token)
+
+		helpers.assert_eq(Bridge.reset_for_teardown(), false)
+		helpers.assert_eq(Bridge.reset_for_teardown(), true)
+		helpers.assert_eq(effects.engine_reset, 2)
+		helpers.assert_eq(Bridge.is_runtime_available(), false)
+	end)
+
+	for _, case in ipairs({
+		{ name = "false", value = false },
+		{ name = "throw", value = function() error("engine reset failed") end },
+	}) do
+		helpers.it("keeps every quarantine closed when engine reset returns " .. case.name, function()
+			local Bridge, _, publish = load_fixture(case.value)
+			local token = publish("failed-reset")
+			helpers.assert_true(Bridge.observe_action_epoch(token))
+
+			local ok, result = pcall(Bridge.reset_for_action_epoch, token)
+			helpers.assert_true(ok, "the reset failure must be contained: " .. tostring(result))
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(Bridge.is_runtime_available(), false,
+				"a failed action-epoch reset must not mark the token safe")
+
+			ok, result = pcall(Bridge.reconcile_observation_gap)
+			helpers.assert_true(ok, "reconciliation must contain the same failure: " .. tostring(result))
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(Bridge.is_runtime_available(), false,
+				"failed reconciliation must not reopen the runtime")
+
+			ok, result = pcall(Bridge.reset_predictions, false)
+			helpers.assert_true(ok, "ordinary reset must contain the same failure: " .. tostring(result))
+			helpers.assert_eq(result, false)
+		end)
+	end
+end)

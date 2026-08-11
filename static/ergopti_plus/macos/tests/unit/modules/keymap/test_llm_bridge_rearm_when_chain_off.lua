@@ -30,8 +30,9 @@ helpers.describe("llm_bridge update_preview re-arms inactivity timer when chain 
 		local region = src:sub(chain, chain + 1600)
 		helpers.assert_true(region:find("elseif llm_on then", 1, true) ~= nil,
 			"the match branch must have an `elseif llm_on` re-arm when chain is off")
-		helpers.assert_true(region:find("start_timer_word_end", 1, true) ~= nil
-			and region:find("engine.start_timer(", 1, true) ~= nil,
-			"the elseif must re-arm via start_timer_word_end / start_timer")
+		helpers.assert_true(
+			region:find('arm_llm_timer("Matched word-end LLM timer", engine.start_timer_word_end)', 1, true) ~= nil
+				and region:find('arm_llm_timer("Matched inactivity LLM timer", engine.start_timer)', 1, true) ~= nil,
+			"the elseif must re-arm both paths through the strict timer owner")
 	end)
 end)

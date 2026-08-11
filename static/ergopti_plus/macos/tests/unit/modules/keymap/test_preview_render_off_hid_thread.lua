@@ -45,13 +45,15 @@ helpers.describe("llm_bridge: the preview render leaves the keyboard callback", 
 		local at = code:find("tooltip.show_stacked", 1, true)
 		helpers.assert_true(at ~= nil, "the preview must still be rendered at some point")
 
-		local before = code:sub(math.max(1, at - 400), at)
-		helpers.assert_true(before:find("TimerScheduler.after", 1, true) ~= nil,
+		local callback_at = code:sub(1, at):match(".*()local function render_preview%(")
+		local schedule_at = callback_at and code:find("TimerScheduler.after(0, render_preview)", at, true)
+		helpers.assert_true(callback_at ~= nil and schedule_at ~= nil,
 			"the render must be scheduled off the keyboard callback. Resolving the tooltip anchor "
 				.. "performs cross-process AX IPC on every preview keystroke, and against a hung "
 				.. "front app that blocks until the AX timeout — long enough for macOS to disable "
 				.. "the keyboard tap for being unresponsive")
-		helpers.assert_true(before:find("_preview_render_generation", 1, true) ~= nil,
+		local callback_body = callback_at and schedule_at and code:sub(callback_at, schedule_at) or ""
+		helpers.assert_true(callback_body:find("_preview_render_generation", 1, true) ~= nil,
 			"and it must be stamped, so a render superseded during its deferral drops itself "
 				.. "instead of resurrecting a dismissed tooltip")
 	end)
@@ -185,7 +187,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			after = function(delay, fn)
 				local handle = { timer = {}, delay = delay, fn = fn }
 				scheduled[#scheduled + 1] = handle
-				return handle
+				return handle, true
 			end,
 		}
 		package.loaded["modules.keymap.utils"] = {
@@ -199,7 +201,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			set_runtime_guard = function() end,
 			init = function() end,
 			get_llm_enabled = function() return false end,
-			reset = function() reset_count = reset_count + 1 end,
+			reset = function() reset_count = reset_count + 1; return true end,
 		}
 		package.loaded["modules.keylogger"] = {}
 		package.loaded["ui.tooltip"] = {
@@ -209,7 +211,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			set_on_show_callback = function() end,
 			set_timeout = function() end,
 			tint = function() return {} end,
-			show_stacked = function() shown = shown + 1 end,
+			show_stacked = function() shown = shown + 1; return true end,
 		}
 
 		local ok, err = pcall(function()

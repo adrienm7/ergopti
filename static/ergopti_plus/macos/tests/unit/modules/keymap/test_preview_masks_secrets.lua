@@ -232,7 +232,7 @@ local function capture_rows(register, buf)
 	local tooltip = require("ui.tooltip")
 	local real_show_stacked = tooltip.show_stacked
 	local captured = nil
-	tooltip.show_stacked = function(rows) captured = rows end
+	tooltip.show_stacked = function(rows) captured = rows; return true end
 
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 	state.preview_providers         = {}

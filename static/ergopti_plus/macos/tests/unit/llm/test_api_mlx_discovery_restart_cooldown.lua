@@ -43,17 +43,26 @@ local helpers = require("tests.helpers")
 --- on their own, plus the network stubs discovery needs to fail cleanly.
 --- @return table env { now, advance, timers, probes, discovery }
 local function make_env()
-	local env = { now = 1000, timers = {}, probes = 0 }
+	local env = { now = 1000, timers = {}, probes = 0, next_timer_id = 0 }
 
 	package.loaded["adapters.timer_scheduler"] = {
 		now = function() return env.now end,
 		after = function(delay, fn)
-			env.timers[#env.timers + 1] = { delay = delay, fn = fn }
-			-- A handle shaped like the real one: reset() calls :stop() on it.
-			return { stop = function() end }
+			env.next_timer_id = env.next_timer_id + 1
+			local handle = { id = env.next_timer_id }
+			env.timers[#env.timers + 1] = { delay = delay, fn = fn, handle = handle }
+			return handle, true
 		end,
-		doEvery = function() return { stop = function() end } end,
-		cancel = function() end,
+		cancel = function(handle)
+			for i, timer in ipairs(env.timers) do
+				if timer.handle == handle then
+					table.remove(env.timers, i)
+					break
+				end
+			end
+			return nil
+		end,
+		activeCount = function() return #env.timers end,
 	}
 
 	-- Every probe fails, which is the path that retries.
@@ -126,17 +135,23 @@ helpers.describe("MLX discovery: a failed cycle does not restart on the next tic
 		local env = make_env()
 		env.discovery.reset()
 
-		env.discovery.discover(function() end)
+		local original_callbacks = 0
+		local retry_callbacks = 0
+		env.discovery.discover(function()
+			original_callbacks = original_callbacks + 1
+			-- This is the production shape: api_mlx.warmup() is the completion
+			-- callback and re-enters discovery while fan-out is still draining.
+			env.discovery.discover(function() retry_callbacks = retry_callbacks + 1 end)
+		end)
 		-- Let the cycle FAIL. Without this the second discover() would be refused by
 		-- the pre-existing in-flight mutex and the test would pass without the
 		-- cooldown existing at all.
 		env.finish_cycle()
-		local timers_after_fail = #env.timers
-
-		-- The re-entry the storm was made of: the queued warmup calling back in.
-		env.discovery.discover(function() end)
-		helpers.assert_eq(timers_after_fail + 1, #env.timers,
-			"the re-entry must arm exactly one timer")
+		helpers.assert_eq(original_callbacks, 1, "the failed cycle must answer its waiter")
+		helpers.assert_eq(retry_callbacks, 0,
+			"the re-entrant waiter belongs to the deferred cycle, not the failed one")
+		helpers.assert_eq(#env.timers, 1,
+			"the callback's re-entry must arm exactly one deferred timer after fan-out")
 
 		-- The DELAY is what distinguishes the two outcomes, not the count. Without a
 		-- cooldown discover() arms its poll with TimerScheduler.after(0, do_poll) —

@@ -16,6 +16,27 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 local ApiOllama = helpers.load_with_stubs("modules.llm.api_ollama")
 
+local function set_upvalue(fn, target, value)
+	for index = 1, 64 do
+		local name = debug.getupvalue(fn, index)
+		if not name then break end
+		if name == target then
+			debug.setupvalue(fn, index, value)
+			return true
+		end
+	end
+	return false
+end
+
+local function get_upvalue(fn, target)
+	for index = 1, 64 do
+		local name, value = debug.getupvalue(fn, index)
+		if not name then break end
+		if name == target then return value end
+	end
+	return nil
+end
+
 
 
 
@@ -81,8 +102,29 @@ end)
 -- =====================================
 
 helpers.describe("ApiOllama.cancel_streaming", function()
-	helpers.it("does not error when no stream is active", function()
-		ApiOllama.cancel_streaming()
+	helpers.it("commits when no stream is active", function()
+		helpers.assert_eq(ApiOllama.cancel_streaming(), true)
+	end)
+
+	helpers.it("retains a task whose native termination raises, then retries it", function()
+		local calls = 0
+		local task = {
+			terminate = function()
+				calls = calls + 1
+				error("native terminate failed")
+			end,
+		}
+		helpers.assert_true(set_upvalue(ApiOllama.cancel_streaming, "_active_stream_task", task),
+			"the behavioral negative control must inject the real owned-task slot")
+		helpers.assert_eq(ApiOllama.cancel_streaming(), false)
+		helpers.assert_eq(calls, 1)
+
+		task.terminate = function() calls = calls + 1; return true end
+		helpers.assert_eq(ApiOllama.cancel_streaming(), true,
+			"a retained native capability must remain retryable")
+		helpers.assert_eq(calls, 2)
+		helpers.assert_eq(ApiOllama.cancel_streaming(), true)
+		helpers.assert_eq(calls, 2, "the successful retry must release the task slot")
 	end)
 end)
 
@@ -168,6 +210,175 @@ helpers.describe("ApiOllama run-loop safety", function()
 		helpers.assert_true(not has_top_exec,
 			"api_ollama must never call ShellRunner.exec at top-level (require-time) — " ..
 			"this blocks the Cocoa run loop and kills the menubar/timers")
+	end)
+end)
+
+
+helpers.describe("ApiOllama daemon startup ownership", function()
+	local ensure_impl = get_upvalue(ApiOllama.ensure_running, "ensure_ollama_running")
+	local shell_runner = ensure_impl and get_upvalue(ensure_impl, "ShellRunner") or nil
+	local scheduler = ensure_impl and get_upvalue(ensure_impl, "TimerScheduler") or nil
+
+	local function reset_startup_state()
+		helpers.assert_not_nil(ensure_impl, "the behavioral test must reach the real startup transaction")
+		for name, value in pairs({
+			_ollama_started = false,
+			_ollama_starting = false,
+			_ollama_start_generation = 0,
+		}) do
+			helpers.assert_true(set_upvalue(ensure_impl, name, value), "missing startup state: " .. name)
+		end
+		for _, name in ipairs({
+			"_ollama_kill_task", "_ollama_launch_timer", "_ollama_serve_task", "_ollama_ambiguous_task",
+		}) do
+			helpers.assert_true(set_upvalue(ensure_impl, name, nil), "missing startup owner: " .. name)
+		end
+	end
+
+	for _, case in ipairs({
+		{ name = "false", start = function() return false end },
+		{ name = "throw", start = function() error("native start raised") end },
+	}) do
+		helpers.it("retries the stale-process task after start " .. case.name, function()
+			reset_startup_state()
+			local original_spawn = shell_runner.spawn
+			local spawn_calls = 0
+			local terminate_calls = 0
+			shell_runner.spawn = function()
+				spawn_calls = spawn_calls + 1
+				return {
+					start = spawn_calls == 1 and case.start or function() return true end,
+					terminate = function() terminate_calls = terminate_calls + 1; return true end,
+				}
+			end
+
+			local ok, err = pcall(function()
+				helpers.assert_eq(ApiOllama.ensure_running(), false)
+				helpers.assert_eq(ApiOllama.ensure_running(), true,
+					"a refused launch must not poison the process-lifetime deduplication latch")
+				helpers.assert_eq(spawn_calls, 2, "the second demand must construct a fresh kill task")
+				if case.name == "throw" then
+					helpers.assert_eq(terminate_calls, 1,
+						"an exceptional start must revoke the ambiguous native capability before retry")
+				end
+			end)
+			shell_runner.spawn = original_spawn
+			if not ok then error(err) end
+		end)
+	end
+
+	for _, case in ipairs({
+		{ name = "false", start = function() return false end },
+		{ name = "throw", start = function() error("serve start raised") end },
+	}) do
+		helpers.it("retries the full transaction after server start " .. case.name, function()
+			reset_startup_state()
+			local original_spawn = shell_runner.spawn
+			local original_after = scheduler.after
+			local spawn_calls = 0
+			local kill_done
+			local launch_server
+			local terminate_calls = 0
+			shell_runner.spawn = function(_, _, on_done)
+				spawn_calls = spawn_calls + 1
+				if spawn_calls == 1 then
+					kill_done = on_done
+					return { start = function() return true end, terminate = function() return true end }
+				end
+				if spawn_calls == 2 then
+					return {
+						start = case.start,
+						terminate = function() terminate_calls = terminate_calls + 1; return true end,
+					}
+				end
+				return { start = function() return true end, terminate = function() return true end }
+			end
+			scheduler.after = function(_, callback)
+				launch_server = callback
+				return { timer = {} }, true
+			end
+
+			local ok, err = pcall(function()
+				helpers.assert_eq(ApiOllama.ensure_running(), true)
+				helpers.assert_eq(type(kill_done), "function")
+				kill_done()
+				helpers.assert_eq(type(launch_server), "function")
+				launch_server()
+				helpers.assert_eq(ApiOllama.ensure_running(), true,
+					"a failed nested serve launch must release the outer in-flight latch")
+				helpers.assert_eq(spawn_calls, 3, "retry must restart from stale-process cleanup")
+				if case.name == "throw" then helpers.assert_eq(terminate_calls, 1) end
+			end)
+			shell_runner.spawn = original_spawn
+			scheduler.after = original_after
+			if not ok then error(err) end
+		end)
+	end
+end)
+
+
+helpers.describe("ApiOllama streaming task ownership", function()
+	local streaming_impl = get_upvalue(ApiOllama.fetch_batch, "post_and_parse_streaming")
+	local shell_runner = streaming_impl and get_upvalue(streaming_impl, "ShellRunner") or nil
+
+	local function request(on_fail)
+		streaming_impl(
+			"fixture-model", "", "typed context", "", 0.2, 8, 1, false,
+			function() error("unexpected success") end, on_fail, {}, function() end)
+	end
+
+	for _, case in ipairs({
+		{ name = "false", start = function() return false end },
+		{ name = "throw", start = function() error("STREAM_START_THROW") end },
+	}) do
+		helpers.it("releases a curl task whose start returns " .. case.name, function()
+			helpers.assert_not_nil(streaming_impl, "the test must drive the real streaming function")
+			helpers.assert_true(set_upvalue(streaming_impl, "_active_stream_task", nil))
+			local original_spawn = shell_runner.spawn
+			local spawns, failures, terminations = 0, 0, 0
+			shell_runner.spawn = function()
+				spawns = spawns + 1
+				return {
+					start = case.start,
+					terminate = function() terminations = terminations + 1; return true end,
+				}
+			end
+
+			local ok, err = pcall(function()
+				request(function() failures = failures + 1 end)
+				helpers.assert_eq(get_upvalue(streaming_impl, "_active_stream_task"), nil)
+				request(function() failures = failures + 1 end)
+				helpers.assert_eq(spawns, 2, "the next prediction must retry after an uncommitted start")
+				helpers.assert_eq(failures, 2)
+				if case.name == "throw" then helpers.assert_eq(terminations, 2) end
+			end)
+			shell_runner.spawn = original_spawn
+			if not ok then error(err) end
+		end)
+	end
+
+	helpers.it("does not republish a task that completes inside start", function()
+		helpers.assert_true(set_upvalue(streaming_impl, "_active_stream_task", nil))
+		local original_spawn = shell_runner.spawn
+		local failures = 0
+		shell_runner.spawn = function(_, _, on_done)
+			return {
+				start = function()
+					on_done(0, "", "")
+					return true
+				end,
+				terminate = function() return true end,
+			}
+		end
+
+		local ok, err = pcall(function()
+			request(function() failures = failures + 1 end)
+			helpers.assert_eq(get_upvalue(streaming_impl, "_active_stream_task"), nil,
+				"completion must revoke ownership before start() returns to the caller")
+			helpers.assert_eq(failures, 1)
+		end)
+		shell_runner.spawn = original_spawn
+		if not ok then error(err) end
 	end)
 end)
 

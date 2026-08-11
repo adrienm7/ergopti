@@ -78,6 +78,102 @@ helpers.describe("apply_prediction: direct text uses one tagged callback batch",
 		helpers.assert_eq(result.synthetic.stats().records, 0)
 	end)
 
+	for _, case in ipairs({
+		{ name = "throw", options = { overlap_error = true } },
+		{ name = "nil", options = { overlap_nil = true } },
+	}) do
+		helpers.it("rejects output when overlap resolution returns " .. case.name, function()
+			local result = fixture.run({
+				text = "texte",
+				buffer = "Je tex",
+				overlap_error = case.options.overlap_error,
+				overlap_nil = case.options.overlap_nil,
+			})
+
+			helpers.assert_true(result.call_ok,
+				"overlap failure must be contained before the eventtap boundary")
+			helpers.assert_eq(result.applied, false,
+				"unsafe unnormalised text must not be accepted")
+			helpers.assert_eq(result.consume, false)
+			helpers.assert_nil(result.events,
+				"no deletion or text event may escape after overlap resolution failed")
+			helpers.assert_eq(result.state.buffer, result.buffer_before)
+			helpers.assert_eq(result.accepted_count, 0)
+			helpers.assert_eq(result.arm_chain_count, 0)
+			helpers.assert_eq(result.reset_count, 1,
+				"the prediction consumed before normalisation must be cleaned up")
+	end)
+	end
+
+	for _, case in ipairs({
+		{ name = "false", value = false },
+		{ name = "nil", value = function() return nil end },
+	}) do
+		helpers.it("commits accepted text without chaining when native reset returns " .. case.name, function()
+			local result = fixture.run({
+				text = "ok",
+				buffer = "prefix ",
+				reset_result = case.value,
+			})
+
+			helpers.assert_true(result.call_ok)
+			helpers.assert_eq(result.applied, true,
+				"a cleanup refusal after the logical fence must not eat accepted text")
+			helpers.assert_eq(result.consume, true)
+			helpers.assert_eq(#result.events, 4)
+			helpers.assert_eq(result.state.buffer, "prefix ok")
+			helpers.assert_eq(result.accepted_count, 1)
+			helpers.assert_eq(result.arm_chain_count, 0,
+				"no new request may chain behind cleanup that did not commit")
+			helpers.assert_eq(result.reset_count, 1)
+			helpers.assert_eq(result.timer_delta, 2,
+				"the normal replacement deferral plus one cleanup retry must remain owned")
+		end)
+	end
+
+	helpers.it("contains a reset throw and commits already-fenced text without chaining", function()
+		local result = fixture.run({
+			text = "ok",
+			buffer = "prefix ",
+			reset_result = function() error("RESET_THROW") end,
+		})
+
+		helpers.assert_true(result.call_ok,
+			"reset failure must be contained before the callback collector aborts")
+		helpers.assert_eq(result.applied, true)
+		helpers.assert_eq(result.consume, true)
+		helpers.assert_eq(#result.events, 4)
+		helpers.assert_eq(result.state.buffer, "prefix ok")
+		helpers.assert_eq(result.accepted_count, 1)
+		helpers.assert_eq(result.arm_chain_count, 0)
+		helpers.assert_eq(result.timer_delta, 2)
+	end)
+
+	for _, case in ipairs({
+		{ name = "false", value = false },
+		{ name = "nil", value = function() return nil end },
+		{ name = "throw", value = function() error("ARM_THROW") end },
+	}) do
+		helpers.it("keeps accepted text committed when chain arm returns " .. case.name, function()
+			local result = fixture.run({
+				text = "ok",
+				buffer = "prefix ",
+				arm_chain_result = case.value,
+			})
+
+			helpers.assert_true(result.call_ok,
+				"post-output chain failure must never abort the collected text batch")
+			helpers.assert_eq(result.applied, true)
+			helpers.assert_eq(result.consume, true)
+			helpers.assert_eq(#result.events, 4)
+			helpers.assert_eq(result.state.buffer, "prefix ok")
+			helpers.assert_eq(result.accepted_count, 1)
+			helpers.assert_eq(result.arm_chain_count, 1)
+			helpers.assert_eq(result.timer_delta, 1,
+				"F16 must not be emitted when no fallback chain owner exists")
+		end)
+	end
+
 	helpers.it("does not leak a partial text_utils stub to later tests", function()
 		fixture.run({ text = "x", buffer = "" })
 		package.loaded["infra.text_utils"] = nil
