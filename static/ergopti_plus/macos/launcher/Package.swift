@@ -5,9 +5,9 @@
 // DESCRIPTION:
 // Builds the tiny native binary that lives at ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus.
 // Its interactive role hosts Sparkle and spawns embedded Hammerspoon with our
-// config-dir override. The same signed executable also provides four headless
-// modes (outer worker, private inner, one-shot revoker, and launchd guardian)
-// that guard exact ErgoptiPlus Karabiner generation variables.
+// config-dir override. The same signed executable also provides exact headless
+// lease, revocation, guardian, status, and explicit settings roles that guard
+// only ErgoptiPlus Karabiner generation variables.
 // Hammerspoon itself stays untouched as a vendored .app inside Contents/Frameworks.
 //
 // FEATURES & RATIONALE:

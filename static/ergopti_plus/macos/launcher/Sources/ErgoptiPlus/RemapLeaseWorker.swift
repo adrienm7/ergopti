@@ -3,9 +3,9 @@
 // ==============================================================================
 // MODULE: Karabiner Lease Worker
 // DESCRIPTION:
-// Provides the headless modes inside the signed ErgoptiPlus launcher: outer
-// worker, inner writer, detached revoker, and launchd-owned guardian. The outer
-// mode owns Hammerspoon’s stdin/stdout protocol and waitpid-supervises one inner
+// Provides the headless modes inside the signed ErgoptiPlus launcher: lease
+// workers, detached revocation, the guardian, and exact user-requested controls.
+// The outer mode owns Hammerspoon’s stdin/stdout protocol and waitpid-supervises one inner
 // over a private socketpair.
 // The inner exclusively creates, signals, and reaps direct karabiner_cli children.
 //
@@ -274,6 +274,63 @@ func validatedInnerLeaseIdentity(
 		identityReader(executablePath) == expectedExecutableIdentity
 	else { return nil }
 	return identity
+}
+
+/// Validates one two-argument guardian control invocation against the exact
+/// launcher vnode exported by the parent GUI process.
+private func validatedGuardianControlInvocation(
+	arguments: [String],
+	expectedFlag: String,
+	executablePath: String?,
+	environment: [String: String],
+	identityReader: (String) -> LeaseExecutableIdentity? = {
+		LeaseExecutableIdentity.capture(at: $0)
+	}
+) -> Bool {
+	guard arguments.count == 2,
+		arguments[1] == expectedFlag,
+		let executablePath,
+		executablePath.hasPrefix("/"),
+		let expectedIdentity = LeaseExecutableIdentity.parse(environment: environment),
+		identityReader(executablePath) == expectedIdentity
+	else { return false }
+	return true
+}
+
+/// Validates the read-only guardian-status role.
+func validatedGuardianStatusInvocation(
+	arguments: [String],
+	executablePath: String?,
+	environment: [String: String],
+	identityReader: (String) -> LeaseExecutableIdentity? = {
+		LeaseExecutableIdentity.capture(at: $0)
+	}
+) -> Bool {
+	return validatedGuardianControlInvocation(
+		arguments: arguments,
+		expectedFlag: kRemapGuardianStatusFlag,
+		executablePath: executablePath,
+		environment: environment,
+		identityReader: identityReader
+	)
+}
+
+/// Validates the explicit Login Items settings role.
+func validatedGuardianSettingsInvocation(
+	arguments: [String],
+	executablePath: String?,
+	environment: [String: String],
+	identityReader: (String) -> LeaseExecutableIdentity? = {
+		LeaseExecutableIdentity.capture(at: $0)
+	}
+) -> Bool {
+	return validatedGuardianControlInvocation(
+		arguments: arguments,
+		expectedFlag: kOpenRemapGuardianSettingsFlag,
+		executablePath: executablePath,
+		environment: environment,
+		identityReader: identityReader
+	)
 }
 
 /// Builds the only JSON payload shapes the native guardian may emit.
@@ -2577,9 +2634,11 @@ enum KarabinerLeaseWorker {
 			|| arguments[1] == kKarabinerLeaseRevokeFlag
 			|| arguments[1] == kKarabinerLeaseInnerFlag
 			|| arguments[1] == kKarabinerLeaseGuardianFlag
+			|| arguments[1] == kRemapGuardianStatusFlag
+			|| arguments[1] == kOpenRemapGuardianSettingsFlag
 	}
 
-	/// Runs one validated outer, revoker, private inner, or independent guardian role.
+	/// Runs one validated lease, guardian, status, or explicit settings role.
 	/// - Parameter arguments: Complete process argv.
 	/// - Returns: Stable process exit status.
 	static func run(arguments: [String]) -> Int32 {
@@ -2602,6 +2661,30 @@ enum KarabinerLeaseWorker {
 			return RemapLeaseGuardianRuntime(paths: paths).run()
 		}
 		#endif
+		if arguments[1] == kRemapGuardianStatusFlag {
+			guard validatedGuardianStatusInvocation(
+				arguments: arguments,
+				executablePath: Bundle.main.executablePath,
+				environment: ProcessInfo.processInfo.environment
+			) else { return LeaseWorkerExit.invalidArguments.rawValue }
+			guard let output = (observeRemapGuardianRegistrationStatus().rawValue + "\n")
+				.data(using: .utf8),
+				writeLauncherLogData(output, descriptor: STDOUT_FILENO)
+			else { return LeaseWorkerExit.innerFailed.rawValue }
+			return LeaseWorkerExit.success.rawValue
+		}
+		if arguments[1] == kOpenRemapGuardianSettingsFlag {
+			guard validatedGuardianSettingsInvocation(
+				arguments: arguments,
+				executablePath: Bundle.main.executablePath,
+				environment: ProcessInfo.processInfo.environment
+			) else { return LeaseWorkerExit.invalidArguments.rawValue }
+			let result = openRemapGuardianSettingsIfRequired()
+			guard let output = (result.rawValue + "\n").data(using: .utf8),
+				writeLauncherLogData(output, descriptor: STDOUT_FILENO)
+			else { return LeaseWorkerExit.innerFailed.rawValue }
+			return LeaseWorkerExit.success.rawValue
+		}
 		if arguments[1] == kKarabinerLeaseGuardianFlag {
 			guard arguments.count == 2 else {
 				return LeaseWorkerExit.invalidArguments.rawValue
@@ -2660,7 +2743,10 @@ enum KarabinerLeaseWorker {
 			),
 			guardianRegistration: detached
 				? nil
-				: LeaseGuardianRegistration(identity: identity)
+				: LeaseGuardianRegistration(
+					identity: identity,
+					activationAuthorized: remapGuardianActivationIsAuthorized
+				)
 		)
 		return runtime.run()
 	}

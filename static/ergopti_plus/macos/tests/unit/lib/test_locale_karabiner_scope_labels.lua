@@ -16,6 +16,7 @@ local OWNED_ONLY_KEYS = {
 	"karabiner.enable_failed",
 	"menu.karabiner.start",
 	"menu.karabiner.status_active",
+	"menu.karabiner.status_guardian_approval_required",
 	"menu.karabiner.status_inactive",
 	"menu.karabiner.status_not_primed",
 	"menu.karabiner.status_priming",
@@ -25,6 +26,7 @@ local OWNED_ONLY_KEYS = {
 local TRANSLATED_FAILURE_KEYS = {
 	"karabiner.disable_failed",
 	"karabiner.enable_failed",
+	"karabiner.guardian_settings_open_failed",
 	"script_control.pause_failed",
 	"script_control.resume_failed",
 }

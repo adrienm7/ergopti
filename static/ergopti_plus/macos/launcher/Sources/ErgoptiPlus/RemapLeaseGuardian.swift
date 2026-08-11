@@ -39,6 +39,8 @@ import ServiceManagement
 // ======================================
 
 let kKarabinerLeaseGuardianFlag = "--karabiner-lease-guardian"
+let kRemapGuardianStatusFlag = "--remap-guardian-status"
+let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
 let kRemapGuardianLabel = "com.ergoptiplus.remap-guardian"
 let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"
 let kRemapGuardianServiceErrorDomain = "SMAppServiceErrorDomain"
@@ -652,6 +654,7 @@ protocol LeaseGuardianRegistering: AnyObject {
 final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 	private let record: LeaseGuardianRecord
 	private let paths: LeaseGuardianPaths
+	private let activationAuthorized: () -> Bool
 	private var recordDescriptor: Int32 = -1
 	private var guardianLockDescriptor: Int32 = -1
 	private var activationGateDescriptor: Int32 = -1
@@ -671,7 +674,11 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 	}
 
 	/// Creates one unarmed registration with a fresh nonce for the supplied token.
-	init(identity: LeaseIdentity, paths: LeaseGuardianPaths = LeaseGuardianPaths()) {
+	init(
+		identity: LeaseIdentity,
+		paths: LeaseGuardianPaths = LeaseGuardianPaths(),
+		activationAuthorized: @escaping () -> Bool
+	) {
 		record = LeaseGuardianRecord(
 			token: identity.token,
 			nonce: UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
@@ -679,11 +686,13 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 			state: .live
 		)
 		self.paths = paths
+		self.activationAuthorized = activationAuthorized
 	}
 
 	/// Publishes, locks, and obtains a generation-bound acknowledgement before return.
 	func arm() -> Bool {
-		guard !armed,
+		guard activationAuthorized(),
+			!armed,
 			prepareGuardianDirectories(paths),
 			let encoded = record.encoded
 		else { return false }
@@ -761,6 +770,10 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 					continue
 				}
 				guardianGeneration = generation
+				guard activationAuthorized() else {
+					cancelBeforeActivation()
+					return false
+				}
 				armed = true
 				return true
 			}
@@ -772,7 +785,7 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 
 	/// Revalidates live ownership by the exact guardian generation accepted at ARM.
 	func guardianStillPresent() -> Bool {
-		guard let guardianGeneration else { return false }
+		guard activationAuthorized(), let guardianGeneration else { return false }
 		return activeGuardianGeneration(
 			descriptor: guardianLockDescriptor,
 			activationGateDescriptor: activationGateDescriptor
@@ -782,7 +795,11 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 
 	/// Locks the generation-bound gate before any live write can cross privately.
 	func beginLiveTransport() -> Bool {
-		guard armed, !liveTransportActive, let guardianGeneration else { return false }
+		guard activationAuthorized(),
+			armed,
+			!liveTransportActive,
+			let guardianGeneration
+		else { return false }
 		if !activationGateLocked {
 			guard Darwin.flock(
 				activationGateDescriptor,
@@ -1759,29 +1776,32 @@ private func legacyGuardianPlistMatches(
 	return observed == expected
 }
 
+/// Performs one side-effect-free exact health observation.
+func legacyGuardianIsHealthy(_ paths: LeaseGuardianPaths) -> Bool {
+	let singleton = Darwin.open(
+		paths.singletonLock,
+		O_RDWR | O_CLOEXEC | O_NOFOLLOW
+	)
+	let activationGate = Darwin.open(
+		paths.activationGate,
+		O_RDWR | O_CLOEXEC | O_NOFOLLOW
+	)
+	defer {
+		if singleton >= 0 { Darwin.close(singleton) }
+		if activationGate >= 0 { Darwin.close(activationGate) }
+	}
+	guard singleton >= 0, activationGate >= 0 else { return false }
+	return activeGuardianGeneration(
+		descriptor: singleton,
+		activationGateDescriptor: activationGate
+	) != nil
+}
+
 /// Waits a bounded interval for an exclusively held ACTIVE singleton generation.
 func waitForLegacyGuardianHealth(_ paths: LeaseGuardianPaths) -> Bool {
 	let deadline = ProcessInfo.processInfo.systemUptime + kLegacyLaunchctlTimeoutSeconds
 	repeat {
-		let singleton = Darwin.open(
-			paths.singletonLock,
-			O_RDWR | O_CLOEXEC | O_NOFOLLOW
-		)
-		let activationGate = Darwin.open(
-			paths.activationGate,
-			O_RDWR | O_CLOEXEC | O_NOFOLLOW
-		)
-		if singleton >= 0, activationGate >= 0,
-			activeGuardianGeneration(
-				descriptor: singleton,
-				activationGateDescriptor: activationGate
-			) != nil {
-			Darwin.close(singleton)
-			Darwin.close(activationGate)
-			return true
-		}
-		if singleton >= 0 { Darwin.close(singleton) }
-		if activationGate >= 0 { Darwin.close(activationGate) }
+		if legacyGuardianIsHealthy(paths) { return true }
 		usleep(kGuardianArmPollMicroseconds)
 	} while ProcessInfo.processInfo.systemUptime < deadline
 	return false
@@ -1930,6 +1950,11 @@ enum RemapGuardianRegistrationStatus: String, Equatable {
 	case unavailable
 }
 
+enum RemapGuardianSettingsResult: String, Equatable {
+	case opened
+	case notRequired = "not_required"
+}
+
 @available(macOS 13.0, *)
 /// Recognizes only the ServiceManagement error representing user approval state.
 private func modernGuardianErrorRequiresApproval(_ error: Error) -> Bool {
@@ -1994,6 +2019,95 @@ func resolveModernRemapGuardianRegistration(
 	@unknown default:
 		return .unavailable
 	}
+}
+
+/// Observes modern authorization without registering, bootstrapping, or
+/// otherwise changing ServiceManagement state. Only exact live health is ready.
+@available(macOS 13.0, *)
+func observeModernRemapGuardianRegistration(
+	service: RemapGuardianModernService,
+	guardianHealth: () -> Bool
+) -> RemapGuardianRegistrationStatus {
+	let statusBeforeHealth = service.status
+	switch statusBeforeHealth {
+	case .enabled, .notRegistered, .notFound:
+		// Ad-hoc-signed ZIP releases intentionally use the exact legacy
+		// LaunchAgent after SMAppService rejects registration. Its authenticated
+		// lock/health proof remains authoritative when no modern approval is
+		// pending; `.requiresApproval` below must never take this fallback.
+		let healthy = guardianHealth()
+		let statusAfterHealth = service.status
+		if statusAfterHealth == .requiresApproval { return .requiresApproval }
+		guard statusAfterHealth == statusBeforeHealth else { return .unavailable }
+		return healthy ? .ready : .unavailable
+	case .requiresApproval:
+		return .requiresApproval
+	@unknown default:
+		return .unavailable
+	}
+}
+
+/// Allows exact lease activity only while current Background Items state does
+/// not require a user decision. Missing registration remains valid for the
+/// bundle-owned legacy LaunchAgent compatibility path; unknown future states
+/// fail closed.
+@available(macOS 13.0, *)
+func modernGuardianActivationIsAuthorized(
+	service: RemapGuardianModernService
+) -> Bool {
+	switch service.status {
+	case .enabled, .notRegistered, .notFound:
+		return true
+	case .requiresApproval:
+		return false
+	@unknown default:
+		return false
+	}
+}
+
+/// Rechecks authorization at ARM and before every live lease transport.
+func remapGuardianActivationIsAuthorized() -> Bool {
+	if #available(macOS 13.0, *) {
+		return modernGuardianActivationIsAuthorized(
+			service: SMAppService.agent(plistName: kRemapGuardianPlistName)
+		)
+	}
+	return true
+}
+
+/// Returns the current side-effect-free guardian authorization and health.
+func observeRemapGuardianRegistrationStatus() -> RemapGuardianRegistrationStatus {
+	if #available(macOS 13.0, *) {
+		return observeModernRemapGuardianRegistration(
+			service: SMAppService.agent(plistName: kRemapGuardianPlistName),
+			guardianHealth: { legacyGuardianIsHealthy(LeaseGuardianPaths()) }
+		)
+	}
+	return legacyGuardianIsHealthy(LeaseGuardianPaths()) ? .ready : .unavailable
+}
+
+/// Opens Login Items only for a current exact approval requirement. This helper
+/// has no registration or legacy-launchctl path and is invoked only by an
+/// explicit user action from the enabled ErgoptiPlus remap menu.
+@available(macOS 13.0, *)
+func openModernRemapGuardianSettingsIfRequired(
+	service: RemapGuardianModernService,
+	openSettings: () -> Void
+) -> RemapGuardianSettingsResult {
+	guard service.status == .requiresApproval else { return .notRequired }
+	openSettings()
+	return .opened
+}
+
+/// Rechecks current ServiceManagement state immediately before the UI effect.
+func openRemapGuardianSettingsIfRequired() -> RemapGuardianSettingsResult {
+	if #available(macOS 13.0, *) {
+		return openModernRemapGuardianSettingsIfRequired(
+			service: SMAppService.agent(plistName: kRemapGuardianPlistName),
+			openSettings: { SMAppService.openSystemSettingsLoginItems() }
+		)
+	}
+	return .notRequired
 }
 
 /// Registers only ErgoptiPlus's own user LaunchAgent before Hammerspoon starts.

@@ -36,6 +36,9 @@ local function disabled_remap()
 		get_sticky_timeout = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 		open_gui = function() error("GUI open must remain explicit") end,
+		open_guardian_settings = function()
+			error("guardian settings must remain an explicit enabled-only action")
+		end,
 		regenerate = function() error("disabled build must not regenerate") end,
 		stop_lease = function() error("disabled build must not stop the exact lease") end,
 	}
@@ -161,6 +164,152 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 		helpers.assert_eq(calls.stop, 0)
 		helpers.assert_eq(calls.execute, 0)
 		helpers.assert_eq(calls.gui, 0)
+	end)
+
+	helpers.it("hides a cached guardian approval action while integration is disabled", function()
+		local calls = { probe = 0, raw_open = 0, facade_open = 0, regenerate = 0 }
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function()
+				return "idle", { phase = "idle", guardian_status = "requires_approval" }
+			end,
+			probe_guardian_status = function()
+				calls.probe = calls.probe + 1
+				error("disabled menu must never probe the guardian")
+			end,
+			open_guardian_settings = function()
+				calls.raw_open = calls.raw_open + 1
+				error("disabled menu must never open Login Items settings")
+			end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.open_guardian_settings = function()
+			calls.facade_open = calls.facade_open + 1
+			return true
+		end
+		remap.regenerate = function()
+			calls.regenerate = calls.regenerate + 1
+			return true
+		end
+
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local approval_row = find_item(built,
+			"menu.karabiner.status_guardian_approval_required")
+		local inactive_row = find_item(built, "menu.karabiner.status_inactive")
+
+		helpers.assert_nil(approval_row,
+			"a cached bundled-app hint must not expose an approval action for stock Karabiner")
+		helpers.assert_not_nil(inactive_row)
+		helpers.assert_nil(row_action(inactive_row),
+			"the disabled status row must carry no stale native action")
+		helpers.assert_true(helpers.deep_equal(calls, {
+			probe = 0, raw_open = 0, facade_open = 0, regenerate = 0,
+		}), "rendering a disabled approval snapshot must have zero external effects")
+	end)
+
+	helpers.it("routes the enabled approval row only to the guarded settings facade", function()
+		local calls = { open = 0, regenerate = 0 }
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function()
+				return "failed", { phase = "failed", guardian_status = "requires_approval" }
+			end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.get_enabled = function() return true end
+		remap.open_guardian_settings = function(callback)
+			calls.open = calls.open + 1
+			if callback then callback(true, "opened") end
+			return true
+		end
+		remap.regenerate = function()
+			calls.regenerate = calls.regenerate + 1
+			return true
+		end
+
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local approval_row = find_item(built,
+			"menu.karabiner.status_guardian_approval_required")
+		helpers.assert_not_nil(approval_row)
+		helpers.assert_type(row_action(approval_row), "function")
+
+		row_action(approval_row)()
+		helpers.assert_eq(calls.open, 1,
+			"one approval click must reach the ownership-aware facade exactly once")
+		helpers.assert_eq(calls.regenerate, 0,
+			"approval cannot be repaired by rebuilding rules before native consent")
+	end)
+
+	helpers.it("makes an approval closure inert after integration is disabled", function()
+		local enabled = true
+		local calls = { open = 0, regenerate = 0 }
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function()
+				return "failed", { phase = "failed", guardian_status = "requires_approval" }
+			end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.get_enabled = function() return enabled end
+		remap.open_guardian_settings = function()
+			calls.open = calls.open + 1
+			return true
+		end
+		remap.regenerate = function()
+			calls.regenerate = calls.regenerate + 1
+			return true
+		end
+
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local approval_action = row_action(find_item(built,
+			"menu.karabiner.status_guardian_approval_required"))
+		helpers.assert_type(approval_action, "function")
+		enabled = false
+
+		approval_action()
+		helpers.assert_true(helpers.deep_equal(calls, { open = 0, regenerate = 0 }),
+			"the stale closure must perform no native or remap action")
+	end)
+
+	helpers.it("contains a guardian settings facade fault inside the approval action", function()
+		local notifications = {}
+		local regenerate_calls = 0
+		package.loaded["infra.notifications"] = {
+			notify = function(title, body, kind)
+				notifications[#notifications + 1] = { title = title, body = body, kind = kind }
+			end,
+		}
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function()
+				return "failed", { phase = "failed", guardian_status = "requires_approval" }
+			end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		remap.get_enabled = function() return true end
+		remap.open_guardian_settings = function() error("injected facade fault") end
+		remap.regenerate = function()
+			regenerate_calls = regenerate_calls + 1
+			return true
+		end
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local approval_action = row_action(find_item(built,
+			"menu.karabiner.status_guardian_approval_required"))
+
+		approval_action()
+		helpers.assert_eq(regenerate_calls, 0)
+		helpers.assert_eq(#notifications, 1)
+		helpers.assert_eq(notifications[1].title,
+			"karabiner.guardian_settings_open_failed")
+		helpers.assert_eq(notifications[1].kind, "error")
 	end)
 
 	helpers.it("can cancel the exact lease while its watchdog is still starting", function()
