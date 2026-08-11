@@ -76,7 +76,7 @@ helpers.describe("lease-bound F17 activation ordering", function()
 			"local function activate_lease_generation(",
 			"local function start_or_join_lease_activation("
 		)
-		local mount_call = assert(activation_body:find("start_lease_bound_inputs(phase", 1, true))
+		local mount_call = assert(activation_body:find("start_lease_bound_inputs(", 1, true))
 		local classifier = assert(activation_body:find("refresh_managed_output_set()", 1, true))
 		local prepared_resume = assert(activation_body:find("LeaseController.resume_prepared", 1, true))
 		helpers.assert_true(mount_call < classifier and classifier < prepared_resume,

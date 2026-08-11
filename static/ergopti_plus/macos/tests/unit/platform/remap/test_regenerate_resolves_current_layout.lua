@@ -65,11 +65,24 @@ helpers.describe("karabiner.regenerate: resolves against the live layout", funct
 		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
 		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 
+		local helper_at = src:find("local function query_shortcuts_pause_state(", 1, true)
+		local helper_end = src:find("local function deferred_regeneration_intent_is_current(",
+			helper_at, true)
+		helpers.assert_true(helper_at ~= nil and helper_end ~= nil,
+			"the strict pause-state helper must be present")
+		local helper_body = src:sub(helper_at, helper_end - 1)
+		helpers.assert_true(helper_body:find("shortcuts.is_paused()", 1, true) ~= nil,
+			"the pause-state helper must query the live shortcuts module")
+		helpers.assert_true(
+			helper_body:find("type(paused) ~= \"boolean\"", 1, true) ~= nil,
+			"a missing or malformed pause answer must fail closed"
+		)
+
 		local regen_at = src:find("function M.regenerate(", 1, true)
-		local guard_at = src:find("shortcuts.is_paused()", regen_at, true)
+		local guard_at = src:find("query_shortcuts_pause_state(", regen_at, true)
 		local build_at = src:find("Generator.build_karabiner_json", regen_at, true)
 		helpers.assert_true(guard_at ~= nil and guard_at < build_at,
-			"M.regenerate() must check shortcuts.is_paused() before building — a paused "
+			"M.regenerate() must query the strict pause gate before building — a paused "
 				.. "script that redeploys has silently undone its own pause")
 	end)
 
