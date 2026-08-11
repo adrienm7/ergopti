@@ -99,6 +99,15 @@ local _karabiner  = nil
 local _gestures_were_enabled  = false
 local _shortcuts_were_running = false
 
+-- The dedicated script-control tap deliberately survives a pause so the user
+-- can recover or terminate the host. Only lifecycle actions keep that privilege;
+-- an arbitrary UI/gesture action assigned to the same three physical slots must
+-- remain subject to the pause that stopped every other Ergopti feature.
+local PAUSED_ACTION_ALLOWLIST = {
+	script_reload = true,
+	script_quit   = true,
+}
+
 
 
 
@@ -923,6 +932,11 @@ local function dispatch_action(action, binding)
 		local target_paused = not desired_pause_state()
 		Logger.info(LOG, "Requesting script %s transaction.", target_paused and "pause" or "resume")
 		request_pause_transition(target_paused)
+		return true
+	end
+
+	if _is_paused and PAUSED_ACTION_ALLOWLIST[action] ~= true then
+		Logger.debug(LOG, "Ignoring non-lifecycle script-control action while paused: %s.", action)
 		return true
 	end
 
