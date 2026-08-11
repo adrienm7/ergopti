@@ -53,6 +53,11 @@ local _bindings = {}
 -- binding stays permanently unknown instead of silently addressing a later one.
 local _next_token = 0
 
+-- Process-wide delivery policy injected by the shortcuts lifecycle. Native
+-- hotkeys can remain registered during pause (UI shortcuts are not owned by the
+-- bindings subsystem), so every adapter-owned callback re-checks this live gate.
+local _delivery_guard = function() return true end
+
 --- Issues the next handle token.
 --- @return string A token unique for the lifetime of this Lua state.
 local function next_handle()
@@ -102,7 +107,24 @@ function M.bind(chord, callback)
 	}
 	local function deliver_if_enabled(...)
 		if entry.enabled ~= true then return nil end
-		return callback(...)
+		local guard_ok, allowed_or_err = xpcall(_delivery_guard, debug.traceback)
+		if not guard_ok then
+			Logger.error(LOG, "Delivery guard raised for %s — callback denied: %s.",
+				entry.chord, tostring(allowed_or_err))
+			return nil
+		end
+		if allowed_or_err ~= true then return nil end
+
+		local args = table.pack(...)
+		local callback_ok, result_or_err = xpcall(function()
+			return callback(table.unpack(args, 1, args.n))
+		end, debug.traceback)
+		if not callback_ok then
+			Logger.error(LOG, "Hotkey callback raised for %s: %s.",
+				entry.chord, tostring(result_or_err))
+			return nil
+		end
+		return result_or_err
 	end
 
 	local ok, hotkey = pcall(hs.hotkey.bind, parsed.mods, hs_key, deliver_if_enabled)
@@ -116,6 +138,20 @@ function M.bind(chord, callback)
 	_bindings[handle] = entry
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle
+end
+
+--- Installs the live process-wide delivery predicate for adapter-owned hotkeys.
+--- The default allows delivery so the port remains usable before lifecycle
+--- wiring; production injects the canonical script-pause predicate at boot.
+--- @param guard function Predicate returning true when callbacks may run.
+--- @return boolean True when the guard was accepted.
+function M.set_delivery_guard(guard)
+	if type(guard) ~= "function" then
+		Logger.error(LOG, "set_delivery_guard(): guard must be a function, got %s.", type(guard))
+		return false
+	end
+	_delivery_guard = guard
+	return true
 end
 
 --- Releases a binding.

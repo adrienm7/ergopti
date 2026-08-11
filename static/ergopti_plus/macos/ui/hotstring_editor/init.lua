@@ -23,6 +23,8 @@ local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
+local Chord         = require("chord")
+local Hotkeys       = require("adapters.hotkey_registrar")
 local LOG           = "hotstring_editor"
 
 
@@ -520,25 +522,32 @@ end
 --- @param mods table Array of modifier keys (e.g., {"cmd", "alt"}).
 --- @param key string The character key.
 function M.set_shortcut(mods, key)
-	M.clear_shortcut()
+	if M.clear_shortcut() ~= true then return false end
 	if type(mods) == "table" and type(key) == "string" and key ~= "" then
+		local chord, chord_err = Chord.format(mods, key)
+		if not chord then
+			Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
+			return false
+		end
 		-- Toggle: close the editor if already open, otherwise open it.
-		local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+		local handle = Hotkeys.bind(chord, function()
 			if _webview then M.close() else M.open("shortcut") end
 		end)
-		if ok and hk then
-			_hotkey = hk
-			pcall(function() _hotkey:enable() end)
-		end
+		if not handle then return false end
+		_hotkey = handle
 	end
+	return true
 end
 
 --- Unbinds the global hotkey if set.
 function M.clear_shortcut()
-	if _hotkey then 
-		if type(_hotkey.delete) == "function" then pcall(function() _hotkey:delete() end) end
-		_hotkey = nil 
+	if not _hotkey then return true end
+	if Hotkeys.unbind(_hotkey) ~= true then
+		Logger.error(LOG, "Editor shortcut release did not commit; handle retained for retry.")
+		return false
 	end
+	_hotkey = nil
+	return true
 end
 
 return M
