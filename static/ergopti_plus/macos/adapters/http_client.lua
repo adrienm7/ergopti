@@ -145,7 +145,8 @@ local function new()
 			_active_task = nil
 			_stop_timeout()
 			local is_ok  = type(status) == "number" and status >= 200 and status < 300
-			local err_msg = is_ok and nil or string.format("HTTP %s", tostring(status))
+			local err_msg = nil
+			if not is_ok then err_msg = string.format("HTTP %s", tostring(status)) end
 			invoke_callback(callback, {
 				ok     = is_ok,
 				status = type(status) == "number" and status or 0,
