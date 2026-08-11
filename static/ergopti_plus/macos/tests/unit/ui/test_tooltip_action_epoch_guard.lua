@@ -63,10 +63,12 @@ local function load_fixture()
 		render = function(_blocks, _state, on_shown)
 			calls.render = calls.render + 1
 			if type(on_shown) == "function" then on_shown() end
+			return true
 		end,
-		hide = function() calls.hide = calls.hide + 1 end,
+		hide = function() calls.hide = calls.hide + 1; return true end,
 		set_element_text = function()
 			calls.partial_render = calls.partial_render + 1
+			return true
 		end,
 	}
 

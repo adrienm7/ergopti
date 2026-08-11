@@ -46,8 +46,9 @@ local function find_idle_timer(timers)
 end
 
 --- Loads the real tooltip with faithful observable UI and logger boundaries.
+--- @param faults table|nil Renderer failure controls.
 --- @return table context
-local function load_tooltip()
+local function load_tooltip(faults)
 	local Config = helpers.load_with_stubs("ui.tooltip.config")
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 
@@ -57,6 +58,7 @@ local function load_tooltip()
 
 	local renderer
 	renderer = {
+		ELEM_INFO = 6,
 		visible = false,
 		hide_calls = 0,
 		canvas = {
@@ -71,6 +73,12 @@ local function load_tooltip()
 			renderer.visible = false
 			renderer.hide_calls = renderer.hide_calls + 1
 			return true
+		end,
+		set_element_text = function()
+			if faults and faults.partial_update_throw then
+				error("partial update sentinel")
+			end
+			return not faults or faults.partial_update_result ~= false
 		end,
 	}
 	package.loaded["ui.tooltip.renderer"] = renderer
@@ -187,5 +195,22 @@ helpers.describe("tooltip_llm: user callback failures are visible and fail close
 		helpers.assert_true(not context.tooltip.is_visible())
 		helpers.assert_eq(#context.errors, 0,
 			"successful callbacks must not emit false ERROR diagnostics")
+	end)
+end)
+
+helpers.describe("tooltip_llm: partial renderer exceptions reach the file logger", function()
+	helpers.it("(tooltip-partial-update-visible) rejects and logs a thrown timing write", function()
+		local context = load_tooltip({ partial_update_throw = true })
+
+		local updated = context.tooltip.set_timing(10, 20)
+
+		helpers.assert_eq(updated, false,
+			"a thrown native timing write must fail the public update")
+		helpers.assert_true(log_contains(context.errors, "Crash during tooltip timing update"),
+			"the async-safe boundary must emit a file ERROR")
+		helpers.assert_true(log_contains(context.errors, "partial update sentinel"),
+			"the ERROR must preserve the native exception")
+		helpers.assert_true(log_contains(context.errors, "stack traceback"),
+			"the ERROR must retain an actionable traceback")
 	end)
 end)

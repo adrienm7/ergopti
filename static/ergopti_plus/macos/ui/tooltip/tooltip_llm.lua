@@ -1007,20 +1007,23 @@ end
 --- @param ttlt_ms number|nil Last-token latency in milliseconds (nil while streaming).
 function M.set_timing(ttft_ms, ttlt_ms)
 	if not runtime_available() then return false end
-	pcall(function()
+	local ok, updated_or_err = xpcall(function()
 		local text = format_info_line(_state.info_bar, ttft_ms, ttlt_ms)
 		if not text then
-			Renderer.set_element_text(Renderer.ELEM_INFO, nil)
-			return
+			return Renderer.set_element_text(Renderer.ELEM_INFO, nil) == true
 		end
 		local styled = hs.styledtext.new(text, {
 			font           = { name = Config.fonts.main, size = Config.sizes.info },
 			color          = Config.colors.info_bar,
 			paragraphStyle = { alignment = "center" },
 		})
-		Renderer.set_element_text(Renderer.ELEM_INFO, styled)
-	end)
-	return true
+		return Renderer.set_element_text(Renderer.ELEM_INFO, styled) == true
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Crash during tooltip timing update: %s.", tostring(updated_or_err))
+		return false
+	end
+	return updated_or_err == true
 end
 
 
@@ -1096,8 +1099,7 @@ function M.mark_chain_complete()
 	-- string the partial-update path draws — no flicker on streaming follow-ups.
 	_chain_ttlt_ms = ttlt_ms
 	Logger.debug(LOG, "Chain link complete — TTFT: %.0f ms | TTLT: %.0f ms.", ttft_ms, ttlt_ms)
-	M.set_timing(ttft_ms, ttlt_ms)
-	return true
+	return M.set_timing(ttft_ms, ttlt_ms) == true
 end
 
 function M.set_navigate_callback(callback) _state.on_navigate = callback end
@@ -1141,9 +1143,24 @@ local function hide_impl(log_callsite)
 		Logger.debug(LOG, "HIDE predictions tooltip (was showing %d) — caller %s.",
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0, caller)
 	end
-	local watchers_stopped = false
-	local ok = pcall(function()
-		watchers_stopped = stop_watchers()
+	local stop_ok, stop_result = xpcall(stop_watchers, debug.traceback)
+	local watchers_stopped = stop_ok and stop_result == true
+	if not stop_ok and log_callsite then
+		Logger.error(LOG, "Crash while stopping prediction tooltip watchers: %s.",
+			tostring(stop_result))
+	end
+
+	local hide_ok, hide_result = xpcall(Renderer.hide, debug.traceback)
+	local canvas_hidden = hide_ok and hide_result == true
+	if not hide_ok and log_callsite then
+		Logger.error(LOG, "Crash while hiding prediction tooltip canvas: %s.",
+			tostring(hide_result))
+	end
+
+	-- Logical visibility describes native pixels, not watcher ownership.  If the
+	-- canvas is observably hidden, clear the visual state even when a separate
+	-- watcher teardown failed; the false return still exposes that orphan.
+	if canvas_hidden then
 		_is_visible               = false
 		_state.raw_predictions    = {}
 		_state.current_index      = 1
@@ -1162,9 +1179,8 @@ local function hide_impl(log_callsite)
 		-- timing zone never rendered. The lifecycle of chain timing is
 		-- now owned exclusively by set_chain_start (overwrites on every
 		-- new perform_check).
-		Renderer.hide()
-	end)
-	return ok and watchers_stopped
+	end
+	return watchers_stopped and canvas_hidden
 end
 
 function M.hide() return hide_impl(true) end
@@ -1189,10 +1205,15 @@ function M.navigate(delta)
 		local watcher_callback_ran = false
 		local watcher_activation_ok = false
 		local watcher_activation_crashed = false
-		Renderer.render(assemble_blocks(_state, _state.reserved_count), _state, function()
+		local render_committed = Renderer.render(
+			assemble_blocks(_state, _state.reserved_count), _state, function()
 			watcher_callback_ran = true
 			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
 		end)
+		if render_committed ~= true then
+			dismiss("navigation render did not commit")
+			return
+		end
 		if watcher_activation_crashed then
 			dismiss("watcher activation crash")
 			return
@@ -1331,10 +1352,14 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		local watcher_callback_ran = false
 		local watcher_activation_ok = false
 		local watcher_activation_crashed = false
-		Renderer.render(assemble_blocks(_state, render_count), _state, function()
+		local render_committed = Renderer.render(assemble_blocks(_state, render_count), _state, function()
 			watcher_callback_ran = true
 			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
 		end)
+		if render_committed ~= true then
+			dismiss("prediction render did not commit")
+			return
+		end
 		if watcher_activation_crashed then
 			dismiss("watcher activation crash")
 			return
