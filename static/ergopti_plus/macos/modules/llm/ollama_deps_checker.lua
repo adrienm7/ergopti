@@ -27,6 +27,7 @@ local hs           = hs
 local Logger       = require("infra.logger")
 local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
+local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 
 local LOG = "ollama_deps"
@@ -246,7 +247,16 @@ function M.check_and_install_deps()
 	-- The bootstrap installs the executable, but the Lua owner still supplies the
 	-- canonical logging pipeline. This keeps fresh installs on the same rollover
 	-- and quoting contract as both normal daemon launch paths.
-	local server_cmd, command_err = OllamaServerCommand.build("ollama", Logger.UNIFIED_LOG_FILE)
+	local resolved_bin, resolve_err, managed_override = OllamaBinary.resolve()
+	if managed_override and not resolved_bin then
+		Logger.error(LOG, "The launcher-owned Ollama executable is unavailable: %s",
+			tostring(resolve_err))
+		_bootstrap_state = "failed"
+		_last_failure_message = "The bundled Ollama executable is unavailable."
+		return
+	end
+	local server_cmd, command_err = OllamaServerCommand.build(
+		resolved_bin or "ollama", Logger.UNIFIED_LOG_FILE)
 	if not server_cmd then
 		Logger.error(LOG, "Could not build the Ollama bootstrap server command: %s",
 			tostring(command_err))
@@ -308,7 +318,7 @@ function M.check_and_install_deps()
 			end
 			pcall(llm_progress.set_error, tail)
 		end
-	end, { script_path, server_cmd })
+	end, { script_path, server_cmd, resolved_bin or "" })
 
 	if not task then
 		Logger.error(LOG, "Failed to create hs.task for Ollama bootstrap script.")

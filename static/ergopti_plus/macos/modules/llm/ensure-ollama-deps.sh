@@ -50,6 +50,7 @@ OLLAMA_HEALTH_URL="http://localhost:11434/api/tags"
 # The Lua caller passes the same server/logging pipeline used by the normal API
 # and model-manager launch paths. It is one argv item, not reassembled here.
 OLLAMA_SERVER_COMMAND="${1:-}"
+OLLAMA_RESOLVED_BIN="${2:-}"
 
 
 # ------------------------------------------------------------------------------
@@ -98,7 +99,12 @@ wait_for_server() {
 # ====================================
 # ====================================
 
-if ! command -v ollama >/dev/null 2>&1; then
+if [ -n "$OLLAMA_RESOLVED_BIN" ]; then
+	if [ ! -x "$OLLAMA_RESOLVED_BIN" ]; then
+		log_error "The driver-resolved Ollama executable is no longer executable."
+		exit 1
+	fi
+elif ! command -v ollama >/dev/null 2>&1; then
 	emit_marker "OLLAMA_INSTALLING"
 	log_info "Installation automatique d’Ollama…"
 
