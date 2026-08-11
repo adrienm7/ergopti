@@ -181,8 +181,14 @@ function M.set_sections_enabled(gn, section_names, enabled)
 	-- Every setting first: the rebuild below reads them all, so a rebuild
 	-- interleaved between writes would register a half-applied state.
 	for _, sn in ipairs(section_names) do
-		hs.settings.set("hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn),
-			enabled and nil or false)
+		local key = "hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn)
+		-- Nil is the enabled sentinel and cannot be selected by Lua's and/or
+		-- ternary idiom: `true and nil or false` always evaluates to false.
+		if enabled then
+			hs.settings.set(key, nil)
+		else
+			hs.settings.set(key, false)
+		end
 	end
 
 	if M.is_group_enabled(gn) then
