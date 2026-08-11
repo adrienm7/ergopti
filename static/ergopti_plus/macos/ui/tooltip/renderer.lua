@@ -64,22 +64,112 @@ if M.canvas then
 	)
 end
 
+--- Compares a requested canvas element value with the native value read back.
+--- Styled-text userdata may be copied by the Objective-C bridge, so the native
+--- identity predicate must compare both its text and rendering attributes.
+--- @param expected any Requested attribute value.
+--- @param observed any Native attribute value read after the write.
+--- @return boolean matches Whether the native value represents the request.
+local function canvas_values_match(expected, observed)
+	if type(expected) ~= "userdata" and type(observed) ~= "userdata" then
+		return observed == expected
+	end
+	if type(expected) ~= "userdata" or type(observed) ~= "userdata" then return false end
+	local method_ok, identity_method = pcall(function() return expected.isIdentical end)
+	if not method_ok or type(identity_method) ~= "function" then return false end
+	local identity_ok, identical = pcall(identity_method, expected, observed)
+	return identity_ok and identical == true
+end
+
+--- Hides one native canvas and verifies the resulting visibility state.
+--- A nil canvas is already absent; a live canvas must satisfy both the native
+--- return contract and the independent isShowing() observation.
+--- @param canvas table|userdata|nil Canvas object to hide.
+--- @param label string Diagnostic canvas label.
+--- @return boolean hidden Whether no owned native surface remains shown.
+local function hide_canvas_verified(canvas, label)
+	if canvas == nil then return true end
+	local hide_method_ok, hide_method = pcall(function() return canvas.hide end)
+	if not hide_method_ok or type(hide_method) ~= "function" then
+		Logger.error(LOG, "Failed to hide %s: native hide method is unavailable (%s).",
+			label, tostring(hide_method))
+		return false
+	end
+	local status_method_ok, status_method = pcall(function() return canvas.isShowing end)
+	if not status_method_ok or type(status_method) ~= "function" then
+		Logger.error(LOG, "Failed to hide %s: native visibility method is unavailable (%s).",
+			label, tostring(status_method))
+		return false
+	end
+
+	local hide_ok, hide_result = pcall(hide_method, canvas)
+	if not hide_ok then
+		Logger.error(LOG, "Failed to hide %s: %s.", label, tostring(hide_result))
+		return false
+	end
+	if hide_result == nil or hide_result == false then
+		Logger.error(LOG, "Failed to hide %s: invalid native result (%s).",
+			label, tostring(hide_result))
+		return false
+	end
+
+	local status_ok, is_showing = pcall(status_method, canvas)
+	if not status_ok then
+		Logger.error(LOG, "Failed to verify hidden %s: %s.", label, tostring(is_showing))
+		return false
+	end
+	if is_showing == true then
+		Logger.error(LOG, "%s remained visible after native hide.", label)
+		return false
+	end
+	if is_showing ~= false then
+		Logger.error(LOG, "Failed to verify hidden %s: invalid native status (%s).",
+			label, tostring(is_showing))
+		return false
+	end
+	return true
+end
+
 --- Updates a single text element without redrawing the rest of the canvas.
 --- Used by tooltip_llm during streaming to refresh the info bar / model header
 --- without recreating the canvas — `hs.canvas` element assignment is the
 --- documented anti-flicker path.
 --- @param element_index integer Canvas element index (use M.ELEM_* constants).
 --- @param styled_text userdata|nil Styled text to install, or nil to skip the element.
+--- @return boolean updated Whether the requested native element state was observed.
 function M.set_element_text(element_index, styled_text)
-	pcall(function()
-		if not M.canvas then return end
+	local ok, committed, detail = pcall(function()
+		if not M.canvas then return false, "canvas is unavailable" end
+		local element = M.canvas[element_index]
+		if element == nil then return false, "element is unavailable" end
 		if styled_text == nil then
-			M.canvas[element_index].action = "skip"
-			return
+			element.action = "skip"
+			if element.action ~= "skip" then
+				return false, "action write did not commit"
+			end
+			return true
 		end
-		M.canvas[element_index].action = "fill"
-		M.canvas[element_index].text   = styled_text
+		element.text = styled_text
+		if not canvas_values_match(styled_text, element.text) then
+			return false, "text write did not commit"
+		end
+		element.action = "fill"
+		if element.action ~= "fill" then
+			return false, "action write did not commit"
+		end
+		return true
 	end)
+	if not ok then
+		Logger.error(LOG, "Failed to update canvas element %s: %s.",
+			tostring(element_index), tostring(committed))
+		return false
+	end
+	if committed ~= true then
+		Logger.error(LOG, "Canvas element %s update did not commit: %s.",
+			tostring(element_index), tostring(detail))
+		return false
+	end
+	return true
 end
 
 
@@ -319,11 +409,12 @@ end
 
 --- Safely hides the canvas. Also clears the stable model-info zone so the
 --- next session starts with no stale header from a previous chain.
+--- @return boolean hidden Whether the canvas and stable zone reached hidden state.
 function M.hide()
-	pcall(function()
-		if M.canvas and type(M.canvas.hide) == "function" then M.canvas:hide() end
-		if M.canvas then M.canvas[M.ELEM_MODEL_INFO].action = "skip" end
-	end)
+	if M.canvas == nil then return true end
+	local hidden = hide_canvas_verified(M.canvas, "tooltip canvas")
+	local model_info_cleared = M.set_element_text(M.ELEM_MODEL_INFO, nil)
+	return hidden and model_info_cleared
 end
 
 
@@ -663,12 +754,9 @@ function M.render_stacked(rows, state, start_watchers_callback)
 end
 
 --- Hides the stacked canvas.
+--- @return boolean hidden Whether the native stacked surface reached hidden state.
 function M.hide_stacked()
-	pcall(function()
-		if M.stacked_canvas and type(M.stacked_canvas.hide) == "function" then
-			M.stacked_canvas:hide()
-		end
-	end)
+	return hide_canvas_verified(M.stacked_canvas, "stacked tooltip canvas")
 end
 
 return M
