@@ -19,7 +19,6 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local text_utils = require("infra.text_utils")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
@@ -370,7 +369,6 @@ function M.spotlight_mouse(duration_s)
 		if dismissed then return end
 		local ok_tap, tap
 		ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function(e)
-			if EventTapGuard.handle_disabled(e, tap, "shortcuts.spotlight_mouse") then return false end
 			dismiss()
 			return false  -- Do not consume the event; the cursor must keep moving normally
 		end)

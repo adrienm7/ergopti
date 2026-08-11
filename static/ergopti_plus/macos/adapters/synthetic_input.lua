@@ -23,7 +23,6 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local LOG           = "adapters.synthetic_input"
 
 local eventtap = assert(hs and hs.eventtap,
@@ -978,9 +977,6 @@ local function ensure_pump_started()
 		local events = nil
 		local matched_batch = nil
 		local ok, err = xpcall(function()
-			if EventTapGuard.handle_disabled(event, _pump_tap, "synthetic_input.pump") then
-				return
-			end
 			if event == nil or type(event.getProperty) ~= "function" then return end
 			local read_ok, tag = pcall(event.getProperty, event, USER_DATA_PROPERTY)
 			if not read_ok or type(tag) ~= "number" then return end
@@ -1016,7 +1012,7 @@ local function ensure_pump_started()
 			confirm_dispatched_after_return(batch)
 		end, debug.traceback)
 		if not ok then
-			-- If the guard itself failed, recover ownership cheaply enough to suppress
+			-- If callback processing failed, recover ownership cheaply enough to suppress
 			-- a reserved trigger. An unreadable tag remains indeterminate and passes.
 			if not consume and event and type(event.getProperty) == "function" then
 				local tag_ok, tag = pcall(event.getProperty, event, USER_DATA_PROPERTY)

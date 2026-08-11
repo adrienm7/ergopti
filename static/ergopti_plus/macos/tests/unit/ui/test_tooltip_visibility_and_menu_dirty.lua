@@ -25,7 +25,6 @@ helpers.describe("tooltip: a failed render does not leave the tooltip 'visible'"
 		helpers.load_with_stubs("ui.tooltip.config")
 		package.loaded["adapters.event_provenance"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
-		package.loaded["adapters.event_tap_guard"] = nil
 		local renderer
 		renderer = {
 			standard_hidden = false,

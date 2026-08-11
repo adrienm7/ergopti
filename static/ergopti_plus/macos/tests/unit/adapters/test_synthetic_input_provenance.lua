@@ -17,8 +17,6 @@ local MOUSE_BUTTON = 203
 local KEY_DOWN = 10
 local KEY_UP = 11
 local OTHER_MOUSE_UP = 26
-local TAP_DISABLED_TIMEOUT = 0xFFFFFFFE
-local TAP_DISABLED_USER_INPUT = 0xFFFFFFFF
 local CURRENT_PID = 7001
 
 
@@ -251,8 +249,6 @@ local function make_fixture(options)
 				keyDown = KEY_DOWN,
 				keyUp = KEY_UP,
 				otherMouseUp = OTHER_MOUSE_UP,
-				tapDisabledByTimeout = TAP_DISABLED_TIMEOUT,
-				tapDisabledByUserInput = TAP_DISABLED_USER_INPUT,
 			},
 			newKeyEvent = function(modifiers, key, is_down)
 				new_key_event_calls = new_key_event_calls + 1
@@ -308,13 +304,6 @@ local function make_fixture(options)
 
 	function fixture.load()
 		package.loaded["infra.logger"] = fixture.logger
-		if options.guard_throws then
-			package.loaded["adapters.event_tap_guard"] = {
-				handle_disabled = function() error("guard exploded") end,
-			}
-		else
-			package.loaded["adapters.event_tap_guard"] = nil
-		end
 		local synthetic = helpers.load_with_stubs(
 			"adapters.synthetic_input", fixture.hs_overrides)
 		package.loaded["infra.logger"] = fixture.logger
@@ -631,31 +620,24 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 		helpers.assert_true(old_tap.stop_count > 0)
 	end)
 
-	helpers.it("re-engages the live pump as soon as macOS reports a timeout disable", function()
-		local fixture = make_fixture({ deliver_trigger = false })
+	helpers.it("delivers with the runtime-faithful event-type surface", function()
+		local fixture = make_fixture()
 		local synthetic = fixture.load()
-		local tx = synthetic.begin("unit.disabled-callback", "action")
+		helpers.assert_nil(fixture.eventtap.event.types.tapDisabledByTimeout,
+			"the pump fixture must not manufacture a native-only callback event")
+		helpers.assert_nil(fixture.eventtap.event.types.tapDisabledByUserInput)
+
+		local tx = synthetic.begin("unit.native-contract", "action")
 		local batch = synthetic.begin_batch(tx)
 		synthetic.keyStroke(batch, {}, "x")
 		synthetic.dispatch(batch)
 		synthetic.seal(tx)
 		fixture.fire_next_timer()
 
-		local pump = fixture.active_tap
-		helpers.assert_not_nil(pump, "the deferred batch must have created its pump")
-		helpers.assert_eq(pump.start_count, 1)
-		pump.enabled = false
-		local disabled = fixture.external_event(nil, CURRENT_PID)
-		disabled:setType(TAP_DISABLED_TIMEOUT)
-		local consume, events = pump.callback(disabled)
-
-		helpers.assert_eq(consume, false,
-			"a disable notification is control state, not a payload event to consume")
-		helpers.assert_nil(events)
-		helpers.assert_eq(pump.start_count, 2,
-			"the callback must restart its own tap immediately, before the watchdog delay")
-		helpers.assert_true(pump.enabled,
-			"the pending tagged payload must still have a live delivery path")
+		helpers.assert_eq(#fixture.pump_deliveries, 1)
+		helpers.assert_true(fixture.pump_deliveries[1].consume)
+		helpers.assert_eq(#fixture.pump_deliveries[1].events, 2,
+			"ordinary tagged payload delivery must not depend on an unreachable disable branch")
 	end)
 
 	helpers.it("serializes deferred batches through one FIFO timer under reverse scheduling", function()
@@ -1082,10 +1064,19 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 		helpers.assert_eq(synthetic.stats().pending, 0)
 	end)
 
-	helpers.it("contains a first-line pump guard failure and consumes its exact trigger", function()
-		local fixture = make_fixture({ guard_throws = true })
+	helpers.it("contains pump callback failure and consumes its exact trigger", function()
+		local fixture = make_fixture()
 		local synthetic = fixture.load()
-		local tx = synthetic.begin("unit.guard-failure", "action")
+		local decode_tag = synthetic.decode_tag
+		local fail_once = true
+		synthetic.decode_tag = function(...)
+			if fail_once then
+				fail_once = false
+				error("callback processing exploded")
+			end
+			return decode_tag(...)
+		end
+		local tx = synthetic.begin("unit.callback-failure", "action")
 		local batch = synthetic.begin_batch(tx)
 		synthetic.keyStroke(batch, {}, "x")
 		synthetic.dispatch(batch)
@@ -1094,7 +1085,7 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 		fixture.fire_next_timer()
 		helpers.assert_eq(#fixture.pump_deliveries, 1)
 		helpers.assert_true(fixture.pump_deliveries[1].consume,
-			"a proven broker trigger must never leak when the callback guard throws")
+			"a proven broker trigger must never leak when callback processing throws")
 		helpers.assert_nil(fixture.pump_deliveries[1].events)
 		helpers.assert_eq(synthetic.stats().pending, 0,
 			"the matched batch must fail terminally instead of retrying forever")

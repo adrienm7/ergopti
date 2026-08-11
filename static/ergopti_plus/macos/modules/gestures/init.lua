@@ -17,7 +17,6 @@ local M = {}
 local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local Manifest      = require("infra.manifest_reader")
 local Timings       = require("infra.timings")
 local LOG           = "gestures"
@@ -751,17 +750,6 @@ function M.start()
 		local ok_tap, new_tap = pcall(hs.eventtap.new, types_to_watch, function(event)
 			local t = event:getType()
 			primer_event_count = primer_event_count + 1
-			-- Recovery goes through the adapter, not through a copy of it. This
-			-- branch used to re-implement it inline, and the copy had already
-			-- drifted on two points the audit of 2026-08-04 measured: it collapsed
-			-- the two causes into one message (a timeout is our latency to fix, a
-			-- user-input disable is the accessibility permission moving under us),
-			-- and its `pcall` swallowed a FAILED re-engage — leaving the primer
-			-- deaf without a line in the log. The adapter reports that at ERROR,
-			-- and now counts every disable so the health report can show it.
-			if EventTapGuard.handle_disabled(event, gesture_primer, "gestures.primer") then
-				return false
-			end
 			-- Throttled visibility: 5 events/sec max, so we see something is happening
 			-- without flooding the log during normal use.
 			local now = hs.timer.secondsSinceEpoch()

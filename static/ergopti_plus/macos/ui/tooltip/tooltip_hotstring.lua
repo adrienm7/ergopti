@@ -15,7 +15,6 @@
 local M = {}
 local hs = hs
 local Logger = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
@@ -302,7 +301,6 @@ local function start_watchers()
 	local ok_mouse, watcher_mouse
 	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(event)
 		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
-		if EventTapGuard.handle_disabled(event, watcher_mouse, "tooltip.hotstring_mouse") then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.hotstring_mouse")
 		local fence_events = fence and fence.events or nil
@@ -323,7 +321,6 @@ local function start_watchers()
 	local ok_key, watcher_key
 	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
 		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
-		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.hotstring_key") then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.hotstring")
 		local fence_events = fence and fence.events or nil

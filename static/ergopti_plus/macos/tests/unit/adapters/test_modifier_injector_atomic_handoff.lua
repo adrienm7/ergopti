@@ -27,9 +27,6 @@ local function make_fixture(schedule_ok)
 	local deferred = {}
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()

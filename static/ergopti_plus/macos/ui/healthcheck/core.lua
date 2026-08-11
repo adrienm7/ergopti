@@ -37,6 +37,14 @@ local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
 
+-- The default build pin and this reviewed native contract are locked together
+-- by the native event-tap contract tests. Hammerspoon 1.1.1 consumes
+-- both CoreGraphics disable signals in Objective-C, attempts to re-enable the
+-- tap, and returns before the registered Lua callback. The build version can be
+-- overridden, so diagnostics must compare the live runtime before claiming that
+-- this reviewed behavior applies.
+local EVENT_TAP_REVIEWED_VERSION = "1.1.1"
+
 -- Module load timestamp — used to approximate driver uptime.
 local _load_time = os.time()
 
@@ -49,6 +57,32 @@ local _window = nil
 -- Poll timer for the copy-button JS flag; module-level so show_window() can
 -- stop the PREVIOUS timer when reopening (a local would be orphaned on reopen).
 local _poll_timer = nil
+
+--- Returns an isolated description of the live eventtap telemetry contract.
+--- @param runtime_version string|nil Hammerspoon version reported at runtime.
+--- @return table Contract status safe to expose in a diagnostic snapshot.
+local function event_tap_timeout_telemetry(runtime_version)
+	local runtime = type(runtime_version) == "string" and runtime_version ~= ""
+		and runtime_version or "unknown"
+	local reviewed = runtime == EVENT_TAP_REVIEWED_VERSION
+	local summary
+	if reviewed then
+		summary = string.format(
+			"unavailable — reviewed Hammerspoon %s consumes tap-disable signals and attempts native re-enable before Lua callbacks",
+			EVENT_TAP_REVIEWED_VERSION)
+	else
+		summary = string.format(
+			"unavailable — unreviewed runtime Hammerspoon %s; native contract reviewed only for %s",
+			runtime, EVENT_TAP_REVIEWED_VERSION)
+	end
+	return {
+		available                    = false,
+		runtime_hammerspoon_version = runtime,
+		reviewed_hammerspoon_version = EVENT_TAP_REVIEWED_VERSION,
+		native_contract_reviewed     = reviewed,
+		summary                      = summary,
+	}
+end
 
 local function _stop_poll()
 	if _poll_timer then
@@ -99,11 +133,6 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.event_provenance",
 		contract = { "classify", "classify_with_fence", "is_owned" },
-		wired    = true,
-	},
-	{
-		id       = "adapters.event_tap_guard",
-		contract = { "handle_disabled" },
 		wired    = true,
 	},
 	{
@@ -323,6 +352,7 @@ function M.run()
 		return val
 	end
 
+	local sys = safe_collect("sys_info", H.sys_info)
 	local result = {
 		version          = version,
 		loaded_adapters  = loaded_adapters,
@@ -336,7 +366,8 @@ function M.run()
 		warn_count       = warn_count,
 		err_count        = err_count,
 		recent_issues    = recent_issues,
-		sys              = safe_collect("sys_info",            H.sys_info),
+		event_tap_timeout_telemetry = event_tap_timeout_telemetry(sys and sys.hs_version),
+		sys              = sys,
 		pause_state      = safe_collect("pause_state",         H.collect_pause_state),
 		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
 		llm              = safe_collect("llm_state",           H.collect_llm_state),
@@ -647,20 +678,12 @@ function M.format_plain(snapshot)
 		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
 	end
 
-	-- Event-tap disables. Each `by_timeout` is a callback that overran the
-	-- CoreGraphics deadline on THIS machine under THIS load — the one latency
-	-- event macOS reports to us directly, and so the driver's only self-reported
-	-- performance metric. Reported unconditionally, including at zero: "0" is the
-	-- answer to "does it stall for you?", and an absent line is not.
-	local ok_guard, Guard = pcall(require, "adapters.event_tap_guard")
-	if ok_guard and type(Guard.disable_counts) == "function" then
-		local counts = Guard.disable_counts()
-		table.insert(lines, string.format("Tap disables      : %d after a callback overran, %d after an accessibility change",
-			counts.by_timeout or 0, counts.by_user or 0))
-		for label, n in pairs(counts.taps or {}) do
-			table.insert(lines, string.format("  · %s: %d", label, n))
-		end
-	end
+	-- Absence is explicit: zero would claim that a real timeout measurement ran.
+	-- The fallback keeps copied/plain reports honest for older stored snapshots.
+	local event_tap_telemetry = s.event_tap_timeout_telemetry
+		or event_tap_timeout_telemetry(s.sys and s.sys.hs_version)
+	table.insert(lines, string.format("Native tap timeout telemetry: %s",
+		tostring(event_tap_telemetry.summary)))
 
 	-- Platform coverage: the only place a user can ask why a feature they read
 	-- about is not in their menu. The SILENT count is reported next to the

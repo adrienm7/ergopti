@@ -605,7 +605,6 @@ M.eventtap = {
 			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
 			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
 			scrollWheel = 22,
-			tapDisabledByTimeout = 0xFFFFFFFE, tapDisabledByUserInput = 0xFFFFFFFF,
 		},
 		newKeyEvent   = function(mods, key, isDown)
 			local properties = {}

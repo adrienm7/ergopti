@@ -62,7 +62,6 @@ graph TD
         MACOS_clipboard["Clipboard.lua"]
         MACOS_crypto["Crypto.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
-        MACOS_event_tap_guard["EventTapGuard.lua"]
         MACOS_file_system["FileSystem.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]

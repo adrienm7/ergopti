@@ -97,9 +97,6 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.llm_bridge"] = api({ init = noop })
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
-		package.loaded["adapters.event_tap_guard"] = api({
-			handle_disabled = function() return false end,
-		})
 		package.loaded["adapters.event_provenance"] = api()
 		local epoch = {}
 		package.loaded["adapters.synthetic_input"] = api({

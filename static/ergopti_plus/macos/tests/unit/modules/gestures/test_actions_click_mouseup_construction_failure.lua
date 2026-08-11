@@ -14,7 +14,6 @@ local helpers = require("tests.helpers")
 local DEPENDENCIES = {
 	"infra.logger",
 	"infra.timings",
-	"adapters.event_tap_guard",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"modules.gestures.actions_click",
@@ -108,9 +107,6 @@ local function with_fixture(failure_mode, body)
 	}
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.25 end,
-	}
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
 	}
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
