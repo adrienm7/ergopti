@@ -161,6 +161,8 @@ helpers.describe("Adapter contract vectors: HttpClient", function()
 		helpers.assert_true(result ~= nil, "callback must be called")
 		helpers.assert_true(result.ok == true, "ok must be true for 200")
 		helpers.assert_eq(result.status, 200, "status must be 200")
+		helpers.assert_nil(result.error,
+			"a successful HTTP envelope must not also report an error")
 	end)
 
 	helpers.it("post_auth_error_401 — callback receives ok=false, status=401", function()
@@ -179,6 +181,8 @@ helpers.describe("Adapter contract vectors: HttpClient", function()
 		helpers.assert_true(result ~= nil, "callback must be called")
 		helpers.assert_true(result.ok == false, "ok must be false for 401")
 		helpers.assert_eq(result.status, 401, "status must be 401")
+		helpers.assert_eq(result.error, "HTTP 401",
+			"a failed HTTP envelope must preserve its diagnostic")
 	end)
 
 	helpers.it("isActive returns false when no request is in flight", function()
