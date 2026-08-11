@@ -45,7 +45,14 @@ local function load_controller(options)
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local log_events = { warn = {}, error = {} }
+	local logger = helpers.make_logger_stub()
+	for _, level in ipairs({ "warn", "error" }) do
+		logger[level] = function(...)
+			log_events[level][#log_events[level] + 1] = { ... }
+		end
+	end
+	package.loaded["infra.logger"] = logger
 
 	local ctx = {
 		spawns = {},
@@ -64,6 +71,8 @@ local function load_controller(options)
 		settings_get_calls = 0,
 		cancel_failures = options.cancel_failures or 0,
 		cancel_attempts = 0,
+		terminate_results = options.terminate_results or {},
+		logs = log_events,
 		helper_path = "/test/ErgoptiPlus",
 		helper_error = nil,
 		helper_resolve_calls = 0,
@@ -86,6 +95,7 @@ local function load_controller(options)
 				inputs = {},
 				closed = false,
 				terminated = false,
+				terminate_calls = 0,
 				start_result = start_result,
 			}
 			ctx.next_start_result = nil
@@ -111,7 +121,14 @@ local function load_controller(options)
 					task.closed = true
 					return true
 				end,
-				terminate = function() task.terminated = true end,
+				terminate = function()
+					task.terminate_calls = task.terminate_calls + 1
+					local result = table.remove(ctx.terminate_results, 1)
+					if result == nil then result = true end
+					if result == "raise" then error("injected terminate failure") end
+					if result == true then task.terminated = true end
+					return result
+				end,
 			}
 		end,
 	}
@@ -301,6 +318,256 @@ helpers.describe("karabiner lease controller: activation identity", function()
 		helpers.assert_true(controller.is_initialized() == true)
 		helpers.assert_eq(#ctx.spawns, 0,
 			"initialization status must remain side-effect-free")
+	end)
+
+	helpers.it("parses only one canonical side-effect-free guardian status line", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		local observed = {}
+		local last_cached_status = nil
+
+		for _, fixture in ipairs({
+			{ stdout = "ready\n", expected = "ready" },
+			{ stdout = "requires_approval\n", expected = "requires_approval" },
+			{ stdout = "unavailable\n", expected = "unavailable" },
+			{ stdout = "ready\nready\n", expected = nil },
+			{ stdout = "unknown\n", expected = nil },
+			{ stdout = string.rep("x", 33), expected = nil },
+			{ stdout = "ready\n", exit_code = 9, expected = nil },
+		}) do
+			local handle, reason = controller.probe_guardian_status(function(status)
+				observed[#observed + 1] = status or false
+			end)
+			helpers.assert_true(type(handle) == "table")
+			helpers.assert_eq(reason, nil)
+			local spawn = ctx.spawns[#ctx.spawns]
+			helpers.assert_true(helpers.deep_equal(spawn.args, { "--remap-guardian-status" }))
+			ctx.complete(#ctx.spawns, fixture.exit_code or 0, fixture.stdout)
+			helpers.assert_eq(observed[#observed], fixture.expected or false)
+			if fixture.expected then last_cached_status = fixture.expected end
+			local _, snapshot = controller.status()
+			helpers.assert_eq(snapshot.guardian_status, last_cached_status,
+				"only a canonical successful native probe may replace the cached status")
+		end
+	end)
+
+	helpers.it("rejects a guardian probe whose exact helper cannot start", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		ctx.next_start_result = false
+		local callback_count = 0
+		local handle, reason = controller.probe_guardian_status(function()
+			callback_count = callback_count + 1
+		end)
+
+		helpers.assert_eq(handle, nil)
+		helpers.assert_eq(reason, "helper-start-failed")
+		helpers.assert_eq(callback_count, 0)
+	end)
+
+	helpers.it("invalidates a cancelled guardian observation before retrying exact termination", function()
+		local controller, ctx = load_controller({ terminate_results = { false, true } })
+		controller.init()
+		controller.probe_guardian_status(function() end)
+		ctx.complete(1, 0, "requires_approval\n")
+
+		local callback_count = 0
+		local handle = controller.probe_guardian_status(function()
+			callback_count = callback_count + 1
+		end)
+		helpers.assert_type(handle, "table")
+		helpers.assert_true(handle.terminate() == false,
+			"logical cancellation must survive a failed native terminate")
+		helpers.assert_eq(ctx.spawns[2].terminate_calls, 1)
+
+		ctx.complete(2, 0, "ready\n")
+		local _, snapshot = controller.status()
+		helpers.assert_eq(callback_count, 0,
+			"a cancelled native completion must not reach its consumer")
+		helpers.assert_eq(snapshot.guardian_status, "requires_approval",
+			"a cancelled native completion must not replace cached authorization")
+
+		helpers.assert_true(handle.terminate(),
+			"the wrapper must retry termination through the same raw handle")
+		helpers.assert_eq(ctx.spawns[2].terminate_calls, 2)
+		helpers.assert_true(ctx.spawns[2].terminated)
+	end)
+
+	helpers.it("keeps a newer guardian ready probe over an older settings result", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		controller.probe_guardian_status(function() end)
+		ctx.complete(1, 0, "requires_approval\n")
+
+		helpers.assert_true(controller.open_guardian_settings(function() end))
+		local observed = nil
+		controller.probe_guardian_status(function(status) observed = status end)
+		ctx.complete(3, 0, "ready\n")
+		helpers.assert_eq(observed, "ready")
+
+		ctx.complete(2, 0, "not_required\n")
+		local _, snapshot = controller.status()
+		helpers.assert_eq(snapshot.guardian_status, "ready",
+			"an older settings completion must not clear a newer status observation")
+	end)
+
+	helpers.it("keeps a newer guardian settings recheck over an older status completion", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		controller.probe_guardian_status(function() end)
+		ctx.complete(1, 0, "requires_approval\n")
+
+		local stale_callback_count = 0
+		controller.probe_guardian_status(function()
+			stale_callback_count = stale_callback_count + 1
+		end)
+		helpers.assert_true(controller.open_guardian_settings(function() end))
+		ctx.complete(3, 0, "not_required\n")
+		ctx.complete(2, 0, "requires_approval\n")
+
+		local _, snapshot = controller.status()
+		helpers.assert_eq(stale_callback_count, 0,
+			"a superseded status observation must not reach its consumer")
+		helpers.assert_nil(snapshot.guardian_status,
+			"an older status completion must not overwrite the newer settings recheck")
+	end)
+
+	helpers.it("returns routine guardian probe failures without per-poll controller logs", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		local baseline_warns = #ctx.logs.warn
+		local baseline_errors = #ctx.logs.error
+		local callback_count = 0
+
+		ctx.helper_path = nil
+		ctx.helper_error = "runtime helper identity unavailable"
+		for _ = 1, 3 do
+			local handle, reason = controller.probe_guardian_status(function()
+				callback_count = callback_count + 1
+			end)
+			helpers.assert_nil(handle)
+			helpers.assert_eq(reason, "runtime helper identity unavailable")
+		end
+		ctx.helper_path = "/test/ErgoptiPlus"
+		ctx.helper_error = nil
+		for _ = 1, 3 do
+			ctx.next_start_result = false
+			local handle, reason = controller.probe_guardian_status(function()
+				callback_count = callback_count + 1
+			end)
+			helpers.assert_nil(handle)
+			helpers.assert_eq(reason, "helper-start-failed")
+		end
+		for _ = 1, 3 do
+			local handle = controller.probe_guardian_status(function(status, reason)
+				callback_count = callback_count + 1
+				helpers.assert_nil(status)
+				helpers.assert_type(reason, "string")
+			end)
+			helpers.assert_type(handle, "table")
+			ctx.complete(#ctx.spawns, 9, "malformed\n")
+		end
+
+		helpers.assert_eq(callback_count, 3,
+			"only started probes may deliver routine failure callbacks")
+		helpers.assert_eq(#ctx.logs.warn, baseline_warns)
+		helpers.assert_eq(#ctx.logs.error, baseline_errors,
+			"the polling owner, not the controller, must rate-limit external failures")
+	end)
+
+	helpers.it("accepts only one canonical guardian settings result from exact argv", function()
+		for _, fixture in ipairs({
+			{ stdout = "opened\n", expected_ok = true, expected_reason = "opened" },
+			{ stdout = "not_required\n", expected_ok = true, expected_reason = "not_required" },
+			{ stdout = "opened\nopened\n", expected_ok = false },
+			{ stdout = "unknown\n", expected_ok = false },
+			{ stdout = string.rep("x", 33), expected_ok = false },
+			{ stdout = "opened\n", exit_code = 9, expected_ok = false },
+		}) do
+			local controller, ctx = load_controller()
+			controller.init()
+			local probe_handle = controller.probe_guardian_status(function() end)
+			helpers.assert_type(probe_handle, "table")
+			ctx.complete(1, 0, "requires_approval\n")
+
+			local callback_count = 0
+			local callback_ok, callback_reason = nil, nil
+			local accepted = controller.open_guardian_settings(function(ok, reason)
+				callback_count = callback_count + 1
+				callback_ok, callback_reason = ok, reason
+			end)
+			helpers.assert_true(accepted,
+				"a cached approval requirement must permit the explicit settings request")
+			local settings_task = ctx.spawns[2]
+			helpers.assert_not_nil(settings_task)
+			helpers.assert_true(helpers.deep_equal(settings_task.args,
+				{ "--open-remap-guardian-settings" }),
+				"the explicit action must pass exactly one native launcher flag")
+
+			ctx.complete(2, fixture.exit_code or 0, fixture.stdout)
+			helpers.assert_eq(callback_count, 1,
+				"every accepted settings process must settle its callback exactly once")
+			helpers.assert_eq(callback_ok, fixture.expected_ok)
+			if fixture.expected_ok then
+				helpers.assert_eq(callback_reason, fixture.expected_reason)
+			else
+				helpers.assert_type(callback_reason, "string")
+			end
+			local _, snapshot = controller.status()
+			if fixture.expected_reason == "not_required" then
+				helpers.assert_nil(snapshot.guardian_status,
+					"a native not-required result must retire the stale approval hint")
+			else
+				helpers.assert_eq(snapshot.guardian_status, "requires_approval",
+					"opening or rejecting Settings must not manufacture guardian readiness")
+			end
+		end
+	end)
+
+	helpers.it("rejects a guardian settings request whose exact helper cannot start", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		controller.probe_guardian_status(function() end)
+		ctx.complete(1, 0, "requires_approval\n")
+		ctx.next_start_result = false
+		local callback_count = 0
+		local callback_ok, callback_reason = nil, nil
+
+		local accepted = controller.open_guardian_settings(function(ok, reason)
+			callback_count = callback_count + 1
+			callback_ok, callback_reason = ok, reason
+		end)
+
+		helpers.assert_true(accepted == false)
+		helpers.assert_eq(callback_count, 1)
+		helpers.assert_true(callback_ok == false)
+		helpers.assert_eq(callback_reason, "helper-start-failed")
+		helpers.assert_true(helpers.deep_equal(ctx.spawns[2].args,
+			{ "--open-remap-guardian-settings" }))
+	end)
+
+	helpers.it("joins repeated guardian settings clicks into one native request", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		controller.probe_guardian_status(function() end)
+		ctx.complete(1, 0, "requires_approval\n")
+		local results = {}
+
+		helpers.assert_true(controller.open_guardian_settings(function(ok, reason)
+			results[#results + 1] = { ok = ok, reason = reason }
+		end))
+		helpers.assert_true(controller.open_guardian_settings(function(ok, reason)
+			results[#results + 1] = { ok = ok, reason = reason }
+		end))
+		helpers.assert_eq(#ctx.spawns, 2,
+			"repeated menu clicks must join the retained request instead of opening twice")
+
+		ctx.complete(2, 0, "opened\n")
+		helpers.assert_eq(#results, 2)
+		for _, result in ipairs(results) do
+			helpers.assert_true(result.ok == true)
+			helpers.assert_eq(result.reason, "opened")
+		end
 	end)
 
 	helpers.it("revalidates helper identity before each generation spawn", function()

@@ -60,6 +60,8 @@ local LAYOUT_TIS_SETTLE_SEC = Timings.sec("debounce", "layout_tis_settle_ms")
 -- native helper is unavailable.
 local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
+local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
+local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient
 -- failures inside that barrier therefore get their own bounded retry budget;
@@ -67,7 +69,7 @@ local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 -- each other forever.
 local LAYOUT_REFRESH_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local REMAP_GUARDIAN_STATUS_ENV = "ERGOPTI_REMAP_GUARDIAN_STATUS"
-local REMAP_GUARDIAN_REQUIRES_APPROVAL = "requires_approval"
+local REMAP_GUARDIAN_READY = "ready"
 
 local DISABLED_LEGACY_PROBE_STRINGS = {
 	"[ErgoptiPlus managed:",
@@ -159,6 +161,8 @@ local _gesture_cleanup_backlog = {}    -- Failed eventtap stops retain their exa
 local _lease_inputs_tainted    = false -- Retained disabled handles are not proof of liveness
 local _lease_recovery          = nil   -- One bounded retry series across replacement tokens
 local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop must be retried
+local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
+local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
 
@@ -170,6 +174,7 @@ local PAUSED_DISABLE_RECOVERY = {}
 local PAUSED_RESUME_REGENERATION = {}
 local LEASE_FAILURE_RECOVERY_CAPABILITY = {}
 local ACTIVE_LAYOUT_FAILURE_RECOVERY = {}
+local GUARDIAN_READY_REGENERATION = {}
 
 --- Invokes a public async callback without letting its error vanish in a task callback.
 --- @param label string Operation label for diagnostics.
@@ -1332,6 +1337,28 @@ local function retry_lease_recovery_timer_cleanup()
 	return #_lease_recovery_timer_cleanup_backlog == 0
 end
 
+--- Retries exact guardian-status task termination without process discovery.
+--- ShellRunner deliberately retains the native task after a failed terminate;
+--- retaining this opaque handle is therefore the only safe cleanup capability.
+--- @return boolean complete Whether no native status task remains retained.
+local function retry_lease_recovery_probe_cleanup()
+	for index = #_lease_recovery_probe_cleanup_backlog, 1, -1 do
+		local handle = _lease_recovery_probe_cleanup_backlog[index]
+		local terminate = type(handle) == "table" and handle.terminate or nil
+		local ok, terminated_or_err = pcall(function()
+			if type(terminate) ~= "function" then return false end
+			return terminate()
+		end)
+		if ok and terminated_or_err == true then
+			table.remove(_lease_recovery_probe_cleanup_backlog, index)
+		else
+			Logger.error(LOG, "Karabiner guardian-status probe termination retry failed: %s.",
+				tostring(terminated_or_err))
+		end
+	end
+	return #_lease_recovery_probe_cleanup_backlog == 0
+end
+
 --- Cancels one exact recovery series logically before touching its native timer.
 --- Exact-record identity keeps a queued callback inert even when timer:stop()
 --- itself fails.
@@ -1339,10 +1366,49 @@ end
 --- @return boolean complete Whether every native timer cancellation is proven.
 local function cancel_lease_recovery(reason)
 	local backlog_clean = retry_lease_recovery_timer_cleanup()
+	local probe_backlog_clean = retry_lease_recovery_probe_cleanup()
 	local recovery = _lease_recovery
 	_lease_recovery = nil
-	if not recovery then return backlog_clean end
+	if not recovery then return backlog_clean and probe_backlog_clean end
 	recovery.cancelled = true
+	-- Detach the exact probe before asking its task to stop. hs.task may still
+	-- deliver a completion after terminate(); record identity makes that callback
+	-- inert even when native termination fails or races process exit.
+	local guardian_probe = recovery.guardian_probe
+	recovery.guardian_probe = nil
+	recovery.waiting_for_guardian = false
+	local probe_timer_clean = true
+	if guardian_probe and guardian_probe.timeout then
+		local timeout = guardian_probe.timeout
+		guardian_probe.timeout = nil
+		local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timeout)
+		if not ok or cancelled_or_err ~= true then
+			probe_timer_clean = false
+			_lease_recovery_timer_cleanup_backlog[
+				#_lease_recovery_timer_cleanup_backlog + 1
+			] = timeout
+			Logger.error(LOG,
+				"Karabiner guardian-status timeout cancellation failed; callback fenced by identity: %s.",
+				tostring(cancelled_or_err))
+		end
+	end
+	local probe_clean = true
+	if guardian_probe and guardian_probe.handle then
+		local terminate = guardian_probe.handle.terminate
+		local ok, terminated_or_err = pcall(function()
+			if type(terminate) ~= "function" then return false end
+			return terminate()
+		end)
+		if not ok or terminated_or_err ~= true then
+			probe_clean = false
+			_lease_recovery_probe_cleanup_backlog[
+				#_lease_recovery_probe_cleanup_backlog + 1
+			] = guardian_probe.handle
+			Logger.error(LOG,
+				"Karabiner guardian-status probe termination failed; callback fenced by identity: %s.",
+				tostring(terminated_or_err))
+		end
+	end
 	local timer = recovery.timer
 	recovery.timer = nil
 	local timer_clean = true
@@ -1359,7 +1425,8 @@ local function cancel_lease_recovery(reason)
 		end
 	end
 	Logger.debug(LOG, "Cancelled Karabiner lease auto-recovery (%s).", tostring(reason))
-	return backlog_clean and timer_clean
+	return backlog_clean and probe_backlog_clean and probe_timer_clean
+		and timer_clean and probe_clean
 end
 
 --- Defers one pending automatic attempt until the post-TIS layout pipeline has
@@ -1416,31 +1483,519 @@ local function defer_lease_recovery_for_layout(recovery)
 end
 
 --- Returns a stable reason when automatic recovery must not create authority.
---- A missing exported guardian status is allowed for direct Hammerspoon
---- development launches; the bundled app always exports an exact status.
 --- @return string|nil reason
 local function lease_recovery_block_reason()
 	if not _running or _state == nil then return "lifecycle-inactive" end
 	if _shutdown_requested then return "shutdown-in-progress" end
 	if _state.enabled ~= true then return "integration-disabled" end
 	if _enabled_transition ~= nil then return "enabled-transition-in-progress" end
-	local status_ok, guardian_status = pcall(os.getenv, REMAP_GUARDIAN_STATUS_ENV)
-	if not status_ok then
-		Logger.error(LOG, "Could not read %s; automatic remap recovery stays inert: %s.",
-			REMAP_GUARDIAN_STATUS_ENV, tostring(guardian_status))
-		return "guardian-status-unavailable"
-	end
-	if guardian_status == REMAP_GUARDIAN_REQUIRES_APPROVAL then
-		return "guardian-approval-required"
-	end
 	return nil
 end
 
 local schedule_lease_recovery
+local schedule_guardian_status_poll
+local probe_guardian_for_recovery
+
+--- Returns whether this process was launched through the ErgoptiPlus app and
+--- therefore has an exact native guardian-status role available. Direct
+--- Hammerspoon development sessions intentionally export no status and keep the
+--- existing bounded recovery path. An unreadable or malformed environment is
+--- treated as bundled/fail-closed, never as permission to skip the native gate.
+--- @return boolean required
+local function guardian_status_probe_required()
+	local ok, exported_status = pcall(os.getenv, REMAP_GUARDIAN_STATUS_ENV)
+	if not ok then
+		Logger.error(LOG, "Could not read %s; requiring an exact native guardian probe: %s.",
+			REMAP_GUARDIAN_STATUS_ENV, tostring(exported_status))
+		return true
+	end
+	if exported_status == nil or exported_status == "" then return false end
+	if type(exported_status) ~= "string" then
+		Logger.error(LOG, "%s had a non-string value; requiring an exact native guardian probe.",
+			REMAP_GUARDIAN_STATUS_ENV)
+	end
+	return true
+end
+
+local schedule_guardian_regeneration_poll
+local start_guardian_regeneration_probe
+
+--- Returns whether one retained preflight still owns the current lifecycle.
+--- @param wait table Exact bundled regeneration wait.
+--- @return boolean current
+local function guardian_regeneration_wait_is_current(wait)
+	return _guardian_regeneration_wait == wait
+		and wait.cancelled ~= true
+		and is_current_lifecycle(wait.epoch)
+end
+
+--- Moves callbacks from an equivalent duplicate context into the retained one.
+--- @param retained table Existing regeneration context.
+--- @param duplicate table Newly created equivalent context.
+local function join_guardian_regeneration_context(retained, duplicate)
+	for _, callback in ipairs(duplicate.callbacks or {}) do
+		retained.callbacks[#retained.callbacks + 1] = callback
+	end
+	duplicate.callbacks = {}
+	duplicate.settled = true
+	duplicate.attempt_finished = true
+	_regeneration_contexts[duplicate] = nil
+end
+
+--- Terminates one exact status helper after logically detaching it. The
+--- controller wrapper invalidates cache authority before native termination,
+--- so a late completion stays inert even when terminate() itself fails.
+--- @param probe table Owned probe record.
+--- @param label string Stable diagnostic label.
+--- @return boolean terminated
+local function terminate_guardian_regeneration_probe(probe, label)
+	local handle = probe and probe.handle or nil
+	if probe then probe.handle = nil end
+	if not handle then return true end
+	local terminate = type(handle) == "table" and handle.terminate or nil
+	local ok, terminated_or_err = pcall(function()
+		if type(terminate) ~= "function" then return false end
+		return terminate()
+	end)
+	if ok and terminated_or_err == true then return true end
+	_lease_recovery_probe_cleanup_backlog[
+		#_lease_recovery_probe_cleanup_backlog + 1
+	] = handle
+	Logger.error(LOG, "%s; exact status helper retained for termination retry: %s.",
+		label, tostring(terminated_or_err))
+	return false
+end
+
+--- Cancels one probe timeout while retaining a failed timer capability.
+--- @param probe table Owned probe record.
+--- @return boolean cancelled
+local function cancel_guardian_regeneration_probe_timeout(probe)
+	local timeout = probe and probe.timeout or nil
+	if probe then probe.timeout = nil end
+	if not timeout then return true end
+	local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timeout)
+	if ok and cancelled_or_err == true then return true end
+	_lease_recovery_timer_cleanup_backlog[
+		#_lease_recovery_timer_cleanup_backlog + 1
+	] = timeout
+	Logger.error(LOG,
+		"Karabiner regeneration guardian timeout could not stop; callback fenced by identity: %s.",
+		tostring(cancelled_or_err))
+	return false
+end
+
+--- Settles every regeneration retained behind guardian readiness.
+--- @param reason string Stable cancellation reason.
+--- @return boolean complete Whether native cleanup was proven.
+local function cancel_guardian_regeneration_wait(reason)
+	local wait = _guardian_regeneration_wait
+	_guardian_regeneration_wait = nil
+	if not wait then return true end
+	wait.cancelled = true
+
+	local all_clean = true
+	local timer = wait.timer
+	wait.timer = nil
+	if timer then
+		local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timer)
+		if not ok or cancelled_or_err ~= true then
+			all_clean = false
+			_lease_recovery_timer_cleanup_backlog[
+				#_lease_recovery_timer_cleanup_backlog + 1
+			] = timer
+			Logger.error(LOG,
+				"Karabiner regeneration guardian poll could not stop; callback fenced by identity: %s.",
+				tostring(cancelled_or_err))
+		end
+	end
+	local probe = wait.probe
+	wait.probe = nil
+	if probe then
+		probe.cancelled = true
+		if not cancel_guardian_regeneration_probe_timeout(probe) then all_clean = false end
+		if not terminate_guardian_regeneration_probe(
+			probe,
+			"Karabiner regeneration guardian probe could not stop"
+		) then all_clean = false end
+	end
+
+	local contexts = wait.contexts
+	wait.contexts = {}
+	for _, context in ipairs(contexts) do
+		if not context.settled and type(context.settle) == "function" then
+			context:settle(false, reason or "guardian-readiness-cancelled")
+		end
+	end
+	return all_clean
+end
+
+--- Replays retained regenerations through their ordinary state/layout gates.
+--- The module-private proof is valid only for this synchronous callback chain.
+--- @param wait table Exact bundled regeneration wait.
+local function replay_guardian_regenerations(wait)
+	if not guardian_regeneration_wait_is_current(wait) then return end
+	_guardian_regeneration_wait = nil
+	wait.completed = true
+	local contexts = wait.contexts
+	wait.contexts = {}
+	for _, context in ipairs(contexts) do
+		if not context.settled then
+			local call_ok, accepted_or_err = xpcall(function()
+				return M.regenerate(
+					nil,
+					context.capability,
+					context,
+					GUARDIAN_READY_REGENERATION
+				)
+			end, debug.traceback)
+			if not call_ok then
+				context:settle(false,
+					"guardian-ready-regeneration-raised: " .. tostring(accepted_or_err))
+			elseif accepted_or_err ~= true and not context.settled then
+				context:settle(false, "guardian-ready-regeneration-rejected")
+			end
+		end
+	end
+end
+
+--- Arms the next non-budgeted readiness poll for bundled regeneration.
+--- @param wait table Exact bundled regeneration wait.
+--- @param reason any Last canonical status or probe failure.
+--- @return boolean retained
+schedule_guardian_regeneration_poll = function(wait, reason)
+	if not guardian_regeneration_wait_is_current(wait)
+		or wait.probe ~= nil or wait.timer ~= nil then return false end
+	retry_lease_recovery_timer_cleanup()
+
+	local timer = nil
+	local armed = false
+	local fired_before_arm = false
+	local schedule_ok, timer_or_err = pcall(
+		TimerScheduler.after,
+		LEASE_GUARDIAN_STATUS_POLL_SEC,
+		function()
+			if not armed then
+				fired_before_arm = true
+				return
+			end
+			if not guardian_regeneration_wait_is_current(wait)
+				or wait.timer ~= timer then return end
+			wait.timer = nil
+			run_async_step("Karabiner regeneration guardian-status poll", function()
+				start_guardian_regeneration_probe(wait, "guardian-status-poll")
+			end)
+		end
+	)
+	if schedule_ok then timer = timer_or_err end
+	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+		wait.timer_arm_attempts = wait.timer_arm_attempts + 1
+		if wait.timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
+			Logger.warn(LOG,
+				"Guardian readiness poll arm %d/%d failed; retrying retained regeneration: %s.",
+				wait.timer_arm_attempts, LEASE_RECOVERY_TIMER_ARM_ATTEMPTS,
+				tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+			return schedule_guardian_regeneration_poll(wait, reason)
+		end
+		Logger.error(LOG,
+			"Could not retain Karabiner regeneration after %d guardian timer failures: %s.",
+			wait.timer_arm_attempts,
+			tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+		cancel_guardian_regeneration_wait("guardian-status-timer-unavailable")
+		return false
+	end
+	wait.timer_arm_attempts = 0
+	wait.timer = timer
+	armed = true
+	Logger.debug(LOG,
+		"Karabiner regeneration remains fail-closed pending guardian readiness "
+			.. "(next check in %.1f s; %s).",
+		LEASE_GUARDIAN_STATUS_POLL_SEC, tostring(reason))
+	return true
+end
+
+--- Performs one exact, bounded native readiness observation for all queued
+--- bundled regenerations. Only `ready` may enter the build/deploy path.
+--- @param wait table Exact bundled regeneration wait.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean retained
+start_guardian_regeneration_probe = function(wait, reason)
+	if not guardian_regeneration_wait_is_current(wait)
+		or wait.probe ~= nil or wait.timer ~= nil then return false end
+	if not retry_lease_recovery_probe_cleanup() then
+		return schedule_guardian_regeneration_poll(
+			wait,
+			"previous-probe-termination-pending"
+		)
+	end
+
+	local probe = { handle = nil, timeout = nil, settled = false, cancelled = false }
+	wait.probe = probe
+	local function settle_probe(status, probe_error)
+		if probe.settled or probe.cancelled then return end
+		probe.settled = true
+		cancel_guardian_regeneration_probe_timeout(probe)
+		if not guardian_regeneration_wait_is_current(wait)
+			or wait.probe ~= probe then return end
+		wait.probe = nil
+		if status == REMAP_GUARDIAN_READY then
+			wait.last_wait_status = nil
+			replay_guardian_regenerations(wait)
+			return
+		end
+
+		local wait_status = status or "probe-failed"
+		local log_wait = wait.last_wait_status == wait_status
+			and Logger.debug or Logger.warn
+		wait.last_wait_status = wait_status
+		log_wait(LOG,
+			"Karabiner regeneration remains fail-closed after guardian status '%s' (%s).",
+			tostring(status), tostring(probe_error or reason))
+		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
+	end
+
+	local call_ok, handle_or_err, launch_error = xpcall(function()
+		return LeaseController.probe_guardian_status(settle_probe)
+	end, debug.traceback)
+	if not call_ok then
+		settle_probe(nil, "guardian-status-probe-raised: " .. tostring(handle_or_err))
+		return guardian_regeneration_wait_is_current(wait)
+	end
+	if probe.settled then return true end
+	if type(handle_or_err) ~= "table" then
+		settle_probe(nil, launch_error or "guardian-status-probe-rejected")
+		return guardian_regeneration_wait_is_current(wait)
+	end
+	probe.handle = handle_or_err
+
+	local timeout = nil
+	local armed = false
+	local fired_before_arm = false
+	local timer_ok, timeout_or_err = pcall(
+		TimerScheduler.after,
+		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
+		function()
+			if not armed then
+				fired_before_arm = true
+				return
+			end
+			if not guardian_regeneration_wait_is_current(wait)
+				or wait.probe ~= probe or probe.timeout ~= timeout then return end
+			probe.timeout = nil
+			terminate_guardian_regeneration_probe(
+				probe,
+				"Karabiner regeneration guardian probe timed out"
+			)
+			settle_probe(nil, "guardian-status-probe-timeout")
+		end
+	)
+	if timer_ok then timeout = timeout_or_err end
+	if type(timeout) ~= "table" or timeout.fired == true or fired_before_arm then
+		if type(timeout) == "table" then pcall(TimerScheduler.cancel, timeout) end
+		terminate_guardian_regeneration_probe(
+			probe,
+			"Karabiner regeneration guardian timeout could not arm"
+		)
+		settle_probe(nil, timer_ok and "guardian-status-timeout-invalid-handle"
+			or "guardian-status-timeout-arm-raised: " .. tostring(timeout_or_err))
+		return guardian_regeneration_wait_is_current(wait)
+	end
+	probe.timeout = timeout
+	armed = true
+	return true
+end
+
+--- Queues one already-validated regeneration until native readiness is fresh.
+--- Equivalent repeated callers share one probe and one eventual build.
+--- @param context table Regeneration context created by M.regenerate().
+--- @return boolean retained
+local function queue_guardian_regeneration(context)
+	local wait = _guardian_regeneration_wait
+	if wait and not guardian_regeneration_wait_is_current(wait) then
+		cancel_guardian_regeneration_wait("guardian-readiness-owner-stale")
+		wait = nil
+	end
+	if not wait then
+		wait = {
+			epoch = _lifecycle_epoch,
+			contexts = {},
+			probe = nil,
+			timer = nil,
+			cancelled = false,
+			completed = false,
+			last_wait_status = nil,
+			timer_arm_attempts = 0,
+		}
+		_guardian_regeneration_wait = wait
+	end
+
+	for _, retained in ipairs(wait.contexts) do
+		local equivalent = retained.epoch == context.epoch
+			and retained.intent == context.intent
+			and retained.capability == context.capability
+			and retained.enabled_transaction == context.enabled_transaction
+		if equivalent and not retained.settled then
+			join_guardian_regeneration_context(retained, context)
+			return true
+		end
+	end
+	wait.contexts[#wait.contexts + 1] = context
+	if wait.probe ~= nil or wait.timer ~= nil then return true end
+	return start_guardian_regeneration_probe(wait, "regeneration-preflight")
+end
+
+--- Runs one side-effect-free native status observation for this exact launcher.
+--- Only `ready` advances the retained recovery. Every other result polls without
+--- charging the bounded build/deploy retry budget. The probe record is installed
+--- before calling the controller so even a synchronous test callback is fenced.
+--- @param recovery table Exact retained recovery series.
+--- @param continuation function Work allowed only after an exact ready result.
+--- @param refund_attempt boolean Whether a timer already reserved one retry.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean started_or_settled
+probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, reason)
+	if _lease_recovery ~= recovery or recovery.cancelled
+		or recovery.guardian_probe ~= nil
+		or not is_current_lifecycle(recovery.epoch) then return false end
+	local blocked = lease_recovery_block_reason()
+	if blocked then
+		cancel_lease_recovery(blocked)
+		return false
+	end
+	if not retry_lease_recovery_probe_cleanup() then
+		schedule_guardian_status_poll(recovery, "previous-probe-termination-pending")
+		return false
+	end
+
+	local probe = { handle = nil, timeout = nil, completed = false }
+	recovery.guardian_probe = probe
+	recovery.waiting_for_guardian = true
+	local callback_fired = false
+	local function cancel_probe_timeout()
+		local timeout = probe.timeout
+		probe.timeout = nil
+		if not timeout then return true end
+		local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timeout)
+		if ok and cancelled_or_err == true then return true end
+		_lease_recovery_timer_cleanup_backlog[
+			#_lease_recovery_timer_cleanup_backlog + 1
+		] = timeout
+		Logger.error(LOG,
+			"Karabiner guardian-status timeout cancellation failed; callback fenced by identity: %s.",
+			tostring(cancelled_or_err))
+		return false
+	end
+	local function terminate_probe_handle(label)
+		local handle = probe.handle
+		probe.handle = nil
+		if not handle then return true end
+		local terminate = handle.terminate
+		local ok, terminated_or_err = pcall(function()
+			if type(terminate) ~= "function" then return false end
+			return terminate()
+		end)
+		if ok and terminated_or_err == true then return true end
+		_lease_recovery_probe_cleanup_backlog[
+			#_lease_recovery_probe_cleanup_backlog + 1
+		] = handle
+		Logger.error(LOG, "%s; exact probe retained for termination retry: %s.",
+			label, tostring(terminated_or_err))
+		return false
+	end
+	local function settle_probe(status, probe_error)
+		if callback_fired then return end
+		callback_fired = true
+		probe.completed = true
+		cancel_probe_timeout()
+		if _lease_recovery ~= recovery or recovery.cancelled
+			or recovery.guardian_probe ~= probe
+			or not is_current_lifecycle(recovery.epoch) then return end
+		recovery.guardian_probe = nil
+		recovery.waiting_for_guardian = false
+
+		local current_block = lease_recovery_block_reason()
+		if current_block then
+			cancel_lease_recovery(current_block)
+			return
+		end
+		if status == REMAP_GUARDIAN_READY then
+			recovery.last_guardian_wait_status = nil
+			recovery.guardian_timer_arm_attempts = 0
+			local continued = run_async_step(
+				"Karabiner guardian-status ready continuation",
+				continuation
+			)
+			if not continued and _lease_recovery == recovery and not recovery.cancelled then
+				if refund_attempt then
+					recovery.attempt = math.max(0, recovery.attempt - 1)
+				end
+				schedule_guardian_status_poll(recovery, "ready-continuation-failed")
+			end
+			return
+		end
+
+		if refund_attempt then
+			recovery.attempt = math.max(0, recovery.attempt - 1)
+		end
+		local wait_status = status or "probe-failed"
+		local log_wait = recovery.last_guardian_wait_status == wait_status
+			and Logger.debug or Logger.warn
+		recovery.last_guardian_wait_status = wait_status
+		log_wait(LOG,
+			"Karabiner lease recovery remains fail-closed after guardian status '%s' (%s).",
+			tostring(status), tostring(probe_error or reason))
+		schedule_guardian_status_poll(recovery, status or probe_error or reason)
+	end
+
+	local call_ok, handle_or_err, launch_error = xpcall(function()
+		return LeaseController.probe_guardian_status(settle_probe)
+	end, debug.traceback)
+	if not call_ok then
+		settle_probe(nil, "guardian-status-probe-raised: " .. tostring(handle_or_err))
+		return false
+	end
+	if callback_fired then return true end
+	if type(handle_or_err) ~= "table" then
+		settle_probe(nil, launch_error or "guardian-status-probe-rejected")
+		return false
+	end
+	probe.handle = handle_or_err
+
+	local timer = nil
+	local armed = false
+	local fired_before_arm = false
+	local timer_ok, timer_or_err = pcall(
+		TimerScheduler.after,
+		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
+		function()
+			if not armed then
+				fired_before_arm = true
+				return
+			end
+			if _lease_recovery ~= recovery or recovery.guardian_probe ~= probe
+				or probe.timeout ~= timer then return end
+			probe.timeout = nil
+			terminate_probe_handle("Karabiner guardian-status probe timed out")
+			settle_probe(nil, "guardian-status-probe-timeout")
+		end
+	)
+	if timer_ok then timer = timer_or_err end
+	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+		terminate_probe_handle("Karabiner guardian-status timeout could not arm")
+		settle_probe(nil, timer_ok and "guardian-status-timeout-invalid-handle"
+			or "guardian-status-timeout-arm-raised: " .. tostring(timer_or_err))
+		return false
+	end
+	probe.timeout = timer
+	armed = true
+	return true
+end
 
 --- Consumes one retained retry after re-proving every user-intent gate.
 --- @param recovery table Exact bounded recovery series.
-local function run_lease_recovery_attempt(recovery)
+--- @param guardian_proven_ready boolean|nil Exact status proof from this callback chain.
+local function run_lease_recovery_attempt(recovery, guardian_proven_ready)
 	if _lease_recovery ~= recovery or recovery.cancelled
 		or not is_current_lifecycle(recovery.epoch) then return end
 	recovery.timer = nil
@@ -1457,6 +2012,12 @@ local function run_lease_recovery_attempt(recovery)
 		cancel_lease_recovery(blocked)
 		return
 	end
+	if guardian_proven_ready ~= true and guardian_status_probe_required() then
+		probe_guardian_for_recovery(recovery, function()
+			run_lease_recovery_attempt(recovery, true)
+		end, true, "recovery-attempt")
+		return
+	end
 	local pause_ok, _, paused = query_shortcuts_pause_state(
 		"Karabiner lease auto-recovery pause-state query"
 	)
@@ -1466,7 +2027,7 @@ local function run_lease_recovery_attempt(recovery)
 	end
 	if not pause_ok then
 		Logger.warn(LOG, "Karabiner lease auto-recovery remained inert because pause state is unavailable.")
-		schedule_lease_recovery(recovery, "pause-state-unavailable")
+		schedule_lease_recovery(recovery, "pause-state-unavailable", true)
 		return
 	end
 
@@ -1474,7 +2035,7 @@ local function run_lease_recovery_attempt(recovery)
 	if not status_ok then
 		Logger.error(LOG, "Karabiner lease auto-recovery could not read controller status: %s.",
 			tostring(phase))
-		schedule_lease_recovery(recovery, "lease-status-unavailable")
+		schedule_lease_recovery(recovery, "lease-status-unavailable", true)
 		return
 	end
 	if phase == "recovering" or phase == "fencing" or phase == "pausing"
@@ -1519,10 +2080,15 @@ local function run_lease_recovery_attempt(recovery)
 			recovery.refund_current_attempt = false
 		end
 		recovery.last_reason = reason or "regeneration-failed"
-		schedule_lease_recovery(recovery, reason or "regeneration-failed")
+		schedule_lease_recovery(recovery, reason or "regeneration-failed", true)
 	end
 	local call_ok, requested_or_err = xpcall(function()
-		return M.regenerate(finish_attempt, recovery)
+		return M.regenerate(
+			finish_attempt,
+			recovery,
+			nil,
+			GUARDIAN_READY_REGENERATION
+		)
 	end, debug.traceback)
 	if not call_ok then
 		finish_attempt(false, "regeneration-raised: " .. tostring(requested_or_err))
@@ -1534,12 +2100,19 @@ end
 --- Arms the next bounded retry while retaining exact timer ownership.
 --- @param recovery table Exact bounded recovery series.
 --- @param reason string Stable reason for diagnostics.
+--- @param guardian_proven_ready boolean|nil Exact status proof from this callback chain.
 --- @return boolean scheduled
-schedule_lease_recovery = function(recovery, reason)
+schedule_lease_recovery = function(recovery, reason, guardian_proven_ready)
 	if _lease_recovery ~= recovery or recovery.cancelled or recovery.in_flight
 		or recovery.timer ~= nil or recovery.waiting_for_layout or recovery.waiting_for_phase
+		or recovery.waiting_for_guardian
 		or _pending_layout_refresh ~= nil
 		or not is_current_lifecycle(recovery.epoch) then return false end
+	if guardian_proven_ready ~= true and guardian_status_probe_required() then
+		return probe_guardian_for_recovery(recovery, function()
+			schedule_lease_recovery(recovery, reason, true)
+		end, false, reason)
+	end
 	local next_attempt = recovery.attempt + 1
 	local delay = LEASE_RECOVERY_RETRY_DELAYS_SEC[next_attempt]
 	if type(delay) ~= "number" then
@@ -1573,7 +2146,7 @@ schedule_lease_recovery = function(recovery, reason)
 				"Karabiner lease recovery timer arm %d/%d failed; retrying the same bounded attempt: %s.",
 				recovery.timer_arm_attempts, LEASE_RECOVERY_TIMER_ARM_ATTEMPTS,
 				tostring(schedule_ok and "invalid timer handle" or timer_or_err))
-			return schedule_lease_recovery(recovery, reason)
+			return schedule_lease_recovery(recovery, reason, true)
 		end
 		recovery.exhausted = true
 		Logger.error(LOG,
@@ -1593,6 +2166,76 @@ schedule_lease_recovery = function(recovery, reason)
 	return true
 end
 
+--- Polls the exact launcher status while authorization or guardian health is
+--- unavailable. These checks never consume the bounded regeneration budget and
+--- never register a service or open System Settings by themselves.
+--- @param recovery table Exact retained recovery series.
+--- @param reason any Last canonical status or probe failure.
+--- @return boolean scheduled
+schedule_guardian_status_poll = function(recovery, reason)
+	if _lease_recovery ~= recovery or recovery.cancelled or recovery.in_flight
+		or recovery.timer ~= nil or recovery.waiting_for_layout
+		or recovery.waiting_for_phase or recovery.guardian_probe ~= nil
+		or not is_current_lifecycle(recovery.epoch) then return false end
+	recovery.waiting_for_guardian = true
+	retry_lease_recovery_timer_cleanup()
+
+	local timer = nil
+	local armed = false
+	local fired_before_arm = false
+	local schedule_ok, timer_or_err = pcall(
+		TimerScheduler.after,
+		LEASE_GUARDIAN_STATUS_POLL_SEC,
+		function()
+			if not armed then
+				fired_before_arm = true
+				return
+			end
+			if _lease_recovery ~= recovery or recovery.timer ~= timer then return end
+			run_async_step("Karabiner guardian-status poll", function()
+				recovery.timer = nil
+				recovery.waiting_for_guardian = false
+				local blocked = lease_recovery_block_reason()
+				if blocked then
+					cancel_lease_recovery(blocked)
+					return
+				end
+				probe_guardian_for_recovery(recovery, function()
+					Logger.info(LOG,
+						"Remap guardian became ready; resuming bounded lease recovery.")
+					schedule_lease_recovery(recovery, "guardian-ready", true)
+				end, false, "guardian-status-poll")
+			end)
+		end
+	)
+	if schedule_ok then timer = timer_or_err end
+	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+		recovery.guardian_timer_arm_attempts =
+			(recovery.guardian_timer_arm_attempts or 0) + 1
+		if recovery.guardian_timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
+			Logger.warn(LOG,
+				"Guardian-status timer arm %d/%d failed; retrying without charging recovery: %s.",
+				recovery.guardian_timer_arm_attempts, LEASE_RECOVERY_TIMER_ARM_ATTEMPTS,
+				tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+			return schedule_guardian_status_poll(recovery, reason)
+		end
+		recovery.exhausted = true
+		Logger.error(LOG,
+			"Could not arm guardian-status polling after %d scheduler attempt(s): %s.",
+			recovery.guardian_timer_arm_attempts,
+			tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+		return false
+	end
+	recovery.guardian_timer_arm_attempts = 0
+	recovery.timer = timer
+	armed = true
+	Logger.debug(LOG,
+		"Karabiner lease recovery is waiting for guardian readiness (next check in %.1f s; %s).",
+		LEASE_GUARDIAN_STATUS_POLL_SEC, tostring(reason))
+	return true
+end
+
 --- Starts or coalesces one bounded series after an unexpected lease loss.
 --- A failed enabled-state rollback can finish before its asynchronous exact
 --- fence publishes IDLE/FAILED; in that case the record is retained without a
@@ -1603,10 +2246,6 @@ begin_lease_recovery = function(failed_token, wait_for_phase)
 	if type(failed_token) ~= "string" or failed_token == "" then return end
 	local blocked = lease_recovery_block_reason()
 	if blocked then
-		if blocked == "guardian-approval-required" then
-			Logger.warn(LOG,
-				"Karabiner lease auto-recovery suppressed until the remap guardian is approved.")
-		end
 		cancel_lease_recovery(blocked)
 		return
 	end
@@ -1632,8 +2271,12 @@ begin_lease_recovery = function(failed_token, wait_for_phase)
 			waiting_for_layout = false,
 			layout_barrier_exhausted = false,
 			waiting_for_phase = false,
+			waiting_for_guardian = false,
 			refund_current_attempt = false,
 			timer_arm_attempts = 0,
+			guardian_timer_arm_attempts = 0,
+			guardian_probe = nil,
+			last_guardian_wait_status = nil,
 			owned_token = nil,
 			last_reason = nil,
 			timer = nil,
@@ -2101,6 +2744,48 @@ end
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
 
+--- Opens Login Items only for an enabled integration whose last exact native
+--- observation still requires approval. The child rechecks ServiceManagement
+--- immediately before opening, so a stale menu can never cause the side effect.
+--- @param on_done function|nil Callback fn(ok, reason).
+--- @return boolean accepted
+function M.open_guardian_settings(on_done)
+	if not require_state("open_guardian_settings") then
+		invoke_public_callback("open guardian settings", on_done, false, "not-initialized")
+		return false
+	end
+	if _state.enabled ~= true then
+		invoke_public_callback("open guardian settings", on_done, false, "integration-disabled")
+		return false
+	end
+	local status_ok, _, snapshot = pcall(LeaseController.status)
+	if not status_ok or type(snapshot) ~= "table"
+		or snapshot.guardian_status ~= "requires_approval" then
+		invoke_public_callback("open guardian settings", on_done, false,
+			status_ok and "approval-not-required" or "guardian-status-unavailable")
+		return false
+	end
+
+	local callback_fired = false
+	local function finish(ok, reason)
+		if callback_fired then return end
+		callback_fired = true
+		invoke_public_callback("open guardian settings", on_done, ok, reason)
+	end
+	local call_ok, accepted_or_err = xpcall(function()
+		return LeaseController.open_guardian_settings(finish)
+	end, debug.traceback)
+	if not call_ok then
+		finish(false, "settings-request-raised: " .. tostring(accepted_or_err))
+		return false
+	end
+	if accepted_or_err ~= true then
+		finish(false, "settings-request-rejected")
+		return false
+	end
+	return true
+end
+
 
 
 
@@ -2234,6 +2919,7 @@ function M.set_enabled(value, on_done)
 		return regenerate_requested == true or _enabled_transition == transaction
 	end
 
+	cancel_guardian_regeneration_wait("integration-disable-requested")
 	cancel_deferred_layout_regeneration("integration-disable-requested")
 	cancel_lease_recovery("integration-disable-requested")
 	local _, _, disable_snapshot = pcall(LeaseController.status)
@@ -2607,8 +3293,14 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after READY or failure.
 --- @param recovery_capability any Private enable/rollback/resume capability; public callers omit it.
 --- @param regeneration_context table|nil Private transaction retained across a layout settle.
+--- @param guardian_ready_capability any Private proof from an immediately preceding native probe.
 --- @return boolean True when deployment and activation request were accepted.
-function M.regenerate(on_done, recovery_capability, regeneration_context)
+function M.regenerate(
+	on_done,
+	recovery_capability,
+	regeneration_context,
+	guardian_ready_capability
+)
 	if regeneration_context == nil then
 		local retained = _deferred_layout_regeneration
 		if retained and retained.capability == recovery_capability
@@ -2620,6 +3312,12 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 				tostring(retained.intent))
 			return true
 		end
+	end
+	if guardian_ready_capability ~= nil
+		and guardian_ready_capability ~= GUARDIAN_READY_REGENERATION then
+		Logger.error(LOG, "Karabiner regeneration refused an invalid guardian-ready capability.")
+		invoke_public_callback("regenerate", on_done, false, "invalid-guardian-capability")
+		return false
 	end
 	local enable_transaction = recovery_capability
 	local is_enable_transition = type(enable_transaction) == "table"
@@ -2787,6 +3485,13 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 			"Karabiner regeneration refused because layout event %d exhausted its settle barrier.",
 			_layout_event_serial)
 		return fail("layout-refresh-exhausted")
+	end
+	if guardian_status_probe_required()
+		and guardian_ready_capability ~= GUARDIAN_READY_REGENERATION then
+		Logger.debug(LOG,
+			"Retaining %s Karabiner regeneration behind a fresh native guardian proof.",
+			tostring(context.intent))
+		return queue_guardian_regeneration(context)
 	end
 	Logger.start(LOG, "Regenerating Karabiner config…")
 
@@ -3037,6 +3742,7 @@ function M.stop_lease(on_done)
 		return false
 	end
 	_lease_user_intent_revision = _lease_user_intent_revision + 1
+	cancel_guardian_regeneration_wait("explicit-lease-stop-requested")
 	cancel_deferred_layout_regeneration("explicit-lease-stop-requested")
 	cancel_lease_recovery("explicit-lease-stop-requested")
 	Logger.start(LOG, "Stopping the exact Ergopti Karabiner lease by user request…")
@@ -3084,6 +3790,7 @@ function M.pause(on_done)
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
 	end
+	cancel_guardian_regeneration_wait("script-pause-requested")
 	cancel_deferred_layout_regeneration("script-pause-requested")
 	cancel_lease_recovery("script-pause-requested")
 	local status_ok, phase = pcall(LeaseController.status)
@@ -3541,6 +4248,7 @@ local function stop_local_resources()
 	_running = false
 	_shutdown_requested = true
 	_lifecycle_epoch = _lifecycle_epoch + 1
+	cancel_guardian_regeneration_wait("local-teardown")
 	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
@@ -3623,6 +4331,7 @@ function M.revoke(reason, on_done)
 		_shutdown_requested = true
 		_lifecycle_epoch = _lifecycle_epoch + 1
 	end
+	cancel_guardian_regeneration_wait("lease-revocation-requested")
 	cancel_lease_recovery("lease-revocation-requested")
 	cancel_deferred_layout_regeneration("lease-revocation-requested")
 	_pending_layout_refresh = nil

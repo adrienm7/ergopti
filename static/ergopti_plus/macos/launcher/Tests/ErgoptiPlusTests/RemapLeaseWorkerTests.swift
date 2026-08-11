@@ -565,7 +565,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			initialMode: kLeaseModeActive,
 			heartbeatSeconds: 5
 		)
-		let registration = LeaseGuardianRegistration(identity: freshIdentity, paths: paths)
+		let registration = LeaseGuardianRegistration(
+			identity: freshIdentity,
+			paths: paths,
+			activationAuthorized: { true }
+		)
 		XCTAssertTrue(registration.arm(),
 			"a launchd replacement must durably ACK a fresh exact generation")
 		registration.cancelBeforeActivation()
@@ -864,6 +868,270 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(invalidSignatureFallbackCalls, 1)
 	}
 
+	/// Runtime observation is read-only and requires both eligibility and health.
+	func testModernGuardianObservationNeverRegistersAndRequiresExactHealth() {
+		guard #available(macOS 13.0, *) else { return }
+		for (status, healthy, expected, expectedHealthCalls) in [
+			(SMAppService.Status.enabled, true,
+				RemapGuardianRegistrationStatus.ready, 1),
+			(SMAppService.Status.enabled, false,
+				RemapGuardianRegistrationStatus.unavailable, 1),
+			(SMAppService.Status.requiresApproval, true,
+				RemapGuardianRegistrationStatus.requiresApproval, 0),
+			(SMAppService.Status.notRegistered, true,
+				RemapGuardianRegistrationStatus.ready, 1),
+			(SMAppService.Status.notRegistered, false,
+				RemapGuardianRegistrationStatus.unavailable, 1),
+			(SMAppService.Status.notFound, true,
+				RemapGuardianRegistrationStatus.ready, 1),
+			(SMAppService.Status.notFound, false,
+				RemapGuardianRegistrationStatus.unavailable, 1),
+		] {
+			let service = ScriptedModernGuardianService(status: status)
+			var healthCalls = 0
+			let observed = observeModernRemapGuardianRegistration(
+				service: service,
+				guardianHealth: {
+					healthCalls += 1
+					return healthy
+				}
+			)
+			XCTAssertEqual(observed, expected)
+			XCTAssertEqual(healthCalls, expectedHealthCalls)
+			XCTAssertEqual(service.registerCalls, 0,
+				"a status probe must never mutate Background Items registration")
+		}
+	}
+
+	/// A Background Items transition during filesystem health cannot publish ready.
+	func testModernGuardianObservationRechecksAuthorizationAfterHealth() {
+		guard #available(macOS 13.0, *) else { return }
+		let service = ScriptedModernGuardianService(status: .enabled)
+		let observed = observeModernRemapGuardianRegistration(
+			service: service,
+			guardianHealth: {
+				service.status = .requiresApproval
+				return true
+			}
+		)
+
+		XCTAssertEqual(observed, .requiresApproval)
+		XCTAssertEqual(service.registerCalls, 0)
+	}
+
+	/// Current approval state is checked independently of legacy guardian health.
+	func testModernGuardianActivationAuthorizationFailsClosed() {
+		guard #available(macOS 13.0, *) else { return }
+		for (status, expected) in [
+			(SMAppService.Status.enabled, true),
+			(SMAppService.Status.notRegistered, true),
+			(SMAppService.Status.notFound, true),
+			(SMAppService.Status.requiresApproval, false),
+		] {
+			let service = ScriptedModernGuardianService(status: status)
+			XCTAssertEqual(
+				modernGuardianActivationIsAuthorized(service: service),
+				expected
+			)
+			XCTAssertEqual(service.registerCalls, 0)
+		}
+	}
+
+	/// ARM consults current authorization before publishing any durable record.
+	func testGuardianRegistrationRefusesUnapprovedActivationBeforePublication() {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-denied-arm-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		var authorizationCalls = 0
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths,
+			activationAuthorized: {
+				authorizationCalls += 1
+				return false
+			}
+		)
+
+		XCTAssertFalse(registration.arm())
+		XCTAssertEqual(authorizationCalls, 1)
+		XCTAssertFalse(FileManager.default.fileExists(
+			atPath: paths.recordPath(token: token)
+		))
+	}
+
+	/// ARM rechecks approval after the guardian ACK and retires the pending record.
+	func testGuardianRegistrationRefusesApprovalLostDuringArmHandshake() {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-revoked-arm-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		var authorizationCalls = 0
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths,
+			activationAuthorized: {
+				authorizationCalls += 1
+				return authorizationCalls == 1
+			}
+		)
+
+		XCTAssertFalse(registration.arm())
+		XCTAssertEqual(authorizationCalls, 2)
+		XCTAssertFalse(FileManager.default.fileExists(
+			atPath: paths.recordPath(token: token)
+		))
+		runtime = nil
+	}
+
+	/// A live registration rechecks approval before reporting or transporting authority.
+	func testGuardianRegistrationRevokesAuthorizationFromLiveTransport() {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-revoked-transport-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(runtime?.startObservingForTesting() == true)
+		var authorized = true
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(),
+			paths: paths,
+			activationAuthorized: { authorized }
+		)
+		XCTAssertTrue(registration.arm())
+
+		authorized = false
+		XCTAssertFalse(registration.guardianStillPresent())
+		XCTAssertFalse(registration.beginLiveTransport())
+
+		registration.cancelBeforeActivation()
+		runtime = nil
+	}
+
+	/// Login Items opens only after an explicit request that still needs approval.
+	func testModernGuardianSettingsOpenOnlyForCurrentApprovalRequirement() {
+		guard #available(macOS 13.0, *) else { return }
+		for (status, expected, expectedOpenCalls) in [
+			(SMAppService.Status.requiresApproval,
+				RemapGuardianSettingsResult.opened, 1),
+			(SMAppService.Status.enabled,
+				RemapGuardianSettingsResult.notRequired, 0),
+			(SMAppService.Status.notRegistered,
+				RemapGuardianSettingsResult.notRequired, 0),
+			(SMAppService.Status.notFound,
+				RemapGuardianSettingsResult.notRequired, 0),
+		] {
+			let service = ScriptedModernGuardianService(status: status)
+			var openCalls = 0
+			let result = openModernRemapGuardianSettingsIfRequired(
+				service: service,
+				openSettings: { openCalls += 1 }
+			)
+			XCTAssertEqual(result, expected)
+			XCTAssertEqual(openCalls, expectedOpenCalls)
+			XCTAssertEqual(service.registerCalls, 0,
+				"opening settings must never mutate Background Items registration")
+		}
+	}
+
+	/// The read-only status role accepts only the exact launcher vnode and argv.
+	func testGuardianStatusInvocationRequiresExactLauncherIdentity() {
+		let arguments = ["/Applications/ErgoptiPlus", kRemapGuardianStatusFlag]
+		let environment = [
+			"ERGOPTI_LAUNCHER_DEVICE": "11",
+			"ERGOPTI_LAUNCHER_INODE": "22",
+		]
+		let matchingIdentity = LeaseExecutableIdentity(device: "11", inode: "22")
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: arguments))
+		XCTAssertTrue(validatedGuardianStatusInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: environment,
+			identityReader: { _ in matchingIdentity }
+		))
+		for invalidArguments in [
+			["/Applications/ErgoptiPlus"],
+			arguments + ["unexpected"],
+			["/Applications/ErgoptiPlus", "--unknown"],
+		] {
+			XCTAssertFalse(validatedGuardianStatusInvocation(
+				arguments: invalidArguments,
+				executablePath: "/Applications/ErgoptiPlus",
+				environment: environment,
+				identityReader: { _ in matchingIdentity }
+			))
+		}
+		XCTAssertFalse(validatedGuardianStatusInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: environment,
+			identityReader: { _ in LeaseExecutableIdentity(device: "11", inode: "23") }
+		))
+		XCTAssertFalse(validatedGuardianStatusInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: [:],
+			identityReader: { _ in matchingIdentity }
+		))
+	}
+
+	/// The explicit settings role also rejects every non-exact launcher invocation.
+	func testGuardianSettingsInvocationRequiresExactLauncherIdentity() {
+		let arguments = ["/Applications/ErgoptiPlus", kOpenRemapGuardianSettingsFlag]
+		let environment = [
+			"ERGOPTI_LAUNCHER_DEVICE": "11",
+			"ERGOPTI_LAUNCHER_INODE": "22",
+		]
+		let matchingIdentity = LeaseExecutableIdentity(device: "11", inode: "22")
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: arguments))
+		XCTAssertTrue(validatedGuardianSettingsInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: environment,
+			identityReader: { _ in matchingIdentity }
+		))
+		for invalidArguments in [
+			["/Applications/ErgoptiPlus"],
+			arguments + ["unexpected"],
+			["/Applications/ErgoptiPlus", kRemapGuardianStatusFlag],
+		] {
+			XCTAssertFalse(validatedGuardianSettingsInvocation(
+				arguments: invalidArguments,
+				executablePath: "/Applications/ErgoptiPlus",
+				environment: environment,
+				identityReader: { _ in matchingIdentity }
+			))
+		}
+		XCTAssertFalse(validatedGuardianSettingsInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: environment,
+			identityReader: { _ in LeaseExecutableIdentity(device: "11", inode: "23") }
+		))
+		XCTAssertFalse(validatedGuardianSettingsInvocation(
+			arguments: arguments,
+			executablePath: "/Applications/ErgoptiPlus",
+			environment: [:],
+			identityReader: { _ in matchingIdentity }
+		))
+	}
+
 	/// A healthy exact legacy job is reused without any destructive handoff.
 	func testLegacyRegistrationPreservesAlreadyRunningGuardian() throws {
 		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -1001,7 +1269,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		let registration = LeaseGuardianRegistration(
 			identity: identity,
-			paths: fixture.paths
+			paths: fixture.paths,
+			activationAuthorized: { true }
 		)
 		let observerFinished = DispatchSemaphore(value: 0)
 		DispatchQueue.global(qos: .userInitiated).async {
@@ -1055,7 +1324,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 		let collision = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: fixture.paths
+			paths: fixture.paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertFalse(collision.arm())
 
@@ -1142,7 +1412,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		let armResult = GuardianStartupRecorder()
 		let armFinished = DispatchSemaphore(value: 0)
@@ -1212,7 +1483,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
 		let registrationA = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registrationA.arm())
 		XCTAssertTrue(registrationA.beginLiveTransport())
@@ -1225,7 +1497,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			initialMode: kLeaseModeActive,
 			heartbeatSeconds: 5
 		)
-		let registrationB = LeaseGuardianRegistration(identity: identityB, paths: paths)
+		let registrationB = LeaseGuardianRegistration(
+			identity: identityB,
+			paths: paths,
+			activationAuthorized: { true }
+		)
 		let armBResult = GuardianStartupRecorder()
 		let armBFinished = DispatchSemaphore(value: 0)
 		DispatchQueue.global(qos: .userInitiated).async {
@@ -1795,7 +2071,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
 		XCTAssertTrue(registration.guardianStillPresent())
@@ -1832,7 +2109,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(priorRuntime?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
 		XCTAssertTrue(registration.beginLiveTransport())
@@ -1902,7 +2180,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
 		XCTAssertTrue(registration.beginLiveTransport())
@@ -1952,7 +2231,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
 		XCTAssertTrue(registration.beginLiveTransport())
@@ -2003,7 +2283,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(guardian?.startObservingForTesting() == true)
 		let registration = LeaseGuardianRegistration(
 			identity: makeIdentity(),
-			paths: paths
+			paths: paths,
+			activationAuthorized: { true }
 		)
 		let fixture = try makeExecutableFixture(
 			body: "IFS= read -r command <&3 || exit 40\n"
@@ -2607,6 +2888,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			kKarabinerLeaseRevokeFlag,
 			kKarabinerLeaseInnerFlag,
 			kKarabinerLeaseGuardianFlag,
+			kRemapGuardianStatusFlag,
+			kOpenRemapGuardianSettingsFlag,
 		] {
 			XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: ["ErgoptiPlus", flag]))
 		}

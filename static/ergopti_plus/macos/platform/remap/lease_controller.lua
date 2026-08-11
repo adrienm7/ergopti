@@ -47,8 +47,56 @@ local MAX_PING_SEQUENCE = 2147483647
 local TOKEN_LEDGER_KEY = "ergopti.karabiner.used_tokens.v1"
 local WORKER_FLAG = "--karabiner-lease-worker"
 local REVOKE_FLAG = "--karabiner-lease-revoke"
+local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
+local GUARDIAN_SETTINGS_FLAG = "--open-remap-guardian-settings"
+local GUARDIAN_STATUS_OUTPUT_MAX_BYTES = 32
+local GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES = 32
+local GUARDIAN_STATUSES = {
+	ready = true,
+	requires_approval = true,
+	unavailable = true,
+}
+local GUARDIAN_SETTINGS_RESULTS = {
+	opened = true,
+	not_required = true,
+}
 
 local _state = nil
+
+--- Reads the immutable launcher snapshot only as an initial UI hint. Runtime
+--- recovery always replaces it with an exact native probe before acting.
+--- @return string|nil status Canonical exported status when present.
+local function initial_guardian_status()
+	local ok, status = pcall(os.getenv, "ERGOPTI_REMAP_GUARDIAN_STATUS")
+	if not ok or GUARDIAN_STATUSES[status] ~= true then return nil end
+	return status
+end
+
+--- Allocates one ordering ticket shared by every native guardian observation.
+--- Status probes and the settings recheck answer the same mutable OS question;
+--- putting them on separate clocks lets an older completion clobber newer truth.
+--- @return integer serial Exact latest-started observation serial.
+local function next_guardian_observation()
+	_state.guardian_observation_serial = _state.guardian_observation_serial + 1
+	return _state.guardian_observation_serial
+end
+
+--- Returns whether one native result still names the latest observation.
+--- @param serial integer Captured observation serial.
+--- @return boolean current
+local function guardian_observation_is_current(serial)
+	return _state ~= nil and _state.guardian_observation_serial == serial
+end
+
+--- Invalidates one exact observation before crossing its native cancel boundary.
+--- A failed terminate must never leave its eventual callback authorized to
+--- publish cache state or resume a recovery using stale authorization.
+--- @param serial integer Captured observation serial.
+local function invalidate_guardian_observation(serial)
+	if guardian_observation_is_current(serial) then
+		_state.guardian_observation_serial = serial + 1
+	end
+end
 
 
 
@@ -1196,6 +1244,157 @@ function M.is_initialized()
 	return _state ~= nil
 end
 
+--- Observes current ServiceManagement authorization plus exact guardian health
+--- through the bundle-owned launcher. No registration or shell is involved.
+--- @param on_done function Callback fn(status, reason); status is canonical or nil.
+--- @return table|nil handle Started cancellation wrapper, or nil on rejection.
+--- @return string|nil error_message Stable launch failure detail.
+function M.probe_guardian_status(on_done)
+	if not require_state("probe_guardian_status") then return nil, "uninitialized" end
+	if type(on_done) ~= "function" then
+		Logger.error(LOG, "probe_guardian_status requires a completion callback.")
+		return nil, "invalid-callback"
+	end
+	local observation_serial = next_guardian_observation()
+	local request = {
+		cancelled = false,
+		settled = false,
+		termination_complete = false,
+	}
+	local raw_handle, helper_error = spawn_current_helper(
+		{ GUARDIAN_STATUS_FLAG },
+		function(exit_code, stdout, stderr)
+			if request.cancelled or request.settled then return end
+			request.settled = true
+			-- A settings recheck or newer status probe supersedes both the cache
+			-- write and the consumer callback from this older observation.
+			if not guardian_observation_is_current(observation_serial) then return end
+			local status = nil
+			if exit_code == 0 and type(stdout) == "string"
+				and #stdout <= GUARDIAN_STATUS_OUTPUT_MAX_BYTES then
+				status = stdout:match("^([a-z_]+)\n$")
+				if GUARDIAN_STATUSES[status] ~= true then status = nil end
+			end
+			if status then
+				_state.guardian_status = status
+				invoke_callback("lease.probe_guardian_status", on_done, status, nil)
+				return
+			end
+			local reason = string.format("guardian status probe failed (exit %s): %s",
+				tostring(exit_code), tostring(stderr))
+			-- The retained polling owner rate-limits this routine external fault.
+			-- Logging here as well emitted one warning every three seconds.
+			invoke_callback("lease.probe_guardian_status", on_done, nil, reason)
+		end
+	)
+	if not raw_handle then
+		request.cancelled = true
+		invalidate_guardian_observation(observation_serial)
+		return nil, helper_error or "helper-unavailable"
+	end
+
+	-- Logical invalidation precedes native termination. Retain the same opaque
+	-- raw handle after false/throw so a later teardown can retry exact ownership.
+	local handle = {}
+	function handle.terminate()
+		if not request.cancelled then
+			request.cancelled = true
+			invalidate_guardian_observation(observation_serial)
+		end
+		if request.termination_complete or request.settled then return true end
+		local terminate = raw_handle and raw_handle.terminate or nil
+		if type(terminate) ~= "function" then return false end
+		local terminated = terminate()
+		if terminated == true then request.termination_complete = true end
+		return terminated == true
+	end
+
+	local start_ok, started = pcall(raw_handle.start)
+	if request.settled then return handle, nil end
+	if not start_ok or started ~= true then
+		request.cancelled = true
+		invalidate_guardian_observation(observation_serial)
+		return nil, start_ok and "helper-start-failed"
+			or "helper-start-raised: " .. tostring(started)
+	end
+	return handle, nil
+end
+
+--- Opens the exact Login Items settings pane after a native current-status
+--- recheck. Re-entrant clicks join one child process; no registration or stock
+--- Karabiner process control is performed here.
+--- @param on_done function|nil Callback fn(ok, reason).
+--- @return boolean accepted
+function M.open_guardian_settings(on_done)
+	if not require_state("open_guardian_settings") then
+		invoke_callback("lease.open_guardian_settings", on_done, false, "uninitialized")
+		return false
+	end
+	if _state.guardian_status ~= "requires_approval" then
+		invoke_callback("lease.open_guardian_settings", on_done, false, "approval-not-required")
+		return false
+	end
+	local existing = _state.guardian_settings_request
+	if existing then
+		if type(on_done) == "function" then
+			existing.callbacks[#existing.callbacks + 1] = on_done
+		end
+		return true
+	end
+
+	local request = {
+		callbacks = type(on_done) == "function" and { on_done } or {},
+		handle = nil,
+		settled = false,
+		observation_serial = next_guardian_observation(),
+	}
+	_state.guardian_settings_request = request
+	local function finish_request(ok, reason)
+		if request.settled then return end
+		request.settled = true
+		if _state and _state.guardian_settings_request == request then
+			_state.guardian_settings_request = nil
+		end
+		settle_callbacks("lease.open_guardian_settings", request.callbacks, ok, reason)
+	end
+
+	local handle, helper_error = spawn_current_helper(
+		{ GUARDIAN_SETTINGS_FLAG },
+		function(exit_code, stdout, stderr)
+			local result = nil
+			if exit_code == 0 and type(stdout) == "string"
+				and #stdout <= GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES then
+				result = stdout:match("^([a-z_]+)\n$")
+				if GUARDIAN_SETTINGS_RESULTS[result] ~= true then result = nil end
+			end
+			if result then
+				if result == "not_required" and _state
+					and _state.guardian_settings_request == request
+					and guardian_observation_is_current(request.observation_serial) then
+					_state.guardian_status = nil
+				end
+				finish_request(true, result)
+				return
+			end
+			finish_request(false, string.format("guardian settings helper failed (exit %s): %s",
+				tostring(exit_code), tostring(stderr)))
+		end
+	)
+	if not handle then
+		finish_request(false, helper_error or "helper-unavailable")
+		return false
+	end
+	request.handle = handle
+	local start_ok, started = pcall(handle.start)
+	if request.settled then return true end
+	if not start_ok or started ~= true then
+		finish_request(false, start_ok and "helper-start-failed"
+			or "helper-start-raised: " .. tostring(started))
+		return false
+	end
+	return true
+end
+
 --- Initializes the controller without touching Karabiner or starting a task.
 --- @param phase_listener function|nil Guarded callback fn(phase, token) invoked
 ---   for lifecycle changes so dependent consumers can release claimed state.
@@ -1218,6 +1417,9 @@ function M.init(phase_listener)
 		used_token_order = used_token_order or {},
 		token_ledger_ready = token_ledger_ready,
 		token_ledger_error = token_ledger_error,
+		guardian_status = initial_guardian_status(),
+		guardian_observation_serial = 0,
+		guardian_settings_request = nil,
 		helper_path = helper_path,
 		helper_error = helper_err,
 		last_phase = token_ledger_ready and "idle" or "failed",
@@ -1553,6 +1755,7 @@ function M.status()
 	end
 	return phase, {
 		phase = phase,
+		guardian_status = _state.guardian_status,
 		token = generation and generation.token or nil,
 		mode = generation and generation.mode or nil,
 		revoked = generation and generation.revoked or nil,

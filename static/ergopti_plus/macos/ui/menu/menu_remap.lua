@@ -773,18 +773,22 @@ function M.build(ctx)
 	local enabled = karabiner.get_enabled()
 	-- Status is an in-memory lease-controller read. Opening this submenu while
 	-- disabled never probes, launches or otherwise touches stock Karabiner.
-	local phase         = read_lease_status()
+	local phase, snapshot = read_lease_status()
 	local active        = enabled and phase == "active"
 	local transitioning = enabled and (phase == "starting" or phase == "pausing"
 		or phase == "resuming" or phase == "stopping")
 	local lease_attached = phase == "starting" or phase == "active" or phase == "paused"
 		or phase == "pausing" or phase == "resuming" or phase == "stopping"
+	local guardian_approval_required = enabled
+		and snapshot.guardian_status == "requires_approval"
 	local tap_hold, raccourcis = build_picker_trees(karabiner, update_menu, enabled)
 
 	-- The icon reports only facts Ergopti owns: exact lease active, transitioning,
 	-- enabled-but-inactive, or disabled. It never infers ownership from a shared PID.
 	local status_title
-	if active then
+	if guardian_approval_required then
+		status_title = i18n.get("menu.karabiner.status_guardian_approval_required")
+	elseif active then
 		status_title = i18n.get("menu.karabiner.status_active")
 	elseif transitioning then
 		status_title = i18n.get("menu.karabiner.status_priming")
@@ -796,14 +800,49 @@ function M.build(ctx)
 
 	local status_rows = {}
 
-	status_rows[#status_rows + 1] = {
-		label    = status_title,
-		disabled = not enabled,
-		action   = enabled and function()
+	local status_action = nil
+	if guardian_approval_required then
+		status_action = function()
+			-- Menu closures can outlive the state they rendered. Re-read the facade
+			-- before any native launch so disabling the integration makes this inert.
+			local enabled_ok, still_enabled = pcall(karabiner.get_enabled)
+			if not enabled_ok or still_enabled ~= true then
+				Logger.debug(LOG,
+					"Ignoring stale guardian approval action after Karabiner integration disable.")
+				return
+			end
+
+			local callback_fired = false
+			local function finish(ok, reason)
+				if callback_fired then return end
+				callback_fired = true
+				if ok ~= true then
+					Logger.error(LOG, "Could not open Login Items settings: %s.", tostring(reason))
+					Notifications.notify(
+						i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
+				end
+				if update_menu then pcall(update_menu) end
+			end
+			local call_ok, accepted_or_err = xpcall(function()
+				return karabiner.open_guardian_settings(finish)
+			end, debug.traceback)
+			if not call_ok then
+				finish(false, "settings-action-raised: " .. tostring(accepted_or_err))
+			elseif accepted_or_err ~= true and not callback_fired then
+				finish(false, "settings-action-rejected")
+			end
+		end
+	elseif enabled then
+		status_action = function()
 			Logger.info(LOG, "Status clicked — rebuilding inert rules and requesting exact lease activation.")
 			request_regeneration(karabiner, "Status rebuild")
 			if update_menu then pcall(update_menu) end
-		end or nil,
+		end
+	end
+	status_rows[#status_rows + 1] = {
+		label    = status_title,
+		disabled = not enabled,
+		action   = status_action,
 	}
 	status_rows[#status_rows + 1] = {
 		label  = i18n.get("menu.karabiner.open_gui"),
