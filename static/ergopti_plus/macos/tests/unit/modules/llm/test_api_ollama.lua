@@ -218,6 +218,14 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	local ensure_impl = get_upvalue(ApiOllama.ensure_running, "ensure_ollama_running")
 	local shell_runner = ensure_impl and get_upvalue(ensure_impl, "ShellRunner") or nil
 	local scheduler = ensure_impl and get_upvalue(ensure_impl, "TimerScheduler") or nil
+	local binary_resolver = ensure_impl and get_upvalue(ensure_impl, "OllamaBinary") or nil
+	local original_resolve = binary_resolver and binary_resolver.resolve or nil
+	helpers.assert_not_nil(original_resolve,
+		"startup ownership tests must control the independent executable-resolution dependency")
+	-- This describe exercises task commitment, not filesystem discovery. The
+	-- bundled-path regression test drives the real resolver with executable and
+	-- non-executable fixtures; supplying one valid path here isolates ownership.
+	binary_resolver.resolve = function() return "/fixture/ollama", nil, true end
 
 	local function reset_startup_state()
 		helpers.assert_not_nil(ensure_impl, "the behavioral test must reach the real startup transaction")
@@ -314,6 +322,8 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			if not ok then error(err) end
 		end)
 	end
+
+	binary_resolver.resolve = original_resolve
 end)
 
 
