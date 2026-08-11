@@ -27,7 +27,6 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
@@ -490,7 +489,6 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		},
 		function(_event)
 			if watcher_gen ~= _capsword_watcher_gen then return false end
-			if EventTapGuard.handle_disabled(_event, watcher, "karabiner.trackpad_capsword") then return false end
 			-- This is the hottest eventtap. Keep the full probe entry guarded even
 			-- though each async constructor/completion also has its own file-log boundary.
 			Logger.pcall(LOG, deactivate_current_capsword)

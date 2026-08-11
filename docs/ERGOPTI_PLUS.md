@@ -551,7 +551,7 @@ updateElement) · `TrayMenu` (setIcon, setMenu, setTooltip, destroy) · `WindowI
 getFocused)
 
 `adapters/` contient aussi des helpers d'isolation OS qui **ne sont pas des ports** et c'est
-volontaire : `shell_runner` (les trois), `event_tap_guard` / `json_codec` / `toml_cache`
+volontaire : `shell_runner` (les trois), `json_codec` / `toml_cache`
 (macOS), `event_loop` (Linux). La règle est « `adapters/` est la couche d'isolation OS », pas
 « exactement les 20 ports ».
 

@@ -19,7 +19,6 @@ local CAPTURED_STACK = {
 	"adapters.clipboard",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.event_tap_guard",
 	"adapters.timer_scheduler",
 }
 

@@ -1,145 +1,135 @@
 --- tests/unit/adapters/test_event_tap_guard_counts.lua
 
 --- ==============================================================================
---- MODULE: Event-Tap Disable Accounting
+--- MODULE: Honest Event-Tap Timeout Telemetry
 --- DESCRIPTION:
---- When a tap callback overruns the CoreGraphics deadline, macOS disables the tap
---- and tells us so through the callback itself. That notification is the ONLY
---- latency event the OS reports to this driver directly, which makes counting it
---- the driver's only self-reported performance metric.
+--- The bundled Hammerspoon runtime consumes tap-disable notifications before
+--- Lua. A zero count would therefore claim a measurement that never ran. The
+--- health snapshot and both report formats must disclose that blind spot.
 ---
---- WHY A COUNT AND NOT JUST THE LOG LINE:
---- the guard has always logged the disable. A log line is recoverable — it takes
---- a user willing to send their log and someone willing to grep it — but it is
---- not OBSERVABLE: the driver cannot answer "how often did this happen to you?".
---- The count can, and it lands in the health report the same user already opens.
---- Found by the 2026-08-04 performance audit, whose own prompt names it: "compte
---- combien de fois il a tiré dans les logs — c'est ta mesure directe du nombre de
---- fois où le budget a été dépassé en conditions réelles."
----
---- THE TWO CAUSES ARE COUNTED SEPARATELY ON PURPOSE. A timeout is our latency to
---- fix. A user-input disable is the accessibility permission moving underneath
---- us, and has nothing to do with performance. Summing them would put the second
---- into a number someone reads as the first.
+--- ROOT CAUSE ENCODED:
+--- The former counter was only exercised through constants invented by the test
+--- stub. These behavioral assertions observe the diagnostic data and text that
+--- users actually receive, including the fallback for older stored snapshots.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- The synthetic event types. The guard resolves them from hs.eventtap.event.types
--- at call time, so the stub must publish the same names.
-local TYPE_TIMEOUT    = 0xFFFE
-local TYPE_USER_INPUT = 0xFFFF
-local TYPE_KEY_DOWN   = 10
+local CONTRACT_VERSION = "1.1.1"
+local TELEMETRY_LABEL = "Native tap timeout telemetry"
 
 
-
-
--- ==================================================
--- ==================================================
--- ======= 1/ Harness ===============================
--- ==================================================
--- ==================================================
-
---- Loads the guard against an hs stub that publishes the disable types.
---- @return table Guard module.
-local function fresh_guard()
-	local Guard = helpers.load_with_stubs("adapters.event_tap_guard", {
-		eventtap = {
-			event = {
-				types = {
-					tapDisabledByTimeout   = TYPE_TIMEOUT,
-					tapDisabledByUserInput = TYPE_USER_INPUT,
-					keyDown                = TYPE_KEY_DOWN,
-				},
-			},
-		},
-	})
-	Guard.reset_disable_counts()
-	return Guard
-end
-
---- A minimal event object answering getType().
---- @param t number
---- @return table
-local function event_of(t)
-	return { getType = function() return t end }
-end
-
---- A tap whose start() always succeeds.
---- @return table
-local function live_tap()
-	return { start = function() end }
+--- Loads the healthcheck formatter without invoking live OS collectors.
+--- @return table Healthcheck core module.
+local function load_healthcheck(runtime_version)
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["ui.healthcheck.helpers"] = {
+		format_uptime = function() return "0s" end,
+		sys_info = function() return { hs_version = runtime_version or CONTRACT_VERSION } end,
+	}
+	package.loaded["infra.paths"] = {
+		shared = function() return "" end,
+	}
+	package.loaded["healthcheck.snapshot"] = {
+		count_issues = function() return 0, 0 end,
+		extract_recent_issues = function() return {} end,
+	}
+	package.loaded["ui.healthcheck.core"] = nil
+	return require("ui.healthcheck.core")
 end
 
 
+--- Returns the smallest complete snapshot accepted by format_plain().
+--- @return table Diagnostic snapshot.
+local function empty_snapshot()
+	return {
+		version = "test",
+		uptime_sec = 0,
+		warn_count = 0,
+		err_count = 0,
+		sys = {},
+		ports_validated = {},
+		failed_adapters = {},
+		unwired_adapters = {},
+		wired_count = 0,
+		adapter_count = 0,
+	}
+end
 
 
--- ==================================================
--- ==================================================
--- ======= 2/ The tally =============================
--- ==================================================
--- ==================================================
+helpers.describe("event tap telemetry: health snapshot", function()
 
-helpers.describe("event_tap_guard: disable accounting", function()
+	helpers.it("publishes a structured unavailable result", function()
+		local telemetry = load_healthcheck().run().event_tap_timeout_telemetry
 
-	helpers.it("starts at zero", function()
-		local Guard = fresh_guard()
-		local counts = Guard.disable_counts()
-		helpers.assert_eq(0, counts.by_timeout)
-		helpers.assert_eq(0, counts.by_user)
+		helpers.assert_not_nil(telemetry,
+			"the web renderer receives M.run(), so a format-only disclaimer stays invisible")
+		helpers.assert_eq(false, telemetry.available,
+			"the snapshot must not describe this native-only signal as measured")
 	end)
 
-	helpers.it("counts a callback overrun", function()
-		local Guard = fresh_guard()
-		Guard.handle_disabled(event_of(TYPE_TIMEOUT), live_tap(), "keymap.main")
-		local counts = Guard.disable_counts()
-		helpers.assert_eq(1, counts.by_timeout,
-			"a tap disabled after its callback overran the deadline must be counted — it is the "
-			.. "only latency event macOS reports to this driver directly")
-		helpers.assert_eq(0, counts.by_user,
-			"an overrun is not an accessibility change; summing the two would put a permission "
-			.. "toggle into the number someone reads as a performance measurement")
+	helpers.it("ties the unavailable result to the reviewed runtime", function()
+		local telemetry = load_healthcheck().run().event_tap_timeout_telemetry
+
+		helpers.assert_eq(CONTRACT_VERSION, telemetry.reviewed_hammerspoon_version)
+		helpers.assert_eq(CONTRACT_VERSION, telemetry.runtime_hammerspoon_version)
+		helpers.assert_eq(true, telemetry.native_contract_reviewed)
+		helpers.assert_contains(telemetry.summary, CONTRACT_VERSION)
+		helpers.assert_contains(telemetry.summary, "unavailable")
 	end)
 
-	helpers.it("counts an accessibility change separately", function()
-		local Guard = fresh_guard()
-		Guard.handle_disabled(event_of(TYPE_USER_INPUT), live_tap(), "keymap.main")
-		local counts = Guard.disable_counts()
-		helpers.assert_eq(0, counts.by_timeout)
-		helpers.assert_eq(1, counts.by_user)
+	helpers.it("does not apply the reviewed contract to a different runtime", function()
+		local telemetry = load_healthcheck("9.9.9").run().event_tap_timeout_telemetry
+
+		helpers.assert_eq("9.9.9", telemetry.runtime_hammerspoon_version)
+		helpers.assert_eq(false, telemetry.native_contract_reviewed)
+		helpers.assert_contains(telemetry.summary, "unreviewed runtime Hammerspoon 9.9.9")
+		helpers.assert_true(not telemetry.summary:find("reviewed Hammerspoon 1.1.1 consumes", 1, true),
+			"a build override must not inherit the default runtime's native guarantee")
 	end)
 
-	helpers.it("attributes each disable to its tap", function()
-		local Guard = fresh_guard()
-		Guard.handle_disabled(event_of(TYPE_TIMEOUT), live_tap(), "keymap.main")
-		Guard.handle_disabled(event_of(TYPE_TIMEOUT), live_tap(), "keymap.main")
-		Guard.handle_disabled(event_of(TYPE_TIMEOUT), live_tap(), "gestures.primer")
-		local taps = Guard.disable_counts().taps
-		helpers.assert_eq(2, taps["keymap.main"],
-			"per-tap attribution is what turns the number into an action: it names WHICH callback "
-			.. "is too slow, and they have very different owners")
-		helpers.assert_eq(1, taps["gestures.primer"])
+	helpers.it("returns an isolated telemetry table on every run", function()
+		local Healthcheck = load_healthcheck()
+		local first = Healthcheck.run().event_tap_timeout_telemetry
+		first.summary = "forged"
+		local second = Healthcheck.run().event_tap_timeout_telemetry
+
+		helpers.assert_true(first ~= second, "diagnostic snapshots must not share mutable state")
+		helpers.assert_true(second.summary ~= "forged",
+			"a report consumer must not be able to rewrite future telemetry status")
 	end)
 
-	helpers.it("does not count an ordinary event", function()
-		local Guard = fresh_guard()
-		Guard.handle_disabled(event_of(TYPE_KEY_DOWN), live_tap(), "keymap.main")
-		local counts = Guard.disable_counts()
-		helpers.assert_eq(0, counts.by_timeout,
-			"every keystroke passes through this function. Counting one would report a driver that "
-			.. "overruns its deadline on every key, which is the opposite of a useful metric")
-		helpers.assert_eq(0, counts.by_user)
+end)
+
+
+helpers.describe("event tap telemetry: plain report", function()
+
+	helpers.it("states unavailable instead of reporting a false zero", function()
+		local report = load_healthcheck().format_plain(empty_snapshot())
+
+		helpers.assert_contains(report, TELEMETRY_LABEL,
+			"an absent line is ambiguous; the blind spot must be explicit")
+		helpers.assert_contains(report, CONTRACT_VERSION,
+			"the claim must name the runtime contract it was derived from")
+		helpers.assert_contains(report, "unavailable")
 	end)
 
-	helpers.it("hands back a copy, not the live tally", function()
-		local Guard = fresh_guard()
-		Guard.handle_disabled(event_of(TYPE_TIMEOUT), live_tap(), "keymap.main")
-		local snapshot = Guard.disable_counts()
-		snapshot.by_timeout = 999
-		snapshot.taps["keymap.main"] = 999
-		local fresh = Guard.disable_counts()
-		helpers.assert_eq(1, fresh.by_timeout, "a caller mutating the snapshot must not rewrite history")
-		helpers.assert_eq(1, fresh.taps["keymap.main"])
+	helpers.it("does not retain the old invented measurement language", function()
+		local report = load_healthcheck().format_plain(empty_snapshot())
+
+		helpers.assert_true(not report:find("after a callback overran", 1, true),
+			"the removed counter must not survive in the text fallback")
+		helpers.assert_true(not report:find("Tap disables", 1, true),
+			"the report must not present native-only events as a Lua tally")
+	end)
+
+	helpers.it("keeps older stored snapshots honest through the fallback", function()
+		local snapshot = empty_snapshot()
+		snapshot.event_tap_timeout_telemetry = nil
+		local report = load_healthcheck().format_plain(snapshot)
+
+		helpers.assert_contains(report, "unavailable")
+		helpers.assert_contains(report, CONTRACT_VERSION)
 	end)
 
 end)

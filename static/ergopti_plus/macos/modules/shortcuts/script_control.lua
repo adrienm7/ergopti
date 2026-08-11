@@ -21,7 +21,6 @@ local M = {}
 
 local hs            = hs
 local notifications = require("infra.notifications")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local Logger        = require("infra.logger")
@@ -965,7 +964,6 @@ end
 --- @param e userdata The hs.eventtap.event object.
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
-	if EventTapGuard.handle_disabled(e, _tap, "shortcuts.script_control") then return false end
 	local provenance, status, fence = EventProvenance.classify_with_fence(
 		e, "shortcuts.script_control")
 	local fence_events = fence and fence.events or nil
@@ -1111,9 +1109,9 @@ function M.start(keymap, shortcuts, gestures, karabiner)
 	_tap = new_tap
 	pcall(function() _tap:start() end)
 
-	-- Hard safety net: if macOS ever disables the tap (a stalled callback or a
-	-- blocking osascript on the run loop), re-enable it so the script-management
-	-- shortcuts can never get permanently stuck off.
+	-- Hard safety net: Hammerspoon normally recovers CoreGraphics timeout signals
+	-- in native code, but any tap still observed disabled must be re-enabled so
+	-- the script-management shortcuts cannot remain stuck off.
 	if _tap_watchdog then pcall(function() _tap_watchdog:stop() end) end
 	_tap_watchdog = hs.timer.doEvery(TAP_WATCHDOG_INTERVAL_SEC, function()
 		if _tap and type(_tap.isEnabled) == "function" and not _tap:isEnabled() then

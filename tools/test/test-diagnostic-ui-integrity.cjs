@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
@@ -83,6 +84,46 @@ check(
     SHARED_UI_DIR + '/index.html',
     /script\.js/
 );
+
+/**
+ * Executes the shared renderer against the macOS-only telemetry shape.
+ * A source grep would pass if the label lived in dead code or read the wrong
+ * field, so this assertion observes the HTML the user actually sees.
+ */
+function checkNativeTapTelemetryRender() {
+	const content = { innerHTML: '' };
+	const sandbox = {
+		window: {},
+		document: {
+			getElementById: () => content,
+		},
+		escapeHtml: value => String(value),
+	};
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+	sandbox.window.renderHealthcheck({
+		version: 'test',
+		uptime_sec: 0,
+		sys: { hs_version: '1.1.1' },
+		event_tap_timeout_telemetry: {
+			available: false,
+			summary: 'unavailable — native contract marker',
+		},
+	});
+
+	if (content.innerHTML.includes('Native tap timeout telemetry')
+		&& content.innerHTML.includes('unavailable — native contract marker')) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: macOS native tap telemetry status is rendered`);
+		return;
+	}
+
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: macOS native tap telemetry status is rendered`);
+	console.log('       Violation: rendered HTML omitted the explicit unavailable status');
+}
+
+checkNativeTapTelemetryRender();
 
 // --- Hammerspoon (macOS) Checks ---
 // The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua

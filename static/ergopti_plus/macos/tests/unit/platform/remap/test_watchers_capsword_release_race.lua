@@ -31,9 +31,6 @@ local function fresh_harness(options)
 	options = options or {}
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 
 	local h = {
 		clock = 1000,

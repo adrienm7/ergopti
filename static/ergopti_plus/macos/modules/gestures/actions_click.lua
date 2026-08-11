@@ -23,7 +23,6 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local Timings = require("infra.timings")
@@ -60,7 +59,6 @@ end
 local function start_click_key_watcher()
 	if click_key_watcher then return end
 	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(e)
-		if EventTapGuard.handle_disabled(e, click_key_watcher, "gestures.click_key") then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			e, "gestures.click_key")
 		local ordered_events = {}
@@ -181,7 +179,6 @@ function M.toggle_right_click()
 	local t0       = hs.timer.secondsSinceEpoch()
 	local evTypes  = hs.eventtap.event.types
 	rightMouseTap  = hs.eventtap.new({ evTypes.mouseMoved, evTypes.rightMouseUp }, function(e)
-		if EventTapGuard.handle_disabled(e, rightMouseTap, "gestures.right_click") then return false end
 		local t = e:getType()
 		if t == evTypes.rightMouseUp then
 			-- Swallow the spurious finger-lift mouseUp within the cooldown window.
@@ -235,7 +232,6 @@ function M.toggle_left_click()
 	local t0      = hs.timer.secondsSinceEpoch()
 	local evTypes = hs.eventtap.event.types
 	leftMouseTap  = hs.eventtap.new({ evTypes.mouseMoved, evTypes.leftMouseUp }, function(e)
-		if EventTapGuard.handle_disabled(e, leftMouseTap, "gestures.left_click") then return false end
 		local t = e:getType()
 		if t == evTypes.leftMouseUp then
 			-- Swallow the spurious finger-lift mouseUp within the cooldown window.

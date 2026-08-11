@@ -38,6 +38,10 @@ package.loaded["modules.gestures.actions"] = {
   SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" },
   AX_NAMES = {}
 }
+-- Pause requires tooltip teardown to commit. Keep the generic state-machine
+-- tests independent from the real canvas-backed tooltip, which cannot own a
+-- surface under the headless hs stub.
+package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 
 -- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
 -- sentinel guard delegates the live right-AltGr query to that adapter).
@@ -318,11 +322,11 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 end)
 
 helpers.describe("ScriptControl eventtap watchdog (tap-disable recovery regression)", function()
-	-- Regression: a blocking osascript on the run loop (the pause/resume layout
-	-- switch) can make macOS disable the script-control CGEventTap. A disabled tap
-	-- silently stops delivering events, so AltGr+Enter (right_command + Enter) no
-	-- longer toggles pause AT ALL. M.start now arms a watchdog that re-enables the
-	-- tap so the script-management shortcuts can never get permanently stuck off.
+	-- Hammerspoon 1.1.1 normally handles CoreGraphics timeout notifications and
+	-- re-enables the tap in native code. This simulates the residual state where
+	-- a native or lifecycle failure leaves the script-control tap disabled. The
+	-- watchdog must remain as an independent recovery path, or AltGr+Enter can
+	-- stay permanently unavailable.
 	helpers.it("re-enables the script-control tap after macOS disables it", function()
 		local started = 0
 		local enabled = true

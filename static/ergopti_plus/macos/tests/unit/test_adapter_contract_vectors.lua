@@ -232,7 +232,6 @@ helpers.describe("Adapter contract vectors: TextSender", function()
 
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
-		package.loaded["adapters.event_tap_guard"] = nil
 		local adapter = helpers.load_with_stubs("adapters.text_sender", { eventtap = eventtap })
 		local hs_table = _G.hs
 

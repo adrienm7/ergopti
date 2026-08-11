@@ -20,17 +20,12 @@
 ---    emulators, games, anything using IOHID — treat a synthesised copy
 ---    differently from the key the user actually pressed. Returning false with
 ---    the flags already set is what lets the real event continue.
---- 3. A tap macOS switches off is reported. The callback routes through
----    EventTapGuard like every other tap in the driver, so a callback that
----    overruns the CoreGraphics deadline is visible in the log rather than
----    silently leaving the modifiers armed forever.
 --- ==============================================================================
 
 local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 
@@ -93,7 +88,6 @@ function M.arm(flags, on_applied)
 	if _tap then return true end
 
 	local ok, tap_or_err = pcall(hs.eventtap.new, { hs.eventtap.event.types.keyDown }, function(event)
-		if EventTapGuard.handle_disabled(event, _tap, LOG) then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "modifier_injector")
 		local fence_events = fence and fence.events or nil

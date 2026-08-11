@@ -3,15 +3,16 @@
 --- ==============================================================================
 --- MODULE: Regression — keylogger tap-watchdog behavioral test (C2)
 --- DESCRIPTION:
---- When macOS silently disables the keylogger eventtap (kCGEventTapDisabledByTimeout
---- after a blocking call, screen-saver unlock, or security prompt), keystrokes are
---- no longer captured. The tap-watchdog timer (TAP_WATCHDOG_INTERVAL_SEC = 5 s)
---- must detect the disabled tap and call _event_tap:start() to revive it.
+--- Hammerspoon 1.1.1 normally handles CoreGraphics timeout notifications and
+--- re-enables the tap in native code before Lua runs. A native or lifecycle
+--- failure can still leave the keylogger tap observed disabled after wake,
+--- unlock, or a security prompt. The watchdog is the independent backstop that
+--- calls KeyboardHook.start() when that residual state is observed.
 ---
 --- This test verifies the structural contract of the watchdog:
 ---   1. A TAP_WATCHDOG_INTERVAL_SEC-second repeating timer is started by M.start().
 ---   2. The callback checks CoreState.is_enabled (gate: no restart while paused).
----   3. The callback checks _event_tap:isEnabled() to detect OS-disabled taps.
+---   3. The callback checks the hook state to detect a still-disabled tap.
 ---   4. The callback calls _event_tap:start() when the tap is disabled.
 ---   5. The watchdog timer is stopped (and cleared) by M.stop().
 ---
@@ -72,7 +73,7 @@ helpers.describe("keylogger: tap-watchdog behavioral contract (C2)", function()
 		helpers.assert_true(
 			callback_window:find("not KeyboardHook.isRunning()", 1, true) ~= nil,
 			"watchdog callback must ask KeyboardHook whether the tap is running; "
-			.. "without this check the watchdog cannot detect a silent kCGEventTapDisabledByTimeout")
+			.. "without this check the watchdog cannot detect a tap that remains disabled")
 	end)
 
 	helpers.it("watchdog callback restarts the tap through KeyboardHook", function()

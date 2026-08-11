@@ -1572,8 +1572,8 @@ function M.start(script_control)
 	})
 	_event_tap = true
 
-	-- Tap watchdog: restarts the event tap if Hammerspoon silently disabled it
-	-- (can happen after a system wake, screen-saver unlock, or security prompt).
+	-- Independent backstop: restart a tap that remains disabled after native or
+	-- lifecycle recovery (for example after wake, unlock, or a security prompt).
 	if not _tap_watchdog_timer then
 		_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC, function()
 			if not CoreState.is_enabled then return end

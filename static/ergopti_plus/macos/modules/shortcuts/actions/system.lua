@@ -31,7 +31,6 @@ local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
@@ -437,7 +436,6 @@ function M.toggle_awake()
 			end
 		end
 		awake_input_watcher = eventtap.new(watch_types, function(_ev)
-			if EventTapGuard.handle_disabled(_ev, awake_input_watcher, "shortcuts.keep_awake") then return false end
 			local is_physical, fence_events = classify_physical_event(
 				_ev, "shortcuts.keep_awake")
 			if not is_physical or not awake_active then
@@ -591,7 +589,6 @@ end
 function M.bind_instant_screenshot()
 	local tap
 	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.at_hash") then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.at_hash")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -625,7 +622,6 @@ function M.bind_layer_scroll()
 	key_tap = hs.eventtap.new(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
-			if EventTapGuard.handle_disabled(event, key_tap, "shortcuts.f19_layer") then return false end
 			local is_physical, fence_events = classify_physical_event(
 				event, "shortcuts.f19_layer")
 			if not is_physical then return finish_tap(false, fence_events) end
@@ -659,7 +655,6 @@ function M.bind_layer_scroll()
 
 	local scroll_tap
 	scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
-		if EventTapGuard.handle_disabled(event, scroll_tap, "shortcuts.f19_scroll") then return false end
 		local is_physical, fence_events = classify_physical_event(
 			event, "shortcuts.f19_scroll")
 		if not is_physical or not layer_held then
@@ -714,7 +709,6 @@ end
 function M.bind_cmd_star(on_trigger)
 	local tap
 	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.cmd_star") then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.cmd_star")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -870,7 +864,6 @@ end
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
 	local tap
 	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.wrap_text") then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.wrap_text")
 		if not is_physical then return finish_tap(false, fence_events) end

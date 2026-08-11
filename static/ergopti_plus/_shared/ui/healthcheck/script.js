@@ -16,6 +16,7 @@
 //       version, sys, uptime_sec, warn_count, err_count,
 //       ports_validated, failed_adapters,
 //       wired_count, adapter_count, unwired_adapters,  (macOS only)
+//       event_tap_timeout_telemetry,                    (macOS only)
 //       last_error, recent_issues,
 //       pause_state, keylogger, llm, layout, hotstrings, logs, config
 // ===========================================================================
@@ -87,6 +88,12 @@ window.renderHealthcheck = function (s) {
 	} else if (sys.hs_version !== undefined) {
 		// macOS / Hammerspoon driver
 		html += row('Hammerspoon', escapeHtml(String(sys.hs_version || '?')));
+		if (s.event_tap_timeout_telemetry) {
+			html += row(
+				'Native tap timeout telemetry',
+				escapeHtml(String(s.event_tap_timeout_telemetry.summary || 'unavailable'))
+			);
+		}
 		html += row('macOS', escapeHtml(String(sys.os_version || '?')));
 		html += row('Architecture', escapeHtml(String(sys.arch || '?')));
 	}

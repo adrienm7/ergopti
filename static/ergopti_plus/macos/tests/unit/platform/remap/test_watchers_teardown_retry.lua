@@ -20,9 +20,6 @@ local helpers = require("tests.helpers")
 local function fresh_harness()
 	local keycode_map = hs.keycodes.map
 	package.loaded["platform.remap.watchers"] = nil
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 
 	local h = {
 		fail_once = false,

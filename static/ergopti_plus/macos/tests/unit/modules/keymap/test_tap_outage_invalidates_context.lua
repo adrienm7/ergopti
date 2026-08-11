@@ -7,12 +7,12 @@
 --- Users reported characters simply disappearing while typing. Two distinct
 --- mechanisms produced that, and both are pinned here.
 ---
---- ROOT CAUSE 1 — the outage lasted up to five seconds. macOS silently disables
---- an event tap whose callback overruns the system timeout. Nothing in the
---- driver can notice, because a dead tap delivers no events to notice WITH: the
---- only detector is a polling watchdog, so its interval IS the length of the
---- outage. It polled every 5 s — several sentences during which no expansion
---- fires and the buffer stops tracking the screen.
+--- ROOT CAUSE 1 — the residual outage lasted up to five seconds. Hammerspoon
+--- 1.1.1 normally re-enables CoreGraphics timeout notifications in native code,
+--- but a native or lifecycle failure can still leave a tap observed disabled.
+--- A dead tap delivers no events to Lua, so the independent polling watchdog
+--- bounds that residual outage. At 5 s, several sentences can pass while no
+--- expansion fires and the buffer stops tracking the screen.
 ---
 --- ROOT CAUSE 2 — and the part that outlived the outage: reviving the tap
 --- restored the plumbing but not the truth. CoreState.buffer still described the
@@ -83,7 +83,7 @@ helpers.describe("keymap tap watchdog: the polling interval bounds the outage", 
 		local src = keymap_source()
 		local value = src:match("local TAP_WATCHDOG_SEC%s*=%s*([%d%.]+)")
 		helpers.assert_not_nil(value,
-			"TAP_WATCHDOG_SEC must exist — it is the only thing that ever notices a dead tap")
+			"TAP_WATCHDOG_SEC must exist as an independent still-disabled-tap backstop")
 		local seconds = tonumber(value)
 		helpers.assert_not_nil(seconds, "TAP_WATCHDOG_SEC must be numeric")
 		helpers.assert_true(seconds <= 1,
