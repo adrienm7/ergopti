@@ -29,6 +29,8 @@ local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
+local Chord         = require("chord")
+local Hotkeys       = require("adapters.hotkey_registrar")
 local TerminationCoordinator = require("infra.termination_coordinator")
 
 local LOG = "menu"
@@ -91,6 +93,33 @@ local core_mods = {
 }
 
 M._active_tasks = {}
+
+--- Creates a native-compatible facade over an opaque registrar handle.
+--- MenuState still owns the delayed :enable() warm-up, while all creation,
+--- delivery fencing, and teardown remain centralized in the adapter.
+--- @param mods table Modifier array.
+--- @param key string Key name.
+--- @param callback function Press callback.
+--- @return table|nil Managed hotkey facade.
+local function bind_managed_hotkey(mods, key, callback)
+	local chord, chord_err = Chord.format(mods, key)
+	if not chord then
+		Logger.error(LOG, "Cannot bind menu hotkey: %s.", tostring(chord_err))
+		return nil
+	end
+	local handle = Hotkeys.bind(chord, callback)
+	if not handle then return nil end
+	return {
+		enable = function() return Hotkeys.setEnabled(handle, true) end,
+		disable = function() return Hotkeys.setEnabled(handle, false) end,
+		delete = function()
+			if not handle then return true end
+			if Hotkeys.unbind(handle) ~= true then return false end
+			handle = nil
+			return true
+		end,
+	}
+end
 
 
 
@@ -325,7 +354,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
 		if mods and key then
 			state.metrics_shortcut = { mods = mods, key = key }
-			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+			local hk = bind_managed_hotkey(mods, key, function()
 				-- Toggle: close the dashboard if already open, otherwise open it.
 				-- Using package.loaded so we don't accidentally trigger require() on close.
 				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
@@ -337,7 +366,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
 			end)
-			if ok and hk then _metrics_hk = hk; hk:enable() end
+			if hk then _metrics_hk = hk; hk:enable() end
 		else
 			state.metrics_shortcut = false
 		end
@@ -352,7 +381,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
 		if mods and key then
 			state.apps_time_shortcut = { mods = mods, key = key }
-			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+			local hk = bind_managed_hotkey(mods, key, function()
 				-- Toggle behaviour: close if open, else open
 				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
 				if at_loaded and at_loaded._wv then
@@ -363,7 +392,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end)
-			if ok and hk then _apps_time_hk = hk; hk:enable() end
+			if hk then _apps_time_hk = hk; hk:enable() end
 		else
 			state.apps_time_shortcut = false
 		end

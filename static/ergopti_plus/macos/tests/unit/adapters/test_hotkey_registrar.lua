@@ -278,3 +278,35 @@ helpers.describe("hotkey_registrar: setEnabled", function()
 			"an unknown handle must be reported, not silently accepted")
 	end)
 end)
+
+helpers.describe("hotkey_registrar: delivery guard", function()
+	helpers.it("audit pause fence: blocks every owned callback from one live predicate", function()
+		local adapter, hs_stub = fresh()
+		local paused = true
+		local fired = 0
+		helpers.assert_eq(adapter.set_delivery_guard(function() return not paused end), true)
+		adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 0,
+			"a registered native handle must not bypass the live process pause")
+
+		paused = false
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 1,
+			"the same handle must resume without a fragile native rebind sweep")
+	end)
+
+	helpers.it("audit pause fence: a throwing delivery guard fails closed", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		adapter.set_delivery_guard(function() error("guard failure") end)
+		adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+
+		local ok = pcall(hs_stub.hotkey._bound[1].pressed_fn)
+		helpers.assert_eq(ok, true,
+			"native callback delivery must not leak a guard exception to Hammerspoon")
+		helpers.assert_eq(fired, 0,
+			"an unreadable lifecycle state must deny the action rather than guess active")
+	end)
+end)

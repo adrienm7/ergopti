@@ -16,8 +16,17 @@ local hs = hs
 local Bindings          = require("modules.shortcuts.bindings")
 local ScriptControl     = require("modules.shortcuts.script_control")
 local KeyboardShortcuts = require("modules.shortcuts.keyboard_shortcuts")
+local HotkeyRegistrar   = require("adapters.hotkey_registrar")
 
 local M = {}
+
+-- One live fence covers every adapter-owned native hotkey, including UI
+-- shortcuts that are intentionally kept registered while the bindings layer is
+-- stopped. The callback resolves ScriptControl at delivery time, so a pause or
+-- resume takes effect without a fragile rebind sweep.
+HotkeyRegistrar.set_delivery_guard(function()
+	return ScriptControl.is_paused() ~= true
+end)
 
 
 
