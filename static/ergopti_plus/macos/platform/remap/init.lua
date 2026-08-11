@@ -3294,7 +3294,8 @@ end
 --- @param recovery_capability any Private enable/rollback/resume capability; public callers omit it.
 --- @param regeneration_context table|nil Private transaction retained across a layout settle.
 --- @param guardian_ready_capability any Private proof from an immediately preceding native probe.
---- @return boolean True when deployment and activation request were accepted.
+--- @return boolean True when the regeneration request was accepted or retained;
+---   final deployment and activation completion is reported through `on_done`.
 function M.regenerate(
 	on_done,
 	recovery_capability,
