@@ -70,6 +70,7 @@ local function load_paths(opts)
 	end
 
 	package.loaded["ui.menu.menu_paths"] = nil
+	package.loaded["infra.config_paths"] = nil
 	local mod = helpers.load_with_stubs("ui.menu.menu_paths")
 	os.getenv = real_getenv
 	return mod
@@ -101,10 +102,14 @@ end
 
 helpers.describe("menu_paths: every named path resolves in all four states", function()
 	local STATES = {
-		{ name = "HOME set, no paths.toml", home = nil, toml = nil },
-		{ name = "HOME set, paths.toml overrides", home = nil, toml = true },
-		{ name = "HOME unset, no paths.toml", home = false, toml = nil },
-		{ name = "HOME unset, paths.toml overrides", home = false, toml = true },
+		{ name = "HOME set, no paths.toml", home = function()
+			return make_tmp_dir():gsub("[/\\]$", "")
+		end, toml = nil },
+		{ name = "HOME set, paths.toml overrides", home = function()
+			return make_tmp_dir():gsub("[/\\]$", "")
+		end, toml = true },
+		{ name = "HOME unset, no paths.toml", home = function() return nil end, toml = nil },
+		{ name = "HOME unset, paths.toml overrides", home = function() return nil end, toml = true },
 	}
 
 	for _, state in ipairs(STATES) do
@@ -112,7 +117,7 @@ helpers.describe("menu_paths: every named path resolves in all four states", fun
 			local base = make_tmp_dir()
 			local override = state.toml and make_tmp_dir() or nil
 			local Paths = load_paths({
-				home = state.home == false and nil or make_tmp_dir():gsub("[/\\]$", ""),
+				home = state.home(),
 				paths_toml = override and ('ConfigDirPath = "' .. override .. '"\n') or nil,
 				base_dir = base,
 			})

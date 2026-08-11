@@ -188,10 +188,18 @@ end)
 --- the double and drives the module itself, so the assumption is checked rather
 --- than asserted.
 helpers.describe("menu_paths really retargets after persist_config_dir_for_wizard", function()
+	local function make_real_base_dir()
+		local path = os.tmpname()
+		os.remove(path)
+		os.execute('mkdir "' .. path .. '"')
+		return path .. "/"
+	end
+
 	--- Loads the real menu_paths with the filesystem side effects neutralised.
 	--- @return table
 	local function fresh_menu_paths()
 		package.loaded["ui.menu.menu_paths"] = nil
+		package.loaded["infra.config_paths"] = nil
 		local MP = helpers.load_with_stubs("ui.menu.menu_paths", {
 			fs = {
 				-- Report every directory as already present so ensure_dir does no
@@ -201,7 +209,7 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 				currentDir = function() return "/" end,
 			},
 		})
-		MP.init(OLD_DIR, function() end)
+		MP.init(make_real_base_dir(), function() end)
 		return MP
 	end
 

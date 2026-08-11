@@ -79,6 +79,10 @@ end)()
 -- In-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded.
 local _bootstrap = nil
 
+-- Module-load path discovery lets early consumers resolve read-only paths, but
+-- it is not lifecycle initialization. Only M.init() may publish this sentinel.
+local _initialized = false
+
 -- Directories already ensured this session. get("ConfigTomlPath") runs through
 -- file_in_driver_subdir on EVERY save_prefs() — i.e. on every menu toggle, on
 -- the run loop that services the typing event tap — and used to fork /bin/sh for
@@ -305,9 +309,14 @@ end
 --- Initializes the module with the driver base directory.
 --- @param base_dir string Absolute path to the driver directory (trailing slash).
 function M.init(base_dir)
+	Logger.start(LOG, "Initializing config paths…")
 	if type(base_dir) ~= "string" or base_dir == "" then
 		Logger.error(LOG, "M.init(): base_dir must be a non-empty string — module non-functional.")
-		return
+		return false
+	end
+	if _initialized then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return false
 	end
 	_base_dir = base_dir
 	ensure_dir(_base_dir)
@@ -330,13 +339,15 @@ function M.init(base_dir)
 	-- ~/.config/ergopti_plus/ on every reload.
 	local resolved = config_dir()
 	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
-	Logger.info(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)
+	_initialized = true
+	Logger.success(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)
+	return true
 end
 
 --- True when M.init() has already run.
 --- @return boolean
 function M.is_initialized()
-	return _base_dir ~= nil
+	return _initialized
 end
 
 --- Resolves a well-known personal file by name.
