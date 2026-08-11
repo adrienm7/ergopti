@@ -143,6 +143,7 @@ local _layout_deployed_serial   = 0    -- Newest settled layout carried by a pro
 local _deferred_layout_regeneration = nil -- User intent retained until the newest TIS event settles
 local schedule_layout_refresh  = nil  -- Forward declaration used by the lease-phase callback
 local retry_pending_layout_refresh = nil -- Forward declaration used by deferred activation replay
+local begin_lease_recovery = nil -- Forward declaration used by proven failure-fence callbacks
 -- Wake-from-sleep watcher. Held at module scope so it survives past the function
 -- that arms it: an hs.caffeinate.watcher referenced only by a local is collected
 -- and stops delivering, silently.
@@ -159,6 +160,7 @@ local _lease_inputs_tainted    = false -- Retained disabled handles are not proo
 local _lease_recovery          = nil   -- One bounded retry series across replacement tokens
 local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop must be retried
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
+local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
 
 local _state = nil
 local _enabled_transition = nil
@@ -167,6 +169,7 @@ local _enabled_transition = nil
 local PAUSED_DISABLE_RECOVERY = {}
 local PAUSED_RESUME_REGENERATION = {}
 local LEASE_FAILURE_RECOVERY_CAPABILITY = {}
+local ACTIVE_LAYOUT_FAILURE_RECOVERY = {}
 
 --- Invokes a public async callback without letting its error vanish in a task callback.
 --- @param label string Operation label for diagnostics.
@@ -341,13 +344,69 @@ local function exact_generation_phase(expected_token)
 	return phase
 end
 
+--- Returns whether a proven failure fence has no other transaction that will
+--- restore the live enabled state. Layout-invalidated contexts already retain
+--- their own exact retry; private enable/resume/recovery contexts do likewise.
+--- @param owner table|nil Regeneration context or the internal layout sentinel.
+--- @return boolean required
+local function failure_fence_needs_background_recovery(owner)
+	if owner == ACTIVE_LAYOUT_FAILURE_RECOVERY then return true end
+	return type(owner) == "table" and owner.intent == "public"
+		and owner.layout_invalidated ~= true
+end
+
+--- Creates an exact-once completion which transfers a proven ACTIVE fence to
+--- the bounded fresh-token recovery state machine. Accepted STOPPING is not
+--- enough: only the aggregate STOPPED/fallback callback establishes that a new
+--- generation may be allocated. All user-intent gates are re-read afterwards.
+--- @param expected_token string Exact generation being fenced.
+--- @param owner table|nil Regeneration context or the internal layout sentinel.
+--- @return function|nil callback
+local function make_failure_fence_completion(expected_token, owner)
+	if not failure_fence_needs_background_recovery(owner) then return nil end
+	local expected_epoch = _lifecycle_epoch
+	local expected_user_intent_revision = _lease_user_intent_revision
+	local callback_fired = false
+	return function(fenced, detail)
+		if callback_fired then
+			Logger.warn(LOG, "Duplicate failure-driven Karabiner fence completion ignored.")
+			return
+		end
+		callback_fired = true
+		if fenced ~= true then
+			Logger.error(LOG, "Failure-driven Karabiner fence did not prove STOPPED: %s.",
+				tostring(detail))
+			return
+		end
+		if expected_epoch ~= _lifecycle_epoch
+			or expected_user_intent_revision ~= _lease_user_intent_revision
+			or not _running or _shutdown_requested then return end
+		-- A newer layout can turn the same public context into a retained activation
+		-- owner while this asynchronous fence is completing. Never launch a second
+		-- recovery producer for that context.
+		if not failure_fence_needs_background_recovery(owner) then return end
+		if type(begin_lease_recovery) ~= "function" then
+			Logger.error(LOG, "Failure-driven Karabiner recovery API is unavailable after STOPPED.")
+			return
+		end
+		local status_ok, phase, snapshot = pcall(LeaseController.status)
+		if status_ok and phase == "active" and type(snapshot) == "table"
+			and snapshot.token ~= expected_token then
+			Logger.debug(LOG, "Failure recovery skipped because a newer exact generation is ACTIVE.")
+			return
+		end
+		begin_lease_recovery(expected_token)
+	end
+end
+
 --- Fences only the captured generation when config publication may already
 --- have happened while its normal rules were live. A proven PAUSED/PREPARED
 --- generation is inert and can safely be retried without destroying its lease.
 --- @param expected_token string Exact generation embedded in the attempted file.
 --- @param detail any Deployment failure detail for diagnostics.
+--- @param recovery_owner table|nil Regeneration transaction owning later recovery.
 --- @return boolean safe True when no fence is needed or exact fencing was accepted.
-local function contain_ambiguous_deploy_failure(expected_token, detail)
+local function contain_ambiguous_deploy_failure(expected_token, detail, recovery_owner)
 	local exact_phase = exact_generation_phase(expected_token)
 	if exact_phase == "paused" or exact_phase == "prepared" then return true end
 	if type(LeaseController.stop_exact) ~= "function" then
@@ -356,8 +415,14 @@ local function contain_ambiguous_deploy_failure(expected_token, detail)
 			tostring(expected_token))
 		return false
 	end
+	local on_fenced = exact_phase == "active"
+		and make_failure_fence_completion(expected_token, recovery_owner) or nil
 	local stop_ok, stopped_or_err = xpcall(function()
-		return LeaseController.stop_exact(expected_token, "deploy_publication_ambiguous")
+		return LeaseController.stop_exact(
+			expected_token,
+			"deploy_publication_ambiguous",
+			on_fenced
+		)
 	end, debug.traceback)
 	if not stop_ok or stopped_or_err ~= true then
 		Logger.error(LOG, "Exact fence after ambiguous Karabiner deployment failed: %s.",
@@ -370,6 +435,42 @@ local function contain_ambiguous_deploy_failure(expected_token, detail)
 	return true
 end
 
+--- Fences rules resolved for the previous input source when settled layout
+--- maintenance cannot even publish a replacement. Leaving that exact ACTIVE
+--- generation installed would turn a build error into silently wrong keycodes.
+--- @param expected_token string Exact pre-maintenance ACTIVE generation.
+--- @param detail any Maintenance failure detail for diagnostics.
+--- @return boolean safe True when no fence is needed or exact fencing was accepted.
+local function fence_failed_active_layout_generation(expected_token, detail)
+	if exact_generation_phase(expected_token) ~= "active" then return true end
+	if type(LeaseController.stop_exact) ~= "function" then
+		Logger.error(LOG,
+			"Cannot fence stale-layout Karabiner generation %s — exact stop API is unavailable.",
+			tostring(expected_token))
+		return false
+	end
+	local on_fenced = make_failure_fence_completion(
+		expected_token,
+		ACTIVE_LAYOUT_FAILURE_RECOVERY
+	)
+	local stop_ok, stopped_or_err = xpcall(function()
+		return LeaseController.stop_exact(
+			expected_token,
+			"layout_refresh_failed",
+			on_fenced
+		)
+	end, debug.traceback)
+	if not stop_ok or stopped_or_err ~= true then
+		Logger.error(LOG, "Exact stale-layout fence after maintenance failure failed: %s.",
+			tostring(stopped_or_err))
+		return false
+	end
+	Logger.warn(LOG,
+		"Exact Karabiner generation %s is being fenced after layout maintenance failed: %s.",
+		tostring(expected_token), tostring(detail))
+	return true
+end
+
 --- Rolls back a failed input mount and, unless the caller can prove the same
 --- generation remains PAUSED, fences only the exact Ergopti lease. The KC
 --- classifier remains live while an ACTIVE generation is still being fenced so
@@ -377,9 +478,15 @@ end
 --- @param detail string Diagnostic detail.
 --- @param retain_if_paused boolean True only for a user resume that may remain paused.
 --- @param expected_token string|nil Generation capability captured before mounting.
+--- @param recovery_owner table|nil Regeneration transaction owning later recovery.
 --- @return boolean Always false.
 --- @return string Stable public failure reason.
-local function fail_lease_bound_input_start(detail, retain_if_paused, expected_token)
+local function fail_lease_bound_input_start(
+	detail,
+	retain_if_paused,
+	expected_token,
+	recovery_owner
+)
 	Logger.error(LOG, "Lease-bound input startup failed: %s.", tostring(detail))
 	local exact_phase = exact_generation_phase(expected_token)
 	if exact_phase == nil then
@@ -394,11 +501,18 @@ local function fail_lease_bound_input_start(detail, retain_if_paused, expected_t
 	if not may_remain_paused then
 		local stop_method = type(LeaseController.stop_exact) == "function"
 			and LeaseController.stop_exact or LeaseController.stop
+		local on_fenced = exact_phase == "active"
+			and make_failure_fence_completion(expected_token, recovery_owner) or nil
 		local stop_ok, stop_result
 		if stop_method == LeaseController.stop_exact then
-			stop_ok, stop_result = pcall(stop_method, expected_token, "lease_input_bind_failed")
+			stop_ok, stop_result = pcall(
+				stop_method,
+				expected_token,
+				"lease_input_bind_failed",
+				on_fenced
+			)
 		else
-			stop_ok, stop_result = pcall(stop_method, "lease_input_bind_failed")
+			stop_ok, stop_result = pcall(stop_method, "lease_input_bind_failed", on_fenced)
 		end
 		if not stop_ok or stop_result ~= true then
 			Logger.error(LOG, "Exact lease fencing request after input startup failure failed: %s.",
@@ -456,16 +570,20 @@ end
 
 --- @param required_phase string `paused` or `active`.
 --- @param retain_if_paused boolean True only for a user resume that may remain paused.
+--- @param recovery_owner table|nil Regeneration transaction owning later recovery.
 --- @return boolean mounted True only when every lease-owned resource is retained.
 --- @return string reason Stable acceptance/failure detail.
-local function start_lease_bound_inputs(required_phase, retain_if_paused)
+local function start_lease_bound_inputs(required_phase, retain_if_paused, recovery_owner)
+	local function fail_start(detail, may_retain, token)
+		return fail_lease_bound_input_start(detail, may_retain, token, recovery_owner)
+	end
 	if not inputs_are_authorized() then
-		return fail_lease_bound_input_start("integration is not enabled", retain_if_paused)
+		return fail_start("integration is not enabled", retain_if_paused)
 	end
 	local status_ok, phase, lease_snapshot = pcall(LeaseController.status)
 	if not status_ok or phase ~= required_phase or type(lease_snapshot) ~= "table"
 		or type(lease_snapshot.token) ~= "string" then
-		return fail_lease_bound_input_start(
+		return fail_start(
 			"exact " .. tostring(required_phase) .. " lease snapshot is unavailable",
 			retain_if_paused,
 			type(lease_snapshot) == "table" and lease_snapshot.token or nil
@@ -476,7 +594,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 	local expected_token = lease_snapshot.token
 	if _lease_inputs_tainted then
 		if required_phase ~= "paused" then
-			return fail_lease_bound_input_start(
+			return fail_start(
 				"tainted F17 handles cannot be repaired while rules are ACTIVE",
 				false,
 				expected_token
@@ -486,7 +604,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 		-- non-nil Lua object is not proof of liveness, so retry exact cleanup while
 		-- rules are still PAUSED before deciding whether fresh binds are safe.
 		if stop_lease_bound_inputs() ~= true then
-			return fail_lease_bound_input_start(
+			return fail_start(
 				"tainted F17 handles could not be released before resume",
 				true,
 				expected_token
@@ -496,7 +614,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 	local has_all_hotkeys = _state.hotkey_cycle_windows and _state.hotkey_alt_tab_windows
 		and _state.hotkey_alt_tab_apps and _state.hotkey_alt_tab_monitor
 	if required_phase == "active" and not has_all_hotkeys then
-		return fail_lease_bound_input_start(
+		return fail_start(
 			"an ACTIVE lease was observed before all F17 consumers existed",
 			false,
 			expected_token
@@ -504,7 +622,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 	end
 	if not has_all_hotkeys and (_state.hotkey_cycle_windows or _state.hotkey_alt_tab_windows
 		or _state.hotkey_alt_tab_apps or _state.hotkey_alt_tab_monitor) then
-		return fail_lease_bound_input_start(
+		return fail_start(
 			"partial F17 hotkey state existed before startup",
 			retain_if_paused,
 			expected_token
@@ -518,7 +636,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 			return Watchers.start_gesture_watcher(gestures_engine, expected_token)
 		end, debug.traceback)
 		if not watcher_ok or watcher_or_err == nil then
-			return fail_lease_bound_input_start(watcher_ok
+			return fail_start(watcher_ok
 				and "gesture watcher returned nil"
 				or watcher_or_err, retain_if_paused, expected_token)
 		end
@@ -531,7 +649,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 			or final_phase ~= required_phase or type(final_snapshot) ~= "table"
 			or final_snapshot.token ~= expected_token then
 			rollback_uncommitted_inputs({}, uncommitted_watcher, false)
-			return fail_lease_bound_input_start(
+			return fail_start(
 				"lease ownership changed during gesture watcher startup",
 				retain_if_paused,
 				expected_token
@@ -556,7 +674,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 	end, debug.traceback)
 	if not bind_ok then
 		rollback_uncommitted_inputs(handles, uncommitted_watcher, true)
-		return fail_lease_bound_input_start(bind_err, retain_if_paused, expected_token)
+		return fail_start(bind_err, retain_if_paused, expected_token)
 	end
 
 	-- Binders do not yield in production, but a re-entrant test double must not
@@ -567,7 +685,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused)
 		or final_phase ~= required_phase or type(final_snapshot) ~= "table"
 		or final_snapshot.token ~= expected_token then
 		rollback_uncommitted_inputs(handles, uncommitted_watcher, true)
-		return fail_lease_bound_input_start(
+		return fail_start(
 			"lease ownership changed during F17 binding",
 			retain_if_paused,
 			expected_token
@@ -616,6 +734,14 @@ local function activate_lease_generation(options, on_done)
 	options = options or {}
 	local retain_if_paused = options.retain_if_paused == true
 	local respect_pause_intent = options.respect_pause_intent == true
+	local function fail_activation_inputs(detail, may_retain, token)
+		return fail_lease_bound_input_start(
+			detail,
+			may_retain,
+			token,
+			options.failure_recovery_owner
+		)
+	end
 	local settled = false
 	local function finish(ok, reason)
 		if settled then return end
@@ -627,7 +753,7 @@ local function activate_lease_generation(options, on_done)
 	local token = type(snapshot) == "table" and snapshot.token or nil
 	if not status_ok or (phase ~= "paused" and phase ~= "active")
 		or type(token) ~= "string" then
-		local _, reason = fail_lease_bound_input_start(
+		local _, reason = fail_activation_inputs(
 			"activation did not expose an exact settled generation",
 			retain_if_paused,
 			token
@@ -641,7 +767,7 @@ local function activate_lease_generation(options, on_done)
 		if guard_ok and current == true then return false end
 		local public_reason = guard_ok
 			and (guard_reason or "layout-refresh-pending") or "layout-guard-raised"
-		fail_lease_bound_input_start(
+		fail_activation_inputs(
 			stage .. ": " .. tostring(guard_ok and guard_reason or current),
 			false,
 			token
@@ -656,7 +782,7 @@ local function activate_lease_generation(options, on_done)
 		if ok_shortcuts and shortcuts and type(shortcuts.is_paused) == "function" then
 			local ok_paused, paused_or_err = pcall(shortcuts.is_paused)
 			if not ok_paused then
-				local _, reason = fail_lease_bound_input_start(
+				local _, reason = fail_activation_inputs(
 					"script pause-state query failed: " .. tostring(paused_or_err),
 					retain_if_paused,
 					token
@@ -673,7 +799,7 @@ local function activate_lease_generation(options, on_done)
 		if type(options.before_resume) == "function" then
 			local hook_ok, committed, commit_reason = xpcall(options.before_resume, debug.traceback)
 			if not hook_ok or committed ~= true then
-				local _, reason = fail_lease_bound_input_start(
+				local _, reason = fail_activation_inputs(
 					"paused activation commit failed: "
 						.. tostring(hook_ok and commit_reason or committed),
 					false,
@@ -690,7 +816,11 @@ local function activate_lease_generation(options, on_done)
 	end
 	if reject_stale_layout("layout changed before lease-input preparation") then return false end
 
-	local inputs_ok, inputs_reason = start_lease_bound_inputs(phase, retain_if_paused)
+	local inputs_ok, inputs_reason = start_lease_bound_inputs(
+		phase,
+		retain_if_paused,
+		options.failure_recovery_owner
+	)
 	if inputs_ok ~= true then
 		finish(false, inputs_reason)
 		return false
@@ -698,7 +828,7 @@ local function activate_lease_generation(options, on_done)
 
 	local classifier_ok, classifier_reason = refresh_managed_output_set()
 	if classifier_ok ~= true then
-		local _, reason = fail_lease_bound_input_start(
+		local _, reason = fail_activation_inputs(
 			"managed-output classifier unavailable: " .. tostring(classifier_reason),
 			retain_if_paused,
 			token
@@ -710,7 +840,7 @@ local function activate_lease_generation(options, on_done)
 	if type(options.before_resume) == "function" then
 		local hook_ok, committed, commit_reason = xpcall(options.before_resume, debug.traceback)
 		if not hook_ok or committed ~= true then
-			local _, reason = fail_lease_bound_input_start(
+			local _, reason = fail_activation_inputs(
 				"pre-RESUME commit failed: " .. tostring(hook_ok and commit_reason or committed),
 				retain_if_paused,
 				token
@@ -749,7 +879,7 @@ local function activate_lease_generation(options, on_done)
 					finish(true, "ready-paused-by-user-intent")
 					return
 				end
-				local _, failure_reason = fail_lease_bound_input_start(
+				local _, failure_reason = fail_activation_inputs(
 					"prepared lease RESUME failed: " .. tostring(resume_reason),
 					retain_if_paused,
 					token
@@ -763,7 +893,7 @@ local function activate_lease_generation(options, on_done)
 			local final_ok, final_phase, final_snapshot = pcall(LeaseController.status)
 			if not final_ok or final_phase ~= "active"
 				or type(final_snapshot) ~= "table" or final_snapshot.token ~= token then
-				local _, failure_reason = fail_lease_bound_input_start(
+				local _, failure_reason = fail_activation_inputs(
 					"RESUMED did not publish the captured ACTIVE generation",
 					false,
 					token
@@ -780,7 +910,7 @@ local function activate_lease_generation(options, on_done)
 	end, debug.traceback)
 
 	if not call_ok then
-		local _, reason = fail_lease_bound_input_start(
+		local _, reason = fail_activation_inputs(
 			"prepared lease RESUME raised: " .. tostring(accepted_or_err),
 			retain_if_paused,
 			token
@@ -790,7 +920,7 @@ local function activate_lease_generation(options, on_done)
 		return false
 	end
 	if accepted_or_err ~= true and not callback_fired then
-		local _, reason = fail_lease_bound_input_start(
+		local _, reason = fail_activation_inputs(
 			"prepared lease RESUME request was rejected",
 			retain_if_paused,
 			token
@@ -1469,7 +1599,7 @@ end
 --- timer and the settled phase callback owns the first arm.
 --- @param failed_token string Exact token owned by the failed transaction.
 --- @param wait_for_phase boolean|nil True while its exact fence is still pending.
-local function begin_lease_recovery(failed_token, wait_for_phase)
+begin_lease_recovery = function(failed_token, wait_for_phase)
 	if type(failed_token) ~= "string" or failed_token == "" then return end
 	local blocked = lease_recovery_block_reason()
 	if blocked then
@@ -1807,6 +1937,16 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 			rebind_if_current()
 			return
 		end
+		local active_status_ok, active_phase, active_snapshot = pcall(LeaseController.status)
+		local maintenance_token = type(active_snapshot) == "table" and active_snapshot.token or nil
+		if not active_status_ok or active_phase ~= "active"
+			or type(maintenance_token) ~= "string" then
+			Logger.error(LOG,
+				"Settled %s layout maintenance lost its exact ACTIVE generation before build.",
+				source)
+			retry_pending_layout_refresh(pending, "active-generation-unavailable")
+			return
+		end
 		-- regenerate() owns the one active-mode resolution immediately before its
 		-- consumer. Resolving here as well would double the layout hot-path walk.
 		local callback_fired = false
@@ -1823,6 +1963,7 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 				else
 					Logger.error(LOG, "Settled %s Karabiner regeneration failed: %s.",
 						source, tostring(reason))
+					fence_failed_active_layout_generation(maintenance_token, reason)
 					retry_pending_layout_refresh(pending,
 						"regeneration-failed:" .. tostring(reason))
 				end
@@ -1840,6 +1981,10 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 		if not regenerate_ok then
 			Logger.error(LOG, "Settled %s Karabiner regeneration raised: %s.",
 				source, tostring(accepted_or_err))
+			fence_failed_active_layout_generation(
+				maintenance_token,
+				"regeneration-raised:" .. tostring(accepted_or_err)
+			)
 			retry_pending_layout_refresh(pending, "regeneration-raised")
 			return
 		end
@@ -2593,11 +2738,10 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 	-- script_control paused until deploy, READY and lease-bound input startup all
 	-- succeed. Failed-disable and enable capabilities instead provision a fresh
 	-- generation atomically paused, never normal-first
-	local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
-	local script_is_paused = ok_sc
-		and shortcuts
-		and type(shortcuts.is_paused) == "function"
-		and shortcuts.is_paused() == true
+	local pause_ok, _, script_is_paused = query_shortcuts_pause_state(
+		"Karabiner regeneration pause-state query"
+	)
+	if not pause_ok then return fail("pause-state-unavailable") end
 	if script_is_paused and not is_disable_recovery and not is_enable_transition
 		and not is_resume_regeneration then
 		Logger.info(LOG, "Regenerate skipped — script is paused (« pause = tout éteint »).")
@@ -2702,7 +2846,7 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
 			KARABINER_OUT, tostring(deploy_failure))
-		contain_ambiguous_deploy_failure(lease_token, deploy_failure)
+		contain_ambiguous_deploy_failure(lease_token, deploy_failure, context)
 		return fail("deploy-failed")
 	end
 
@@ -2824,6 +2968,7 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 				respect_pause_intent = not is_resume_regeneration,
 				before_resume = before_resume,
 				layout_guard = layout_guard,
+				failure_recovery_owner = context,
 			}, function(activated, activation_reason)
 				if activation_callback_fired then return end
 				activation_callback_fired = true
@@ -2855,7 +3000,8 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 			local _, failure_reason = fail_lease_bound_input_start(
 				"prepared activation callback raised: " .. tostring(activation_requested_or_err),
 				is_resume_regeneration,
-				lease_token
+				lease_token,
+				context
 			)
 			if not activation_callback_fired then finish(false, failure_reason) end
 		elseif activation_requested_or_err ~= true and not activation_callback_fired then
@@ -2876,6 +3022,56 @@ function M.regenerate(on_done, recovery_capability, regeneration_context)
 		if not start_callback_fired then finish(false, "activation-request-rejected") end
 		return false
 	end
+	return true
+end
+
+--- Stops only the current exact Ergopti lease while keeping the integration
+--- enabled. The intent revision is advanced before joining an existing fence,
+--- so a late failure-recovery callback cannot undo the user's explicit Stop.
+--- Stock/personal Karabiner processes and local bridge lifecycle remain intact.
+--- @param on_done function|nil Callback fn(ok, reason) after the exact fence.
+--- @return boolean True when the stop transaction was accepted or completed.
+function M.stop_lease(on_done)
+	if not require_state("stop_lease") then
+		invoke_public_callback("stop lease", on_done, false, "not-initialized")
+		return false
+	end
+	_lease_user_intent_revision = _lease_user_intent_revision + 1
+	cancel_deferred_layout_regeneration("explicit-lease-stop-requested")
+	cancel_lease_recovery("explicit-lease-stop-requested")
+	Logger.start(LOG, "Stopping the exact Ergopti Karabiner lease by user request…")
+	local callback_fired = false
+	local callback_succeeded = false
+	local function finish_stop(stopped, reason)
+		if callback_fired then
+			Logger.warn(LOG, "Duplicate explicit Karabiner lease-stop callback ignored.")
+			return
+		end
+		callback_fired = true
+		callback_succeeded = stopped == true
+		if stopped == true then
+			Logger.success(LOG, "Exact Ergopti Karabiner lease stopped by user request.")
+		else
+			Logger.error(LOG, "Exact Ergopti Karabiner lease stop failed: %s.", tostring(reason))
+		end
+		invoke_public_callback("stop lease", on_done, stopped == true, reason)
+		replay_pending_layout_refresh()
+	end
+	local stop_ok, accepted_or_err = xpcall(function()
+		return LeaseController.stop("menu_stop", finish_stop)
+	end, debug.traceback)
+	if not stop_ok then
+		Logger.error(LOG, "Exact Ergopti Karabiner lease stop raised: %s.",
+			tostring(accepted_or_err))
+		if not callback_fired then finish_stop(false, "stop-raised") end
+		return false
+	end
+	if accepted_or_err ~= true then
+		Logger.error(LOG, "Exact Ergopti Karabiner lease stop request was rejected.")
+		if not callback_fired then finish_stop(false, "stop-rejected") end
+		return false
+	end
+	if callback_fired then return callback_succeeded end
 	return true
 end
 

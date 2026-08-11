@@ -37,6 +37,7 @@ local function disabled_remap()
 		get_simultaneous_threshold = function() return 50 end,
 		open_gui = function() error("GUI open must remain explicit") end,
 		regenerate = function() error("disabled build must not regenerate") end,
+		stop_lease = function() error("disabled build must not stop the exact lease") end,
 	}
 end
 
@@ -94,16 +95,24 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 		helpers.assert_true(ok, "Start faults must be logged, not escape the menu callback: " .. tostring(err))
 	end)
 
-	helpers.it("contains a controller fault from the exact-lease Stop action", function()
+	helpers.it("contains a remap transaction fault from the exact-lease Stop action", function()
+		local calls = { raw_stop = 0, stop_lease = 0 }
 		package.loaded["platform.remap.lease_controller"] = {
 			status = function() return "active", { phase = "active" } end,
-			stop = function() error("stop fault") end,
+			stop = function()
+				calls.raw_stop = calls.raw_stop + 1
+				error("menu must not bypass the remap transaction")
+			end,
 		}
 		package.loaded["ui.menu.menu_remap"] = nil
 		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
 		local remap = disabled_remap()
 		remap.get_enabled = function() return true end
 		remap.regenerate = function() return true end
+		remap.stop_lease = function()
+			calls.stop_lease = calls.stop_lease + 1
+			error("stop transaction fault")
+		end
 		remap.open_gui = function() return true end
 		local built = menu.build({ karabiner = remap, updateMenu = function() end })
 		local stop_row = find_item(built, "menu.karabiner.stop")
@@ -112,6 +121,9 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 		helpers.assert_type(row_action(stop_row), "function")
 		local ok, err = pcall(row_action(stop_row))
 		helpers.assert_true(ok, "Stop faults must be logged, not escape the menu callback: " .. tostring(err))
+		helpers.assert_eq(calls.stop_lease, 1)
+		helpers.assert_eq(calls.raw_stop, 0,
+			"even the fault path must not bypass the remap intent transaction")
 	end)
 
 	helpers.it("build and prime perform zero shell, GUI, task, start or stop actions", function()
@@ -152,21 +164,21 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 	end)
 
 	helpers.it("can cancel the exact lease while its watchdog is still starting", function()
-		local calls = { stop = 0 }
+		local calls = { raw_stop = 0, stop_lease = 0 }
 		package.loaded["platform.remap.lease_controller"] = {
 			status = function() return "starting", { phase = "starting" } end,
-			stop = function(reason, callback)
-				calls.stop = calls.stop + 1
-				calls.reason = reason
-				if callback then callback(true, "stopped") end
-				return true
-			end,
+			stop = function() calls.raw_stop = calls.raw_stop + 1 return true end,
 		}
 		package.loaded["ui.menu.menu_remap"] = nil
 		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
 		local remap = disabled_remap()
 		remap.get_enabled = function() return true end
 		remap.regenerate = function() return true end
+		remap.stop_lease = function(callback)
+			calls.stop_lease = calls.stop_lease + 1
+			if callback then callback(true, "stopped") end
+			return true
+		end
 		remap.open_gui = function() return true end
 
 		local built = menu.build({ karabiner = remap, updateMenu = function() end })
@@ -177,8 +189,10 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 			"starting is cancellable — disabling Stop leaves a racing generation able to activate")
 		helpers.assert_type(row_action(stop_row), "function")
 		row_action(stop_row)()
-		helpers.assert_eq(calls.stop, 1)
-		helpers.assert_eq(calls.reason, "menu_stop")
+		helpers.assert_eq(calls.stop_lease, 1,
+			"the menu must route Stop through the remap intent fence")
+		helpers.assert_eq(calls.raw_stop, 0,
+			"the menu must never bypass recovery cancellation through the raw controller")
 	end)
 
 	helpers.it("does not offer a second start while the exact lease is paused", function()
