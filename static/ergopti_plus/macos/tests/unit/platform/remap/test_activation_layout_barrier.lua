@@ -94,6 +94,11 @@ local function with_remap(options, body)
 		script_paused = options.paused == true,
 		builds = {},
 		deploy_tokens = {},
+		classifier_refreshes = 0,
+		next_build_failure = nil,
+		next_deploy_failure = nil,
+		next_classifier_failure = nil,
+		pause_queries_until_failure = nil,
 		start_callbacks = {},
 		resume_callbacks = {},
 		stop_callbacks = {},
@@ -197,10 +202,18 @@ local function with_remap(options, body)
 					token = token,
 					layout = calls.resolved_revision,
 				}
+				local failure = calls.next_build_failure
+				calls.next_build_failure = nil
+				if failure == "throw" then error("synthetic generation failure") end
+				if failure == "false" then return nil, "synthetic generation failure" end
 				return { token = token }, nil, {}, {}
 			end,
 			merge_and_deploy_config = function(generated)
 				calls.deploy_tokens[#calls.deploy_tokens + 1] = generated.token
+				local failure = calls.next_deploy_failure
+				calls.next_deploy_failure = nil
+				if failure == "throw" then error("synthetic deploy failure") end
+				if failure == "false" then return false, "synthetic deploy failure" end
 				return true, "ok"
 			end,
 			KE_PHYSICAL_KC_LOG = nil,
@@ -293,7 +306,11 @@ local function with_remap(options, body)
 				settle_token_callbacks("start_callbacks", token, false, "lease-stopping")
 				settle_token_callbacks("resume_callbacks", token, false, "lease-stopping")
 				if options.defer_exact_stop then
-					calls.exact_stop_deferred = { token = token, callback = on_done }
+					calls.exact_stop_deferred = {
+						token = token,
+						callback = on_done,
+						joined_callbacks = {},
+					}
 					return true
 				end
 				calls.current_token = nil
@@ -303,6 +320,13 @@ local function with_remap(options, body)
 			end,
 			stop = function(reason, on_done)
 				calls.stop_reasons[#calls.stop_reasons + 1] = reason
+				if calls.exact_stop_deferred then
+					if on_done then
+						local joined = calls.exact_stop_deferred.joined_callbacks
+						joined[#joined + 1] = on_done
+					end
+					return true
+				end
 				if options.defer_disable_stop and not calls.public_stop_deferred then
 					calls.public_stop_deferred = true
 					local token = calls.current_token
@@ -356,11 +380,27 @@ local function with_remap(options, body)
 		}
 		package.loaded["modules.keylogger.kc_bridge"] = {
 			clear_managed_set = function() return true end,
-			refresh_managed_set = function() return true end,
+			refresh_managed_set = function()
+				calls.classifier_refreshes = calls.classifier_refreshes + 1
+				local failure = calls.next_classifier_failure
+				calls.next_classifier_failure = nil
+				if failure == "throw" then error("synthetic classifier failure") end
+				if failure == "false" then return false end
+				return true
+			end,
 		}
 		package.loaded["modules.gestures.engine"] = {}
 		package.loaded["modules.shortcuts"] = {
-			is_paused = function() return calls.script_paused end,
+			is_paused = function()
+				if type(calls.pause_queries_until_failure) == "number" then
+					calls.pause_queries_until_failure = calls.pause_queries_until_failure - 1
+					if calls.pause_queries_until_failure == 0 then
+						calls.pause_queries_until_failure = nil
+						error("synthetic pause-state query failure")
+					end
+				end
+				return calls.script_paused
+			end,
 			rebind_for_layout = function() return true end,
 		}
 		package.loaded["hs.caffeinate.watcher"] = {
@@ -514,6 +554,9 @@ local function with_remap(options, body)
 			calls.exact_stop_deferred = nil
 			calls.current_token = nil
 			publish("idle", nil)
+			for _, callback in ipairs(pending.joined_callbacks or {}) do
+				callback(true, "stopped")
+			end
 			if pending.callback then pending.callback(true, "stopped") end
 			return true
 		end
@@ -584,6 +627,57 @@ local function complete_replacement(calls, stale_token, expected_layout, results
 	helpers.assert_eq(results[1].ok, expected_ok)
 	helpers.assert_eq(calls.phase, "active")
 	helpers.assert_eq(calls.status_token, replacement.token)
+	return replacement
+end
+
+
+--- Activates the fixture's initial generation and returns its exact token.
+--- @param remap table Real remap orchestrator under test.
+--- @param calls table Harness observations and drivers.
+--- @return string token
+local function activate_initial_generation(remap, calls)
+	helpers.assert_true(remap.regenerate())
+	local initial = calls.builds[#calls.builds]
+	helpers.assert_type(initial, "table")
+	helpers.assert_true(calls.deliver_all_ready(initial.token))
+	helpers.assert_true(calls.deliver_resumed(initial.token))
+	helpers.assert_eq(calls.phase, "active")
+	return initial.token
+end
+
+
+--- Completes one background safety recovery with a fresh exact token.
+--- @param calls table Harness observations and drivers.
+--- @param stale_token string Token fenced by the failed maintenance attempt.
+--- @param expected_layout string Layout that the replacement must consume.
+--- @return table replacement Fresh build descriptor.
+local function complete_failure_recovery(calls, stale_token, expected_layout)
+	local started = calls.drain_until(function()
+		return calls.phase == "starting" and calls.current_token ~= stale_token
+	end)
+	helpers.assert_true(started,
+		"a proven failure fence must launch one bounded fresh-token recovery")
+	local replacement = calls.builds[#calls.builds]
+	helpers.assert_type(replacement, "table")
+	helpers.assert_true(replacement.token ~= stale_token,
+		"failure recovery must never reuse the fenced generation")
+	helpers.assert_eq(replacement.layout, expected_layout,
+		"failure recovery must build from the current settled layout")
+	helpers.assert_true(calls.deliver_all_ready(replacement.token))
+	helpers.assert_true(calls.deliver_resumed(replacement.token))
+	helpers.assert_eq(calls.phase, "active")
+	helpers.assert_eq(calls.status_token, replacement.token)
+	local build_count = #calls.builds
+	local token_index = calls.token_index
+	for _ = 1, 20 do
+		if not calls.fire_next_async_timer() then break end
+	end
+	calls.force_stale_successes()
+	helpers.assert_eq(#calls.builds, build_count,
+		"stale layout/fence callbacks must not launch a duplicate recovery")
+	helpers.assert_eq(calls.token_index, token_index,
+		"one proven fence must allocate exactly one replacement token")
+	helpers.assert_eq(calls.phase, "active")
 	return replacement
 end
 
@@ -1155,4 +1249,412 @@ helpers.describe("Karabiner activation layout barrier", function()
 			helpers.assert_eq(calls.token_index, 1)
 		end)
 	end)
+end)
+
+
+
+
+
+-- ====================================================================
+-- ====================================================================
+-- ======= 2/ Failure-Driven ACTIVE Lease Recovery After Layout =======
+-- ====================================================================
+-- ====================================================================
+
+helpers.describe("Karabiner active layout maintenance failure recovery", function()
+	helpers.it("settles public regeneration fail-closed when pause state raises", function()
+		with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+			function(remap, calls)
+				local results = {}
+				calls.pause_queries_until_failure = 1
+
+				local call_ok, accepted = pcall(remap.regenerate, function(ok, reason)
+					results[#results + 1] = { ok = ok, reason = reason }
+				end)
+
+				helpers.assert_true(call_ok,
+					"a public regeneration must contain a pause-state exception")
+				helpers.assert_true(accepted == false,
+					"unavailable pause state must reject regeneration fail-closed")
+				helpers.assert_eq(#results, 1,
+					"the public callback must settle exactly once")
+				helpers.assert_true(results[1].ok == false)
+				helpers.assert_eq(results[1].reason, "pause-state-unavailable")
+				helpers.assert_eq(#calls.builds, 0,
+					"unknown pause intent must block config generation")
+				helpers.assert_eq(#calls.deploy_tokens, 0,
+					"unknown pause intent must block config publication")
+				helpers.assert_eq(calls.classifier_refreshes, 0,
+					"unknown pause intent must not mount lease-bound input state")
+			end)
+	end)
+
+	helpers.it("fences stale layout rules when regeneration rejects unavailable pause state", function()
+		with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+			function(remap, calls)
+				local stale_token = activate_initial_generation(remap, calls)
+				calls.builds = {}
+				calls.deploy_tokens = {}
+				calls.stop_exact_tokens = {}
+				-- The settled pipeline consumes the first query. The strict public
+				-- API contains the second failure and settles its callback false.
+				calls.pause_queries_until_failure = 2
+
+				calls.change_layout("layout-b")
+				helpers.assert_true(calls.fire_next_async_timer())
+				helpers.assert_eq(#calls.builds, 0,
+					"the unavailable pause state must reject before generation")
+				helpers.assert_eq(#calls.deploy_tokens, 0)
+				helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1,
+					"the callback failure branch must fence old-layout ACTIVE rules")
+
+				local replacement = complete_failure_recovery(
+					calls, stale_token, "layout-b"
+				)
+				helpers.assert_eq(#calls.builds, 1)
+				helpers.assert_eq(#calls.deploy_tokens, 1)
+				helpers.assert_eq(calls.deploy_tokens[1], replacement.token)
+			end)
+	end)
+
+	helpers.it("fences stale layout rules when regeneration raises before its callback", function()
+		with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+			function(remap, calls)
+				local stale_token = activate_initial_generation(remap, calls)
+				calls.builds = {}
+				calls.deploy_tokens = {}
+				calls.stop_exact_tokens = {}
+				local real_regenerate = remap.regenerate
+				local raise_before_callback = true
+				remap.regenerate = function(...)
+					if raise_before_callback then
+						raise_before_callback = false
+						error("synthetic public regeneration boundary failure")
+					end
+					return real_regenerate(...)
+				end
+
+				calls.change_layout("layout-b")
+				helpers.assert_true(calls.fire_next_async_timer())
+				helpers.assert_eq(#calls.builds, 0,
+					"the injected public-boundary exception must happen before generation")
+				helpers.assert_eq(#calls.deploy_tokens, 0)
+				helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1,
+					"the no-callback exception branch must fence old-layout ACTIVE rules")
+
+				local replacement = complete_failure_recovery(
+					calls, stale_token, "layout-b"
+				)
+				helpers.assert_eq(#calls.builds, 1)
+				helpers.assert_eq(#calls.deploy_tokens, 1)
+				helpers.assert_eq(calls.deploy_tokens[1], replacement.token)
+			end)
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("fences and replaces stale layout rules after generation " .. mode, function()
+			with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+				function(remap, calls)
+					local stale_token = activate_initial_generation(remap, calls)
+					calls.builds = {}
+					calls.deploy_tokens = {}
+					calls.stop_exact_tokens = {}
+					calls.next_build_failure = mode
+
+					calls.change_layout("layout-b")
+					helpers.assert_true(calls.fire_next_async_timer(),
+						"the post-TIS layout maintenance callback must run")
+					helpers.assert_eq(#calls.builds, 1,
+						"the injected failure must occur on the first layout-B build")
+					helpers.assert_eq(calls.builds[1].layout, "layout-b")
+					helpers.assert_eq(#calls.deploy_tokens, 0,
+						"a generation failure must happen before config publication")
+					helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1,
+						"old-layout ACTIVE rules must be exact-fenced after generation failure")
+
+					local replacement = complete_failure_recovery(
+						calls, stale_token, "layout-b"
+					)
+					helpers.assert_eq(#calls.builds, 2,
+						"one failed build must produce exactly one fresh replacement build")
+					helpers.assert_eq(#calls.deploy_tokens, 1)
+					helpers.assert_eq(calls.deploy_tokens[1], replacement.token)
+				end)
+		end)
+
+		helpers.it("recovers a clean IDLE fence after deploy " .. mode, function()
+			with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+				function(remap, calls)
+					local stale_token = activate_initial_generation(remap, calls)
+					calls.builds = {}
+					calls.deploy_tokens = {}
+					calls.stop_exact_tokens = {}
+					calls.next_deploy_failure = mode
+
+					calls.change_layout("layout-b")
+					helpers.assert_true(calls.fire_next_async_timer())
+					helpers.assert_eq(calls.phase, "idle",
+						"the fixture must publish the clean STOPPED path that used to lose ownership")
+					helpers.assert_eq(calls.current_token, nil)
+					helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1)
+
+					local replacement = complete_failure_recovery(
+						calls, stale_token, "layout-b"
+					)
+					helpers.assert_eq(#calls.builds, 2)
+					helpers.assert_eq(#calls.deploy_tokens, 2,
+						"the ambiguous attempt and one replacement are the only publications")
+					helpers.assert_eq(calls.deploy_tokens[1], stale_token)
+					helpers.assert_eq(calls.deploy_tokens[2], replacement.token)
+				end)
+		end)
+	end
+
+	helpers.it("waits for the exact STOPPED callback before recovering a failed deploy", function()
+		with_remap({
+			enabled = true,
+			paused = false,
+			initial_phase = "prepared",
+			defer_exact_stop = true,
+		}, function(remap, calls)
+			local stale_token = activate_initial_generation(remap, calls)
+			calls.builds = {}
+			calls.deploy_tokens = {}
+			calls.stop_exact_tokens = {}
+			calls.next_deploy_failure = "false"
+
+			calls.change_layout("layout-b")
+			helpers.assert_true(calls.fire_next_async_timer())
+			helpers.assert_eq(calls.phase, "stopping")
+			for _ = 1, 5 do
+				if not calls.fire_next_async_timer() then break end
+			end
+			helpers.assert_eq(calls.token_index, 1,
+				"accepted STOPPING is not proof that a fresh token is safe to allocate")
+			helpers.assert_eq(#calls.builds, 1)
+
+			local duplicate_completion = calls.exact_stop_deferred.callback
+			calls.deliver_exact_stopped()
+			duplicate_completion(true, "duplicate-stopped")
+			complete_failure_recovery(calls, stale_token, "layout-b")
+		end)
+	end)
+
+	helpers.it("coalesces a newer layout before the failed generation reaches STOPPED", function()
+		with_remap({
+			enabled = true,
+			paused = false,
+			initial_phase = "prepared",
+			defer_exact_stop = true,
+		}, function(remap, calls)
+			local stale_token = activate_initial_generation(remap, calls)
+			calls.builds = {}
+			calls.deploy_tokens = {}
+			calls.stop_exact_tokens = {}
+			calls.next_deploy_failure = "false"
+
+			calls.change_layout("layout-b")
+			helpers.assert_true(calls.fire_next_async_timer())
+			helpers.assert_eq(calls.phase, "stopping")
+			calls.change_layout("layout-c")
+			calls.deliver_exact_stopped()
+
+			local replacement = complete_failure_recovery(calls, stale_token, "layout-c")
+			helpers.assert_eq(#calls.builds, 2,
+				"the failed B attempt and successful C replacement are the only builds")
+			helpers.assert_eq(calls.builds[1].layout, "layout-b")
+			helpers.assert_eq(calls.builds[2].layout, "layout-c")
+			helpers.assert_eq(calls.deploy_tokens[#calls.deploy_tokens], replacement.token)
+		end)
+	end)
+
+	helpers.it("lets a newer Pause cancel recovery before the exact fence completes", function()
+		with_remap({
+			enabled = true,
+			paused = false,
+			initial_phase = "prepared",
+			defer_exact_stop = true,
+		}, function(remap, calls)
+			local stale_token = activate_initial_generation(remap, calls)
+			calls.builds = {}
+			calls.deploy_tokens = {}
+			calls.next_deploy_failure = "false"
+
+			calls.change_layout("layout-b")
+			helpers.assert_true(calls.fire_next_async_timer())
+			helpers.assert_eq(calls.phase, "stopping")
+			-- script_control commits this state only after its joined native fence;
+			-- setting it before completion models the authoritative newer intent.
+			calls.script_paused = true
+			calls.deliver_exact_stopped()
+			for _ = 1, 20 do
+				if not calls.fire_next_async_timer() then break end
+			end
+			helpers.assert_eq(calls.token_index, 1,
+				"a late failure callback must not override the newer Pause intent")
+			helpers.assert_eq(#calls.builds, 1)
+			helpers.assert_eq(calls.phase, "idle")
+		end)
+	end)
+
+	helpers.it("lets an explicit menu Stop defeat a pending failure recovery", function()
+		with_remap({
+			enabled = true,
+			paused = false,
+			initial_phase = "prepared",
+			defer_exact_stop = true,
+		}, function(remap, calls)
+			activate_initial_generation(remap, calls)
+			calls.builds = {}
+			calls.deploy_tokens = {}
+			calls.next_deploy_failure = "false"
+
+			calls.change_layout("layout-b")
+			helpers.assert_true(calls.fire_next_async_timer())
+			helpers.assert_eq(calls.phase, "stopping")
+			local stop_results = {}
+			helpers.assert_true(remap.stop_lease(function(ok, reason)
+				stop_results[#stop_results + 1] = { ok = ok, reason = reason }
+			end))
+			helpers.assert_eq(#stop_results, 0,
+				"explicit Stop must join rather than outrun the existing exact fence")
+
+			calls.deliver_exact_stopped()
+			helpers.assert_eq(#stop_results, 1)
+			helpers.assert_true(stop_results[1].ok)
+			for _ = 1, 20 do
+				if not calls.fire_next_async_timer() then break end
+			end
+			helpers.assert_eq(calls.token_index, 1,
+				"a late failure callback must not undo the user's explicit Stop")
+			helpers.assert_eq(#calls.builds, 1)
+			helpers.assert_eq(calls.phase, "idle")
+		end)
+	end)
+
+	helpers.it("cancels an armed failure-recovery timer on explicit menu Stop", function()
+		with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+			function(remap, calls)
+				activate_initial_generation(remap, calls)
+				calls.builds = {}
+				calls.deploy_tokens = {}
+				calls.next_deploy_failure = "false"
+
+				calls.change_layout("layout-b")
+				helpers.assert_true(calls.fire_next_async_timer())
+				helpers.assert_eq(calls.phase, "idle")
+				helpers.assert_true(calls.fire_next_async_timer(),
+					"the inactive layout replay must consume B and arm recovery")
+				helpers.assert_eq(calls.token_index, 1,
+					"the recovery delay must not allocate a token yet")
+
+				local stop_results = {}
+				helpers.assert_true(remap.stop_lease(function(ok, reason)
+					stop_results[#stop_results + 1] = { ok = ok, reason = reason }
+				end))
+				helpers.assert_eq(#stop_results, 1)
+				helpers.assert_true(stop_results[1].ok)
+				for _ = 1, 20 do
+					if not calls.fire_next_async_timer() then break end
+				end
+				helpers.assert_eq(calls.token_index, 1,
+					"explicit Stop must cancel an already-armed background recovery")
+				helpers.assert_eq(#calls.builds, 1)
+				helpers.assert_eq(calls.phase, "idle")
+			end)
+	end)
+
+	helpers.it("epoch-fences a failure callback after explicit revocation", function()
+		with_remap({
+			enabled = true,
+			paused = false,
+			initial_phase = "prepared",
+			defer_exact_stop = true,
+		}, function(remap, calls)
+			activate_initial_generation(remap, calls)
+			calls.builds = {}
+			calls.deploy_tokens = {}
+			calls.next_deploy_failure = "false"
+
+			calls.change_layout("layout-b")
+			helpers.assert_true(calls.fire_next_async_timer())
+			helpers.assert_eq(calls.phase, "stopping")
+			local revoke_results = {}
+			helpers.assert_true(remap.revoke("test-explicit-revoke", function(ok, reason)
+				revoke_results[#revoke_results + 1] = { ok = ok, reason = reason }
+			end))
+			helpers.assert_eq(#revoke_results, 0,
+				"revocation must join rather than outrun the existing exact fence")
+
+			calls.deliver_exact_stopped()
+			helpers.assert_eq(#revoke_results, 1)
+			helpers.assert_true(revoke_results[1].ok)
+			for _ = 1, 20 do
+				if not calls.fire_next_async_timer() then break end
+			end
+			helpers.assert_eq(calls.token_index, 1,
+				"a pre-revocation failure callback must be inert in the newer lifecycle")
+			helpers.assert_eq(#calls.builds, 1)
+			helpers.assert_eq(calls.phase, "idle")
+		end)
+	end)
+
+	helpers.it("keeps a failed public deploy separate from its safety recovery", function()
+		with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+			function(remap, calls)
+				local stale_token = activate_initial_generation(remap, calls)
+				calls.builds = {}
+				calls.deploy_tokens = {}
+				calls.stop_exact_tokens = {}
+				calls.next_deploy_failure = "false"
+				local results = {}
+
+				remap.regenerate(function(ok, reason)
+					results[#results + 1] = { ok = ok, reason = reason }
+				end)
+				helpers.assert_eq(#results, 1)
+				helpers.assert_true(results[1].ok == false)
+				helpers.assert_eq(results[1].reason, "deploy-failed")
+				helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1)
+
+				complete_failure_recovery(calls, stale_token, "layout-a")
+				helpers.assert_eq(#results, 1,
+					"background recovery must never rewrite the failed public result")
+				helpers.assert_true(results[1].ok == false)
+			end)
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("recovers an ACTIVE classifier " .. mode .. " outside layout maintenance",
+			function()
+				with_remap({ enabled = true, paused = false, initial_phase = "prepared" },
+					function(remap, calls)
+						local stale_token = activate_initial_generation(remap, calls)
+						calls.builds = {}
+						calls.deploy_tokens = {}
+						calls.stop_exact_tokens = {}
+						calls.next_classifier_failure = mode
+						local results = {}
+
+						remap.regenerate(function(ok, reason)
+							results[#results + 1] = { ok = ok, reason = reason }
+						end)
+						helpers.assert_eq(#results, 1)
+						helpers.assert_true(results[1].ok == false,
+							"the failed public operation must remain honestly failed")
+						helpers.assert_eq(results[1].reason, "lease-input-start-failed")
+						helpers.assert_eq(count_value(calls.stop_exact_tokens, stale_token), 1)
+						helpers.assert_eq(calls.phase, "idle")
+
+						local replacement = complete_failure_recovery(
+							calls, stale_token, "layout-a"
+						)
+						helpers.assert_eq(#results, 1,
+							"background safety recovery must not resettle the failed public callback")
+						helpers.assert_true(results[1].ok == false)
+						helpers.assert_eq(#calls.builds, 2)
+						helpers.assert_eq(calls.deploy_tokens[#calls.deploy_tokens], replacement.token)
+					end)
+			end)
+	end
 end)

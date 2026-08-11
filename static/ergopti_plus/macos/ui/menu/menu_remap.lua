@@ -822,14 +822,8 @@ function M.build(ctx)
 		label    = i18n.get("menu.karabiner.stop"),
 		disabled = not enabled or not lease_attached,
 		action   = function()
-			Logger.start(LOG, "User requested exact Ergopti Karabiner lease stop…")
 			local stop_ok, requested_or_err = xpcall(function()
-				return LeaseController.stop("menu_stop", function(ok, reason)
-					if ok then
-						Logger.success(LOG, "Exact Ergopti Karabiner lease stopped.")
-					else
-						Logger.error(LOG, "Exact lease stop failed: %s.", tostring(reason))
-					end
+				return karabiner.stop_lease(function()
 					if update_menu then pcall(update_menu) end
 				end)
 			end, debug.traceback)
