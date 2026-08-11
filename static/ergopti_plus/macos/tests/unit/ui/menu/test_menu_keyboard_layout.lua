@@ -379,22 +379,19 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 	end)
 end)
 
-helpers.describe("Startup applies the resume layout (regression)", function()
-	-- The pause-layout feature switches layout on pause AND resume, but the chosen
-	-- "resume" (active-state) layout was never applied at HS startup/reload — only
-	-- on an actual pause→resume cycle. The script boots in the non-paused state, so
-	-- startup must honour layout_on_resume the same way a resume would: ui/menu/init.lua
-	-- calls schedule_pause_layout_switch(false, state) once the boot settles. Behaviour
-	-- of the false→resume mapping itself is covered above; here we lock in the wiring.
-	helpers.it("ui/menu/init.lua applies the non-paused (resume) layout at startup", function()
+helpers.describe("Startup applies the live pause layout (regression)", function()
+	-- The behavioural generation test drives this callback in both live states:
+	-- false still selects the resume layout, while a pause committed during the
+	-- four-second delay selects the pause layout instead of replaying a stale false.
+	helpers.it("audit startup layout: ui/menu/init.lua derives the delayed layout from live pause state", function()
 		-- Selected by a declaration unique to ui/menu/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function safe_require")
 		helpers.assert_true(src ~= nil, "ui/menu/init.lua source must be locatable")
-		-- The on_pause_change listener calls it with the `is_paused` variable; the
-		-- startup application is the one that passes the `false` literal (resume layout).
-		helpers.assert_true(src:find("schedule_pause_layout_switch, false", 1, true) ~= nil,
-			"startup must call schedule_pause_layout_switch with is_paused=false (resume layout)")
+		helpers.assert_true(src:find("pcall(shortcuts_mod.is_paused)", 1, true) ~= nil,
+			"the delayed startup callback must read the canonical live pause predicate")
+		helpers.assert_true(src:find("schedule_pause_layout_switch, live_paused", 1, true) ~= nil,
+			"the delayed startup callback must pass the live result to layout selection")
 	end)
 end)
