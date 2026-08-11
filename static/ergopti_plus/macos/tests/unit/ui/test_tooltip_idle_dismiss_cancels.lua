@@ -37,8 +37,11 @@ local function load_tooltip()
 	-- at its documented shape: render(blocks, state, on_shown).
 	local T = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
 	package.loaded["ui.tooltip.renderer"] = {
-		render = function(_blocks, _state, on_shown) if type(on_shown) == "function" then on_shown() end end,
-		hide   = function() end,
+		render = function(_blocks, _state, on_shown)
+			if type(on_shown) == "function" then on_shown() end
+			return true
+		end,
+		hide   = function() return true end,
 		-- The width-calc pass measures text through the live canvas; without it
 		-- show_predictions throws before it ever reaches the render call.
 		canvas = { minimumTextSize = function() return { w = 100, h = 20 } end },

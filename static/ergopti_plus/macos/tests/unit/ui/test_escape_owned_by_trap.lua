@@ -49,8 +49,11 @@ local function load_with_keydown_watcher()
 	package.loaded["ui.tooltip.config"] = nil
 	local T = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
 	package.loaded["ui.tooltip.renderer"] = {
-		render = function(_blocks, _state, on_shown) if type(on_shown) == "function" then on_shown() end end,
-		hide   = function() end,
+		render = function(_blocks, _state, on_shown)
+			if type(on_shown) == "function" then on_shown() end
+			return true
+		end,
+		hide   = function() return true end,
 		canvas = { minimumTextSize = function() return { w = 100, h = 20 } end },
 	}
 	package.loaded["ui.tooltip.tooltip_llm"] = nil

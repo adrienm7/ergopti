@@ -78,12 +78,32 @@ end
 local function make_canvas(options)
 	options = options or {}
 	local canvas = { showing = options.showing ~= false }
-	for index = 1, 7 do
+	local element_count = options.element_count or 7
+	for index = 1, element_count do
 		local element_options = index == 7 and options.model_element or nil
 		canvas[index] = select(1, make_element(element_options))
 	end
 	local model_values
-	canvas[7], model_values = make_element(options.model_element)
+	if element_count >= 7 then
+		canvas[7], model_values = make_element(options.model_element)
+	end
+
+	function canvas:minimumTextSize()
+		return { w = 100, h = 20 }
+	end
+
+	function canvas:frame(value)
+		if value ~= nil then self.native_frame = value end
+		return self.native_frame or { x = 0, y = 0, w = 100, h = 20 }
+	end
+
+	function canvas:show()
+		if options.show_mode == "throw" then error("native show failed") end
+		if options.show_mode ~= "refuse" then self.showing = true end
+		if options.show_mode == "nil" then return nil end
+		if options.show_mode == "false" then return false end
+		return self
+	end
 
 	function canvas:hide()
 		if options.hide_mode == "throw" then error("native hide failed") end
@@ -173,7 +193,97 @@ end)
 
 -- =========================================
 -- =========================================
--- ======= 3/ Hide Commit Gate =============
+-- ======= 3/ Show Commit Gate =============
+-- =========================================
+-- =========================================
+
+helpers.describe("tooltip renderer native commit: show transitions", function()
+	local failure_modes = {
+		{ label = "throw", options = { show_mode = "throw", showing = false }, marker = "Failed to show" },
+		{ label = "nil", options = { show_mode = "nil", showing = false }, marker = "invalid native result" },
+		{ label = "false", options = { show_mode = "false", showing = false }, marker = "invalid native result" },
+		{ label = "hidden", options = { show_mode = "refuse", showing = false }, marker = "remained hidden" },
+	}
+
+	helpers.it("returns true and starts standard watchers only after native visibility is observable (renderer-native-show-commit)", function()
+		local renderer = load_renderer()
+		local canvas = make_canvas({ showing = false })
+		local callbacks = 0
+		renderer.canvas = canvas
+
+		local shown = renderer.render({ preds = "prediction" }, {}, function()
+			callbacks = callbacks + 1
+			helpers.assert_eq(canvas:isShowing(), true,
+				"the callback must run only after the native read-back reports visible")
+		end)
+
+		helpers.assert_eq(shown, true, "a verified standard show must return strict true")
+		helpers.assert_eq(callbacks, 1, "a committed show must arm its owner exactly once")
+	end)
+
+	helpers.it("rejects every uncommitted standard show without invoking its callback (renderer-native-show-commit)", function()
+		for _, case in ipairs(failure_modes) do
+			local renderer, errors = load_renderer()
+			local canvas = make_canvas(case.options)
+			local callbacks = 0
+			renderer.canvas = canvas
+
+			local shown = renderer.render({ preds = "prediction" }, {}, function()
+				callbacks = callbacks + 1
+			end)
+
+			helpers.assert_eq(shown, false,
+				case.label .. " standard show must fail closed")
+			helpers.assert_eq(callbacks, 0,
+				case.label .. " standard show must not arm watchers")
+			helpers.assert_eq(canvas:isShowing(), false,
+				case.label .. " standard show failure must clean up any partial native visibility")
+			assert_error_logged(errors, case.marker)
+		end
+	end)
+
+	helpers.it("applies the same native show gate to stacked canvases (renderer-native-show-commit)", function()
+		local renderer = load_renderer()
+		local committed_canvas = make_canvas({ element_count = 5, showing = false })
+		local callbacks = 0
+		renderer.stacked_canvas = committed_canvas
+
+		helpers.assert_eq(renderer.render_stacked({ { text = "expansion" } }, {}, function()
+			callbacks = callbacks + 1
+			helpers.assert_eq(committed_canvas:isShowing(), true)
+		end), true)
+		helpers.assert_eq(callbacks, 1)
+
+		for _, case in ipairs(failure_modes) do
+			renderer = load_renderer()
+			local options = {}
+			for key, value in pairs(case.options) do options[key] = value end
+			options.element_count = 5
+			local canvas = make_canvas(options)
+			callbacks = 0
+			renderer.stacked_canvas = canvas
+
+			local shown = renderer.render_stacked({ { text = "expansion" } }, {}, function()
+				callbacks = callbacks + 1
+			end)
+
+			helpers.assert_eq(shown, false,
+				case.label .. " stacked show must fail closed")
+			helpers.assert_eq(callbacks, 0,
+				case.label .. " stacked show must not arm watchers")
+			helpers.assert_eq(canvas:isShowing(), false,
+				case.label .. " stacked show failure must clean up any partial native visibility")
+		end
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Hide Commit Gate =============
 -- =========================================
 -- =========================================
 

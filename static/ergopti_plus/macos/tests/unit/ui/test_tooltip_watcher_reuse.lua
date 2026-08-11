@@ -49,9 +49,11 @@ local function load_tooltip(spec, faults)
 
 	local renderer
 	renderer = {
+		ELEM_INFO = 6,
 		hide_calls = 0,
 		render_calls = 0,
 		stacked_render_calls = 0,
+		partial_render_calls = 0,
 		visible = false,
 		stacked_visible = false,
 		canvas = {
@@ -63,20 +65,43 @@ local function load_tooltip(spec, faults)
 			renderer.visible = true
 			if faults and faults.render_skip_callback then
 				renderer.hide()
-				return
+				return faults.render_result
 			end
 			if type(on_shown) == "function" then on_shown() end
+			if faults and faults.render_result ~= nil then return faults.render_result end
+			return true
 		end,
 		render_stacked = function(_rows, _state, on_shown)
 			renderer.stacked_render_calls = renderer.stacked_render_calls + 1
 			renderer.stacked_visible = true
 			if type(on_shown) == "function" then on_shown() end
+			if faults and faults.stacked_render_result ~= nil then
+				return faults.stacked_render_result
+			end
+			return true
 		end,
 		hide = function()
 			renderer.hide_calls = renderer.hide_calls + 1
-			renderer.visible = false
+			if not faults or faults.hide_result ~= false then renderer.visible = false end
+			if faults and faults.hide_result ~= nil then return faults.hide_result end
+			return true
 		end,
-		hide_stacked = function() renderer.stacked_visible = false end,
+		hide_stacked = function()
+			if not faults or faults.hide_stacked_result ~= false then
+				renderer.stacked_visible = false
+			end
+			if faults and faults.hide_stacked_result ~= nil then
+				return faults.hide_stacked_result
+			end
+			return true
+		end,
+		set_element_text = function()
+			renderer.partial_render_calls = renderer.partial_render_calls + 1
+			if faults and faults.partial_render_result ~= nil then
+				return faults.partial_render_result
+			end
+			return true
+		end,
 	}
 	package.loaded["ui.tooltip.renderer"] = renderer
 
@@ -703,6 +728,80 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			"a loading renderer that swallows failure must still report no commit")
 		helpers.assert_true(not swallowed.tooltip.is_visible(),
 			"swallowed loading failure must clear logical visibility")
+	end)
+
+	for _, spec in ipairs(CASES) do
+		local tooltip_spec = spec
+		helpers.it("(tooltip-native-commit-propagation) " .. tooltip_spec.label
+			.. " rejects a renderer false even when its callback ran", function()
+			local context = load_tooltip(tooltip_spec, { render_result = false })
+
+			local render_result = tooltip_spec.render(context.tooltip)
+
+			helpers.assert_eq(render_result, false,
+				"owner success must require the renderer's strict commit result")
+			helpers.assert_true(not context.tooltip.is_visible(),
+				"a rejected native paint must not publish logical visibility")
+			helpers.assert_true(context.renderer.hide_calls >= 1,
+				"a callback that ran before a rejected commit must be torn down")
+			for _, watcher in ipairs(context.created) do
+				helpers.assert_true(not watcher:isEnabled(),
+					"a rejected render must revoke every watcher it tentatively armed")
+			end
+		end)
+
+		helpers.it("(tooltip-native-commit-propagation) " .. tooltip_spec.label
+			.. " preserves logical ownership when native hide is refused", function()
+			local faults = {}
+			local context = load_tooltip(tooltip_spec, faults)
+			helpers.assert_eq(tooltip_spec.render(context.tooltip), true)
+			faults.hide_result = false
+
+			local hidden = context.tooltip.hide()
+
+			helpers.assert_eq(hidden, false,
+				"native hide refusal must propagate to the public owner")
+			helpers.assert_true(context.tooltip.is_visible(),
+				"logical visibility must keep describing the still-visible canvas")
+			helpers.assert_true(context.renderer.visible,
+				"the fixture must prove the native canvas really refused the hide")
+
+			faults.hide_result = true
+			helpers.assert_eq(context.tooltip.hide(), true,
+				"a later authoritative retry must be able to complete teardown")
+			helpers.assert_true(not context.tooltip.is_visible())
+		end)
+	end
+
+	helpers.it("(tooltip-native-commit-propagation) stacked native refusal cannot publish or clear hotstring visibility", function()
+		local faults = { stacked_render_result = false }
+		local context = load_tooltip(CASES[2], faults)
+
+		helpers.assert_eq(context.tooltip.show_stacked({ { text = "preview" } }, true), false,
+			"a stacked renderer false must reject the logical show")
+		helpers.assert_true(not context.tooltip.is_visible())
+
+		faults.stacked_render_result = true
+		helpers.assert_eq(context.tooltip.show_stacked({ { text = "preview" } }, true), true)
+		faults.hide_stacked_result = false
+		helpers.assert_eq(context.tooltip.hide_forced(), false,
+			"a stacked native hide refusal must propagate")
+		helpers.assert_true(context.tooltip.is_visible(),
+			"the owner must remain logically visible while stacked pixels remain")
+		helpers.assert_true(context.renderer.stacked_visible)
+	end)
+
+	helpers.it("(tooltip-native-commit-propagation) LLM timing completion requires the native partial write", function()
+		local faults = { partial_render_result = false }
+		local context = load_tooltip(CASES[1], faults)
+
+		helpers.assert_eq(context.tooltip.set_timing(10, 20), false,
+			"a refused info-zone write must not report a timing commit")
+		helpers.assert_eq(context.tooltip.set_chain_start(hs.timer.secondsSinceEpoch() - 1), true)
+		helpers.assert_eq(context.tooltip.mark_chain_complete(), false,
+			"chain completion must propagate the refused timing write")
+		helpers.assert_eq(context.renderer.partial_render_calls, 2,
+			"both public paths must reach the same strict renderer boundary")
 	end)
 
 	helpers.it("(tooltip-watcher-reuse) stale LLM acceptance cannot target a streaming repaint", function()

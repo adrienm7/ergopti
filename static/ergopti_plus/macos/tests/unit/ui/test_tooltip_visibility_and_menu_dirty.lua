@@ -31,8 +31,8 @@ helpers.describe("tooltip: a failed render does not leave the tooltip 'visible'"
 			standard_hidden = false,
 			stacked_hidden = false,
 			render_stacked = function() error("simulated stacked canvas failure") end,
-			hide = function() renderer.standard_hidden = true end,
-			hide_stacked = function() renderer.stacked_hidden = true end,
+			hide = function() renderer.standard_hidden = true; return true end,
+			hide_stacked = function() renderer.stacked_hidden = true; return true end,
 		}
 		package.loaded["ui.tooltip.renderer"] = renderer
 		package.loaded["ui.tooltip.tooltip_hotstring"] = nil

@@ -437,19 +437,40 @@ end
 -- =============================
 -- =============================
 
+--- Runs a teardown transition without allowing an exception to disappear at an
+--- eventtap/timer boundary.  Native renderer methods use strict booleans: a
+--- protected call succeeding with nil/false is still a failed transition.
+--- @param label string Stable operation label for the file logger.
+--- @param callback function Zero-arity transition.
+--- @return boolean committed
+local function run_boolean_transition(label, callback)
+	local ok, result = xpcall(callback, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+		return false
+	end
+	return result == true
+end
+
 --- Forces the tooltip to hide regardless of any active dequeue cycle.
 --- Only call this when an authoritative dismissal is required (e.g. the
 --- keyboard watcher detected a real typing key, or an explicit hide() call
 --- from outside the tooltip subsystem).
 function M.hide_forced()
-	local watchers_stopped = false
-	local ok = pcall(function()
-		watchers_stopped = stop_watchers()
+	local watchers_stopped = run_boolean_transition(
+		"Hotstring tooltip watcher teardown", stop_watchers)
+	local standard_hidden = run_boolean_transition(
+		"Standard tooltip canvas teardown", Renderer.hide)
+	local stacked_hidden = run_boolean_transition(
+		"Stacked tooltip canvas teardown", Renderer.hide_stacked)
+	-- Visibility follows the native surfaces.  A watcher may remain orphaned and
+	-- still force the public return false, but it must not keep an already-hidden
+	-- tooltip logically visible.
+	if standard_hidden and stacked_hidden then
 		_state.bg_color = nil
 		_state.is_visible = false
-		Renderer.hide()
-	end)
-	return ok and watchers_stopped
+	end
+	return watchers_stopped and standard_hidden and stacked_hidden
 end
 
 function M.hide()
@@ -458,32 +479,29 @@ function M.hide()
 	-- so that rows with longer durations survive past the first row's expiry.
 	-- The dequeue tick itself calls hide_forced() when the last row expires.
 	if _dequeue_rows then return true end
-	local watchers_stopped = false
-	local ok = pcall(function()
-		watchers_stopped = stop_watchers()
-		_state.bg_color = nil
-		_state.is_visible = false
-		Renderer.hide()
-	end)
-	return ok and watchers_stopped
+	return M.hide_forced()
 end
 
 --- Resets internal state and stops watchers without hiding the shared canvas.
 --- Used when transitioning to the LLM tooltip so the canvas content is overwritten
 --- in-place rather than first blanked then redrawn, which would produce a visible gap.
 function M.dismiss_silent()
-	local watchers_stopped = false
-	local ok = pcall(function()
-		-- Hide the stacked canvas (hotstring preview) when transitioning away;
-		-- without this it survives the LLM tooltip transition and stays on screen
-		-- as an orphaned layer behind the new prediction canvas (E1 audit fix).
-		pcall(Renderer.hide_stacked)
-		watchers_stopped = stop_watchers()
-		if not watchers_stopped then Renderer.hide() end
+	-- Hide the stacked canvas (hotstring preview) when transitioning away;
+	-- without this it survives the LLM tooltip transition and stays on screen
+	-- as an orphaned layer behind the new prediction canvas (E1 audit fix).
+	local stacked_hidden = run_boolean_transition(
+		"Stacked tooltip transition teardown", Renderer.hide_stacked)
+	local watchers_stopped = run_boolean_transition(
+		"Hotstring tooltip transition watcher teardown", stop_watchers)
+	if stacked_hidden and watchers_stopped then
 		_state.bg_color = nil
 		_state.is_visible = false
-	end)
-	return ok and watchers_stopped
+		return true
+	end
+	-- A silent in-place handoff is no longer safe.  Attempt authoritative cleanup
+	-- while preserving the failed return so the LLM owner cannot publish success.
+	M.hide_forced()
+	return false
 end
 
 function M.show(content, is_llm_origin, is_enabled, background_color)
@@ -502,10 +520,12 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 		end
 		-- Hide any surviving stacked canvas from a prior hotstring expansion
 		-- that was not cleaned up by a transition function (E1 audit fix).
-		pcall(Renderer.hide_stacked)
+		if Renderer.hide_stacked() ~= true then
+			M.hide_forced()
+			return
+		end
 
 		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
-		_state.is_visible = true
 
 		local styled_content = type(content) == "userdata" and content or hs.styledtext.new(tostring(content), {
 			font  = { name = Config.fonts.main, size = Config.sizes.main, traits = is_llm_origin and { italic = true } or {} },
@@ -515,10 +535,14 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 		local watcher_callback_ran = false
 		local watcher_activation_ok = false
 		local watcher_activation_crashed = false
-		Renderer.render(styled_content, _state, function()
+		local render_committed = Renderer.render(styled_content, _state, function()
 			watcher_callback_ran = true
 			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
 		end)
+		if render_committed ~= true then
+			M.hide_forced()
+			return
+		end
 		if watcher_activation_crashed then
 			M.hide_forced()
 			return
@@ -528,6 +552,7 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 			return
 		end
 		if not watcher_activation_ok then return end
+		_state.is_visible = true
 		rendered = true
 	end)
 
@@ -558,10 +583,12 @@ function M.show_loading(content, is_enabled, background_color)
 		end
 		-- Hide any surviving stacked canvas from a prior hotstring preview;
 		-- the loading indicator must render above a clean surface (E1 audit fix).
-		pcall(Renderer.hide_stacked)
+		if Renderer.hide_stacked() ~= true then
+			M.hide_forced()
+			return
+		end
 
 		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
-		_state.is_visible = true
 
 		local styled_content = type(content) == "userdata" and content or hs.styledtext.new(tostring(content), {
 			font  = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } },
@@ -571,11 +598,13 @@ function M.show_loading(content, is_enabled, background_color)
 		-- Loading owns no interaction watcher; this callback is only a synchronous
 		-- commit marker proving that the canvas reached its shown state.
 		local render_completed = false
-		Renderer.render(styled_content, _state, function() render_completed = true end)
-		if not render_completed then
+		local render_committed = Renderer.render(
+			styled_content, _state, function() render_completed = true end)
+		if render_committed ~= true or not render_completed then
 			M.hide_forced()
 			return
 		end
+		_state.is_visible = true
 		rendered = true
 	end)
 
@@ -618,7 +647,6 @@ function M.show_stacked(rows, is_enabled)
 			end
 		end
 
-		_state.is_visible = true
 		local function render_with_watcher_ownership(active_rows, reuse_watchers)
 			local watcher_callback_ran = false
 			local watcher_activation_ok = reuse_watchers == true and watchers_are_active() or false
@@ -629,9 +657,9 @@ function M.show_stacked(rows, is_enabled)
 					watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
 				end
 			end
-			Renderer.render_stacked(active_rows, _state, watcher_cb)
+			local render_committed = Renderer.render_stacked(active_rows, _state, watcher_cb)
 			if watcher_activation_crashed then M.hide_forced() end
-			return watcher_callback_ran and watcher_activation_ok
+			return render_committed == true and watcher_callback_ran and watcher_activation_ok
 		end
 
 		if Dequeue.should_use_dequeue_path(rows, _dequeue_opts) then
@@ -656,32 +684,15 @@ function M.show_stacked(rows, is_enabled)
 				return
 			end
 		end
+		_state.is_visible = true
 		rendered = true
 	end)
 	if not ok then
 		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
-		-- The visibility flag was optimistically set BEFORE the render. If the
-		-- render threw there is no canvas on screen, yet tooltip.is_visible() went
-		-- on reporting true — and the persistent Escape trap consults exactly that
-		-- to decide whether to swallow Escape. The user's next Escape would vanish
-		-- into a tooltip that does not exist. Roll the claim back on failure.
+		-- Authoritatively hide any partially committed canvas and revoke ownership.
 		M.hide_forced()
 	end
 	return ok and rendered
-end
-
---- Hides the stacked canvas alongside the standard one (authoritative).
-local _original_hide_forced = M.hide_forced
-M.hide_forced = function()
-	local stopped = _original_hide_forced()
-	local stacked_hidden = pcall(Renderer.hide_stacked)
-	return stopped and stacked_hidden
-end
-
---- Hides both canvases unless a dequeue cycle is active (respects guard).
-M.hide = function()
-	if _dequeue_rows then return true end
-	return M.hide_forced()
 end
 
 -- Assign the dequeue tick function now that M.hide and M.show_stacked exist.

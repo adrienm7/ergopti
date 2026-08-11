@@ -130,6 +130,60 @@ local function hide_canvas_verified(canvas, label)
 	return true
 end
 
+--- Shows one native canvas and verifies the resulting visibility state.
+--- The Objective-C bridge documents show() as returning the canvas object, so
+--- nil/false is a rejected commit even if no Lua exception escaped.  The
+--- independent isShowing() read-back prevents a no-op native call from arming
+--- interaction watchers for pixels that never became visible.
+--- @param canvas table|userdata|nil Canvas object to show.
+--- @param label string Diagnostic canvas label.
+--- @return boolean shown Whether the owned native surface is observably shown.
+local function show_canvas_verified(canvas, label)
+	if canvas == nil then
+		Logger.error(LOG, "Failed to show %s: canvas is unavailable.", label)
+		return false
+	end
+	local show_method_ok, show_method = pcall(function() return canvas.show end)
+	if not show_method_ok or type(show_method) ~= "function" then
+		Logger.error(LOG, "Failed to show %s: native show method is unavailable (%s).",
+			label, tostring(show_method))
+		return false
+	end
+	local status_method_ok, status_method = pcall(function() return canvas.isShowing end)
+	if not status_method_ok or type(status_method) ~= "function" then
+		Logger.error(LOG, "Failed to show %s: native visibility method is unavailable (%s).",
+			label, tostring(status_method))
+		return false
+	end
+
+	local show_ok, show_result = pcall(show_method, canvas)
+	if not show_ok then
+		Logger.error(LOG, "Failed to show %s: %s.", label, tostring(show_result))
+		return false
+	end
+	if show_result == nil or show_result == false then
+		Logger.error(LOG, "Failed to show %s: invalid native result (%s).",
+			label, tostring(show_result))
+		return false
+	end
+
+	local status_ok, is_showing = pcall(status_method, canvas)
+	if not status_ok then
+		Logger.error(LOG, "Failed to verify visible %s: %s.", label, tostring(is_showing))
+		return false
+	end
+	if is_showing == false then
+		Logger.error(LOG, "%s remained hidden after native show.", label)
+		return false
+	end
+	if is_showing ~= true then
+		Logger.error(LOG, "Failed to verify visible %s: invalid native status (%s).",
+			label, tostring(is_showing))
+		return false
+	end
+	return true
+end
+
 --- Updates a single text element without redrawing the rest of the canvas.
 --- Used by tooltip_llm during streaming to refresh the info bar / model header
 --- without recreating the canvas — `hs.canvas` element assignment is the
@@ -269,10 +323,6 @@ end
 -- ====================================
 -- ====================================
 
---- Compiles the component blocks, applies layout logic, and draws the canvas.
---- @param blocks table|userdata The text payloads to draw.
---- @param state table The orchestrator state object.
---- @param start_watchers_callback function Function to execute event watchers post-render.
 --- Resolves where the tooltip canvas goes, given an anchor and a screen frame.
 ---
 --- Pure: the only OS-derived inputs are the two parameters, so a test can drive
@@ -297,9 +347,17 @@ function M.compute_position(anchor, canvas, screen_frame)
 	})
 end
 
+--- Compiles the component blocks, applies layout logic, and draws the canvas.
+--- @param blocks table|userdata The text payloads to draw.
+--- @param state table The orchestrator state object.
+--- @param start_watchers_callback function Function to execute event watchers post-render.
+--- @return boolean rendered Whether the canvas became natively visible and the callback completed.
 function M.render(blocks, state, start_watchers_callback)
-	local ok, err = pcall(function()
-		if not M.canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then return end
+	if not M.canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then
+		Logger.error(LOG, "Cannot render tooltip: canvas or content is unavailable.")
+		return false
+	end
+	local ok, rendered_or_err = xpcall(function()
 
 		local size_predictions = { w = 0, h = 0 }
 		if type(blocks) == "userdata" then
@@ -396,15 +454,22 @@ function M.render(blocks, state, start_watchers_callback)
 
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
 		M.canvas[2].frame = { x = 0, y = 0, w = canvas_width, h = canvas_height }
-		M.canvas:show()
-		
+		if not show_canvas_verified(M.canvas, "tooltip canvas") then return false end
+
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
-	end)
+		return true
+	end, debug.traceback)
 
 	if not ok then
-		Logger.error(LOG, "Crash during UI rendering: " .. tostring(err) .. ".")
+		Logger.error(LOG, "Crash during UI rendering: " .. tostring(rendered_or_err) .. ".")
 		M.hide()
+		return false
 	end
+	if rendered_or_err ~= true then
+		M.hide()
+		return false
+	end
+	return true
 end
 
 --- Safely hides the canvas. Also clears the stable model-info zone so the
@@ -570,10 +635,17 @@ M._measure_styled = measure_styled
 --- @param rows table Array of row descriptors.
 --- @param state table Must contain fixed_width (or nil) and timeout_sec.
 --- @param start_watchers_callback function|nil Called after canvas is shown.
+--- @return boolean rendered Whether the canvas became natively visible and the callback completed.
 function M.render_stacked(rows, state, start_watchers_callback)
-	local ok, err = pcall(function()
-		if not rows or #rows == 0 then return end
-		if not _ensure_stacked_canvas(#rows) then return end
+	if not rows or #rows == 0 then
+		Logger.error(LOG, "Cannot render stacked tooltip: rows are unavailable.")
+		return false
+	end
+	local ok, rendered_or_err = xpcall(function()
+		if not _ensure_stacked_canvas(#rows) then
+			Logger.error(LOG, "Cannot render stacked tooltip: canvas is unavailable.")
+			return false
+		end
 
 		local pad_x     = Config.layout.pad_x
 		local pad_y     = Config.layout.pad_y
@@ -744,13 +816,20 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		local border_idx = row_count * 5
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
-		M.stacked_canvas:show()
+		if not show_canvas_verified(M.stacked_canvas, "stacked tooltip canvas") then return false end
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
-	end)
+		return true
+	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
+		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(rendered_or_err) .. ".")
 		M.hide_stacked()
+		return false
 	end
+	if rendered_or_err ~= true then
+		M.hide_stacked()
+		return false
+	end
+	return true
 end
 
 --- Hides the stacked canvas.
