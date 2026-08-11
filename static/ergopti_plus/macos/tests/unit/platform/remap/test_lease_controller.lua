@@ -1559,6 +1559,51 @@ helpers.describe("karabiner lease controller: generation isolation", function()
 			"aggregate settlement must stay exact-token-only across both retirees")
 	end)
 
+	helpers.it("clears the retired token from an IDLE publication after STOPPED", function()
+		local controller, ctx = load_controller()
+		local phases = {}
+		controller.init(function(phase, token)
+			phases[#phases + 1] = { phase = phase, token = token }
+		end)
+		local retired = controller.variables()
+		controller.start()
+		ctx.chunk(1, "READY\n")
+
+		controller.stop("normal token cleanup")
+		ctx.chunk(1, "STOPPED\n")
+
+		local phase, snapshot = controller.status()
+		helpers.assert_eq(phase, "idle")
+		helpers.assert_nil(snapshot.token)
+		helpers.assert_eq(phases[#phases].phase, "idle")
+		helpers.assert_nil(phases[#phases].token,
+			"IDLE must not publish the retired exact-generation identity")
+		helpers.assert_true(retired.token ~= nil)
+	end)
+
+	helpers.it("clears the retired token from an IDLE publication after fallback", function()
+		local controller, ctx = load_controller()
+		local phases = {}
+		controller.init(function(phase, token)
+			phases[#phases + 1] = { phase = phase, token = token }
+		end)
+		local retired = controller.variables()
+		controller.start()
+		ctx.chunk(1, "READY\n")
+		ctx.next_input_result = false
+
+		controller.stop("fallback token cleanup")
+		helpers.assert_eq(find_native_revoke(ctx, retired), ctx.spawns[2])
+		ctx.complete(2, 0, "")
+
+		local phase, snapshot = controller.status()
+		helpers.assert_eq(phase, "idle")
+		helpers.assert_nil(snapshot.token)
+		helpers.assert_eq(phases[#phases].phase, "idle")
+		helpers.assert_nil(phases[#phases].token,
+			"fallback IDLE must not leak the revoked generation identity")
+	end)
+
 	helpers.it("accepts a broken STOP channel but settles only after fallback fencing", function()
 		local controller, ctx = load_controller()
 		controller.init()

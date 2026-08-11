@@ -413,8 +413,9 @@ local function mark_generation_safe(generation, protocol_ok, reason)
 			phase = generation.failure_reason and not generation.stop_requested and "failed" or "idle"
 		end
 		_state.last_phase = phase
-		invoke_callback("lease.phase", _state.phase_listener, phase,
-			phase == "idle" and nil or generation.token)
+		local published_token = generation.token
+		if phase == "idle" then published_token = nil end
+		invoke_callback("lease.phase", _state.phase_listener, phase, published_token)
 	end
 	if generation.failure_reason then
 		settle_callbacks("lease.start", generation.start_callbacks, false, generation.failure_reason)
