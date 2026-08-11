@@ -137,7 +137,12 @@ M.MOD_COMBOS = {}
 local _wizard_ran_this_session  = false
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
 local _pending_layout_refresh   = nil  -- Latest settled-layout pipeline deferred by a lease transition
+local _layout_event_serial      = 0    -- Monotonic identity of physical TIS/wake notifications
+local _layout_settled_serial    = 0    -- Newest physical event whose TIS delay elapsed
+local _layout_deployed_serial   = 0    -- Newest settled layout carried by a proven regeneration
+local _deferred_layout_regeneration = nil -- User intent retained until the newest TIS event settles
 local schedule_layout_refresh  = nil  -- Forward declaration used by the lease-phase callback
+local retry_pending_layout_refresh = nil -- Forward declaration used by deferred activation replay
 -- Wake-from-sleep watcher. Held at module scope so it survives past the function
 -- that arms it: an hs.caffeinate.watcher referenced only by a local is collected
 -- and stops delivering, silently.
@@ -147,6 +152,7 @@ local _lifecycle_epoch          = 0     -- Invalidates async callbacks retained 
 local _running                  = false -- True only for the current initialized lifecycle
 local _shutdown_requested       = false -- Rejects new work while the exact fence is pending
 local _activation_transaction  = nil   -- Same-token regenerate callers share one mount + RESUME
+local _regeneration_contexts   = {}    -- All unsettled builds, including callers joined before READY
 local _hotkey_cleanup_backlog  = {}    -- Failed adapter deletes retained for a later exact retry
 local _gesture_cleanup_backlog = {}    -- Failed eventtap stops retain their exact handles for retry
 local _lease_inputs_tainted    = false -- Retained disabled handles are not proof of liveness
@@ -207,6 +213,9 @@ end
 local function commit_enable_transition(transaction)
 	if _enabled_transition ~= transaction or transaction.kind ~= "enabling" then
 		return false, "stale-enable-transaction"
+	end
+	if transaction.committed == true and _state.enabled == true then
+		return true, "already-enabled"
 	end
 	if not persist_enabled_flag(true) then return false, "persistence-failed" end
 	_state.enabled = true
@@ -626,6 +635,20 @@ local function activate_lease_generation(options, on_done)
 		finish(false, reason)
 		return false
 	end
+	local function reject_stale_layout(stage)
+		if type(options.layout_guard) ~= "function" then return false end
+		local guard_ok, current, guard_reason = xpcall(options.layout_guard, debug.traceback)
+		if guard_ok and current == true then return false end
+		local public_reason = guard_ok
+			and (guard_reason or "layout-refresh-pending") or "layout-guard-raised"
+		fail_lease_bound_input_start(
+			stage .. ": " .. tostring(guard_ok and guard_reason or current),
+			false,
+			token
+		)
+		finish(false, public_reason or "layout-refresh-pending")
+		return true
+	end
 
 	local script_paused = false
 	if respect_pause_intent and phase == "paused" then
@@ -665,6 +688,7 @@ local function activate_lease_generation(options, on_done)
 		finish(true, "ready-paused-by-user-intent")
 		return true
 	end
+	if reject_stale_layout("layout changed before lease-input preparation") then return false end
 
 	local inputs_ok, inputs_reason = start_lease_bound_inputs(phase, retain_if_paused)
 	if inputs_ok ~= true then
@@ -695,6 +719,7 @@ local function activate_lease_generation(options, on_done)
 			return false
 		end
 	end
+	if reject_stale_layout("layout changed before RESUME") then return false end
 
 	if phase == "active" then
 		finish(true, "already-active")
@@ -733,6 +758,7 @@ local function activate_lease_generation(options, on_done)
 				finish(false, resume_reason or failure_reason)
 				return
 			end
+			if reject_stale_layout("layout changed before RESUMED publication") then return end
 
 			local final_ok, final_phase, final_snapshot = pcall(LeaseController.status)
 			if not final_ok or final_phase ~= "active"
@@ -945,6 +971,217 @@ local function query_shortcuts_pause_state(label)
 	end)
 	if not ok then return false, nil, nil end
 	return true, result.shortcuts, result.paused
+end
+
+--- Returns whether a deferred regeneration still represents live user intent.
+--- The capability itself is not sufficient for enable/rollback: the exact
+--- enabled-state transaction must still be the one that requested the build.
+--- @param context table Regeneration transaction retained across TIS settle.
+--- @return boolean current
+local function deferred_regeneration_intent_is_current(context)
+	if type(context) ~= "table" or context.settled
+		or not is_current_lifecycle(context.epoch) then return false end
+	if context.intent == "enable" then
+		return type(_enabled_transition) == "table"
+			and _enabled_transition == context.enabled_transaction
+			and _enabled_transition.kind == "enabling"
+	end
+	if context.intent == "disable-recovery" then
+		return type(_enabled_transition) == "table"
+			and _enabled_transition == context.enabled_transaction
+			and _enabled_transition.kind == "recovering"
+	end
+	if context.intent == "resume" then
+		return _state.enabled == true
+			and _enabled_transition == context.enabled_transaction
+			and (_enabled_transition == nil or _enabled_transition.kind ~= "disabling")
+	end
+	if context.intent == "public" then
+		return _state.enabled == true and _enabled_transition == nil
+	end
+	return false
+end
+
+--- Settles and detaches one retained layout regeneration exactly once.
+--- @param reason string Stable public failure reason.
+local function cancel_deferred_layout_regeneration(reason)
+	local context = _deferred_layout_regeneration
+	_deferred_layout_regeneration = nil
+	if not context then return true end
+	context.waiting_for_layout = false
+	if not context.settled and type(context.settle) == "function" then
+		context:settle(false, reason or "layout-regeneration-cancelled")
+	end
+	return true
+end
+
+--- Retains a user-visible regeneration instead of publishing a transient
+--- failure merely because the input source changed at READY/RESUMED.
+--- @param context table Regeneration transaction.
+--- @param token string|nil Exact generation invalidated by the event.
+--- @param replay_now boolean|nil False while schedule_layout_refresh is still arming its timer.
+--- @return boolean retained
+local function retain_regeneration_for_layout(context, token, replay_now)
+	if not deferred_regeneration_intent_is_current(context) then return false end
+	if context.built_layout_serial == _layout_event_serial
+		and context.built_after_tis_settle == true then
+		return false
+	end
+	local pending = _pending_layout_refresh
+	if not pending or pending.layout_serial ~= _layout_event_serial then return false end
+	local existing = _deferred_layout_regeneration
+	if existing and existing ~= context then
+		local same_intent = existing.epoch == context.epoch
+			and existing.intent == context.intent
+			and existing.capability == context.capability
+			and existing.enabled_transaction == context.enabled_transaction
+		local active_intents_are_compatible = existing.epoch == context.epoch
+			and existing.enabled_transaction == nil
+			and context.enabled_transaction == nil
+			and ((existing.intent == "public" and context.intent == "resume")
+				or (existing.intent == "resume" and context.intent == "public"))
+		if (same_intent or active_intents_are_compatible)
+			and deferred_regeneration_intent_is_current(existing) then
+			if context.intent == "resume" then
+				existing.intent = "resume"
+				existing.capability = PAUSED_RESUME_REGENERATION
+			end
+			for _, callback in ipairs(context.callbacks) do
+				existing.callbacks[#existing.callbacks + 1] = callback
+			end
+			context.callbacks = {}
+			context.waiting_for_layout = false
+			context.settled = true
+			_regeneration_contexts[context] = nil
+			Logger.debug(LOG,
+				"Joined an equivalent %s regeneration behind layout event %d.",
+				tostring(context.intent), _layout_event_serial)
+			return true
+		end
+		Logger.error(LOG,
+			"A second layout-invalidated regeneration was rejected while one user intent is retained.")
+		return false
+	end
+	context.waiting_for_layout = true
+	context.invalidated_token = token or context.invalidated_token
+	_deferred_layout_regeneration = context
+	Logger.info(LOG,
+		"Retained %s Karabiner regeneration until layout event %d settles.",
+		tostring(context.intent), _layout_event_serial)
+	if replay_now ~= false then replay_pending_layout_refresh() end
+	return true
+end
+
+--- Invalidates an activation whose RESUME may already be in flight. The
+--- retained context prevents the settled layout record from being consumed as
+--- ordinary maintenance before the exact stale token has been fenced.
+local function invalidate_inflight_regeneration_for_layout()
+	local contexts = {}
+	for context in pairs(_regeneration_contexts) do
+		contexts[#contexts + 1] = context
+	end
+	local invalidated_tokens = {}
+	for _, context in ipairs(contexts) do
+		local layout_is_stale = type(context) == "table" and not context.settled
+			and context.intent ~= "lease-recovery"
+			and type(context.built_layout_serial) == "number"
+			and (context.built_layout_serial ~= _layout_event_serial
+				or context.built_after_tis_settle ~= true)
+		if layout_is_stale then
+			context.layout_invalidated = true
+			if type(context.lease_token) == "string" then
+				invalidated_tokens[context.lease_token] = true
+			end
+			retain_regeneration_for_layout(context, context.lease_token, false)
+		end
+	end
+	if next(invalidated_tokens) == nil then return end
+	local status_ok, phase, snapshot = pcall(LeaseController.status)
+	local invalidated_token = type(snapshot) == "table" and snapshot.token or nil
+	local owns_invalidated_token = status_ok and type(snapshot) == "table"
+		and type(invalidated_token) == "string"
+		and invalidated_tokens[invalidated_token] == true
+	if not owns_invalidated_token
+		or (phase ~= "starting" and phase ~= "resuming" and phase ~= "active") then return end
+	local stop_ok, stopped_or_err = pcall(
+		LeaseController.stop_exact,
+		invalidated_token,
+		"layout_changed_during_activation"
+	)
+	if not stop_ok or stopped_or_err ~= true then
+		Logger.error(LOG, "Could not fence in-flight layout-invalidated generation %s: %s.",
+			tostring(invalidated_token), tostring(stopped_or_err))
+	end
+end
+
+--- Restarts one retained intent only after TIS settled and the invalidated
+--- generation reached a non-emitting phase. The pending record deliberately
+--- remains owned by the layout pipeline until the replacement becomes ACTIVE;
+--- a newer physical event therefore invalidates the replacement as well.
+--- @param pending table Exact settled layout record.
+--- @return boolean handled
+local function restart_deferred_layout_regeneration(pending)
+	local context = _deferred_layout_regeneration
+	if not context then return false end
+	if not deferred_regeneration_intent_is_current(context) then
+		cancel_deferred_layout_regeneration("layout-regeneration-intent-cancelled")
+		return false
+	end
+	if pending.tis_settled ~= true or pending.layout_serial ~= _layout_event_serial
+		or context.attempt_finished ~= true then
+		return true
+	end
+	local status_ok, phase, snapshot = pcall(LeaseController.status)
+	if not status_ok or type(snapshot) ~= "table" then
+		retry_pending_layout_refresh(pending, "lease-status-unavailable")
+		return true
+	end
+	local invalidated_token_is_live = type(context.invalidated_token) == "string"
+		and snapshot.token == context.invalidated_token
+		and (phase == "active" or phase == "resuming" or phase == "starting")
+	if invalidated_token_is_live then
+		local stop_ok, stopped_or_err = pcall(
+			LeaseController.stop_exact,
+			context.invalidated_token,
+			"layout_changed_during_activation"
+		)
+		if not stop_ok or stopped_or_err ~= true then
+			Logger.error(LOG, "Could not fence layout-invalidated generation %s: %s.",
+				tostring(context.invalidated_token), tostring(stopped_or_err))
+			retry_pending_layout_refresh(pending, "layout-generation-fence-failed")
+		end
+		return true
+	end
+	if phase == "recovering" or phase == "fencing" or phase == "pausing"
+		or phase == "resuming" or phase == "starting" or phase == "stopping" then
+		return true
+	end
+	local active_without_invalidated_generation = phase == "active"
+		and context.invalidated_token == nil
+	if not active_without_invalidated_generation
+		and phase ~= "paused" and phase ~= "prepared" and phase ~= "idle" and phase ~= "failed" then
+		Logger.error(LOG, "Deferred layout regeneration reached unsafe lease phase '%s'.",
+			tostring(phase))
+		cancel_deferred_layout_regeneration("layout-regeneration-unsafe-phase")
+		return true
+	end
+
+	_deferred_layout_regeneration = nil
+	context.waiting_for_layout = false
+	context.attempt_finished = false
+	local call_ok, accepted_or_err = xpcall(function()
+		return M.regenerate(nil, context.capability, context)
+	end, debug.traceback)
+	if not call_ok then
+		context:settle(false, "layout-regeneration-raised: " .. tostring(accepted_or_err))
+	elseif accepted_or_err ~= true and not context.settled
+		and _deferred_layout_regeneration ~= context then
+		context:settle(false, "layout-regeneration-request-rejected")
+	end
+	if context.settled and _pending_layout_refresh == pending then
+		replay_pending_layout_refresh()
+	end
+	return true
 end
 
 --- Retries cancellation of timers whose native stop previously failed.
@@ -1415,6 +1652,11 @@ local function exhaust_pending_layout_refresh(pending, reason)
 		_layout_rebuild_timer = nil
 	end
 	_pending_layout_refresh = nil
+	local deferred = _deferred_layout_regeneration
+	if deferred and deferred.waiting_for_layout
+		and pending.layout_serial == _layout_event_serial then
+		cancel_deferred_layout_regeneration("layout-refresh-exhausted")
+	end
 	local recovery = _lease_recovery
 	if recovery and recovery.waiting_for_layout then
 		recovery.layout_barrier_exhausted = true
@@ -1435,7 +1677,7 @@ end
 --- @param pending table Exact retained layout record.
 --- @param reason string Stable diagnostic reason.
 --- @return boolean scheduled
-local function retry_pending_layout_refresh(pending, reason)
+retry_pending_layout_refresh = function(pending, reason)
 	local current = _pending_layout_refresh
 	if current ~= pending then
 		if not current or current.retry_lineage ~= pending.retry_lineage then return false end
@@ -1487,6 +1729,7 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 		return
 	end
 	if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
+	if restart_deferred_layout_regeneration(pending) then return end
 	local settled_mode, unsettled_reason = settled_layout_refresh_mode(paused)
 	if not settled_mode then
 		if LAYOUT_REGENERATION_DEFER_REASONS[unsettled_reason] then
@@ -1557,6 +1800,13 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 	end
 
 	if settled_mode == "active" then
+		if _layout_deployed_serial >= (pending.layout_serial or 0) then
+			Logger.debug(LOG,
+				"%s refresh already deployed by the layout-fenced activation; rebinding only.",
+				source)
+			rebind_if_current()
+			return
+		end
 		-- regenerate() owns the one active-mode resolution immediately before its
 		-- consumer. Resolving here as well would double the layout hot-path walk.
 		local callback_fired = false
@@ -1632,17 +1882,23 @@ schedule_layout_refresh = function(
 	end
 	local lineage = retry_lineage or {
 		retry_attempt = retry_attempt or 0,
+		layout_serial = _layout_event_serial,
 	}
 	if retry_attempt ~= nil then lineage.retry_attempt = retry_attempt end
+	if type(lineage.layout_serial) ~= "number" then
+		lineage.layout_serial = _layout_event_serial
+	end
 	local pending = {
 		layout_name = layout_name,
 		source = source,
 		epoch = epoch,
+		layout_serial = lineage.layout_serial,
 		tis_settled = tis_settled == true,
 		retry_attempt = lineage.retry_attempt or 0,
 		retry_lineage = lineage,
 	}
 	_pending_layout_refresh = pending
+	invalidate_inflight_regeneration_for_layout()
 	if _lease_recovery then defer_lease_recovery_for_layout(_lease_recovery) end
 	-- Exact fencing can settle synchronously (for example a re-entrant STOPPED
 	-- transport callback) and replay this pending event before defer returns.
@@ -1663,6 +1919,7 @@ schedule_layout_refresh = function(
 		if _layout_rebuild_timer ~= timer or _pending_layout_refresh ~= pending then return end
 		_layout_rebuild_timer = nil
 		pending.tis_settled = true
+		_layout_settled_serial = math.max(_layout_settled_serial, pending.layout_serial or 0)
 		local ok = run_async_step("Delayed " .. source .. " layout refresh", function()
 			perform_settled_layout_refresh(layout_name, source, epoch)
 		end)
@@ -1832,6 +2089,7 @@ function M.set_enabled(value, on_done)
 		return regenerate_requested == true or _enabled_transition == transaction
 	end
 
+	cancel_deferred_layout_regeneration("integration-disable-requested")
 	cancel_lease_recovery("integration-disable-requested")
 	local _, _, disable_snapshot = pcall(LeaseController.status)
 	local transaction = {
@@ -2203,8 +2461,21 @@ end
 --- a failed or late re-prime after an unnecessary kill/relaunch cycle.
 --- @param on_done function|nil Callback fn(ok, reason) after READY or failure.
 --- @param recovery_capability any Private enable/rollback/resume capability; public callers omit it.
+--- @param regeneration_context table|nil Private transaction retained across a layout settle.
 --- @return boolean True when deployment and activation request were accepted.
-function M.regenerate(on_done, recovery_capability)
+function M.regenerate(on_done, recovery_capability, regeneration_context)
+	if regeneration_context == nil then
+		local retained = _deferred_layout_regeneration
+		if retained and retained.capability == recovery_capability
+			and deferred_regeneration_intent_is_current(retained) then
+			if type(on_done) == "function" then
+				retained.callbacks[#retained.callbacks + 1] = on_done
+			end
+			Logger.debug(LOG, "Joined retained %s regeneration after a layout change.",
+				tostring(retained.intent))
+			return true
+		end
+	end
 	local enable_transaction = recovery_capability
 	local is_enable_transition = type(enable_transaction) == "table"
 		and enable_transaction == _enabled_transition
@@ -2214,11 +2485,74 @@ function M.regenerate(on_done, recovery_capability)
 	local is_lease_failure_recovery = type(recovery_capability) == "table"
 		and recovery_capability == _lease_recovery
 		and recovery_capability.capability == LEASE_FAILURE_RECOVERY_CAPABILITY
+	local context = regeneration_context
+	if context ~= nil and (type(context) ~= "table" or context.capability ~= recovery_capability
+		or context.settled or context.epoch ~= _lifecycle_epoch) then
+		invoke_public_callback("regenerate", on_done, false, "invalid-regeneration-context")
+		return false
+	end
+	if context == nil then
+		local intent = is_enable_transition and "enable"
+			or is_disable_recovery and "disable-recovery"
+			or is_resume_regeneration and "resume"
+			or is_lease_failure_recovery and "lease-recovery"
+			or "public"
+		context = {
+			epoch = _lifecycle_epoch,
+			capability = recovery_capability,
+			enabled_transaction = (is_enable_transition or is_disable_recovery
+				or is_resume_regeneration)
+				and _enabled_transition or nil,
+			intent = intent,
+			callbacks = {},
+			settled = false,
+			attempt = 0,
+			attempt_finished = false,
+			waiting_for_layout = false,
+			layout_invalidated = false,
+		}
+		_regeneration_contexts[context] = true
+		if type(on_done) == "function" then context.callbacks[1] = on_done end
+		function context:settle(ok, reason)
+			if self.settled then return end
+			self.settled = true
+			self.waiting_for_layout = false
+			_regeneration_contexts[self] = nil
+			if _deferred_layout_regeneration == self then
+				_deferred_layout_regeneration = nil
+			end
+			local callbacks = self.callbacks
+			self.callbacks = {}
+			for _, callback in ipairs(callbacks) do
+				invoke_public_callback("regenerate", callback, ok == true, reason)
+			end
+		end
+	end
+	context.attempt = context.attempt + 1
+	local attempt = context.attempt
+	context.attempt_finished = false
+	context.layout_invalidated = false
 	local callback_settled = false
 	local function finish(ok, reason)
 		if callback_settled then return end
 		callback_settled = true
-		invoke_public_callback("regenerate", on_done, ok, reason)
+		if context.settled or context.attempt ~= attempt then return end
+		context.attempt_finished = true
+		local layout_invalidated = reason == "layout-refresh-pending"
+			or context.layout_invalidated == true
+		if context.intent ~= "lease-recovery" and layout_invalidated then
+			if retain_regeneration_for_layout(context, context.lease_token) then return end
+			context:settle(false, reason or "layout-refresh-pending")
+			return
+		end
+		if ok == true and context.built_layout_serial == _layout_event_serial
+			and context.built_after_tis_settle == true then
+			_layout_deployed_serial = math.max(
+				_layout_deployed_serial,
+				context.built_layout_serial
+			)
+		end
+		context:settle(ok == true, reason)
 	end
 	local function fail(reason)
 		finish(false, reason)
@@ -2287,6 +2621,29 @@ function M.regenerate(on_done, recovery_capability)
 			return fail("lease-transition-in-progress")
 		end
 	end
+	local pending_layout = _pending_layout_refresh
+	local layout_serial_is_unsettled = context.intent ~= "lease-recovery"
+		and _layout_settled_serial < _layout_event_serial
+	if layout_serial_is_unsettled then
+		context.layout_invalidated = true
+		context.attempt_finished = true
+		local owns_live_barrier = type(pending_layout) == "table"
+			and pending_layout.epoch == context.epoch
+			and pending_layout.layout_serial == _layout_event_serial
+		if owns_live_barrier then
+			if retain_regeneration_for_layout(context, context.lease_token) then
+				Logger.info(LOG,
+					"Karabiner regeneration retained until layout event %d settles before build.",
+					_layout_event_serial)
+				return true
+			end
+			return fail("layout-refresh-pending")
+		end
+		Logger.error(LOG,
+			"Karabiner regeneration refused because layout event %d exhausted its settle barrier.",
+			_layout_event_serial)
+		return fail("layout-refresh-exhausted")
+	end
 	Logger.start(LOG, "Regenerating Karabiner config…")
 
 	-- Re-resolve the layout-dependent key codes against the layout that is active
@@ -2307,12 +2664,15 @@ function M.regenerate(on_done, recovery_capability)
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")
 		if not layout_ok then return fail("layout-resolution-failed") end
 	end
+	context.built_layout_serial = _layout_event_serial
+	context.built_after_tis_settle = _layout_settled_serial >= context.built_layout_serial
 
 	local lease_token = LeaseController.token()
 	if type(lease_token) ~= "string" then
 		Logger.error(LOG, "Karabiner generation refused — no exact Ergopti lease token is available.")
 		return fail("token-unavailable")
 	end
+	context.lease_token = lease_token
 	if is_lease_failure_recovery then recovery_capability.owned_token = lease_token end
 
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
@@ -2394,6 +2754,20 @@ function M.regenerate(on_done, recovery_capability)
 			tostring(status_phase))
 		return fail("invalid-lease-phase")
 	end
+	local layout_guard = nil
+	if not is_lease_failure_recovery then
+		layout_guard = function()
+			if context.settled or context.attempt ~= attempt
+				or not is_current_lifecycle(context.epoch) then
+				return false, "layout-regeneration-cancelled"
+			end
+			local current = context.built_layout_serial == _layout_event_serial
+				and context.built_after_tis_settle == true
+			if current then return true end
+			context.layout_invalidated = true
+			return false, "layout-refresh-pending"
+		end
+	end
 
 	local start_callback_fired = false
 	local function handle_start(ok, reason)
@@ -2449,6 +2823,7 @@ function M.regenerate(on_done, recovery_capability)
 				retain_if_paused = is_resume_regeneration,
 				respect_pause_intent = not is_resume_regeneration,
 				before_resume = before_resume,
+				layout_guard = layout_guard,
 			}, function(activated, activation_reason)
 				if activation_callback_fired then return end
 				activation_callback_fired = true
@@ -2513,6 +2888,7 @@ function M.pause(on_done)
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
 	end
+	cancel_deferred_layout_regeneration("script-pause-requested")
 	cancel_lease_recovery("script-pause-requested")
 	local status_ok, phase = pcall(LeaseController.status)
 	if status_ok and (phase == "failed" or phase == "idle" or phase == "prepared") then
@@ -2853,6 +3229,7 @@ function M.init(file_system)
 			run_async_step("Input-source callback", function()
 				local epoch = _lifecycle_epoch
 				if not is_current_lifecycle(epoch) then return end
+				_layout_event_serial = _layout_event_serial + 1
 				Logger.start(LOG, "Layout change detected — scheduling settled refresh for layout '%s'…",
 					tostring(layout_name))
 				schedule_layout_refresh(layout_name, "Layout-change", epoch)
@@ -2906,6 +3283,7 @@ function M.init(file_system)
 			-- Wake and input-source notifications share the same post-TIS-settle
 			-- pipeline. Resolving immediately here can read the pre-sleep key map, and
 			-- omitting the sibling shortcut rebind leaves Hammerspoon on old scancodes.
+			_layout_event_serial = _layout_event_serial + 1
 			schedule_layout_refresh(nil, "Wake", wake_epoch)
 		end
 		local function on_wake(event)
@@ -2967,6 +3345,7 @@ local function stop_local_resources()
 	_running = false
 	_shutdown_requested = true
 	_lifecycle_epoch = _lifecycle_epoch + 1
+	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
 	if _wake_watcher then
@@ -3049,6 +3428,7 @@ function M.revoke(reason, on_done)
 		_lifecycle_epoch = _lifecycle_epoch + 1
 	end
 	cancel_lease_recovery("lease-revocation-requested")
+	cancel_deferred_layout_regeneration("lease-revocation-requested")
 	_pending_layout_refresh = nil
 	local callback_fired = false
 	local callback_succeeded = false
