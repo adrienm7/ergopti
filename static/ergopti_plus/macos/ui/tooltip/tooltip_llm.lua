@@ -178,6 +178,24 @@ end
 -- ================================
 -- ================================
 
+--- Invokes a caller-owned callback without letting an exception disappear.
+--- @param label string Stable callback label for the file logger.
+--- @param callback function|nil Caller callback.
+--- @param ... any Arguments forwarded to the callback.
+--- @return boolean succeeded
+local function invoke_user_callback(label, callback, ...)
+	if type(callback) ~= "function" then return true end
+	local arguments = table.pack(...)
+	local ok, err = xpcall(function()
+		callback(table.unpack(arguments, 1, arguments.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback failed: %s.", tostring(label), tostring(err))
+		return false
+	end
+	return true
+end
+
 --- Dismisses the tooltip through the FULL cancel contract.
 ---
 --- Hiding is only half of a dismissal. The prediction engine tracks its own
@@ -189,8 +207,9 @@ end
 --- @param reason string Why the tooltip is being dismissed, for the log.
 local function dismiss(reason)
 	Logger.debug(LOG, "Dismissing predictions tooltip (%s).", reason)
-	if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-	return M.hide()
+	local callback_ok = invoke_user_callback("Prediction cancel", _state.on_cancel)
+	local hidden = M.hide()
+	return callback_ok and hidden == true
 end
 
 --- Reads a timer's live state across native hs.timer and the test double.
@@ -1184,7 +1203,11 @@ function M.navigate(delta)
 		end
 		if not watcher_activation_ok then return end
 		
-		if type(_state.on_navigate) == "function" then pcall(_state.on_navigate, _state.current_index) end
+		if not invoke_user_callback("Prediction navigation", _state.on_navigate,
+			_state.current_index) then
+			dismiss("navigation callback failure")
+			return
+		end
 		completed = true
 	end)
 	
