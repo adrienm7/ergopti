@@ -2615,6 +2615,10 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			"ErgoptiPlus",
 			kKarabinerLeaseGuardianLifetimeTestFlag,
 		]))
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: [
+			"ErgoptiPlus",
+			kLauncherLogAppendTestFlag,
+		]))
 		#endif
 		XCTAssertFalse(KarabinerLeaseWorker.handles(arguments: ["ErgoptiPlus"]))
 	}
