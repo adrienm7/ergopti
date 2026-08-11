@@ -82,17 +82,29 @@ function M.run(options)
 			local prediction = { deletes = 0, to_type = prediction_text }
 			return prediction, { prediction }
 		end,
-		reset = function() reset_count = reset_count + 1 end,
-		arm_chain = function() arm_chain_count = arm_chain_count + 1 end,
+		reset = function()
+			reset_count = reset_count + 1
+			if type(options.reset_result) == "function" then return options.reset_result(reset_count) end
+			if options.reset_result ~= nil then return options.reset_result end
+			return true
+		end,
+		arm_chain = function()
+			arm_chain_count = arm_chain_count + 1
+			if type(options.arm_chain_result) == "function" then
+				return options.arm_chain_result(arm_chain_count)
+			end
+			if options.arm_chain_result ~= nil then return options.arm_chain_result end
+			return true
+		end,
 		get_llm_enabled = function() return false end,
 		get_predictions = function() return {} end,
 		get_current_index = function() return 1 end,
 		get_navigation_mods = function() return {} end,
 		get_validation_mods = function() return {} end,
 		is_visible = function() return false end,
-		start_timer = noop,
-		start_timer_word_end = noop,
-		stop_timer = noop,
+		start_timer = function() return true end,
+		start_timer_word_end = function() return true end,
+		stop_timer = function() return true end,
 		perform_check = noop,
 		handle_chain_signal = function() return false end,
 		navigate = noop,
@@ -126,18 +138,15 @@ function M.run(options)
 		mappings_for_star_tail = function() return nil end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {}
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 	package.loaded["modules.keymap.terminator_replay"] = {
 		init = noop,
 		flush_now = noop,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(delay, callback)
-			local timer = hs_stub.timer.doAfter(delay, callback)
-			return { timer = timer, cancel = function() timer:stop() end }
-		end,
+			after = function(delay, callback)
+				local timer = hs_stub.timer.doAfter(delay, callback)
+				return { timer = timer, cancel = function() timer:stop() end }, true
+			end,
 	}
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
@@ -156,6 +165,8 @@ function M.run(options)
 	local km_utils = require("modules.keymap.utils")
 	-- Keep the fixture about dispatch, not overlap policy.
 	km_utils.resolve_prediction_overlap = function(_, deletes, text)
+		if options.overlap_error then error("OVERLAP_THROW") end
+		if options.overlap_nil then return nil, nil end
 		return deletes, text
 	end
 

@@ -62,7 +62,7 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
-	cancel_streaming        = function() end,
+	cancel_streaming        = function() return true end,
 	-- Dispatch-path surface (exercised by the perform_check regression in §8).
 	is_backend_ready        = function() return true end,
 	get_active_profile      = function() return { label = "Test profile" } end,
@@ -109,10 +109,10 @@ package.loaded["modules.llm.prompt_builder"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                 = function(_cfg) end,
 	build_callbacks      = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog         = function(_cfg) end,
-	stop_watchdog        = function() end,
+	arm_watchdog         = function(_cfg) return true end,
+	stop_watchdog        = function() return true end,
 	reset_failure_count  = function() end,
-	cancel_streaming     = function() end,
+	cancel_streaming     = function() return true end,
 }
 
 -- Stub AppFilter — the real export is is_blocked(state, apps, url_filter, secure_filter).
@@ -144,17 +144,17 @@ package.loaded["infra.keycodes"] = {
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
-	mark_chain_complete   = function() end,
+	set_chain_start       = function(_) return true end,
+	mark_chain_complete   = function() return true end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
+	hide                  = function() return true end,
 	-- Dispatch-path surface (exercised by §8).
 	set_llm_timeout       = function(_) end,
-	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
-	show_predictions      = function(...) end,
+	reset_llm_timer       = function() return true end,
+	show_loading          = function(...) return true end,
+	show_predictions      = function(...) return true end,
 	tint                  = function(_) return nil end,
 }
 
@@ -205,7 +205,7 @@ helpers.describe("prediction_engine — module surface", function()
 	helpers.it("calls tooltip.hide_forced immediately on reset (e.g. after prediction apply)", function()
 		local tt_hidden_forced = false
 		local old_hide_forced = package.loaded["ui.tooltip"].hide_forced
-		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true end
+		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
 		PE.reset()
 		helpers.assert_true(tt_hidden_forced, "tooltip.hide_forced must be called on reset")
 		package.loaded["ui.tooltip"].hide_forced = old_hide_forced
@@ -358,6 +358,7 @@ helpers.describe("prediction_engine — configuration setters", function()
 	helpers.it("set_preview_ai_enabled accepts boolean", function()
 		PE.set_preview_ai_enabled(true)
 		PE.set_preview_ai_enabled(false)
+		PE.set_preview_ai_enabled(true)
 	end)
 end)
 
@@ -543,8 +544,8 @@ helpers.describe("prediction_engine: turning the AI preview off tears the state 
 		local calls = {}
 		local tt = package.loaded["ui.tooltip"]
 		local old_hide, old_forced = tt.hide, tt.hide_forced
-		tt.hide        = function() calls[#calls + 1] = "hide" end
-		tt.hide_forced = function() calls[#calls + 1] = "hide_forced" end
+		tt.hide        = function() calls[#calls + 1] = "hide"; return true end
+		tt.hide_forced = function() calls[#calls + 1] = "hide_forced"; return true end
 
 		PE.set_preview_ai_enabled(false)
 

@@ -468,7 +468,14 @@ end
 --- Cancels the in-flight streaming task on the active backend, if any.
 --- Called when a new request supersedes the current stream.
 function M.cancel_streaming()
-	pcall(function() get_api().cancel_streaming() end)
+	local ok, result = xpcall(function()
+		return get_api().cancel_streaming()
+	end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Backend stream cancellation did not commit (result: %s).", tostring(result))
+		return false
+	end
+	return true
 end
 
 --- Sets the active LLM backend identifier.

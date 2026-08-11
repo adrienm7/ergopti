@@ -11,9 +11,9 @@
 --- was stopped (e.g. during a Hammerspoon reload). The orphaned tap consumed
 --- Escape in every subsequent application until a full HS restart.
 ---
---- The fix adds M.stop(), which calls :stop() on _escape_trap and nils the
---- reference. keymap/init.lua M.stop() now calls LLMBridge.stop() so the
---- lifecycle is always respected.
+--- The fix verifies both start and stop against :isEnabled(). A failed start
+--- never becomes published ownership, while a failed stop retains the only
+--- handle so a later lifecycle attempt can retry it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -45,7 +45,7 @@ helpers.describe("llm_bridge M.stop(): existence (escape-trap-ghost-tap)", funct
 		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 		-- Called directly. A stop before any start must leave the bridge startable:
 		-- the boot path stops defensively before it starts.
-		Bridge.stop()
+		helpers.assert_eq(Bridge.stop(), true)
 		helpers.assert_eq(type(Bridge.init), "function",
 			"a stop with no escape trap armed must leave the bridge usable")
 	end)
@@ -53,9 +53,11 @@ helpers.describe("llm_bridge M.stop(): existence (escape-trap-ghost-tap)", funct
 	helpers.it("M.stop() is idempotent — safe to call twice", function()
 		package.loaded["modules.keymap.llm_bridge"] = nil
 		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
-		local ok1 = pcall(Bridge.stop)
-		local ok2 = pcall(Bridge.stop)
+		local ok1, result1 = pcall(Bridge.stop)
+		local ok2, result2 = pcall(Bridge.stop)
 		helpers.assert_true(ok1 and ok2, "M.stop() must be safe to call multiple times in a row")
+		helpers.assert_eq(result1, true)
+		helpers.assert_eq(result2, true)
 	end)
 end)
 
@@ -91,19 +93,21 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 		-- Must happen after the reload so the module's arm_escape_trap() closure uses
 		-- this interception rather than the previous stub instance.
 		local trap_stopped = false
+		local trap_enabled = false
 		local mock_trap    = {
-			start  = function(self) return self end,
-			stop   = function(self) trap_stopped = true end,
+			start = function(self) trap_enabled = true; return self end,
+			stop = function(self) trap_stopped = true; trap_enabled = false; return self end,
+			isEnabled = function() return trap_enabled end,
 		}
 		local orig_eventtap_new = hs.eventtap.new
 		hs.eventtap.new = function(types, cb) return mock_trap end
 
 		-- Trigger arm_escape_trap() via the stored show callback
 		if type(show_cb) == "function" then
-			show_cb()
+			helpers.assert_eq(show_cb(), true)
 		end
 
-		Bridge.stop()
+		helpers.assert_eq(Bridge.stop(), true)
 
 		-- Restore
 		hs.eventtap.new = orig_eventtap_new
@@ -114,5 +118,170 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 
 		helpers.assert_true(trap_stopped,
 			"M.stop() must call :stop() on the escape trap eventtap (escape-trap-ghost-tap)")
+	end)
+
+	helpers.it("retries after a transient start failure instead of publishing a dead trap", function()
+		package.loaded["modules.keymap.llm_bridge"] = nil
+		local show_cb = nil
+		local orig_tooltip = package.loaded["ui.tooltip"] or {}
+		local orig_set_on_show = orig_tooltip.set_on_show_callback
+		orig_tooltip.set_on_show_callback = function(cb) show_cb = cb end
+		package.loaded["ui.tooltip"] = orig_tooltip
+
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local orig_eventtap_new = hs.eventtap.new
+		local created, starts = 0, 0
+		hs.eventtap.new = function()
+			created = created + 1
+			local ordinal = created
+			local enabled = false
+			return {
+				start = function(self)
+					starts = starts + 1
+					if ordinal == 1 then error("START_FAIL") end
+					enabled = true
+					return self
+				end,
+				stop = function(self) enabled = false; return self end,
+				isEnabled = function() return enabled end,
+			}
+		end
+
+		helpers.assert_eq(type(show_cb), "function")
+		helpers.assert_eq(show_cb(), false,
+			"a thrown native start cannot own visible tooltip interaction")
+		helpers.assert_eq(show_cb(), true,
+			"a later show must retry and commit after the transient failure")
+		helpers.assert_eq(created, 2,
+			"the failed disabled candidate must not block a fresh eventtap")
+		helpers.assert_eq(starts, 2)
+		helpers.assert_eq(Bridge.stop(), true)
+
+		hs.eventtap.new = orig_eventtap_new
+		orig_tooltip.set_on_show_callback = orig_set_on_show
+		package.loaded["ui.tooltip"] = orig_tooltip
+	end)
+
+	helpers.it("retains and retries the handle when stop raises", function()
+		package.loaded["modules.keymap.llm_bridge"] = nil
+		local show_cb = nil
+		local orig_tooltip = package.loaded["ui.tooltip"] or {}
+		local orig_set_on_show = orig_tooltip.set_on_show_callback
+		orig_tooltip.set_on_show_callback = function(cb) show_cb = cb end
+		package.loaded["ui.tooltip"] = orig_tooltip
+
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local orig_eventtap_new = hs.eventtap.new
+		local enabled, stop_calls = false, 0
+		hs.eventtap.new = function()
+			return {
+				start = function(self) enabled = true; return self end,
+				stop = function(self)
+					stop_calls = stop_calls + 1
+					if stop_calls == 1 then error("STOP_FAIL") end
+					enabled = false
+					return self
+				end,
+				isEnabled = function() return enabled end,
+			}
+		end
+
+		helpers.assert_eq(show_cb(), true)
+		helpers.assert_eq(Bridge.stop(), false,
+			"a thrown native stop must remain an incomplete lifecycle step")
+		helpers.assert_eq(enabled, true)
+		helpers.assert_eq(Bridge.stop(), true,
+			"the retained handle must make the next teardown attempt effective")
+		helpers.assert_eq(enabled, false)
+		helpers.assert_eq(stop_calls, 2)
+		helpers.assert_eq(Bridge.stop(), true)
+		helpers.assert_eq(stop_calls, 2,
+			"verified teardown releases the handle and becomes idempotent")
+
+		hs.eventtap.new = orig_eventtap_new
+		orig_tooltip.set_on_show_callback = orig_set_on_show
+		package.loaded["ui.tooltip"] = orig_tooltip
+	end)
+
+	helpers.it("retains the handle when stop returns but the tap remains enabled", function()
+		package.loaded["modules.keymap.llm_bridge"] = nil
+		local show_cb = nil
+		local orig_tooltip = package.loaded["ui.tooltip"] or {}
+		local orig_set_on_show = orig_tooltip.set_on_show_callback
+		orig_tooltip.set_on_show_callback = function(cb) show_cb = cb end
+		package.loaded["ui.tooltip"] = orig_tooltip
+
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local orig_eventtap_new = hs.eventtap.new
+		local enabled, stop_calls = false, 0
+		hs.eventtap.new = function()
+			return {
+				start = function(self) enabled = true; return self end,
+				stop = function(self)
+					stop_calls = stop_calls + 1
+					if stop_calls > 1 then enabled = false end
+					return self
+				end,
+				isEnabled = function() return enabled end,
+			}
+		end
+
+		helpers.assert_eq(show_cb(), true)
+		helpers.assert_eq(Bridge.stop(), false)
+		helpers.assert_eq(enabled, true,
+			"a no-op stop must be detected through native state")
+		helpers.assert_eq(Bridge.stop(), true)
+		helpers.assert_eq(stop_calls, 2)
+
+		hs.eventtap.new = orig_eventtap_new
+		orig_tooltip.set_on_show_callback = orig_set_on_show
+		package.loaded["ui.tooltip"] = orig_tooltip
+	end)
+
+	helpers.it("contains and file-logs a throw at the first Escape callback line", function()
+		local original_provenance = package.loaded["adapters.event_provenance"]
+		local original_tooltip = package.loaded["ui.tooltip"] or {}
+		local original_set_on_show = original_tooltip.set_on_show_callback
+		local logger = package.loaded["infra.logger"]
+		local original_logger_error = logger.error
+		local original_eventtap_new = hs.eventtap.new
+		local show_cb, event_cb
+		local error_count = 0
+		local enabled = false
+
+		package.loaded["adapters.event_provenance"] = {
+			STATUS_UNREADABLE = "unreadable",
+			classify_with_fence = function() error("CLASSIFY_THROW") end,
+		}
+		original_tooltip.set_on_show_callback = function(cb) show_cb = cb end
+		package.loaded["ui.tooltip"] = original_tooltip
+		logger.error = function(...) error_count = error_count + 1; return original_logger_error(...) end
+		package.loaded["modules.keymap.llm_bridge"] = nil
+
+		local case_ok, case_err = pcall(function()
+			local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+			hs.eventtap.new = function(_, callback)
+				event_cb = callback
+				return {
+					start = function(self) enabled = true; return self end,
+					stop = function(self) enabled = false; return self end,
+					isEnabled = function() return enabled end,
+				}
+			end
+			helpers.assert_eq(show_cb(), true)
+			local callback_ok, consumed = pcall(event_cb, {})
+			helpers.assert_true(callback_ok, "the Quartz callback boundary must contain the throw")
+			helpers.assert_eq(consumed, false, "a failed classifier must pass the physical key through")
+			helpers.assert_true(error_count >= 1, "the swallowed Hammerspoon callback error must reach the file logger")
+			helpers.assert_eq(Bridge.stop(), true)
+		end)
+
+		hs.eventtap.new = original_eventtap_new
+		logger.error = original_logger_error
+		original_tooltip.set_on_show_callback = original_set_on_show
+		package.loaded["ui.tooltip"] = original_tooltip
+		package.loaded["adapters.event_provenance"] = original_provenance
+		package.loaded["modules.keymap.llm_bridge"] = nil
+		if not case_ok then error(case_err) end
 	end)
 end)

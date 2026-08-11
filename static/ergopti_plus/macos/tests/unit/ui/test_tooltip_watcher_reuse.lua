@@ -45,7 +45,6 @@ local function load_tooltip(spec, faults)
 	-- different timer table and pass without ever draining the real queue.
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_tap_guard"] = nil
 
 	local renderer
 	renderer = {
@@ -223,7 +222,7 @@ helpers.describe("tooltip watcher reuse", function()
 	helpers.it("(tooltip-watcher-reuse) LLM reset closes a visible tooltip with a disabled watcher", function()
 		local context = load_tooltip(CASES[1])
 		local cancels = 0
-		context.tooltip.set_cancel_callback(function() cancels = cancels + 1 end)
+		context.tooltip.set_cancel_callback(function() cancels = cancels + 1; return true end)
 		helpers.assert_eq(CASES[1].render(context.tooltip), true)
 		context.created[1].enabled = false
 
@@ -244,7 +243,7 @@ helpers.describe("tooltip watcher reuse", function()
 	helpers.it("(tooltip-watcher-reuse) a replaced LLM idle callback cannot dismiss the live deadline", function()
 		local context = load_tooltip(CASES[1])
 		local cancels = 0
-		context.tooltip.set_cancel_callback(function() cancels = cancels + 1 end)
+		context.tooltip.set_cancel_callback(function() cancels = cancels + 1; return true end)
 		helpers.assert_eq(CASES[1].render(context.tooltip), true)
 		local old_timer = running_timers(context.timers)[1]
 		helpers.assert_not_nil(old_timer)
@@ -345,6 +344,7 @@ helpers.describe("tooltip watcher reuse", function()
 					if spec.label == "LLM" then
 						context.tooltip.set_cancel_callback(function()
 							cancel_calls = cancel_calls + 1
+							return true
 						end)
 					end
 					local failed_render = spec.render(context.tooltip)
@@ -591,7 +591,7 @@ helpers.describe("tooltip watcher reuse", function()
 			local context = load_tooltip(spec, { render_skip_callback = true })
 			local cancel_calls = 0
 			if spec.label == "LLM" then
-				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 			end
 
 			local render_result = spec.render(context.tooltip)
@@ -620,7 +620,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			local context = load_tooltip(spec, { render_throw = true })
 			local cancel_calls = 0
 			if spec.label == "LLM" then
-				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 			end
 
 			local render_result = spec.render(context.tooltip)
@@ -645,7 +645,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			local context = load_tooltip(spec)
 			local cancel_calls = 0
 			if spec.label == "LLM" then
-				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+				context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 			end
 			local saved_event_types = hs.eventtap.event.types
 			hs.eventtap.event.types = nil
@@ -672,7 +672,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 	helpers.it("(tooltip-watcher-reuse) a failed LLM refresh cannot expose new state behind old pixels", function()
 		local context = load_tooltip(CASES[1])
 		local cancel_calls = 0
-		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "old" }, 1, true), true)
 		context.renderer.render = function() error("simulated streaming repaint failure") end
 
@@ -694,7 +694,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 	helpers.it("(tooltip-watcher-reuse) failed LLM navigation cannot diverge selection from pixels", function()
 		local context = load_tooltip(CASES[1])
 		local cancel_calls = 0
-		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "first", "second" }, 1, true), true)
 		context.renderer.render = function() error("simulated navigation repaint failure") end
 
@@ -808,7 +808,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		local context = load_tooltip(CASES[1])
 		local accepts = 0
 		local synthetic = require("adapters.synthetic_input")
-		context.tooltip.set_accept_callback(function() accepts = accepts + 1 end)
+		context.tooltip.set_accept_callback(function() accepts = accepts + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "visible A" }, 1, true), true)
 		local key_watcher = context.created[CASES[1].watcher_count]
 		helpers.assert_eq(key_watcher.fn(hardware_key_event(48, {}, "\t")), true,
@@ -850,7 +850,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		local context = load_tooltip(CASES[1])
 		local accepts = 0
 		local synthetic = require("adapters.synthetic_input")
-		context.tooltip.set_accept_callback(function() accepts = accepts + 1 end)
+		context.tooltip.set_accept_callback(function() accepts = accepts + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "visible" }, 1, true), true)
 		local key_watcher = context.created[CASES[1].watcher_count]
 		helpers.assert_eq(key_watcher.fn(hardware_key_event(48, {}, "\t")), true)
@@ -1096,7 +1096,7 @@ helpers.describe("tooltip facade propagates watcher ownership", function()
 		package.loaded["ui.tooltip.init"] = nil
 		local facade = require("ui.tooltip.init")
 		local show_calls = 0
-		facade.set_on_show_callback(function() show_calls = show_calls + 1 end)
+		facade.set_on_show_callback(function() show_calls = show_calls + 1; return true end)
 
 		helpers.assert_eq(facade.show("preview", false, true), false,
 			"the facade must propagate a hotstring watcher failure")

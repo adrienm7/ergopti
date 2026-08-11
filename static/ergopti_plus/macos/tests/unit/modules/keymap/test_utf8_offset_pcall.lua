@@ -487,10 +487,10 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		local engine_stub = {
 			init                    = function() end,
 			get_llm_enabled         = function() return false end,
-			stop_timer              = function() end,
+			stop_timer              = function() return true end,
 			start_timer             = function() end,
 			start_timer_word_end    = function() end,
-			reset                   = function() end,
+			reset                   = function() return true end,
 			is_visible              = function() return false end,
 			get_predictions         = function() return {} end,
 			navigate                = function() end,

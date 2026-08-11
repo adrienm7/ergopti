@@ -26,7 +26,6 @@ local M = {}
 
 local hs        = hs
 local km_utils         = require("modules.keymap.utils")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance  = require("adapters.event_provenance")
 local SyntheticInput   = require("adapters.synthetic_input")
 local text_utils       = require("infra.text_utils")
@@ -486,6 +485,24 @@ local function masked_for_preview(m)
 	return Fields.for_preview(value, m.field)
 end
 
+
+--- Arms one prediction-engine timer through its strict native ownership contract.
+--- @param label string Diagnostic label.
+--- @param fn function Engine timer method.
+--- @param delay number|nil Optional delay override.
+--- @return boolean committed True only when the delayed timer is running.
+local function arm_llm_timer(label, fn, delay)
+	local ok, result = xpcall(function()
+		if delay ~= nil then return fn(delay) end
+		return fn()
+	end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s did not commit (result: %s).", tostring(label), tostring(result))
+		return false
+	end
+	return true
+end
+
 --- Refreshes the preview tooltip from the current buffer content.
 ---
 --- Decision tree:
@@ -501,7 +518,16 @@ function M.update_preview(buf)
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
 	local llm_on = M.is_runtime_available() and engine.get_llm_enabled()
-	if llm_on then engine.stop_timer() end
+	if llm_on then
+		local stop_ok, stop_result = xpcall(engine.stop_timer, debug.traceback)
+		if not stop_ok or stop_result ~= true then
+			Logger.error(LOG, "LLM timer/stream cancellation did not commit (result: %s).", tostring(stop_result))
+			-- Keep hotstring previews available, but never queue new LLM work behind a
+			-- stream whose native capability could not be terminated. The next physical
+			-- key retries this exact cancellation path.
+			llm_on = false
+		end
+	end
 
 	if not buf or #buf == 0 then
 		Logger.debug(LOG, "Empty buffer — predictions cleared.")
@@ -522,10 +548,12 @@ function M.update_preview(buf)
 
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then
-		M.reset_predictions()
+		local reset_committed = M.reset_predictions() == true
 		-- Buffer ends with whitespace: the user just finished a word or sentence.
 		-- start_timer_word_end() bypasses the debounce when instant_on_word_end is on.
-		if llm_on then engine.start_timer_word_end() end
+		if llm_on and reset_committed then
+			arm_llm_timer("Word-end LLM timer", engine.start_timer_word_end)
+		end
 		return
 	end
 
@@ -708,7 +736,7 @@ function M.update_preview(buf)
 	end
 
 	if #matches > 0 then
-		M.reset_predictions(true)
+		if M.reset_predictions(true) ~= true then llm_on = false end
 
 		-- Build tooltip rows (one per match). Within each kind (star / autocorrect /
 		-- provider) the FIRST surviving row is the one the engine will fire — the
@@ -849,54 +877,40 @@ function M.update_preview(buf)
 		local tooltip_timeout = min_timeout or INFINITE_TOOLTIP_SEC
 		tooltip.set_timeout(tooltip_timeout)
 
-		if any_enabled then
-			-- Off the HID thread: see _preview_render_generation. One runloop tick
-			-- is imperceptible for a preview; a blocked AX query on this thread is
-			-- not — it can trip the tap-timeout that disables the keyboard tap.
-			invalidate_pending_preview()
-			local my_generation = _preview_render_generation
-			TimerScheduler.after(0, function()
-				if my_generation ~= _preview_render_generation then return end
-				tooltip.show_stacked(rows, true)
-			end)
-		end
-
-		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
-		-- When a preview IS shown, wait for it to close (min_timeout + offset). When
-		-- NO row is enabled (preview disabled, or the group's show_tooltip=false),
-		-- min_timeout is nil and tooltip_timeout fell back to INFINITE_TOOLTIP_SEC —
-		-- the 24 h "never auto-dismiss a VISIBLE tooltip" sentinel, which is wrong as
-		-- a real LLM delay: there is no tooltip to wait for, so the chained prediction
-		-- must fire promptly. Using the sentinel armed the LLM for ~24 h (it never
-		-- fired) and every further matching keystroke re-armed the same 24 h timer.
-		if fire_llm_after_hotstring and llm_on then
-			-- Clamp against the INFINITE sentinel regardless of any_enabled: an
-			-- ENABLED preview row can still carry a 0 ms ("infinite") delay, so
-			-- tooltip_timeout degenerates to INFINITE_TOOLTIP_SEC even though a row is
-			-- shown. Waiting ~24 h means the chained prediction never appears. When
-			-- there is no FINITE auto-close to wait for, fire after the short offset.
-			local chain_delay = (any_enabled and tooltip_timeout < INFINITE_TOOLTIP_SEC)
-				and (tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
-				or HOTSTRING_CHAIN_OFFSET_SEC
-			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", chain_delay)
-			engine.start_timer(chain_delay)
-		elseif llm_on then
-			-- Chain-after-hotstring is OFF but the LLM is on. update_preview stopped the
-			-- inactivity timer at the top and this matches branch otherwise re-arms
-			-- NOTHING, so predictions would silently stop on any keystroke whose buffer
-			-- tail matches a hotstring trigger. Re-arm the inactivity timer exactly as
-			-- the no-match branch does (F-L9).
-			if is_word_boundary(buf) then
-				engine.start_timer_word_end()
-			else
-				engine.start_timer()
-			end
-		end
-
 		local trigger_key = primary_match.input or last_word
 		local type_str    = primary_match.type == "star" and "star"
 			or (primary_match.type == "autocorrect" and "autocorrect" or "personal")
-		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
+
+		--- Arms the LLM timer appropriate for this match after its UI decision.
+		local function arm_match_timer()
+			-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
+			-- An intentionally hidden row has no finite surface to wait for, so it keeps
+			-- the short offset without fabricating a visible suggestion record.
+			if fire_llm_after_hotstring and llm_on then
+				local chain_delay = (any_enabled and tooltip_timeout < INFINITE_TOOLTIP_SEC)
+					and (tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
+					or HOTSTRING_CHAIN_OFFSET_SEC
+				if arm_llm_timer("Hotstring-chain LLM timer", engine.start_timer, chain_delay) then
+					Logger.debug(LOG, "LLM chain scheduled in %.3gs.", chain_delay)
+					return true
+				end
+				return false
+			elseif llm_on then
+				-- update_preview stopped the inactivity timer at entry, so a matching
+				-- trigger must re-arm it when chain-after-hotstring is disabled.
+				if is_word_boundary(buf) then
+					return arm_llm_timer("Matched word-end LLM timer", engine.start_timer_word_end)
+				else
+					return arm_llm_timer("Matched inactivity LLM timer", engine.start_timer)
+				end
+			end
+			return true
+		end
+
+		--- Publishes state and telemetry for a physically committed preview.
+		local function publish_visible_match()
+			arm_match_timer()
+			if last_shown_hotstring and last_shown_hotstring.trigger == trigger_key then return end
 			-- is_private travels with the record because the DISMISS telemetry fires
 			-- from reset_predictions, long after `matches` is gone — so the flag has
 			-- to be carried, not looked up again.
@@ -921,20 +935,84 @@ function M.update_preview(buf)
 			-- docs/PROJECT_MEMORY.md records the same class shipping once before.
 			if may_persist_preview(primary_match) then
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
-				TimerScheduler.after(0, function()
-					pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
-				end)
+				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()
+					return TimerScheduler.after(0, function()
+						pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+					end)
+				end, debug.traceback)
+				if not schedule_ok or telemetry_committed ~= true then
+					Logger.error(LOG, "Hotstring suggestion telemetry could not be scheduled (result: %s).",
+						tostring(telemetry_handle))
+				end
+			end
+		end
+
+		if any_enabled then
+			-- Off the HID thread: see _preview_render_generation. One runloop tick
+			-- is imperceptible for a preview; a blocked AX query on this thread is
+			-- not — it can trip the tap-timeout that disables the keyboard tap.
+			invalidate_pending_preview()
+			local my_generation = _preview_render_generation
+			local function render_preview()
+				local callback_ok, callback_err = xpcall(function()
+					if my_generation ~= _preview_render_generation then return end
+					local render_result = tooltip.show_stacked(rows, true)
+					if render_result ~= true then
+						Logger.error(LOG, "Hotstring preview did not commit (result: %s).", tostring(render_result))
+						if my_generation == _preview_render_generation then M.reset_predictions(false) end
+						return
+					end
+					if my_generation ~= _preview_render_generation then return end
+					publish_visible_match()
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "Hotstring preview callback raised — visible surface revoked: %s",
+						tostring(callback_err))
+					if my_generation == _preview_render_generation then
+						local cleanup_ok, cleanup_err = xpcall(function()
+							M.reset_predictions(false)
+						end, debug.traceback)
+						if not cleanup_ok then
+							Logger.error(LOG, "Hotstring preview failure cleanup raised: %s", tostring(cleanup_err))
+						end
+					end
+				end
+			end
+			local schedule_ok, handle_or_err, render_committed = xpcall(function()
+				return TimerScheduler.after(0, render_preview)
+			end, debug.traceback)
+			if not schedule_ok or render_committed ~= true then
+				Logger.error(LOG, "Hotstring preview render could not be scheduled (result: %s).",
+					tostring(handle_or_err))
+				if my_generation == _preview_render_generation then
+					local cleanup_ok, cleanup_err = xpcall(function()
+						M.reset_predictions(false)
+					end, debug.traceback)
+					if not cleanup_ok then
+						Logger.error(LOG, "Hotstring preview schedule-failure cleanup raised: %s",
+							tostring(cleanup_err))
+					end
+				end
+			end
+		else
+			-- No-row is deliberate (preview toggle or per-section show_tooltip=false).
+			-- Preserve LLM scheduling, but do not claim a suggestion was displayed.
+			if arm_match_timer() ~= true then
+				M.reset_predictions(true)
 			end
 		end
 	else
 		-- No hotstring match — let the inactivity timer drive the LLM.
-		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
-		M.reset_predictions()
-		if llm_on then
+		local reset_committed = M.reset_predictions() == true
+		if llm_on and reset_committed then
+			local timer_committed
 			if is_word_boundary(buf) then
-				engine.start_timer_word_end()
+				timer_committed = arm_llm_timer("No-match word-end LLM timer", engine.start_timer_word_end)
 			else
-				engine.start_timer()
+				timer_committed = arm_llm_timer("No-match inactivity LLM timer", engine.start_timer)
+			end
+			if timer_committed then
+				Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
 			end
 		end
 	end
@@ -967,50 +1045,146 @@ end
 --- non-trivial. Doing so on every preview keystroke blows the macOS 50 ms HID-callback
 --- budget on the NEXT keystroke, causing the triggering key to leak through to the
 --- app (e.g. "hs★" → "hsammerspoon" because ★ reached the screen before our deletes).
+local function escape_trap_enabled(trap)
+	local trap_type = type(trap)
+	if (trap_type ~= "table" and trap_type ~= "userdata")
+		or type(trap.isEnabled) ~= "function" then
+		return nil, "eventtap isEnabled() is unavailable"
+	end
+	local ok, enabled_or_err = xpcall(function()
+		return trap:isEnabled()
+	end, debug.traceback)
+	if not ok then return nil, enabled_or_err end
+	if type(enabled_or_err) ~= "boolean" then
+		return nil, "eventtap isEnabled() returned " .. tostring(enabled_or_err)
+	end
+	return enabled_or_err, nil
+end
+
+
+--- Starts a candidate trap and verifies the native capability, not merely the Lua call.
+--- @param trap table|userdata Candidate eventtap.
+--- @return boolean committed True only when Quartz reports the tap enabled.
+--- @return string|nil err Failure detail.
+local function start_escape_trap(trap)
+	local trap_type = type(trap)
+	if (trap_type ~= "table" and trap_type ~= "userdata")
+		or type(trap.start) ~= "function" then
+		return false, "eventtap start() is unavailable"
+	end
+	local ok, start_err = xpcall(function()
+		trap:start()
+	end, debug.traceback)
+	if not ok then return false, start_err end
+	local enabled, enabled_err = escape_trap_enabled(trap)
+	if enabled ~= true then return false, enabled_err or "eventtap remained disabled" end
+	return true, nil
+end
+
+
+--- Best-effort cleanup for a candidate that never committed ownership.
+--- @param trap table|userdata Candidate eventtap.
+--- @return boolean stopped True only when the tap is verified disabled.
+local function stop_escape_trap_candidate(trap)
+	local trap_type = type(trap)
+	if (trap_type ~= "table" and trap_type ~= "userdata")
+		or type(trap.stop) ~= "function" then return false end
+	local stop_ok = xpcall(function()
+		trap:stop()
+	end, debug.traceback)
+	if not stop_ok then return false end
+	local enabled = escape_trap_enabled(trap)
+	return enabled == false
+end
+
+
 local function arm_escape_trap()
-	if _escape_trap then return end
-	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-		if EventTapGuard.handle_disabled(event, _escape_trap, "llm.escape_trap") then
+	if _escape_trap then
+		local enabled, enabled_err = escape_trap_enabled(_escape_trap)
+		if enabled == true then return true end
+		if enabled == nil then
+			Logger.error(LOG, "Escape trap state is unreadable; ownership not published: %s",
+				tostring(enabled_err))
 			return false
 		end
-		local provenance, status, fence = EventProvenance.classify_with_fence(
-			event, "llm.escape_trap")
-		local fence_events = fence and fence.events or nil
-		local function finish(consume) return consume == true, fence_events end
-		if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
-			return finish(false)
+		local restarted, restart_err = start_escape_trap(_escape_trap)
+		if restarted then
+			Logger.debug(LOG, "Escape trap re-armed after a disabled state.")
+			return true
 		end
-		local key_ok, keycode = pcall(event.getKeyCode, event)
-		if not key_ok or keycode ~= KEYCODE_ESCAPE then return finish(false) end
-		if not M.is_runtime_available() then
-			-- Hotstring previews remain a valid non-LLM feature during quarantine.
-			-- Dismiss only that surface; stale LLM state is logically invisible and
-			-- must never make Escape consume an application keystroke.
-			if type(tooltip.is_hotstring_visible) == "function"
-				and tooltip.is_hotstring_visible() then
-				local scheduled = SyntheticInput.defer_after_callback(
-					"hotstring Escape dismissal", function()
-						invalidate_pending_preview()
-						local hide = tooltip.hide_forced_silent or tooltip.hide_forced
-						if type(hide) == "function" then hide() end
-					end)
-				return finish(scheduled)
+		Logger.error(LOG, "Escape trap restart did not commit: %s", tostring(restart_err))
+		return false
+	end
+
+	local create_ok, candidate_or_err = xpcall(function()
+		return hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+		local fence_events = nil
+		local callback_ok, consume_or_err, returned_events = xpcall(function()
+			local provenance, status, fence = EventProvenance.classify_with_fence(
+				event, "llm.escape_trap")
+			fence_events = fence and fence.events or nil
+			local function finish(consume) return consume == true, fence_events end
+			if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
+				return finish(false)
 			end
-			return finish(false)
+			local key_ok, keycode = pcall(event.getKeyCode, event)
+			if not key_ok or keycode ~= KEYCODE_ESCAPE then return finish(false) end
+			if not M.is_runtime_available() then
+				-- Hotstring previews remain a valid non-LLM feature during quarantine.
+				-- Dismiss only that surface; stale LLM state is logically invisible and
+				-- must never make Escape consume an application keystroke.
+				if type(tooltip.is_hotstring_visible) == "function"
+					and tooltip.is_hotstring_visible() then
+					local scheduled = SyntheticInput.defer_after_callback(
+						"hotstring Escape dismissal", function()
+							invalidate_pending_preview()
+							local hide = tooltip.hide_forced_silent or tooltip.hide_forced
+							if type(hide) == "function" then hide() end
+						end)
+					return finish(scheduled)
+				end
+				return finish(false)
+			end
+			-- Let Escape through when no tooltip is on screen — Raycast (or the system)
+			-- should handle it normally in that case.
+			if not tooltip.is_visible() then return finish(false) end
+			local scheduled = SyntheticInput.defer_after_callback(
+				"LLM Escape dismissal", function()
+					if not M.is_runtime_available() or not tooltip.is_visible() then return end
+					Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
+					M.reset_predictions()
+				end)
+			return finish(scheduled)
+		end, debug.traceback)
+		if not callback_ok then
+			Logger.error(LOG, "Escape trap callback raised; event passed through: %s", tostring(consume_or_err))
+			return false, fence_events
 		end
-		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
-		-- should handle it normally in that case.
-		if not tooltip.is_visible() then return finish(false) end
-		local scheduled = SyntheticInput.defer_after_callback(
-			"LLM Escape dismissal", function()
-				if not M.is_runtime_available() or not tooltip.is_visible() then return end
-				Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
-				M.reset_predictions()
-			end)
-		return finish(scheduled)
-	end)
-	_escape_trap:start()
+		return consume_or_err == true, returned_events
+		end)
+	end, debug.traceback)
+	local candidate_type = type(candidate_or_err)
+	if not create_ok or (candidate_type ~= "table" and candidate_type ~= "userdata") then
+		Logger.error(LOG, "Escape trap creation did not commit: %s", tostring(candidate_or_err))
+		return false
+	end
+
+	local candidate = candidate_or_err
+	local started, start_err = start_escape_trap(candidate)
+	if not started then
+		local stopped = stop_escape_trap_candidate(candidate)
+		if not stopped then
+			-- Never lose the only handle to a candidate whose native state could not
+			-- be proven disabled. M.stop() and the next show can retry its teardown.
+			_escape_trap = candidate
+		end
+		Logger.error(LOG, "Escape trap start did not commit: %s", tostring(start_err))
+		return false
+	end
+
+	_escape_trap = candidate
 	Logger.debug(LOG, "Escape trap armed (persistent).")
+	return true
 end
 
 
@@ -1021,14 +1195,14 @@ end
 local function schedule_quarantine_surface_hide()
 	if _quarantine_hide_pending then return end
 	_quarantine_hide_pending = true
-	local ok, handle_or_err = pcall(TimerScheduler.after, 0, function()
+	local ok, handle_or_err, committed = pcall(TimerScheduler.after, 0, function()
 		_quarantine_hide_pending = false
 		if not M.is_runtime_available() then
 			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 			if type(hide) == "function" then pcall(hide) end
 		end
 	end)
-	if not ok or type(handle_or_err) ~= "table" or handle_or_err.timer == nil then
+	if not ok or committed ~= true then
 		_quarantine_hide_pending = false
 	end
 end
@@ -1058,24 +1232,37 @@ local function reset_predictions_impl(keep_hotstring_log, force_full)
 		--
 		-- The values are captured NOW: a later keystroke must not change what gets
 		-- recorded, and the field is cleared immediately below.
-		local d_trigger = last_shown_hotstring.trigger
-		local d_repl    = last_shown_hotstring.replacement
-		local d_type    = last_shown_hotstring.h_type
+		local dismissed = last_shown_hotstring
+		local d_trigger = dismissed.trigger
+		local d_repl    = dismissed.replacement
+		local d_type    = dismissed.h_type
+		-- Relinquish the record before crossing the fallible scheduler boundary.
+		-- Telemetry is best-effort; engine teardown is the user-visible contract.
+		last_shown_hotstring = nil
 		-- Withheld for a private mapping, like its suggested sibling. This one is
 		-- the easier of the two to miss: the value was captured on a keystroke that
 		-- has already happened, and the record outlives the match it came from.
-		if may_persist_preview(last_shown_hotstring) then
-			TimerScheduler.after(0, function()
-				pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
-			end)
+		if may_persist_preview(dismissed) then
+			local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
+				return TimerScheduler.after(0, function()
+					pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+				end)
+			end, debug.traceback)
+			if not schedule_ok or telemetry_committed ~= true then
+				Logger.error(LOG, "Hotstring dismissal telemetry could not be scheduled (result: %s).",
+					tostring(handle_or_err))
+			end
 		end
-		last_shown_hotstring = nil
 	end
 	if not force_full and not M.is_runtime_available() then
 		schedule_quarantine_surface_hide()
 		return false
 	end
-	engine.reset()
+	local reset_ok, reset_result = xpcall(engine.reset, debug.traceback)
+	if not reset_ok or reset_result ~= true then
+		Logger.error(LOG, "Prediction-engine reset did not commit (result: %s).", tostring(reset_result))
+		return false
+	end
 	return true
 end
 
@@ -1087,7 +1274,7 @@ end
 --- independently closed by the exact _safe_action_epoch comparison.
 --- @return boolean True after the full reset completed.
 function M.reconcile_observation_gap()
-	reset_predictions_impl(false, true)
+	if reset_predictions_impl(false, true) ~= true then return false end
 	M.set_runtime_quarantined(false)
 	return true
 end
@@ -1103,6 +1290,15 @@ function M.reset_predictions(keep_hotstring_log)
 end
 
 
+--- Performs a force-full reset for module teardown without reopening runtime gates.
+--- Unlike an ordinary user reset, this must work while an action epoch is
+--- quarantined; the listener that could reconcile that epoch is being removed.
+--- @return boolean committed True when engine teardown completed.
+function M.reset_for_teardown()
+	return reset_predictions_impl(false, true)
+end
+
+
 --- Performs the full reset for one exact action token outside the eventtap.
 --- Success opens the runtime only if no newer action arrived while reset ran.
 --- @param epoch table Opaque SyntheticInput action token.
@@ -1110,7 +1306,7 @@ end
 function M.reset_for_action_epoch(epoch)
 	M.observe_action_epoch(epoch)
 	if epoch ~= SyntheticInput.current_action_epoch() then return false end
-	reset_predictions_impl(false, true)
+	if reset_predictions_impl(false, true) ~= true then return false end
 	if epoch ~= SyntheticInput.current_action_epoch() then return false end
 	_safe_action_epoch = epoch
 	_runtime_quarantined = false
@@ -1138,10 +1334,18 @@ function M.apply_prediction(idx)
 	-- This call was accidentally dropped during the 183effff refactor.
 	local ok_overlap, res_deletes, res_text = pcall(
 		km_utils.resolve_prediction_overlap, _state.buffer, delete_count, text_to_type)
-	if ok_overlap and res_deletes ~= nil and res_text ~= nil then
-		delete_count = res_deletes
-		text_to_type = res_text
+	if not ok_overlap or res_deletes == nil or res_text == nil then
+		Logger.error(LOG, "Prediction overlap resolution failed; output rejected before injection: %s",
+			tostring(ok_overlap and "invalid nil result" or res_deletes))
+		local cleanup_ok, cleanup_result = xpcall(M.reset_predictions, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Prediction overlap failure cleanup did not commit (result: %s).",
+				tostring(cleanup_result))
+		end
+		return false
 	end
+	delete_count = res_deletes
+	text_to_type = res_text
 
 	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
 		idx, tostring(text_to_type), delete_count)
@@ -1153,7 +1357,20 @@ function M.apply_prediction(idx)
 		if ok and offset then deleted_text = _state.buffer:sub(offset) end
 	end
 
-	M.reset_predictions()
+	local reset_ok, reset_result = xpcall(function()
+		return M.reset_predictions()
+	end, debug.traceback)
+	if not reset_ok then
+		Logger.error(LOG, "Prediction acceptance reset raised before output: %s", tostring(reset_result))
+		return false
+	end
+	local cleanup_committed = reset_result == true
+	if not cleanup_committed then
+		-- engine.consume() already fenced the accepted generation, so preserving the
+		-- user's requested text is safe. Do not chain another request behind native
+		-- work that failed to terminate; retry cleanup after this callback instead.
+		Logger.error(LOG, "Prediction acceptance cleanup remains incomplete; text will apply without chaining.")
+	end
 
 	-- Route through the single injection choke point so deletion, text and paste
 	-- events share one immutable generation and owner — the same transaction path
@@ -1187,7 +1404,12 @@ function M.apply_prediction(idx)
 		Logger.error(LOG, "Prediction #%d could not be injected; action was not accepted.", idx)
 		return false
 	end
-	keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
+	local telemetry_ok, telemetry_err = xpcall(function()
+		keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
+	end, debug.traceback)
+	if not telemetry_ok then
+		Logger.error(LOG, "Prediction acceptance telemetry raised after text commit: %s", tostring(telemetry_err))
+	end
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
@@ -1196,9 +1418,41 @@ function M.apply_prediction(idx)
 	-- all previous keystrokes have been delivered to the target application.
 	-- engine.arm_chain() sets a fallback timer in case F16 is somehow missed.
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
-	engine.arm_chain()
+	if not cleanup_committed then
+		local retry_ok, retry_handle, retry_committed = xpcall(function()
+			return TimerScheduler.after(0, function()
+				local callback_ok, callback_result = xpcall(function()
+					return M.reset_predictions(true)
+				end, debug.traceback)
+				if not callback_ok or callback_result ~= true then
+					Logger.error(LOG, "Deferred post-accept cleanup did not commit (result: %s).",
+						tostring(callback_result))
+				end
+			end)
+		end, debug.traceback)
+		if not retry_ok or retry_committed ~= true then
+			Logger.error(LOG, "Post-accept cleanup retry could not be scheduled (result: %s).",
+				tostring(retry_handle))
+		end
+		return true
+	end
+
+	local arm_ok, arm_result = xpcall(engine.arm_chain, debug.traceback)
+	if not arm_ok or arm_result ~= true then
+		Logger.error(LOG, "Prediction applied, but LLM chain ownership did not commit (result: %s).",
+			tostring(arm_result))
+		return true
+	end
+	local signal_ok, signal_result = xpcall(function()
+		return SyntheticInput.emit_loopback_key_stroke(
+			{}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
+	end, debug.traceback)
+	if not signal_ok or signal_result ~= true then
+		Logger.error(LOG, "Prediction applied; F16 signal failed, so the owned fallback remains active (result: %s).",
+			tostring(signal_result))
+		return true
+	end
 	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
-	SyntheticInput.emit_loopback_key_stroke({}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
 	return true
 end
 
@@ -1330,8 +1584,7 @@ end
 --- Called by the expander after a text replacement to trigger a fresh prediction.
 function M.start_timer()
 	if not M.is_runtime_available() then return false end
-	engine.start_timer()
-	return true
+	return arm_llm_timer("Public inactivity LLM timer", engine.start_timer)
 end
 
 --- Initializes the bridge with the shared CoreState and keymap defaults.
@@ -1377,20 +1630,38 @@ end
 --- Must be called from keymap/init.lua M.stop() so that Escape is not
 --- intercepted after the module is unloaded (escape-trap-ghost-tap).
 function M.stop()
-	if _escape_trap then
-		pcall(function() _escape_trap:stop() end)
-		_escape_trap = nil
-		Logger.debug(LOG, "Escape trap stopped.")
+	if not _escape_trap then return true end
+	local trap = _escape_trap
+	local trap_type = type(trap)
+	if (trap_type ~= "table" and trap_type ~= "userdata") or type(trap.stop) ~= "function" then
+		Logger.error(LOG, "Escape trap stop() is unavailable; handle retained for retry.")
+		return false
 	end
+	local stop_ok, stop_err = xpcall(function()
+		trap:stop()
+	end, debug.traceback)
+	if not stop_ok then
+		Logger.error(LOG, "Escape trap stop raised; handle retained for retry: %s", tostring(stop_err))
+		return false
+	end
+	local enabled, enabled_err = escape_trap_enabled(trap)
+	if enabled ~= false then
+		Logger.error(LOG, "Escape trap stop did not commit; handle retained for retry: %s",
+			tostring(enabled_err or ("isEnabled=" .. tostring(enabled))))
+		return false
+	end
+	_escape_trap = nil
+	Logger.debug(LOG, "Escape trap stopped.")
+	return true
 end
 
 -- Wire tooltip callbacks so the tooltip module can call back into the bridge.
 -- Closures ensure the functions are resolved at call time, not at bind time.
 if type(tooltip.set_accept_callback) == "function" then
-	tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
+	tooltip.set_accept_callback(function(idx) return M.apply_prediction(idx) end)
 end
 if type(tooltip.set_cancel_callback) == "function" then
-	tooltip.set_cancel_callback(function() M.reset_predictions() end)
+	tooltip.set_cancel_callback(function() return M.reset_predictions() end)
 end
 -- Create the persistent Escape trap the first time any tooltip appears.
 -- This guarantees the tap is inserted at HEAD after Raycast (or any other app) has

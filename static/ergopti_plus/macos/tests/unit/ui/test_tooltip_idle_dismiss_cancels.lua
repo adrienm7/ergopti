@@ -59,7 +59,7 @@ local function load_tooltip()
 	end
 
 	local cancels = {}
-	T.set_cancel_callback(function() cancels[#cancels + 1] = true end)
+	T.set_cancel_callback(function() cancels[#cancels + 1] = true; return true end)
 
 	--- Fires the LONGEST-delay armed timer, which is the idle auto-hide: the
 	--- render path also arms doAfter(0) deferrals, and firing one of those would

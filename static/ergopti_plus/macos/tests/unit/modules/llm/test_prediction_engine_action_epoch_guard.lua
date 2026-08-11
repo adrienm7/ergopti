@@ -81,7 +81,7 @@ local function load_fixture(streaming)
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,
 		set_llm_streaming = function() end,
-		cancel_streaming = function() end,
+		cancel_streaming = function() return true end,
 		fetch_llm_prediction = function(...)
 			fetches = fetches + 1
 			captured.success = select(7, ...)
@@ -132,14 +132,14 @@ local function load_fixture(streaming)
 	local tooltip = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
-		set_chain_start = function() end,
+		set_chain_start = function() return true end,
 		set_llm_timeout = function() end,
-		reset_llm_timer = function() end,
-		show_loading = function() effects.renders = effects.renders + 1 end,
-		show_predictions = function() effects.renders = effects.renders + 1 end,
+		reset_llm_timer = function() return true end,
+		show_loading = function() effects.renders = effects.renders + 1; return true end,
+		show_predictions = function() effects.renders = effects.renders + 1; return true end,
 		hide = function() effects.hides = effects.hides + 1 end,
 		hide_forced = function() effects.hides = effects.hides + 1 end,
-		mark_chain_complete = function() effects.timing_paints = effects.timing_paints + 1 end,
+		mark_chain_complete = function() effects.timing_paints = effects.timing_paints + 1; return true end,
 		make_diff_styled = function() return true end,
 		get_current_index = function() return 1 end,
 		navigate = function() return true end,

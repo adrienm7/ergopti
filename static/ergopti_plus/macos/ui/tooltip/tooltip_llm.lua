@@ -13,7 +13,6 @@
 local M = {}
 local hs = hs
 local Logger = require("infra.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
@@ -186,11 +185,15 @@ end
 local function invoke_user_callback(label, callback, ...)
 	if type(callback) ~= "function" then return true end
 	local arguments = table.pack(...)
-	local ok, err = xpcall(function()
-		callback(table.unpack(arguments, 1, arguments.n))
+	local ok, result = xpcall(function()
+		return callback(table.unpack(arguments, 1, arguments.n))
 	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s callback failed: %s.", tostring(label), tostring(err))
+		Logger.error(LOG, "%s callback failed: %s.", tostring(label), tostring(result))
+		return false
+	end
+	if result ~= true then
+		Logger.error(LOG, "%s callback did not commit (result: %s).", tostring(label), tostring(result))
 		return false
 	end
 	return true
@@ -210,6 +213,16 @@ local function dismiss(reason)
 	local callback_ok = invoke_user_callback("Prediction cancel", _state.on_cancel)
 	local hidden = M.hide()
 	return callback_ok and hidden == true
+end
+
+
+--- Applies a selected prediction through the caller-owned strict commit port.
+--- @param index number Selected prediction index.
+--- @return boolean committed True only when the owner accepted the action.
+local function accept_prediction(index)
+	if invoke_user_callback("Prediction acceptance", _state.on_accept, index) then return true end
+	dismiss("acceptance callback failure")
+	return false
 end
 
 --- Reads a timer's live state across native hs.timer and the test double.
@@ -494,9 +507,6 @@ local function start_watchers()
 		{ event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel },
 		function(event)
 			if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
-			if EventTapGuard.handle_disabled(event, watcher_mouse, "tooltip.llm_mouse") then
-				return false
-			end
 			local provenance, status, fence = EventProvenance.classify_with_fence(
 				event, "tooltip.llm_mouse")
 			local fence_events = fence and fence.events or nil
@@ -523,9 +533,6 @@ local function start_watchers()
 	local ok_flags, watcher_flags
 	ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(event)
 		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
-		if EventTapGuard.handle_disabled(event, watcher_flags, "tooltip.llm_flags") then
-			return false
-		end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.llm_flags")
 		local fence_events = fence and fence.events or nil
@@ -562,9 +569,6 @@ local function start_watchers()
 	local ok_key, watcher_key
 	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
 		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
-		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.llm_key") then
-			return false
-		end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.llm_key")
 		local fence_events = fence and fence.events or nil
@@ -612,9 +616,7 @@ local function start_watchers()
 					-- Tab always accepts directly, regardless of prior navigation
 					local index = _state.current_index
 					local scheduled = defer_runtime_action("LLM tooltip Tab acceptance",
-						function()
-							if type(_state.on_accept) == "function" then _state.on_accept(index) end
-						end)
+						accept_prediction, index)
 					return finish(scheduled)
 				end
 				defer_dismiss("modified Tab")
@@ -634,17 +636,13 @@ local function start_watchers()
 				if _state.navigation_started then
 					local index = _state.current_index
 					local scheduled = defer_runtime_action("LLM tooltip Enter acceptance",
-						function()
-							if type(_state.on_accept) == "function" then _state.on_accept(index) end
-						end)
+						accept_prediction, index)
 					return finish(scheduled)
 				end
 				if _state.enter_validates then
 					local index = _state.current_index
 					local scheduled = defer_runtime_action("LLM tooltip validating Enter",
-						function()
-							if type(_state.on_accept) == "function" then _state.on_accept(index) end
-						end)
+						accept_prediction, index)
 					return finish(scheduled)
 				end
 				defer_dismiss("newline")
@@ -697,9 +695,7 @@ local function start_watchers()
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if pred_index <= preds_count then
 					local scheduled = defer_runtime_action("LLM tooltip numbered acceptance",
-						function()
-							if type(_state.on_accept) == "function" then _state.on_accept(pred_index) end
-						end)
+						accept_prediction, pred_index)
 					return finish(scheduled)
 				end
 				return finish(true)

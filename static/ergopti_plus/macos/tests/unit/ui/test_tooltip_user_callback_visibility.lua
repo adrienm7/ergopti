@@ -54,7 +54,6 @@ local function load_tooltip(faults)
 
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_tap_guard"] = nil
 
 	local renderer
 	renderer = {
@@ -101,7 +100,6 @@ local function load_tooltip(faults)
 	package.loaded["infra.logger"] = real_logger
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_tap_guard"] = nil
 
 	return {
 		errors = errors,
@@ -143,7 +141,7 @@ helpers.describe("tooltip_llm: user callback failures are visible and fail close
 	helpers.it("(tooltip-callback-visible) rejects a navigation throw and cancels the divergent selection", function()
 		local context = load_tooltip()
 		local cancel_calls = 0
-		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 		context.tooltip.set_navigate_callback(function()
 			error("navigation callback sentinel")
 		end)
@@ -175,8 +173,8 @@ helpers.describe("tooltip_llm: user callback failures are visible and fail close
 		local context = load_tooltip()
 		local navigated_to = nil
 		local cancel_calls = 0
-		context.tooltip.set_navigate_callback(function(index) navigated_to = index end)
-		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1 end)
+		context.tooltip.set_navigate_callback(function(index) navigated_to = index; return true end)
+		context.tooltip.set_cancel_callback(function() cancel_calls = cancel_calls + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "first", "second" }, 1, true), true)
 
 		helpers.assert_eq(context.tooltip.navigate(1), true,
@@ -196,6 +194,35 @@ helpers.describe("tooltip_llm: user callback failures are visible and fail close
 		helpers.assert_eq(#context.errors, 0,
 			"successful callbacks must not emit false ERROR diagnostics")
 	end)
+
+	for _, case in ipairs({
+		{ name = "false", value = false },
+		{ name = "nil", value = nil },
+	}) do
+		helpers.it("rejects a navigation callback returning " .. case.name, function()
+			local context = load_tooltip()
+			context.tooltip.set_cancel_callback(function() return true end)
+			context.tooltip.set_navigate_callback(function() return case.value end)
+			helpers.assert_eq(context.tooltip.show_predictions({ "first", "second" }, 1, true), true)
+
+			helpers.assert_eq(context.tooltip.navigate(1), false)
+			helpers.assert_true(log_contains(context.errors, "Prediction navigation callback did not commit"))
+			helpers.assert_true(not context.tooltip.is_visible())
+			helpers.assert_true(not context.renderer.visible)
+		end)
+
+		helpers.it("hides after a cancel callback returning " .. case.name, function()
+			local context = load_tooltip()
+			context.tooltip.set_cancel_callback(function() return case.value end)
+			helpers.assert_eq(context.tooltip.show_predictions({ "prediction" }, 1, true), true)
+			local idle_timer = find_idle_timer(context.timers)
+			idle_timer:fire()
+
+			helpers.assert_true(log_contains(context.errors, "Prediction cancel callback did not commit"))
+			helpers.assert_true(not context.tooltip.is_visible())
+			helpers.assert_true(not context.renderer.visible)
+		end)
+	end
 end)
 
 helpers.describe("tooltip_llm: partial renderer exceptions reach the file logger", function()

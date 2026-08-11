@@ -563,6 +563,7 @@ end
 --- Kept as a no-op so the engine's dispatch surface stays identical across
 --- backends and there is no need for a "supports streaming?" capability flag.
 function M.cancel_streaming()
+	return true
 end
 
 --- Async availability check used by the menu / status indicator. Calls

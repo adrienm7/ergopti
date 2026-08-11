@@ -65,7 +65,7 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
-	cancel_streaming        = function() end,
+	cancel_streaming        = function() return true end,
 	is_backend_ready        = function() return true end,
 	get_active_profile      = function() return { label = "Test profile" } end,
 	fetch_llm_prediction    = function(...) end,
@@ -98,10 +98,10 @@ package.loaded["modules.llm.prompt_builder"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                = function(_cfg) end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) end,
-	stop_watchdog       = function() end,
+	arm_watchdog        = function(_cfg) return true end,
+	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
-	cancel_streaming    = function() end,
+	cancel_streaming    = function() return true end,
 }
 
 -- Stub AppFilter.
@@ -132,16 +132,16 @@ package.loaded["infra.keycodes"] = {
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
+	set_chain_start       = function(_) return true end,
 	mark_chain_complete   = function() end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
-	hide_forced           = function() end,
+	hide                  = function() return true end,
+	hide_forced           = function() return true end,
 	set_llm_timeout       = function(_) end,
 	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
+	show_loading          = function(...) return true end,
 	show_predictions      = function(...) end,
 	tint                  = function(_) return nil end,
 }
@@ -257,4 +257,33 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 			"arm_chain() must call core_state.suppress_rescan_keep_buffer")
 		PE.reset()
 	end)
+
+	for _, case in ipairs({
+		{ name = "throw", build = function() error("FALLBACK_CREATE_THROW") end },
+		{ name = "nil", build = function() return nil end },
+		{
+			name = "stopped handle",
+			build = function(original, delay, callback)
+				local timer = original(delay, callback)
+				timer.running = false
+				return timer
+			end,
+		},
+	}) do
+		helpers.it("arm_chain rejects a " .. case.name .. " fallback constructor", function()
+			PE.reset()
+			PE.init(core_state)
+			local original = hs_stub.timer.doAfter
+			hs_stub.timer.doAfter = function(delay, callback)
+				return case.build(original, delay, callback)
+			end
+			local ok, result = pcall(PE.arm_chain)
+			hs_stub.timer.doAfter = original
+
+			helpers.assert_true(ok, "fallback construction failure must be contained")
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(PE.is_chain_pending(), false,
+				"chain state cannot publish before the fallback timer is running")
+		end)
+	end
 end)

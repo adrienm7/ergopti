@@ -53,12 +53,13 @@ local function make_tooltip_stub()
 	}
 	stub.show_predictions = function(_preds, _idx, _ai, _info, _val, _indent, _nav, _tint, _loading, _slots)
 		stub.show_predictions_calls = stub.show_predictions_calls + 1
+		return true
 	end
-	stub.hide               = function() stub.hidden = true end
+	stub.hide               = function() stub.hidden = true; return true end
 	stub.get_current_index  = function() return 1 end
 	stub.make_diff_styled   = function(_chunks, _nw) return true end
 	stub.tint               = function(_name) return {} end
-	stub.mark_chain_complete = function() end
+	stub.mark_chain_complete = function() return true end
 	return stub
 end
 
@@ -103,11 +104,12 @@ local function make_ctx(fetch_id, get_fetch_id_fn)
 		build_info_bar_text      = function() return nil end,
 		resolve_backend_label    = function() return "mlx" end,
 		is_noise_pred            = function(_) return false end,
-		reset_llm_dismiss_timer  = function() end,
+		reset_llm_dismiss_timer  = function() return true end,
 		pending_predictions_ref  = { value = {} },
 		predictions_visible_ref  = { value = false },
 		tail                     = "",
-		is_ai_preview_enabled    = false,
+		-- build_callbacks is reachable only after prediction_engine's preview gate.
+		is_ai_preview_enabled    = true,
 	}
 end
 

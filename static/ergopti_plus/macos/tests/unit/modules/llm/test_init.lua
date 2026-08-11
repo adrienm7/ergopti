@@ -381,6 +381,36 @@ end)
 
 
 
+
+-- =====================================
+-- =====================================
+-- ======= 4b/ Cancellation contract ===
+-- =====================================
+-- =====================================
+
+helpers.describe("Core.cancel_streaming strict backend contract", function()
+	helpers.it("propagates true, false, and throw outcomes from the active backend", function()
+		local api = package.loaded["modules.llm.api_ollama"]
+		helpers.assert_not_nil(api)
+		local previous_cancel = api.cancel_streaming
+		Core.set_backend("ollama")
+
+		api.cancel_streaming = function() return true end
+		helpers.assert_eq(Core.cancel_streaming(), true)
+		api.cancel_streaming = function() return false end
+		helpers.assert_eq(Core.cancel_streaming(), false)
+		api.cancel_streaming = function() error("backend cancel failed") end
+		local ok, result = pcall(Core.cancel_streaming)
+		helpers.assert_true(ok, "backend cancellation errors must reach the file logger, not escape")
+		helpers.assert_eq(result, false)
+
+		api.cancel_streaming = previous_cancel
+	end)
+end)
+
+
+
+
 -- =====================================
 -- =====================================
 -- ======= 5/ check_modifiers ==========

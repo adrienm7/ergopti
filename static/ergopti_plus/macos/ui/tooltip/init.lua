@@ -40,11 +40,11 @@ end
 local function publish_show(shown)
 	if shown ~= true then return false end
 	if not _on_show_callback then return true end
-	local callback_ok, callback_err = xpcall(_on_show_callback, debug.traceback)
-	if callback_ok then return true end
+	local callback_ok, callback_result = xpcall(_on_show_callback, debug.traceback)
+	if callback_ok and callback_result == true then return true end
 
-	Logger.error(LOG, "Tooltip on-show callback raised: %s. Visible surface revoked.",
-		tostring(callback_err))
+	Logger.error(LOG, "Tooltip on-show callback did not commit (result: %s). Visible surface revoked.",
+		tostring(callback_result))
 	local cleanup_ok, cleanup_result = xpcall(M.hide_forced, debug.traceback)
 	if not cleanup_ok or cleanup_result ~= true then
 		Logger.error(LOG, "Tooltip on-show failure cleanup did not commit (result: %s).",

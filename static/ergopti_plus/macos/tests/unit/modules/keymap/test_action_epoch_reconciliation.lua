@@ -16,7 +16,7 @@ local RESET_MODULES = {
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"adapters.synthetic_input", "adapters.event_provenance",
-	"adapters.event_tap_guard", "infra.logger", "infra.perf",
+	"infra.logger", "infra.perf",
 	"infra.hotpath_profiler", "infra.manifest_reader", "infra.keycodes",
 }
 
@@ -93,11 +93,8 @@ local function load_fixture()
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
-			return nil, "foreign", synthetic_stub.claim_physical_fence()
+		return nil, "foreign", synthetic_stub.claim_physical_fence()
 		end,
-	}
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
 	}
 
 	local state = {
@@ -135,6 +132,15 @@ local function load_fixture()
 	package.loaded["modules.keymap.llm_bridge"] = api({
 		reset_predictions = function()
 			calls[#calls + 1] = "ordinary-reset"
+			return not llm_quarantined
+		end,
+		reset_for_teardown = function()
+			calls[#calls + 1] = "teardown-reset"
+			return true
+		end,
+		stop = function()
+			calls[#calls + 1] = "bridge-stop"
+			return true
 		end,
 		check_nav_reset = function()
 			if record_nav_reset then calls[#calls + 1] = "ordinary-reset" end
@@ -383,6 +389,19 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 		fixture.keymap.stop()
 		helpers.assert_eq(fixture.unregister_calls(), 1)
+	end)
+
+	helpers.it("stop uses the teardown reset even while the ordinary runtime is quarantined", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		fixture.physical_letter("x")
+		helpers.assert_true(fixture.llm_quarantined())
+
+		helpers.assert_eq(fixture.keymap.stop(), true,
+			"teardown must not wait for a listener that stop has already unregistered")
+		helpers.assert_eq(table.concat(fixture.calls, ","),
+			"observe,teardown-reset,bridge-stop",
+			"keymap.stop must bypass the ordinary quarantine gate and still stop the sibling trap")
 	end)
 end)
 

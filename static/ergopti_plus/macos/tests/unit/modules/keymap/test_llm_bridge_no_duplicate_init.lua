@@ -120,7 +120,7 @@ package.loaded["ui.tooltip"] = {
 local ENGINE_ENABLED = false
 package.loaded["modules.llm.prediction_engine"] = {
 	init                          = function() end,
-	reset                         = function() end,
+	reset                         = function() return true end,
 	set_preview_ai_enabled        = function() end,
 	set_preview_ai_color          = function() end,
 	set_llm_enabled               = function(v) ENGINE_ENABLED = v end,
@@ -155,7 +155,7 @@ package.loaded["modules.llm.prediction_engine"] = {
 	consume                       = function() return nil, {} end,
 	handle_chain_signal           = function() return false end,
 	arm_chain                     = function() end,
-	stop_timer                    = function() end,
+	stop_timer                    = function() return true end,
 	start_timer                   = function() end,
 	start_timer_word_end          = function() end,
 	perform_check                 = function() end,

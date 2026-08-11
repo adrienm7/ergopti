@@ -70,10 +70,10 @@ helpers.describe("api_mlx_discovery.lua: discovery cycles carry a generation gua
 		helpers.assert_true(capture_pos ~= nil,
 			"M.discover() must capture local my_discovery_gen = _discovery_gen (F-MED-8)")
 
-		-- The first async dispatch in the function. Anything scheduled or posted
-		-- before the capture could complete against a generation that was never read.
+		-- The first poll-chain dispatch in the function. The cooldown has its own
+		-- captured generation; this assertion protects the cycle-local probe chain.
 		local first_async = nil
-		for _, needle in ipairs({ "TimerScheduler.after(0, do_poll", "http:post(", "HttpClient" }) do
+		for _, needle in ipairs({ 'schedule_poll(0, "initial")', "ShellRunner.spawn(", "_probe_client.post(" }) do
 			local at = src:find(needle, discover_pos, true)
 			if at and (not first_async or at < first_async) then first_async = at end
 		end

@@ -28,9 +28,6 @@ local function load_fixture()
 	}
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_tap_guard"] = {
-		handle_disabled = function() return false end,
-	}
 	package.loaded["infra.hotpath_profiler"] = {
 		now = function() return 0 end,
 		log_if_slow = function() end,
@@ -104,9 +101,9 @@ local function load_fixture()
 	local TooltipLLM = require("ui.tooltip.tooltip_llm")
 	local available = true
 	TooltipLLM.set_runtime_guard(function() return available end)
-	TooltipLLM.set_accept_callback(function() calls.accept = calls.accept + 1 end)
-	TooltipLLM.set_cancel_callback(function() calls.cancel = calls.cancel + 1 end)
-	TooltipLLM.set_navigate_callback(function() calls.navigate = calls.navigate + 1 end)
+	TooltipLLM.set_accept_callback(function() calls.accept = calls.accept + 1; return true end)
+	TooltipLLM.set_cancel_callback(function() calls.cancel = calls.cancel + 1; return true end)
+	TooltipLLM.set_navigate_callback(function() calls.navigate = calls.navigate + 1; return true end)
 
 	local function restore()
 		hs.eventtap.new = previous_eventtap_new

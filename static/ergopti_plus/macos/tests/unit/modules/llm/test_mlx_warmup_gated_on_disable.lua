@@ -224,7 +224,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			set_llm_model_ollama    = function(_) end,
 			set_runtime_llm_enabled = function(_) end,
 			set_llm_streaming       = function(_) end,
-			cancel_streaming        = function() end,
+			cancel_streaming        = function() return true end,
 			is_backend_ready        = function() return false end,
 			get_active_profile      = function() return nil end,
 			fetch_llm_prediction    = function(...) end,
@@ -237,8 +237,8 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		package.loaded["modules.llm.streaming_handler"] = {
 			init = function(_) end,
 			build_callbacks = function(_) return function() end, function() end, function() end end,
-			arm_watchdog = function(_) end, stop_watchdog = function() end,
-			reset_failure_count = function() end, cancel_streaming = function() end,
+			arm_watchdog = function(_) return true end, stop_watchdog = function() return true end,
+			reset_failure_count = function() end, cancel_streaming = function() return true end,
 		}
 		package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
 		package.loaded["modules.llm.api_common"] = {
@@ -249,11 +249,11 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		package.loaded["ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
-			set_chain_start = function(_) end, mark_chain_complete = function() end,
+			set_chain_start = function(_) return true end, mark_chain_complete = function() return true end,
 			get_current_index = function() return nil end, navigate = function(_) end,
-			show = function() end, hide = function() end, hide_forced = function() end,
+			show = function() end, hide = function() return true end, hide_forced = function() return true end,
 			set_llm_timeout = function(_) end, reset_llm_timer = function() end,
-			show_loading = function() end, show_predictions = function() end,
+			show_loading = function() return true end, show_predictions = function() return true end,
 			tint = function(_) return nil end,
 		}
 		package.loaded["modules.keylogger"] = {

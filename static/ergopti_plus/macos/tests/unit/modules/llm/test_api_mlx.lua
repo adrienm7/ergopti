@@ -16,6 +16,15 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 
+local function get_upvalue(fn, target)
+	for index = 1, 64 do
+		local name, value = debug.getupvalue(fn, index)
+		if not name then break end
+		if name == target then return value end
+	end
+	return nil
+end
+
 
 
 
@@ -56,6 +65,49 @@ helpers.describe("ApiMlx module surface", function()
 	end)
 
 	helpers.it("cancel_streaming is a no-op when nothing is in flight", function()
-		ApiMlx.cancel_streaming()
+		helpers.assert_eq(ApiMlx.cancel_streaming(), true)
+	end)
+
+	helpers.it("retains a timeout whose native cancellation failed", function()
+		local stream = get_upvalue(ApiMlx.cancel_streaming, "_stream")
+		local scheduler = get_upvalue(ApiMlx.cancel_streaming, "TimerScheduler")
+		helpers.assert_not_nil(stream)
+		helpers.assert_not_nil(scheduler)
+		local previous_cancel = scheduler.cancel
+		local handle = { timer = {} }
+		stream.timeout = handle
+		stream.task = nil
+		scheduler.cancel = function(candidate)
+			helpers.assert_eq(candidate, handle)
+			return false
+		end
+
+		helpers.assert_eq(ApiMlx.cancel_streaming(), false)
+		helpers.assert_eq(stream.timeout, handle,
+			"a failed stop must retain the exact timer capability for retry")
+		scheduler.cancel = function() return true end
+		helpers.assert_eq(ApiMlx.cancel_streaming(), true)
+		helpers.assert_eq(stream.timeout, nil)
+		scheduler.cancel = previous_cancel
+	end)
+
+	helpers.it("retains a task whose native termination raises, then retries it", function()
+		local stream = get_upvalue(ApiMlx.cancel_streaming, "_stream")
+		local calls = 0
+		local task = {
+			terminate = function()
+				calls = calls + 1
+				error("native terminate failed")
+			end,
+		}
+		stream.timeout = nil
+		stream.task = task
+		helpers.assert_eq(ApiMlx.cancel_streaming(), false)
+		helpers.assert_eq(stream.task, task)
+
+		task.terminate = function() calls = calls + 1; return true end
+		helpers.assert_eq(ApiMlx.cancel_streaming(), true)
+		helpers.assert_eq(stream.task, nil)
+		helpers.assert_eq(calls, 2)
 	end)
 end)
