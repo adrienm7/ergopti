@@ -132,8 +132,8 @@ end
 
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
-	-- MenuPaths was already initialized by init.lua before menu.start() is called;
-	-- call init() again only as a no-op safety net in case of standalone testing.
+	-- init.lua initializes only the resolver. The editor owns its reload callback
+	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
 	end
@@ -786,7 +786,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() set_all_enabled(true) end,
 		disable_all               = function() set_all_enabled(false) end,
 		reset_defaults            = function() reset_all_defaults() end,
-		open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		open_paths                = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
 		reload                    = function() do_reload("menu") end,
 		quit                      = function()
 			local exit_requested = false
@@ -818,7 +818,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_console              = function() pcall(hs.openConsole) end,
-		open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		open_paths_editor         = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end
