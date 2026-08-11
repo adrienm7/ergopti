@@ -22,8 +22,10 @@
 --- 3. Resolution works BEFORE init(). Modules requiring this during their own
 ---    load — keylogger's init IIFE among them — must still get the
 ---    user-configured directory, so the default is computed at module load and
----    paths.toml is lazy-read on first use. init() only overrides the base
----    directory and creates what is missing.
+---    paths.toml is lazy-read on first use. A packaged launch exports its stable
+---    user-writable bootstrap path; source-tree launches retain the adjacent
+---    development file. init() only overrides the base directory and creates
+---    what is missing.
 --- 4. The failure mode this file exists to avoid is not a crash. A wrong-depth
 ---    path resolves to a directory that EXISTS and holds nothing, the write
 ---    succeeds against the wrong place, and nothing is logged. Five separate
@@ -53,15 +55,27 @@ local LOG        = "config_paths"
 
 
 
--- Bootstrap file, next to init.lua (gitignored).
+-- Bootstrap filename. In source-tree mode it remains next to init.lua
+-- (gitignored); the packaged launcher exports a stable user-writable path because
+-- its init.lua lives inside the signed application resources.
 local PATHS_FILENAME = "paths.toml"
+
+-- Exact path exported by the native packaged launcher. Ignore a missing,
+-- relative, or empty inherited value so standalone Hammerspoon development keeps
+-- using the source-adjacent bootstrap and never writes through an ambiguous cwd.
+local MANAGED_PATHS_ENV = "ERGOPTI_PATHS_FILE"
+local _managed_paths_file = os.getenv(MANAGED_PATHS_ENV)
+if type(_managed_paths_file) ~= "string"
+		or _managed_paths_file == ""
+		or _managed_paths_file:sub(1, 1) ~= "/" then
+	_managed_paths_file = nil
+end
 
 -- The single key stored in paths.toml.
 local CONFIG_DIR_KEY = "ConfigDirPath"
 
--- Driver root (where paths.toml lives) — derived at module-load time from this
--- file's own path so that get_config_dir() can read paths.toml even before
--- M.init() has been called. M.init() may override this later.
+-- Driver root — derived at module-load time so standalone source-tree launches
+-- can read their adjacent paths.toml before M.init(). M.init() may override it.
 local _src      = debug.getinfo(1, "S").source:sub(2)
 local _base_dir = (_src:match("^(.*[/\\])") or "./"):gsub("infra[/\\]$", "")
 
@@ -107,6 +121,14 @@ local _ensured_dirs = {}
 --- Returns the absolute path to paths.toml.
 --- @return string
 local function paths_file()
+	return _managed_paths_file or ((_base_dir or "") .. PATHS_FILENAME)
+end
+
+--- Returns the legacy source-adjacent bootstrap path. Packaged builds prior to
+--- the managed-path contract could leave an override here when run from a
+--- writable location; it is read once for migration, never preferred for writes.
+--- @return string
+local function legacy_paths_file()
 	return (_base_dir or "") .. PATHS_FILENAME
 end
 
@@ -125,6 +147,35 @@ local function parse_toml(content)
 	return result
 end
 
+--- Reads and parses one bootstrap file.
+--- @param path string Absolute paths.toml path.
+--- @return table|nil bootstrap Parsed table, or nil when absent/unreadable.
+local function read_bootstrap(path)
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local raw = fh:read("*a")
+	fh:close()
+	if type(raw) ~= "string" then return nil end
+	return parse_toml(raw)
+end
+
+--- Loads the primary bootstrap, falling back to the adjacent legacy file only
+--- when a packaged launcher selected a different stable path.
+--- @return table|nil bootstrap
+--- @return string|nil source_path
+local function load_bootstrap()
+	local primary = paths_file()
+	local parsed = read_bootstrap(primary)
+	if parsed then return parsed, primary end
+
+	local legacy = legacy_paths_file()
+	if _managed_paths_file and legacy ~= primary then
+		parsed = read_bootstrap(legacy)
+		if parsed then return parsed, legacy end
+	end
+	return nil, nil
+end
+
 --- Returns the resolved config directory (with trailing slash).
 --- Falls back to ~/.config/ergopti_plus/ when no override is set. Lazy-loads
 --- paths.toml on first call so that modules requiring this before init() still
@@ -132,13 +183,7 @@ end
 --- @return string
 local function config_dir()
 	if _bootstrap == nil then
-		_bootstrap = {}
-		local fh = io.open(paths_file(), "r")
-		if fh then
-			local raw = fh:read("*a")
-			fh:close()
-			_bootstrap = parse_toml(raw)
-		end
+		_bootstrap = load_bootstrap() or {}
 	end
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then return v end
@@ -320,18 +365,25 @@ function M.init(base_dir)
 	end
 	_base_dir = base_dir
 	ensure_dir(_base_dir)
+	if _managed_paths_file then
+		ensure_dir(paths_file():match("^(.*[/\\])") or "")
+	end
 
-	-- Read paths.toml, creating a commented template when absent.
-	local fh = io.open(paths_file(), "r")
-	if not fh then
+	-- Read paths.toml, migrating an adjacent legacy override when present, or
+	-- creating a commented template when neither location exists.
+	local loaded, source_path = load_bootstrap()
+	if not loaded then
 		Logger.info(LOG, "paths.toml not found — generating with defaults at '%s'.", paths_file())
 		_bootstrap = {}
 		save_bootstrap()
 	else
-		local raw = fh:read("*a")
-		fh:close()
-		_bootstrap = parse_toml(raw)
-		Logger.debug(LOG, "Paths loaded from '%s'.", paths_file())
+		_bootstrap = loaded
+		if source_path ~= paths_file() then
+			Logger.info(LOG, "Migrating paths from '%s' to '%s'.", source_path, paths_file())
+			save_bootstrap()
+		else
+			Logger.debug(LOG, "Paths loaded from '%s'.", source_path)
+		end
 	end
 
 	-- Only create the default fallback directory when no custom path is

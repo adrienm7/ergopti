@@ -51,6 +51,16 @@ let kErgoptiBundleId = "com.ergoptiplus.app"
 // MJConfigDir is a community myth — variables.m uses MJConfigFile exclusively.
 let kHammerspoonConfigKey = "MJConfigFile"
 
+/// Stable user-writable bootstrap file used by the bundled Lua resolver.
+/// The Lua source itself lives inside signed application resources, so deriving
+/// paths.toml from MJConfigFile would make every first-run write target the app
+/// bundle and lose the override across replacements.
+/// - Parameter homeDirectory: Current user's Foundation home directory.
+/// - Returns: Absolute path exported to the embedded Hammerspoon process.
+func managedPathsFile(homeDirectory: String = NSHomeDirectory()) -> String {
+	return homeDirectory + "/Library/Application Support/ErgoptiPlus/paths.toml"
+}
+
 /// Returns the inherited child environment with the exact live launcher
 /// identity replacing any stale values inherited from an ancestor process.
 /// - Parameters:
@@ -535,6 +545,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
+		env["ERGOPTI_PATHS_FILE"]             = managedPathsFile()
 		env["ERGOPTI_KARABINER_INSTALLER"]    = bundledKarabinerInstallerPath()
 		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath

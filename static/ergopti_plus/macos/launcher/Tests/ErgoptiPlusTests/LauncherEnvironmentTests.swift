@@ -14,6 +14,8 @@
 // 3. Environment preservation: unrelated child configuration survives unchanged.
 // 4. Fail-fast identity: a missing device/inode proof reaches the fatal path
 //    before the embedded Hammerspoon child runner can execute.
+// 5. Writable bootstrap: the packaged Lua child receives a stable paths.toml
+//    location outside the signed application resources.
 //
 // NOTE: This target requires the macOS Swift toolchain. Verify with
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
@@ -106,6 +108,26 @@ final class LauncherEnvironmentTests: XCTestCase {
 			childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"],
 			"requires_approval"
 		)
+	}
+
+	/// paths.toml must survive app replacement and remain writable in /Applications.
+	func testManagedBootstrapPathIsOutsideTheBundleAndExported() {
+		XCTAssertEqual(
+			managedPathsFile(homeDirectory: "/Users/test"),
+			"/Users/test/Library/Application Support/ErgoptiPlus/paths.toml"
+		)
+
+		var childEnvironment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			processRunner: { process in childEnvironment = process.environment ?? [:] }
+		)
+		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+
+		let exported = childEnvironment["ERGOPTI_PATHS_FILE"]
+		XCTAssertEqual(exported, managedPathsFile())
+		XCTAssertFalse(exported?.contains(".app/Contents/") ?? true,
+			"the managed bootstrap must never resolve inside signed app resources")
 	}
 
 	/// The composed startup cannot create the child before registration resolves.
