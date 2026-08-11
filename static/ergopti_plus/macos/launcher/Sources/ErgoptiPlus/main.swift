@@ -101,13 +101,56 @@ func launcherExecutableFileIdentity(
 // just doesn't start" gave us nothing to go on. LauncherLog appends a
 // timestamped line to a small on-disk file next to every NSAlert/failure path
 // (and a few success milestones) so a post-mortem is always possible.
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+let kLauncherLogAppendTestFlag = "--launcher-log-append-test"
+#endif
+
+/// Writes every byte through one injectable POSIX operation. Retrying EINTR and
+/// advancing after a short write prevents a diagnostic from becoming a torn
+/// record merely because the kernel accepted only a prefix.
+/// - Parameters:
+///   - data: Complete UTF-8 log record.
+///   - descriptor: Already-open append-only regular-file descriptor.
+///   - writeOperation: POSIX write boundary, injectable for deterministic tests.
+/// - Returns: Whether every byte reached the kernel.
+func writeLauncherLogData(
+	_ data: Data,
+	descriptor: Int32,
+	writeOperation: (
+		Int32,
+		UnsafeRawPointer?,
+		Int
+	) -> Int = { Darwin.write($0, $1, $2) }
+) -> Bool {
+	return data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Bool in
+		guard let base = bytes.baseAddress else { return data.isEmpty }
+		var offset = 0
+		while offset < bytes.count {
+			let written = writeOperation(
+				descriptor,
+				base.advanced(by: offset),
+				bytes.count - offset
+			)
+			if written > 0 {
+				offset += written
+				continue
+			}
+			if written == -1 && errno == EINTR { continue }
+			return false
+		}
+		return true
+	}
+}
+
 enum LauncherLog {
 	// Standard macOS per-app log location; readable by the user without special
 	// permissions and rotated by nothing — kept deliberately tiny (one line per
 	// launch event) so unbounded growth is not a practical concern.
 	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
-	private static let logPath = logDirectory + "/launcher.log"
+	private static let logFileName = "launcher.log"
 	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
+	private static let lockTimeoutSeconds: TimeInterval = 0.25
+	private static let lockRetryMicroseconds: useconds_t = 1_000
 
 	private static let dateFormatter: DateFormatter = {
 		let f = DateFormatter()
@@ -119,29 +162,138 @@ enum LauncherLog {
 	/// Best-effort: a logging failure must never prevent the launcher from
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {
-		queue.sync { writeUnlocked(message) }
+		queue.sync {
+			_ = writeUnlocked(message, directoryPath: logDirectory)
+		}
 	}
 
-	private static func writeUnlocked(_ message: String) {
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Exercises the production append path in a private SwiftPM subprocess.
+	/// Release builds expose no caller-controlled logging destination.
+	static func writeForTesting(
+		_ message: String,
+		directoryPath: String,
+		beforeLock: (() -> Void)? = nil
+	) -> Bool {
+		guard isValidTestLogDirectory(directoryPath) else { return false }
+		return queue.sync {
+			writeUnlocked(
+				message,
+				directoryPath: directoryPath,
+				beforeLock: beforeLock
+			)
+		}
+	}
+
+	/// Restricts the debug-only path override to one owned 0700 temp directory.
+	static func isValidTestLogDirectory(_ directoryPath: String) -> Bool {
+		guard directoryPath.hasPrefix("/") else { return false }
+		let temporaryRoot = FileManager.default.temporaryDirectory
+			.standardizedFileURL
+			.resolvingSymlinksInPath()
+		let candidate = URL(fileURLWithPath: directoryPath, isDirectory: true)
+			.standardizedFileURL
+		let resolvedCandidate = candidate.resolvingSymlinksInPath()
+		let rootPrefix = temporaryRoot.path.hasSuffix("/")
+			? temporaryRoot.path
+			: temporaryRoot.path + "/"
+		guard resolvedCandidate.path.hasPrefix(rootPrefix),
+			candidate.lastPathComponent.hasPrefix("ergopti-launcher-log-")
+		else { return false }
+
+		var attributes = stat()
+		return candidate.path.withCString({ Darwin.lstat($0, &attributes) }) == 0
+			&& (attributes.st_mode & S_IFMT) == S_IFDIR
+			&& (attributes.st_mode & 0o777) == 0o700
+			&& attributes.st_uid == geteuid()
+	}
+	#endif
+
+	/// Opens one exact user-owned directory without following its final component.
+	private static func openLogDirectory(_ directoryPath: String) -> Int32 {
+		// Another launcher role may win the create race. The descriptor-based
+		// validation below is authoritative, so an EEXIST-style error is harmless.
+		try? FileManager.default.createDirectory(
+			atPath: directoryPath,
+			withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700]
+		)
+
+		let descriptor = Darwin.open(
+			directoryPath,
+			O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
+		)
+		guard descriptor >= 0 else { return -1 }
+		var attributes = stat()
+		guard Darwin.fstat(descriptor, &attributes) == 0,
+			(attributes.st_mode & S_IFMT) == S_IFDIR,
+			attributes.st_uid == geteuid(),
+			Darwin.fchmod(descriptor, S_IRWXU) == 0
+		else {
+			Darwin.close(descriptor)
+			return -1
+		}
+		return descriptor
+	}
+
+	/// Opens only `launcher.log` relative to the already-validated directory.
+	private static func openLogFile(directoryDescriptor: Int32) -> Int32 {
+		let descriptor = logFileName.withCString { name in
+			Darwin.openat(
+				directoryDescriptor,
+				name,
+				O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK,
+				S_IRUSR | S_IWUSR
+			)
+		}
+		guard descriptor >= 0 else { return -1 }
+		var attributes = stat()
+		guard Darwin.fstat(descriptor, &attributes) == 0,
+			(attributes.st_mode & S_IFMT) == S_IFREG,
+			attributes.st_uid == geteuid(),
+			attributes.st_nlink == 1,
+			Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0
+		else {
+			Darwin.close(descriptor)
+			return -1
+		}
+		return descriptor
+	}
+
+	/// Takes a bounded advisory lock so partial writes from two processes cannot
+	/// interleave. A stopped writer can delay diagnostics by at most 250 ms.
+	private static func acquireLogLock(_ descriptor: Int32) -> Bool {
+		let deadline = ProcessInfo.processInfo.systemUptime + lockTimeoutSeconds
+		while true {
+			if Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0 { return true }
+			let lockError = errno
+			guard lockError == EINTR || lockError == EAGAIN || lockError == EWOULDBLOCK,
+				ProcessInfo.processInfo.systemUptime < deadline
+			else { return false }
+			if lockError != EINTR { usleep(lockRetryMicroseconds) }
+		}
+	}
+
+	@discardableResult
+	private static func writeUnlocked(
+		_ message: String,
+		directoryPath: String,
+		beforeLock: (() -> Void)? = nil
+	) -> Bool {
 		let timestamp = dateFormatter.string(from: Date())
 		let line = "[\(timestamp)] \(message)\n"
+		guard let data = line.data(using: .utf8) else { return false }
 
-		if !FileManager.default.fileExists(atPath: logDirectory) {
-			try? FileManager.default.createDirectory(
-				atPath: logDirectory, withIntermediateDirectories: true)
-		}
-
-		guard let data = line.data(using: .utf8) else { return }
-
-		if FileManager.default.fileExists(atPath: logPath) {
-			if let handle = FileHandle(forWritingAtPath: logPath) {
-				handle.seekToEndOfFile()
-				handle.write(data)
-				handle.closeFile()
-			}
-		} else {
-			try? data.write(to: URL(fileURLWithPath: logPath))
-		}
+		let directoryDescriptor = openLogDirectory(directoryPath)
+		guard directoryDescriptor >= 0 else { return false }
+		defer { Darwin.close(directoryDescriptor) }
+		let logDescriptor = openLogFile(directoryDescriptor: directoryDescriptor)
+		guard logDescriptor >= 0 else { return false }
+		defer { Darwin.close(logDescriptor) }
+		beforeLock?()
+		guard acquireLogLock(logDescriptor) else { return false }
+		defer { _ = Darwin.flock(logDescriptor, LOCK_UN) }
+		return writeLauncherLogData(data, descriptor: logDescriptor)
 	}
 }
 

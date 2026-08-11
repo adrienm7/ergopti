@@ -2568,7 +2568,10 @@ enum KarabinerLeaseWorker {
 	static func handles(arguments: [String]) -> Bool {
 		guard arguments.count > 1 else { return false }
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
-		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag { return true }
+		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag
+			|| arguments[1] == kLauncherLogAppendTestFlag {
+			return true
+		}
 		#endif
 		return arguments[1] == kKarabinerLeaseWorkerFlag
 			|| arguments[1] == kKarabinerLeaseRevokeFlag
@@ -2586,6 +2589,9 @@ enum KarabinerLeaseWorker {
 		prepareLeaseChildReaping()
 		_ = Darwin.signal(SIGPIPE, SIG_IGN)
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		if arguments[1] == kLauncherLogAppendTestFlag {
+			return runLauncherLogAppendTest(arguments: arguments)
+		}
 		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag {
 			guard arguments.count == 3,
 				let paths = validatedGuardianLifetimeTestPaths(arguments[2])
@@ -2658,4 +2664,64 @@ enum KarabinerLeaseWorker {
 		)
 		return runtime.run()
 	}
+
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Runs the production logger in a real cooperating SwiftPM process. One
+	/// READY byte precedes the one-byte START barrier so XCTest can align writers.
+	private static func runLauncherLogAppendTest(arguments: [String]) -> Int32 {
+		guard arguments.count == 6,
+			LauncherLog.isValidTestLogDirectory(arguments[2]),
+			isValidLogTestIdentifier(arguments[3]),
+			isValidLogTestIdentifier(arguments[4]),
+			let lineCount = Int(arguments[5]),
+			(1...512).contains(lineCount)
+		else { return LeaseWorkerExit.invalidArguments.rawValue }
+
+		var ready: UInt8 = 1
+		guard Darwin.write(STDOUT_FILENO, &ready, 1) == 1 else {
+			return LeaseWorkerExit.innerFailed.rawValue
+		}
+		var start: UInt8 = 0
+		var readCount: Int
+		repeat {
+			readCount = Darwin.read(STDIN_FILENO, &start, 1)
+		} while readCount == -1 && errno == EINTR
+		guard readCount == 1, start == 1 else {
+			return LeaseWorkerExit.invalidArguments.rawValue
+		}
+
+		let payload = String(repeating: "x", count: 2_048)
+		for index in 0..<lineCount {
+			let message = "MULTIPROCESS session=\(arguments[3]) "
+				+ "writer=\(arguments[4]) entry=\(index) payload=\(payload)"
+			var boundaryWriteSucceeded = true
+			let beforeLock: (() -> Void)? = index == 0 ? {
+				var boundary: UInt8 = 2
+				boundaryWriteSucceeded = Darwin.write(
+					STDOUT_FILENO,
+					&boundary,
+					1
+				) == 1
+			} : nil
+			guard LauncherLog.writeForTesting(
+				message,
+				directoryPath: arguments[2],
+				beforeLock: beforeLock
+			), boundaryWriteSucceeded
+			else { return LeaseWorkerExit.innerFailed.rawValue }
+		}
+		return LeaseWorkerExit.success.rawValue
+	}
+
+	/// Keeps test identifiers on one bounded ASCII log line.
+	private static func isValidLogTestIdentifier(_ value: String) -> Bool {
+		guard !value.isEmpty, value.utf8.count <= 64 else { return false }
+		return value.utf8.allSatisfy { byte in
+			(byte >= 48 && byte <= 57)
+				|| (byte >= 65 && byte <= 90)
+				|| (byte >= 97 && byte <= 122)
+				|| byte == 45
+		}
+	}
+	#endif
 }
