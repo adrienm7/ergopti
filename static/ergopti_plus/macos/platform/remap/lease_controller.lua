@@ -303,6 +303,19 @@ local function create_stop_barrier(on_done)
 	return barrier
 end
 
+--- Applies one aggregate Stop intent to every generation the resulting barrier
+--- will wait for. A failure fence that began before Stop must settle IDLE, not
+--- publish FAILED immediately before reporting the requested stopped state.
+--- @return boolean unsafe_retiring True while any captured fence is outstanding.
+local function mark_retiring_stop_requested()
+	local unsafe_retiring = false
+	for _, generation in pairs(_state.retiring) do
+		generation.stop_requested = true
+		if not generation.safe then unsafe_retiring = true end
+	end
+	return unsafe_retiring
+end
+
 local cancel_heartbeat_timer
 local cancel_heartbeat_retry_timer
 
@@ -1443,6 +1456,13 @@ function M.stop(reason, on_done)
 	end
 	local generation = _state.current
 	if not generation then
+		if not mark_retiring_stop_requested() then
+			local phase_changed = _state.last_phase ~= "idle"
+			_state.last_phase = "idle"
+			if phase_changed then
+				invoke_callback("lease.phase", _state.phase_listener, "idle", nil)
+			end
+		end
 		create_stop_barrier(on_done)
 		return true
 	end
@@ -1451,7 +1471,7 @@ function M.stop(reason, on_done)
 	_state.retiring[generation.token] = generation
 	_state.last_phase = "stopping"
 	set_phase(generation, "stopping", true)
-	generation.stop_requested = true
+	mark_retiring_stop_requested()
 	-- Snapshot every older retiring generation before any call below can settle
 	-- synchronously. The caller observes a system-wide Ergopti fence, not merely
 	-- the newest token's STOPPED line.
