@@ -114,6 +114,7 @@ local function with_remap(options, body)
 		exact_stop_deferred = nil,
 		remaining_layout_timer_failures = options.layout_timer_failures or 0,
 		layout_timer_arm_attempts = 0,
+		guardian_probe_calls = 0,
 	}
 
 	local function publish(phase, token)
@@ -350,6 +351,11 @@ local function with_remap(options, body)
 				return true
 			end,
 			refresh_liveness = function() return true end,
+			probe_guardian_status = function(callback)
+				calls.guardian_probe_calls = calls.guardian_probe_calls + 1
+				callback("ready")
+				return { terminate = function() return true end }
+			end,
 		}
 
 		local function make_handle(kind)
@@ -637,6 +643,8 @@ end
 --- @return string token
 local function activate_initial_generation(remap, calls)
 	helpers.assert_true(remap.regenerate())
+	helpers.assert_eq(calls.guardian_probe_calls, 1,
+		"bundled regeneration must cross one fresh guardian-ready proof")
 	local initial = calls.builds[#calls.builds]
 	helpers.assert_type(initial, "table")
 	helpers.assert_true(calls.deliver_all_ready(initial.token))
