@@ -16,6 +16,8 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local text_utils    = require("infra.text_utils")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}
@@ -142,20 +144,19 @@ function M.new(deps, presets, ram_getter)
 		local ollama_bin = get_ollama_path()
 		if not ollama_bin or ollama_bin == "" then return false end
 		
-		-- Launch daemon via bash nohup to ensure it survives subprocess termination,
-		-- and funnel its output into the unified Ergopti log with an
-		-- [OLLAMA-SERVER] prefix (single tail target for the whole stack).
-		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
-		-- lacks gawk's strftime() / fflush(file) builtins, so the previous
-		-- awk pipeline crashed on the first line and killed ollama on SIGPIPE.
-		local log_path = Logger.UNIFIED_LOG_FILE
-		local ok = pcall(hs.execute,
-			"nohup bash -c \"" .. ollama_bin .. " serve 2>&1 | " ..
-			"while IFS= read -r LINE; do " ..
-			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
-			">> " .. string.format("%q", log_path) .. "; " ..
-			"done\" &")
-		return ok == true
+		-- Launch daemon via bash nohup to ensure it survives subprocess termination.
+		-- The shared foreground pipeline uses a `while read` loop because macOS'
+		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
+		local launch_cmd, command_err = OllamaServerCommand.build(
+			ollama_bin, Logger.UNIFIED_LOG_FILE)
+		if not launch_cmd then
+			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
+			return false
+		end
+		local detached_cmd = "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
+			.. " </dev/null >/dev/null 2>&1 &"
+		local call_ok, _, command_ok = pcall(hs.execute, detached_cmd)
+		return call_ok == true and command_ok ~= false
 	end
 
 	--- Ensures the Ollama daemon is running, starts it otherwise.

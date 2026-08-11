@@ -22,6 +22,7 @@ local _check_client  = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local LOG            = "llm.api_ollama"
 
 -- Ollama bind address. The default port is the single source in
@@ -214,13 +215,14 @@ local function ensure_ollama_running()
 					_ollama_launch_timer = nil
 
 					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
-					-- [OLLAMA-SERVER] prefix so the user has one tail target.
-					local log_path = Logger.UNIFIED_LOG_FILE
-					local launch_cmd = "/opt/homebrew/bin/ollama serve 2>&1 | " ..
-						"while IFS= read -r LINE; do " ..
-						"printf '%s [OLLAMA-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
-						">> " .. text_utils.shell_quote(log_path) .. "; " ..
-						"done"
+					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
+					-- directory; its shell loop derives the dated filename for every line.
+					local launch_cmd, command_err = OllamaServerCommand.build(
+						"/opt/homebrew/bin/ollama", Logger.UNIFIED_LOG_FILE)
+					if not launch_cmd then
+						fail_start("server command creation", command_err)
+						return
+					end
 
 					local serve_handle
 					local serve_completed = false
