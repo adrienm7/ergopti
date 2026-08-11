@@ -13,6 +13,10 @@ local helpers = require("tests.helpers")
 
 local SYSTEM_DID_WAKE = 7
 local SCREENS_DID_UNLOCK = 8
+local LEASE_TOKENS = {
+	"00112233445566778899aabbccddeeff",
+	"102132435465768798a9babbdcddedef",
+}
 
 --- Loads platform.remap with observable collaborators and a retained wake callback.
 --- @param options table|nil Harness behavior overrides.
@@ -47,6 +51,10 @@ local function load_remap(options)
 		script_paused = options.paused == true,
 		activation_blocked = options.activation_blocked == true,
 		refresh_enters_recovery = options.refresh_enters_recovery == true,
+		lease_token = LEASE_TOKENS[1],
+		lease_token_index = 1,
+		resume_tokens = {},
+		stop_exact_tokens = {},
 	}
 
 	local function append(value)
@@ -128,17 +136,24 @@ local function load_remap(options)
 			return true
 		end,
 		token = function()
+			if options.model_exact_layout_fence and calls.lease_token == nil then
+				if calls.lease_phase ~= "idle" and calls.lease_phase ~= "failed" then return nil end
+				calls.lease_token_index = calls.lease_token_index + 1
+				calls.lease_token = LEASE_TOKENS[calls.lease_token_index]
+				helpers.assert_type(calls.lease_token, "string",
+					"test exhausted its fresh-token catalogue")
+			end
 			if calls.lease_phase == "idle" or calls.lease_phase == "failed" then
 				calls.lease_phase = "prepared"
 				if calls.phase_listener then calls.phase_listener("prepared") end
 			end
-			return "00112233445566778899aabbccddeeff"
+			return calls.lease_token
 		end,
 		status = function()
 			return calls.lease_phase, {
 				phase = calls.lease_phase,
 				token = (calls.lease_phase == "idle" or calls.lease_phase == "failed")
-					and nil or "00112233445566778899aabbccddeeff",
+					and nil or calls.lease_token,
 				activation_blocked = calls.activation_blocked,
 			}
 		end,
@@ -167,8 +182,10 @@ local function load_remap(options)
 			return true
 		end,
 		resume_prepared = function(token, on_done)
-			helpers.assert_eq(token, "00112233445566778899aabbccddeeff")
+			helpers.assert_eq(token, calls.lease_token,
+				"RESUME must name the exact current generation")
 			calls.lease_resume = calls.lease_resume + 1
+			calls.resume_tokens[#calls.resume_tokens + 1] = token
 			append("lease-resume")
 			calls.lease_phase = "resuming"
 			calls.lease_resume_callbacks[#calls.lease_resume_callbacks + 1] = on_done
@@ -179,7 +196,30 @@ local function load_remap(options)
 			calls.lease_stop_callbacks[#calls.lease_stop_callbacks + 1] = on_done
 			return true
 		end,
-		stop_exact = function() return true end,
+		stop_exact = function(token, _reason, on_done)
+			calls.stop_exact_tokens[#calls.stop_exact_tokens + 1] = token
+			if not options.model_exact_layout_fence then return true end
+			if calls.lease_phase == "stopping" and token == calls.lease_token then return true end
+			if token ~= calls.lease_token then
+				if on_done then on_done(true, "generation-gone") end
+				return true
+			end
+			calls.lease_phase = "stopping"
+			append("lease-stopping")
+			if calls.phase_listener then calls.phase_listener("stopping") end
+			local start_callbacks = calls.lease_start_callbacks
+			calls.lease_start_callbacks = {}
+			for _, callback in ipairs(start_callbacks) do callback(false, "lease-stopping") end
+			local resume_callbacks = calls.lease_resume_callbacks
+			calls.lease_resume_callbacks = {}
+			for _, callback in ipairs(resume_callbacks) do callback(false, "lease-stopping") end
+			calls.lease_token = nil
+			calls.lease_phase = "idle"
+			append("lease-idle")
+			if calls.phase_listener then calls.phase_listener("idle") end
+			if on_done then on_done(true, "stopped") end
+			return true
+		end,
 		pause = function(on_done)
 			calls.lease_pause = calls.lease_pause + 1
 			append("lease-pause")
@@ -189,6 +229,7 @@ local function load_remap(options)
 		end,
 		resume = function(on_done)
 			calls.lease_resume = calls.lease_resume + 1
+			calls.resume_tokens[#calls.resume_tokens + 1] = calls.lease_token
 			append("lease-resume")
 			calls.lease_phase = "resuming"
 			calls.lease_resume_callbacks[#calls.lease_resume_callbacks + 1] = on_done
@@ -681,27 +722,49 @@ helpers.describe("karabiner wake callback lifecycle", function()
 	end)
 
 	helpers.it("waits for both native ACTIVE and the script resume commit", function()
-		local remap, calls = load_remap({ initial_phase = "paused", paused = true })
+		local remap, calls = load_remap({
+			initial_phase = "paused",
+			paused = true,
+			model_exact_layout_fence = true,
+		})
 		local resume_results = {}
+		local stale_token = calls.lease_token
 		helpers.assert_true(remap.resume(function(ok, reason)
 			resume_results[#resume_results + 1] = { ok = ok, reason = reason }
 			if ok then calls.set_script_paused(false) end
 		end))
+		helpers.assert_eq(calls.resume_tokens[1], stale_token,
+			"the fixture must reach RESUMING on the pre-layout token")
 		reset_layout_observations(calls)
 
 		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
-		calls.latest_timer():fire()
-		calls.publish_phase("active")
-		local premature_replay = calls.latest_timer()
-		premature_replay:fire()
-		helpers.assert_eq(calls.resolve, 0,
-			"native ACTIVE alone must not consume a layout event before script-control commits")
+		helpers.assert_true(sequence_index(calls.stop_exact_tokens, stale_token) ~= nil,
+			"the layout event must fence the exact pre-layout generation")
+		helpers.assert_eq(calls.lease_phase, "idle",
+			"the retry must remain fail-closed until the TIS settle timer fires")
+		helpers.assert_eq(#resume_results, 0,
+			"fencing an internal stale attempt must preserve the public Resume intent")
+		local settle_timer = calls.latest_timer()
+		settle_timer:fire()
+		local fresh_token = calls.lease_token
+		helpers.assert_true(fresh_token ~= stale_token,
+			"post-TIS retry must own a fresh lease token")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(#resume_results, 0,
+			"a rebuilt PAUSED generation is not success before READY and RESUMED")
 
-		calls.deliver_resume_callbacks(true, "resumed")
+		calls.deliver_ready()
+		helpers.assert_eq(calls.resume_tokens[2], fresh_token,
+			"only the fresh post-TIS generation may receive the replacement RESUME")
+		helpers.assert_eq(#calls.resume_tokens, 2,
+			"the stale generation must never receive a second RESUME")
+		calls.deliver_resumed()
 		helpers.assert_eq(#resume_results, 1)
 		helpers.assert_true(resume_results[1].ok)
 		local committed_replay = calls.latest_timer()
-		helpers.assert_true(committed_replay ~= premature_replay)
+		helpers.assert_true(committed_replay ~= settle_timer)
 		helpers.assert_eq(committed_replay.delay, 0)
 		committed_replay:fire()
 		helpers.assert_eq(#resume_results, 1,
@@ -713,30 +776,48 @@ helpers.describe("karabiner wake callback lifecycle", function()
 	end)
 
 	helpers.it("retains a layout change until an enable transaction commits", function()
-		local remap, calls = load_remap({ enabled = false })
+		local remap, calls = load_remap({
+			enabled = false,
+			model_exact_layout_fence = true,
+		})
 		local enable_results = {}
+		local stale_token = calls.lease_token
 		helpers.assert_true(remap.set_enabled(true, function(ok, reason)
 			enable_results[#enable_results + 1] = { ok = ok, reason = reason }
 		end))
 		reset_layout_observations(calls)
 
 		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
-		calls.latest_timer():fire()
+		helpers.assert_true(sequence_index(calls.stop_exact_tokens, stale_token) ~= nil,
+			"the layout event must fence the exact pre-layout Enable generation")
+		helpers.assert_eq(calls.lease_phase, "idle")
+		helpers.assert_eq(#calls.resume_tokens, 0,
+			"the stale pre-layout generation must never receive RESUME")
+		helpers.assert_eq(#enable_results, 0,
+			"the internal exact fence must preserve the public Enable intent")
 		helpers.assert_eq(calls.resolve, 0,
-			"the previous disabled value must not consume work owned by an enable transaction")
-		calls.publish_phase("paused")
-		calls.latest_timer():fire()
-		helpers.assert_eq(calls.resolve, 0)
-		calls.deliver_start_callbacks(true, "ready-paused")
-		calls.publish_phase("active")
-		calls.latest_timer():fire()
-		helpers.assert_eq(calls.resolve, 0,
-			"ACTIVE publication precedes the enabled transaction commit callback")
+			"the private Enable retry must not read TIS before the settle timer")
+		local settle_timer = calls.latest_timer()
+		settle_timer:fire()
+		local fresh_token = calls.lease_token
+		helpers.assert_true(fresh_token ~= stale_token,
+			"post-TIS Enable retry must own a fresh lease token")
+		helpers.assert_eq(calls.resolve, 1)
+		helpers.assert_eq(calls.build, 1)
+		helpers.assert_eq(calls.deploy, 1)
+		helpers.assert_eq(#enable_results, 0)
 
-		calls.deliver_resume_callbacks(true, "resumed")
+		calls.deliver_ready()
+		helpers.assert_eq(calls.resume_tokens[1], fresh_token)
+		helpers.assert_eq(#enable_results, 0,
+			"pre-RESUME preference commit must not publish Enable success")
+		calls.deliver_resumed()
 		helpers.assert_eq(#enable_results, 1)
 		helpers.assert_true(enable_results[1].ok)
-		calls.latest_timer():fire()
+		local committed_replay = calls.latest_timer()
+		helpers.assert_true(committed_replay ~= settle_timer)
+		helpers.assert_eq(committed_replay.delay, 0)
+		committed_replay:fire()
 		helpers.assert_eq(#enable_results, 1,
 			"layout replay must not resettle the originating enable transaction")
 		helpers.assert_eq(calls.resolve, 1)
@@ -810,10 +891,14 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		calls.latest_timer():fire()
 		helpers.assert_eq(#disable_results, 1,
 			"rollback replay must not resettle the failed disable transaction")
-		helpers.assert_eq(calls.resolve, 1)
-		helpers.assert_eq(calls.build, 1)
-		helpers.assert_eq(calls.deploy, 1)
-		helpers.assert_eq(calls.rebind, 1)
+		helpers.assert_eq(calls.resolve, 0,
+			"the rollback already resolved the settled layout serial before this observation reset")
+		helpers.assert_eq(calls.build, 0,
+			"the committed rollback generation must suppress a duplicate layout build")
+		helpers.assert_eq(calls.deploy, 0,
+			"the committed rollback generation must suppress a duplicate config deployment")
+		helpers.assert_eq(calls.rebind, 1,
+			"the consumed rollback deployment still owes exactly one shortcut rebind")
 	end)
 
 	helpers.it("rejects a cancelled timer callback without erasing its replacement", function()
