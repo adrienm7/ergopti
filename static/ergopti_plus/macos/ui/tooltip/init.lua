@@ -14,6 +14,9 @@ local M = {}
 local Config          = require("ui.tooltip.config")
 local TooltipLLM      = require("ui.tooltip.tooltip_llm")
 local TooltipHotstring = require("ui.tooltip.tooltip_hotstring")
+local Logger          = require("infra.logger")
+
+local LOG = "tooltip"
 
 -- Callback fired when the tooltip transitions to visible state.
 -- Registered from llm_bridge to create the persistent Escape trap at HEAD.
@@ -27,6 +30,27 @@ local _runtime_guard = function() return true end
 local function runtime_available()
 	local ok, available = pcall(_runtime_guard)
 	return ok and available == true
+end
+
+--- Publishes a completed show only after its external ownership callback runs.
+--- A failed Escape-trap arm leaves visible pixels with no matching interaction
+--- owner, so revoke both surfaces rather than reporting a partial success.
+--- @param shown boolean Whether the concrete tooltip owner committed its show.
+--- @return boolean published True when the full facade transition committed.
+local function publish_show(shown)
+	if shown ~= true then return false end
+	if not _on_show_callback then return true end
+	local callback_ok, callback_err = xpcall(_on_show_callback, debug.traceback)
+	if callback_ok then return true end
+
+	Logger.error(LOG, "Tooltip on-show callback raised: %s. Visible surface revoked.",
+		tostring(callback_err))
+	local cleanup_ok, cleanup_result = xpcall(M.hide_forced, debug.traceback)
+	if not cleanup_ok or cleanup_result ~= true then
+		Logger.error(LOG, "Tooltip on-show failure cleanup did not commit (result: %s).",
+			tostring(cleanup_result))
+	end
+	return false
 end
 
 
@@ -126,8 +150,7 @@ end
 function M.show(content, is_llm_origin, is_enabled, background_color)
 	if TooltipLLM.hide() ~= true then return false end
 	local shown = TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color) == true
-	if shown and _on_show_callback then pcall(_on_show_callback) end
-	return shown
+	return publish_show(shown)
 end
 
 --- Displays a stacked multi-row tooltip for hotstring previews.
@@ -137,8 +160,7 @@ end
 function M.show_stacked(rows, is_enabled)
 	if TooltipLLM.hide() ~= true then return false end
 	local shown = TooltipHotstring.show_stacked(rows, is_enabled) == true
-	if shown and _on_show_callback then pcall(_on_show_callback) end
-	return shown
+	return publish_show(shown)
 end
 
 --- Displays a persistent loading indicator that will not auto-dismiss.
@@ -151,8 +173,7 @@ function M.show_loading(content, is_enabled, background_color)
 	if not runtime_available() then return false end
 	if TooltipLLM.hide() ~= true then return false end
 	local shown = TooltipHotstring.show_loading(content, is_enabled, background_color) == true
-	if shown and _on_show_callback then pcall(_on_show_callback) end
-	return shown
+	return publish_show(shown)
 end
 
 --- Displays AI predictions with interactive navigation (LLM mode).
@@ -175,8 +196,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
 		max_reserved_count) == true
 	if not shown then TooltipHotstring.hide_forced() end
-	if shown and _on_show_callback then pcall(_on_show_callback) end
-	return shown
+	return publish_show(shown)
 end
 
 function M.navigate(delta)
