@@ -1425,6 +1425,140 @@ helpers.describe("karabiner lease controller: generation isolation", function()
 		helpers.assert_eq(ctx.spawns[3].args[1], "--karabiner-lease-worker")
 	end)
 
+	helpers.it("publishes IDLE before stopping an already-safe FAILED controller", function()
+		local controller, ctx = load_controller()
+		local phases = {}
+		controller.init(function(phase, token)
+			phases[#phases + 1] = { phase = phase, token = token }
+		end)
+		local failed_variables = controller.variables()
+		ctx.next_start_result = false
+		helpers.assert_true(controller.start() == false)
+		helpers.assert_eq(controller.status(), "failed")
+		local spawn_count = #ctx.spawns
+		local timer_count = #ctx.timers
+		local callback_calls = 0
+		local callback_ok, callback_reason, callback_phase = nil, nil, nil
+
+		helpers.assert_true(controller.stop("shutdown safe failure", function(ok, reason)
+			callback_calls = callback_calls + 1
+			callback_ok = ok
+			callback_reason = reason
+			callback_phase = controller.status()
+		end))
+
+		helpers.assert_eq(callback_calls, 1,
+			"an empty aggregate barrier must settle synchronously exactly once")
+		helpers.assert_true(callback_ok == true)
+		helpers.assert_eq(callback_reason, "already-stopped")
+		helpers.assert_eq(callback_phase, "idle",
+			"successful STOP proof must be public before a teardown callback re-enters")
+		helpers.assert_eq(controller.status(), "idle")
+		helpers.assert_eq(phases[#phases].phase, "idle")
+		helpers.assert_nil(phases[#phases].token)
+		helpers.assert_eq(#ctx.spawns, spawn_count)
+		helpers.assert_eq(#ctx.timers, timer_count)
+		helpers.assert_eq(#ctx.spawns[1].inputs, 0)
+		helpers.assert_nil(find_native_revoke(ctx, failed_variables),
+			"normalizing a proven-safe failure must not launch another helper")
+	end)
+
+	helpers.it("publishes IDLE before a stop joined to an in-flight failure fence", function()
+		local controller, ctx = load_controller()
+		local phases = {}
+		controller.init(function(phase, token)
+			phases[#phases + 1] = { phase = phase, token = token }
+		end)
+		local failed_variables = controller.variables()
+		controller.start()
+		ctx.chunk(1, "READY\n")
+		ctx.chunk(1, "UNKNOWN_AFTER_READY\n")
+		helpers.assert_eq(controller.status(), "fencing")
+		local exact_revoke = find_native_revoke(ctx, failed_variables)
+		helpers.assert_eq(exact_revoke, ctx.spawns[2])
+		helpers.assert_eq(exact_revoke.args[3], failed_variables.mode)
+		helpers.assert_eq(exact_revoke.args[4], failed_variables.revoked)
+		local spawn_count = #ctx.spawns
+		local callback_calls = 0
+		local callback_ok, callback_reason, callback_phase = nil, nil, nil
+		local callback_publication = nil
+
+		helpers.assert_true(controller.stop("shutdown during failure fence", function(ok, reason)
+			callback_calls = callback_calls + 1
+			callback_ok = ok
+			callback_reason = reason
+			callback_phase = controller.status()
+			callback_publication = phases[#phases]
+		end))
+		helpers.assert_eq(callback_calls, 0,
+			"accepted FENCING is not yet proof that teardown is safe")
+		helpers.assert_eq(#ctx.spawns, spawn_count,
+			"joining an exact fence must not launch or signal a generic Karabiner process")
+		helpers.assert_eq(#ctx.spawns[1].inputs, 0,
+			"joining FENCING must not send a second transport command")
+
+		ctx.complete(2, 0, "")
+		helpers.assert_eq(callback_calls, 1)
+		helpers.assert_true(callback_ok == true)
+		helpers.assert_eq(callback_reason, "fallback-revoked")
+		helpers.assert_eq(callback_phase, "idle",
+			"the aggregate fence must publish the explicit Stop intent before its callback")
+		helpers.assert_eq(callback_publication.phase, "idle",
+			"lease consumers must receive IDLE before the teardown callback re-enters")
+		helpers.assert_eq(controller.status(), "idle")
+		ctx.complete(2, 0, "")
+		helpers.assert_eq(callback_calls, 1,
+			"a duplicate native completion must not re-settle the Stop callback")
+		helpers.assert_eq(#ctx.spawns, spawn_count,
+			"late completions must remain confined to the captured exact revoker")
+	end)
+
+	helpers.it("applies aggregate Stop intent to every simultaneous retiring generation", function()
+		local controller, ctx = load_controller()
+		local phases = {}
+		controller.init(function(phase, token)
+			phases[#phases + 1] = { phase = phase, token = token }
+		end)
+
+		local first = controller.variables()
+		controller.start()
+		ctx.chunk(1, "READY\n")
+		controller.stop("retire first generation")
+		local second = controller.variables()
+		controller.start()
+		ctx.chunk(2, "READY\n")
+		ctx.chunk(2, "BROKEN_REPLACEMENT\n")
+		helpers.assert_eq(controller.status(), "fencing")
+		helpers.assert_true(first.token ~= second.token)
+		helpers.assert_eq(find_native_revoke(ctx, second), ctx.spawns[3])
+		local spawn_count = #ctx.spawns
+		local callback_calls = 0
+		local callback_phase = nil
+
+		helpers.assert_true(controller.stop("aggregate shutdown", function(ok)
+			callback_calls = callback_calls + 1
+			helpers.assert_true(ok == true)
+			callback_phase = controller.status()
+		end))
+		helpers.assert_eq(callback_calls, 0)
+		helpers.assert_eq(#ctx.spawns, spawn_count)
+		helpers.assert_eq(ctx.spawns[1].inputs[#ctx.spawns[1].inputs], "STOP\n")
+		helpers.assert_eq(#ctx.spawns[2].inputs, 0,
+			"joining the failed replacement must not send an unfenced generic STOP")
+
+		ctx.chunk(1, "STOPPED\n")
+		helpers.assert_eq(callback_calls, 0,
+			"the first retiree cannot outrun the replacement's exact fallback")
+		ctx.complete(3, 0, "")
+		helpers.assert_eq(callback_calls, 1)
+		helpers.assert_eq(callback_phase, "idle",
+			"the final failed retiree must inherit the aggregate Stop intent")
+		helpers.assert_eq(phases[#phases].phase, "idle")
+		helpers.assert_eq(controller.status(), "idle")
+		helpers.assert_eq(#ctx.spawns, spawn_count,
+			"aggregate settlement must stay exact-token-only across both retirees")
+	end)
+
 	helpers.it("accepts a broken STOP channel but settles only after fallback fencing", function()
 		local controller, ctx = load_controller()
 		controller.init()

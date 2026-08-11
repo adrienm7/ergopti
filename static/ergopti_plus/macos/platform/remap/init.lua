@@ -3118,9 +3118,9 @@ function M.pause(on_done)
 			invoke_public_callback("pause", on_done, stopped == true,
 				stopped == true and "already-fail-closed" or reason)
 			if stopped == true then
-				-- FAILED is published before aggregate stop-barrier callbacks. It may
-				-- have briefly armed a replacement while script_control was still
-				-- committing this pause; the accepted user intent wins afterwards.
+				-- Aggregate Stop publishes IDLE before this callback. Also cancel any
+				-- recovery armed by an earlier FAILED publication: the accepted user
+				-- pause remains the newest intent after the joined fence.
 				cancel_lease_recovery("script-pause-committed-after-fence")
 			end
 			replay_pending_layout_refresh()
