@@ -22,30 +22,30 @@ local helpers = require("tests.helpers")
 helpers.describe("tooltip: a failed render does not leave the tooltip 'visible'", function()
 
 	helpers.it("rolls the visibility claim back when render_stacked throws", function()
-		local src = helpers.read_driver_source("Crash during stacked tooltip rendering")
-		helpers.assert_true(type(src) == "string" and src ~= "",
-			"the tooltip source must be readable or this asserts nothing")
-		-- Two files carry this phrase and the concatenated blob orders them
-		-- arbitrarily, so a single find() lands in whichever came first — which is
-		-- how an earlier version of this assertion passed against the unfixed code.
-		-- Every occurrence's own block is checked, and at least one must withdraw
-		-- the claim.
-		local found_rollback = false
-		local pos = 1
-		while true do
-			local at = src:find("Crash during stacked tooltip rendering", pos, true)
-			if not at then break end
-			local block_end = src:find("\n\tend\n", at, true) or (at + 600)
-			if src:sub(at, block_end):find("is_visible = false", 1, true) then
-				found_rollback = true
-				break
-			end
-			pos = at + 1
-		end
-		helpers.assert_true(found_rollback,
-			"is_visible is set optimistically before the render; if the render throws the "
-			.. "claim must be withdrawn INSIDE that failure branch, or the Escape trap "
-			.. "swallows Escape for a tooltip that is not on screen")
+		helpers.load_with_stubs("ui.tooltip.config")
+		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_tap_guard"] = nil
+		local renderer
+		renderer = {
+			standard_hidden = false,
+			stacked_hidden = false,
+			render_stacked = function() error("simulated stacked canvas failure") end,
+			hide = function() renderer.standard_hidden = true end,
+			hide_stacked = function() renderer.stacked_hidden = true end,
+		}
+		package.loaded["ui.tooltip.renderer"] = renderer
+		package.loaded["ui.tooltip.tooltip_hotstring"] = nil
+		local Tooltip = require("ui.tooltip.tooltip_hotstring")
+
+		local shown = Tooltip.show_stacked({ { text = "preview" } }, true)
+
+		helpers.assert_eq(shown, false,
+			"a swallowed stacked-render exception must fail the transaction")
+		helpers.assert_true(not Tooltip.is_visible(),
+			"a failed render must withdraw the logical visibility claim")
+		helpers.assert_true(renderer.standard_hidden and renderer.stacked_hidden,
+			"a failed render must close both physical canvas layers")
 	end)
 
 end)

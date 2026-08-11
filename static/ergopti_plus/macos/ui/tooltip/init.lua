@@ -59,23 +59,34 @@ function M.set_colorization_enabled(enabled) Config.set_colorization_enabled(ena
 --- Respects the hotstring dequeue guard: if a stacked multi-row tooltip is
 --- currently cycling through its rows, mouse/scroll events are ignored so
 --- longer-lived rows survive past the first row's expiry deadline.
+--- @return boolean True when both owners are stopped or safely guarded.
 function M.hide()
-	TooltipLLM.hide()
-	TooltipHotstring.hide()
+	local llm_hidden = TooltipLLM.hide() == true
+	local hotstring_hidden = TooltipHotstring.hide() == true
+	return llm_hidden and hotstring_hidden
 end
 
 --- Bypasses all guards and hides both tooltip types immediately.
 --- Use for keyboard-triggered dismissals or when the caller needs an
 --- authoritative hide regardless of any active dequeue cycle.
+--- @return boolean True when both owners are verified stopped.
 function M.hide_forced()
-	TooltipLLM.hide()
-	TooltipHotstring.hide_forced()
+	local llm_hidden = TooltipLLM.hide() == true
+	local hotstring_hidden = TooltipHotstring.hide_forced() == true
+	return llm_hidden and hotstring_hidden
 end
 
 --- Authoritative hide for the keyboard hot path without synchronous log I/O.
+--- @return boolean True when both owners are verified stopped.
 function M.hide_forced_silent()
-	if TooltipLLM.hide_silent then TooltipLLM.hide_silent() else TooltipLLM.hide() end
-	TooltipHotstring.hide_forced()
+	local llm_hidden
+	if TooltipLLM.hide_silent then
+		llm_hidden = TooltipLLM.hide_silent() == true
+	else
+		llm_hidden = TooltipLLM.hide() == true
+	end
+	local hotstring_hidden = TooltipHotstring.hide_forced() == true
+	return llm_hidden and hotstring_hidden
 end
 
 --- Checks if any tooltip is currently rendered on screen.
@@ -113,9 +124,10 @@ end
 --- @param is_enabled boolean Guard clause to prevent rendering if disabled.
 --- @param background_color table|nil Optional background tint.
 function M.show(content, is_llm_origin, is_enabled, background_color)
-	TooltipLLM.hide()
-	TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color)
-	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
+	if TooltipLLM.hide() ~= true then return false end
+	local shown = TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color) == true
+	if shown and _on_show_callback then pcall(_on_show_callback) end
+	return shown
 end
 
 --- Displays a stacked multi-row tooltip for hotstring previews.
@@ -123,9 +135,10 @@ end
 --- @param rows table Array of row descriptors.
 --- @param is_enabled boolean Guard clause.
 function M.show_stacked(rows, is_enabled)
-	TooltipLLM.hide()
-	TooltipHotstring.show_stacked(rows, is_enabled)
-	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
+	if TooltipLLM.hide() ~= true then return false end
+	local shown = TooltipHotstring.show_stacked(rows, is_enabled) == true
+	if shown and _on_show_callback then pcall(_on_show_callback) end
+	return shown
 end
 
 --- Displays a persistent loading indicator that will not auto-dismiss.
@@ -136,10 +149,10 @@ end
 --- @param background_color table|nil Optional background tint.
 function M.show_loading(content, is_enabled, background_color)
 	if not runtime_available() then return false end
-	TooltipLLM.hide()
-	TooltipHotstring.show_loading(content, is_enabled, background_color)
-	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
-	return true
+	if TooltipLLM.hide() ~= true then return false end
+	local shown = TooltipHotstring.show_loading(content, is_enabled, background_color) == true
+	if shown and _on_show_callback then pcall(_on_show_callback) end
+	return shown
 end
 
 --- Displays AI predictions with interactive navigation (LLM mode).
@@ -157,10 +170,13 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 	if not runtime_available() then return false end
 	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
 	-- the loading indicator in-place — no blank frame between the two tooltips.
-	TooltipHotstring.dismiss_silent()
-	TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
-	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
-	return true
+	if TooltipHotstring.dismiss_silent() ~= true then return false end
+	local shown = TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar,
+		shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
+		max_reserved_count) == true
+	if not shown then TooltipHotstring.hide_forced() end
+	if shown and _on_show_callback then pcall(_on_show_callback) end
+	return shown
 end
 
 function M.navigate(delta)

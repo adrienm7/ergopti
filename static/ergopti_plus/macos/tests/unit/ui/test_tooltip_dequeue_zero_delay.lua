@@ -6,9 +6,9 @@
 --- Regression tests for bug M-10: when all rows in a stacked tooltip carry no
 --- expiry (duration == 0 / no expire_at), Dequeue.next_expiry_delay_sec returns
 --- 0. The arm_dequeue_timer function must detect this and call
---- hs.timer.doAfter(0, _dequeue_tick) immediately rather than assigning a nil
---- _dequeue_timer, which would leave _dequeue_rows non-nil and block every
---- subsequent M.hide() call forever.
+--- hs.timer.doAfter(0, _dequeue_tick) immediately while retaining the returned
+--- handle until delivery. Losing that handle makes authoritative teardown unable
+--- to revoke a queued callback and permits it to race a replacement stack.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Zero-delay guard: asserts doAfter(0, cb) is called when delay <= 0.
@@ -72,7 +72,8 @@ local function make_simulation(next_delay_sec, do_after_stub)
 		return "hidden"
 	end
 
-	-- arm_dequeue_timer — exact replica of the production code path under test
+	-- Small state-machine model for the zero-delay invariant. The real module is
+	-- exercised separately by test_tooltip_watcher_reuse.lua.
 	local function arm_dequeue_timer()
 		if _dequeue_timer then
 			pcall(function() _dequeue_timer:stop() end)
@@ -81,14 +82,14 @@ local function make_simulation(next_delay_sec, do_after_stub)
 		if not _dequeue_rows then return end
 		local delay = stub_dequeue.next_expiry_delay_sec(
 			_dequeue_rows, os.time(), {})
-		if delay and delay <= 0 then
-			-- All rows are permanent (no expire_at) — fire the tick immediately;
-			-- without this _dequeue_rows stays non-nil and M.hide() is blocked
-			-- forever (M-10 root cause)
-			do_after_stub(0, function() _dequeue_tick() end)
-		else
-			_dequeue_timer = do_after_stub(delay, function() _dequeue_tick() end)
-		end
+		local schedule_delay = delay and math.max(0, delay) or 0
+		local timer_handle
+		timer_handle = do_after_stub(schedule_delay, function()
+			if _dequeue_timer ~= timer_handle then return end
+			_dequeue_timer = nil
+			_dequeue_tick()
+		end)
+		_dequeue_timer = timer_handle
 	end
 
 	-- _dequeue_tick mirrors the production body: prune then hide_forced when empty
@@ -165,26 +166,24 @@ helpers.describe("arm_dequeue_timer: zero-delay path fires doAfter(0, cb) (M-10)
 		helpers.assert_eq(calls[1].delay, 0, "doAfter delay must be 0 regardless of negative input")
 	end)
 
-	helpers.it("does not assign _dequeue_timer when the zero-delay path is taken", function()
-		-- On the zero-delay path doAfter is called but the return value must NOT
-		-- be assigned to _dequeue_timer — the production code has no assignment there
-		-- (the timer is ephemeral). We verify this indirectly by calling arm() a
-		-- second time immediately after the first; it must not attempt to stop a
-		-- stale timer object and must still call doAfter.
+	helpers.it("owns and revokes the prior zero-delay handle when re-armed", function()
 		local call_count = 0
+		local stop_count = 0
 		local function stub_do_after(delay, fn)
 			call_count = call_count + 1
 			_ = fn  -- captured but not executed
-			return { stop = function() end }
+			return { stop = function() stop_count = stop_count + 1 end }
 		end
 
 		local sim = make_simulation(0, stub_do_after)
 		sim.activate_dequeue()
 		sim.arm()
-		-- A second arm() call (e.g. from a rebuild) must not crash on a nil timer
+		-- A second arm() owns a replacement only after revoking the exact prior handle.
 		sim.arm()
 
 		helpers.assert_eq(call_count, 2, "each arm() on the zero-delay path schedules one doAfter call")
+		helpers.assert_eq(stop_count, 1,
+			"re-arming must revoke the previously owned zero-delay callback")
 	end)
 end)
 

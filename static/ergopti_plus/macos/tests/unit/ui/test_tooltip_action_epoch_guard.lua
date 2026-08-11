@@ -78,15 +78,17 @@ local function load_fixture()
 			callback = callback,
 			started = false,
 			stopped = false,
+			enabled = false,
 		}
-		function watcher:start() self.started = true; return self end
-		function watcher:stop() self.stopped = true; return self end
+		function watcher:start() self.started = true; self.enabled = true; return self end
+		function watcher:stop() self.stopped = true; self.enabled = false; return self end
+		function watcher:isEnabled() return self.enabled end
 		watchers[#watchers + 1] = watcher
 		return watcher
 	end
 	hs.timer.doAfter = function(delay, callback)
-		local timer = { delay = delay, callback = callback, stopped = false }
-		function timer:stop() self.stopped = true end
+		local timer = { delay = delay, callback = callback, stopped = false, running = true }
+		function timer:stop() self.stopped = true; self.running = false end
 		timers[#timers + 1] = timer
 		return timer
 	end
@@ -321,10 +323,10 @@ helpers.describe("tooltip facade: quarantine is LLM-only", function()
 		}
 		package.loaded["ui.tooltip.tooltip_llm"] = {
 			set_runtime_guard = function(guard) llm_guard = guard end,
-			hide = function() end,
-			hide_silent = function() end,
+			hide = function() return true end,
+			hide_silent = function() return true end,
 			is_visible = function() return false end,
-			show_predictions = function() calls.predictions = calls.predictions + 1 end,
+			show_predictions = function() calls.predictions = calls.predictions + 1; return true end,
 			navigate = function() calls.navigate = calls.navigate + 1 end,
 			set_navigate_callback = function() end,
 			set_accept_callback = function() end,
@@ -337,13 +339,13 @@ helpers.describe("tooltip facade: quarantine is LLM-only", function()
 			mark_chain_complete = function() end,
 		}
 		package.loaded["ui.tooltip.tooltip_hotstring"] = {
-			hide = function() end,
-			hide_forced = function() end,
+			hide = function() return true end,
+			hide_forced = function() return true end,
 			is_visible = function() return false end,
-			show = function() end,
-			show_stacked = function() calls.stacked = calls.stacked + 1 end,
-			show_loading = function() calls.loading = calls.loading + 1 end,
-			dismiss_silent = function() end,
+			show = function() return true end,
+			show_stacked = function() calls.stacked = calls.stacked + 1; return true end,
+			show_loading = function() calls.loading = calls.loading + 1; return true end,
+			dismiss_silent = function() return true end,
 		}
 		package.loaded["ui.tooltip"] = nil
 		local Tooltip = require("ui.tooltip")
