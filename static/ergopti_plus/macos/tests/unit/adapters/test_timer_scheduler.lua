@@ -78,7 +78,9 @@ helpers.describe("TimerScheduler adapter — after()", function()
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
 			{ timer = timer_stub })
 		local fired = false
-		local h = TS.after(1, function() fired = true end)
+		local h, committed = TS.after(1, function() fired = true end)
+		helpers.assert_true(committed == true,
+			"after() must explicitly report that the native timer committed")
 		helpers.assert_true(not h.fired, "handle should not be fired yet")
 		timer_stub.fire(1)
 		helpers.assert_true(fired, "callback should have fired")
@@ -119,7 +121,9 @@ helpers.describe("TimerScheduler adapter — after()", function()
 		timer_stub.doAfter = function() return nil end
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
 			{ timer = timer_stub })
-		local handle = TS.after(1, function() end)
+		local handle, committed = TS.after(1, function() end)
+		helpers.assert_true(committed == false,
+			"after() must explicitly report that no native timer was armed")
 		helpers.assert_true(handle.fired,
 			"a schedule failure must return a terminal handle")
 		helpers.assert_nil(handle.timer)

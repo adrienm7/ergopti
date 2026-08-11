@@ -59,6 +59,7 @@ end
 --- @param delaySec number Delay in seconds (fractional values accepted).
 --- @param fn function Zero-arity callback to invoke.
 --- @return table Opaque cancellation handle.
+--- @return boolean committed True only when the native timer was armed.
 function M.after(delaySec, fn)
 	local handle = { fired = false, id = _new_id() }
 	local ok, timer_or_err = pcall(hs.timer.doAfter, delaySec, function()
@@ -73,11 +74,11 @@ function M.after(delaySec, fn)
 		handle.fired = true
 		Logger.error(LOG, "after(): hs.timer.doAfter failed — %s",
 			tostring(timer_or_err or "returned nil"))
-		return handle
+		return handle, false
 	end
 	handle.timer = timer_or_err
 	_live_timers[handle.id] = handle
-	return handle
+	return handle, true
 end
 
 --- Schedules fn to fire repeatedly every intervalSec seconds.
