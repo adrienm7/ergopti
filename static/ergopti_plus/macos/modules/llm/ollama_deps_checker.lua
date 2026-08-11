@@ -27,6 +27,7 @@ local hs           = hs
 local Logger       = require("infra.logger")
 local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
 
 local LOG = "ollama_deps"
 
@@ -242,6 +243,18 @@ function M.check_and_install_deps()
 		return
 	end
 
+	-- The bootstrap installs the executable, but the Lua owner still supplies the
+	-- canonical logging pipeline. This keeps fresh installs on the same rollover
+	-- and quoting contract as both normal daemon launch paths.
+	local server_cmd, command_err = OllamaServerCommand.build("ollama", Logger.UNIFIED_LOG_FILE)
+	if not server_cmd then
+		Logger.error(LOG, "Could not build the Ollama bootstrap server command: %s",
+			tostring(command_err))
+		_bootstrap_state = "failed"
+		_last_failure_message = "Could not prepare the Ollama server command."
+		return
+	end
+
 	local task
 	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
 		if task then _active_tasks[task] = nil end
@@ -295,7 +308,7 @@ function M.check_and_install_deps()
 			end
 			pcall(llm_progress.set_error, tail)
 		end
-	end, { script_path })
+	end, { script_path, server_cmd })
 
 	if not task then
 		Logger.error(LOG, "Failed to create hs.task for Ollama bootstrap script.")
