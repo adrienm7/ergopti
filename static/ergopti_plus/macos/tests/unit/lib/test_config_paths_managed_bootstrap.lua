@@ -57,6 +57,8 @@ local function with_memory_files(initial, fn)
 	for path, content in pairs(initial or {}) do files[path] = content end
 	local writes = {}
 	local real_open = io.open
+	local real_remove = os.remove
+	local real_rename = os.rename
 
 	io.open = function(path, mode)
 		if mode == "r" then
@@ -83,14 +85,31 @@ local function with_memory_files(initial, fn)
 		end
 		return real_open(path, mode)
 	end
+	os.remove = function(path)
+		if files[path] ~= nil or path:find("paths.toml", 1, true) ~= nil then
+			files[path] = nil
+			return true
+		end
+		return real_remove(path)
+	end
+	os.rename = function(from, to)
+		if files[from] ~= nil then
+			files[to] = files[from]
+			files[from] = nil
+			return true
+		end
+		return nil, "not found"
+	end
 
 	local ok, err = xpcall(function() fn(files, writes) end, debug.traceback)
 	io.open = real_open
+	os.remove = real_remove
+	os.rename = real_rename
 	if not ok then error(err, 0) end
 end
 
 helpers.describe("managed ConfigPaths bootstrap lives outside the app bundle", function()
-	helpers.it("writes first-boot and user overrides only to the launcher-owned path", function()
+	helpers.it("managed bootstrap: writes first-boot and user overrides outside the bundle", function()
 		with_memory_files({}, function(files, writes)
 			local ConfigPaths = load_managed()
 			helpers.assert_true(ConfigPaths.init(BUNDLE_DIR))
@@ -107,7 +126,7 @@ helpers.describe("managed ConfigPaths bootstrap lives outside the app bundle", f
 		end)
 	end)
 
-	helpers.it("migrates a legacy adjacent override before creating a blank template", function()
+	helpers.it("managed bootstrap: migrates a legacy adjacent override", function()
 		local legacy = BUNDLE_DIR .. "paths.toml"
 		with_memory_files({
 			[legacy] = 'ConfigDirPath = "' .. CUSTOM_DIR .. '"\n',

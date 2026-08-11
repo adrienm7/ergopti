@@ -122,11 +122,28 @@ function M.get_default_config_dir()
 	return ConfigPaths.get_default_config_dir()
 end
 
+--- Persists through ConfigPaths and distinguishes a returned I/O failure from a
+--- no-change success. Lua file writes normally return false rather than raise,
+--- so pcall status alone is not a commit acknowledgement.
+--- @param new_dir string|nil
+--- @return boolean persisted
+--- @return boolean|string changed_or_err
+local function persist_config_dir(new_dir)
+	local ok, changed, save_err = xpcall(function()
+		return ConfigPaths.set_config_dir(new_dir)
+	end, debug.traceback)
+	if not ok then return false, changed end
+	if save_err ~= nil then return false, tostring(save_err) end
+	return true, changed == true
+end
+
 --- Persists a new config directory WITHOUT reloading. Used by the onboarding
 --- wizard, which writes config.toml right after and reloads once at the end.
 --- @param new_dir string|nil
+--- @return boolean persisted
+--- @return boolean|string changed_or_err
 function M.persist_config_dir_for_wizard(new_dir)
-	ConfigPaths.set_config_dir(new_dir)
+	return persist_config_dir(new_dir)
 end
 
 
@@ -222,12 +239,25 @@ local function apply_and_reload(new_dir)
 	-- picks up the new location. The wizard calls the same writer and deliberately
 	-- does not reload, which is the entire difference between the two writers this
 	-- replaces.
-	local changed = ConfigPaths.set_config_dir(new_dir)
+	local persisted, changed_or_err = persist_config_dir(new_dir)
+	if not persisted then
+		Logger.error(LOG, "Paths editor save failed: %s.", tostring(changed_or_err))
+		local ok_dialog, dialog = pcall(require, "infra.dialog_util")
+		if ok_dialog and dialog and type(dialog.block_alert) == "function" then
+			pcall(dialog.block_alert,
+				i18n.get("paths_editor.save_failed_title"),
+				i18n.get("paths_editor.save_failed"),
+				i18n.get("onboarding.btn.ok"))
+		end
+		return false
+	end
+
+	local changed = changed_or_err == true
 	close_webview()
 
 	if not changed then
 		Logger.debug(LOG, "Paths editor: directory unchanged, skipping reload.")
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Applying new config directory and reloading…")

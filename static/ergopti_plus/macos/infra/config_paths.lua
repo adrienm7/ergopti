@@ -193,9 +193,10 @@ end
 --- Ensures a directory exists (idempotent), creating parents as needed.
 --- Memoised per session; prefers the in-process hs.fs API over a shell fork.
 --- @param path string Absolute path with trailing slash.
+--- @return boolean ensured True only when the directory exists after the call.
 local function ensure_dir(path)
-	if not path or path == "" then return end
-	if _ensured_dirs[path] then return end
+	if not path or path == "" then return false end
+	if _ensured_dirs[path] then return true end
 
 	-- hs.fs.mkdir creates a single level only, so walk the ancestors first to
 	-- reproduce "mkdir -p" without leaving the process.
@@ -234,8 +235,10 @@ local function ensure_dir(path)
 	local ok_final, final_attr = pcall(hs.fs.attributes, path)
 	if ok_final and final_attr then
 		_ensured_dirs[path] = true
+		return true
 	else
 		Logger.warn(LOG, "Could not create '%s' — not memoised, will retry on next use.", path)
+		return false
 	end
 end
 
@@ -265,17 +268,76 @@ local function serialize_toml()
 	return table.concat(lines, "\n")
 end
 
+--- Replaces one file atomically on macOS. The Windows branch exists solely for
+--- the portable Lua suite, whose CRT cannot rename over an existing target; it
+--- keeps a rollback copy so even that fallback preserves the old file on error.
+--- @param temporary string Complete sibling temporary file.
+--- @param target string Final paths.toml file.
+--- @return boolean replaced
+--- @return string|nil err
+local function replace_file(temporary, target)
+	local ok_rename, renamed, rename_err = pcall(os.rename, temporary, target)
+	if ok_rename and renamed then return true end
+	local first_err = ok_rename and rename_err or renamed
+
+	if package.config:sub(1, 1) ~= "\\" then
+		return false, tostring(first_err or "rename failed")
+	end
+
+	local backup = target .. ".bak"
+	pcall(os.remove, backup)
+	local old_moved = os.rename(target, backup)
+	local new_moved, new_err = os.rename(temporary, target)
+	if new_moved then
+		if old_moved then pcall(os.remove, backup) end
+		return true
+	end
+	if old_moved then pcall(os.rename, backup, target) end
+	return false, tostring(new_err or first_err or "rename failed")
+end
+
 --- Persists the current _bootstrap table to disk as TOML.
+--- @return boolean saved True only after write, close, and atomic publish.
+--- @return string|nil err Concrete I/O reason on failure.
 local function save_bootstrap()
 	local content = serialize_toml()
-	local fh = io.open(paths_file(), "w")
-	if not fh then
-		Logger.error(LOG, "Cannot open paths file for writing: '%s'.", paths_file())
-		return
+	local target = paths_file()
+	local temporary = target .. ".tmp"
+	pcall(os.remove, temporary)
+
+	local ok_open, fh, open_err = pcall(io.open, temporary, "w")
+	if not ok_open or not fh then
+		local reason = tostring((ok_open and open_err) or fh or "open failed")
+		Logger.error(LOG, "Cannot open paths file for writing: '%s' (%s).", target, reason)
+		return false, reason
 	end
-	fh:write(content)
-	fh:close()
-	Logger.info(LOG, "Paths saved to '%s'.", paths_file())
+
+	local ok_write, wrote, write_err = pcall(fh.write, fh, content)
+	if not ok_write or not wrote then
+		local reason = tostring((ok_write and write_err) or wrote or "write failed")
+		pcall(fh.close, fh)
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot write paths file '%s' (%s).", target, reason)
+		return false, reason
+	end
+
+	local ok_close, closed, close_err = pcall(fh.close, fh)
+	if not ok_close or not closed then
+		local reason = tostring((ok_close and close_err) or closed or "close failed")
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot flush paths file '%s' (%s).", target, reason)
+		return false, reason
+	end
+
+	local replaced, replace_err = replace_file(temporary, target)
+	if not replaced then
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot publish paths file '%s' (%s).", target, tostring(replace_err))
+		return false, replace_err
+	end
+
+	Logger.info(LOG, "Paths saved to '%s'.", target)
+	return true
 end
 
 
@@ -449,16 +511,23 @@ function M.set_config_dir(new_dir)
 	if new_dir ~= "" and not new_dir:match("[/\\]$") then new_dir = new_dir .. "/" end
 
 	local old_dir = config_dir()
+	local old_override = _bootstrap[CONFIG_DIR_KEY]
 	-- An empty path or one equal to the default → clear the override so
 	-- paths.toml stays a commented-out template and a future reload follows the
 	-- OS default.
 	if new_dir == "" or new_dir == (_default_config_dir or "") then
 		_bootstrap[CONFIG_DIR_KEY] = nil
 	else
+		if not ensure_dir(new_dir) then
+			return false, string.format("could not create config directory '%s'", new_dir)
+		end
 		_bootstrap[CONFIG_DIR_KEY] = new_dir
-		ensure_dir(new_dir)
 	end
-	save_bootstrap()
+	local saved, save_err = save_bootstrap()
+	if not saved then
+		_bootstrap[CONFIG_DIR_KEY] = old_override
+		return false, save_err
+	end
 	return config_dir() ~= old_dir
 end
 
@@ -466,7 +535,7 @@ end
 --- directory the user typed before it is stored.
 --- @param path string Absolute path with trailing slash.
 function M.ensure_dir(path)
-	ensure_dir(path)
+	return ensure_dir(path)
 end
 
 return M

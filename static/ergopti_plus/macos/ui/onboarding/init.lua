@@ -366,6 +366,24 @@ function M._commit_write(writer, path, updates)
 	return true
 end
 
+--- Persists the wizard's selected config directory and requires an explicit
+--- acknowledgement from the menu_paths bridge. pcall success is insufficient:
+--- the filesystem writer reports ordinary I/O failures by returning false.
+--- @param menu_paths table Resolver/UI bridge.
+--- @param new_dir string User-selected directory.
+--- @return boolean persisted
+--- @return string|nil err
+function M._persist_config_dir(menu_paths, new_dir)
+	if type(menu_paths) ~= "table"
+			or type(menu_paths.persist_config_dir_for_wizard) ~= "function" then
+		return false, "config path persistence is unavailable"
+	end
+	local ok, persisted, detail = pcall(menu_paths.persist_config_dir_for_wizard, new_dir)
+	if not ok then return false, tostring(persisted) end
+	if persisted ~= true then return false, tostring(detail or "write was not confirmed") end
+	return true
+end
+
 --- Returns the config.toml path the wizard must write to, re-resolved through
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
@@ -410,19 +428,26 @@ local function commit(answers)
 	-- "drop the override" case internally).
 	if type(answers.config_dir) == "string" and answers.config_dir ~= "" then
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-		if ok_mp and menu_paths and menu_paths.persist_config_dir_for_wizard then
-			local ok_persist, err = pcall(menu_paths.persist_config_dir_for_wizard, answers.config_dir)
-			if ok_persist then
-				-- _config_path was captured in M.run() from the config dir as it
-				-- stood BEFORE the wizard ran; the persist above just moved the
-				-- resolver. Writing through the stale path would leave the NEW
-				-- directory without a config.toml, so should_run() fires again and
-				-- the wizard re-opens blank with every answer lost.
-				_config_path = M._resolve_commit_path(menu_paths, _config_path)
-			else
-				Logger.warn(LOG, "Failed to persist config dir override: %s.", tostring(err))
-			end
+		local persisted, persist_err = M._persist_config_dir(
+			ok_mp and menu_paths or nil,
+			answers.config_dir
+		)
+		if not persisted then
+			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
+			close_webview()
+			local dialog = require("infra.dialog_util")
+			dialog.block_alert(
+				i18n.get("paths_editor.save_failed_title"),
+				i18n.get("paths_editor.save_failed"),
+				i18n.get("onboarding.btn.ok")
+			)
+			return
 		end
+		-- _config_path was captured in M.run() from the config dir as it stood
+		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
+		-- through the stale path would leave the NEW directory without config.toml,
+		-- so should_run() would reopen the wizard with every answer lost.
+		_config_path = M._resolve_commit_path(menu_paths, _config_path)
 	end
 
 	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
