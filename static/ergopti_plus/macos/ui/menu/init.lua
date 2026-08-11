@@ -655,16 +655,28 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then pcall(llm_handler.check_startup) end
 	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() if type(updateMenu) == "function" then updateMenu() end end) end
 
-	-- At startup / reload the script is in the active (non-paused) state, so honour
-	-- the user's chosen "resume" layout the same way a resume would: if the
-	-- pause-layout feature is on and a resume layout is configured, make it the
-	-- active layout. Deferred so it never blocks boot and runs after KE's first
-	-- deploy/prime. schedule_pause_layout_switch(false, …) is a no-op when the
-	-- feature is off or no resume layout is set.
+	-- Honour the live pause state once KE's first deploy/prime has settled. The
+	-- callback runs four seconds after this code, so capturing the boot-time
+	-- `false` would let a pause in that window get overwritten by the resume layout.
 	hs.timer.doAfter(STARTUP_LAYOUT_SWITCH_DELAY_SEC, function()
 		local kbd_layout_mod = menu_mods.keyboard_layout
 		if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
-			pcall(kbd_layout_mod.schedule_pause_layout_switch, false, state)
+			local live_paused = false
+			local shortcuts_mod = core_mods.shortcuts_mod
+			if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
+				local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
+				if not ok_pause then
+					Logger.error(LOG, "Startup layout callback could not read live pause state: %s.",
+						tostring(paused_or_err))
+					return
+				end
+				live_paused = paused_or_err == true
+			end
+			local ok_switch, switch_err = pcall(
+				kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
+			if not ok_switch then
+				Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
+			end
 		end
 	end)
 
