@@ -35,6 +35,7 @@ local KeLifecycle = require("platform.remap.ke_lifecycle")
 local LeaseController = require("platform.remap.lease_controller")
 local Watchers    = require("platform.remap.watchers")
 local Registrar   = require("adapters.hotkey_registrar")
+local TimerScheduler = require("adapters.timer_scheduler")
 local Timings     = require("infra.timings")
 
 -- The managed-output classifier is a lease prerequisite even when the
@@ -52,6 +53,21 @@ local LOG = "karabiner"
 -- the NEW layout's keycode map, not the previous one. Sourced from the Timings
 -- registry (was a bare 0.5 inline literal) so it is tunable cross-driver in one place.
 local LAYOUT_TIS_SETTLE_SEC = Timings.sec("debounce", "layout_tis_settle_ms")
+
+-- An unexpected worker/guardian loss is already fenced by LeaseController
+-- before it publishes FAILED. Retry only a small, named series: an unbounded
+-- loop would continuously rewrite karabiner.json when launchd approval or the
+-- native helper is unavailable.
+local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
+local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
+-- A retained input-source event is an ordering barrier for lease recovery: the
+-- replacement must not resolve keycodes until TIS has settled.  Transient
+-- failures inside that barrier therefore get their own bounded retry budget;
+-- otherwise one failed timer/query/rebind can leave both pipelines waiting on
+-- each other forever.
+local LAYOUT_REFRESH_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
+local REMAP_GUARDIAN_STATUS_ENV = "ERGOPTI_REMAP_GUARDIAN_STATUS"
+local REMAP_GUARDIAN_REQUIRES_APPROVAL = "requires_approval"
 
 local DISABLED_LEGACY_PROBE_STRINGS = {
 	"[ErgoptiPlus managed:",
@@ -134,6 +150,9 @@ local _activation_transaction  = nil   -- Same-token regenerate callers share on
 local _hotkey_cleanup_backlog  = {}    -- Failed adapter deletes retained for a later exact retry
 local _gesture_cleanup_backlog = {}    -- Failed eventtap stops retain their exact handles for retry
 local _lease_inputs_tainted    = false -- Retained disabled handles are not proof of liveness
+local _lease_recovery          = nil   -- One bounded retry series across replacement tokens
+local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop must be retried
+local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 
 local _state = nil
 local _enabled_transition = nil
@@ -141,6 +160,7 @@ local _enabled_transition = nil
 -- transactions to rebuild while the public script state remains paused
 local PAUSED_DISABLE_RECOVERY = {}
 local PAUSED_RESUME_REGENERATION = {}
+local LEASE_FAILURE_RECOVERY_CAPABILITY = {}
 
 --- Invokes a public async callback without letting its error vanish in a task callback.
 --- @param label string Operation label for diagnostics.
@@ -861,38 +881,11 @@ local function replay_pending_layout_refresh()
 		pending.layout_name,
 		pending.source,
 		pending.epoch,
-		pending.tis_settled
+		pending.tis_settled,
+		pending.retry_attempt,
+		pending.tis_settled and 0 or nil,
+		pending.retry_lineage
 	) == true
-end
-
---- Releases derivative state after every settled non-active lease transition.
---- In-flight pause/resume commands retain the last settled classification until
---- their ACK, avoiding a double-count window while Karabiner still has old state.
---- @param phase string Lease-controller lifecycle phase.
-local function on_lease_phase(phase)
-	if not _running then return end
-	-- A bounded heartbeat retry retains the last settled mode. Tearing down and
-	-- immediately rebuilding derivative inputs during that one-second recovery
-	-- window would create user-visible churn without improving fail-closedness.
-	if phase == "recovering" then return end
-	-- FENCING means the protocol failed, not that the tombstone transport has
-	-- completed. Retain both consumers and classification until IDLE/FAILED;
-	-- otherwise still-live rules can emit an F17 with nobody listening.
-	if phase == "fencing" then return end
-	-- A normal STOPPING is only an accepted disable/quit intent. Rules can still
-	-- emit until STOPPED, so consumers and classification remain live to avoid a
-	-- transient missing-output window. The settled IDLE phase releases both.
-	if phase == "stopping" then return end
-	if phase == "idle" or phase == "prepared" or phase == "starting"
-		or phase == "paused" or phase == "failed" then
-		clear_managed_output_set()
-		stop_lease_bound_inputs()
-		KeLifecycle.stop()
-	end
-	if phase == "active" or phase == "paused" or phase == "prepared"
-		or phase == "idle" or phase == "failed" then
-		replay_pending_layout_refresh()
-	end
 end
 
 local function require_state(func_name)
@@ -954,6 +947,425 @@ local function query_shortcuts_pause_state(label)
 	return true, result.shortcuts, result.paused
 end
 
+--- Retries cancellation of timers whose native stop previously failed.
+--- Their callbacks are already inert because their owning recovery record was
+--- detached before cancellation was attempted.
+--- @return boolean complete Whether no native recovery timer remains retained.
+local function retry_lease_recovery_timer_cleanup()
+	for index = #_lease_recovery_timer_cleanup_backlog, 1, -1 do
+		local timer = _lease_recovery_timer_cleanup_backlog[index]
+		local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timer)
+		if ok and cancelled_or_err == true then
+			table.remove(_lease_recovery_timer_cleanup_backlog, index)
+		else
+			Logger.error(LOG, "Karabiner lease recovery timer cancellation retry failed: %s.",
+				tostring(cancelled_or_err))
+		end
+	end
+	return #_lease_recovery_timer_cleanup_backlog == 0
+end
+
+--- Cancels one exact recovery series logically before touching its native timer.
+--- Exact-record identity keeps a queued callback inert even when timer:stop()
+--- itself fails.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean complete Whether every native timer cancellation is proven.
+local function cancel_lease_recovery(reason)
+	local backlog_clean = retry_lease_recovery_timer_cleanup()
+	local recovery = _lease_recovery
+	_lease_recovery = nil
+	if not recovery then return backlog_clean end
+	recovery.cancelled = true
+	local timer = recovery.timer
+	recovery.timer = nil
+	local timer_clean = true
+	if timer then
+		local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timer)
+		if not ok or cancelled_or_err ~= true then
+			timer_clean = false
+			_lease_recovery_timer_cleanup_backlog[
+				#_lease_recovery_timer_cleanup_backlog + 1
+			] = timer
+			Logger.error(LOG,
+				"Karabiner lease recovery timer cancellation failed; callback fenced by identity: %s.",
+				tostring(cancelled_or_err))
+		end
+	end
+	Logger.debug(LOG, "Cancelled Karabiner lease auto-recovery (%s).", tostring(reason))
+	return backlog_clean and timer_clean
+end
+
+--- Defers one pending automatic attempt until the post-TIS layout pipeline has
+--- consumed the newest event. A native timer whose stop fails is still harmless:
+--- clearing the record's exact timer slot makes its queued callback stale.
+--- @param recovery table Exact bounded recovery series.
+local function defer_lease_recovery_for_layout(recovery)
+	if _lease_recovery ~= recovery or recovery.cancelled then return end
+	recovery.waiting_for_layout = true
+	recovery.layout_barrier_exhausted = false
+	if recovery.in_flight then recovery.refund_current_attempt = true end
+	-- READY and the RESUMED acknowledgement are separate async boundaries.  If
+	-- the input source changes after RESUME was sent, the pre-RESUME hook has
+	-- already run and cannot protect this generation.  Fence the exact private
+	-- token now so its old-layout rules can never become the surviving ACTIVE set.
+	if recovery.in_flight and type(recovery.owned_token) == "string" then
+		local status_ok, phase, snapshot = pcall(LeaseController.status)
+		local owns_resuming_generation = status_ok and phase == "resuming"
+			and type(snapshot) == "table" and snapshot.token == recovery.owned_token
+		if owns_resuming_generation or not status_ok then
+			local stop_ok, stopped_or_err = pcall(
+				LeaseController.stop_exact,
+				recovery.owned_token,
+				"layout_changed_during_recovery_resume"
+			)
+			if not stop_ok or stopped_or_err ~= true then
+				Logger.error(LOG,
+					"Exact recovery generation could not be fenced after a layout change: %s.",
+					tostring(stopped_or_err))
+			else
+				Logger.warn(LOG,
+					"Fencing recovery generation %s because layout changed before RESUMED.",
+					recovery.owned_token)
+			end
+		end
+	end
+	local timer = recovery.timer
+	if not timer then
+		return
+	end
+	recovery.timer = nil
+	-- Arming reserves an attempt number; a layout deferral happens before that
+	-- attempt runs, so it must not consume the bounded failure budget.
+	recovery.attempt = math.max(0, recovery.attempt - 1)
+	local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timer)
+	if not ok or cancelled_or_err ~= true then
+		_lease_recovery_timer_cleanup_backlog[
+			#_lease_recovery_timer_cleanup_backlog + 1
+		] = timer
+		Logger.error(LOG,
+			"Karabiner lease recovery timer could not stop for layout settle; callback fenced by identity: %s.",
+			tostring(cancelled_or_err))
+	end
+end
+
+--- Returns a stable reason when automatic recovery must not create authority.
+--- A missing exported guardian status is allowed for direct Hammerspoon
+--- development launches; the bundled app always exports an exact status.
+--- @return string|nil reason
+local function lease_recovery_block_reason()
+	if not _running or _state == nil then return "lifecycle-inactive" end
+	if _shutdown_requested then return "shutdown-in-progress" end
+	if _state.enabled ~= true then return "integration-disabled" end
+	if _enabled_transition ~= nil then return "enabled-transition-in-progress" end
+	local status_ok, guardian_status = pcall(os.getenv, REMAP_GUARDIAN_STATUS_ENV)
+	if not status_ok then
+		Logger.error(LOG, "Could not read %s; automatic remap recovery stays inert: %s.",
+			REMAP_GUARDIAN_STATUS_ENV, tostring(guardian_status))
+		return "guardian-status-unavailable"
+	end
+	if guardian_status == REMAP_GUARDIAN_REQUIRES_APPROVAL then
+		return "guardian-approval-required"
+	end
+	return nil
+end
+
+local schedule_lease_recovery
+
+--- Consumes one retained retry after re-proving every user-intent gate.
+--- @param recovery table Exact bounded recovery series.
+local function run_lease_recovery_attempt(recovery)
+	if _lease_recovery ~= recovery or recovery.cancelled
+		or not is_current_lifecycle(recovery.epoch) then return end
+	recovery.timer = nil
+	if _pending_layout_refresh ~= nil then
+		-- The timer fired after an input-source event but before TIS settled. Do
+		-- not read the old key map or charge an attempt that performed no work.
+		recovery.attempt = math.max(0, recovery.attempt - 1)
+		recovery.waiting_for_layout = true
+		return
+	end
+
+	local blocked = lease_recovery_block_reason()
+	if blocked then
+		cancel_lease_recovery(blocked)
+		return
+	end
+	local pause_ok, _, paused = query_shortcuts_pause_state(
+		"Karabiner lease auto-recovery pause-state query"
+	)
+	if pause_ok and paused == true then
+		cancel_lease_recovery("script-paused")
+		return
+	end
+	if not pause_ok then
+		Logger.warn(LOG, "Karabiner lease auto-recovery remained inert because pause state is unavailable.")
+		schedule_lease_recovery(recovery, "pause-state-unavailable")
+		return
+	end
+
+	local status_ok, phase, snapshot = pcall(LeaseController.status)
+	if not status_ok then
+		Logger.error(LOG, "Karabiner lease auto-recovery could not read controller status: %s.",
+			tostring(phase))
+		schedule_lease_recovery(recovery, "lease-status-unavailable")
+		return
+	end
+	if phase == "recovering" or phase == "fencing" or phase == "pausing"
+		or phase == "resuming" or phase == "stopping" then
+		-- The next settled phase callback owns continuation. Scheduling here would
+		-- race the exact fence or burn the bounded budget while it is still working.
+		recovery.attempt = math.max(0, recovery.attempt - 1)
+		recovery.waiting_for_phase = true
+		recovery.last_reason = "lease-transition-in-progress"
+		return
+	end
+	local owns_observed_token = type(snapshot) == "table"
+		and type(recovery.owned_token) == "string"
+		and snapshot.token == recovery.owned_token
+	local may_retry = phase == "failed" or phase == "idle"
+		or ((phase == "prepared" or phase == "paused") and owns_observed_token)
+	if not may_retry then
+		cancel_lease_recovery("lease-superseded-in-phase-" .. tostring(phase))
+		return
+	end
+
+	recovery.in_flight = true
+	recovery.waiting_for_phase = false
+	recovery.refund_current_attempt = false
+	local attempt_number = recovery.attempt
+	local callback_fired = false
+	local function finish_attempt(ok, reason)
+		if callback_fired then return end
+		callback_fired = true
+		if _lease_recovery ~= recovery or recovery.cancelled
+			or not is_current_lifecycle(recovery.epoch) then return end
+		recovery.in_flight = false
+		if ok == true then
+			Logger.info(LOG, "Karabiner lease auto-recovery completed with a fresh generation.")
+			cancel_lease_recovery("recovered")
+			return
+		end
+		Logger.warn(LOG, "Karabiner lease auto-recovery attempt %d failed: %s.",
+			attempt_number, tostring(reason))
+		if recovery.refund_current_attempt then
+			recovery.attempt = math.max(0, recovery.attempt - 1)
+			recovery.refund_current_attempt = false
+		end
+		recovery.last_reason = reason or "regeneration-failed"
+		schedule_lease_recovery(recovery, reason or "regeneration-failed")
+	end
+	local call_ok, requested_or_err = xpcall(function()
+		return M.regenerate(finish_attempt, recovery)
+	end, debug.traceback)
+	if not call_ok then
+		finish_attempt(false, "regeneration-raised: " .. tostring(requested_or_err))
+	elseif requested_or_err ~= true and not callback_fired then
+		finish_attempt(false, "regeneration-request-rejected")
+	end
+end
+
+--- Arms the next bounded retry while retaining exact timer ownership.
+--- @param recovery table Exact bounded recovery series.
+--- @param reason string Stable reason for diagnostics.
+--- @return boolean scheduled
+schedule_lease_recovery = function(recovery, reason)
+	if _lease_recovery ~= recovery or recovery.cancelled or recovery.in_flight
+		or recovery.timer ~= nil or recovery.waiting_for_layout or recovery.waiting_for_phase
+		or _pending_layout_refresh ~= nil
+		or not is_current_lifecycle(recovery.epoch) then return false end
+	local next_attempt = recovery.attempt + 1
+	local delay = LEASE_RECOVERY_RETRY_DELAYS_SEC[next_attempt]
+	if type(delay) ~= "number" then
+		recovery.exhausted = true
+		Logger.error(LOG,
+			"Karabiner lease auto-recovery exhausted after %d attempt(s); rules remain fail-closed (%s).",
+			recovery.attempt, tostring(reason))
+		return false
+	end
+
+	retry_lease_recovery_timer_cleanup()
+	local timer = nil
+	local armed = false
+	local fired_before_arm = false
+	local schedule_ok, timer_or_err = pcall(TimerScheduler.after, delay, function()
+		if not armed then
+			fired_before_arm = true
+			return
+		end
+		if _lease_recovery ~= recovery or recovery.timer ~= timer then return end
+		run_async_step("Karabiner lease auto-recovery timer", function()
+			run_lease_recovery_attempt(recovery)
+		end)
+	end)
+	if schedule_ok then timer = timer_or_err end
+	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+		recovery.timer_arm_attempts = (recovery.timer_arm_attempts or 0) + 1
+		if recovery.timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
+			Logger.warn(LOG,
+				"Karabiner lease recovery timer arm %d/%d failed; retrying the same bounded attempt: %s.",
+				recovery.timer_arm_attempts, LEASE_RECOVERY_TIMER_ARM_ATTEMPTS,
+				tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+			return schedule_lease_recovery(recovery, reason)
+		end
+		recovery.exhausted = true
+		Logger.error(LOG,
+			"Could not arm Karabiner lease auto-recovery attempt %d after %d scheduler attempt(s): %s.",
+			next_attempt, recovery.timer_arm_attempts,
+			tostring(schedule_ok and "invalid timer handle" or timer_or_err))
+		return false
+	end
+	recovery.timer_arm_attempts = 0
+	recovery.attempt = next_attempt
+	recovery.last_reason = reason
+	recovery.timer = timer
+	armed = true
+	Logger.warn(LOG,
+		"Karabiner lease failed after exact fencing; fresh-generation recovery attempt %d/%d in %.1f s (%s).",
+		next_attempt, #LEASE_RECOVERY_RETRY_DELAYS_SEC, delay, tostring(reason))
+	return true
+end
+
+--- Starts or coalesces one bounded series after an unexpected lease loss.
+--- A failed enabled-state rollback can finish before its asynchronous exact
+--- fence publishes IDLE/FAILED; in that case the record is retained without a
+--- timer and the settled phase callback owns the first arm.
+--- @param failed_token string Exact token owned by the failed transaction.
+--- @param wait_for_phase boolean|nil True while its exact fence is still pending.
+local function begin_lease_recovery(failed_token, wait_for_phase)
+	if type(failed_token) ~= "string" or failed_token == "" then return end
+	local blocked = lease_recovery_block_reason()
+	if blocked then
+		if blocked == "guardian-approval-required" then
+			Logger.warn(LOG,
+				"Karabiner lease auto-recovery suppressed until the remap guardian is approved.")
+		end
+		cancel_lease_recovery(blocked)
+		return
+	end
+
+	local pause_ok, _, paused = query_shortcuts_pause_state(
+		"Karabiner lease failure pause-state query"
+	)
+	if pause_ok and paused == true then
+		cancel_lease_recovery("script-paused")
+		return
+	end
+
+	local recovery = _lease_recovery
+	if not recovery then
+		recovery = {
+			epoch = _lifecycle_epoch,
+			failed_token = failed_token,
+			attempt = 0,
+			in_flight = false,
+			cancelled = false,
+			exhausted = false,
+			capability = LEASE_FAILURE_RECOVERY_CAPABILITY,
+			waiting_for_layout = false,
+			layout_barrier_exhausted = false,
+			waiting_for_phase = false,
+			refund_current_attempt = false,
+			timer_arm_attempts = 0,
+			owned_token = nil,
+			last_reason = nil,
+			timer = nil,
+		}
+		_lease_recovery = recovery
+	else
+		recovery.failed_token = failed_token
+		recovery.waiting_for_phase = false
+	end
+	if wait_for_phase == true then
+		recovery.waiting_for_phase = true
+		recovery.last_reason = "recovery-fence-pending"
+		return
+	end
+	if recovery.in_flight or recovery.timer ~= nil or recovery.exhausted then return end
+	if _pending_layout_refresh ~= nil then
+		recovery.waiting_for_layout = true
+		return
+	end
+	schedule_lease_recovery(recovery,
+		pause_ok and "unexpected-worker-loss" or "pause-state-unavailable")
+end
+
+--- Rearms a layout-deferred series only after the latest event was consumed.
+local function resume_lease_recovery_after_layout()
+	local recovery = _lease_recovery
+	if not recovery or recovery.cancelled or not recovery.waiting_for_layout then return end
+	recovery.waiting_for_layout = false
+	recovery.layout_barrier_exhausted = false
+	local blocked = lease_recovery_block_reason()
+	if blocked then
+		cancel_lease_recovery(blocked)
+		return
+	end
+	schedule_lease_recovery(recovery, "layout-settled")
+end
+
+--- Releases derivative state after every settled non-active lease transition.
+--- In-flight pause/resume commands retain the last settled classification until
+--- their ACK, avoiding a double-count window while Karabiner still has old state.
+--- @param phase string Lease-controller lifecycle phase.
+--- @param token string|nil Exact generation token named by the controller.
+local function on_lease_phase(phase, token)
+	if not _running then return end
+	-- A bounded heartbeat retry retains the last settled mode. Tearing down and
+	-- immediately rebuilding derivative inputs during that one-second recovery
+	-- window would create user-visible churn without improving fail-closedness.
+	if phase == "recovering" then return end
+	-- FENCING means the protocol failed, not that the tombstone transport has
+	-- completed. Retain both consumers and classification until IDLE/FAILED;
+	-- otherwise still-live rules can emit an F17 with nobody listening.
+	if phase == "fencing" then return end
+	-- A normal STOPPING is only an accepted disable/quit intent. Rules can still
+	-- emit until STOPPED, so consumers and classification remain live to avoid a
+	-- transient missing-output window. The settled IDLE phase releases both.
+	if phase == "stopping" then return end
+	if phase == "idle" or phase == "prepared" or phase == "starting"
+		or phase == "paused" or phase == "failed" then
+		clear_managed_output_set()
+		stop_lease_bound_inputs()
+		KeLifecycle.stop()
+	end
+	if phase == "active" or phase == "paused" or phase == "prepared"
+		or phase == "idle" or phase == "failed" then
+		replay_pending_layout_refresh()
+	end
+
+	local recovery = _lease_recovery
+	if phase == "failed" then
+		if type(token) == "string" and token ~= "" then _last_failed_lease_token = token end
+		begin_lease_recovery(token)
+	elseif phase == "active" then
+		_last_failed_lease_token = nil
+		if not recovery or token ~= recovery.owned_token then
+			cancel_lease_recovery("lease-settled-active")
+		end
+	elseif phase == "idle" and recovery then
+		recovery.waiting_for_phase = false
+		if not recovery.in_flight and recovery.timer == nil
+			and not recovery.waiting_for_layout and not recovery.exhausted then
+			schedule_lease_recovery(recovery, recovery.last_reason or "recovery-fence-settled")
+		end
+	elseif (phase == "prepared" or phase == "starting" or phase == "paused")
+		and recovery and not recovery.in_flight then
+		-- A public/manual transaction superseded the pending automatic attempt.
+		-- During an automatic attempt these phases are intermediate and must keep
+		-- the series budget until its callback proves success or failure.
+		if type(token) == "string" and token == recovery.owned_token then
+			recovery.waiting_for_phase = false
+			if recovery.timer == nil and not recovery.waiting_for_layout
+				and not recovery.exhausted then
+				schedule_lease_recovery(recovery, recovery.last_reason or "owned-phase-settled")
+			end
+		else
+			cancel_lease_recovery("lease-superseded-in-phase-" .. phase)
+		end
+	end
+end
+
 --- Classifies whether a retained layout event may be consumed right now.
 --- Enabled-state transitions are authoritative even when `_state.enabled` still
 --- carries the previous committed value. For a live integration, both the exact
@@ -968,8 +1380,12 @@ local function settled_layout_refresh_mode(paused)
 	if _state.enabled ~= true then return nil, "enabled-state-unavailable" end
 
 	local status_ok, phase, snapshot = pcall(LeaseController.status)
-	if not status_ok or type(snapshot) ~= "table"
-		or type(snapshot.activation_blocked) ~= "boolean" then
+	if not status_ok then
+		Logger.error(LOG, "Settled layout lease-status query failed: %s.", tostring(phase))
+		return nil, "lease-status-unavailable"
+	end
+	if type(snapshot) ~= "table" or type(snapshot.activation_blocked) ~= "boolean" then
+		Logger.error(LOG, "Settled layout lease-status query returned an invalid snapshot.")
 		return nil, "lease-status-unavailable"
 	end
 	-- Direct menu Stop, a fully fenced controller failure, and an observable
@@ -987,6 +1403,73 @@ local function settled_layout_refresh_mode(paused)
 	return nil, "lease-transition-in-progress"
 end
 
+--- Terminates one exhausted retained layout barrier explicitly.  Recovery must
+--- stay fail-closed rather than wait forever on a record that owns no timer.
+--- A later physical input-source event creates a new independent retry budget.
+--- @param pending table Exact retained layout record.
+--- @param reason string Stable terminal reason.
+local function exhaust_pending_layout_refresh(pending, reason)
+	if _pending_layout_refresh ~= pending then return end
+	if _layout_rebuild_timer then
+		pcall(function() _layout_rebuild_timer:stop() end)
+		_layout_rebuild_timer = nil
+	end
+	_pending_layout_refresh = nil
+	local recovery = _lease_recovery
+	if recovery and recovery.waiting_for_layout then
+		recovery.layout_barrier_exhausted = true
+		Logger.error(LOG,
+			"%s layout refresh exhausted after %d retry attempt(s); remap recovery remains fail-closed until a new layout event (%s).",
+			tostring(pending.source), pending.retry_attempt or 0, tostring(reason))
+	else
+		Logger.error(LOG,
+			"%s layout refresh exhausted after %d retry attempt(s); the current lease state was retained (%s).",
+			tostring(pending.source), pending.retry_attempt or 0, tostring(reason))
+	end
+end
+
+--- Rearms one exact post-TIS pipeline after a transient callback failure.
+--- Failed timer creation is routed through the same bounded budget, so every
+--- retained pending record either owns a live timer or has a documented future
+--- lease transition that will replay it.
+--- @param pending table Exact retained layout record.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean scheduled
+local function retry_pending_layout_refresh(pending, reason)
+	local current = _pending_layout_refresh
+	if current ~= pending then
+		if not current or current.retry_lineage ~= pending.retry_lineage then return false end
+		pending = current
+	end
+	if not is_current_lifecycle(pending.epoch) then
+		return false
+	end
+	local lineage = pending.retry_lineage
+	local next_attempt = (lineage.retry_attempt or 0) + 1
+	local delay = LAYOUT_REFRESH_RETRY_DELAYS_SEC[next_attempt]
+	if type(delay) ~= "number" then
+		exhaust_pending_layout_refresh(pending, reason)
+		return false
+	end
+	if pending.tis_settled ~= true then
+		delay = math.max(delay, LAYOUT_TIS_SETTLE_SEC)
+	end
+	lineage.retry_attempt = next_attempt
+	pending.retry_attempt = next_attempt
+	Logger.warn(LOG, "%s layout refresh retry %d/%d in %.1f s (%s).",
+		tostring(pending.source), next_attempt, #LAYOUT_REFRESH_RETRY_DELAYS_SEC,
+		delay, tostring(reason))
+	return schedule_layout_refresh(
+		pending.layout_name,
+		pending.source,
+		pending.epoch,
+		pending.tis_settled,
+		next_attempt,
+		delay,
+		lineage
+	) == true
+end
+
 --- Executes the one canonical post-TIS-settle layout refresh pipeline.
 --- Both input-source notifications and wake events schedule this function.
 --- @param layout_name string|nil Notification layout label, if known.
@@ -999,25 +1482,49 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 	local pause_ok, shortcuts, paused = query_shortcuts_pause_state(
 		"Settled " .. source .. " pause-state query"
 	)
-	if not pause_ok or not is_current_lifecycle(epoch)
-		or _pending_layout_refresh ~= pending then return end
+	if not pause_ok then
+		retry_pending_layout_refresh(pending, "pause-state-unavailable")
+		return
+	end
+	if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
 	local settled_mode, unsettled_reason = settled_layout_refresh_mode(paused)
 	if not settled_mode then
-		retain_layout_refresh(pending, unsettled_reason)
+		if LAYOUT_REGENERATION_DEFER_REASONS[unsettled_reason] then
+			retain_layout_refresh(pending, unsettled_reason)
+		else
+			retry_pending_layout_refresh(pending, unsettled_reason or "layout-mode-unavailable")
+		end
 		return
 	end
 
+	local function adopt_current_lineage()
+		local current = _pending_layout_refresh
+		if current == pending then return true end
+		if not current or current.retry_lineage ~= pending.retry_lineage then return false end
+		pending = current
+		return true
+	end
 	local function consume_pending()
-		if _pending_layout_refresh == pending then _pending_layout_refresh = nil end
+		if not adopt_current_lineage() then return end
+		_pending_layout_refresh = nil
+		resume_lease_recovery_after_layout()
 	end
 	local function rebind_if_current()
-		if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
+		if not is_current_lifecycle(epoch) or not adopt_current_lineage() then return end
+		if type(shortcuts.rebind_for_layout) ~= "function" then
+			Logger.error(LOG, "Settled %s shortcut rebind API is unavailable.", source)
+			retry_pending_layout_refresh(pending, "shortcut-rebind-unavailable")
+			return
+		end
 		if type(shortcuts.rebind_for_layout) == "function" then
 			local rebind_ok, rebound = run_async_step(
 				"Settled " .. source .. " shortcut rebind",
 				shortcuts.rebind_for_layout
 			)
-			if not rebind_ok then return end
+			if not rebind_ok then
+				retry_pending_layout_refresh(pending, "shortcut-rebind-failed")
+				return
+			end
 			if rebound then
 				Logger.info(LOG, "Shortcuts rebound for layout '%s'.",
 					tostring(layout_name or "current"))
@@ -1035,8 +1542,11 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 		resolved_ok, resolved_count = resolve_current_layout_actions(
 			"Settled " .. source .. " layout-action resolution"
 		)
-		if not resolved_ok or not is_current_lifecycle(epoch)
-			or _pending_layout_refresh ~= pending then return end
+		if not resolved_ok then
+			retry_pending_layout_refresh(pending, "layout-action-resolution-failed")
+			return
+		end
+		if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
 	end
 
 	if settled_mode == "paused" then
@@ -1056,13 +1566,15 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 				return
 			end
 			callback_fired = true
-			if not is_current_lifecycle(epoch) or _pending_layout_refresh ~= pending then return end
+			if not is_current_lifecycle(epoch) or not adopt_current_lineage() then return end
 			if regenerated ~= true then
 				if LAYOUT_REGENERATION_DEFER_REASONS[reason] then
 					retain_layout_refresh(pending, reason)
 				else
 					Logger.error(LOG, "Settled %s Karabiner regeneration failed: %s.",
 						source, tostring(reason))
+					retry_pending_layout_refresh(pending,
+						"regeneration-failed:" .. tostring(reason))
 				end
 				return
 			end
@@ -1078,6 +1590,7 @@ local function perform_settled_layout_refresh(layout_name, source, epoch)
 		if not regenerate_ok then
 			Logger.error(LOG, "Settled %s Karabiner regeneration raised: %s.",
 				source, tostring(accepted_or_err))
+			retry_pending_layout_refresh(pending, "regeneration-raised")
 			return
 		end
 		if accepted_or_err ~= true and not callback_fired then
@@ -1099,25 +1612,48 @@ end
 --- @param source string Stable event source for diagnostics.
 --- @param epoch integer Scheduling lifecycle epoch.
 --- @param tis_settled boolean|nil True when a retained event already paid the TIS debounce.
+--- @param retry_attempt integer|nil Count of transient failures already charged.
+--- @param delay_override number|nil Exact retry/replay delay; nil uses the TIS delay.
+--- @param retry_lineage table|nil Shared budget across re-entrant phase replays.
 --- @return boolean scheduled
-schedule_layout_refresh = function(layout_name, source, epoch, tis_settled)
+schedule_layout_refresh = function(
+	layout_name,
+	source,
+	epoch,
+	tis_settled,
+	retry_attempt,
+	delay_override,
+	retry_lineage
+)
 	if not is_current_lifecycle(epoch) then return false end
 	if _layout_rebuild_timer then
 		pcall(function() _layout_rebuild_timer:stop() end)
 		_layout_rebuild_timer = nil
 	end
+	local lineage = retry_lineage or {
+		retry_attempt = retry_attempt or 0,
+	}
+	if retry_attempt ~= nil then lineage.retry_attempt = retry_attempt end
 	local pending = {
 		layout_name = layout_name,
 		source = source,
 		epoch = epoch,
 		tis_settled = tis_settled == true,
+		retry_attempt = lineage.retry_attempt or 0,
+		retry_lineage = lineage,
 	}
 	_pending_layout_refresh = pending
+	if _lease_recovery then defer_lease_recovery_for_layout(_lease_recovery) end
+	-- Exact fencing can settle synchronously (for example a re-entrant STOPPED
+	-- transport callback) and replay this pending event before defer returns.
+	-- Never let the superseded outer call overwrite that newer timer owner.
+	if _pending_layout_refresh ~= pending then return _layout_rebuild_timer ~= nil end
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local timer_ok, timer_or_err = pcall(hs.timer.doAfter,
-		pending.tis_settled and 0 or LAYOUT_TIS_SETTLE_SEC, function()
+	local delay = type(delay_override) == "number"
+		and delay_override or (pending.tis_settled and 0 or LAYOUT_TIS_SETTLE_SEC)
+	local timer_ok, timer_or_err = pcall(hs.timer.doAfter, delay, function()
 		if not armed then
 			fired_before_arm = true
 			return
@@ -1130,7 +1666,7 @@ schedule_layout_refresh = function(layout_name, source, epoch, tis_settled)
 		local ok = run_async_step("Delayed " .. source .. " layout refresh", function()
 			perform_settled_layout_refresh(layout_name, source, epoch)
 		end)
-		if not ok then return end
+		if not ok then retry_pending_layout_refresh(pending, "layout-callback-raised") end
 	end)
 	timer = timer_or_err
 	local timer_type = type(timer_or_err)
@@ -1141,7 +1677,7 @@ schedule_layout_refresh = function(layout_name, source, epoch, tis_settled)
 			pcall(function() timer_or_err:stop() end)
 		end
 		Logger.error(LOG, "Could not schedule %s layout refresh: %s.", source, tostring(timer_or_err))
-		return false
+		return retry_pending_layout_refresh(pending, "timer-arm-failed")
 	end
 	_layout_rebuild_timer = timer_or_err
 	armed = true
@@ -1296,7 +1832,13 @@ function M.set_enabled(value, on_done)
 		return regenerate_requested == true or _enabled_transition == transaction
 	end
 
-	local transaction = { kind = "disabling", callbacks = {} }
+	cancel_lease_recovery("integration-disable-requested")
+	local _, _, disable_snapshot = pcall(LeaseController.status)
+	local transaction = {
+		kind = "disabling",
+		callbacks = {},
+		previous_token = type(disable_snapshot) == "table" and disable_snapshot.token or nil,
+	}
 	if type(on_done) == "function" then transaction.callbacks[1] = on_done end
 	_enabled_transition = transaction
 	Logger.info(LOG, "Karabiner integration disable requested; awaiting STOPPED.")
@@ -1312,6 +1854,24 @@ function M.set_enabled(value, on_done)
 		end
 		settle_enabled_callbacks(transaction, false,
 			disable_reason or recovery_reason or "disable-failed")
+		if not recovered and _enabled_transition == nil and _state.enabled == true then
+			local status_ok, phase, snapshot = pcall(LeaseController.status)
+			local seed_token = type(snapshot) == "table" and snapshot.token
+				or _last_failed_lease_token or transaction.previous_token
+			local phase_is_settled = phase == "failed" or phase == "idle"
+				or phase == "prepared" or phase == "paused"
+			local phase_is_fencing = phase == "recovering" or phase == "fencing"
+				or phase == "pausing" or phase == "resuming"
+				or phase == "starting" or phase == "stopping"
+			if status_ok and type(seed_token) == "string"
+				and (phase_is_settled or phase_is_fencing) then
+				begin_lease_recovery(seed_token, phase_is_fencing)
+				if _lease_recovery and type(snapshot) == "table"
+					and snapshot.token == seed_token then
+					_lease_recovery.owned_token = seed_token
+				end
+			end
+		end
 	end
 
 	local function rollback_enabled_state(disable_reason)
@@ -1651,6 +2211,9 @@ function M.regenerate(on_done, recovery_capability)
 		and enable_transaction.kind == "enabling"
 	local is_disable_recovery = recovery_capability == PAUSED_DISABLE_RECOVERY
 	local is_resume_regeneration = recovery_capability == PAUSED_RESUME_REGENERATION
+	local is_lease_failure_recovery = type(recovery_capability) == "table"
+		and recovery_capability == _lease_recovery
+		and recovery_capability.capability == LEASE_FAILURE_RECOVERY_CAPABILITY
 	local callback_settled = false
 	local function finish(ok, reason)
 		if callback_settled then return end
@@ -1663,7 +2226,7 @@ function M.regenerate(on_done, recovery_capability)
 	end
 	if not require_state("regenerate") then return fail("not-initialized") end
 	local has_private_capability = is_enable_transition
-		or is_disable_recovery or is_resume_regeneration
+		or is_disable_recovery or is_resume_regeneration or is_lease_failure_recovery
 	if recovery_capability ~= nil and not has_private_capability then
 		Logger.error(LOG, "Karabiner regeneration refused an invalid private recovery capability.")
 		return fail("invalid-recovery-capability")
@@ -1676,7 +2239,8 @@ function M.regenerate(on_done, recovery_capability)
 		Logger.debug(LOG, "Regenerate skipped — Karabiner disable fencing is in progress.")
 		return fail("disable-in-progress")
 	end
-	if recovery_capability == nil and _enabled_transition ~= nil then
+	if (recovery_capability == nil or is_lease_failure_recovery)
+		and _enabled_transition ~= nil then
 		Logger.debug(LOG, "Regenerate skipped — a Karabiner enabled-state transition is in progress.")
 		return fail("enabled-transition-in-progress")
 	end
@@ -1706,7 +2270,7 @@ function M.regenerate(on_done, recovery_capability)
 		return fail("script-paused")
 	end
 
-	if recovery_capability == nil then
+	if recovery_capability == nil or is_lease_failure_recovery then
 		local status_ok, phase, snapshot = pcall(LeaseController.status)
 		if not status_ok or type(snapshot) ~= "table"
 			or type(snapshot.activation_blocked) ~= "boolean" then
@@ -1749,6 +2313,7 @@ function M.regenerate(on_done, recovery_capability)
 		Logger.error(LOG, "Karabiner generation refused — no exact Ergopti lease token is available.")
 		return fail("token-unavailable")
 	end
+	if is_lease_failure_recovery then recovery_capability.owned_token = lease_token end
 
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,
@@ -1848,6 +2413,37 @@ function M.regenerate(on_done, recovery_capability)
 			local before_resume = nil
 			if is_enable_transition then
 				before_resume = function() return commit_enable_transition(enable_transaction) end
+			elseif is_lease_failure_recovery then
+				local captured_recovery = recovery_capability
+				before_resume = function()
+					if _lease_recovery ~= captured_recovery or captured_recovery.cancelled then
+						-- A user PAUSE deliberately cancels future automatic work, but a
+						-- replacement that has already reached exact PAUSED is the desired
+						-- fail-closed state: retain its script-control-only rules. Every
+						-- other cancellation (disable, resume, revoke, lifecycle loss)
+						-- remains unauthorized and fences this token below.
+						local pause_ok, _, paused = query_shortcuts_pause_state(
+							"Cancelled Karabiner lease recovery pause-state query"
+						)
+						local status_ok, current_phase, current_snapshot = pcall(LeaseController.status)
+						local pause_intent_proven = pause_ok and paused == true
+							or (status_ok and current_phase == "paused"
+								and type(current_snapshot) == "table"
+								and current_snapshot.token == lease_token
+								and current_snapshot.activation_blocked == true)
+						if pause_intent_proven and exact_generation_phase(lease_token) == "paused" then
+							return true
+						end
+						return false, "lease-recovery-cancelled"
+					end
+					if captured_recovery.waiting_for_layout
+						or _pending_layout_refresh ~= nil then
+						captured_recovery.waiting_for_layout = true
+						return false, captured_recovery.layout_barrier_exhausted
+							and "layout-refresh-exhausted" or "layout-refresh-pending"
+					end
+					return true
+				end
 			end
 			return start_or_join_lease_activation({
 				retain_if_paused = is_resume_regeneration,
@@ -1867,7 +2463,16 @@ function M.regenerate(on_done, recovery_capability)
 				else
 					Logger.success(LOG, "Ergopti Karabiner lease activated after local input preparation.")
 				end
-				KeLifecycle.notify_ready()
+				local pending_recovery = _lease_recovery
+				if not is_lease_failure_recovery and pending_recovery
+					and pending_recovery.owned_token == lease_token then
+					cancel_lease_recovery("owned-generation-activated-manually")
+				end
+				local notify_ok, notify_err = xpcall(KeLifecycle.notify_ready, debug.traceback)
+				if not notify_ok then
+					Logger.error(LOG, "Karabiner ready notification failed after activation: %s.",
+						tostring(notify_err))
+				end
 				finish(true, activation_reason or reason or "ready")
 			end)
 		end, debug.traceback)
@@ -1908,6 +2513,62 @@ function M.pause(on_done)
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
 	end
+	cancel_lease_recovery("script-pause-requested")
+	local status_ok, phase = pcall(LeaseController.status)
+	if status_ok and (phase == "failed" or phase == "idle" or phase == "prepared") then
+		-- No generation can emit normal Ergopti rules in these settled phases.
+		-- Treat that exact fail-closed fact as PAUSED so script_control can commit
+		-- its local pause state; the later explicit Resume provisions/activates a
+		-- generation instead of trapping the UI in an unpaused/no-lease loop.
+		Logger.info(LOG, "Karabiner pause already satisfied by fail-closed lease phase '%s'.", phase)
+		invoke_public_callback("pause", on_done, true, "already-fail-closed")
+		replay_pending_layout_refresh()
+		return true
+	end
+	if status_ok and (phase == "stopping" or phase == "fencing") then
+		-- The controller has already detached the failed generation, so PAUSE
+		-- cannot address it. Its old rules may still emit until STOPPED/fallback,
+		-- however: join the aggregate exact fence and publish Pause only afterwards.
+		Logger.info(LOG, "Karabiner pause is joining the in-flight exact lease fence.")
+		local callback_fired = false
+		local function finish_joined_pause(stopped, reason)
+			if callback_fired then
+				Logger.warn(LOG, "Duplicate joined-fence Karabiner pause callback ignored.")
+				return
+			end
+			callback_fired = true
+			if stopped == true then
+				Logger.info(LOG, "Karabiner pause committed after the exact lease fence settled.")
+			else
+				Logger.error(LOG, "Karabiner pause could not prove the in-flight fence: %s.",
+					tostring(reason))
+			end
+			invoke_public_callback("pause", on_done, stopped == true,
+				stopped == true and "already-fail-closed" or reason)
+			if stopped == true then
+				-- FAILED is published before aggregate stop-barrier callbacks. It may
+				-- have briefly armed a replacement while script_control was still
+				-- committing this pause; the accepted user intent wins afterwards.
+				cancel_lease_recovery("script-pause-committed-after-fence")
+			end
+			replay_pending_layout_refresh()
+		end
+		local join_ok, accepted_or_err = xpcall(function()
+			return LeaseController.stop("script_pause_joined_fence", finish_joined_pause)
+		end, debug.traceback)
+		if not join_ok then
+			Logger.error(LOG, "Karabiner pause exact-fence join raised: %s.",
+				tostring(accepted_or_err))
+			if not callback_fired then finish_joined_pause(false, "fence-join-raised") end
+			return false
+		end
+		if accepted_or_err ~= true then
+			Logger.error(LOG, "Karabiner pause exact-fence join was rejected.")
+			if not callback_fired then finish_joined_pause(false, "fence-join-rejected") end
+			return false
+		end
+		return true
+	end
 	Logger.start(LOG, "Pausing ErgoptiPlus Karabiner remapping…")
 	local callback_fired = false
 	local request_ok, requested_or_err = xpcall(function()
@@ -1947,6 +2608,7 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
 	end
+	cancel_lease_recovery("script-resume-requested")
 	if _enabled_transition and _enabled_transition.kind == "disabling" then
 		Logger.debug(LOG, "Resume skipped — Karabiner disable fencing is in progress.")
 		invoke_public_callback("resume", on_done, false, "disable-in-progress")
@@ -2306,7 +2968,7 @@ local function stop_local_resources()
 	_shutdown_requested = true
 	_lifecycle_epoch = _lifecycle_epoch + 1
 	_pending_layout_refresh = nil
-	local all_stopped = true
+	local all_stopped = cancel_lease_recovery("local-teardown") == true
 	if _wake_watcher then
 		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
 		if not stopped or stop_result == false then
@@ -2386,6 +3048,7 @@ function M.revoke(reason, on_done)
 		_shutdown_requested = true
 		_lifecycle_epoch = _lifecycle_epoch + 1
 	end
+	cancel_lease_recovery("lease-revocation-requested")
 	_pending_layout_refresh = nil
 	local callback_fired = false
 	local callback_succeeded = false
