@@ -16,8 +16,8 @@
 --- focused application. A stuck-true flag silently misroutes every subsequent
 --- keypress until the next successful show_predictions() or an explicit hide().
 ---
---- Fix: move the `_is_visible = true` assignment to after Renderer.render()
---- returns without raising, inside the same internal pcall.
+--- Fix: commit visibility only after the renderer invokes its post-show callback
+--- and the complete dismissal-watcher set is verified active.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -66,25 +66,14 @@ helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions
 			"is_visible() must not get stuck true after show_predictions failed to render — " ..
 			"llm_bridge.lua would otherwise keep routing keystrokes to a tooltip that was never shown")
 	end)
-end)
 
-helpers.describe("tooltip_llm: _is_visible is set after Renderer.render(), not before (F-MED-24)", function()
-	local function read_src()
-		-- Selected by a declaration unique to ui/tooltip/tooltip_llm.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function refresh_chain_timing")
-		helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_llm.lua source must be locatable")
-		return src
-	end
+	helpers.it("show_predictions reports a failed transaction when rendering crashes", function()
+		local Tooltip = load_tooltip_llm_with_logger_spy()
+		local preds = { { chunks = {}, nw = "hello" } }
 
-	helpers.it("the _is_visible = true assignment appears after the Renderer.render call", function()
-		local src = read_src()
-		local render_call_pos = src:find("Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)", 1, true)
-		local visible_flag_pos = src:find("_is_visible = true", 1, true)
-		helpers.assert_true(render_call_pos ~= nil, "show_predictions must call Renderer.render(...)")
-		helpers.assert_true(visible_flag_pos ~= nil, "show_predictions must set _is_visible = true")
-		helpers.assert_true(visible_flag_pos > render_call_pos,
-			"_is_visible = true must come AFTER the Renderer.render() call so a render crash cannot leave it stuck true")
+		local shown = Tooltip.show_predictions(preds, 1, true, "Model", "alt", 0, {}, nil, nil, 0)
+
+		helpers.assert_eq(shown, false,
+			"a swallowed render exception must not be reported as a committed tooltip")
 	end)
 end)

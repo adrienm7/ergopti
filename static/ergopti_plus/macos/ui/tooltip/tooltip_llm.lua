@@ -65,6 +65,10 @@ local _state = {
 local _watchers = {}
 local _idle_timer = nil
 local _shift_side = nil  -- "left", "right", or nil when no shift is held
+local _watcher_session_active = false
+local _watcher_epoch = 0
+local _ui_generation = 0
+local REQUIRED_WATCHER_COUNT = 3
 
 -- ── Chain timing instrumentation ─────────────────────────────────────────────
 -- Backend-agnostic TTFT / TTLT measurement done at the tooltip level.
@@ -102,6 +106,11 @@ local _runtime_guard = function() return true end
 local function runtime_available()
 	local ok, available = pcall(_runtime_guard)
 	return ok and available == true
+end
+
+--- Invalidates work classified against an older tooltip render.
+local function advance_ui_generation()
+	_ui_generation = _ui_generation + 1
 end
 
 --- Composes the info-bar text shown beneath the prediction list.
@@ -181,12 +190,53 @@ end
 local function dismiss(reason)
 	Logger.debug(LOG, "Dismissing predictions tooltip (%s).", reason)
 	if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-	M.hide()
+	return M.hide()
+end
+
+--- Reads a timer's live state across native hs.timer and the test double.
+--- @param timer table|userdata Timer object.
+--- @return boolean ok
+--- @return boolean|any running_or_error
+local function timer_running(timer)
+	local ok, result = pcall(function()
+		local probe = timer and timer.running
+		if type(probe) == "function" then return probe(timer) end
+		if type(probe) == "boolean" then return probe end
+		error("running status is unavailable")
+	end)
+	return ok, result
+end
+
+--- Stops a timer and proves the native object is no longer running.
+--- @param timer table|userdata Timer object.
+--- @param label string Diagnostic label.
+--- @return boolean stopped
+local function stop_timer_verified(timer, label)
+	if not timer or type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot stop %s: invalid timer.", label)
+		return false
+	end
+	local stop_ok, stop_err = pcall(timer.stop, timer)
+	if not stop_ok then
+		Logger.error(LOG, "Failed to stop %s: %s.", label, tostring(stop_err))
+	end
+	local status_ok, running = timer_running(timer)
+	if status_ok and running == false then return true end
+	if not status_ok or running ~= false then
+		Logger.error(LOG, "Cannot verify stopped %s: %s.", label,
+			tostring(status_ok and "timer remained running" or running))
+		return false
+	end
+	return true
 end
 
 --- Clears active timers and sets a new idle timeout if applicable.
+--- @return boolean True when the deadline is owned and usable.
 local function reset_idle_timer()
-	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
+	if _idle_timer then
+		if not stop_timer_verified(_idle_timer, "tooltip idle timer") then return false end
+		_idle_timer = nil
+	end
 	local active_timeout = Config.settings.llm_timeout_sec
 
 	if active_timeout > 0 then
@@ -194,28 +244,122 @@ local function reset_idle_timer()
 		-- had predictions_visible set, so the next Tab typed the prediction that
 		-- had already timed out — text the user never asked for, from a tooltip
 		-- that was no longer on screen.
-		_idle_timer = hs.timer.doAfter(active_timeout, function()
+		local generation = _ui_generation
+		local timer_handle = nil
+		local timer_ok, timer_or_err = pcall(hs.timer.doAfter, active_timeout, function()
+			if not timer_handle or _idle_timer ~= timer_handle then return end
+			_idle_timer = nil
+			if generation ~= _ui_generation or not _watcher_session_active then return end
 			if not runtime_available() then
 				M.hide_silent()
 				return
 			end
 			dismiss("idle timeout")
 		end)
+		if timer_ok then timer_handle = timer_or_err end
+		if timer_ok and timer_or_err then _idle_timer = timer_or_err end
+		local status_ok, running = false, nil
+		if timer_ok then status_ok, running = timer_running(timer_or_err) end
+		if not timer_ok or not timer_or_err or type(timer_or_err.stop) ~= "function"
+			or not status_ok or running ~= true then
+			Logger.error(LOG, "Cannot arm tooltip idle timer: %s.",
+				tostring(timer_ok and (status_ok and "timer did not start" or running) or timer_or_err))
+			if _idle_timer and stop_timer_verified(_idle_timer, "invalid tooltip idle timer") then
+				_idle_timer = nil
+			end
+			return false
+		end
 		Logger.debug(LOG, "Auto-hide idle timer (re)armed: %.1fs.", active_timeout)
 	end
+	return true
 end
 
 --- Terminates all active keyboard and mouse watchers.
+--- A watcher whose stop cannot be verified remains owned so a later render can
+--- retry cleanup without creating a duplicate eventtap beside the orphan.
+--- @return boolean True when every watcher and the idle timer were revoked.
 local function stop_watchers()
-	for _, watcher in ipairs(_watchers) do 
-		if watcher and type(watcher.stop) == "function" then watcher:stop() end 
+	advance_ui_generation()
+	_watcher_epoch = _watcher_epoch + 1
+	_watcher_session_active = false
+	local residual_watchers = {}
+	for _, watcher in ipairs(_watchers) do
+		local stop_ok = false
+		if watcher and type(watcher.stop) == "function" then
+			local ok, err = pcall(watcher.stop, watcher)
+			stop_ok = ok
+			if not ok then Logger.error(LOG, "Failed to stop dismissal event listener: %s.", tostring(err)) end
+		else
+			Logger.error(LOG, "Cannot stop dismissal event listener: invalid watcher.")
+		end
+
+		local status_ok, enabled = false, nil
+		if watcher and type(watcher.isEnabled) == "function" then
+			status_ok, enabled = pcall(watcher.isEnabled, watcher)
+		end
+		if not status_ok or enabled ~= false then
+			if stop_ok then
+				Logger.error(LOG, "Dismissal event listener remained enabled after stop.")
+			end
+			residual_watchers[#residual_watchers + 1] = watcher
+		end
 	end
-	_watchers = {}
+	_watchers = residual_watchers
 	
-	if _idle_timer and type(_idle_timer.stop) == "function" then 
-		_idle_timer:stop()
-		_idle_timer = nil 
+	local timer_stopped = true
+	if _idle_timer then
+		timer_stopped = stop_timer_verified(_idle_timer, "tooltip idle timer")
+		if timer_stopped then _idle_timer = nil end
 	end
+	return #_watchers == 0 and timer_stopped
+end
+
+--- Reports whether every dismissal watcher exists and remains enabled.
+--- @return boolean True when the complete watcher set can be reused.
+local function watchers_are_active()
+	if not _watcher_session_active then return false end
+	if #_watchers ~= REQUIRED_WATCHER_COUNT then return false end
+	for _, watcher in ipairs(_watchers) do
+		if not watcher or type(watcher.isEnabled) ~= "function" then return false end
+		local ok, enabled = pcall(watcher.isEnabled, watcher)
+		if not ok or enabled ~= true then return false end
+	end
+	return true
+end
+
+--- Starts and retains one watcher without letting an OS failure escape rendering.
+--- @param watcher table|nil Eventtap object.
+--- @param label string Diagnostic watcher label.
+--- @return boolean True when the watcher started successfully.
+local function activate_watcher(watcher, label)
+	if not watcher then
+		Logger.error(LOG, "Cannot start %s event listener: invalid watcher.", label)
+		return false
+	end
+	-- Ownership begins when the OS object is returned, not when start() reports
+	-- success: CGEventTap can enable before a Lua wrapper throws. Keeping the
+	-- reference lets stop_watchers() retry instead of losing an active orphan.
+	_watchers[#_watchers + 1] = watcher
+	if type(watcher.start) ~= "function" then
+		Logger.error(LOG, "Cannot start %s event listener: invalid watcher.", label)
+		return false
+	end
+	local ok, err = pcall(watcher.start, watcher)
+	if not ok then
+		Logger.error(LOG, "Failed to start %s event listener: %s.", label, tostring(err))
+		return false
+	end
+	if type(watcher.isEnabled) ~= "function" then
+		Logger.error(LOG, "Cannot verify %s event listener: isEnabled is unavailable.", label)
+		return false
+	end
+	local enabled_ok, enabled = pcall(watcher.isEnabled, watcher)
+	if not enabled_ok or enabled ~= true then
+		Logger.error(LOG, "%s event listener did not enable: %s.", label,
+			tostring(enabled_ok and "CGEventTapCreate failed" or enabled))
+		return false
+	end
+	return true
 end
 
 --- Validates modifier flags securely against expected target mods.
@@ -255,7 +399,9 @@ end
 --- @return boolean scheduled
 local function defer_runtime_action(label, fn, ...)
 	local args = table.pack(...)
+	local generation = _ui_generation
 	return SyntheticInput.defer_after_callback(label, function()
+		if generation ~= _ui_generation or not _watcher_session_active then return end
 		if not runtime_available() then return end
 		return fn(table.unpack(args, 1, args.n))
 	end)
@@ -265,7 +411,9 @@ end
 --- @param reason string Dismissal reason.
 --- @return boolean scheduled
 local function defer_dismiss(reason)
+	local generation = _ui_generation
 	return SyntheticInput.defer_after_callback("LLM tooltip dismissal", function()
+		if generation ~= _ui_generation or not _watcher_session_active then return end
 		if runtime_available() then dismiss(reason) else M.hide_silent() end
 	end)
 end
@@ -274,18 +422,48 @@ end
 --- @param watcher string Watcher label.
 --- @param err any Failure detail.
 local function defer_watcher_failure(watcher, err)
+	local generation = _ui_generation
 	SyntheticInput.defer_after_callback("LLM tooltip watcher failure", function()
 		Logger.error(LOG, "%s watcher failed: %s.", watcher, tostring(err))
+		if generation ~= _ui_generation or not _watcher_session_active then return end
 		if runtime_available() then dismiss(watcher .. " failure") else M.hide_silent() end
 	end)
 end
 
 --- Starts OS-level interception to handle LLM navigation and dismissal.
 local function start_watchers()
-	stop_watchers()
-	reset_idle_timer()
+	if watchers_are_active() then
+		if reset_idle_timer() then return true end
+		if runtime_available() then
+			dismiss("idle timer reset failure")
+		else
+			M.hide_silent()
+		end
+		return false
+	end
+
+	if not stop_watchers() then
+		if runtime_available() then
+			dismiss("watcher cleanup failure")
+		else
+			M.hide_silent()
+		end
+		return false
+	end
+	if not reset_idle_timer() then
+		if runtime_available() then
+			dismiss("idle timer activation failure")
+		else
+			M.hide_silent()
+		end
+		return false
+	end
+	_watcher_session_active = true
+	_watcher_epoch = _watcher_epoch + 1
+	local watcher_epoch = _watcher_epoch
 	
 	local event_types = hs.eventtap.event.types
+	local activation_ok = true
 	
 	-- Mouse Watcher
 	-- mouseMoved intentionally excluded: trackpad fires it at 200+ Hz, which adds
@@ -296,6 +474,7 @@ local function start_watchers()
 	ok_mouse, watcher_mouse = pcall(hs.eventtap.new,
 		{ event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel },
 		function(event)
+			if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
 			if EventTapGuard.handle_disabled(event, watcher_mouse, "tooltip.llm_mouse") then
 				return false
 			end
@@ -311,9 +490,11 @@ local function start_watchers()
 			return false, fence_events
 		end)
 	
-	if ok_mouse and watcher_mouse then 
-		watcher_mouse:start()
-		table.insert(_watchers, watcher_mouse) 
+	if ok_mouse then
+		if not activate_watcher(watcher_mouse, "mouse") then activation_ok = false end
+	else
+		activation_ok = false
+		Logger.error(LOG, "Failed to mount mouse event listener: %s.", tostring(watcher_mouse))
 	end
 
 	-- Keyboard Watcher
@@ -322,6 +503,7 @@ local function start_watchers()
 	-- Right shift + Tab → next prediction    (+1)
 	local ok_flags, watcher_flags
 	ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(event)
+		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
 		if EventTapGuard.handle_disabled(event, watcher_flags, "tooltip.llm_flags") then
 			return false
 		end
@@ -351,13 +533,16 @@ local function start_watchers()
 		end
 		return false, fence_events
 	end)
-	if ok_flags and watcher_flags then
-		watcher_flags:start()
-		table.insert(_watchers, watcher_flags)
+	if ok_flags then
+		if not activate_watcher(watcher_flags, "modifier") then activation_ok = false end
+	else
+		activation_ok = false
+		Logger.error(LOG, "Failed to mount modifier event listener: %s.", tostring(watcher_flags))
 	end
 
 	local ok_key, watcher_key
 	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
 		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.llm_key") then
 			return false
 		end
@@ -541,12 +726,36 @@ local function start_watchers()
 		return finish(false)
 	end)
 	
-	if ok_key and watcher_key then 
-		watcher_key:start()
-		table.insert(_watchers, watcher_key) 
-	else 
-		Logger.error(LOG, "Failed to mount keyboard event listener.") 
+	if ok_key then
+		if not activate_watcher(watcher_key, "keyboard") then activation_ok = false end
+	else
+		activation_ok = false
+		Logger.error(LOG, "Failed to mount keyboard event listener: %s.", tostring(watcher_key))
 	end
+
+	if not activation_ok or not watchers_are_active() then
+		stop_watchers()
+		if runtime_available() then
+			dismiss("watcher activation failure")
+		else
+			M.hide_silent()
+		end
+		return false
+	end
+	return true
+end
+
+--- Runs watcher activation across the renderer callback boundary. Renderer
+--- catches callback exceptions internally, so callers need an explicit status.
+--- @return boolean ready Full verified set is active.
+--- @return boolean crashed Activation raised unexpectedly.
+local function activate_watchers_safely()
+	local ok, result = xpcall(start_watchers, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Crash during dismissal watcher activation: %s.", tostring(result))
+		return false, true
+	end
+	return result == true, false
 end
 
 
@@ -892,8 +1101,14 @@ end
 --- Called by llm_bridge after every navigation and once predictions are final.
 function M.reset_timer()
 	if not runtime_available() then return false end
-	reset_idle_timer()
-	return true
+	if not _is_visible then return false end
+	if not watchers_are_active() then
+		dismiss("idle timer reset without active watchers")
+		return false
+	end
+	if reset_idle_timer() then return true end
+	dismiss("idle timer reset failure")
+	return false
 end
  
 
@@ -907,8 +1122,9 @@ local function hide_impl(log_callsite)
 		Logger.debug(LOG, "HIDE predictions tooltip (was showing %d) — caller %s.",
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0, caller)
 	end
-	pcall(function()
-		stop_watchers()
+	local watchers_stopped = false
+	local ok = pcall(function()
+		watchers_stopped = stop_watchers()
 		_is_visible               = false
 		_state.raw_predictions    = {}
 		_state.current_index      = 1
@@ -929,30 +1145,54 @@ local function hide_impl(log_callsite)
 		-- new perform_check).
 		Renderer.hide()
 	end)
+	return ok and watchers_stopped
 end
 
-function M.hide() hide_impl(true) end
+function M.hide() return hide_impl(true) end
 
 --- Hides immediately without file-backed diagnostic logging.
 --- Used by keyDown reconciliation where stale UI must disappear synchronously
 --- but no logger sink may run inside the eventtap callback.
-function M.hide_silent() hide_impl(false) end
+function M.hide_silent() return hide_impl(false) end
 
 function M.navigate(delta)
 	if not runtime_available() then return false end
+	local completed = false
 	local ok, err = pcall(function()
 		local active_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-		if active_count < 2 then return end
+		if active_count < 2 then
+			completed = true
+			return
+		end
 		
+		advance_ui_generation()
 		_state.current_index = ((_state.current_index - 1 + delta) % active_count) + 1
-		Renderer.render(assemble_blocks(_state, _state.reserved_count), _state, start_watchers)
+		local watcher_callback_ran = false
+		local watcher_activation_ok = false
+		local watcher_activation_crashed = false
+		Renderer.render(assemble_blocks(_state, _state.reserved_count), _state, function()
+			watcher_callback_ran = true
+			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
+		end)
+		if watcher_activation_crashed then
+			dismiss("watcher activation crash")
+			return
+		end
+		if not watcher_callback_ran then
+			dismiss("render did not arm watchers")
+			return
+		end
+		if not watcher_activation_ok then return end
 		
 		if type(_state.on_navigate) == "function" then pcall(_state.on_navigate, _state.current_index) end
-		reset_idle_timer()
+		completed = true
 	end)
 	
-	if not ok then Logger.error(LOG, "Crash during navigation execution: " .. tostring(err) .. ".") end
-	return ok
+	if not ok then
+		Logger.error(LOG, "Crash during navigation execution: " .. tostring(err) .. ".")
+		if runtime_available() then dismiss("navigation render failure") else M.hide_silent() end
+	end
+	return ok and completed
 end
 
 function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
@@ -961,6 +1201,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 	-- so a slow assemble/width-calc/render surfaces as one WARNING instead of an
 	-- invisible per-keystroke drag. Silent when the render is fast.
 	local _hot_t0 = HotPath.now()
+	local rendered = false
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		
@@ -972,6 +1213,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			return
 		end
 
+		advance_ui_generation()
 		_state.raw_predictions = type(predictions) == "table" and predictions or {}
 		_state.current_index   = current_index or 1
 		_state.info_bar        = info_bar
@@ -1063,7 +1305,22 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		-- right now is a "real" newline and should pass through.
 		_state.navigation_started = false
 
-		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
+		local watcher_callback_ran = false
+		local watcher_activation_ok = false
+		local watcher_activation_crashed = false
+		Renderer.render(assemble_blocks(_state, render_count), _state, function()
+			watcher_callback_ran = true
+			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
+		end)
+		if watcher_activation_crashed then
+			dismiss("watcher activation crash")
+			return
+		end
+		if not watcher_callback_ran then
+			dismiss("render did not arm watchers")
+			return
+		end
+		if not watcher_activation_ok then return end
 
 		-- Only flip the visibility flag after Renderer.render() has returned
 		-- without raising. Setting it earlier (before the width-calc loop and
@@ -1072,17 +1329,19 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		-- keystrokes are routed to the tooltip, so a stuck-true flag with no
 		-- actual canvas on screen silently misroutes every subsequent keypress.
 		_is_visible = true
+		rendered = true
 	end)
 
-	if ok then
+	if not ok then
+		Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".")
+		if runtime_available() then dismiss("prediction render failure") else M.hide_silent() end
+	elseif rendered then
 		Logger.debug(LOG, "SHOW predictions: %d active, %d reserved (idle timer armed in start_watchers).",
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0,
 			tonumber(_state.reserved_count) or 0)
-	else
-		Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".")
 	end
 	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0, "LLM prediction render")
-	return ok
+	return ok and rendered
 end
 
 function M.make_diff_styled(diff_chunks, next_words, fallback_text)

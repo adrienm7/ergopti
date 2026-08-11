@@ -32,6 +32,10 @@ local _state = {
 
 local _watchers = {}
 local _idle_timer = nil
+local _watcher_session_active = false
+local _watcher_epoch = 0
+local _ui_generation = 0
+local REQUIRED_WATCHER_COUNT = 2
 
 -- Dequeue state for per-row expiry (destacking). When rows carry distinct
 -- durations, each row's expire_at is tracked separately. The dequeue timer
@@ -49,6 +53,62 @@ local _dequeue_opts = {
 	timeout_floor_sec     = Config.timing.timeout_floor_sec,
 }
 
+--- Invalidates work classified against an older tooltip render.
+local function advance_ui_generation()
+	_ui_generation = _ui_generation + 1
+end
+
+--- Defers a mutation only while the render that classified it still owns UI.
+--- @param label string Diagnostic label.
+--- @param fn function Deferred mutation.
+--- @param ... any Arguments.
+--- @return boolean scheduled
+local function defer_session_action(label, fn, ...)
+	local args = table.pack(...)
+	local generation = _ui_generation
+	return SyntheticInput.defer_after_callback(label, function()
+		if generation ~= _ui_generation or not _watcher_session_active then return end
+		return fn(table.unpack(args, 1, args.n))
+	end)
+end
+
+--- Reads a timer's live state across native hs.timer and the test double.
+--- @param timer table|userdata Timer object.
+--- @return boolean ok
+--- @return boolean|any running_or_error
+local function timer_running(timer)
+	local ok, result = pcall(function()
+		local probe = timer and timer.running
+		if type(probe) == "function" then return probe(timer) end
+		if type(probe) == "boolean" then return probe end
+		error("running status is unavailable")
+	end)
+	return ok, result
+end
+
+--- Stops a timer and proves the native object is no longer running.
+--- @param timer table|userdata Timer object.
+--- @param label string Diagnostic label.
+--- @return boolean stopped
+local function stop_timer_verified(timer, label)
+	if not timer or type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot stop %s: invalid timer.", label)
+		return false
+	end
+	local stop_ok, stop_err = pcall(timer.stop, timer)
+	if not stop_ok then
+		Logger.error(LOG, "Failed to stop %s: %s.", label, tostring(stop_err))
+	end
+	local status_ok, running = timer_running(timer)
+	if status_ok and running == false then return true end
+	if not status_ok or running ~= false then
+		Logger.error(LOG, "Cannot verify stopped %s: %s.", label,
+			tostring(status_ok and "timer remained running" or running))
+		return false
+	end
+	return true
+end
+
 
 
 
@@ -60,57 +120,180 @@ local _dequeue_opts = {
 -- ================================
 
 --- Stops keyboard/mouse watchers and the idle timer without touching dequeue
---- state. Used when (re)arming watchers during an active dequeue cycle.
+--- state. Used when (re)arming watchers during an active dequeue cycle. A tap
+--- whose stop cannot be verified remains owned so no replacement can duplicate it.
+--- @return boolean True when every watcher and the idle timer were revoked.
 local function stop_watchers_only()
+	advance_ui_generation()
+	_watcher_epoch = _watcher_epoch + 1
+	_watcher_session_active = false
+	local residual_watchers = {}
 	for _, watcher in ipairs(_watchers) do
-		if watcher and type(watcher.stop) == "function" then watcher:stop() end
-	end
-	_watchers = {}
+		local stop_ok = false
+		if watcher and type(watcher.stop) == "function" then
+			local ok, err = pcall(watcher.stop, watcher)
+			stop_ok = ok
+			if not ok then Logger.error(LOG, "Failed to stop dismissal event listener: %s.", tostring(err)) end
+		else
+			Logger.error(LOG, "Cannot stop dismissal event listener: invalid watcher.")
+		end
 
-	if _idle_timer and type(_idle_timer.stop) == "function" then
-		_idle_timer:stop()
-		_idle_timer = nil
+		local status_ok, enabled = false, nil
+		if watcher and type(watcher.isEnabled) == "function" then
+			status_ok, enabled = pcall(watcher.isEnabled, watcher)
+		end
+		if not status_ok or enabled ~= false then
+			if stop_ok then
+				Logger.error(LOG, "Dismissal event listener remained enabled after stop.")
+			end
+			residual_watchers[#residual_watchers + 1] = watcher
+		end
 	end
+	_watchers = residual_watchers
+
+	local timer_stopped = true
+	if _idle_timer then
+		timer_stopped = stop_timer_verified(_idle_timer, "tooltip idle timer")
+		if timer_stopped then _idle_timer = nil end
+	end
+	return #_watchers == 0 and timer_stopped
+end
+
+--- Reports whether every dismissal watcher exists and remains enabled.
+--- @return boolean True when the complete watcher set can be reused.
+local function watchers_are_active()
+	if not _watcher_session_active then return false end
+	if #_watchers ~= REQUIRED_WATCHER_COUNT then return false end
+	for _, watcher in ipairs(_watchers) do
+		if not watcher or type(watcher.isEnabled) ~= "function" then return false end
+		local ok, enabled = pcall(watcher.isEnabled, watcher)
+		if not ok or enabled ~= true then return false end
+	end
+	return true
+end
+
+--- Starts and retains one watcher without letting an OS failure escape rendering.
+--- @param watcher table|nil Eventtap object.
+--- @param label string Diagnostic watcher label.
+--- @return boolean True when the watcher started successfully.
+local function activate_watcher(watcher, label)
+	if not watcher then
+		Logger.error(LOG, "Cannot start %s event listener: invalid watcher.", label)
+		return false
+	end
+	-- Own the object before start(): the underlying tap may already be enabled
+	-- even when the wrapper throws, and losing it would allow a duplicate tap.
+	_watchers[#_watchers + 1] = watcher
+	if type(watcher.start) ~= "function" then
+		Logger.error(LOG, "Cannot start %s event listener: invalid watcher.", label)
+		return false
+	end
+	local ok, err = pcall(watcher.start, watcher)
+	if not ok then
+		Logger.error(LOG, "Failed to start %s event listener: %s.", label, tostring(err))
+		return false
+	end
+	if type(watcher.isEnabled) ~= "function" then
+		Logger.error(LOG, "Cannot verify %s event listener: isEnabled is unavailable.", label)
+		return false
+	end
+	local enabled_ok, enabled = pcall(watcher.isEnabled, watcher)
+	if not enabled_ok or enabled ~= true then
+		Logger.error(LOG, "%s event listener did not enable: %s.", label,
+			tostring(enabled_ok and "CGEventTapCreate failed" or enabled))
+		return false
+	end
+	return true
 end
 
 --- Clears active timers and sets a new idle timeout if applicable.
 --- When a dequeue cycle is running the timer is suppressed — the dequeue
 --- manages its own end and an idle timer would kill the surviving rows early.
+--- @return boolean True when the deadline is owned and usable.
 local function reset_idle_timer()
-	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
+	if _idle_timer then
+		if not stop_timer_verified(_idle_timer, "tooltip idle timer") then return false end
+		_idle_timer = nil
+	end
 	-- Suppress the idle timer during a dequeue cycle; _dequeue_timer owns
 	-- the hide lifecycle and fires exactly when the last row expires.
-	if _dequeue_rows then return end
+	if _dequeue_rows then return true end
 	local active_timeout = Config.settings.timeout_sec
 	if active_timeout > 0 then
-		_idle_timer = hs.timer.doAfter(active_timeout, M.hide)
+		local generation = _ui_generation
+		local timer_handle = nil
+		local timer_ok, timer_or_err = pcall(hs.timer.doAfter, active_timeout, function()
+			if not timer_handle or _idle_timer ~= timer_handle then return end
+			_idle_timer = nil
+			if generation ~= _ui_generation or not _watcher_session_active then return end
+			M.hide()
+		end)
+		if timer_ok then timer_handle = timer_or_err end
+		if timer_ok and timer_or_err then _idle_timer = timer_or_err end
+		local status_ok, running = false, nil
+		if timer_ok then status_ok, running = timer_running(timer_or_err) end
+		if not timer_ok or not timer_or_err or type(timer_or_err.stop) ~= "function"
+			or not status_ok or running ~= true then
+			Logger.error(LOG, "Cannot arm tooltip idle timer: %s.",
+				tostring(timer_ok and (status_ok and "timer did not start" or running) or timer_or_err))
+			if _idle_timer and stop_timer_verified(_idle_timer, "invalid tooltip idle timer") then
+				_idle_timer = nil
+			end
+			return false
+		end
 	end
+	return true
+end
+
+--- Stops the dequeue deadline while preserving its handle on any failure.
+--- @return boolean stopped
+local function stop_dequeue_timer()
+	if not _dequeue_timer then return true end
+	if not stop_timer_verified(_dequeue_timer, "tooltip dequeue timer") then return false end
+	_dequeue_timer = nil
+	return true
 end
 
 --- Stops the dequeue timer and clears dequeue state.
+--- @return boolean stopped
 local function stop_dequeue()
-	if _dequeue_timer then
-		pcall(function() _dequeue_timer:stop() end)
-		_dequeue_timer = nil
-	end
+	local stopped = stop_dequeue_timer()
 	_dequeue_rows = nil
+	return stopped
 end
 
 --- Terminates watchers, idle timer, and any active dequeue cycle.
 local function stop_watchers()
-	stop_watchers_only()
-	stop_dequeue()
+	local watchers_stopped = stop_watchers_only()
+	local dequeue_stopped = stop_dequeue()
+	return watchers_stopped and dequeue_stopped
 end
 
 --- Starts OS-level interception to hide the tooltip upon any simple interaction.
 local function start_watchers()
+	if watchers_are_active() then
+		if reset_idle_timer() then return true end
+		M.hide_forced()
+		return false
+	end
+
 	-- Only tear down prior watchers — never stop_dequeue() here. Clearing
 	-- dequeue state on the initial stacked show was the root cause of the
 	-- missing destack behaviour (rows vanished all at once).
-	stop_watchers_only()
-	reset_idle_timer()
+	if not stop_watchers_only() then
+		M.hide_forced()
+		return false
+	end
+	if not reset_idle_timer() then
+		M.hide_forced()
+		return false
+	end
+	_watcher_session_active = true
+	_watcher_epoch = _watcher_epoch + 1
+	local watcher_epoch = _watcher_epoch
 	
 	local event_types = hs.eventtap.event.types
+	local activation_ok = true
 	
 	-- mouseMoved intentionally excluded: trackpad fires it at 200+ Hz, adding
 	-- HID-thread latency while the tooltip is visible. Clicks and scrolls are
@@ -118,24 +301,28 @@ local function start_watchers()
 	-- The dequeue-cycle comment still holds for the remaining event types.
 	local ok_mouse, watcher_mouse
 	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(event)
+		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
 		if EventTapGuard.handle_disabled(event, watcher_mouse, "tooltip.hotstring_mouse") then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.hotstring_mouse")
 		local fence_events = fence and fence.events or nil
 		if provenance ~= nil then return false, fence_events end
 		if status ~= EventProvenance.STATUS_UNREADABLE then
-			SyntheticInput.defer_after_callback("hotstring tooltip mouse dismissal", M.hide)
+			defer_session_action("hotstring tooltip mouse dismissal", M.hide)
 		end
 		return false, fence_events
 	end)
 	
-	if ok_mouse and watcher_mouse then 
-		watcher_mouse:start()
-		table.insert(_watchers, watcher_mouse) 
+	if ok_mouse then
+		if not activate_watcher(watcher_mouse, "mouse") then activation_ok = false end
+	else
+		activation_ok = false
+		Logger.error(LOG, "Failed to mount mouse event listener: %s.", tostring(watcher_mouse))
 	end
 
 	local ok_key, watcher_key
 	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return false end
 		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.hotstring_key") then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.hotstring")
@@ -147,7 +334,7 @@ local function start_watchers()
 		end
 		local key_ok, keycode = pcall(event.getKeyCode, event)
 		if not key_ok or type(keycode) ~= "number" then
-			SyntheticInput.defer_after_callback("hotstring tooltip key diagnostic",
+			defer_session_action("hotstring tooltip key diagnostic",
 				function()
 					Logger.error(LOG, "Cannot read dismissal keycode: %s.", tostring(keycode))
 				end)
@@ -178,33 +365,66 @@ local function start_watchers()
 			if keycode == ignored_code then return finish(false) end
 		end
 		-- A real keystroke is an authoritative dismissal — bypass dequeue guard.
-		SyntheticInput.defer_after_callback("hotstring tooltip key dismissal", M.hide_forced)
+		defer_session_action("hotstring tooltip key dismissal", M.hide_forced)
 		return finish(false)
 	end)
 	
-	if ok_key and watcher_key then 
-		watcher_key:start()
-		table.insert(_watchers, watcher_key) 
-	else 
-		Logger.error(LOG, "Failed to mount keyboard event listener.") 
+	if ok_key then
+		if not activate_watcher(watcher_key, "keyboard") then activation_ok = false end
+	else
+		activation_ok = false
+		Logger.error(LOG, "Failed to mount keyboard event listener: %s.", tostring(watcher_key))
 	end
+
+	if not activation_ok or not watchers_are_active() then
+		stop_watchers_only()
+		M.hide_forced()
+		return false
+	end
+	return true
+end
+
+--- Runs watcher activation across the renderer callback boundary. Renderer
+--- catches callback exceptions internally, so callers need an explicit status.
+--- @return boolean ready Full verified set is active.
+--- @return boolean crashed Activation raised unexpectedly.
+local function activate_watchers_safely()
+	local ok, result = xpcall(start_watchers, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Crash during dismissal watcher activation: %s.", tostring(result))
+		return false, true
+	end
+	return result == true, false
 end
 
 --- Arms the one-shot dequeue timer for the next row expiry.
 local function arm_dequeue_timer()
-	if _dequeue_timer then
-		pcall(function() _dequeue_timer:stop() end)
-		_dequeue_timer = nil
-	end
-	if not _dequeue_rows then return end
+	if not stop_dequeue_timer() then return false end
+	if not _dequeue_rows then return true end
 	local delay = Dequeue.next_expiry_delay_sec(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
-	if delay and delay <= 0 then
-		-- All rows are permanent (no expire_at), so fire _dequeue_tick immediately;
-		-- without this _dequeue_rows stays non-nil and M.hide() is blocked forever (M-10)
-		hs.timer.doAfter(0, _dequeue_tick)
-	else
-		_dequeue_timer = hs.timer.doAfter(delay, _dequeue_tick)
+	local schedule_delay = delay and math.max(0, delay) or 0
+	local generation = _ui_generation
+	local timer_handle = nil
+	local timer_ok, timer_or_err = pcall(hs.timer.doAfter, schedule_delay, function()
+		if _dequeue_timer ~= timer_handle then return end
+		_dequeue_timer = nil
+		if generation ~= _ui_generation then return end
+		_dequeue_tick()
+	end)
+	if timer_ok then timer_handle = timer_or_err end
+	if timer_ok and timer_or_err then _dequeue_timer = timer_or_err end
+	local status_ok, running = false, nil
+	if timer_ok then status_ok, running = timer_running(timer_or_err) end
+	if not timer_ok or not timer_or_err or type(timer_or_err.stop) ~= "function"
+		or not status_ok or running ~= true then
+		Logger.error(LOG, "Cannot arm tooltip dequeue timer: %s.",
+			tostring(timer_ok and (status_ok and "timer did not start" or running) or timer_or_err))
+		if _dequeue_timer and stop_timer_verified(_dequeue_timer, "invalid tooltip dequeue timer") then
+			_dequeue_timer = nil
+		end
+		return false
 	end
+	return true
 end
 
 
@@ -222,12 +442,14 @@ end
 --- keyboard watcher detected a real typing key, or an explicit hide() call
 --- from outside the tooltip subsystem).
 function M.hide_forced()
-	pcall(function()
-		stop_watchers()
+	local watchers_stopped = false
+	local ok = pcall(function()
+		watchers_stopped = stop_watchers()
 		_state.bg_color = nil
 		_state.is_visible = false
 		Renderer.hide()
 	end)
+	return ok and watchers_stopped
 end
 
 function M.hide()
@@ -235,39 +457,49 @@ function M.hide()
 	-- running, external hide() calls from mouse/scroll watchers are ignored
 	-- so that rows with longer durations survive past the first row's expiry.
 	-- The dequeue tick itself calls hide_forced() when the last row expires.
-	if _dequeue_rows then return end
-	pcall(function()
-		stop_watchers()
+	if _dequeue_rows then return true end
+	local watchers_stopped = false
+	local ok = pcall(function()
+		watchers_stopped = stop_watchers()
 		_state.bg_color = nil
 		_state.is_visible = false
 		Renderer.hide()
 	end)
+	return ok and watchers_stopped
 end
 
 --- Resets internal state and stops watchers without hiding the shared canvas.
 --- Used when transitioning to the LLM tooltip so the canvas content is overwritten
 --- in-place rather than first blanked then redrawn, which would produce a visible gap.
 function M.dismiss_silent()
-	pcall(function()
+	local watchers_stopped = false
+	local ok = pcall(function()
 		-- Hide the stacked canvas (hotstring preview) when transitioning away;
 		-- without this it survives the LLM tooltip transition and stays on screen
 		-- as an orphaned layer behind the new prediction canvas (E1 audit fix).
 		pcall(Renderer.hide_stacked)
-		stop_watchers()
+		watchers_stopped = stop_watchers()
+		if not watchers_stopped then Renderer.hide() end
 		_state.bg_color = nil
 		_state.is_visible = false
 	end)
+	return ok and watchers_stopped
 end
 
 function M.show(content, is_llm_origin, is_enabled, background_color)
+	local rendered = false
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		if content == nil or tostring(content) == "" then M.hide_forced(); return end
+		advance_ui_generation()
 
 		-- Dismantle any active dequeue cycle before starting fresh — a stale
 		-- dequeue timer would fire after this call and replace the new content
 		-- with its pruned rows, erasing what we just rendered (E3 audit fix).
-		stop_dequeue()
+		if not stop_dequeue() then
+			M.hide_forced()
+			return
+		end
 		-- Hide any surviving stacked canvas from a prior hotstring expansion
 		-- that was not cleaned up by a transition function (E1 audit fix).
 		pcall(Renderer.hide_stacked)
@@ -280,10 +512,30 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 			color = is_llm_origin and { white = 0.80, alpha = 1.0 } or { white = 1.00, alpha = 1.0 },
 		})
 
-		Renderer.render(styled_content, _state, start_watchers)
+		local watcher_callback_ran = false
+		local watcher_activation_ok = false
+		local watcher_activation_crashed = false
+		Renderer.render(styled_content, _state, function()
+			watcher_callback_ran = true
+			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
+		end)
+		if watcher_activation_crashed then
+			M.hide_forced()
+			return
+		end
+		if not watcher_callback_ran then
+			M.hide_forced()
+			return
+		end
+		if not watcher_activation_ok then return end
+		rendered = true
 	end)
 
-	if not ok then Logger.error(LOG, "Crash during standard tooltip rendering: " .. tostring(err) .. ".") end
+	if not ok then
+		Logger.error(LOG, "Crash during standard tooltip rendering: " .. tostring(err) .. ".")
+		M.hide_forced()
+	end
+	return ok and rendered
 end
 
 --- Shows a persistent loading indicator with no auto-dismiss timer and no interaction watchers.
@@ -293,12 +545,17 @@ end
 --- @param is_enabled boolean Guard clause to prevent rendering if disabled.
 --- @param background_color table|nil Optional background tint.
 function M.show_loading(content, is_enabled, background_color)
+	local rendered = false
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		if content == nil or tostring(content) == "" then M.hide_forced(); return end
+		advance_ui_generation()
 
 		-- Stop any existing watchers/timers from a previous state before rendering
-		stop_watchers()
+		if not stop_watchers() then
+			M.hide_forced()
+			return
+		end
 		-- Hide any surviving stacked canvas from a prior hotstring preview;
 		-- the loading indicator must render above a clean surface (E1 audit fix).
 		pcall(Renderer.hide_stacked)
@@ -311,11 +568,22 @@ function M.show_loading(content, is_enabled, background_color)
 			color = { white = 0.80, alpha = 1.0 },
 		})
 
-		-- No start_watchers callback — the canvas stays up until replaced programmatically
-		Renderer.render(styled_content, _state, nil)
+		-- Loading owns no interaction watcher; this callback is only a synchronous
+		-- commit marker proving that the canvas reached its shown state.
+		local render_completed = false
+		Renderer.render(styled_content, _state, function() render_completed = true end)
+		if not render_completed then
+			M.hide_forced()
+			return
+		end
+		rendered = true
 	end)
 
-	if not ok then Logger.error(LOG, "Crash during loading indicator rendering: " .. tostring(err) .. ".") end
+	if not ok then
+		Logger.error(LOG, "Crash during loading indicator rendering: " .. tostring(err) .. ".")
+		M.hide_forced()
+	end
+	return ok and rendered
 end
 
 function M.is_visible()
@@ -333,31 +601,62 @@ end
 --- @param rows table Array of row descriptor objects (may contain expire_at for rebuild calls).
 --- @param is_enabled boolean Guard clause — skips render if false.
 function M.show_stacked(rows, is_enabled)
+	local rendered = false
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		if not rows or #rows == 0 then M.hide_forced(); return end
+		advance_ui_generation()
 
 		-- Use the canonical Dequeue analysis so that any row (not just row[1])
 		-- carrying an expire_at stamp is detected — checking only the first row
 		-- caused premature stop_dequeue() on partial-expiry rebuilds (M-09)
 		local is_rebuild = Dequeue.analyze_durations(rows, _dequeue_opts)
 		if not is_rebuild then
-			stop_dequeue()
+			if not stop_dequeue() then
+				M.hide_forced()
+				return
+			end
 		end
 
 		_state.is_visible = true
+		local function render_with_watcher_ownership(active_rows, reuse_watchers)
+			local watcher_callback_ran = false
+			local watcher_activation_ok = reuse_watchers == true and watchers_are_active() or false
+			local watcher_activation_crashed = false
+			local watcher_cb = function()
+				watcher_callback_ran = true
+				if not reuse_watchers then
+					watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
+				end
+			end
+			Renderer.render_stacked(active_rows, _state, watcher_cb)
+			if watcher_activation_crashed then M.hide_forced() end
+			return watcher_callback_ran and watcher_activation_ok
+		end
 
 		if Dequeue.should_use_dequeue_path(rows, _dequeue_opts) then
 			local now = hs.timer.secondsSinceEpoch()
 			_dequeue_rows = select(1, Dequeue.stamp_expiry_times(rows, now, _dequeue_opts))
 
-			local watcher_cb = is_rebuild and nil or start_watchers
-			Renderer.render_stacked(_dequeue_rows, _state, watcher_cb)
-			arm_dequeue_timer()
+			if not render_with_watcher_ownership(_dequeue_rows, is_rebuild) then
+				M.hide_forced()
+				return
+			end
+			if not arm_dequeue_timer() then
+				M.hide_forced()
+				return
+			end
 		else
-			stop_dequeue()
-			Renderer.render_stacked(rows, _state, start_watchers)
+			if not stop_dequeue() then
+				M.hide_forced()
+				return
+			end
+			if not render_with_watcher_ownership(rows, false) then
+				M.hide_forced()
+				return
+			end
 		end
+		rendered = true
 	end)
 	if not ok then
 		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
@@ -366,28 +665,29 @@ function M.show_stacked(rows, is_enabled)
 		-- on reporting true — and the persistent Escape trap consults exactly that
 		-- to decide whether to swallow Escape. The user's next Escape would vanish
 		-- into a tooltip that does not exist. Roll the claim back on failure.
-		_state.is_visible = false
-		pcall(Renderer.hide_stacked)
+		M.hide_forced()
 	end
+	return ok and rendered
 end
 
 --- Hides the stacked canvas alongside the standard one (authoritative).
 local _original_hide_forced = M.hide_forced
 M.hide_forced = function()
-	_original_hide_forced()
-	pcall(Renderer.hide_stacked)
+	local stopped = _original_hide_forced()
+	local stacked_hidden = pcall(Renderer.hide_stacked)
+	return stopped and stacked_hidden
 end
 
 --- Hides both canvases unless a dequeue cycle is active (respects guard).
 M.hide = function()
-	if _dequeue_rows then return end
-	M.hide_forced()
+	if _dequeue_rows then return true end
+	return M.hide_forced()
 end
 
 -- Assign the dequeue tick function now that M.hide and M.show_stacked exist.
 -- Prunes expired rows and re-renders the surviving stack, or hides when empty.
 _dequeue_tick = function()
-	pcall(function()
+	local ok, err = xpcall(function()
 		if not _dequeue_rows then return end
 		local remaining = Dequeue.prune_expired(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
 		if #remaining == 0 then
@@ -395,7 +695,11 @@ _dequeue_tick = function()
 			return
 		end
 		M.show_stacked(remaining, true)
-	end)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Crash during tooltip dequeue callback: %s.", tostring(err))
+		M.hide_forced()
+	end
 end
 
 return M
