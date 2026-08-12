@@ -265,9 +265,10 @@ local function register_prefix_entries()
 		-- Two DIFFERENT fields in one block: every entry below expands to the raw
 		-- number except the last, which expands to the spaced variant.
 		local phone_opts  = opts_for("phone_number")
+		local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
 		local fphone_opts = opts_for("phone_number_clean")
 		if #phone >= 2 then
-			_km.add(phone:sub(1, 2) .. _trigger, phone, phone_opts)
+			_km.add(phone:sub(1, 2) .. _trigger, phone, phone_magic_opts)
 			_km.add("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
 		end
 		if #phone >= 4 then
