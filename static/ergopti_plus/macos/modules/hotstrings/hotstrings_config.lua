@@ -62,9 +62,6 @@ local GLOBAL_DEFAULT_COLOR = nil
 -- per-category baselines stay visible in one place.
 local CATEGORY_DEFAULT_COLORS = {}
 
-local ENOENT_ERROR_CODE = 2
-
-
 -- =================================
 -- =================================
 -- ======= 2/ Module State =========
@@ -108,35 +105,6 @@ end
 --- ====================================
 --- ====================================
 
---- Reads a complete file and commits its bytes only after an exact close.
---- @param path string Absolute path.
---- @return string|nil content
---- @return string status `committed`, `absent`, or `error`.
-local function read_complete_file(path)
-	local open_ok, f, open_err, open_code = pcall(io.open, path, "r")
-	if not open_ok then
-		Logger.error(LOG, "Override file open raised for '%s': %s.", path, tostring(f))
-		return nil, "error"
-	end
-	if not f then
-		if open_code == ENOENT_ERROR_CODE then return "", "absent" end
-		Logger.error(LOG, "Override file cannot be opened for reading: %s.", tostring(open_err))
-		return nil, "error"
-	end
-
-	local read_ok, content, read_err = pcall(f.read, f, "*a")
-	local close_ok, closed, close_err = pcall(f.close, f)
-	if not read_ok or type(content) ~= "string" then
-		Logger.error(LOG, "Override file read failed: %s.", tostring(read_ok and read_err or content))
-		return nil, "error"
-	end
-	if not close_ok or closed ~= true then
-		Logger.error(LOG, "Override file close failed: %s.", tostring(close_ok and close_err or closed))
-		return nil, "error"
-	end
-	return content, "committed"
-end
-
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
 --- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
@@ -149,9 +117,17 @@ end
 local function parse_overrides(path)
 	local result = {}
 	local word_delimiters = nil
-	local content, read_status = read_complete_file(path)
-	if read_status == "error" then return result, nil, "error" end
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
+	if not read_ok or read_status == "error" then
+		Logger.error(LOG, "Override source read did not commit: %s.",
+			tostring(read_ok and read_detail or content))
+		return result, nil, "error"
+	end
 	if read_status == "absent" then return result, nil, "absent" end
+	if read_status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
+		return result, nil, "error"
+	end
 
 	local current_cat = nil
 	local current_sec = nil
@@ -880,10 +856,21 @@ function M.set_word_delimiters(delimiters)
 		Logger.error(LOG, "Delimiter save refused because the source read did not commit.")
 		return false
 	end
-	local existing, read_status = read_complete_file(_state.path)
-	if read_status == "error" then
+	local read_ok, existing, read_status, read_detail = pcall(FileSystem.read_with_status, _state.path)
+	if not read_ok or read_status == "error" then
 		_state.writes_blocked = true
-		Logger.error(LOG, "Delimiter save refused because the latest source read failed.")
+		Logger.error(LOG, "Delimiter save refused because the latest source read failed: %s.",
+			tostring(read_ok and read_detail or existing))
+		return false
+	end
+	if read_status ~= "ok" and read_status ~= "absent" then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Delimiter save refused after an invalid read status: %s.", tostring(read_status))
+		return false
+	end
+	if read_status == "ok" and type(existing) ~= "string" then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Delimiter save refused because committed source bytes were not a string.")
 		return false
 	end
 	local content = patch_word_delimiters(existing or "", candidate)

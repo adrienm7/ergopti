@@ -93,7 +93,10 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.it(failure .. " returns false and preserves the live UI state", function()
 			local path = fixture_path(failure:gsub("[^%w]", "_"))
 			install_config_stub()
-			package.loaded["adapters.file_system"] = { write = function() return false end }
+			package.loaded["adapters.file_system"] = {
+				read_with_status = function() return SENTINEL, "ok" end,
+				write = function() return false end,
+			}
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 			local notifications = 0
 			win._on_config_changed = function() notifications = notifications + 1 end
@@ -136,60 +139,67 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		os.remove(path)
 	end)
 
-	helpers.it("EACCES returns false without calling the writer", function()
-		local path = fixture_path("eacces")
+	for _, case in ipairs({
+		{ label = "EACCES", status = "error", detail = "permission denied" },
+		{ label = "failed source close", status = "error", detail = "close failed" },
+		{ label = "dangling symlink", status = "error", detail = "dangling symlink target" },
+		{ label = "directory", status = "error", detail = "expected a regular file, got directory" },
+		{ label = "absent personal file", status = "absent", detail = "not found" },
+	}) do
+		helpers.it(case.label .. " returns false without calling the writer", function()
+			local path = fixture_path(case.label:gsub("[^%w]", "_"))
+			install_config_stub()
+			local reads = 0
+			local writes = 0
+			package.loaded["adapters.file_system"] = {
+				read_with_status = function(candidate)
+					helpers.assert_eq(candidate, path)
+					reads = reads + 1
+					return nil, case.status, case.detail
+				end,
+				write = function() writes = writes + 1 return true end,
+			}
+			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+			local committed = win._on_message({ body = {
+				action = "set_delay", group = "personal", personal_path = path, ms = 420,
+			} })
+
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(reads, 1,
+				"the bridge must consume one adapter-classified source snapshot")
+			helpers.assert_eq(writes, 0, "unread bytes must never reach publication")
+			helpers.assert_eq(read_fixture(path), SENTINEL)
+			os.remove(path)
+		end)
+	end
+
+	helpers.it("a symlink retarget after the read suppresses runtime and UI publication", function()
+		local path = fixture_path("retarget")
 		install_config_stub()
-		local writes = 0
+		local events = {}
 		package.loaded["adapters.file_system"] = {
-			write = function() writes = writes + 1 return true end,
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				events[#events + 1] = "read"
+				return SENTINEL, "ok"
+			end,
+			write = function(candidate)
+				helpers.assert_eq(candidate, path)
+				events[#events + 1] = "retarget-refused"
+				return false
+			end,
 		}
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		local original_open = io.open
-		io.open = function(candidate, mode)
-			if candidate == path and mode == "r" then return nil, "permission denied", 13 end
-			return original_open(candidate, mode)
-		end
-		local committed = win._on_message({ body = {
+		local notifications = 0
+		win._on_config_changed = function() notifications = notifications + 1 end
+
+		helpers.assert_eq(win._on_message({ body = {
 			action = "set_delay", group = "personal", personal_path = path, ms = 420,
-		} })
-		io.open = original_open
-
-		helpers.assert_eq(committed, false)
-		helpers.assert_eq(writes, 0, "unread bytes must never reach publication")
-		helpers.assert_eq(read_fixture(path), SENTINEL)
-		os.remove(path)
-	end)
-
-	helpers.it("a failed source close withholds bytes from the writer", function()
-		local path = fixture_path("close_read")
-		install_config_stub()
-		local writes = 0
-		package.loaded["adapters.file_system"] = {
-			write = function() writes = writes + 1 return true end,
-		}
-		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		local original_open = io.open
-		io.open = function(candidate, mode)
-			if candidate == path and mode == "r" then
-				local lines = { "[_meta]", "delay = 0.33" }
-				return {
-					read = function() return SENTINEL end,
-					lines = function()
-						local index = 0
-						return function() index = index + 1 return lines[index] end
-					end,
-					close = function() return false, "close failed" end,
-				}
-			end
-			return original_open(candidate, mode)
-		end
-		local committed = win._on_message({ body = {
-			action = "set_delay", group = "personal", personal_path = path, ms = 420,
-		} })
-		io.open = original_open
-
-		helpers.assert_eq(committed, false)
-		helpers.assert_eq(writes, 0)
+		} }), false)
+		helpers.assert_eq(events[1], "read")
+		helpers.assert_eq(events[2], "retarget-refused")
+		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(notifications, 0)
 		helpers.assert_eq(read_fixture(path), SENTINEL)
 		os.remove(path)
 	end)
@@ -208,7 +218,10 @@ end)
 helpers.describe("hotstrings config window: incomplete TOML reads are withheld", function()
 	helpers.it("omits personal and extension entries returned with committed=false", function()
 		install_config_stub()
-		package.loaded["adapters.file_system"] = { write = function() return true end }
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function() return nil, "absent", "not found" end,
+			write = function() return true end,
+		}
 		package.loaded["infra.toml.reader"] = {
 			parse = function()
 				return {
