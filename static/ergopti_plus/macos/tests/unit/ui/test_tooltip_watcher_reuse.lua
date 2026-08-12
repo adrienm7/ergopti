@@ -983,6 +983,66 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("(tooltip-action-lease-hide-retry) retains the winner until native hide commits", function()
+		local faults = { hide_stacked_result = false }
+		local context = load_tooltip(CASES[2], faults)
+		local previous_clock = hs.timer.secondsSinceEpoch
+		local now = 100
+		local expiry_calls = 0
+		local lease = {}
+		hs.timer.secondsSinceEpoch = function() return now end
+
+		local ok, err = xpcall(function()
+			helpers.assert_eq(context.tooltip.show_stacked({
+				{
+					text = "timed literal winner",
+					duration = 0.01,
+					expire_at = 100.01,
+					lease_token = lease,
+					on_expire = function() expiry_calls = expiry_calls + 1 end,
+				},
+				{ text = "stale dimmed fallback", duration = 0, dimmed = true },
+			}, true), true)
+
+			local first_deadline = running_timers(context.timers)[1]
+			helpers.assert_not_nil(first_deadline,
+				"the positive control must own the winner deadline")
+			now = 100.02
+			first_deadline.running = false
+			first_deadline.fn()
+
+			helpers.assert_eq(expiry_calls, 0,
+				"re-arbitration must wait until native pixels are actually revoked")
+			helpers.assert_true(context.tooltip.is_visible(),
+				"a refused stacked hide must preserve truthful visible state")
+			helpers.assert_true(context.renderer.stacked_visible,
+				"the native failure double must leave the old pixels on screen")
+			helpers.assert_true(context.tooltip.has_visible_lease(lease),
+				"the action lease must remain bound to pixels that are still visible")
+
+			local retries = running_timers(context.timers)
+			helpers.assert_eq(#retries, 1,
+				"failed native cleanup must retain one asynchronous retry owner")
+			helpers.assert_true(retries[1] ~= first_deadline,
+				"the delivered deadline must not impersonate the cleanup retry")
+			helpers.assert_true(retries[1].delay > 0,
+				"persistent native failures must not create a zero-delay retry loop")
+
+			faults.hide_stacked_result = true
+			retries[1].running = false
+			retries[1].fn()
+			helpers.assert_eq(expiry_calls, 1,
+				"successful retry must delegate exactly one fresh arbitration")
+			helpers.assert_true(not context.tooltip.is_visible())
+			helpers.assert_true(not context.tooltip.has_visible_lease(lease))
+		end, debug.traceback)
+
+		hs.timer.secondsSinceEpoch = previous_clock
+		faults.hide_stacked_result = true
+		context.tooltip.hide_forced()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("(tooltip-watcher-reuse) owns and revokes a zero-delay dequeue timer", function()
 		local context = load_tooltip(CASES[2])
 		local clock_reads = 0

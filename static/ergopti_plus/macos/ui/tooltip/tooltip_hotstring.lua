@@ -35,6 +35,8 @@ local _watcher_session_active = false
 local _watcher_epoch = 0
 local _ui_generation = 0
 local REQUIRED_WATCHER_COUNT = 2
+-- Prevent a permanently failing canvas from spinning the Hammerspoon runloop
+local NATIVE_HIDE_RETRY_SEC = 0.05
 
 -- Dequeue state for per-row expiry (destacking). When rows carry distinct
 -- durations, each row's expire_at is tracked separately. The dequeue timer
@@ -399,11 +401,12 @@ local function activate_watchers_safely()
 end
 
 --- Arms the one-shot dequeue timer for the next row expiry.
-local function arm_dequeue_timer()
+--- @param retry_delay_sec number|nil Explicit cleanup retry delay.
+local function arm_dequeue_timer(retry_delay_sec)
 	if not stop_dequeue_timer() then return false end
 	if not _dequeue_rows then return true end
 	local delay = Dequeue.next_expiry_delay_sec(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
-	local schedule_delay = delay and math.max(0, delay) or 0
+	local schedule_delay = retry_delay_sec or (delay and math.max(0, delay) or 0)
 	local generation = _ui_generation
 	local timer_handle = nil
 	local timer_ok, timer_or_err = pcall(hs.timer.doAfter, schedule_delay, function()
@@ -737,7 +740,15 @@ _dequeue_tick = function()
 			-- Arbitration changed with the winner's deadline. Re-rendering the
 			-- surviving rows in place would preserve stale dimmed/winner flags.
 			-- Revoke the whole surface first, then ask the owner to resolve again.
-			M.hide_forced()
+			local owned_rows = _dequeue_rows
+			if M.hide_forced() ~= true then
+				-- hide_forced tears down dequeue bookkeeping before attempting the
+				-- native canvas. Restore the exact owner while old pixels remain so
+				-- their action lease cannot be cleared by premature re-arbitration
+				_dequeue_rows = owned_rows
+				arm_dequeue_timer(NATIVE_HIDE_RETRY_SEC)
+				return
+			end
 			local callback_ok, callback_err = xpcall(owner_expired, debug.traceback)
 			if not callback_ok then
 				Logger.error(LOG, "Tooltip winner-expiry callback raised: %s.", tostring(callback_err))
