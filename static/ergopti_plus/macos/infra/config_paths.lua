@@ -87,7 +87,7 @@ local _default_config_dir = (function()
 	if type(home) == "string" and home ~= "" then
 		return home .. "/.config/ergopti_plus/"
 	end
-	return ""
+	return nil
 end)()
 
 -- In-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded.
