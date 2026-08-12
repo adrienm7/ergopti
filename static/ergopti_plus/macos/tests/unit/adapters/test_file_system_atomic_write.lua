@@ -413,7 +413,7 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 			return original_rename(old_path, new_path)
 		end
 		local call_ok, written = xpcall(function()
-			return adapter.write(path, "our candidate", {
+			return adapter.write_if_unchanged(path, "our candidate", {
 				status = "ok",
 				content = "observed source",
 			})
@@ -1033,11 +1033,14 @@ helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-1
 
 	helpers.it("write() reserves a private adjacent staging path before publication", function()
 		local src = read_source()
-		local fn_start = src:find("function M.write", 1, true)
-		helpers.assert_true(fn_start ~= nil, "M.write must exist")
+		local fn_start = src:find("local function write_atomic", 1, true)
+		helpers.assert_true(fn_start ~= nil, "the shared atomic writer must exist")
 		local fn_end = src:find("\nfunction M.append", fn_start, true)
 		local body = src:sub(fn_start, fn_end)
+		local public_write = src:match("function M%.write%(path, content%)(.-)end") or ""
 
+		helpers.assert_true(public_write:find("write_atomic(path, content, nil)", 1, true) ~= nil,
+			"the canonical two-argument port must delegate to the reviewed atomic writer")
 		helpers.assert_true(body:find("reserve_staging_area(resolved_path)", 1, true) ~= nil,
 			"write() must exclusively reserve its staging pathname before opening it (F-MED-16)")
 		helpers.assert_true(body:find("os.rename(", 1, true) ~= nil,
@@ -1046,7 +1049,7 @@ helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-1
 
 	helpers.it("write() delegates final-link resolution to the symlink-aware resolver", function()
 		local src = read_source()
-		local fn_start = src:find("function M.write", 1, true)
+		local fn_start = src:find("local function write_atomic", 1, true)
 		local fn_end   = src:find("\nfunction M.append", fn_start, true)
 		local body = src:sub(fn_start, fn_end)
 		local resolver_start = src:find("local function resolve_write_path(path)", 1, true)

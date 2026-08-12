@@ -682,11 +682,9 @@ end
 --- a final pathname that was absent during resolution.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
---- @param expected_source table|nil Optional `{ status = "ok"|"absent", content = string }`
----   snapshot that must still match after staging and immediately before rename.
 --- @return boolean true on success, false on any error.
 --- @return string|nil error_message Concrete failure reason when available.
-function M.write(path, content, expected_source)
+local function write_atomic(path, content, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "write(): path must be a non-empty string.")
 		return false, "path must be a non-empty string"
@@ -851,6 +849,30 @@ function M.write(path, content, expected_source)
 	end
 	if result == true then return true end
 	return false, result_err or "atomic write failed"
+end
+
+--- Writes content atomically through the canonical two-argument FileSystem port.
+--- @param path string Absolute destination path.
+--- @param content string UTF-8 content.
+--- @return boolean written
+--- @return string|nil error_message
+function M.write(path, content)
+	return write_atomic(path, content, nil)
+end
+
+--- Writes only if the classified source still matches immediately before publish.
+--- This macOS extension keeps compare-before-write semantics outside the shared
+--- two-argument FileSystem port contract.
+--- @param path string Absolute destination path.
+--- @param content string UTF-8 content.
+--- @param expected_source table `{ status = "ok"|"absent", content = string|nil }`.
+--- @return boolean written
+--- @return string|nil error_message
+function M.write_if_unchanged(path, content, expected_source)
+	if type(expected_source) ~= "table" then
+		return false, "expected_source must be a table"
+	end
+	return write_atomic(path, content, expected_source)
 end
 
 --- Appends content to a file, creating it if it does not exist.
