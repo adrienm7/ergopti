@@ -35,6 +35,9 @@ local TomlCodec = require("infra.toml.codec")
 local Logger    = require("infra.logger")
 local LOG       = "preferences"
 
+-- POSIX error code that alone proves a missing configuration path
+local ENOENT_ERROR_CODE = 2
+
 
 --- Top-level TOML section names in the order they appear on disk.
 local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater" }
@@ -428,11 +431,21 @@ end
 --- @return table The decoded preferences (empty when the file is absent or invalid).
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
-	local ok, fh = pcall(io.open, prefs_file, "r")
-	if not ok or not fh then return {}, "absent" end
+	local open_ok, fh, open_detail, open_code = pcall(io.open, prefs_file, "r")
+	if not open_ok or not fh then
+		if open_ok and open_code == ENOENT_ERROR_CODE then return {}, "absent" end
+		Logger.error(LOG, "config.toml could not be read; treating it as corrupt "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+		return {}, "corrupt"
+	end
 
-	local content = fh:read("*a")
-	pcall(function() fh:close() end)
+	local read_ok, content = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		Logger.error(LOG, "config.toml read did not commit; treating it as corrupt "
+			.. "(failure content withheld).")
+		return {}, "corrupt"
+	end
 
 	local dec_ok, tbl = pcall(TomlCodec.decode, content)
 	if not dec_ok or type(tbl) ~= "table" then
@@ -440,10 +453,9 @@ function M.load(prefs_file)
 		-- disk and are recoverable by hand; treating this as "fresh install" is
 		-- what destroys them.
 		Logger.error(LOG,
-			"config.toml exists but could not be decoded (%s). Keeping it untouched and running "
-				.. "with in-memory defaults for this session - fix the file, or delete it to start "
-				.. "from factory settings.",
-			tostring(tbl))
+			"config.toml exists but could not be decoded (failure content withheld). Keeping it "
+				.. "untouched and running with in-memory defaults for this session - fix the file, "
+				.. "or delete it to start from factory settings.")
 		return {}, "corrupt"
 	end
 
