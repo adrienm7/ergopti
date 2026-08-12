@@ -364,8 +364,13 @@ end
 --- @param secs number The new threshold in seconds (clamped to ≥ 0).
 function M.set_base_delay(secs)
 	local v = math.max(0, tonumber(secs) or M.DEFAULT_STATE.expansion_delay)
+	if LLMBridge.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
+		return false
+	end
 	CoreState.BASE_DELAY_SEC = v
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
+	return true
 end
 
 --- Returns the side of the last shift key pressed.
@@ -404,7 +409,11 @@ end
 --- @param key string The group identifier (must be a key of DELAYS_DEFAULT).
 --- @param val number The new threshold in seconds.
 function M.set_delay(key, val)
-	if M.DELAYS_DEFAULT[key] == nil then return end
+	if M.DELAYS_DEFAULT[key] == nil then return false end
+	if LLMBridge.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Delay change refused because the active hotstring preview could not be revoked.")
+		return false
+	end
 
 	CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
 	Logger.debug(LOG, "Delay '%s': %.3fs.", key, CoreState.DELAYS[key])
@@ -412,6 +421,7 @@ function M.set_delay(key, val)
 	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes — factors in the
 	-- per-section overrides too (see CoreState.recompute_word_timeout).
 	CoreState.recompute_word_timeout()
+	return true
 end
 
 --- Globally reassigns the magic expansion key (the "★" character by default).
@@ -422,10 +432,15 @@ end
 function M.set_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
-		return
+		return false
+	end
+	if LLMBridge.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Trigger-key change refused because the active hotstring preview could not be revoked.")
+		return false
 	end
 	Registry.update_trigger_char(char)
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
+	return true
 end
 
 --- Ignores a specific window title from hotstring processing.
@@ -464,42 +479,61 @@ function M.register_preview_provider(fn)
 	end
 end
 
+-- Exact visible-action lease queried by interceptor-backed preview providers.
+-- The tooltip owns physical visibility; the bridge owns the buffer/action pair.
+M.owns_visible_magic_action = LLMBridge.owns_visible_magic_action
+M.invalidate_hotstring_preview = LLMBridge.invalidate_hotstring_preview
+
+--- Wraps a registry mutation with a prospective/visible preview fence.
+--- @param fn function Registry mutation.
+--- @return function wrapped
+local function preview_fenced_registry_mutation(fn)
+	return function(...)
+		if LLMBridge.invalidate_hotstring_preview() ~= true then
+			Logger.error(LOG, "Registry mutation refused because the active hotstring preview could not be revoked.")
+			return false
+		end
+		local results = table.pack(fn(...))
+		return table.unpack(results, 1, results.n)
+	end
+end
+
 -- ── Registry proxies ─────────────────────────────────────────────────────────
 
-M.add                   = Registry.add
-M.load_file             = Registry.load_file
-M.load_toml             = Registry.load_toml
+M.add                   = preview_fenced_registry_mutation(Registry.add)
+M.load_file             = preview_fenced_registry_mutation(Registry.load_file)
+M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.is_section_enabled    = Registry.is_section_enabled
-M.disable_section       = Registry.disable_section
-M.enable_section        = Registry.enable_section
+M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section)
+M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section)
 -- Batch form. The menu toggles every section of a group at once, and routing that
 -- through the single-section API rebuilt the group once per section.
-M.set_sections_enabled  = Registry.set_sections_enabled
+M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections_enabled)
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
 M.set_group_context     = Registry.set_group_context
 M.set_post_load_hook    = Registry.set_post_load_hook
-M.disable_group         = Registry.disable_group
+M.disable_group         = preview_fenced_registry_mutation(Registry.disable_group)
 M.is_group_enabled      = Registry.is_group_enabled
 M.list_groups           = Registry.list_groups
-M.register_lua_group    = Registry.register_lua_group
-M.enable_group          = Registry.enable_group
-M.sort_mappings         = Registry.sort_mappings
+M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group)
+M.enable_group          = preview_fenced_registry_mutation(Registry.enable_group)
+M.sort_mappings         = preview_fenced_registry_mutation(Registry.sort_mappings)
 M.defer_sort            = Registry.defer_sort
 M.flush_sort            = Registry.flush_sort
 
 M.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
-M.set_repeat_feature_enabled = Registry.set_repeat_feature_enabled
+M.set_repeat_feature_enabled = preview_fenced_registry_mutation(Registry.set_repeat_feature_enabled)
 
-M.set_terminator_enabled   = Registry.set_terminator_enabled
+M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_terminator_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
 M.get_terminator_defs      = Registry.get_terminator_defs
-M.add_custom_terminator    = Registry.add_custom_terminator
-M.remove_custom_terminator = Registry.remove_custom_terminator
+M.add_custom_terminator    = preview_fenced_registry_mutation(Registry.add_custom_terminator)
+M.remove_custom_terminator = preview_fenced_registry_mutation(Registry.remove_custom_terminator)
 
 
 -- ── LLM bridge proxies ───────────────────────────────────────────────────────
