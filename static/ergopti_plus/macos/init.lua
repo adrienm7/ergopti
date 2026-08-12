@@ -208,7 +208,11 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- resolves through it, and none of them draws a UI. The editor's reload
 -- callback is wired later by ui/menu/init.lua, which is the only caller that
 -- can act on it.
-config_paths.init(base_dir)
+local config_paths_ready = config_paths.init(base_dir)
+if config_paths_ready ~= true then
+	Logger.error(LOG, "Config-path initialization did not commit — startup aborted before input or remap activation.")
+	return
+end
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 
 -- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
