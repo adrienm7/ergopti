@@ -44,6 +44,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut.
 - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — Regles durables sorties de l'audit de `lib/toml/` et `ui/onboarding/` : ou parse-t-on, comment signale-t-on un echec de lecture, et le piege de la sentinelle
 - [project-ahk-unreadable-config-persists-defaults](#project-ahk-unreadable-config-persists-defaults) — A config reader that returns "" on a locked file makes the next save persist DEFAULTS over the user's real config — the TOML_ReadFailed rule exists but is unapplied at five readers
+- [project-macos-absence-needs-lstat-proof](#project-macos-absence-needs-lstat-proof) — `io.open(..., "r")` returning ENOENT does not prove a macOS path is absent; dangling symlinks, missing prefixes, and probe/write races require the FileSystem transaction adapter
 - [project-audit-ahk-2026-07-21-adversarial](#project-audit-ahk-2026-07-21-adversarial) — Fifth adversarial AHK pass: 52 confirmed / 10 refuted, full list in AUDIT_AHK_2026-07-21.md; two confident false-positives killed by measurement
 - [project-webview2-bridge-gotchas](#project-webview2-bridge-gotchas) — Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes.
 - [project-config-v2-refactor](#project-config-v2-refactor) — La migration v1 → v2 est terminee ; ne restent que les gotchas transversaux qu'elle a mis au jour
@@ -1882,6 +1883,18 @@ Concrete sites and their data-loss path (audit 2026-07-21):
 **How to apply:** give each reader the same read-failure sentinel `ParseTomlFile`/`TOML_ReadFailed` already has (a per-path failure flag), and make its writer (`SaveFullConfig`, `_WS_Save`, the metrics persist) FAIL CLOSED — refuse to serialize the affected section while the flag is set — so a transient lock can never be persisted as an empty/default config. One class fix closes all five; a regression test per reader writes a real file, forces the read to throw, mutates, and asserts the on-disk file is unchanged. This is the loop-the-class shape again: the rule was written but pinned at one layer only.
 
 Related [[project_audit_2026_07_21_toml_onboarding]], [[feedback_loader_target_explicit]], [[project_ahk_invariant_incomplete_application]].
+
+### project-macos-absence-needs-lstat-proof
+
+_`io.open(path, "r")` returning ENOENT does not prove that a macOS pathname is safe to create; only the FileSystem adapter's lstat plus parent-listing transaction may authorize publication._
+
+<sub>slug: `project_macos_absence_needs_lstat_proof`</sub>
+
+The 2026-08-12 Hammerspoon audit found the same class as [[project-ahk-unreadable-config-persists-defaults]] across bootstrap paths, preferences, remap settings, hotstring overrides/editors, app categories, personal information, personal shortcuts, and keylogger identity. Lua file APIs sharpen it: `io.open(path, "r")` can return errno 2 for a genuinely absent final entry, a dangling symlink, or a path whose intermediate component vanished. A subsequent `io.open(path, "w")` follows a live symlink, while `rename(tmp, path)` replaces the symlink entry. Even an exact ENOENT check leaves a probe-then-create race in which a concurrent writer's complete file is overwritten.
+
+On macOS, use `adapters.file_system.read_with_status(path)`, which returns only `"ok"`, `"absent"`, or `"error"` after lstat/parent-listing, complete read and close, and symlink revalidation. Creation uses `create_if_absent(path, content)`: its create-only publication never overwrites a winner and returns `"created"`, a stable readable `"exists"`, or `"error"`. Replacement uses `FileSystem.write`, which stages beside the resolved destination and revalidates the symlink chain. Domain state, caches, notifications, reloads, and native remap regeneration publish only after the exact filesystem commitment; a pcall that merely did not raise is not commitment. Readers that parse a file must likewise require the TOML reader's second result to be exactly `true`, never nil or merely not-false.
+
+Regression tests must drive behavior, not grep spelling: preserve sentinel bytes under EACCES, directory, dangling-link and malformed-content cases; inject `write -> nil`, `close -> false`, and `rename -> false`; simulate a file appearing or changing between read and publication; then assert the file, live state, cache, UI, timer/submodule startup, and user notification all remain uncommitted. Related [[project-ahk-unreadable-config-persists-defaults]], [[project-hs-karabiner-exact-lease-isolation]], [[feedback-regression-tests]].
 
 ### project-audit-ahk-2026-07-21-adversarial
 
