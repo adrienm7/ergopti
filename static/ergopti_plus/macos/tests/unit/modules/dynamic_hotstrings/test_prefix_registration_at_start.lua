@@ -40,6 +40,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			set_post_load_hook        = function(_, fn) RE._captured_hook = fn end,
 			register_interceptor      = function() end,
 			register_preview_provider = function() end,
+			registry_transaction      = function(_, mutation) return mutation() == true end,
 		}
 
 		-- Production boot order: inject_data() runs BEFORE start().

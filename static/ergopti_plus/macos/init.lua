@@ -1091,7 +1091,10 @@ end
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
 local personal_info_toml_path = config_paths.get("PersonalInfoTomlPath")
-dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
+local dynamic_hotstrings_started = dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
+if dynamic_hotstrings_started ~= true then
+	error("dynamic_hotstrings.start did not commit")
+end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.

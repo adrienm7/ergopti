@@ -44,6 +44,7 @@ local function make_fake_keymap(custom_trigger)
 		add                       = function() end,
 		register_interceptor      = function(fn) captured_interceptor = fn end,
 		register_preview_provider = function() end,
+		registry_transaction      = function(_, mutation) return mutation() == true end,
 		get_interceptor           = function() return captured_interceptor end,
 		inject_dynamic            = function(delete_count, replacement, emitter, source, is_private)
 			helpers.assert_eq(delete_count, 2, "the matched 'td' suffix must delete two characters")
@@ -95,10 +96,10 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 		local CUSTOM_TRIGGER = "%"
 		local fake_km = make_fake_keymap(CUSTOM_TRIGGER)
 
-		local ok, err = pcall(DynHot.start, "/tmp/", fake_km, scratch_toml)
+		local ok, started = pcall(DynHot.start, "/tmp/", fake_km, scratch_toml)
 		os.remove(scratch_toml)
-		helpers.assert_true(ok, "dynamic_hotstrings.start must not raise with a fake keymap: " .. tostring(err))
-		helpers.assert_nil(err, "and must report no error")
+		helpers.assert_true(ok, "dynamic_hotstrings.start must not raise with a fake keymap")
+		helpers.assert_true(started, "and must report an exact committed terminal")
 
 		local interceptor = fake_km.get_interceptor()
 		helpers.assert_true(type(interceptor) == "function",

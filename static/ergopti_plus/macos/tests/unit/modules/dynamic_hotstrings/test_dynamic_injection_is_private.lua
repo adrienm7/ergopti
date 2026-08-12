@@ -147,6 +147,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 			set_post_load_hook        = function() end,
 			register_interceptor      = function(fn) interceptor = fn end,
 			register_preview_provider = function() end,
+			registry_transaction      = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function(...)
 				captured.n          = select("#", ...)
 				captured.is_private = select(INJECT_DYNAMIC_PRIVATE_ARG, ...)

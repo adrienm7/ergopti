@@ -71,6 +71,7 @@ local function run_scenario()
 		set_post_load_hook = function() end,
 		register_interceptor = function(fn) interceptor = fn end,
 		register_preview_provider = function(fn) provider = fn end,
+		registry_transaction = function(_label, mutation) return mutation() end,
 		invalidate_hotstring_preview = function() return true end,
 		owns_visible_magic_action = function(token, buffer)
 			return token == visible_token and buffer == "zz"
@@ -151,9 +152,11 @@ local function run_scenario()
 			error("simulated provider registration crash", 0)
 		end
 		local start_ok, start_err = pcall(RulesEngine.start, failing_keymap)
-		helpers.assert_eq(start_ok, false,
-			"the failure probe must abort start after most external registrations")
-		helpers.assert_true(tostring(start_err):find("simulated provider registration crash", 1, true) ~= nil)
+		helpers.assert_true(start_ok,
+			"the transactional start boundary must contain a late registration exception")
+		helpers.assert_eq(start_err, false,
+			"the failure probe must return an explicit refusal after rollback")
+		local errors_before_direct_fallback = #errors
 
 		SharedEngine.add_rule("xx", "failed_start_probe", function()
 			error("post-start resolver crash", 0)
@@ -161,7 +164,9 @@ local function run_scenario()
 		SharedEngine.match_buffer("xx", "dynamichotstrings", function() return true end)
 		helpers.assert_eq(after_calls, after_before_failed_start,
 			"a failed start must not leave the Hammerspoon reporter installed globally")
-		helpers.assert_eq(#errors, errors_before_failed_start + 1,
+		helpers.assert_true(errors_before_direct_fallback > errors_before_failed_start,
+			"the failed start itself must remain visible without exposing its payload")
+		helpers.assert_eq(#errors, errors_before_direct_fallback + 1,
 			"without a live platform owner the shared engine must use its direct fallback")
 		helpers.assert_true(errors[#errors]:find("content withheld", 1, true) ~= nil)
 		helpers.assert_true(errors[#errors]:find("post-start resolver crash", 1, true) == nil)

@@ -50,6 +50,7 @@ local function make_fake_keymap(custom_trigger, preview_fence)
 		inject_dynamic            = function() return true end,
 		register_interceptor      = function(fn) interceptors[#interceptors + 1] = fn end,
 		register_preview_provider = function() end,
+		registry_transaction      = function(_, mutation) return mutation() == true end,
 		invalidate_hotstring_preview = preview_fence or function() return true end,
 		interceptors              = interceptors,
 	}

@@ -153,6 +153,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
 			register_preview_provider = noop,
+			registry_transaction = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function()
 				inject_calls = inject_calls + 1
 				return false
@@ -198,6 +199,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
 			register_preview_provider = noop,
+			registry_transaction = function(_, mutation) return mutation() == true end,
 			suppress_rescan = noop,
 			arm_synthetic = function()
 				return synthetic.begin("test.rules_fallback", "replacement")
