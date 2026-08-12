@@ -32,8 +32,14 @@ local SECTION_COUNT = 24
 --- Loads registry_index with counting wrappers around the two rebuild halves.
 --- @return table RI, table counts
 local function load_with_counters()
-	package.loaded["modules.keymap.registry_index"] = nil
-	local RI = helpers.load_with_stubs("modules.keymap.registry_index")
+	local Registry = helpers.load_with_stubs("modules.keymap.registry")
+	package.loaded["modules.keymap.state"] = nil
+	local State = require("modules.keymap.state")
+	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+	Registry.init(state)
+	Registry.register_lua_group(GROUP, "Rolls", {})
+	Registry.set_post_load_hook(GROUP, function() end)
+	local RI = package.loaded["modules.keymap.registry_index"]
 
 	local counts = { disable = 0, enable = 0, settings = 0 }
 
@@ -44,9 +50,13 @@ local function load_with_counters()
 	RI.enable_group  = function(...) counts.enable  = counts.enable  + 1; return real_enable(...) end
 	RI.is_group_enabled = function() return true end
 
-	local real_set = hs.settings.set
+	local real_set, real_clear = hs.settings.set, hs.settings.clear
 	hs.settings.set = function(...) counts.settings = counts.settings + 1; return real_set(...) end
-	counts.restore = function() hs.settings.set = real_set end
+	hs.settings.clear = function(...) counts.settings = counts.settings + 1; return real_clear(...) end
+	counts.restore = function()
+		hs.settings.set = real_set
+		hs.settings.clear = real_clear
+	end
 
 	return RI, counts
 end

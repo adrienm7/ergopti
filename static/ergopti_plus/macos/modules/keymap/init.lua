@@ -513,6 +513,9 @@ M.enable_section        = preview_fenced_registry_mutation(Registry.enable_secti
 -- Batch form. The menu toggles every section of a group at once, and routing that
 -- through the single-section API rebuilt the group once per section.
 M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections_enabled)
+-- Multi-group batch form used by whole-tree menu actions. One exact boolean
+-- commitment covers every setting and live registry rebuild in the click.
+M.set_groups_sections_enabled = preview_fenced_registry_mutation(Registry.set_groups_sections_enabled)
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
 M.set_group_context     = Registry.set_group_context
