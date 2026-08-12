@@ -123,6 +123,18 @@ helpers.describe("event tap telemetry: plain report", function()
 			"the report must not present native-only events as a Lua tally")
 	end)
 
+	helpers.it("does not claim the reviewed contract in an unreviewed runtime report", function()
+		local Healthcheck = load_healthcheck("9.9.9")
+		local report = Healthcheck.format_plain(Healthcheck.run())
+
+		helpers.assert_contains(report, "Hammerspoon      : 9.9.9",
+			"the copied report must expose the runtime version used for the contract decision")
+		helpers.assert_contains(report, "unreviewed runtime Hammerspoon 9.9.9",
+			"the user-facing report must preserve the snapshot's unreviewed status")
+		helpers.assert_true(not report:find("reviewed Hammerspoon 1.1.1 consumes", 1, true),
+			"an overridden runtime must not inherit the reviewed build's native guarantee")
+	end)
+
 	helpers.it("keeps older stored snapshots honest through the fallback", function()
 		local snapshot = empty_snapshot()
 		snapshot.event_tap_timeout_telemetry = nil
