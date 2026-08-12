@@ -484,14 +484,19 @@ helpers.describe("preview masking: the @-tag provider", function()
 	end
 
 	helpers.it("masks the IBAN an @-combo would insert", function()
-		local provider = boot()
+		local provider, interceptor = boot()
+		interceptor(key("@"), "")
+		interceptor(key("i"), "@")
 		helpers.assert_eq(provider("@i"), IBAN_MASKED,
 			"typing @i★ inserts the IBAN, so the bubble that announces it is exactly "
 				.. "the surface a screen share captures")
 	end)
 
 	helpers.it("masks part by part, so a public field in the same combo survives", function()
-		local provider = boot()
+		local provider, interceptor = boot()
+		interceptor(key("@"), "")
+		interceptor(key("i"), "@")
+		interceptor(key("p"), "@i")
 		helpers.assert_eq(provider("@ip"), IBAN_MASKED .. " ⇥ " .. "Adrien",
 			"one combo can resolve to several fields that are not classified alike. "
 				.. "Masking the joined string would have no field to ask about and "
