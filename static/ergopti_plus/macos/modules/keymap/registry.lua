@@ -48,6 +48,7 @@ local _classify_cache = {}
 
 local _sort_deferred = false
 local _sort_pending  = false
+local CANONICAL_MAGIC_KEY = utf8.char(0x2605)
 
 
 --- Guard: verifies that M.init() was called before any public function that
@@ -173,15 +174,13 @@ local function first_codepoint(s)
 	return s:sub(1, 1)
 end
 
---- True when the trigger ends with the configured magic key (★ by default).
---- Such triggers are previewed through the case-SENSITIVE star bucket, so they
---- are excluded from the case-conform fast path to leave that path untouched.
---- @param t string The (already magic-key-substituted) trigger.
+--- True when the source trigger explicitly carries the canonical magic marker.
+--- This is ownership provenance captured before runtime-key substitution.
+--- @param t string The source trigger before substitution.
 --- @return boolean
-local function has_magic_trigger(t)
-	local mk = _state and _state.magic_key
-	if type(mk) ~= "string" or mk == "" then return false end
-	return #t >= #mk and t:sub(-#mk) == mk
+local function owns_canonical_magic(t)
+	return #t >= #CANONICAL_MAGIC_KEY
+		and t:sub(-#CANONICAL_MAGIC_KEY) == CANONICAL_MAGIC_KEY
 end
 
 --- True when any codepoint of the trigger is a "shift-symbol" — a char whose
@@ -548,17 +547,29 @@ function M.add(trigger, replacement, opts)
 		return
 	end
 
+	opts = type(opts) == "table" and opts or {}
+	local owns_magic = owns_canonical_magic(trigger) or opts.is_magic_trigger == true
+
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
 	-- The key is user-configurable through the menu, which accepts any codepoint —
 	-- including "%", which Lua treats specially on the REPLACEMENT side of gsub and
 	-- which raises "invalid use of '%' in replacement string". Unescaped, choosing
 	-- "%" as the magic key made every add() throw during registration, so the driver
 	-- came back from the post-change reload with no hotstrings at all.
-	if _state.magic_key and _state.magic_key ~= "★" then
-		trigger = trigger:gsub("★", text_utils.escape_gsub_replacement(_state.magic_key))
+	if _state.magic_key and _state.magic_key ~= CANONICAL_MAGIC_KEY then
+		trigger = trigger:gsub(CANONICAL_MAGIC_KEY,
+			text_utils.escape_gsub_replacement(_state.magic_key))
 	end
 
-	opts = type(opts) == "table" and opts or {}
+	if owns_magic then
+		local active = _state.magic_key
+		if type(active) ~= "string" or active == ""
+			or #trigger < #active or trigger:sub(-#active) ~= active
+		then
+			Logger.error(LOG, "add: is_magic_trigger requires a trigger ending in the active magic key.")
+			return
+		end
+	end
 	local is_word           = opts.is_word           == true
 	local is_auto           = opts.auto_expand        == true
 	-- The two case flags are ORTHOGONAL, exactly as the AutoHotkey loader treats
@@ -632,7 +643,7 @@ function M.add(trigger, replacement, opts)
 		-- recompute it on every keystroke; invalidated by update_trigger_char()
 		local mk        = _state.magic_key
 		local mkl       = #mk
-		local has_magic = mkl > 0 and t:sub(-mkl) == mk
+		local has_magic = owns_magic
 		local star_base = has_magic and t:sub(1, #t - mkl) or nil
 		local entry = {
 			trigger      = t,
@@ -736,7 +747,7 @@ function M.add(trigger, replacement, opts)
 	-- exclusion of has_magic keeps the case-sensitive star-preview path untouched.
 	local use_conform = (not is_case_sensitive)
 		and is_auto
-		and (not has_magic_trigger(lower_trig))
+		and (not owns_magic)
 		and (plain_repl_base == replacement)
 		and (not trigger_has_shift_symbol(lower_trig))
 
@@ -910,7 +921,7 @@ function M.update_trigger_char(char)
 		-- A mapping carried the old magic key iff its trigger ended with it.
 		-- This check must use the OLD key (via m.trigger) before we rename, so
 		-- we never rely on the stale m.has_magic flag.
-		local had_magic = old_len > 0 and m.trigger:sub(-old_len) == old_char
+		local had_magic = m.has_magic == true
 		if had_magic then
 			local base   = m.trigger:sub(1, #m.trigger - old_len)
 			local new_tr = base .. char

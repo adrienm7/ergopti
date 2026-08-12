@@ -24,9 +24,13 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 
 		local added = {}
+		local options = {}
 		local post_load_hook_fired = false
 		local fake_km = {
-			add                       = function(trigger, repl) added[trigger] = repl end,
+			add                       = function(trigger, repl, opts)
+				added[trigger] = repl
+				options[trigger] = opts
+			end,
 			is_section_enabled        = function() return true end,
 			set_group_context         = function() end,
 			sort_mappings             = function() end,
@@ -46,5 +50,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 
 		helpers.assert_eq(added["0612"], "0612345678",
 			"the 4-digit phone prefix mapping must be registered by start() itself")
+		helpers.assert_eq(options["06*"].is_magic_trigger, true,
+			"an already-substituted dynamic trigger must carry explicit magic ownership")
 	end)
 end)
