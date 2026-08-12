@@ -47,19 +47,6 @@ local ManifestMenu     = require("infra.manifest_menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 
---- Triggers the deps checker matching the given backend name. Designed to
---- be safe to call repeatedly: each underlying script is hash-gated /
---- liveness-gated and exits in milliseconds when the backend is already
---- ready, so this is effectively a no-op on a working system.
---- @param backend string Either "mlx" or "ollama".
-local function check_backend_deps(backend)
-	if backend == "mlx" then
-		pcall(mlx_deps_checker.check_and_install_deps)
-	elseif backend == "ollama" then
-		pcall(ollama_deps_checker.check_and_install_deps)
-	end
-end
-
 local LOG = "menu_llm"
 
 --- Wraps pcall and logs Logger.error when the wrapped call fails, so we
@@ -75,6 +62,23 @@ local function pcall_log(name, fn, ...)
 		Logger.error(LOG, "pcall '%s' failed: %s", tostring(name), tostring(err))
 	end
 	return ok, err
+end
+
+--- Triggers the deps checker matching the given backend name. Designed to
+--- be safe to call repeatedly: each underlying script is hash-gated /
+--- liveness-gated and exits in milliseconds when the backend is already
+--- ready, so this is effectively a no-op on a working system.
+--- @param backend string Either "mlx" or "ollama".
+--- @return boolean completed True when dispatch returned without raising.
+local function check_backend_deps(backend)
+	if backend == "mlx" then
+		return pcall_log("mlx_deps_checker.check_and_install_deps",
+			mlx_deps_checker.check_and_install_deps)
+	elseif backend == "ollama" then
+		return pcall_log("ollama_deps_checker.check_and_install_deps",
+			ollama_deps_checker.check_and_install_deps)
+	end
+	return true
 end
 
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
@@ -455,6 +459,7 @@ function M.create(deps)
 		-- =========================================
 
 		local check_startup
+		local activation_generation = 0
 		local function build_item()
 				Logger.debug(LOG, "Building LLM menu item (build_item)…")
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
@@ -833,57 +838,118 @@ function M.create(deps)
 				return {
 						label   = i18n.get("menu.llm.title"),
 						checked = state.llm_enabled or nil,
-						action  = not paused and function()
-								local function toggle_state()
-										Logger.info(LOG, string.format("Toggling LLM: %s -> %s", tostring(state.llm_enabled), tostring(not state.llm_enabled)))
-										state.llm_enabled = not state.llm_enabled
+							action  = not paused and function()
+								activation_generation = activation_generation + 1
+								local my_generation = activation_generation
+								local activation_backend = state.llm_backend
+								local target_enabled = not state.llm_enabled
+								local activation_settled = false
+
+								local function commit_enabled(enabled)
+										local previous_enabled = state.llm_enabled
+										Logger.info(LOG, string.format("Toggling LLM: %s -> %s",
+												tostring(state.llm_enabled), tostring(enabled)))
+										state.llm_enabled = enabled
 										if keymap and type(keymap.set_llm_enabled) == "function" then
-												local ok = pcall(keymap.set_llm_enabled, state.llm_enabled)
+												local ok = pcall_log("keymap.set_llm_enabled",
+													keymap.set_llm_enabled, state.llm_enabled)
 												Logger.debug(LOG, string.format("keymap.set_llm_enabled(%s) execution -> %s", tostring(state.llm_enabled), tostring(ok)))
+												if not ok then
+														state.llm_enabled = previous_enabled
+														pcall_log("keymap.set_llm_enabled rollback",
+															keymap.set_llm_enabled, previous_enabled)
+														return false
+												end
 										else
 												Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
 										end
 										if save_prefs() ~= true then return false end
-										-- The first activation is when the user expects to see the
-										-- backend’s deps install. It must remain after persistence:
-										-- a rejected config write rolls the candidate state back and
-										-- must not launch an unrelated setup process.
-										if state.llm_enabled then
-												check_backend_deps(state.llm_backend)
-										end
-										update_menu()
-										pcall(function() notifications.notify(state.llm_enabled and i18n.get("notify.llm_enabled") or i18n.get("notify.llm_disabled"), i18n.get("notify.llm_suggestions")) end)
 										return true
 								end
 
-								if not state.llm_enabled then
-										local function activate_llm()
-											if toggle_state() ~= true then return false end
-												if state.llm_model and state.llm_model ~= "" then
-														-- Start the server in the background — the checkmark is
-														-- already showing, so no need to gate on server readiness.
-														models_mgr.check_requirements(state.llm_model, nil, nil)
+								local function publish_toggle()
+										pcall_log("update_menu", update_menu)
+										pcall_log("notifications.notify", function()
+											notifications.notify(
+												state.llm_enabled and i18n.get("notify.llm_enabled")
+													or i18n.get("notify.llm_disabled"),
+												i18n.get("notify.llm_suggestions"))
+										end)
+								end
+
+								local function compensate_activation(reason)
+										Logger.error(LOG, "LLM activation failed (%s); restoring disabled state.",
+											tostring(reason))
+										if commit_enabled(false) ~= true then
+												Logger.error(LOG,
+													"Could not persist the compensating LLM disable after activation failure.")
+												return false
+										end
+										pcall_log("update_menu after activation compensation", update_menu)
+										return false
+								end
+
+								local function finish_activation(skip_deps_check)
+										if my_generation ~= activation_generation
+											or state.llm_backend ~= activation_backend
+											or state.llm_enabled ~= true then
+												Logger.debug(LOG, "Discarding stale LLM activation completion.")
+												return false
+										end
+										if activation_settled then return false end
+										activation_settled = true
+										if not skip_deps_check
+											and check_backend_deps(state.llm_backend) ~= true then
+												return compensate_activation("dependency bootstrap raised")
+										end
+										if state.llm_model and state.llm_model ~= "" then
+												local requirements_ok = pcall_log("models_mgr.check_requirements",
+													models_mgr.check_requirements, state.llm_model, nil, nil)
+												if not requirements_ok then
+														return compensate_activation("requirements dispatch raised")
 												end
 										end
+										publish_toggle()
+										return true
+								end
+
+								if target_enabled then
+										-- No backend process starts until the candidate is durable.
+										if commit_enabled(true) ~= true then return false end
 
 										if state.llm_backend == "mlx" then
-												-- Run the bootstrap (idempotent: fires callback immediately if
-												-- already ready). Activation happens in the on_complete callback
-												-- so the checkmark only appears once deps are confirmed good.
 												Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
-												mlx_deps_checker.check_and_install_deps(function(ok)
+												local bootstrap_ok = pcall_log(
+													"mlx_deps_checker.check_and_install_deps",
+												mlx_deps_checker.check_and_install_deps, function(ok)
+														if my_generation ~= activation_generation
+															or state.llm_backend ~= activation_backend
+															or state.llm_enabled ~= true then
+																Logger.debug(LOG, "Discarding stale MLX bootstrap completion.")
+																return
+														end
+														if activation_settled then return end
+														activation_settled = true
 														if ok then
-																activate_llm()
+																activation_settled = false
+																finish_activation(true)
 														else
-																Logger.error(LOG, "MLX bootstrap failed — cannot activate LLM.")
+																compensate_activation("MLX bootstrap reported failure")
 														end
 												end)
+												if not bootstrap_ok and not activation_settled then
+														activation_settled = true
+														return compensate_activation("MLX bootstrap dispatch raised")
+												end
+												return true
 										else
-												activate_llm()
+												return finish_activation(false)
 										end
-								else
-										toggle_state()
 								end
+
+								if commit_enabled(false) ~= true then return false end
+								publish_toggle()
+								return true
 						end or nil,
 						submenu = main_menu
 				}
