@@ -246,11 +246,11 @@ end
 --- @param value string Raw string.
 --- @return string escaped
 local function escape_toml_string(value)
-	return value:gsub("\\", "\\\\")
+	return (value:gsub("\\", "\\\\")
 		:gsub('"', '\\"')
 		:gsub("\t", "\\t")
 		:gsub("\n", "\\n")
-		:gsub("\r", "\\r")
+		:gsub("\r", "\\r"))
 end
 
 --- Serializes the in-memory override table back to TOML.
