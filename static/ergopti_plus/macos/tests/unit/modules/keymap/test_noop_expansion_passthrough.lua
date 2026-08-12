@@ -41,13 +41,13 @@ local function make_llm()
 end
 
 
-local function mapping(trigger, replacement, auto)
+local function mapping(trigger, replacement, auto, plain_replacement)
 	return {
 		trigger = trigger,
 		trigger_bytes = #trigger,
 		tlen = #trigger,
 		repl = replacement,
-		plain_repl = replacement,
+		plain_repl = plain_replacement or replacement,
 		is_word = false,
 		auto = auto == true,
 		match_mode = "exact",
@@ -171,5 +171,26 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 		helpers.assert_eq(first.effect, "replacement")
 		helpers.assert_eq(first.generation, last.generation)
 		helpers.assert_eq(first.batch, last.batch)
+	end)
+
+	helpers.it("does not erase a key-token side effect as a visible-text no-op", function()
+		local fixture = load_fixture("go")
+		local entry = mapping("go", "go{Tab}", true, "go")
+		local fired, consume, events = run_callback(fixture, function()
+			return fixture.expander.try_auto_expand(entry, 1, false)
+		end)
+
+		helpers.assert_true(fired,
+			"equal plain text must not suppress the raw {Tab} action")
+		helpers.assert_true(consume)
+		helpers.assert_not_nil(events)
+		local saw_tab = false
+		for _, event in ipairs(events) do
+			if event.isDown and event.key == "tab" then saw_tab = true end
+		end
+		helpers.assert_true(saw_tab,
+			"the production replacement transaction must contain the Tab keydown")
+		helpers.assert_eq(fixture.state.buffer, "go",
+			"non-text directives must not corrupt the logical text buffer")
 	end)
 end)
