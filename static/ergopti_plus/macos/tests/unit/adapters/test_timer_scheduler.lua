@@ -255,7 +255,9 @@ helpers.describe("TimerScheduler adapter — every()", function()
 		timer_stub.doEvery = function() return nil end
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
 			{ timer = timer_stub })
-		local handle = TS.every(1, function() end)
+		local handle, committed = TS.every(1, function() end)
+		helpers.assert_eq(committed, false,
+			"every() must explicitly report that no native timer was armed")
 		helpers.assert_true(handle.fired,
 			"a repeating schedule failure must return a terminal handle")
 		helpers.assert_nil(handle.timer)
@@ -267,7 +269,9 @@ helpers.describe("TimerScheduler adapter — every()", function()
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
 			{ timer = timer_stub })
 		local count = 0
-		local h = TS.every(1, function() count = count + 1 end)
+		local h, committed = TS.every(1, function() count = count + 1 end)
+		helpers.assert_eq(committed, true,
+			"every() must explicitly report a live native timer")
 		helpers.assert_true(not h.fired, "repeating handle must not be pre-fired")
 		timer_stub.fire(1)
 		helpers.assert_eq(count, 1)

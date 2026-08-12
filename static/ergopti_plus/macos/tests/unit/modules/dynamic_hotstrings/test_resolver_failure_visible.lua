@@ -29,12 +29,15 @@ local function run_scenario()
 		"dynamic_hotstrings",
 		"infra.logger",
 		"logger.shim",
+		"modules.diagnostics.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
 	}
 	local previous = {}
 	for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
 
-	local scheduled = {}
+	local after_calls = 0
+	local pump_arm_calls = 0
+	local diagnostic_pump = nil
 	local errors = {}
 	local resolver_calls = 0
 	local fallback_calls = 0
@@ -49,11 +52,16 @@ local function run_scenario()
 	package.loaded["infra.logger"] = Logger
 	package.loaded["logger.shim"] = Logger
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(delay, fn)
-			local handle = { delay = delay, fn = fn }
-			scheduled[#scheduled + 1] = handle
-			return handle, true
+		after = function()
+			after_calls = after_calls + 1
+			error("resolver diagnostics must not allocate a one-shot timer", 0)
 		end,
+		every = function(_interval, fn)
+			pump_arm_calls = pump_arm_calls + 1
+			diagnostic_pump = fn
+			return { kind = "diagnostic-pump" }, true
+		end,
+		cancel = function() return true end,
 	}
 
 	local fake_keymap = {
@@ -77,11 +85,16 @@ local function run_scenario()
 		package.loaded["dynamic_hotstrings"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
+		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 		local SharedEngine = require("dynamic_hotstrings")
+		helpers.assert_true(Mailbox.start())
+		helpers.assert_eq(pump_arm_calls, 1)
 		helpers.assert_true(RulesEngine.start(fake_keymap))
 		helpers.assert_true(RulesEngine.add_rule("zz", "broken", function()
 			resolver_calls = resolver_calls + 1
-			error("simulated resolver crash", 0)
+			error(setmetatable({}, {
+				__tostring = function() error("PRIVATE_RESOLVER_FAILURE", 0) end,
+			}), 0)
 		end))
 		helpers.assert_true(RulesEngine.add_rule("zz", "fallback", function()
 			fallback_calls = fallback_calls + 1
@@ -96,15 +109,17 @@ local function run_scenario()
 		helpers.assert_eq(type(token), "table")
 		helpers.assert_eq(#errors, 0,
 			"resolver diagnostics must not perform file logging in the HID callback")
-		helpers.assert_eq(#scheduled, 1,
-			"the first failure must own one deferred diagnostic")
+		helpers.assert_eq(after_calls, 0,
+			"the first failure must reuse the lifecycle pump, not arm a timer")
 
-		scheduled[1].fn()
+		diagnostic_pump()
 		helpers.assert_eq(#errors, 1)
-		helpers.assert_true(errors[1]:find("section 'broken'", 1, true) ~= nil)
+		helpers.assert_true(errors[1]:find("Dynamic resolver raised", 1, true) ~= nil)
 		helpers.assert_true(errors[1]:find("content withheld", 1, true) ~= nil)
-		helpers.assert_true(errors[1]:find("simulated resolver crash", 1, true) == nil,
+		helpers.assert_true(errors[1]:find("PRIVATE_RESOLVER_FAILURE", 1, true) == nil,
 			"a resolver exception can itself carry personal data and must stay out of logs")
+		helpers.assert_true(errors[1]:find("broken", 1, true) == nil,
+			"dynamic section identifiers must not cross the HID mailbox")
 
 		visible_token = token
 		local consumed = interceptor(magic_event(), "zz", {
@@ -121,13 +136,14 @@ local function run_scenario()
 		helpers.assert_eq(resolver_calls, 2,
 			"the one-shot diagnostic must not quarantine a potentially transient resolver")
 		helpers.assert_eq(fallback_calls, 2)
-		helpers.assert_eq(#scheduled, 1,
-			"the same broken rule must schedule no second diagnostic")
+		diagnostic_pump()
+		helpers.assert_eq(after_calls, 0,
+			"the same broken rule must allocate no diagnostic timer")
 		helpers.assert_eq(#errors, 1,
 			"the same broken rule must log exactly once per registration")
 
 		helpers.assert_true(RulesEngine.stop())
-		local scheduled_before_failed_start = #scheduled
+		local after_before_failed_start = after_calls
 		local errors_before_failed_start = #errors
 		local failing_keymap = {}
 		for key, value in pairs(fake_keymap) do failing_keymap[key] = value end
@@ -143,16 +159,20 @@ local function run_scenario()
 			error("post-start resolver crash", 0)
 		end)
 		SharedEngine.match_buffer("xx", "dynamichotstrings", function() return true end)
-		helpers.assert_eq(#scheduled, scheduled_before_failed_start,
+		helpers.assert_eq(after_calls, after_before_failed_start,
 			"a failed start must not leave the Hammerspoon reporter installed globally")
 		helpers.assert_eq(#errors, errors_before_failed_start + 1,
 			"without a live platform owner the shared engine must use its direct fallback")
 		helpers.assert_true(errors[#errors]:find("content withheld", 1, true) ~= nil)
 		helpers.assert_true(errors[#errors]:find("post-start resolver crash", 1, true) == nil)
+		helpers.assert_true(Mailbox.stop())
 	end, debug.traceback)
 
 	if package.loaded["modules.dynamic_hotstrings.rules_engine"] then
 		pcall(package.loaded["modules.dynamic_hotstrings.rules_engine"].stop)
+	end
+	if package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] then
+		pcall(package.loaded["modules.diagnostics.hid_diagnostic_mailbox"].stop)
 	end
 	for _, name in ipairs(dependency_names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end

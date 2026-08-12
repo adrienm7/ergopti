@@ -26,7 +26,7 @@ if not ok_kl then keylogger = nil end
 local SharedEngine = require("dynamic_hotstrings")
 local Terminators = require("keymap.terminators")
 local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -60,25 +60,9 @@ local _sections       = nil
 
 --- Defers shared-resolver diagnostics beyond the key event callback.
 --- @param rule table Shared rule record.
---- @param failure any Error object returned by pcall.
---- @return boolean owned True after the diagnostic was scheduled or logged.
-local function report_resolver_failure(rule, failure)
-	local section = tostring(rule and rule.section or "unknown")
-	local suffix_length = type(rule and rule.suffix) == "string" and #rule.suffix or 0
-	local failure_size = #tostring(failure)
-	local schedule_ok, handle_or_err, committed = xpcall(function()
-		return TimerScheduler.after(0, function()
-			Logger.error(LOG, "Dynamic resolver failed in section '%s' "
-				.. "(%d-byte suffix; %d-byte failure content withheld).",
-				section, suffix_length, failure_size)
-		end)
-	end, debug.traceback)
-	if schedule_ok and committed == true then return true end
-	local scheduling_failure_size = #tostring(handle_or_err)
-	Logger.error(LOG, "Dynamic resolver diagnostic could not be deferred for section '%s' "
-		.. "(%d-byte scheduler detail and %d-byte failure content withheld).",
-		section, scheduling_failure_size, failure_size)
-	return true
+--- @return boolean owned True after privacy-safe metadata entered the mailbox.
+local function report_resolver_failure(rule)
+	return HidDiagnosticMailbox.report_resolver_failure(rule)
 end
 
 --- Revokes the prospective value and any committed row before semantics change.

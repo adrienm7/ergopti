@@ -86,6 +86,7 @@ end
 --- @param intervalSec number Repeat interval in seconds.
 --- @param fn function Zero-arity callback to invoke.
 --- @return table Opaque cancellation handle.
+--- @return boolean committed True only when the native timer was armed.
 function M.every(intervalSec, fn)
 	local handle = { fired = false, id = _new_id() }
 	local ok, timer_or_err = pcall(hs.timer.doEvery, intervalSec, function()
@@ -98,11 +99,11 @@ function M.every(intervalSec, fn)
 		handle.fired = true
 		Logger.error(LOG, "every(): hs.timer.doEvery failed — %s",
 			tostring(timer_or_err or "returned nil"))
-		return handle
+		return handle, false
 	end
 	handle.timer = timer_or_err
 	_live_timers[handle.id] = handle
-	return handle
+	return handle, true
 end
 
 --- Cancels a previously scheduled timer. Safe to call on a nil or already-fired

@@ -40,6 +40,7 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
 local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
+local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -281,27 +282,11 @@ end
 --- Reports one provider failure outside the latency-critical eventtap callback.
 --- @param provider function Provider identity used by the one-shot latch.
 --- @param provider_index number Stable index for diagnosis.
---- @param failure any Error object returned by pcall.
-local function report_preview_provider_failure(provider, provider_index, failure)
+local function report_preview_provider_failure(provider, provider_index)
 	if _provider_error_reported[provider] then return end
-	local failure_size = #tostring(failure)
-	local schedule_ok, handle_or_err, committed = xpcall(function()
-		return TimerScheduler.after(0, function()
-			Logger.error(LOG, "Preview provider #%d raised; static fallback retained "
-				.. "(%d-byte failure content withheld).", provider_index, failure_size)
-		end)
-	end, debug.traceback)
-	if schedule_ok and committed == true then
+	if HidDiagnosticMailbox.report_preview_provider_failure(provider_index) == true then
 		_provider_error_reported[provider] = true
-		return
 	end
-
-	-- Timer creation failure is already exceptional. Report synchronously so the
-	-- original provider error cannot disappear together with its diagnostic
-	_provider_error_reported[provider] = true
-	Logger.error(LOG, "Preview provider #%d raised and its deferred diagnostic failed "
-		.. "(%d-byte scheduler detail and %d-byte failure content withheld).",
-		provider_index, #tostring(handle_or_err), failure_size)
 end
 
 
@@ -631,7 +616,7 @@ function M.update_preview(buf)
 		-- provider API's first (string) return value.
 		local ok, res, provider_action_token = pcall(provider, buf)
 		if not ok then
-			report_preview_provider_failure(provider, provider_index, res)
+			report_preview_provider_failure(provider, provider_index)
 			goto continue_provider
 		end
 		if res then

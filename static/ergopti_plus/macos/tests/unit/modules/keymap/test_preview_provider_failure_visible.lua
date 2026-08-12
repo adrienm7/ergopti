@@ -27,6 +27,7 @@ local function run_scenario()
 		"modules.keylogger",
 		"modules.llm",
 		"modules.llm.prediction_engine",
+		"modules.diagnostics.hid_diagnostic_mailbox",
 		"ui.tooltip",
 		"modules.keymap.llm_bridge",
 	}
@@ -34,6 +35,7 @@ local function run_scenario()
 	for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
 
 	local scheduled = {}
+	local diagnostic_pump = nil
 	local effects = { errors = {}, provider_calls = 0, renders = 0, rows = nil }
 	local action_epoch = {}
 	local star_mapping = {
@@ -57,6 +59,11 @@ local function run_scenario()
 			scheduled[#scheduled + 1] = handle
 			return handle, true
 		end,
+		every = function(_interval, fn)
+			diagnostic_pump = fn
+			return { kind = "diagnostic-pump" }, true
+		end,
+		cancel = function() return true end,
 	}
 	package.loaded["infra.logger"] = Logger
 	package.loaded["infra.manifest_reader"] = {
@@ -110,6 +117,8 @@ local function run_scenario()
 
 	local ok, err = xpcall(function()
 		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+		helpers.assert_true(Mailbox.start())
 		local state = {
 			buffer = "abc",
 			mappings = {},
@@ -119,7 +128,9 @@ local function run_scenario()
 			preview_providers = {
 				function()
 					effects.provider_calls = effects.provider_calls + 1
-					error("simulated provider crash", 0)
+					error(setmetatable({}, {
+						__tostring = function() error("PRIVATE_PROVIDER_FAILURE", 0) end,
+					}), 0)
 				end,
 			},
 			is_repeat_feature_enabled = function() return false end,
@@ -139,6 +150,10 @@ local function run_scenario()
 		helpers.assert_eq(#effects.errors, 0,
 			"provider diagnostics must not perform file logging in the HID callback")
 		drain_scheduled()
+		helpers.assert_eq(#scheduled, 2,
+			"only the normal render and winner-expiry timers may be armed; "
+				.. "the provider failure must not add a diagnostic timer")
+		diagnostic_pump()
 		helpers.assert_eq(effects.renders, 1,
 			"the throwing provider must not suppress the static fallback")
 		helpers.assert_eq(#(effects.rows or {}), 1)
@@ -148,19 +163,24 @@ local function run_scenario()
 			"the first provider failure must become one deferred ERROR")
 		helpers.assert_true(effects.errors[1]:find("Preview provider #1 raised", 1, true) ~= nil)
 		helpers.assert_true(effects.errors[1]:find("content withheld", 1, true) ~= nil)
-		helpers.assert_true(effects.errors[1]:find("simulated provider crash", 1, true) == nil,
+		helpers.assert_true(effects.errors[1]:find("PRIVATE_PROVIDER_FAILURE", 1, true) == nil,
 			"provider exceptions can contain personal data and must stay out of logs")
 
 		Bridge.update_preview(state.buffer)
 		drain_scheduled()
+		diagnostic_pump()
 		helpers.assert_eq(effects.provider_calls, 2,
 			"the diagnostic latch must not quarantine a provider that can recover later")
 		helpers.assert_eq(effects.renders, 2,
 			"the fallback must remain available after repeated provider failures")
 		helpers.assert_eq(#effects.errors, 1,
 			"one broken provider must not flood the log on every keystroke")
+		helpers.assert_true(Mailbox.stop())
 	end, debug.traceback)
 
+	if package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] then
+		pcall(package.loaded["modules.diagnostics.hid_diagnostic_mailbox"].stop)
+	end
 	for _, name in ipairs(dependency_names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end
 end

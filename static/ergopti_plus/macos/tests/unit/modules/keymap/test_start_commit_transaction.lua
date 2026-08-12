@@ -15,6 +15,7 @@ local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
+	"modules.diagnostics.hid_diagnostic_mailbox",
 	"adapters.synthetic_input", "adapters.event_provenance",
 	"infra.logger", "infra.perf", "infra.hotpath_profiler",
 	"infra.manifest_reader", "infra.keycodes", "keymap.terminators",
@@ -44,6 +45,8 @@ local function load_fixture()
 		watchdog_failure_mode = nil,
 		listener_raises = false,
 		listener_result = true,
+		mailbox_start_mode = "ok",
+		mailbox_stop_mode = "ok",
 	}
 	local taps = {}
 	hs_stub.eventtap.new = function(_types, callback)
@@ -143,6 +146,27 @@ local function load_fixture()
 	package.loaded["modules.keymap.terminator_replay"] = api({
 		flush_now = function() return true end,
 	})
+	local mailbox_running = false
+	local mailbox_start_calls, mailbox_stop_calls = 0, 0
+	package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] = {
+		start = function()
+			mailbox_start_calls = mailbox_start_calls + 1
+			if controls.mailbox_start_mode == "throw" then error("MAILBOX_START_FAILURE") end
+			if controls.mailbox_start_mode == "false" then return false end
+			if controls.mailbox_start_mode == "nil" then return nil end
+			mailbox_running = true
+			return true
+		end,
+		stop = function()
+			mailbox_stop_calls = mailbox_stop_calls + 1
+			if controls.mailbox_stop_mode == "throw" then error("MAILBOX_STOP_FAILURE") end
+			if controls.mailbox_stop_mode == "false" then return false end
+			if controls.mailbox_stop_mode == "nil" then return nil end
+			mailbox_running = false
+			return true
+		end,
+		is_running = function() return mailbox_running end,
+	}
 	local tracking_stops = 0
 	package.loaded["modules.keymap.utils"] = api({
 		start_ignored_win_tracking = function() return 1 end,
@@ -175,6 +199,9 @@ local function load_fixture()
 		register_calls = function() return register_calls end,
 		unregister_calls = function() return unregister_calls end,
 		tracking_stops = function() return tracking_stops end,
+		mailbox_start_calls = function() return mailbox_start_calls end,
+		mailbox_stop_calls = function() return mailbox_stop_calls end,
+		mailbox_running = function() return mailbox_running end,
 	}
 end
 
@@ -266,4 +293,55 @@ helpers.describe("keymap start: exact native commitment", function()
 		for _, event_tap in ipairs(fixture.taps) do helpers.assert_true(event_tap.enabled) end
 		helpers.assert_true(fixture.keymap.stop(true))
 	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("refuses key capture when the diagnostic pump returns " .. mode, function()
+			local fixture = load_fixture()
+			fixture.controls.mailbox_start_mode = mode
+			helpers.assert_eq(fixture.keymap.start(), false)
+			assert_all_taps_disabled(fixture)
+			helpers.assert_eq(fixture.mailbox_start_calls(), 1)
+			helpers.assert_eq(fixture.mailbox_running(), false)
+			helpers.assert_eq(fixture.unregister_calls(), 1,
+				"pump arm failure must roll back the pre-tap action listener")
+
+			fixture.controls.mailbox_start_mode = "ok"
+			helpers.assert_true(fixture.keymap.start())
+			helpers.assert_true(fixture.mailbox_running())
+			helpers.assert_true(fixture.keymap.stop(true))
+		end)
+	end
+
+	helpers.it("keeps the diagnostic pump alive across pause and restarts it after stop", function()
+		local fixture = load_fixture()
+		helpers.assert_true(fixture.keymap.start())
+		helpers.assert_eq(fixture.mailbox_start_calls(), 1)
+		fixture.keymap.pause_processing()
+		fixture.keymap.resume_processing()
+		helpers.assert_eq(fixture.mailbox_start_calls(), 1,
+			"pause/resume must not allocate a replacement pump")
+		helpers.assert_eq(fixture.mailbox_stop_calls(), 0,
+			"pause must keep diagnostics deliverable")
+
+		helpers.assert_true(fixture.keymap.stop(true))
+		helpers.assert_eq(fixture.mailbox_stop_calls(), 1)
+		helpers.assert_true(fixture.keymap.start())
+		helpers.assert_eq(fixture.mailbox_start_calls(), 2)
+		helpers.assert_true(fixture.keymap.stop(true))
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains diagnostic ownership when pump stop returns " .. mode, function()
+			local fixture = load_fixture()
+			helpers.assert_true(fixture.keymap.start())
+			fixture.controls.mailbox_stop_mode = mode
+			helpers.assert_eq(fixture.keymap.stop(true), false)
+			helpers.assert_true(fixture.mailbox_running(),
+				"failed pump stop must remain retryable")
+
+			fixture.controls.mailbox_stop_mode = "ok"
+			helpers.assert_true(fixture.keymap.stop(true))
+			helpers.assert_eq(fixture.mailbox_running(), false)
+		end)
+	end
 end)

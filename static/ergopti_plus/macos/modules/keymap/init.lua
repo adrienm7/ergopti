@@ -34,6 +34,7 @@ local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
+local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local M   = {}
 local LOG = "keymap"
@@ -153,6 +154,7 @@ local shift_tap = nil
 local mouse_tap = nil
 local loopback_keyup_tap = nil
 local _started = false
+local _diagnostic_mailbox_started = false
 
 local ACTION_EPOCH_LISTENER_ID = "modules.keymap.action_epoch"
 local _action_listener_registered = false
@@ -164,6 +166,14 @@ local _context_reconcile_timer = nil
 local _context_reconcile_quiet = false
 local _window_context_reconcile_pending = false
 local _last_window_context_generation = 0
+
+
+--- Checks the native diagnostic pump without trusting the local owner latch.
+--- @return boolean running
+local function diagnostic_mailbox_is_running()
+	local ok, running = pcall(HidDiagnosticMailbox.is_running)
+	return ok and running == true
+end
 
 
 --- Reconciles only the keymap context for one action epoch.
@@ -1669,8 +1679,13 @@ end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
-	if _started and taps_are_enabled() and watchdog_is_running(_watchdog_timer) then return true end
+	if _started and taps_are_enabled() and watchdog_is_running(_watchdog_timer)
+		and diagnostic_mailbox_is_running()
+	then
+		return true
+	end
 	if _started or _action_listener_registered or _watchdog_timer
+		or _diagnostic_mailbox_started or diagnostic_mailbox_is_running()
 		or eventtap_is_enabled("keyDown", tap)
 		or eventtap_is_enabled("loopbackKeyUp", loopback_keyup_tap)
 		or eventtap_is_enabled("flagsChanged", shift_tap)
@@ -1717,6 +1732,14 @@ function M.start()
 		observe_action_epoch(SyntheticInput.current_action_epoch())
 	end
 	Logger.start(LOG, "Starting keymap engine…")
+	local mailbox_ok, mailbox_result = xpcall(HidDiagnosticMailbox.start, debug.traceback)
+	if not mailbox_ok or mailbox_result ~= true then
+		Logger.error(LOG,
+			"Keymap start rolled back because the off-HID diagnostic pump is unavailable.")
+		M.stop(true)
+		return false
+	end
+	_diagnostic_mailbox_started = true
 	-- Auto-arm latency sampling when the log level is already DEBUG so the user
 	-- gets measurements without any console intervention. In production (INFO or
 	-- WARNING) _enabled stays false and Perf.is_enabled() in onKeyDown short-circuits
@@ -1818,6 +1841,27 @@ function M.stop(teardown)
 			tostring(filter_result))
 	end
 
+	-- The pump remains live until every key-producing tap is observably stopped.
+	-- If native tap teardown fails, retaining the pump is the only way a late
+	-- callback can still publish its diagnostic without touching the logger.
+	local diagnostic_mailbox_stopped = true
+	if _diagnostic_mailbox_started or diagnostic_mailbox_is_running() then
+		if not taps_stopped then
+			diagnostic_mailbox_stopped = false
+			Logger.error(LOG,
+				"HID diagnostic pump retained because an event tap is still live.")
+		else
+			local mailbox_ok, mailbox_result = xpcall(HidDiagnosticMailbox.stop, debug.traceback)
+			diagnostic_mailbox_stopped = mailbox_ok and mailbox_result == true
+			if diagnostic_mailbox_stopped then
+				_diagnostic_mailbox_started = false
+			else
+				Logger.error(LOG,
+					"HID diagnostic pump teardown did not commit; ownership retained for retry.")
+			end
+		end
+	end
+
 	-- CoreState.interceptors and CoreState.preview_providers are deliberately NOT
 	-- cleared here. Their only writers are M.register_interceptor and
 	-- M.register_preview_provider, called once at boot by dynamic_hotstrings;
@@ -1830,7 +1874,8 @@ function M.stop(teardown)
 	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
 	local stopped = listener_stopped and watchdog_stopped and terminator_settled
-		and taps_stopped and predictions_reset and escape_trap_stopped and window_filter_stopped
+		and taps_stopped and predictions_reset and escape_trap_stopped
+		and window_filter_stopped and diagnostic_mailbox_stopped
 	if stopped then
 		Logger.success(LOG, "Keymap engine stopped.")
 	else
