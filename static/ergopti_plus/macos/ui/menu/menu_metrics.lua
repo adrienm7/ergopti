@@ -268,7 +268,8 @@ function M.build(ctx)
 		if type(Keylogger.set_private_filter_enabled) == "function" then
 			pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
 		end
-		save_prefs(); updateMenu()
+		if save_prefs() ~= true then return false end
+		updateMenu()
 	end
 
 	--- Flips the secure filter. The ROW is built by the shared renderer from
@@ -279,7 +280,8 @@ function M.build(ctx)
 		if type(Keylogger.set_secure_field_filter_enabled) == "function" then
 			pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
 		end
-		save_prefs(); updateMenu()
+		if save_prefs() ~= true then return false end
+		updateMenu()
 	end
 
 	--- Flips the sysauth filter. The ROW is built by the shared renderer from
@@ -290,7 +292,8 @@ function M.build(ctx)
 		if type(Keylogger.set_system_auth_filter_enabled) == "function" then
 			pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
 		end
-		save_prefs(); updateMenu()
+		if save_prefs() ~= true then return false end
+		updateMenu()
 	end
 
 	local function rows_exclude_apps(_ctx)
@@ -306,7 +309,8 @@ function M.build(ctx)
 				if type(Keylogger.set_disabled_apps) == "function" then
 					pcall(Keylogger.set_disabled_apps, new_list)
 				end
-				pcall(save_prefs); pcall(updateMenu)
+				if save_prefs() ~= true then return false end
+				pcall(updateMenu)
 			end,
 			i18n.get("menu.metrics.exclude_apps")
 		)
@@ -322,7 +326,7 @@ function M.build(ctx)
 	-- manifest's, so these supply only what the click does.
 	local function cmd_wpm_menubar()
 		state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
-		save_prefs()
+		if save_prefs() ~= true then return false end
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
@@ -337,7 +341,7 @@ function M.build(ctx)
 
 	local function cmd_menubar_colors()
 		state.keylogger_menubar_colors = not state.keylogger_menubar_colors
-		save_prefs()
+		if save_prefs() ~= true then return false end
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
@@ -355,7 +359,7 @@ function M.build(ctx)
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_widget", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_wpm = not state.keylogger_float_wpm
-				save_prefs()
+				if save_prefs() ~= true then return false end
 				local WpmWidget = require("ui.wpm.wpm_widget")
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
@@ -373,7 +377,7 @@ function M.build(ctx)
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "widget_colors", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_colors = not state.keylogger_float_colors
-				save_prefs()
+				if save_prefs() ~= true then return false end
 				local WpmWidget = require("ui.wpm.wpm_widget")
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
@@ -391,7 +395,7 @@ function M.build(ctx)
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "include_realtime", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_graph = not state.keylogger_float_graph
-				save_prefs()
+				if save_prefs() ~= true then return false end
 				local WpmWidget = require("ui.wpm.wpm_widget")
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
@@ -427,7 +431,7 @@ function M.build(ctx)
 		end
 		TextCipher.set_enabled(want)
 		state.keylogger_encrypt = want
-		save_prefs()
+		if save_prefs() ~= true then return false end
 		local Keylogger = require("modules.keylogger")
 		if type(Keylogger.set_options) == "function" then
 			Keylogger.set_options({ encrypt = want })
@@ -495,7 +499,7 @@ function M.build(ctx)
 			end
 
 			state.keylogger_enabled = not state.keylogger_enabled
-			save_prefs()
+			if save_prefs() ~= true then return false end
 
 			local ok_kl, Keylogger = pcall(require, "modules.keylogger")
 			if not ok_kl then Keylogger = nil end

@@ -110,7 +110,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 				else
 					if type(shortcuts.enable) == "function" then pcall(shortcuts.enable, id) end
 				end
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.notify_feature(pretty_key(id, state), not on)
 				ctx.updateMenu()
 			end
@@ -164,7 +164,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		action       = not paused and function()
 			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = true end
 			state.wrap_symbol_states = sym_states
-			ctx.save_prefs(); ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
 		end or nil,
 	}
 	sub[#sub + 1] = {
@@ -173,7 +174,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		action       = not paused and function()
 			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = false end
 			state.wrap_symbol_states = sym_states
-			ctx.save_prefs(); ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
 		end or nil,
 	}
 	sub[#sub + 1] = {
@@ -182,7 +184,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		action       = not paused and function()
 			state.wrap_symbol_states  = {}
 			state.custom_wrap_symbols = {}
-			ctx.save_prefs(); ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
 		end or nil,
 	}
 	sub[#sub + 1] = { separator = true }
@@ -209,7 +212,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				return function()
 					state.wrap_symbol_states = state.wrap_symbol_states or {}
 					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = true end
-					ctx.save_prefs(); ctx.updateMenu()
+					if ctx.save_prefs() ~= true then return false end
+					ctx.updateMenu()
 				end
 			end)(group_lefts) or nil,
 		}
@@ -220,7 +224,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				return function()
 					state.wrap_symbol_states = state.wrap_symbol_states or {}
 					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = false end
-					ctx.save_prefs(); ctx.updateMenu()
+					if ctx.save_prefs() ~= true then return false end
+					ctx.updateMenu()
 				end
 			end)(group_lefts) or nil,
 		}
@@ -240,7 +245,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					return function()
 						state.wrap_symbol_states      = state.wrap_symbol_states or {}
 						state.wrap_symbol_states[k]   = not (state.wrap_symbol_states[k] ~= false)
-						ctx.save_prefs(); ctx.updateMenu()
+						if ctx.save_prefs() ~= true then return false end
+						ctx.updateMenu()
 					end
 				end)(pair.left) or nil,
 			}
@@ -270,7 +276,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 						label = i18n.get("button.delete"),
 						action    = (function(i) return function()
 							table.remove(state.custom_wrap_symbols, i)
-							ctx.save_prefs(); ctx.updateMenu()
+							if ctx.save_prefs() ~= true then return false end
+							ctx.updateMenu()
 						end end)(idx),
 					},
 				}
@@ -319,7 +326,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			-- 3. Persist
 			if type(state.custom_wrap_symbols) ~= "table" then state.custom_wrap_symbols = {} end
 			table.insert(state.custom_wrap_symbols, { left = left_char, right = right_char })
-			ctx.save_prefs(); ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
 		end or nil,
 	}
 
@@ -359,7 +367,7 @@ function M.build(ctx)
 			else
 				if type(shortcuts.pause_bindings) == "function" then pcall(shortcuts.pause_bindings) end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
 			ctx.updateMenu()
 		end,
@@ -404,7 +412,7 @@ function M.build(ctx)
 										if type(shortcuts.set_chatgpt_url) == "function" then
 											pcall(shortcuts.set_chatgpt_url, url)
 										end
-										ctx.save_prefs()
+										if ctx.save_prefs() ~= true then return false end
 										ctx.updateMenu()
 									end
 								end or nil,
@@ -477,7 +485,7 @@ function M.build(ctx)
 								if type(script_control.set_shortcut_action) == "function" then
 									pcall(script_control.set_shortcut_action, keyname, a)
 								end
-								ctx.save_prefs()
+								if ctx.save_prefs() ~= true then return false end
 								ctx.updateMenu()
 							end
 

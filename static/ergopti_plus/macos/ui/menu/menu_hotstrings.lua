@@ -156,7 +156,7 @@ local function toggleGroupFn(ctx, name)
 			return mutator(name)
 		end, function()
 			ctx.state.hotstrings[name] = will_enable
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(groupLabel(ctx, name), will_enable)
 			ctx.updateMenu()
 		end)
@@ -181,7 +181,7 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 			if type(mutator) ~= "function" then return false end
 			return mutator(group_name, sec_name)
 		end, function()
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
 			ctx.updateMenu()
 		end)
@@ -209,7 +209,7 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 			return km.set_groups_sections_enabled(changes, enable)
 		end, function()
 			if enable then ctx.state.hotstrings[group_name] = true end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end)
 	end
@@ -244,7 +244,7 @@ local function setAllSectionsFn(ctx, enable)
 			if enable then
 				for _, change in ipairs(changes) do ctx.state.hotstrings[change.name] = true end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end)
 	end
@@ -268,7 +268,7 @@ local function buildPersonalInfoItems(ctx, description)
 				else 
 					if type(ctx.personal_info.disable) == "function" then pcall(ctx.personal_info.disable) end 
 				end
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.notify_feature(description or i18n.get("notify.personal_info"), ctx.state.personal_info)
 				ctx.updateMenu()
 			end,

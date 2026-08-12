@@ -100,7 +100,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_instant_on_word_end) == "function" then
 				pcall(keymap.set_llm_instant_on_word_end, state.llm_instant_on_word_end)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	}
 
@@ -113,7 +114,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_after_hotstring) == "function" then
 				pcall(keymap.set_llm_after_hotstring, state.llm_after_hotstring)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	}
 
@@ -133,7 +135,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_url_bar_filter_enabled) == "function" then
 				pcall(keymap.set_llm_url_bar_filter_enabled, state.llm_url_bar_filter_enabled)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	}
 
@@ -146,7 +149,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_secure_field_filter_enabled) == "function" then
 				pcall(keymap.set_llm_secure_field_filter_enabled, state.llm_secure_field_filter_enabled)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	}
 
@@ -165,7 +169,8 @@ function M.build(ctx)
 		function(new_list)
 			state.llm_disabled_apps = new_list
 			if keymap and type(keymap.set_llm_disabled_apps) == "function" then pcall(keymap.set_llm_disabled_apps, new_list) end
-			pcall(save_prefs); pcall(update_menu)
+			if save_prefs() ~= true then return false end
+			pcall(update_menu)
 		end,
 		i18n.get("menu.llm.exclude_from_ai")
 	)

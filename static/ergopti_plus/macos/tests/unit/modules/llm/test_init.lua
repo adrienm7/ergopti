@@ -301,6 +301,33 @@ helpers.describe("Core profile accessors", function()
 			"a backend switch before the deferred warmup fires must discard the stale dispatch (F-MED-6)")
 	end)
 
+	helpers.it("does NOT dispatch a rejected profile warmup after rollback", function()
+		local captured = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			captured[#captured + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+		local warmup_calls = {}
+		local old_warmup_model = Core.warmup_model
+		Core.warmup_model = function(model_name, profile)
+			warmup_calls[#warmup_calls + 1] = { model = model_name, profile = profile }
+		end
+
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_active_profile("advanced")
+		helpers.assert_eq(#captured, 1)
+		Core.set_active_profile("basic")
+		captured[1].fn()
+
+		hs.timer.doAfter = old_do_after
+		Core.warmup_model = old_warmup_model
+		Core.set_runtime_llm_enabled(false)
+		helpers.assert_eq(#warmup_calls, 0,
+			"the rollback profile generation must fence the rejected deferred warmup")
+	end)
+
 	helpers.it("DOES dispatch the deferred warmup when the backend is unchanged (F-MED-6 control)", function()
 		local captured = {}
 		local old_do_after = hs.timer.doAfter

@@ -403,7 +403,8 @@ function M.create(deps)
 										else
 												Logger.warn(LOG, "keymap.set_llm_num_predictions is unavailable.")
 										end
-										save_prefs(); update_menu()
+										if save_prefs() ~= true then return false end
+										update_menu()
 								end
 						})
 				end
@@ -678,7 +679,8 @@ function M.create(deps)
 								fn       = function()
 										state.llm_num_predictions = llm_mod.DEFAULT_STATE.llm_num_predictions
 										if keymap and type(keymap.set_llm_num_predictions) == "function" then pcall(keymap.set_llm_num_predictions, state.llm_num_predictions) end
-										save_prefs(); update_menu()
+										if save_prefs() ~= true then return false end
+										update_menu()
 								end
 						})
 				end
@@ -717,7 +719,8 @@ function M.create(deps)
 						action   = function()
 								state.llm_reset_on_nav = not state.llm_reset_on_nav
 								if keymap and type(keymap.set_llm_reset_on_nav) == "function" then pcall(keymap.set_llm_reset_on_nav, state.llm_reset_on_nav) end
-								save_prefs(); update_menu()
+								if save_prefs() ~= true then return false end
+								update_menu()
 						end
 				})
 
@@ -847,13 +850,15 @@ function M.create(deps)
 										if state.llm_enabled then
 												check_backend_deps(state.llm_backend)
 										end
-										save_prefs(); update_menu()
+										if save_prefs() ~= true then return false end
+										update_menu()
 										pcall(function() notifications.notify(state.llm_enabled and i18n.get("notify.llm_enabled") or i18n.get("notify.llm_disabled"), i18n.get("notify.llm_suggestions")) end)
+										return true
 								end
 
 								if not state.llm_enabled then
 										local function activate_llm()
-												toggle_state()
+											if toggle_state() ~= true then return false end
 												if state.llm_model and state.llm_model ~= "" then
 														-- Start the server in the background — the checkmark is
 														-- already showing, so no need to gate on server readiness.
@@ -928,7 +933,8 @@ function M.create(deps)
 		return {
 				build_item          = build_item,
 				build_download_item = build_download_item,
-				check_startup       = check_startup
+				check_startup       = check_startup,
+				restore_preference_runtime = trigger_orch.restore_shortcuts,
 		}
 end
 

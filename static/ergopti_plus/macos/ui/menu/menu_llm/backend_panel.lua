@@ -108,6 +108,7 @@ function M.build(ctx)
 			if state.llm_backend ~= "mlx" then
 				Logger.info(LOG, "Activating MLX backend…")
 				state.llm_backend = "mlx"
+				if save_prefs() ~= true then return false end
 				llm_mod.set_backend("mlx")
 				-- On-demand deps check: bootstrap the MLX venv if the user just
 				-- switched and the engine is not ready — silent on the fast path.
@@ -134,7 +135,6 @@ function M.build(ctx)
 					if keymap and type(keymap.set_llm_display_model_name) == "function" then
 						pcall(keymap.set_llm_display_model_name, "")
 					end
-					save_prefs()
 					update_menu()
 				end
 			end
@@ -154,6 +154,7 @@ function M.build(ctx)
 			if state.llm_backend ~= "ollama" then
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				state.llm_backend = "ollama"
+				if save_prefs() ~= true then return false end
 				llm_mod.set_backend("ollama")
 				-- On-demand deps check — silent on the fast path.
 				check_backend_deps("ollama")
@@ -179,7 +180,6 @@ function M.build(ctx)
 					if keymap and type(keymap.set_llm_display_model_name) == "function" then
 						pcall(keymap.set_llm_display_model_name, "")
 					end
-					save_prefs()
 					update_menu()
 				end
 			end
@@ -202,6 +202,7 @@ function M.build(ctx)
 			if state.llm_backend ~= "api" then
 				Logger.info(LOG, "Activating remote API backend…")
 				state.llm_backend = "api"
+				if save_prefs() ~= true then return false end
 				llm_mod.set_backend("api")
 				-- probe_llm_health() intentionally skips the API backend (no local
 				-- server to probe there); without resetting it here, a prior
@@ -218,7 +219,6 @@ function M.build(ctx)
 				-- the active one so the health indicator reflects reality.
 				if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
 				WarmupCtrl.warmup("api_backend_switch")
-				save_prefs()
 				update_menu()
 			end
 		end or nil

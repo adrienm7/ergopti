@@ -583,7 +583,7 @@ function M.build(ctx)
 			checked = feature_on or nil,
 			action      = function()
 				state.layout_pause_switch_enabled = not feature_on
-				if save_prefs then save_prefs() end
+				if save_prefs and save_prefs() ~= true then return false end
 				if update_menu then update_menu() end
 			end,
 		}
@@ -600,7 +600,7 @@ function M.build(ctx)
 			disabled = (not feature_on) or hs_paused_pre or nil,
 			items     = build_layout_picker_submenu(cur_pause, function(id)
 				state.layout_on_pause = id
-				if save_prefs then save_prefs() end
+				if save_prefs and save_prefs() ~= true then return false end
 				if update_menu then update_menu() end
 			end),
 		}
@@ -613,7 +613,7 @@ function M.build(ctx)
 			disabled = (not feature_on) or hs_paused_pre or nil,
 			items     = build_layout_picker_submenu(cur_resume, function(id)
 				state.layout_on_resume = id
-				if save_prefs then save_prefs() end
+				if save_prefs and save_prefs() ~= true then return false end
 				if update_menu then update_menu() end
 			end),
 		}

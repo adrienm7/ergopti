@@ -360,7 +360,7 @@ function M.new(deps, presets, ram_getter)
 					if type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
 					if type(deps.keymap.set_llm_display_model_name) == "function" then pcall(deps.keymap.set_llm_display_model_name, display_model) end
 				end
-				pcall(deps.save_prefs)
+				if deps.save_prefs() ~= true then return false end
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()

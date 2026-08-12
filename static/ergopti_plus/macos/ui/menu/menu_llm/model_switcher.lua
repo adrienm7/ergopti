@@ -314,7 +314,8 @@ function M.new(ctx)
 		state.llm_active_profile = profile_id
 		llm_mod.set_active_profile(profile_id)
 		check_profile_power_mismatch(profile_id, state.llm_model)
-		save_prefs(); update_menu()
+		if save_prefs() ~= true then return false end
+		update_menu()
 	end
 
 	--- Offers to switch to the recommended profile when it differs from the current one.
@@ -356,7 +357,8 @@ function M.new(ctx)
 					"Completion model: silently switching profile %s → %s.", cur_profile, rec_profile))
 				state.llm_active_profile = rec_profile
 				llm_mod.set_active_profile(rec_profile)
-				save_prefs(); update_menu()
+				if save_prefs() ~= true then return false end
+				update_menu()
 			else
 				local title = type(opts.dialog_title) == "string"
 					and opts.dialog_title
@@ -372,7 +374,8 @@ function M.new(ctx)
 					Logger.info(LOG, string.format("Profile changed to %s (accepted).", rec_profile))
 					state.llm_active_profile = rec_profile
 					llm_mod.set_active_profile(rec_profile)
-					save_prefs(); update_menu()
+					if save_prefs() ~= true then return false end
+					update_menu()
 				else
 					-- User refused — the profile is already cur_profile; no setter call
 					-- or save needed. Re-applying set_active_profile without persisting
@@ -446,7 +449,11 @@ function M.new(ctx)
 				pcall(keymap.set_llm_display_model_name, new_model)
 			end
 
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then
+				unlock_predictions()
+				return false
+			end
+			update_menu()
 			unlock_predictions()
 			apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
 		end, function()

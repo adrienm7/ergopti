@@ -22,6 +22,7 @@ local LOG    = "menu_state"
 -- log-rotation work) only feeds typing metrics, so it is deferred off the boot
 -- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
 local KEYLOGGER_START_DELAY_SEC = 0.5
+local _keylogger_start_generation = 0
 
 --- Calls fn(...) under pcall and logs a WARN when the call raises.
 --- Falls through silently on success — the existing code never checked the
@@ -90,6 +91,20 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 
 	-- Re-register custom terminators created by the user (persisted in state)
 	if keymap and type(keymap.add_custom_terminator) == "function" then
+		local desired_custom = {}
+		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
+			if type(ct) == "table" and type(ct.key) == "string" then desired_custom[ct.key] = true end
+		end
+		if type(keymap.get_terminator_defs) == "function"
+			and type(keymap.remove_custom_terminator) == "function" then
+			local defs = keymap.get_terminator_defs()
+			for index = #(type(defs) == "table" and defs or {}), 1, -1 do
+				local def = defs[index]
+				if type(def) == "table" and def.custom == true and not desired_custom[def.key] then
+					try("keymap.remove_custom_terminator", keymap.remove_custom_terminator, def.key)
+				end
+			end
+		end
 		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 			if type(ct) == "table" and ct.key and ct.char then
 				try("keymap.add_custom_terminator", keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
@@ -153,8 +168,31 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 	if gestures and type(gestures.apply_all_overrides) == "function" then try("gestures.apply_all_overrides", gestures.apply_all_overrides) end
 
+	-- Restore the backend/profile/model identity before keymap LLM setters. Those
+	-- setters may schedule warmup work immediately, so reversing this order would
+	-- dispatch the acknowledged model through the just-rejected backend.
+	local llm = core_mods and core_mods.llm
+	if llm then
+		local llm_map = {
+			{ fn = "set_backend",        val = state.llm_backend },
+			{ fn = "set_active_profile", val = state.llm_active_profile },
+			{ fn = "set_llm_streaming",  val = state.llm_streaming },
+			{ fn = "set_user_profiles",  val = state.llm_user_profiles },
+		}
+		for _, item in ipairs(llm_map) do
+			if type(llm[item.fn]) == "function" then try("llm." .. item.fn, llm[item.fn], item.val) end
+		end
+		if type(llm.set_llm_model_ollama) == "function" then
+			try("llm.set_llm_model_ollama", llm.set_llm_model_ollama, state.llm_model_ollama)
+		end
+		if type(llm.set_llm_model_mlx) == "function" then
+			try("llm.set_llm_model_mlx", llm.set_llm_model_mlx, state.llm_model_mlx)
+		end
+	end
+
 	-- Sync keymap options
 	if keymap then
+		local backend_labels = { mlx = "MLX 🚀", ollama = "Ollama 🦙", api = "API 🌐" }
 		local map = {
 			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
@@ -165,11 +203,18 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_enabled",                 val = state.llm_enabled },
 			{ fn = "set_llm_debounce",                val = state.llm_debounce },
 			{ fn = "set_llm_model",                   val = state.llm_model },
+			{ fn = "set_llm_backend_name",            val = backend_labels[state.llm_backend] or state.llm_backend },
+			{ fn = "set_llm_display_model_name",      val = state.llm_model },
 			{ fn = "set_trigger_char",                val = state.trigger_char },
 			{ fn = "set_llm_context_length",          val = state.llm_context_length },
 			{ fn = "set_llm_reset_on_nav",            val = state.llm_reset_on_nav },
 			{ fn = "set_llm_temperature",             val = state.llm_temperature },
+			{ fn = "set_llm_max_words",               val = state.llm_max_words },
+			{ fn = "set_llm_min_words",               val = state.llm_min_words },
 			{ fn = "set_llm_num_predictions",         val = state.llm_num_predictions },
+			{ fn = "set_llm_sequential_mode",         val = state.llm_sequential_mode },
+			{ fn = "set_llm_streaming",               val = state.llm_streaming },
+			{ fn = "set_llm_streaming_multi",         val = state.llm_streaming_multi },
 			{ fn = "set_llm_arrow_nav_enabled",       val = state.llm_arrow_nav_enabled },
 			{ fn = "set_llm_nav_modifiers",           val = state.llm_nav_modifiers },
 			{ fn = "set_llm_show_info_bar",           val = state.llm_show_info_bar },
@@ -183,6 +228,15 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		for _, item in ipairs(map) do
 			if type(keymap[item.fn]) == "function" then try("keymap." .. item.fn, keymap[item.fn], item.val) end
 		end
+	end
+	-- Several LLM editors also mirror these values in hs.settings. Restore that
+	-- secondary runtime store from the same acknowledged snapshot so a failed
+	-- config.toml publication cannot survive as a plist-only preference.
+	for _, key in ipairs({
+		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
+		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
+	}) do
+		if state[key] ~= nil then try("hs.settings.set " .. key, hs.settings.set, key, state[key]) end
 	end
 
 	-- Sync editor options
@@ -205,13 +259,23 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key) end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
 		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key) end
+	elseif sc == false and type(hotstring_editor.clear_shortcut) == "function" then
+		try("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 	end
 
-	if type(state.metrics_shortcut) == "table" then
-		apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key)
+	if type(apply_metrics_shortcut) == "function" then
+		if type(state.metrics_shortcut) == "table" then
+			apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key, false)
+		else
+			apply_metrics_shortcut(nil, nil, false)
+		end
 	end
-	if type(state.apps_time_shortcut) == "table" then
-		apply_apps_time_shortcut(state.apps_time_shortcut.mods, state.apps_time_shortcut.key)
+	if type(apply_apps_time_shortcut) == "function" then
+		if type(state.apps_time_shortcut) == "table" then
+			apply_apps_time_shortcut(state.apps_time_shortcut.mods, state.apps_time_shortcut.key, false)
+		else
+			apply_apps_time_shortcut(nil, nil, false)
+		end
 	end
 	-- Re-enable after a brief warm-up delay: on the very first presses after
 	-- a Hammerspoon restart the event tap may not be fully live, so the first
@@ -226,6 +290,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- Sync keylogger engine
 	local kl = core_mods.keylogger
 	if kl then
+		_keylogger_start_generation = _keylogger_start_generation + 1
+		local keylogger_generation = _keylogger_start_generation
 		if type(kl.set_options) == "function" then
 			try("keylogger.set_options", kl.set_options, {
 				encrypt     = state.keylogger_encrypt,
@@ -235,6 +301,18 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			})
 		end
 		if type(kl.set_disabled_apps) == "function" then try("keylogger.set_disabled_apps", kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
+		if type(kl.set_private_filter_enabled) == "function" then
+			try("keylogger.set_private_filter_enabled", kl.set_private_filter_enabled,
+				state.keylogger_private_filter_enabled)
+		end
+		if type(kl.set_secure_field_filter_enabled) == "function" then
+			try("keylogger.set_secure_field_filter_enabled", kl.set_secure_field_filter_enabled,
+				state.keylogger_secure_filter_enabled)
+		end
+		if type(kl.set_system_auth_filter_enabled) == "function" then
+			try("keylogger.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
+				state.keylogger_system_auth_filter_enabled)
+		end
 		if state.keylogger_enabled then
 			-- Keylogger start is the single biggest boot cost (~1.3 s: SQLite open,
 			-- log-rotation offset replay, export setup). It only feeds typing
@@ -243,6 +321,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
 			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
+				if keylogger_generation ~= _keylogger_start_generation then return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
 				try("keylogger.start", kl.start, _shortcuts_ref)
@@ -252,6 +331,10 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		else
 			if type(kl.stop) == "function" then try("keylogger.stop", kl.stop) end
 		end
+	end
+	local cipher_ok, TextCipher = pcall(require, "modules.keylogger.text_cipher")
+	if cipher_ok and type(TextCipher) == "table" and type(TextCipher.set_enabled) == "function" then
+		try("keylogger.text_cipher.set_enabled", TextCipher.set_enabled, state.keylogger_encrypt)
 	end
 
 	-- Start/stop engines
@@ -281,18 +364,18 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 
 		-- Sync granular settings
-		if type(state.gesture_modes) == "table" then
-			for slot, mode in pairs(state.gesture_modes) do
+		if type(saved.gesture_modes) == "table" then
+			for slot, mode in pairs(saved.gesture_modes) do
 				if type(gestures.set_mode) == "function" then try("gestures.set_mode", gestures.set_mode, slot, mode) end
 			end
 		end
-		if type(state.gesture_sensitivities) == "table" then
-			for slot, sens in pairs(state.gesture_sensitivities) do
+		if type(saved.gesture_sensitivities) == "table" then
+			for slot, sens in pairs(saved.gesture_sensitivities) do
 				if type(gestures.set_sensitivity) == "function" then try("gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
 			end
 		end
-		if state.gesture_space_wrap ~= nil then
-			if type(gestures.set_space_wrap) == "function" then try("gestures.set_space_wrap", gestures.set_space_wrap, state.gesture_space_wrap) end
+		if saved.gesture_space_wrap ~= nil then
+			if type(gestures.set_space_wrap) == "function" then try("gestures.set_space_wrap", gestures.set_space_wrap, saved.gesture_space_wrap) end
 		end
 	end
 	-- Drive shortcuts with binding-only helpers so the script-control eventtap
@@ -304,6 +387,16 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		else
 			if type(core_mods.shortcuts_mod.pause_bindings) == "function" then try("shortcuts.pause_bindings", core_mods.shortcuts_mod.pause_bindings) end
 		end
+	end
+	if core_mods.shortcuts_mod and type(state.script_control_shortcuts) == "table"
+		and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
+		for keyname, action in pairs(state.script_control_shortcuts) do
+			try("shortcuts.set_shortcut_action", core_mods.shortcuts_mod.set_shortcut_action,
+				keyname, action)
+		end
+	end
+	if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
+		try("shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
 	end
 	if core_mods.dyn_hot_mod then
 		if state.personal_info then
@@ -347,7 +440,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
-	if config_absent then save_prefs() end
+	if config_absent and save_prefs() ~= true then return false end
+	return true
 end
 
 return M
