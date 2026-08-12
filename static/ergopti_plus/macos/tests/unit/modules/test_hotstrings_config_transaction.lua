@@ -38,7 +38,9 @@ end
 --- @param write_result boolean Result returned by the file-system adapter.
 --- @return table module
 local function fresh_module(path, write_result)
+	local fixture_io = require("tests.support.file_system_write_stub")
 	package.loaded["adapters.file_system"] = {
+		read_with_status = fixture_io.read_with_status,
 		write = function() return write_result end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
@@ -47,43 +49,34 @@ local function fresh_module(path, write_result)
 	return mod
 end
 
---- Runs init while replacing only the target file's read handle.
+--- Runs init against one explicit adapter read result.
 --- @param path string Override path.
---- @param open_target function Target-path io.open implementation.
+--- @param status string Adapter status.
+--- @param detail string Failure detail.
 --- @return boolean ok
---- @return table|string module_or_error
-local function init_with_open_override(path, open_target)
-	local original_open = io.open
-	io.open = function(candidate, mode)
-		if candidate == path and mode == "r" then return open_target() end
-		return original_open(candidate, mode)
-	end
-	package.loaded["adapters.file_system"] = { write = function() return true end }
+--- @return table|string result
+--- @return table calls
+local function init_with_read_status(path, status, detail)
+	local calls = { reads = 0, writes = 0 }
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function(candidate)
+			helpers.assert_eq(candidate, path)
+			calls.reads = calls.reads + 1
+			if status == "ok" then return SENTINEL, "ok" end
+			return nil, status, detail
+		end,
+		write = function()
+			calls.writes = calls.writes + 1
+			return true
+		end,
+	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local ok, result = pcall(function()
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
-		mod.init({ override_path = path, toml_resolver = function() return nil end })
-		return mod
+		local initialized = mod.init({ override_path = path, toml_resolver = function() return nil end })
+		return { module = mod, initialized = initialized }
 	end)
-	io.open = original_open
-	return ok, result
-end
-
---- Creates a handle that can be read but whose exact close result fails.
---- @return table handle
-local function close_failure_handle()
-	local lines = { "[rolls]", "delay = 0.33" }
-	return {
-		read = function() return SENTINEL end,
-		lines = function()
-			local index = 0
-			return function()
-				index = index + 1
-				return lines[index]
-			end
-		end,
-		close = function() return false, "close failed" end,
-	}
+	return ok, result, calls
 end
 
 
@@ -97,50 +90,87 @@ end
 -- ======================================================
 
 helpers.describe("hotstrings config: failed source reads stay fail-closed", function()
-	helpers.it("EACCES preserves the existing group and rejects a later setter", function()
-		local path = fixture_path("eacces")
-		local ok, mod = init_with_open_override(path, function()
-			return nil, "permission denied", 13
-		end)
-		helpers.assert_true(ok, "an EACCES read must degrade safely instead of throwing")
+	for _, case in ipairs({
+		{ label = "EACCES", detail = "permission denied" },
+		{ label = "mid-read failure", detail = "input/output error" },
+		{ label = "failed close", detail = "close failed" },
+		{ label = "dangling symlink", detail = "dangling symlink target" },
+		{ label = "directory", detail = "expected a regular file, got directory" },
+	}) do
+		helpers.it(case.label .. " preserves the source and rejects every later setter", function()
+			local path = fixture_path(case.label:gsub("[^%w]", "_"))
+			local ok, result, calls = init_with_read_status(path, "error", case.detail)
+			helpers.assert_true(ok, case.label .. " must degrade safely instead of throwing")
+			helpers.assert_eq(result.initialized, false,
+				"an uncommitted source must be visible to the caller")
 
-		helpers.assert_eq(mod.set_override("abbrevs", nil, "delay", 0.7), false,
-			"an unread source must never become a writable empty configuration")
-		helpers.assert_eq(mod.clear_override("missing", nil, "delay"), false,
-			"even a logical no-op must not report a writable state after EACCES")
-		helpers.assert_nil(mod.get_user_override("abbrevs", nil),
-			"the rejected candidate must not leak into memory")
-		helpers.assert_eq(read_fixture(path), SENTINEL,
-			"the user's pre-existing rolls group must survive the transient lock")
-		os.remove(path)
-	end)
-
-	helpers.it("a mid-read failure is contained and leaves the source write-blocked", function()
-		local path = fixture_path("read")
-		local ok, mod = init_with_open_override(path, function()
-			return {
-				read = function() return nil, "input/output error", 5 end,
-				lines = function()
-					return function() error("input/output error") end
-				end,
-				close = function() return true end,
-			}
+			local mod = result.module
+			helpers.assert_eq(mod.set_override("abbrevs", nil, "delay", 0.7), false,
+				"an unread source must never become a writable empty configuration")
+			helpers.assert_eq(mod.clear_override("missing", nil, "delay"), false,
+				"even a logical no-op must stay blocked after an unsafe read")
+			helpers.assert_nil(mod.get_user_override("abbrevs", nil),
+				"the rejected candidate must not leak into memory")
+			helpers.assert_eq(calls.reads, 1,
+				"initialization must consume exactly one classified adapter snapshot")
+			helpers.assert_eq(calls.writes, 0,
+				"an unsafe source classification must never reach publication")
+			helpers.assert_eq(read_fixture(path), SENTINEL,
+				"the user's pre-existing group must survive the unsafe source")
+			os.remove(path)
 		end)
-		helpers.assert_true(ok, "a file iterator/read failure must not escape init")
-		helpers.assert_eq(mod.set_override("abbrevs", nil, "delay", 0.7), false)
+	end
+
+	helpers.it("a dangling symlink discovered by reload retains prior memory and blocks writes", function()
+		local path = fixture_path("reload_dangling")
+		local phase = "ok"
+		local calls = { writes = 0 }
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function()
+				if phase == "ok" then return SENTINEL, "ok" end
+				return nil, "error", "dangling symlink target"
+			end,
+			write = function() calls.writes = calls.writes + 1 return true end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33)
+
+		phase = "retargeted"
+		helpers.assert_eq(mod.reload(), false)
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33,
+			"a failed revalidation must retain the last committed in-memory snapshot")
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", 0.7), false)
+		helpers.assert_eq(calls.writes, 0)
 		helpers.assert_eq(read_fixture(path), SENTINEL)
 		os.remove(path)
 	end)
 
-	helpers.it("a failed close withholds the parsed candidate and blocks writes", function()
-		local path = fixture_path("close")
-		local ok, mod = init_with_open_override(path, close_failure_handle)
-		helpers.assert_true(ok, "a close failure must be reported as a failed read transaction")
-		helpers.assert_eq(mod.set_override("abbrevs", nil, "delay", 0.7), false)
-		helpers.assert_nil(mod.get_user_override("rolls", nil),
-			"bytes are not committed input until close succeeds")
-		helpers.assert_eq(read_fixture(path), SENTINEL)
+	helpers.it("a proven-absent override source remains writable", function()
+		local path = os.tmpname() .. "_absent.toml"
 		os.remove(path)
+		local writes = 0
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return nil, "absent", "not found"
+			end,
+			write = function(candidate, content)
+				helpers.assert_eq(candidate, path)
+				helpers.assert_contains(content, "[rolls]")
+				writes = writes + 1
+				return true
+			end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", 0.7), true)
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.7)
+		helpers.assert_eq(writes, 1,
+			"only a positively classified absence may start a new override file")
 	end)
 end)
 
@@ -171,6 +201,38 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 			os.remove(path)
 		end)
 	end
+
+	helpers.it("a symlink retarget between committed read and write publishes no candidate", function()
+		local path = fixture_path("retarget")
+		local events = {}
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				events[#events + 1] = "read"
+				return SENTINEL, "ok"
+			end,
+			write = function(candidate)
+				helpers.assert_eq(candidate, path)
+				events[#events + 1] = "retarget-refused"
+				return false
+			end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+		local before = mod.resolve("rolls", nil)
+
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", 0.7), false)
+		helpers.assert_eq(events[1], "read")
+		helpers.assert_eq(events[2], "retarget-refused",
+			"publication must remain delegated to the symlink-revalidating adapter")
+		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33)
+		helpers.assert_eq(mod.resolve("rolls", nil), before,
+			"the last committed memo must survive a TOCTOU refusal")
+		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
 
 	helpers.it("clear_override rolls back when publication fails", function()
 		local path = fixture_path("clear")

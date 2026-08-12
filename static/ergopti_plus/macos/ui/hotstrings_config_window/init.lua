@@ -221,13 +221,17 @@ local function discover_extensions(extensions_dir)
 		-- Read the extension label from manifest.toml via a line scan;
 		-- the manifest uses [extension] not [_meta], so TomlReader.meta won't help.
 		local label = ext_name
-		local fh = io.open(manifest, "r")
-		if fh then
-			for line in fh:lines() do
+		local read_ok, manifest_content, manifest_status, manifest_detail =
+			pcall(FileSystem.read_with_status, manifest)
+		if read_ok and manifest_status == "ok" and type(manifest_content) == "string" then
+			for line in (manifest_content .. "\n"):gmatch("([^\n]*)\n") do
+				line = line:gsub("\r$", "")
 				local v = line:match('^name%s*=%s*"(.-)"')
 				if v then label = v; break end
 			end
-			pcall(function() fh:close() end)
+		elseif not read_ok or manifest_status ~= "absent" then
+			Logger.error(LOG, "Extension manifest read did not commit for '%s' — %s.",
+				manifest, tostring(read_ok and manifest_detail or manifest_content))
 		end
 
 		local toml_files = list_toml_files(hs_dir)
@@ -510,22 +514,10 @@ end
 --- @param field string "delay" or "color".
 --- @param value string|number|nil The new value, or nil to remove the field.
 local function patch_personal_toml(toml_path, section, field, value)
-	local open_ok, f, open_err = pcall(io.open, toml_path, "r")
-	if not open_ok or not f then
-		Logger.error(LOG, "patch_personal_toml: cannot open '%s' for reading — %s.",
-			toml_path, tostring(open_ok and open_err or f))
-		return false
-	end
-	local read_ok, content, read_err = pcall(f.read, f, "*a")
-	local close_ok, closed, close_err = pcall(f.close, f)
-	if not read_ok or type(content) ~= "string" then
-		Logger.error(LOG, "patch_personal_toml: read failed for '%s' — %s.",
-			toml_path, tostring(read_ok and read_err or content))
-		return false
-	end
-	if not close_ok or closed ~= true then
-		Logger.error(LOG, "patch_personal_toml: close failed for '%s' — %s.",
-			toml_path, tostring(close_ok and close_err or closed))
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, toml_path)
+	if not read_ok or read_status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "patch_personal_toml: source read did not commit for '%s' — %s.",
+			toml_path, tostring(read_ok and read_detail or content))
 		return false
 	end
 	local lines = {}
