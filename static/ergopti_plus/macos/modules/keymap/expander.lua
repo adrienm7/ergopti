@@ -298,6 +298,16 @@ function M.would_fire(m, buffer)
 		_state and _state.start_is_word_boundary
 	)
 
+	-- Equal visible text is not an identity operation when the raw replacement
+	-- also carries key directives: `go -> go{Tab}` must still emit Tab even though
+	-- plain_text deliberately strips that action before matching. Unknown
+	-- placeholders remain literal, so raw ~= plain identifies a recognised
+	-- key/newline directive on this registry path
+	if is_noop and m.repl ~= m.plain_repl then
+		eff_plain = m.plain_repl
+		is_noop = false
+	end
+
 	-- A replacement identical to what was typed is a no-op: the engine passes the
 	-- keystroke through rather than expanding, so the preview must not offer it.
 	-- Reported as a distinct outcome because the engine still has cleanup to do
