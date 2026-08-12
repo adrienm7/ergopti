@@ -61,6 +61,11 @@ end
 --- @return string|nil
 local function function_body(src, name)
 	local start = src:find("local function " .. name .. "%(")
+	if not start then
+		-- Forward-declared callbacks use `name = function(...)` so constructors
+		-- above them capture the local rather than an accidental nil global.
+		start = src:find("\n" .. name .. "%s*=%s*function%(")
+	end
 	if not start then return nil end
 	local rest = src:sub(start)
 	local _, stop = rest:find("\nend\n")
@@ -125,8 +130,12 @@ helpers.describe("keymap tap recovery: a revived tap must not trust the old buff
 				.. "fires expansions flush against unknown text")
 		helpers.assert_true(body:find("LLMBridge%.set_runtime_quarantined%(true%)") ~= nil,
 			"the HID path must close prediction interaction immediately without canvas/task work")
-		helpers.assert_true(body:find("_context_reconcile_pending%s*=%s*true") ~= nil,
-			"the closed runtime must retain a full-reset obligation for the async retry")
+		helpers.assert_true(body:find("arm_observed_context_reconcile%(false%)") ~= nil,
+			"the closed runtime must arm the retained full-reset obligation")
+		local arm_body = function_body(keymap_source(), "arm_observed_context_reconcile")
+		helpers.assert_not_nil(arm_body, "the async reconciliation armer must exist")
+		helpers.assert_true(arm_body:find("_context_reconcile_pending%s*=%s*true") ~= nil,
+			"the armer must retain a full-reset obligation for timer failure/watchdog retry")
 		helpers.assert_true(body:find("SyntheticInput%.cancel") == nil,
 			"tap recovery must not revoke already-authorized tagged user output")
 	end)

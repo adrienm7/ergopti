@@ -68,7 +68,7 @@ helpers.describe("update_preview early-out when LLM and both previews are off", 
 		local after_guard = src:sub(guard)
 
 		-- Provider iteration must be AFTER the guard.
-		local prov = after_guard:find("for _, provider in ipairs(_state.preview_providers)", 1, true)
+		local prov = after_guard:find("in ipairs(_state.preview_providers)", 1, true)
 		helpers.assert_true(prov ~= nil, "provider iteration must appear after the guard")
 
 		local resolve = after_guard:find(

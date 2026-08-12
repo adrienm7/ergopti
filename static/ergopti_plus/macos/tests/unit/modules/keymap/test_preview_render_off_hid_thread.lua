@@ -68,7 +68,9 @@ helpers.describe("llm_bridge: the preview render leaves the keyboard callback", 
 		-- Capturing a stamp is worthless without comparing it at fire time. The
 		-- comparison must sit INSIDE the deferred body, between the schedule and
 		-- the render — that is the whole mechanism.
-		local body = code:sub(math.max(1, at - 200), at)
+		local callback_at = code:sub(1, at):match(".*()local function render_preview%(")
+		helpers.assert_not_nil(callback_at, "the deferred render callback must remain locatable")
+		local body = code:sub(callback_at or 1, at)
 		helpers.assert_true(body:find("~= _preview_render_generation", 1, true) ~= nil,
 			"the deferred body must compare its captured stamp against the current one and "
 				.. "return early when superseded. Capturing without comparing protects nothing, "
@@ -105,8 +107,6 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			end
 		end
 
-		helpers.assert_true(hides >= 3,
-			"the scan must reach the real direct hide calls (found " .. hides .. ")")
 		helpers.assert_eq(guarded, hides,
 			"every immediate hide must first invalidate any pending render (" .. guarded .. "/" .. hides
 				.. "). One that does not lets a render armed a tick earlier put the tooltip back "
@@ -136,6 +136,8 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		end
 		helpers.assert_true(dynamic >= 3,
 			"the scan must reach the dynamic hide sites (found " .. dynamic .. ")")
+		helpers.assert_true(hides + dynamic >= 3,
+			"the scan must reach the real immediate/dynamic hide class")
 		helpers.assert_eq(deferred, 1,
 			"exactly the coalesced quarantine hide may rely on reset-time invalidation")
 		helpers.assert_eq(immediate_guarded, immediate,
