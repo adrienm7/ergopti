@@ -207,8 +207,9 @@ local function start_real_keylogger()
 
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
-		write = function() return true end,
-		read = function() return nil end,
+		write            = function() return true end,
+		read             = function() return nil end,
+		read_with_status = function() return nil, "absent" end,
 	}
 	local km = helpers.load_with_stubs("modules.keylogger.init", hs_overrides)
 	package.loaded["adapters.file_system"] = saved_file_system
