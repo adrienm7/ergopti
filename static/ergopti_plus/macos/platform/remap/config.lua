@@ -526,14 +526,13 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 			return false
 		end
 		if source_status == "ok" then
-			local decoded_ok = pcall(TomlCodec.decode, source)
-			if not decoded_ok then
+			local decoded_ok, decoded = pcall(TomlCodec.decode, source)
+			if not decoded_ok or type(decoded) ~= "table" then
 				Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
 					user_config_path)
 				return false
 			end
-		end
-		if source_status ~= "absent" then
+		elseif source_status ~= "absent" then
 			Logger.error(LOG, "Refusing to overwrite user config at '%s' after an unclassified read.",
 				user_config_path)
 			return false
