@@ -308,18 +308,20 @@ local function save_bootstrap()
 	local content = serialize_toml()
 	local target = paths_file()
 	local replaced = false
+	local write_error = nil
 	if _bootstrap_status == "absent" then
-		local created, create_status = FileSystem.create_if_absent(target, content)
+		local created, create_status, create_detail = FileSystem.create_if_absent(target, content)
 		replaced = created == true
 		if create_status == "exists" then
 			return false, "paths.toml appeared concurrently"
 		end
+		write_error = create_detail or "create-only publication failed"
 	else
-		replaced = FileSystem.write(target, content) == true
+		replaced, write_error = FileSystem.write(target, content)
 	end
 	if not replaced then
 		Logger.error(LOG, "Cannot publish paths file '%s'.", target)
-		return false, "atomic write failed"
+		return false, write_error or "atomic write failed"
 	end
 
 	_bootstrap_status = "ok"

@@ -685,10 +685,11 @@ end
 --- @param expected_source table|nil Optional `{ status = "ok"|"absent", content = string }`
 ---   snapshot that must still match after staging and immediately before rename.
 --- @return boolean true on success, false on any error.
+--- @return string|nil error_message Concrete failure reason when available.
 function M.write(path, content, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "write(): path must be a non-empty string.")
-		return false
+		return false, "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
 
@@ -728,14 +729,14 @@ function M.write(path, content, expected_source)
 		return released, release_err
 	end
 
-	local ok, result = pcall(function()
+	local ok, result, result_err = pcall(function()
 		-- Resolve every existing component before creating any missing parent.
 		-- A dangling final link has no safe target in Hammerspoon and fails closed.
 		local resolve_err = nil
 		resolved_path, symlink_chain, resolve_err = resolve_write_path(path)
 		if not resolved_path then
 			Logger.error(LOG, "write(): cannot resolve '%s' safely — %s", path, tostring(resolve_err))
-			return false
+			return false, tostring(resolve_err or "path resolution failed")
 		end
 
 		local dir = parent_dir(resolved_path)
@@ -749,45 +750,48 @@ function M.write(path, content, expected_source)
 				resolved_path,
 				tostring(resolve_err)
 			)
-			return false
+			return false, tostring(resolve_err or "staging reservation failed")
 		end
 
 		-- Stage beside the resolved target so publication stays on one filesystem.
 		local tmp_path = staging_area.payload_path
 		local fh, err  = io.open(tmp_path, "w")
 		if not fh then
-			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", tmp_path, tostring(err))
+			local reason = tostring(err or "open failed")
+			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", tmp_path, reason)
 			cleanup_staging_if_safe("open failure")
-			return false
+			return false, reason
 		end
 		local write_ok, write_result, write_err = pcall(function() return fh:write(content) end)
 		local close_ok, close_result, close_err = pcall(function() return fh:close() end)
 		if not write_ok or write_result == nil or write_result == false then
+			local reason = tostring((write_ok and write_err) or write_result or "write failed")
 			Logger.error(
 				LOG,
 				"write(): write failed for '%s' — %s",
 				tmp_path,
-				tostring(write_ok and write_err or write_result)
+				reason
 			)
 			cleanup_staging_if_safe("write failure")
-			return false
+			return false, reason
 		end
 		if not close_ok or close_result == nil or close_result == false then
+			local reason = tostring((close_ok and close_err) or close_result or "close failed")
 			Logger.error(
 				LOG,
 				"write(): close failed for '%s' — %s",
 				tmp_path,
-				tostring(close_ok and close_err or close_result)
+				reason
 			)
 			cleanup_staging_if_safe("close failure")
-			return false
+			return false, reason
 		end
 
 		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
 		if not unchanged then
 			Logger.error(LOG, "write(): destination changed before publication — %s", tostring(revalidate_err))
 			preserve_staging_area("pre-publication revalidation failure", revalidate_err)
-			return false
+			return false, tostring(revalidate_err or "destination changed before publication")
 		end
 
 		if type(expected_source) == "table" then
@@ -795,27 +799,29 @@ function M.write(path, content, expected_source)
 			local source_unchanged = current_status == expected_source.status
 				and (current_status ~= "ok" or current == expected_source.content)
 			if not source_unchanged then
+				local reason = tostring(current_detail or current_status or "source changed before publication")
 				Logger.error(
 					LOG,
 					"write(): source changed before publication — %s",
-					tostring(current_detail or current_status)
+					reason
 				)
 				cleanup_staging_if_safe("source precondition failure")
-				return false
+				return false, reason
 			end
 		end
 
 		local rename_ok, rename_err = os.rename(tmp_path, resolved_path)
 		if not rename_ok then
+			local reason = tostring(rename_err or "rename failed")
 			Logger.error(
 				LOG,
 				"write(): rename '%s' -> '%s' failed — %s",
 				tmp_path,
 				resolved_path,
-				tostring(rename_err)
+				reason
 			)
 			cleanup_staging_if_safe("rename failure")
-			return false
+			return false, reason
 		end
 		payload_published = true
 		unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
@@ -827,7 +833,7 @@ function M.write(path, content, expected_source)
 				tostring(revalidate_err)
 			)
 			preserve_staging_area("post-publication revalidation failure", revalidate_err)
-			return false
+			return false, tostring(revalidate_err or "destination changed after publication")
 		end
 		cleanup_staging_if_safe("successful publication")
 		return true
@@ -841,9 +847,10 @@ function M.write(path, content, expected_source)
 			end
 		end
 		Logger.error(LOG, "write(): unexpected error on '%s' — %s", path, tostring(result))
-		return false
+		return false, tostring(result)
 	end
-	return result == true
+	if result == true then return true end
+	return false, result_err or "atomic write failed"
 end
 
 --- Appends content to a file, creating it if it does not exist.
