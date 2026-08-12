@@ -160,12 +160,13 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 		-- stricter than raw stream access and may cache no conclusion from it.
 		-- Use a classified adapter snapshot for the publication-refusal half.
 		local original_read = FileSystem.read_with_status
+		local original_write_if_unchanged = FileSystem.write_if_unchanged
 		local reads = 0
 		FileSystem.read_with_status = function(candidate)
 			reads = reads + 1
 			return original, "ok"
 		end
-		FileSystem.write = function(_, _, expected_source)
+		FileSystem.write_if_unchanged = function(_, _, expected_source)
 			publications = publications + 1
 			if type(expected_source) ~= "table"
 					or expected_source.status ~= "ok"
@@ -176,7 +177,7 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 		end
 		local write_result = Config.save_user_config(make_state(), path)
 		FileSystem.read_with_status = original_read
-		FileSystem.write = original_write
+		FileSystem.write_if_unchanged = original_write_if_unchanged
 		helpers.assert_eq(write_result, false, "a refused staging write must reject the save")
 		helpers.assert_eq(reads, 1, "save must take one classified source snapshot")
 		helpers.assert_eq(publications, 1,
@@ -218,8 +219,8 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 
 		local payload
 		local write_assertion
-		local original_write = FileSystem.write
-		FileSystem.write = function(candidate, content, expected_source)
+		local original_write = FileSystem.write_if_unchanged
+		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
 			write_assertion = candidate == path
 				and type(expected_source) == "table"
 				and expected_source.status == "absent"
@@ -228,7 +229,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			return true
 		end
 		local saved = Config.save_user_config(make_state(), path)
-		FileSystem.write = original_write
+		FileSystem.write_if_unchanged = original_write
 		cleanup(path)
 
 		helpers.assert_eq(saved, true, "a first-launch save must succeed")
@@ -247,12 +248,12 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local write_assertion
 		local original_read = FileSystem.read_with_status
 		local reads = 0
-		local original_write = FileSystem.write
+		local original_write = FileSystem.write_if_unchanged
 		FileSystem.read_with_status = function(candidate)
 			reads = reads + 1
 			return valid, "ok"
 		end
-		FileSystem.write = function(candidate, content, expected_source)
+		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
 			write_assertion = candidate == path
 				and type(expected_source) == "table"
 				and expected_source.status == "ok"
@@ -265,7 +266,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			saved = Config.save_user_config(make_state(), path)
 		end)
 		FileSystem.read_with_status = original_read
-		FileSystem.write = original_write
+		FileSystem.write_if_unchanged = original_write
 		cleanup(path)
 
 		helpers.assert_eq(saved, true)
@@ -284,14 +285,14 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local path = os.tmpname()
 		write_file(path, CORRUPT_TOML)
 
-		-- Third argument = the reset-to-defaults escape hatch. Without it a user
+		-- The reset-to-defaults escape hatch intentionally uses the ordinary
+		-- two-argument overwrite port. Without it a user
 		-- whose file went bad could never repair it from the UI.
 		local payload
 		local write_assertion
 		local original_write = FileSystem.write
-		FileSystem.write = function(candidate, content, expected_source)
+		FileSystem.write = function(candidate, content)
 			write_assertion = candidate == path
-				and (expected_source == nil or expected_source == false)
 			payload = content
 			return true
 		end

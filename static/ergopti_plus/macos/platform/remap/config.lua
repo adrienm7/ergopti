@@ -566,7 +566,13 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 			content = source,
 		}
 	end
-	local write_ok, written = pcall(FileSystem.write, user_config_path, payload, expected_source)
+	local writer = expected_source and FileSystem.write_if_unchanged or FileSystem.write
+	local write_ok, written
+	if expected_source then
+		write_ok, written = pcall(writer, user_config_path, payload, expected_source)
+	else
+		write_ok, written = pcall(writer, user_config_path, payload)
+	end
 	if not write_ok or written ~= true then
 		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
 			user_config_path)
