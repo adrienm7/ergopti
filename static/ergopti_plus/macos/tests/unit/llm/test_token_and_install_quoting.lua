@@ -109,7 +109,7 @@ end)
 
 helpers.describe("layout_install: the privileged install is POSIX-quoted", function()
 	helpers.it("install_system quotes every interpolated path", function()
-		local src = helpers.read_driver_source("install_system")
+		local src = helpers.read_driver_unit("local function install_system")
 		helpers.assert_true(src ~= nil and src ~= "",
 			"layout_install must be locatable by its install_system symbol")
 
@@ -128,7 +128,10 @@ helpers.describe("layout_install: the privileged install is POSIX-quoted", funct
 	end)
 
 	helpers.it("path_exists does not shell out with %q", function()
-		local src = helpers.read_driver_source("path_exists")
+		-- Resolve the translation unit by its unique install helper. A whole-tree
+		-- search for `path_exists` also matches filesystem adapter helpers such as
+		-- path_exists_no_follow, making this test inspect an unrelated function.
+		local src = helpers.read_driver_unit("local function install_system")
 		helpers.assert_true(src ~= nil and src ~= "",
 			"layout_install must be locatable by its path_exists symbol")
 
