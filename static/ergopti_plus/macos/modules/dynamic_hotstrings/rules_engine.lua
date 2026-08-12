@@ -111,7 +111,8 @@ end
 local function run_start_step(label, operation)
 	local ok, result = xpcall(operation, debug.traceback)
 	if ok and result ~= false then return true, result end
-	Logger.error(LOG, "Rules-engine start step '%s' failed (terminal type: %s).", label, type(result))
+	Logger.error(LOG, "Rules-engine start step '%s' failed "
+		.. "(callback content withheld; terminal type: %s).", label, type(result))
 	return false, result
 end
 
@@ -604,7 +605,8 @@ function M.start(keymap_module)
 			Logger.debug(LOG, "Dynamic rules engine already started with this keymap.")
 			return true
 		end
-		Logger.error(LOG, "Dynamic rules engine already owns a different keymap — stop it before replacement.")
+		Logger.error(LOG, "Dynamic rules engine already owns a different keymap — "
+			.. "stop it before replacement (callback content withheld).")
 		return false
 	end
 	if _starting_token then

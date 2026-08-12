@@ -86,7 +86,8 @@ local function register_start_callback(label, registrar, callback)
 	end
 	local ok, result = xpcall(function() return registrar(callback) end, debug.traceback)
 	if ok and result ~= false then return true end
-	Logger.error(LOG, "Personal-info %s failed (terminal type: %s).", label, type(result))
+	Logger.error(LOG, "Personal-info %s failed (callback content withheld; terminal type: %s).",
+		label, type(result))
 	return false
 end
 

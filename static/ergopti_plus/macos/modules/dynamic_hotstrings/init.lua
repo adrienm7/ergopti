@@ -49,7 +49,8 @@ end
 local function run_start_step(label, operation)
 	local ok, result = xpcall(operation, debug.traceback)
 	if ok and result == true then return true end
-	Logger.error(LOG, "Dynamic-hotstrings start step '%s' failed (terminal type: %s).", label, type(result))
+	Logger.error(LOG, "Dynamic-hotstrings start step '%s' failed "
+		.. "(callback content withheld; terminal type: %s).", label, type(result))
 	return false
 end
 
@@ -67,8 +68,8 @@ local function rollback_start(reason)
 		local label, stop = entry.label, entry.stop
 		local ok, result = xpcall(stop, debug.traceback)
 		if not ok then
-			Logger.error(LOG, "Dynamic-hotstrings rollback could not stop %s (terminal type: %s).",
-				label, type(result))
+			Logger.error(LOG, "Dynamic-hotstrings rollback could not stop %s "
+				.. "(callback content withheld; terminal type: %s).", label, type(result))
 		end
 	end
 	_started = false
