@@ -150,7 +150,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- Moving the assignment must not have moved a truncated copy of it: the
 		-- teardown is only worth arming early if it is still the whole teardown.
 		for _, step in ipairs({
-			"keymap.stop", "gestures.stop", "shortcuts.stop",
+			"return keymap.stop(true)", "gestures.stop", "shortcuts.stop",
 			"LauncherGuard.stop",
 			"restore_all_overrides",
 			"terminate_helper_processes", "script_watchers",
