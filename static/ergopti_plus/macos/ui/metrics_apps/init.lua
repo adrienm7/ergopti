@@ -24,13 +24,13 @@ local M = {}
 
 local hs         = hs
 local fs         = require("hs.fs")
-local text_utils = require("infra.text_utils")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local dialog     = require("infra.dialog_util")
 local i18n       = require("infra.i18n")
+local FileSystem = require("adapters.file_system")
 
 local LOG = "metrics_apps"
 
@@ -66,10 +66,8 @@ end
 
 local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
-local CONFIG_DIR          = hs.configdir .. "/data"
-local CATEGORIES_FILE     = CONFIG_DIR .. "/app_categories.json"
-local CATEGORIES_TEMP_FILE = CATEGORIES_FILE .. ".tmp"
-local ENOENT_ERROR_CODE    = 2
+local CONFIG_DIR      = hs.configdir .. "/data"
+local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
 --- Fallback category assigned to an uncategorised app on first edit.
 ---
 --- A FUNCTION rather than a module-level constant, and it reads the same i18n key
@@ -127,19 +125,16 @@ end
 -- ==========================================
 
 local function load_categories()
-	local open_ok, file, open_detail, open_code = pcall(io.open, CATEGORIES_FILE, "r")
-	if not open_ok or not file then
-		if open_ok and open_code == ENOENT_ERROR_CODE then return {}, "absent" end
-		Logger.error(LOG, "App categories could not be opened; edit refused "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, CATEGORIES_FILE)
+	if not read_ok or read_status == "error" then
+		Logger.error(LOG, "App categories read did not commit; edit refused — %s.",
+			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-
-	local read_ok, content = pcall(file.read, file, "*a")
-	local close_ok, closed = pcall(file.close, file)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
-		Logger.error(LOG, "App categories read did not commit; edit refused "
-			.. "(failure content withheld).")
+	if read_status == "absent" then return {}, "absent" end
+	if read_status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
+			tostring(read_status))
 		return nil, "failed"
 	end
 
@@ -158,32 +153,9 @@ local function save_categories(data)
 		return false
 	end
 
-	local mkdir_ok = pcall(os.execute, "mkdir -p " .. text_utils.shell_quote(CONFIG_DIR))
-	if not mkdir_ok then
-		Logger.error(LOG, "Cannot prepare the app-categories directory; changes were not saved.")
-		return false
-	end
-	local open_ok, file = pcall(io.open, CATEGORIES_TEMP_FILE, "w")
-	if not open_ok or not file then
-		Logger.error(LOG, "Cannot open the app-categories staging file; changes were not saved.")
-		return false
-	end
-
-	local write_ok, written = pcall(file.write, file, encoded)
-	local flush_ok, flushed = pcall(file.flush, file)
-	local close_ok, closed = pcall(file.close, file)
-	if not write_ok or not written or not flush_ok or flushed ~= true
-		or not close_ok or closed ~= true
-	then
-		pcall(os.remove, CATEGORIES_TEMP_FILE)
-		Logger.error(LOG, "App-categories staging write did not commit; changes were not saved.")
-		return false
-	end
-
-	local rename_ok, renamed = pcall(os.rename, CATEGORIES_TEMP_FILE, CATEGORIES_FILE)
-	if not rename_ok or renamed ~= true then
-		pcall(os.remove, CATEGORIES_TEMP_FILE)
-		Logger.error(LOG, "App-categories publication did not commit; changes were not saved.")
+	local write_ok, committed = pcall(FileSystem.write, CATEGORIES_FILE, encoded)
+	if not write_ok or committed ~= true then
+		Logger.error(LOG, "App-categories atomic publication did not commit; changes were not saved.")
 		return false
 	end
 	return true
