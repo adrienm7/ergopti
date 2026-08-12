@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_file_system = package.loaded["adapters.file_system"]
 
 
 
@@ -36,6 +37,13 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 package.loaded["infra.i18n"] = {
 	t = function(key) return key end,
+}
+
+-- Every harness below models a fresh install. Identity publication is a
+-- prerequisite owned by the filesystem adapter, not the behavior under test.
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	read = function() return nil end,
 }
 
 -- Sub-module stubs so log_manager never tries to open real files.
@@ -688,3 +696,5 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 			"ensure_ingest_running() must NOT create a second timer when already running")
 	end)
 end)
+
+package.loaded["adapters.file_system"] = saved_file_system

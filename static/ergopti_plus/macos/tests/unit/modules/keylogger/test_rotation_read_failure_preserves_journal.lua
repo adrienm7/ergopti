@@ -29,6 +29,7 @@ local STUBBED_MODULES = {
 	"modules.keylogger.rotation",
 	"modules.keylogger.export",
 	"keylogger.metrics",
+	"adapters.file_system",
 }
 
 local function fake_writer()
@@ -146,6 +147,10 @@ local function run_rollover_case(failure_mode)
 			sync_foreign_data_sql = function() end,
 		}
 		package.loaded["keylogger.metrics"] = {}
+		package.loaded["adapters.file_system"] = {
+			write = function() return true end,
+			read = function() return nil end,
+		}
 
 		local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {
 			execute = function(command)
