@@ -29,6 +29,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local FileSystem = require("adapters.file_system")
 local text_utils = require("infra.text_utils")
 local LOG    = "personal_shortcuts"
 
@@ -99,39 +100,59 @@ end
 -- ========================================
 -- ========================================
 
---- Create the file from TEMPLATE if it does not exist yet. Idempotent.
+--- Create the file from TEMPLATE only after the filesystem adapter proves that
+--- the final pathname is absent. This is intentionally not an io.open probe:
+--- ENOENT can also describe a dangling symlink or missing path component, and a
+--- later "w" open can overwrite a file created between those two calls.
+--- @param path string Absolute personal-shortcuts path.
+--- @return boolean ready True only for a committed readable file.
 local function ensure_file(path)
-	local fh = io.open(path, "r")
-	if fh then fh:close(); return true end
-
-	-- Make sure the parent directory exists; on a fresh install
-	-- ~/.config/ergopti_plus/ has just been created by MenuPaths.init.
-	local parent = path:match("^(.*[/\\])") or ""
-	if parent ~= "" then
-		pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(parent))
-	end
-
-	local fw, err = io.open(path, "w")
-	if not fw then
-		Logger.error(LOG, "Cannot create personal_shortcuts.lua at '%s': %s.",
-			path, tostring(err))
+	local read_ok, _, status, detail = pcall(FileSystem.read_with_status, path)
+	if not read_ok or status == "error" then
+		Logger.error(LOG, "Personal shortcuts ownership could not be established; operation refused "
+			.. "(failure content withheld; terminal type: %s).", type(read_ok and detail or status))
 		return false
 	end
-	fw:write(TEMPLATE); fw:close()
-	Logger.info(LOG, "Personal shortcuts template created at '%s'.", path)
-	return true
+	if status == "ok" then return true end
+	if status ~= "absent" then
+		Logger.error(LOG, "Personal shortcuts reader returned an unknown status; operation refused.")
+		return false
+	end
+
+	local create_ok, created, create_status, create_detail = pcall(
+		FileSystem.create_if_absent,
+		path,
+		TEMPLATE
+	)
+	if not create_ok or create_status == "error" then
+		Logger.error(LOG, "Personal shortcuts template publication failed "
+			.. "(failure content withheld; terminal type: %s).",
+			type(create_ok and create_detail or created))
+		return false
+	end
+	if created == true and create_status == "created" then
+		Logger.info(LOG, "Personal shortcuts template created at '%s'.", path)
+		return true
+	end
+	-- A concurrent creator is safe only when the adapter has re-read and
+	-- classified its complete result as a stable ordinary file.
+	if created == false and create_status == "exists" then return true end
+	Logger.error(LOG, "Personal shortcuts create transaction returned an unknown status; operation refused.")
+	return false
 end
 
 --- Load the user's file. Errors are logged but never propagated — a
 --- broken personal_shortcuts.lua must not block the driver bootstrap.
 function M.load()
 	local path = resolve_path()
-	if not ensure_file(path) then return end
+	if not ensure_file(path) then return false end
 	local ok, err = pcall(dofile, path)
 	if ok then
 		Logger.success(LOG, "Loaded personal_shortcuts.lua.")
+		return true
 	else
 		Logger.error(LOG, "Error in personal_shortcuts.lua: %s.", tostring(err))
+		return false
 	end
 end
 
@@ -148,10 +169,22 @@ end
 --- Open the file in the user's default Lua / text editor.
 function M.open()
 	local path = resolve_path()
-	ensure_file(path)
-	hs.timer.doAfter(0, function()
-		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
+	if not ensure_file(path) then return false end
+	local scheduled_ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
+		local call_ok, _, launched, _, exit_code = pcall(
+			hs.execute,
+			"open " .. text_utils.shell_quote(path)
+		)
+		if not call_ok or launched ~= true then
+			Logger.error(LOG, "Personal shortcuts editor launch failed (exit type: %s).",
+				type(call_ok and exit_code or launched))
+		end
 	end)
+	if not scheduled_ok or timer_or_err == nil then
+		Logger.error(LOG, "Personal shortcuts editor launch could not be scheduled.")
+		return false
+	end
+	return true
 end
 
 --- Returns the absolute path — handy for menu entries that display it.
