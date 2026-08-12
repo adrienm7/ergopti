@@ -37,6 +37,21 @@ end
 
 
 helpers.describe("registry mutations: exact commitment and rollback", function()
+	helpers.it("exposes one caller-owned transaction across a registration batch", function()
+		local state, registry = fresh_registry()
+		local committed = registry.registry_transaction("test_batch", function()
+			registry.register_lua_group("prospective", "Prospective", {})
+			add_group_mapping(registry, "prospective", "partial")
+			return false
+		end)
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_nil(state.groups.prospective,
+			"the public transaction must restore group ownership")
+		helpers.assert_eq(#state.mappings, 0,
+			"the public transaction must restore every mapping in the batch")
+	end)
+
 	helpers.it("returns exact booleans for committed and impossible group states", function()
 		local _, registry = fresh_registry()
 		registry.register_lua_group("atomic", "Atomic", {})

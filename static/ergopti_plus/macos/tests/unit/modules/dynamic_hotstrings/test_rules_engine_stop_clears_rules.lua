@@ -17,6 +17,7 @@ local function fake_keymap(revoke_allowed)
 		register_interceptor = function() end,
 		register_preview_provider = function() end,
 		invalidate_hotstring_preview = function() return revoke_allowed ~= false end,
+		registry_transaction = function(_, mutation) return mutation() == true end,
 	}
 end
 

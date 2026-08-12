@@ -136,9 +136,11 @@ local function load_fixture()
 	package.loaded["modules.keymap.registry"] = api({
 		is_repeat_feature_enabled = function() return false end,
 		set_repeat_feature_enabled = noop,
+		registry_transaction = function(_, mutation) return mutation() end,
 	})
 	package.loaded["modules.keymap.expander"] = api()
 	package.loaded["modules.keymap.llm_bridge"] = api({
+		invalidate_hotstring_preview = function() return true end,
 		reset_for_teardown = function() return true end,
 		stop = function() return true end,
 		is_runtime_available = function() return true end,
@@ -213,6 +215,17 @@ local function assert_all_taps_disabled(fixture, message)
 end
 
 helpers.describe("keymap start: exact native commitment", function()
+	helpers.it("forwards exact registry transactions to feature starters", function()
+		local fixture = load_fixture()
+		local calls = 0
+		local committed = fixture.keymap.registry_transaction("feature_start", function()
+			calls = calls + 1
+			return true
+		end)
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(calls, 1)
+	end)
+
 	for ordinal = 1, 4 do
 		for _, mode in ipairs({ "throw", "disabled" }) do
 			helpers.it("rolls back tap " .. ordinal .. " after " .. mode .. " start", function()

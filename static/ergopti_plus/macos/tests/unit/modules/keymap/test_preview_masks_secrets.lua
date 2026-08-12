@@ -371,6 +371,7 @@ helpers.describe("preview masking: display only", function()
 			set_post_load_hook        = function() end,
 			register_interceptor      = function() end,
 			register_preview_provider = function() end,
+			registry_transaction      = function(_, mutation) return mutation() == true end,
 		}
 
 		RE.inject_data({

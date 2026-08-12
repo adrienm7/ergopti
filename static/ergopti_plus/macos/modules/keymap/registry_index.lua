@@ -111,6 +111,14 @@ function M.register_lua_group(name, meta_description, sections)
 	Groups.register_lua_group(name, meta_description, sections)
 end
 
+--- Runs a caller-owned multi-step registry mutation against one snapshot.
+--- @param label string Stable diagnostic label.
+--- @param mutation function Callback that must return exact true to commit.
+--- @return boolean committed
+function M.registry_transaction(label, mutation)
+	return Groups.transaction(label, mutation)
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.

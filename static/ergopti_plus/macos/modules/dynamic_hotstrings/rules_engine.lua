@@ -57,6 +57,100 @@ local _preview_snapshot = nil
 -- Mutable section list kept as an upvalue so register_prefix_entries can
 -- update the real counts after personal data is injected.
 local _sections       = nil
+-- Callback registries do not expose an inverse operation. Every published
+-- closure therefore carries one start token and remains inert until that exact
+-- generation commits; a failed generation can never revive on a later retry.
+local _active_start_token = nil
+local _starting_token     = nil
+
+--- Calls a historically void keymap API while honoring an explicit refusal.
+--- Nil remains success because the production registration APIs return no value.
+--- @param label string Diagnostic step name.
+--- @param fn function Keymap operation.
+--- @param ... any Operation arguments.
+--- @return any result Raw successful result.
+local function require_void_commit(label, fn, ...)
+	if type(fn) ~= "function" then
+		error(label .. " capability is unavailable", 0)
+	end
+	local result = fn(...)
+	if result == false then
+		error(label .. " explicitly refused commitment", 0)
+	end
+	return result
+end
+
+--- Captures the shared rules owned before a prospective start.
+--- @return table[] snapshot
+local function snapshot_shared_rules()
+	local snapshot = {}
+	for index, rule in ipairs(SharedEngine.get_rules()) do
+		snapshot[index] = {
+			suffix = rule.suffix,
+			section = rule.section,
+			resolver = rule.resolver,
+		}
+	end
+	return snapshot
+end
+
+--- Restores the shared rule set after a failed prospective start.
+--- @param snapshot table[] Previously owned rules.
+local function restore_shared_rules(snapshot)
+	SharedEngine.reset_rules()
+	for _, rule in ipairs(snapshot) do
+		SharedEngine.add_rule(rule.suffix, rule.section, rule.resolver)
+	end
+end
+
+--- Reports one failed start step without letting its exception escape.
+--- @param label string Diagnostic step name.
+--- @param operation function Protected operation.
+--- @return boolean committed
+--- @return any result
+local function run_start_step(label, operation)
+	local ok, result = xpcall(operation, debug.traceback)
+	if ok and result ~= false then return true, result end
+	Logger.error(LOG, "Rules-engine start step '%s' failed (terminal type: %s).", label, type(result))
+	return false, result
+end
+
+--- Tests whether a callback belongs to the sole committed start generation.
+--- @param token table Prospective generation token.
+--- @param keymap table Keymap captured when the callback was registered.
+--- @return boolean active
+local function owns_active_start(token, keymap)
+	return _active_start_token == token and _km == keymap
+end
+
+--- Restores every RulesEngine-owned state field after start failure.
+--- @param token table Failed generation token.
+--- @param rules_snapshot table[] Pre-start shared rules.
+--- @param sections_snapshot table|nil Pre-start menu sections.
+--- @param reason string Failure context.
+--- @return boolean false
+local function rollback_start(token, rules_snapshot, sections_snapshot, reason)
+	if (_starting_token ~= nil and _starting_token ~= token)
+		or (_active_start_token ~= nil and _active_start_token ~= token)
+	then
+		Logger.error(LOG, "Stale rules-engine start failed after ownership moved: %s.", tostring(reason))
+		return false
+	end
+	_starting_token = nil
+	_active_start_token = nil
+	_preview_snapshot = nil
+	_sections = sections_snapshot
+	_km = nil
+	restore_shared_rules(rules_snapshot)
+	if type(SharedEngine.set_resolver_error_reporter) == "function" then
+		local reporter_ok, reporter_cleared = pcall(SharedEngine.set_resolver_error_reporter, nil)
+		if not reporter_ok or reporter_cleared ~= true then
+			Logger.error(LOG, "Dynamic rules engine rollback could not clear its resolver reporter.")
+		end
+	end
+	Logger.error(LOG, "Dynamic rules engine start rolled back after %s.", tostring(reason))
+	return false
+end
 
 --- Defers shared-resolver diagnostics beyond the key event callback.
 --- @param rule table Shared rule record.
@@ -242,6 +336,31 @@ local function interceptor(event, km_buffer, ctx)
 	return ok and "consume" or nil
 end
 
+--- Resolves the exact dynamic action advertised by the keymap tooltip.
+--- @param buf string Current keymap buffer.
+--- @return string|nil result
+--- @return table|nil token
+local function preview_provider(buf)
+	_preview_snapshot = nil
+	if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
+		return nil
+	end
+	local is_sec_enabled = _km.is_section_enabled
+	local guard = is_sec_enabled
+		and function(grp, sec) return is_sec_enabled(grp, sec) end
+		or nil
+	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard)
+	if not match then return nil end
+	local token = {}
+	_preview_snapshot = {
+		buffer = buf,
+		trigger = _trigger,
+		match = match,
+		token = token,
+	}
+	return match.result, token
+end
+
 
 
 
@@ -254,7 +373,7 @@ end
 
 --- Generates and registers all prefix-based hotstrings based on the user's personal data.
 local function register_prefix_entries()
-	if type(_personal_data) ~= "table" then return end
+	if type(_personal_data) ~= "table" then return true end
 	if not _km then
 		-- Personal data is present but the keymap is not wired yet. This happens
 		-- when inject_data() runs BEFORE start() (the production order), so the
@@ -262,7 +381,7 @@ local function register_prefix_entries()
 		-- set. This is the normal production order; M.start() verifies the keymap
 		-- was actually wired before registering any prefix expansion.
 		Logger.debug(LOG, "Personal data received before keymap wiring; prefix registration deferred to M.start().")
-		return
+		return true
 	end
 	Logger.debug(LOG, "Registering prefix-based dynamic hotstrings…")
 
@@ -315,63 +434,102 @@ local function register_prefix_entries()
 		end
 	end
 
-	if _km.set_group_context then _km.set_group_context(GROUP_NAME) end
-
-	-- Register phone prefixes
-	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
-		-- Two DIFFERENT fields in one block: every entry below expands to the raw
-		-- number except the last, which expands to the spaced variant.
-		local phone_opts  = opts_for("phone_number")
-		local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
-		local fphone_opts = opts_for("phone_number_clean")
-		if #phone >= 2 then
-			_km.add(phone:sub(1, 2) .. _trigger, phone, phone_magic_opts)
-			_km.add("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
-		end
-		if #phone >= 4 then
-			_km.add(phone:sub(1, 4), phone, phone_opts)
-			_km.add("+33" .. phone:sub(2, 4), "+33" .. phone, phone_opts)
-		end
-		if #phone >= 6 then
-			_km.add(phone:sub(2, 5), phone, phone_opts)
-		end
-		if #fphone >= 5 then
-			_km.add(fphone:sub(1, 5), fphone, fphone_opts)
-		end
+	require_void_commit("group-context registration", _km.set_group_context, GROUP_NAME)
+	local function add_mapping(trigger, replacement, options)
+		require_void_commit("prefix mapping registration", _km.add,
+			trigger, replacement, options)
 	end
 
-	-- Register SSN prefixes: no-space trigger → SSN without spaces; spaced → SSN with spaces
-	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
-		if #ssn_raw >= 5 then
-			local ssn_raw_pfx    = ssn_raw:sub(1, 5)
-			local ssn_spaced_pfx = SharedEngine.spaced_prefix(ssn, 5)
-			local ssn_opts       = opts_for("social_security_number")
-			_km.add(ssn_raw_pfx, ssn_raw, ssn_opts)
-			if ssn_spaced_pfx ~= ssn_raw_pfx then
-				_km.add(ssn_spaced_pfx, ssn, ssn_opts)
+	local registered, registration_error = xpcall(function()
+		-- Register phone prefixes
+		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
+			-- Two DIFFERENT fields in one block: every entry below expands to the raw
+			-- number except the last, which expands to the spaced variant.
+			local phone_opts  = opts_for("phone_number")
+			local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
+			local fphone_opts = opts_for("phone_number_clean")
+			if #phone >= 2 then
+				add_mapping(phone:sub(1, 2) .. _trigger, phone, phone_magic_opts)
+				add_mapping("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
+			end
+			if #phone >= 4 then
+				add_mapping(phone:sub(1, 4), phone, phone_opts)
+				add_mapping("+33" .. phone:sub(2, 4), "+33" .. phone, phone_opts)
+			end
+			if #phone >= 6 then
+				add_mapping(phone:sub(2, 5), phone, phone_opts)
+			end
+			if #fphone >= 5 then
+				add_mapping(fphone:sub(1, 5), fphone, fphone_opts)
 			end
 		end
-	end
 
-	-- Register IBAN prefixes: 6 raw chars (case-insensitive) → IBAN without spaces;
-	-- 7-char spaced trigger (e.g. "FR76 XX") → IBAN with spaces.
-	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
-		if #iban_raw >= 6 then
-			local iban_raw_pfx    = iban_raw:sub(1, 6)
-			local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
-			-- is_private for the same reason as `base_opts` above: the IBAN and its
-			-- 6-char prefix trigger are both secret
-			local opts_ci = opts_for("iban", { is_case_sensitive = false })
-			_km.add(iban_raw_pfx,    iban:gsub("%s+", ""), opts_ci)
-			if iban_spaced_pfx ~= iban_raw_pfx then
-				_km.add(iban_spaced_pfx, iban, opts_ci)
+		-- Register SSN prefixes: no-space trigger → SSN without spaces; spaced → SSN with spaces
+		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
+			if #ssn_raw >= 5 then
+				local ssn_raw_pfx    = ssn_raw:sub(1, 5)
+				local ssn_spaced_pfx = SharedEngine.spaced_prefix(ssn, 5)
+				local ssn_opts       = opts_for("social_security_number")
+				add_mapping(ssn_raw_pfx, ssn_raw, ssn_opts)
+				if ssn_spaced_pfx ~= ssn_raw_pfx then
+					add_mapping(ssn_spaced_pfx, ssn, ssn_opts)
+				end
 			end
 		end
-	end
 
-	if _km.set_group_context then _km.set_group_context(nil) end
-	if _km.sort_mappings then _km.sort_mappings() end
+		-- Register IBAN prefixes: 6 raw chars (case-insensitive) → IBAN without spaces;
+		-- 7-char spaced trigger (e.g. "FR76 XX") → IBAN with spaces.
+		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
+			if #iban_raw >= 6 then
+				local iban_raw_pfx    = iban_raw:sub(1, 6)
+				local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
+				-- is_private for the same reason as `base_opts` above: the IBAN and its
+				-- 6-char prefix trigger are both secret
+				local opts_ci = opts_for("iban", { is_case_sensitive = false })
+				add_mapping(iban_raw_pfx, iban:gsub("%s+", ""), opts_ci)
+				if iban_spaced_pfx ~= iban_raw_pfx then
+					add_mapping(iban_spaced_pfx, iban, opts_ci)
+				end
+			end
+		end
+
+		require_void_commit("prefix mapping sort", _km.sort_mappings)
+		return true
+	end, debug.traceback)
+	local context_reset, context_error = xpcall(function()
+		require_void_commit("group-context reset", _km.set_group_context, nil)
+	end, debug.traceback)
+	if not registered then error(registration_error, 0) end
+	if not context_reset then error(context_error, 0) end
 	Logger.info(LOG, "Prefix-based dynamic hotstrings registered.")
+	return true
+end
+
+--- Builds the menu metadata without publishing it into the keymap registry.
+--- @return table[] sections
+local function build_sections()
+	local dates = SharedEngine.today_date_strings()
+	local function loc(key) return locale and locale.get(key) or "" end
+	local desc_datefr = loc("dynamichotstrings.datefr")
+	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " inserts current date ({date})" end
+	desc_datefr = desc_datefr:gsub("{date}", text_utils.escape_gsub_replacement(dates.fr))
+	local desc_datelongfr = loc("dynamichotstrings.datelongfr")
+	if desc_datelongfr == "" then desc_datelongfr = "date" .. _trigger .. " inserts long date ({date})" end
+	desc_datelongfr = desc_datelongfr:gsub("{date}", text_utils.escape_gsub_replacement(dates.long_fr))
+	local desc_date = loc("dynamichotstrings.date")
+	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
+	desc_date = desc_date:gsub("{date}", text_utils.escape_gsub_replacement(dates.iso))
+
+	return {
+		{ name = "datelongfr", description = desc_datelongfr, count = 1 },
+		{ name = "datefr", description = desc_datefr, count = 1 },
+		{ name = "date", description = desc_date, count = 1 },
+		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"), count = 0 },
+		{ name = "ssnprefixes", description = loc("dynamichotstrings.ssnprefixes"), count = 0 },
+		{ name = "ibanprefixes", description = loc("dynamichotstrings.ibanprefixes"), count = 0 },
+		{ name = "-" },
+		{ name = "textexpansionpersonalinformation", count = 0, is_module_placeholder = true },
+	}
 end
 
 
@@ -401,7 +559,12 @@ function M.inject_data(personal_data, trigger_char)
 	if not invalidate_preview_snapshot("Personal-data update") then return false end
 	_personal_data = type(personal_data) == "table" and personal_data or {}
 	if type(trigger_char) == "string" and trigger_char ~= "" then _trigger = trigger_char end
-	register_prefix_entries()
+	local ok, committed = xpcall(register_prefix_entries, debug.traceback)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Personal-data prefix registration failed (details withheld; terminal type: %s).",
+			type(committed))
+		return false
+	end
 	return true
 end
 
@@ -432,103 +595,108 @@ function M.start(keymap_module)
 		Logger.error(LOG, "Keymap module missing, rules engine aborted.")
 		return false
 	end
+	if type(keymap_module.registry_transaction) ~= "function" then
+		Logger.error(LOG, "Keymap registry transaction missing, rules engine aborted.")
+		return false
+	end
+	if _active_start_token then
+		if _km == keymap_module then
+			Logger.debug(LOG, "Dynamic rules engine already started with this keymap.")
+			return true
+		end
+		Logger.error(LOG, "Dynamic rules engine already owns a different keymap — stop it before replacement.")
+		return false
+	end
+	if _starting_token then
+		Logger.error(LOG, "Dynamic rules engine start refused because another start is in progress.")
+		return false
+	end
 	if not invalidate_preview_snapshot("Rules-engine start") then return false end
+
+	local token = {}
+	local rules_snapshot = snapshot_shared_rules()
+	local sections_snapshot = _sections
+	_starting_token = token
 	_km = keymap_module
 	_preview_snapshot = nil
 
-	-- Register date rules via shared engine so both HS and Linux produce identical expansions
-	SharedEngine.register_date_rules(_trigger)
-
-	local dates = SharedEngine.today_date_strings()
-
-	-- Descriptions show today's date so the user can immediately see the expected output.
-	local function loc(key) return locale and locale.get(key) or "" end
-	local desc_datefr = loc("dynamichotstrings.datefr")
-	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " inserts current date ({date})" end
-	desc_datefr = desc_datefr:gsub("{date}", text_utils.escape_gsub_replacement(dates.fr))
-	local desc_datelongfr = loc("dynamichotstrings.datelongfr")
-	if desc_datelongfr == "" then desc_datelongfr = "date" .. _trigger .. " inserts long date ({date})" end
-	desc_datelongfr = desc_datelongfr:gsub("{date}", text_utils.escape_gsub_replacement(dates.long_fr))
-	local desc_date = loc("dynamichotstrings.date")
-	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
-	desc_date = desc_date:gsub("{date}", text_utils.escape_gsub_replacement(dates.iso))
-
-	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
-	-- Prefix section counts start at 0; register_prefix_entries updates them with
-	-- the real values once personal data is injected.
-	-- textexpansionpersonalinformation is a module placeholder — resolved by the menu via _index.toml.
-	-- textexpansionpersonalinformation is last, separated — mirrors AHK DynamicHotstrings layout.
-	-- Descriptions come from lib.locale (static/locales/fr.json) so the JSON
-	-- is the single source of truth shared with the AHK driver.
-	_sections = {
-		{ name = "datelongfr",    description = desc_datelongfr,                            count = 1 },
-		{ name = "datefr",        description = desc_datefr,                                count = 1 },
-		{ name = "date",          description = desc_date,                                  count = 1 },
-		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"),     count = 0 },
-		{ name = "ssnprefixes",   description = loc("dynamichotstrings.ssnprefixes"),       count = 0 },
-		{ name = "ibanprefixes",  description = loc("dynamichotstrings.ibanprefixes"),      count = 0 },
-		{ name = "-" },
-		{ name = "textexpansionpersonalinformation", count = 0, is_module_placeholder = true },
-	}
-
-	if _km.register_lua_group then
-		_km.register_lua_group(GROUP_NAME, loc("dynamichotstrings.group_label"), _sections)
+	-- The keymap exposes no unregister operation for these callback arrays. Stage
+	-- token-gated closures before any registry write; even a registrar that
+	-- appends and then reports failure can leave behind only a permanently inert
+	-- closure.
+	local interceptor_ok = run_start_step("interceptor registration", function()
+		return require_void_commit("interceptor registration", _km.register_interceptor,
+			function(...)
+				if not owns_active_start(token, keymap_module) then return nil end
+				return interceptor(...)
+			end)
+	end)
+	if not interceptor_ok then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "interceptor registration")
 	end
 
-	-- Register the phone/SSN/IBAN prefix hotstrings NOW that _km is wired. This
-	-- must NOT rely on the post_load_hook below: register_lua_group already marks
-	-- the group enabled, and on a default boot menu_state applies group state
-	-- delta-only, so enable_group("dynamichotstrings") early-returns as a no-op
-	-- and the hook never fires — leaving every prefix mapping unregistered. The
-	-- direct call here is the single guaranteed registration; the hook still
-	-- covers a later disable→re-enable cycle. inject_data() set _personal_data
-	-- before start() ran, so the data is available here.
-	register_prefix_entries()
-
-	if _km.set_post_load_hook then
-		_km.set_post_load_hook(GROUP_NAME, function()
-			register_prefix_entries()
-		end)
+	local provider_ok = run_start_step("preview-provider registration", function()
+		return require_void_commit("preview-provider registration", _km.register_preview_provider,
+			function(buf)
+				if not owns_active_start(token, keymap_module) then return nil end
+				return preview_provider(buf)
+			end)
+	end)
+	if not provider_ok then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "preview-provider registration")
 	end
 
-	if _km.register_interceptor then
-		_km.register_interceptor(interceptor)
+	local rules_ok = run_start_step("shared date-rule registration", function()
+		require_void_commit("shared date-rule registration", SharedEngine.register_date_rules, _trigger)
+		return true
+	end)
+	if not rules_ok then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "shared date-rule registration")
 	end
 
-	-- Register preview provider — delegates matching to the shared engine.
-	-- Also gate on the group master so preview is suppressed when the group is
-	-- disabled (symmetric to the interceptor gate above, M-9).
-	if type(_km.register_preview_provider) == "function" then
-		local is_sec_enabled = _km.is_section_enabled
-		local guard = is_sec_enabled
-			and function(grp, sec) return is_sec_enabled(grp, sec) end
-			or nil
-		_km.register_preview_provider(function(buf)
-			_preview_snapshot = nil
-			if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
-				return nil
-			end
-			local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard)
-			if not match then return nil end
-			local token = {}
-			_preview_snapshot = {
-				buffer = buf,
-				trigger = _trigger,
-				match = match,
-				token = token,
-			}
-			return match.result, token
-		end)
+	local sections_ok, prospective_sections = run_start_step("section metadata preparation", build_sections)
+	if not sections_ok or type(prospective_sections) ~= "table" then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "section metadata preparation")
+	end
+	_sections = prospective_sections
+
+	-- Sections are ordered identically to the AHK DynamicHotstrings feature map.
+	-- Prefix registration runs directly at start because the default enabled-group
+	-- path deliberately does not invoke the post-load hook.
+	local function publish_registry_state()
+		local group_label = locale and locale.get("dynamichotstrings.group_label") or ""
+		require_void_commit("dynamic group registration", _km.register_lua_group,
+			GROUP_NAME, group_label, _sections)
+		register_prefix_entries()
+		require_void_commit("dynamic post-load hook registration", _km.set_post_load_hook,
+			GROUP_NAME, function()
+				if not owns_active_start(token, keymap_module) then return true end
+				return register_prefix_entries()
+			end)
+		if type(SharedEngine.set_resolver_error_reporter) ~= "function"
+			or SharedEngine.set_resolver_error_reporter(report_resolver_failure) ~= true
+		then
+			error("shared resolver error reporter did not commit", 0)
+		end
+		if _starting_token ~= token or _km ~= keymap_module then
+			error("prospective rules-engine ownership became stale", 0)
+		end
+		_active_start_token = token
+		_starting_token = nil
+		return true
 	end
 
-	-- Install the process-global reporter only after every fallible registration
-	-- above has completed. The Lua runloop cannot deliver an interceptor between
-	-- this assignment and return, so a failed start never leaks a stale owner
-	if type(SharedEngine.set_resolver_error_reporter) ~= "function"
-		or SharedEngine.set_resolver_error_reporter(report_resolver_failure) ~= true
-	then
-		Logger.error(LOG, "Shared resolver error reporter could not be installed; rules engine aborted.")
-		return false
+	local registry_ok = run_start_step("keymap registry transaction", function()
+		local committed = _km.registry_transaction("dynamic_rules_start", publish_registry_state)
+		if committed ~= true then error("keymap registry transaction did not commit", 0) end
+		return true
+	end)
+	if not registry_ok then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "keymap registry transaction")
+	end
+
+	if _active_start_token ~= token or _starting_token ~= nil or _km ~= keymap_module then
+		return rollback_start(token, rules_snapshot, sections_snapshot, "final ownership verification")
 	end
 
 	Logger.info(LOG, "Dynamic rules engine started successfully.")
@@ -543,10 +711,13 @@ function M.stop()
 	-- Teardown must fail closed even if native pixels cannot be revoked: leaving
 	-- an interceptor live after pause/quit is worse than a stale surface that the
 	-- outer tooltip teardown can retry. Return the revocation result to the owner.
+	_active_start_token = nil
+	_starting_token = nil
 	local revoked = invalidate_preview_snapshot("Rules-engine stop")
 	_preview_snapshot = nil
 	SharedEngine.reset_rules()
 	local reporter_cleared = SharedEngine.set_resolver_error_reporter(nil) == true
+	_sections = nil
 	_km = nil
 	return revoked and reporter_cleared
 end

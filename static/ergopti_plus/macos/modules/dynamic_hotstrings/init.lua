@@ -20,6 +20,9 @@ local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
 local Logger       = require("infra.logger")
 local Manifest     = require("infra.manifest_reader")
 local LOG          = "dynamic_hotstrings"
+local _started     = false
+local _starting    = false
+local _started_keymap = nil
 
 
 
@@ -37,6 +40,42 @@ local LOG          = "dynamic_hotstrings"
 -- a macOS-local master switch), so it stays a literal.
 local function feat_enabled(path)
 	return Manifest.default_for(path).enabled
+end
+
+--- Runs one exact start commit behind an exception boundary.
+--- @param label string Diagnostic step name.
+--- @param operation function Start operation.
+--- @return boolean committed
+local function run_start_step(label, operation)
+	local ok, result = xpcall(operation, debug.traceback)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Dynamic-hotstrings start step '%s' failed (terminal type: %s).", label, type(result))
+	return false
+end
+
+--- Stops both prospective children after any failed start step.
+--- @param reason string Failure context.
+--- @return boolean false
+local function rollback_start(reason)
+	-- Rules first: its callback can resolve personal data. Both stops are protected
+	-- so one teardown failure cannot leave the sibling generation live.
+	local stops = {
+		{ label = "rules_engine", stop = RulesEngine.stop },
+		{ label = "personal_info", stop = PersonalInfo.stop },
+	}
+	for _, entry in ipairs(stops) do
+		local label, stop = entry.label, entry.stop
+		local ok, result = xpcall(stop, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Dynamic-hotstrings rollback could not stop %s (terminal type: %s).",
+				label, type(result))
+		end
+	end
+	_started = false
+	_starting = false
+	_started_keymap = nil
+	Logger.error(LOG, "Dynamic hotstrings core start rolled back after %s.", tostring(reason))
+	return false
 end
 
 M.DEFAULT_STATE = {
@@ -65,10 +104,24 @@ M.DEFAULT_STATE = {
 --- @param keymap_module table The active keymap module reference.
 --- @param info_toml_path string|nil Absolute path to personal_info.toml.
 function M.start(base_dir, keymap_module, info_toml_path)
+	if _started then
+		if _started_keymap == keymap_module then return true end
+		Logger.error(LOG, "Dynamic hotstrings core already owns a different keymap.")
+		return false
+	end
+	if _starting then
+		Logger.error(LOG, "Dynamic hotstrings core start refused because another start is in progress.")
+		return false
+	end
+	_starting = true
 	Logger.debug(LOG, "Starting the personal info tracker…")
 
 	-- Start the personal info tracker
-	PersonalInfo.start(base_dir, keymap_module, info_toml_path)
+	if not run_start_step("personal-info start", function()
+		return PersonalInfo.start(base_dir, keymap_module, info_toml_path)
+	end) then
+		return rollback_start("personal-info start")
+	end
 
 	Logger.debug(LOG, "Injecting personal data into the rules engine…")
 
@@ -81,21 +134,36 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	local trigger_char = (type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function")
 		and keymap_module.get_trigger_char()
 		or PersonalInfo.get_trigger_char()
-	RulesEngine.inject_data(PersonalInfo.get_info(), trigger_char)
+	if not run_start_step("personal-data injection", function()
+		return RulesEngine.inject_data(PersonalInfo.get_info(), trigger_char)
+	end) then
+		return rollback_start("personal-data injection")
+	end
 
 	Logger.debug(LOG, "Starting the dynamic rules engine…")
 	
 	-- Start the dynamic rules engine
-	RulesEngine.start(keymap_module)
+	if not run_start_step("rules-engine start", function()
+		return RulesEngine.start(keymap_module)
+	end) then
+		return rollback_start("rules-engine start")
+	end
 	
+	_started = true
+	_starting = false
+	_started_keymap = keymap_module
 	Logger.info(LOG, "The dynamic hotstrings core initialized successfully.")
+	return true
 end
 
 --- Stops both dynamic expansion engines.
 function M.stop()
 	Logger.start(LOG, "Stopping dynamic hotstrings core…")
-	PersonalInfo.stop()
+	_started = false
+	_starting = false
+	_started_keymap = nil
 	RulesEngine.stop()
+	PersonalInfo.stop()
 	Logger.success(LOG, "Dynamic hotstrings core stopped.")
 end
 

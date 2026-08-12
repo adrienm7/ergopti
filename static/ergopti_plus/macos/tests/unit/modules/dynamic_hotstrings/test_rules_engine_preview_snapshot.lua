@@ -33,6 +33,7 @@ helpers.describe("dynamic rules consume the exact committed preview snapshot", f
 			set_post_load_hook = function() end,
 			register_interceptor = function(fn) interceptor = fn end,
 			register_preview_provider = function(fn) provider = fn end,
+			registry_transaction = function(_, mutation) return mutation() == true end,
 			owns_visible_magic_action = function(token, buffer)
 				return token == visible_token and buffer == "zz"
 			end,

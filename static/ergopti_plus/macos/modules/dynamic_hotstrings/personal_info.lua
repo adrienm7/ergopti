@@ -58,6 +58,8 @@ local _base_dir        = ""
 local _info_toml_path  = ""
 
 local _keymap    = nil
+local _active_start_token = nil
+local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
@@ -71,6 +73,40 @@ local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
 -- classification cannot be reached. Fixed rather than the value's own length:
 -- how long a secret is, is itself a hint about which one it is.
 local UNCLASSIFIED_PREVIEW_BULLETS = 8
+
+--- Registers one append-only keymap callback as part of a prospective start.
+--- @param label string Stable diagnostic label.
+--- @param registrar function Keymap registration function.
+--- @param callback function Token-gated callback to publish.
+--- @return boolean committed
+local function register_start_callback(label, registrar, callback)
+	if type(registrar) ~= "function" then
+		Logger.error(LOG, "Personal-info start requires keymap.%s.", label)
+		return false
+	end
+	local ok, result = xpcall(function() return registrar(callback) end, debug.traceback)
+	if ok and result ~= false then return true end
+	Logger.error(LOG, "Personal-info %s failed (terminal type: %s).", label, type(result))
+	return false
+end
+
+--- Invalidates every callback published by an uncommitted start generation.
+--- @param token table Prospective generation token.
+--- @param reason string Failure context.
+--- @return boolean false
+local function rollback_start(token, reason)
+	if _starting_token == token or _active_start_token == token then
+		_starting_token = nil
+		_active_start_token = nil
+		_enabled = false
+		_replacing = false
+		_state = STATE_IDLE
+		_combo = ""
+		_keymap = nil
+	end
+	Logger.error(LOG, "Personal info tracker start rolled back after %s.", tostring(reason))
+	return false
+end
 
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
@@ -755,6 +791,18 @@ end
 --- @param info_toml_path string|nil Absolute path to personal_info.toml (optional override).
 function M.start(base_dir, keymap_module, info_toml_path)
 	Logger.debug(LOG, "Starting personal info tracker…")
+	if _active_start_token then
+		if _keymap == keymap_module then return true end
+		Logger.error(LOG, "Personal info tracker already owns a different keymap.")
+		return false
+	end
+	if _starting_token then
+		Logger.error(LOG, "Personal info tracker start refused because another start is in progress.")
+		return false
+	end
+
+	local token = {}
+	_starting_token = token
 	if type(base_dir) == "string" then _base_dir = base_dir end
 
 	-- Resolve the TOML path: explicit override > default relative to base_dir
@@ -767,7 +815,7 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	local config, was_missing = load_config(_info_toml_path)
 	if type(config) ~= "table" then
 		Logger.warn(LOG, "Module disabled because configuration is missing or invalid.")
-		return
+		return rollback_start(token, "configuration load")
 	end
 
 	_info    = type(config.info) == "table" and config.info or {}
@@ -798,18 +846,23 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	_replacing = false
 	_enabled   = true
 	
-	if type(keymap_module) == "table" then
-		_keymap = keymap_module
-	end
+	_keymap = type(keymap_module) == "table" and keymap_module or nil
+	local callback_keymap = _keymap
 
 	-- Register the keystroke interceptor
-	if _keymap and type(_keymap.register_interceptor) == "function" then
-		_keymap.register_interceptor(interceptor)
+	if _keymap and not register_start_callback("register_interceptor", _keymap.register_interceptor,
+		function(...)
+			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
+			return interceptor(...)
+		end)
+	then
+		return rollback_start(token, "interceptor registration")
 	end
 
 	-- Register the preview provider for UI feedback
-	if _keymap and type(_keymap.register_preview_provider) == "function" then
-		_keymap.register_preview_provider(function(buf)
+	if _keymap and not register_start_callback("register_preview_provider", _keymap.register_preview_provider,
+		function(buf)
+			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
 			if not _enabled or type(buf) ~= "string" then return nil end
 			
 			local match = buf:match("@([a-z]+)$")
@@ -833,8 +886,13 @@ function M.start(base_dir, keymap_module, info_toml_path)
 			end
 			return nil
 		end)
+	then
+		return rollback_start(token, "preview-provider registration")
 	end
+	_active_start_token = token
+	_starting_token = nil
 	Logger.info(LOG, "Personal info tracker started successfully.")
+	return true
 end
 
 --- Enables the engine tracking.
@@ -853,7 +911,10 @@ end
 
 --- Stops the engine tracking.
 function M.stop()
+	_active_start_token = nil
+	_starting_token = nil
 	M.disable()
+	_keymap = nil
 end
 
 return M

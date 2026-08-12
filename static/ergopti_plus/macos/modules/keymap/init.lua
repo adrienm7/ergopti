@@ -534,6 +534,7 @@ M.disable_group         = preview_fenced_registry_mutation(Registry.disable_grou
 M.is_group_enabled      = Registry.is_group_enabled
 M.list_groups           = Registry.list_groups
 M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group)
+M.registry_transaction = preview_fenced_registry_mutation(Registry.registry_transaction)
 M.enable_group          = preview_fenced_registry_mutation(Registry.enable_group)
 M.sort_mappings         = preview_fenced_registry_mutation(Registry.sort_mappings)
 M.defer_sort            = Registry.defer_sort
