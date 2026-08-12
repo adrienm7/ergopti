@@ -430,7 +430,8 @@ function M.read_with_status(path)
 		return nil, "error", "path must be a non-empty string"
 	end
 
-	local resolved_path, classification, detail, chain, final_identity = classify_read_path(path)
+	local requested_path = normalize_path(path)
+	local resolved_path, classification, detail, chain, final_identity = classify_read_path(requested_path)
 	if classification == "absent" then return nil, "absent", detail end
 	if classification ~= "present" then
 		Logger.error(LOG, "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
@@ -456,7 +457,7 @@ function M.read_with_status(path)
 		return nil, "error", detail
 	end
 
-	local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
 		Logger.error(LOG, "read_with_status(): pathname changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
@@ -584,12 +585,13 @@ function M.create_if_absent(path, content)
 		return false, "error", "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
+	local requested_path = normalize_path(path)
 
-	local existing, read_status, read_detail = M.read_with_status(path)
+	local existing, read_status, read_detail = M.read_with_status(requested_path)
 	if read_status == "ok" then return false, "exists" end
 	if read_status ~= "absent" then return false, "error", read_detail end
 
-	local resolved_path, classification, detail, chain = classify_read_path(path)
+	local resolved_path, classification, detail, chain = classify_read_path(requested_path)
 	if classification ~= "absent" then
 		if classification == "present" then return false, "exists" end
 		return false, "error", detail
@@ -621,20 +623,20 @@ function M.create_if_absent(path, content)
 		return false, "error", tostring((close_ok and close_err) or closed or "close failed")
 	end
 
-	local current_path, current_classification, current_detail, current_chain = classify_read_path(path)
+	local current_path, current_classification, current_detail, current_chain = classify_read_path(requested_path)
 	if current_classification ~= "absent" or current_path ~= resolved_path then
 		cleanup()
 		if current_classification == "present" then return false, "exists" end
 		return false, "error", current_detail or "destination changed before publication"
 	end
-	local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
 		cleanup()
 		return false, "error", revalidate_err
 	end
 	-- Keep both observations explicit: a symlink introduced after the second
 	-- classification must not inherit an earlier empty chain.
-	unchanged, revalidate_err = revalidate_write_path(path, current_path, current_chain)
+	unchanged, revalidate_err = revalidate_write_path(requested_path, current_path, current_chain)
 	if not unchanged then
 		cleanup()
 		return false, "error", revalidate_err
@@ -652,7 +654,7 @@ function M.create_if_absent(path, content)
 	)
 	if not link_ok or linked ~= true then
 		cleanup()
-		local _, winner_status, winner_detail = M.read_with_status(path)
+		local _, winner_status, winner_detail = M.read_with_status(requested_path)
 		if winner_status == "ok" then return false, "exists" end
 		return false, "error", winner_detail or tostring(link_ok and link_err or linked)
 	end

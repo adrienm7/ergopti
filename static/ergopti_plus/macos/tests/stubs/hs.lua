@@ -371,7 +371,14 @@ local function fs_symlink_attributes(path, attribute)
 	-- result gains the resolved target. Multi-result failures stay untouched.
 	if attribute == "target" then return M.fs.pathToAbsolute(path) end
 	local method, method_err = optional_lfs_method("symlinkattributes")
-	if not method then return nil, method_err end
+	if not method then
+		-- Stock Windows Lua used by CI has no LuaFileSystem. Preserve useful
+		-- regular-file/directory lstat behavior through the stub's own attribute
+		-- probe; tests that need link identity inject symlinkAttributes explicitly.
+		local fallback = M.fs.attributes(path)
+		if type(fallback) == "table" then return fallback end
+		return nil, method_err
+	end
 	local results = attribute ~= nil
 		and pack_results(method(path, attribute))
 		or pack_results(method(path))
