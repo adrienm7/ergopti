@@ -341,31 +341,27 @@ end
 --- Enables or disables the ★ hotstring preview tooltip.
 --- @param v boolean
 function M.set_preview_star_enabled(v)
-	is_star_preview_enabled = (v == true)
-	Logger.debug(LOG, "Star preview: %s.", is_star_preview_enabled and "on" or "off")
-	if not v then
-		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
-		-- a no-op so multi-row previews survive the first row's expiry — which
-		-- means turning the preview OFF left the rows the user just disabled
-		-- sitting on screen until they timed out on their own.
-		invalidate_pending_preview()
-		tooltip.hide_forced()
+	local enabled = v == true
+	if not enabled and M.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Star-preview disable refused because its visible promise could not be revoked.")
+		return false
 	end
+	is_star_preview_enabled = enabled
+	Logger.debug(LOG, "Star preview: %s.", enabled and "on" or "off")
+	return true
 end
 
 --- Enables or disables the autocorrect hotstring preview tooltip.
 --- @param v boolean
 function M.set_preview_autocorrect_enabled(v)
-	is_autocorrect_preview_enabled = (v == true)
-	Logger.debug(LOG, "Autocorrect preview: %s.", is_autocorrect_preview_enabled and "on" or "off")
-	if not v then
-		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
-		-- a no-op so multi-row previews survive the first row's expiry — which
-		-- means turning the preview OFF left the rows the user just disabled
-		-- sitting on screen until they timed out on their own.
-		invalidate_pending_preview()
-		tooltip.hide_forced()
+	local enabled = v == true
+	if not enabled and M.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Autocorrect-preview disable refused because its visible promise could not be revoked.")
+		return false
 	end
+	is_autocorrect_preview_enabled = enabled
+	Logger.debug(LOG, "Autocorrect preview: %s.", enabled and "on" or "off")
+	return true
 end
 
 --- Enables or disables the AI prediction tooltip.
@@ -378,26 +374,28 @@ end
 --- Enables or disables all non-LLM preview tooltips simultaneously.
 --- @param enabled boolean
 function M.set_preview_enabled(enabled)
-	is_star_preview_enabled        = (enabled == true)
-	is_autocorrect_preview_enabled = (enabled == true)
-	Logger.debug(LOG, "All hotstring tooltips: %s.", enabled and "on" or "off")
-	if not enabled then
-		-- hide_forced for the same reason as the per-kind setters above.
-		invalidate_pending_preview()
-		tooltip.hide_forced()
+	local next_enabled = enabled == true
+	if not next_enabled and M.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Hotstring-preview disable refused because its visible promise could not be revoked.")
+		return false
 	end
+	is_star_preview_enabled        = next_enabled
+	is_autocorrect_preview_enabled = next_enabled
+	Logger.debug(LOG, "All hotstring tooltips: %s.", next_enabled and "on" or "off")
+	return true
 end
 
 --- Enables or disables background tinting for all tooltip types.
 --- Delegates to the tooltip module, which is the single owner of colorization state.
 --- @param v boolean
 function M.set_preview_colored_tooltips(v)
+	if M.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Tooltip colorization change refused because the active preview could not be revoked.")
+		return false
+	end
 	tooltip.set_colorization_enabled(v == true)
 	Logger.debug(LOG, "Colored tooltips: %s.", v and "on" or "off")
-	-- The hide clears the surface so the new tint applies to the next render; a
-	-- render still waiting on its tick would repaint it with the old one.
-	invalidate_pending_preview()
-	tooltip.hide()
+	return true
 end
 
 --- Overrides the accent tint for ★ hotstring tooltips.
@@ -1279,6 +1277,34 @@ end
 --- @return boolean full_reset True when engine.reset ran.
 function M.reset_predictions(keep_hotstring_log)
 	return reset_predictions_impl(keep_hotstring_log, false)
+end
+
+--- Invalidates any prospective/visible hotstring action before registry or
+--- provider semantics mutate. Without a committed row this is an O(1)
+--- generation fence; visible pixels and their exact lease are revoked together.
+--- @return boolean committed
+function M.invalidate_hotstring_preview()
+	local had_visible_owner = _visible_magic_lease ~= nil or last_shown_hotstring ~= nil
+	-- Fence deferred renders immediately, but retain the exact lease until the
+	-- native pixels are confirmed gone. Otherwise a failed hide leaves an old
+	-- promise visible with no owner able to honor it.
+	invalidate_pending_preview(had_visible_owner)
+	if not had_visible_owner then return true end
+
+	-- Revoke pixels before logical state. reset_predictions_impl clears its lease
+	-- first, so it cannot be the first step of a transactional semantic mutation.
+	local hide = tooltip.hide_forced_silent or tooltip.hide_forced
+	if type(hide) ~= "function" then
+		Logger.error(LOG, "Hotstring preview invalidation has no authoritative hide operation.")
+		return false
+	end
+	local hide_ok, hide_result = xpcall(hide, debug.traceback)
+	if not hide_ok or hide_result ~= true then
+		Logger.error(LOG, "Hotstring preview invalidation could not revoke native pixels (result: %s).",
+			tostring(hide_result))
+		return false
+	end
+	return reset_predictions_impl(false, false)
 end
 
 
