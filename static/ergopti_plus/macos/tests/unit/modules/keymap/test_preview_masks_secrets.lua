@@ -216,8 +216,12 @@ local function capture_rows(register, buf)
 	local State = helpers.load_with_stubs("modules.keymap.state")
 
 	-- Dropped so it is re-required under the fresh stub the bridge load installs;
-	-- see trap 2 above.
+	-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
+	-- either cached makes the resolver answer for a previous test's CoreState.
 	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["modules.keymap.terminators"] = nil
+	package.loaded["modules.keymap.expander"] = nil
 	package.loaded["modules.keymap.llm_bridge"] = nil
 	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 
@@ -226,6 +230,8 @@ local function capture_rows(register, buf)
 	-- would be initialised over a state the bridge never reads.
 	local Registry = package.loaded["modules.keymap.registry"]
 	helpers.assert_not_nil(Registry, "the bridge must have loaded the registry")
+	local Expander = package.loaded["modules.keymap.expander"]
+	helpers.assert_not_nil(Expander, "the bridge must have loaded the expander")
 
 	-- The REAL tooltip with exactly one method neutralised (trap 3). Patched
 	-- rather than replaced: a hand-written stub has to guess the whole surface.
@@ -242,6 +248,7 @@ local function capture_rows(register, buf)
 	Registry.sort_mappings()
 
 	Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
+	Expander.init(state, Registry, Bridge)
 	Bridge.set_preview_star_enabled(true)
 	Bridge.set_preview_autocorrect_enabled(true)
 
@@ -268,7 +275,7 @@ helpers.describe("preview rows: a declared secret is partially masked on screen"
 	helpers.it("shows an IBAN with only its head and tail", function()
 		local rows = capture_rows(function(Registry)
 			Registry.add("FR7630★", IBAN_FULL,
-				{ is_case_sensitive = true, is_private = true, field = "iban" })
+				{ auto_expand = true, is_case_sensitive = true, is_private = true, field = "iban" })
 		end, "FR7630")
 
 		helpers.assert_true(#rows > 0,
@@ -283,7 +290,7 @@ helpers.describe("preview rows: a declared secret is partially masked on screen"
 	helpers.it("leaves a declared-public personal_info field in full", function()
 		local rows = capture_rows(function(Registry)
 			Registry.add("0612★", PHONE_FULL,
-				{ is_case_sensitive = true, is_private = true, field = "phone_number" })
+				{ auto_expand = true, is_case_sensitive = true, is_private = true, field = "phone_number" })
 		end, "0612")
 
 		helpers.assert_true(#rows > 0, "no row reached the tooltip")
@@ -295,7 +302,7 @@ helpers.describe("preview rows: a declared secret is partially masked on screen"
 
 	helpers.it("leaves an ordinary hotstring untouched", function()
 		local rows = capture_rows(function(Registry)
-			Registry.add("btw★", PLAIN_REPL, {})
+			Registry.add("btw★", PLAIN_REPL, { auto_expand = true })
 		end, "btw")
 
 		helpers.assert_true(#rows > 0, "no row reached the tooltip")
@@ -325,7 +332,7 @@ helpers.describe("preview masking: display only", function()
 	helpers.it("keeps the registry entry the expander types from in clear", function()
 		local rows, state = capture_rows(function(Registry)
 			Registry.add("FR7630★", IBAN_FULL,
-				{ is_case_sensitive = true, is_private = true, field = "iban" })
+				{ auto_expand = true, is_case_sensitive = true, is_private = true, field = "iban" })
 		end, "FR7630")
 
 		helpers.assert_eq(rows[1] and rows[1].text, IBAN_MASKED,

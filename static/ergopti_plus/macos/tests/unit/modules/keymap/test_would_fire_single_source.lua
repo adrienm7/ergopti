@@ -4,8 +4,9 @@
 --- MODULE: would_fire Single-Source Tests
 --- DESCRIPTION:
 --- `Expander.would_fire` is the pure predicate answering "will this hotstring
---- fire against this buffer", and it has FOUR consumers: the expansion path
---- itself, the tooltip preview, and two sites in the LLM bridge. Its own
+--- fire against this buffer". The emitters call it directly, while the keyboard
+--- magic path and tooltip both enter through `resolve_magic_action`, which calls
+--- the same predicate for every candidate. Its own
 --- docstring records why that matters — "keeping it in one place" — and the LLM
 --- bridge's comment says the same: "so there is one rule and nothing left to keep
 --- in sync". Both sentences exist because the rule was duplicated once and the
@@ -41,13 +42,16 @@ local helpers = require("tests.helpers")
 
 helpers.describe("would_fire: one rule for every consumer", function()
 	helpers.it("every consumer calls the predicate rather than re-deriving it", function()
-		-- Selected by a declaration unique to each file rather than by path, so a
-		-- move cannot turn this invariant into a path error.
 		local consumers = {
 			{ symbol = "function M.would_fire", name = "expander (the definition)" },
-			{ symbol = "and Expander.would_fire(m, CoreState.buffer)", name = "the tooltip preview" },
-			{ symbol = "expander.would_fire(mapping, star_buf)", name = "the LLM bridge star path" },
-			{ symbol = "expander.would_fire(mapping, buf)", name = "the LLM bridge buffer path" },
+			{
+				symbol = "local resolution = Expander.resolve_magic_action",
+				name = "the keyboard engine",
+			},
+			{
+				symbol = "expander.resolve_magic_action(buf, literal_preview_allowed)",
+				name = "the tooltip bridge",
+			},
 		}
 		for _, consumer in ipairs(consumers) do
 			local src = helpers.read_driver_source(consumer.symbol)
@@ -56,6 +60,14 @@ helpers.describe("would_fire: one rule for every consumer", function()
 				"rule lives in one place, and the preview once showed an expansion that did not fire " ..
 				"because it did not")
 		end
+
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
+		helpers.assert_true(src ~= nil, "the shared prospective resolver must be readable")
+		helpers.assert_true(src:find("M.would_fire(mapping, auto_buffer)", 1, true) ~= nil,
+			"star candidates must reach the shared match predicate")
+		helpers.assert_true(src:find(
+			"resolve_terminator_match(mapping, end_buffer, physical_magic, true)", 1, true) ~= nil,
+			"end-character candidates must reach the emitter's shared terminator predicate")
 	end)
 
 	helpers.it("and the predicate itself defers to the CROSS-DRIVER rule", function()

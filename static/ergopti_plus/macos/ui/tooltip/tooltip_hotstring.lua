@@ -42,6 +42,10 @@ local REQUIRED_WATCHER_COUNT = 2
 -- remaining stack. nil means no dequeue cycle is active.
 local _dequeue_rows  = nil
 local _dequeue_timer = nil
+-- Exact rows owned by the committed stacked canvas. Unlike _dequeue_rows this
+-- also covers an all-infinite stack, which has no dequeue cycle but may still
+-- carry an interceptor/provider action lease.
+local _visible_rows = nil
 -- Forward declaration — assigned after M.hide and M.show_stacked are defined.
 local _dequeue_tick
 
@@ -466,6 +470,7 @@ function M.hide_forced()
 	if standard_hidden and stacked_hidden then
 		_state.bg_color = nil
 		_state.is_visible = false
+		_visible_rows = nil
 	end
 	return watchers_stopped and standard_hidden and stacked_hidden
 end
@@ -493,6 +498,7 @@ function M.dismiss_silent()
 	if stacked_hidden and watchers_stopped then
 		_state.bg_color = nil
 		_state.is_visible = false
+		_visible_rows = nil
 		return true
 	end
 	-- A silent in-place handoff is no longer safe.  Attempt authoritative cleanup
@@ -550,6 +556,7 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 		end
 		if not watcher_activation_ok then return end
 		_state.is_visible = true
+		_visible_rows = nil
 		rendered = true
 	end)
 
@@ -602,6 +609,7 @@ function M.show_loading(content, is_enabled, background_color)
 			return
 		end
 		_state.is_visible = true
+		_visible_rows = nil
 		rendered = true
 	end)
 
@@ -614,6 +622,19 @@ end
 
 function M.is_visible()
 	return _state.is_visible
+end
+
+--- Returns whether the exact leased row is still part of the visible stack.
+--- A canvas-level visibility bit is insufficient: after one row dequeues, a
+--- different dimmed row may keep the same canvas visible.
+--- @param token any Opaque identity supplied by the preview owner.
+--- @return boolean
+function M.has_visible_lease(token)
+	if token == nil or not _state.is_visible or not _visible_rows then return false end
+	for _, row in ipairs(_visible_rows) do
+		if row.lease_token == token then return true end
+	end
+	return false
 end
 
 --- Shows a stacked multi-row tooltip where each row has its own tint.
@@ -686,6 +707,7 @@ function M.show_stacked(rows, is_enabled)
 			end
 		end
 		_state.is_visible = true
+		_visible_rows = _dequeue_rows or rows
 		rendered = true
 	end)
 	if not ok then
@@ -701,7 +723,28 @@ end
 _dequeue_tick = function()
 	local ok, err = xpcall(function()
 		if not _dequeue_rows then return end
-		local remaining = Dequeue.prune_expired(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
+		local now = hs.timer.secondsSinceEpoch()
+		local owner_expired = nil
+		for _, row in ipairs(_dequeue_rows) do
+			if row.expire_at and row.expire_at ~= 0 and now >= row.expire_at
+				and type(row.on_expire) == "function"
+			then
+				owner_expired = row.on_expire
+				break
+			end
+		end
+		if owner_expired then
+			-- Arbitration changed with the winner's deadline. Re-rendering the
+			-- surviving rows in place would preserve stale dimmed/winner flags.
+			-- Revoke the whole surface first, then ask the owner to resolve again.
+			M.hide_forced()
+			local callback_ok, callback_err = xpcall(owner_expired, debug.traceback)
+			if not callback_ok then
+				Logger.error(LOG, "Tooltip winner-expiry callback raised: %s.", tostring(callback_err))
+			end
+			return
+		end
+		local remaining = Dequeue.prune_expired(_dequeue_rows, now, _dequeue_opts)
 		if #remaining == 0 then
 			M.hide_forced()
 			return

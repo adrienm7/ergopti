@@ -31,6 +31,7 @@ local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
+local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
 
@@ -130,6 +131,11 @@ local COMPLEX_CARRY_SEC = 0.3
 -- them out of init.lua prevents three separate files (Registry, Expander,
 -- LLMBridge) from silently assuming divergent field sets.
 local CoreState = CoreStateM.new(M.DEFAULT_STATE, M.DELAYS_DEFAULT)
+-- Prospective UI cannot know which modifiers the next physical magic-key event
+-- will carry. Expose the largest policy multiplier so a visible timed literal
+-- remains a valid promise for every event shape the tap can still accept. The
+-- event path may use the narrower live multiplier when no preview owns a lease.
+CoreState.COMPLEX_DELAY_MULT = COMPLEX_DELAY_MULT
 
 -- Registry exposes the repeat-feature toggle used by the event loop. Binding
 -- it after state.new() avoids a circular require (state.lua cannot reference
@@ -701,12 +707,8 @@ local function mapping_fires(m)
 	-- Resolved by CoreState so the PREVIEW gets the identical answer: it sizes
 	-- the row's lifetime from this, and a second implementation is exactly how
 	-- the tooltip came to promise expansions the engine would refuse.
-	local specific_delay = CoreState.resolve_mapping_delay(m)
-	-- Autocorrections are never stretched for complex keystrokes (they
-	-- fire on letter combos, not on modifier+letter sequences)
-	local allow_complex_delay = (m.group ~= "autocorrection")
-	local allowed_delay       = allow_complex_delay and (specific_delay * _tc_complex_mult) or specific_delay
-	return allowed_delay == 0 or _tc_dt <= allowed_delay
+	local allowed = CoreState.mapping_delay_remaining(m, _tc_dt, _tc_complex_mult)
+	return allowed
 end
 
 --- Runs trigger matching against the current buffer. Module-level function
@@ -740,7 +742,48 @@ local function run_trigger_checks()
 	-- bypass here the tooltip (which applies no delay gate when it collects star
 	-- matches) and the engine disagree, and the disagreement is what reaches the
 	-- screen.
-	local star_validated = chars == CoreState.magic_key
+	local star_validated = Terminators.matches_magic_event(chars, CoreState.magic_key)
+	if star_validated then
+		-- Ask the same prospective resolver the tooltip uses. It owns candidate
+		-- eligibility and cross-kind ordering, so pressing the advertised key cannot
+		-- select a different mapping from the row that was shown immediately before.
+		local before_magic = CoreState.buffer:sub(1, #CoreState.buffer - #chars)
+		local function ordinary_magic_auto_allowed(mapping)
+			if LLMBridge.owns_visible_magic_action(mapping, before_magic) then return true end
+			return mapping_fires(mapping)
+		end
+		local logical_buffer = before_magic .. CoreState.magic_key
+		local logical_char_len = text_utils.utf8_len(CoreState.magic_key)
+		local resolution = Expander.resolve_magic_action(
+			before_magic, ordinary_magic_auto_allowed, chars)
+		if resolution then
+			for _, action in ipairs(resolution.attempts) do
+				local fired
+				if action.kind == "autocorrect" then
+					fired = Expander.try_terminator_expand(
+						action.mapping, chars, char_len, false, true)
+				else
+					-- Both true star mappings and ordinary autos whose literal suffix
+					-- became the configured magic key commit through the auto emitter.
+					-- Its explicit match buffer avoids mutating shared state while the
+					-- physical NBSP/NNBSP payload is still needed by fallbacks/errors.
+					fired = Expander.try_auto_expand(
+						action.mapping, logical_char_len, false, logical_buffer)
+				end
+				if fired then return true end
+				-- A final no-op deliberately clears the buffer via suppress_rescan.
+				-- Returning immediately preserves that fence against repeat fallback.
+				if action.is_noop and action.mapping.final_result then return false end
+			end
+		end
+
+		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
+		if (star_allowed == 0 or _tc_dt <= star_allowed)
+			and Expander.try_repeat_feature(chars, false) then
+			return true
+		end
+		return false
+	end
 
 	local auto_bucket = Registry.mappings_for_tail(tail_chars)
 

@@ -105,6 +105,11 @@ function M.new(defaults, delays_default)
 		mappings_lookup            = {},
 		mappings_by_tail_char      = {},
 		mappings_by_star_tail_char = {},
+		-- Ordinary auto mappings that happened to end with a newly selected
+		-- magic key are deliberately not reclassified as star mappings. Keep a
+		-- narrow index for that rare collision so prospective magic resolution
+		-- does not rescan the full (usually thousands-entry) magic tail bucket.
+		mappings_by_literal_magic_tail = {},
 		groups                     = {},
 		seq_counter                = 0,
 		-- Monotonic counter assigned on first registration of a group name;
@@ -173,6 +178,30 @@ function M.new(defaults, delays_default)
 		if m.section and s.SECTION_DELAYS[m.section] then return s.SECTION_DELAYS[m.section] end
 		if m.group and s.DELAYS[m.group] then return s.DELAYS[m.group] end
 		return s.BASE_DELAY_SEC
+	end
+
+	--- Returns whether an ordinary auto mapping is live and, when finite, how
+	--- many seconds remain. Both the eventtap and prospective tooltip use this
+	--- comparison; the caller supplies elapsed time so no consumer reads another
+	--- consumer's transient clock state.
+	--- @param m table Registry mapping.
+	--- @param elapsed number Seconds since the preceding physical key.
+	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
+	--- @return boolean allowed
+	--- @return number|nil remaining Nil means the mapping has no deadline.
+	s.mapping_delay_remaining = function(m, elapsed, complex_mult)
+		local specific_delay = s.resolve_mapping_delay(m)
+		local multiplier = tonumber(complex_mult) or 1
+		-- Autocorrections are never stretched for complex keystrokes (they fire
+		-- on letter combos, not modifier+letter sequences).
+		local allowed_delay = m and m.group == "autocorrection"
+			and specific_delay or (specific_delay * multiplier)
+		if allowed_delay == 0 then return true, nil end
+		local remaining = allowed_delay - math.max(0, tonumber(elapsed) or 0)
+		-- Deadlines are half-open. Tooltip dequeue expires a row when now >=
+		-- expire_at; accepting the mapping at equality would let callback order
+		-- decide whether the same timestamp still owns a visible promise.
+		return remaining > 0, math.max(0, remaining)
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)

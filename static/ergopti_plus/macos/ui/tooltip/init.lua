@@ -213,6 +213,7 @@ function M.get_current_index()
 end
 function M.is_llm_visible() return TooltipLLM.is_visible() end
 function M.is_hotstring_visible() return TooltipHotstring.is_visible() end
+function M.has_visible_hotstring_lease(token) return TooltipHotstring.has_visible_lease(token) end
 function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 
 

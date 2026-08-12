@@ -152,6 +152,7 @@ local function load_tooltip(spec, faults)
 
 	return {
 		created = created,
+		config = Config,
 		renderer = renderer,
 		timers = hs.timer.__timers,
 		tooltip = tooltip,
@@ -906,6 +907,77 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 					"every dismissal watcher must be live before visibility commits")
 			end
 		end, debug.traceback)
+		hs.timer.secondsSinceEpoch = previous_clock
+		context.tooltip.hide_forced()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(tooltip-action-lease) revokes the exact winner before re-arbitration", function()
+		local context = load_tooltip(CASES[2])
+		local previous_clock = hs.timer.secondsSinceEpoch
+		local now = 100
+		local expiry_calls = 0
+		local visible_inside_expiry = nil
+		local lease = {}
+		hs.timer.secondsSinceEpoch = function() return now end
+
+		local ok, err = xpcall(function()
+			helpers.assert_eq(context.tooltip.show_stacked({
+				{
+					text = "timed literal winner",
+					duration = 0.01,
+					expire_at = 100.01,
+					lease_token = lease,
+					on_expire = function()
+						expiry_calls = expiry_calls + 1
+						visible_inside_expiry = context.tooltip.is_visible()
+					end,
+				},
+				{ text = "stale dimmed fallback", duration = 0, dimmed = true },
+			}, true), true)
+			helpers.assert_true(context.tooltip.has_visible_lease(lease),
+				"the exact winner row, not merely its canvas, must own the action lease")
+
+			local timers = running_timers(context.timers)
+			helpers.assert_eq(#timers, 1,
+				"the finite winner must own exactly one dequeue deadline")
+			now = 100.02
+			timers[1].running = false
+			timers[1].fn()
+
+			helpers.assert_eq(expiry_calls, 1,
+				"winner expiry must delegate one fresh arbitration to its owner")
+			helpers.assert_eq(visible_inside_expiry, false,
+				"stale pixels and their lease must be revoked before owner code runs")
+			helpers.assert_true(not context.tooltip.has_visible_lease(lease))
+			helpers.assert_true(not context.tooltip.is_visible())
+			helpers.assert_eq(context.renderer.stacked_render_calls, 1,
+				"the dequeue must not promote a stale dimmed fallback on its own")
+
+			local persistent_lease = {}
+			context.config.settings.timeout_sec = 0
+			local running_before_persistent = {}
+			for _, timer in ipairs(running_timers(context.timers)) do
+				running_before_persistent[timer] = true
+			end
+			helpers.assert_eq(context.tooltip.show_stacked({
+				{ text = "provider snapshot", duration = 0, lease_token = persistent_lease },
+			}, true), true)
+			helpers.assert_true(context.tooltip.has_visible_lease(persistent_lease),
+				"an infinite provider row needs an exact lease even without dequeue state")
+			local new_running_timers = 0
+			for _, timer in ipairs(running_timers(context.timers)) do
+				if not running_before_persistent[timer] then
+					new_running_timers = new_running_timers + 1
+				end
+			end
+			helpers.assert_eq(new_running_timers, 0,
+				"the infinite lease must not fabricate a dequeue deadline")
+			helpers.assert_eq(context.tooltip.hide_forced(), true)
+			helpers.assert_true(not context.tooltip.has_visible_lease(persistent_lease),
+				"authoritative hide must revoke an infinite provider lease")
+		end, debug.traceback)
+
 		hs.timer.secondsSinceEpoch = previous_clock
 		context.tooltip.hide_forced()
 		if not ok then error(err, 0) end
