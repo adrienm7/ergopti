@@ -72,6 +72,7 @@ local function load_fixture()
 			register_calls = register_calls + 1
 			listener = callback
 			registered_epoch = acknowledged_epoch
+			return true
 		end,
 		unregister_action_listener = function(id)
 			helpers.assert_eq(id, "modules.keymap.action_epoch")
@@ -173,10 +174,22 @@ local function load_fixture()
 			calls[#calls + 1] = "preview:" .. tostring(buf)
 		end,
 	})
-	package.loaded["modules.keymap.terminator_replay"] = api()
-	package.loaded["modules.keymap.utils"] = api({
-		is_ignored_window = function() return false end,
+	package.loaded["modules.keymap.terminator_replay"] = api({
+		flush_now = function() return true end,
+		is_pending = function() return false end,
 	})
+	package.loaded["modules.keymap.utils"] = api({
+		start_ignored_win_tracking = function() return 1 end,
+		prewarm_ignored_win_watchers = function() return true end,
+		stop = function() return true end,
+		is_ignored_window = function() return false, 1 end,
+	})
+	local mailbox_running = false
+	package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] = {
+		start = function() mailbox_running = true; return true end,
+		stop = function() mailbox_running = false; return true end,
+		is_running = function() return mailbox_running end,
+	}
 	package.loaded["infra.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
