@@ -4,7 +4,10 @@ local helpers = require("tests.helpers")
 
 package.loaded["infra.logger"] = nil
 helpers.load_with_stubs("infra.logger")
-local writer = helpers.load_with_stubs("infra.toml.writer")
+-- Exercise the shared fallback transaction directly. The macOS wrapper now
+-- injects adapters.file_system; adapter-specific source revalidation is covered
+-- below with an explicit behavioral double.
+local writer = helpers.load_with_stubs("toml_codec.writer")
 
 local function with_file_stubs(open_fn, rename_fn, body)
 	local original_open = io.open
@@ -188,5 +191,29 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			helpers.assert_eq(ok, false)
 			helpers.assert_eq(renames, 0, "an external edit must not be overwritten")
 		end)
+	end)
+
+	helpers.it("adapter publication revalidates the exact source snapshot", function()
+		local source_reads = 0
+		local writes = 0
+		local adapter = {
+			read_with_status = function()
+				source_reads = source_reads + 1
+				if source_reads == 1 then return nil, "absent" end
+				return "[private]\nsentinel = true\n", "ok"
+			end,
+			write = function()
+				writes = writes + 1
+				return true
+			end,
+		}
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "features", key = "enabled", value = true },
+		}, adapter)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(source_reads, 2,
+			"the adapter-backed writer must revalidate immediately before publication")
+		helpers.assert_eq(writes, 0,
+			"a file created after the absence proof must never be overwritten")
 	end)
 end)

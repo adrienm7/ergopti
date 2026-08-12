@@ -65,7 +65,23 @@ local function with_open(replacement, callback)
 end
 
 local function preferences()
-	return helpers.load_with_stubs("infra.preferences", {})
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function(path)
+			local open_ok, fh, open_detail, open_code = pcall(io.open, path, "r")
+			if not open_ok or not fh then
+				if open_ok and open_code == 2 then return nil, "absent" end
+				return nil, "error", open_detail
+			end
+			local read_ok, content = pcall(fh.read, fh, "*a")
+			local close_ok, closed = pcall(fh.close, fh)
+			if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+				return nil, "error", "stream did not commit"
+			end
+			return content, "ok"
+		end,
+	}
+	package.loaded["infra.preferences"] = nil
+	return require("infra.preferences")
 end
 
 

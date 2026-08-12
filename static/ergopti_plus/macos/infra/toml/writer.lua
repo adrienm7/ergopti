@@ -14,4 +14,21 @@
 --- any module is required, so this shim can delegate with a plain require().
 --- ==============================================================================
 
-return require("toml_codec.writer")
+local SharedWriter = require("toml_codec.writer")
+local FileSystem   = require("adapters.file_system")
+
+local M = {}
+
+function M.write(path, data)
+	return SharedWriter.write(path, data, FileSystem)
+end
+
+function M.create_if_absent(path, data)
+	return SharedWriter.write(path, data, FileSystem, true)
+end
+
+function M.batch_write(path, updates)
+	return SharedWriter.batch_write(path, updates, FileSystem)
+end
+
+return M

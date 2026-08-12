@@ -47,32 +47,8 @@ local MAX_STAGING_RESERVATION_ATTEMPTS = 64
 --- Reads the entire contents of a file as a string.
 --- @param path string Absolute path to the file.
 --- @return string|nil File contents, or nil on any error.
-function M.read(path)
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "read(): path must be a non-empty string.")
-		return nil
-	end
-
-	local ok, result = pcall(function()
-		local fh, err = io.open(path, "r")
-		if not fh then
-			Logger.debug(LOG, "read(): cannot open '%s' — %s", path, tostring(err))
-			return nil
-		end
-		-- Inner pcall ensures fh:close() always runs even when read() panics
-		-- (e.g. an I/O error mid-read on a file that was truncated after open)
-		local read_ok, content = pcall(function() return fh:read("*a") end)
-		fh:close()
-		if not read_ok then return nil end
-		return content
-	end)
-
-	if not ok then
-		Logger.error(LOG, "read(): unexpected error on '%s' — %s", path, tostring(result))
-		return nil
-	end
-	return result
-end
+-- Defined after the lstat helpers so both the legacy read() contract and the
+-- classified API use the same fail-closed implementation.
 
 --- Ensures all intermediate directories on the path exist.
 --- Walks up the directory chain and creates any missing nodes via hs.fs.mkdir.
@@ -335,6 +311,179 @@ local function revalidate_write_path(requested_path, expected_path, chain)
 	return true
 end
 
+--- Resolves a pathname for reading while preserving the distinction between a
+--- proven missing final entry and every unsafe lookup failure. A missing path
+--- prefix and a dangling final symlink are errors: neither authorizes creation.
+--- @param path string Requested pathname.
+--- @return string|nil resolved_path
+--- @return string status `present`, `absent`, or `error`.
+--- @return string|nil detail
+--- @return table chain Observed symlinks for post-read revalidation.
+--- @return table|nil final_identity Final regular-file lstat observation.
+local function classify_read_path(path)
+	local current = path
+	local chain = {}
+	local visited_links = {}
+	local hop_count = 0
+	local final_link_requires_target = false
+
+	while true do
+		local root, components = split_path(current)
+		if #components == 0 then return nil, "error", "pathname has no final component", chain end
+		local prefix = root
+		local replaced = false
+
+		for index, component in ipairs(components) do
+			local component_parent = prefix == "" and "." or prefix
+			prefix = append_component(prefix, component)
+			local attributes, attributes_err = inspect_path(prefix, component_parent, component)
+			if attributes_err ~= nil then return nil, "error", attributes_err, chain end
+			if attributes == nil then
+				if index < #components then
+					return nil, "error", "missing path prefix: " .. prefix, chain
+				end
+				if final_link_requires_target then
+					return nil, "error", "dangling final symlink resolves to: " .. prefix, chain
+				end
+				return normalize_path(prefix), "absent", nil, chain
+			end
+
+			if attributes.mode == "link" then
+				hop_count = hop_count + 1
+				if hop_count > MAX_SYMLINK_HOPS then
+					return nil, "error", "symlink chain exceeds " .. tostring(MAX_SYMLINK_HOPS) .. " hops", chain
+				end
+				if visited_links[prefix] then
+					return nil, "error", "symlink cycle detected at " .. prefix, chain
+				end
+				visited_links[prefix] = true
+				if type(attributes.target) ~= "string" or attributes.target == "" then
+					return nil, "error", "symlink target is unavailable for " .. prefix, chain
+				end
+
+				local target = resolve_link_target(prefix, attributes.target)
+				chain[#chain + 1] = {
+					path = prefix,
+					target = target,
+					dev = attributes.dev,
+					ino = attributes.ino,
+				}
+				if index == #components then final_link_requires_target = true end
+				for remainder = index + 1, #components do
+					target = append_component(target, components[remainder])
+				end
+				current = normalize_path(target)
+				replaced = true
+				break
+			end
+
+			if index < #components and attributes.mode ~= "directory" then
+				return nil, "error", "non-directory path component: " .. prefix, chain
+			end
+			if index == #components then
+				if attributes.mode ~= "file" then
+					return nil, "error", "pathname is not a regular file: " .. prefix, chain
+				end
+				return normalize_path(prefix), "present", nil, chain, {
+					path = normalize_path(prefix),
+					mode = attributes.mode,
+					dev = attributes.dev,
+					ino = attributes.ino,
+				}
+			end
+		end
+
+		if not replaced then return nil, "error", "pathname resolution did not terminate", chain end
+	end
+end
+
+--- Revalidates the final regular-file identity after the stream is closed.
+--- Hammerspoon/macOS exposes dev+ino. Tests running without host lstat support
+--- still get type/presence validation, while injected identities exercise the
+--- replacement race deterministically.
+--- @param expected table Final lstat observation captured before open.
+--- @return boolean unchanged
+--- @return string|nil error_message
+local function revalidate_read_identity(expected)
+	if type(expected) ~= "table" or type(expected.path) ~= "string" then
+		return false, "final file identity was not captured"
+	end
+	local current, inspect_err = inspect_path(expected.path)
+	if inspect_err ~= nil then return false, inspect_err end
+	if type(current) ~= "table" or current.mode ~= "file" then
+		return false, "final regular file disappeared or changed type: " .. expected.path
+	end
+	if expected.dev ~= nil and expected.ino ~= nil
+			and (current.dev ~= expected.dev or current.ino ~= expected.ino) then
+		return false, "final regular file identity changed: " .. expected.path
+	end
+	return true
+end
+
+--- Reads a regular file without turning lookup or stream failures into absence.
+--- @param path string Absolute path to the file.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail
+function M.read_with_status(path)
+	if type(path) ~= "string" or path == "" then
+		return nil, "error", "path must be a non-empty string"
+	end
+
+	local resolved_path, classification, detail, chain, final_identity = classify_read_path(path)
+	if classification == "absent" then return nil, "absent", detail end
+	if classification ~= "present" then
+		Logger.error(LOG, "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
+		return nil, "error", detail
+	end
+
+	local open_ok, fh, open_err = pcall(io.open, resolved_path, "r")
+	if not open_ok or not fh then
+		detail = tostring((open_ok and open_err) or fh or "open failed")
+		Logger.error(LOG, "read_with_status(): cannot open '%s' — %s", path, detail)
+		return nil, "error", detail
+	end
+	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" then
+		detail = tostring((read_ok and read_err) or content or "read failed")
+		Logger.error(LOG, "read_with_status(): read failed for '%s' — %s", path, detail)
+		return nil, "error", detail
+	end
+	if not close_ok or closed ~= true then
+		detail = tostring((close_ok and close_err) or closed or "close failed")
+		Logger.error(LOG, "read_with_status(): close failed for '%s' — %s", path, detail)
+		return nil, "error", detail
+	end
+
+	local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+	if not unchanged then
+		Logger.error(LOG, "read_with_status(): pathname changed while reading '%s' — %s",
+			path, tostring(revalidate_err))
+		return nil, "error", revalidate_err
+	end
+	unchanged, revalidate_err = revalidate_read_identity(final_identity)
+	if not unchanged then
+		Logger.error(LOG, "read_with_status(): file identity changed while reading '%s' — %s",
+			path, tostring(revalidate_err))
+		return nil, "error", revalidate_err
+	end
+	return content, "ok"
+end
+
+--- Reads the entire contents of a file as a string.
+--- @param path string Absolute path to the file.
+--- @return string|nil File contents, or nil on absence/error.
+function M.read(path)
+	local content, status, detail = M.read_with_status(path)
+	if status == "absent" then
+		Logger.debug(LOG, "read(): '%s' is absent.", tostring(path))
+	elseif status == "error" then
+		Logger.debug(LOG, "read(): '%s' failed — %s", tostring(path), tostring(detail))
+	end
+	return content
+end
+
 --- Builds a staging candidate beside the destination for POSIX rename.
 --- The tag and sequence reduce collisions, but do not prove uniqueness across
 --- processes. reserve_staging_area() supplies that proof with an atomic mkdir.
@@ -420,6 +569,95 @@ local function release_staging_area(area, payload_published)
 		return false, tostring(call_ok and rmdir_err or removed)
 	end
 	return true
+end
+
+--- Creates a regular file only when its final directory entry is proven absent.
+--- Publication uses hard-link create semantics, so a concurrent winner can
+--- never be overwritten between the absence probe and publication.
+--- @param path string Absolute destination path.
+--- @param content string UTF-8 content.
+--- @return boolean created True only when this call published the file.
+--- @return string status `created`, `exists`, or `error`.
+--- @return string|nil detail
+function M.create_if_absent(path, content)
+	if type(path) ~= "string" or path == "" then
+		return false, "error", "path must be a non-empty string"
+	end
+	content = type(content) == "string" and content or ""
+
+	local existing, read_status, read_detail = M.read_with_status(path)
+	if read_status == "ok" then return false, "exists" end
+	if read_status ~= "absent" then return false, "error", read_detail end
+
+	local resolved_path, classification, detail, chain = classify_read_path(path)
+	if classification ~= "absent" then
+		if classification == "present" then return false, "exists" end
+		return false, "error", detail
+	end
+	local staging_area, reserve_err = reserve_staging_area(resolved_path)
+	if not staging_area then return false, "error", reserve_err end
+
+	local function cleanup()
+		local released, release_err = release_staging_area(staging_area, false)
+		if not released then
+			Logger.warn(LOG, "create_if_absent(): staging cleanup failed for '%s' — %s",
+				path, tostring(release_err))
+		end
+	end
+
+	local open_ok, fh, open_err = pcall(io.open, staging_area.payload_path, "w")
+	if not open_ok or not fh then
+		cleanup()
+		return false, "error", tostring((open_ok and open_err) or fh or "open failed")
+	end
+	local write_ok, written, write_err = pcall(fh.write, fh, content)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not write_ok or written == nil or written == false then
+		cleanup()
+		return false, "error", tostring((write_ok and write_err) or written or "write failed")
+	end
+	if not close_ok or closed ~= true then
+		cleanup()
+		return false, "error", tostring((close_ok and close_err) or closed or "close failed")
+	end
+
+	local current_path, current_classification, current_detail, current_chain = classify_read_path(path)
+	if current_classification ~= "absent" or current_path ~= resolved_path then
+		cleanup()
+		if current_classification == "present" then return false, "exists" end
+		return false, "error", current_detail or "destination changed before publication"
+	end
+	local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+	if not unchanged then
+		cleanup()
+		return false, "error", revalidate_err
+	end
+	-- Keep both observations explicit: a symlink introduced after the second
+	-- classification must not inherit an earlier empty chain.
+	unchanged, revalidate_err = revalidate_write_path(path, current_path, current_chain)
+	if not unchanged then
+		cleanup()
+		return false, "error", revalidate_err
+	end
+
+	if not hs or not hs.fs or type(hs.fs.link) ~= "function" then
+		cleanup()
+		return false, "error", "hs.fs.link is unavailable; create-only publication is unsupported"
+	end
+	local link_ok, linked, link_err = pcall(
+		hs.fs.link,
+		staging_area.payload_path,
+		resolved_path,
+		false
+	)
+	if not link_ok or linked ~= true then
+		cleanup()
+		local _, winner_status, winner_detail = M.read_with_status(path)
+		if winner_status == "ok" then return false, "exists" end
+		return false, "error", winner_detail or tostring(link_ok and link_err or linked)
+	end
+	cleanup()
+	return true, "created"
 end
 
 --- Writes content to a file atomically (temp file + rename), overwriting any

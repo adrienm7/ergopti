@@ -413,9 +413,16 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 		fs = {
 			dir = host_fs.dir,
 			attributes = host_fs.attributes,
-			symlinkAttributes = host_fs.symlinkAttributes,
+			symlinkAttributes = function(path)
+				local attributes, attributes_err = host_fs.symlinkAttributes(path)
+				if attributes then return attributes end
+				local fallback = host_fs.attributes(path)
+				if fallback then return fallback end
+				return nil, attributes_err
+			end,
 			mkdir = host_fs.mkdir,
 			rmdir = host_fs.rmdir,
+			link = host_fs.link,
 			pathToAbsolute = function(p) return p end,
 		},
 	})

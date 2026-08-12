@@ -28,6 +28,7 @@ local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
 local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
+local FileSystem    = require("adapters.file_system")
 local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
@@ -356,6 +357,10 @@ end
 --- @return boolean ok True only when the file was actually written.
 --- @return string|nil err Failure reason, from either the raise or the return.
 function M._commit_write(writer, path, updates)
+	local _, read_status, read_detail = FileSystem.read_with_status(path)
+	if read_status ~= "ok" and read_status ~= "absent" then
+		return false, tostring(read_detail or "destination is not safely readable")
+	end
 	local ok, wrote, write_err = pcall(function()
 		return writer.batch_write(path, updates)
 	end)

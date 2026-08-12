@@ -46,7 +46,7 @@ end
 --- @return table editor Real editor module.
 --- @return function dispatch Sends one bridge message.
 --- @return table state Observable side effects.
-local function load_editor(writer, reader)
+local function load_editor(writer, reader, file_system)
 	local hs_stub = require("tests.stubs.hs")
 	local dispatch
 	local state = { notifications = 0, reloads = 0 }
@@ -55,7 +55,9 @@ local function load_editor(writer, reader)
 		return { setCallback = function(_, callback) dispatch = callback end }
 	end
 	_G.hs = hs_stub
+	package.loaded["adapters.file_system"] = file_system
 	package.loaded["infra.toml.writer"] = writer
+	package.loaded["toml_codec.writer"] = nil
 	package.loaded["infra.toml.reader"] = reader
 	package.loaded["infra.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1 end,
@@ -107,8 +109,14 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 			end
 			local editor, dispatch, state = load_editor({
 				write = function() writes = writes + 1; return true end,
+				create_if_absent = function() writes = writes + 1; return true end,
 			}, {
 				parse = function() reader_calls = reader_calls + 1; return {} end,
+			}, {
+				read_with_status = function(candidate)
+					helpers.assert_eq(candidate, path)
+					return nil, "error", "Permission denied"
+				end,
 			})
 			local keymap = {
 				PERSONAL_GROUP_NAME = "personal",
@@ -149,12 +157,17 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 				return original_open(candidate, mode)
 			end
 			local editor = load_editor({
-				write = function(candidate)
+				create_if_absent = function(candidate)
 					writes = writes + 1
 					helpers.assert_eq(candidate, path, "the baseline must target the configured path")
 					return true
 				end,
-			}, { parse = function() return { sections = {}, sections_order = {} }, true end })
+			}, { parse = function() return { sections = {}, sections_order = {} }, true end }, {
+				read_with_status = function(candidate)
+					helpers.assert_eq(candidate, path)
+					return nil, "absent"
+				end,
+			})
 			editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
 			helpers.assert_eq(writes, 1, "exact absence must publish exactly one baseline")
 		end, function()
@@ -173,8 +186,14 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		with_cleanup(function()
 			local editor, dispatch, state = load_editor({
 				write = function() writes = writes + 1; return true end,
+				create_if_absent = function() writes = writes + 1; return true end,
 			}, {
 				parse = function() error("PRIVATE-PARSE-FAILURE", 0) end,
+			}, {
+				read_with_status = function(candidate)
+					helpers.assert_eq(candidate, path)
+					return "[_meta]\nsections_order = []\n", "ok"
+				end,
 			})
 			editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
 			editor.open("menu")
@@ -205,6 +224,11 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 						if parse_status == "nil" then return data end
 						return data, false
 					end,
+				}, {
+					read_with_status = function(candidate)
+						helpers.assert_eq(candidate, path)
+						return "[_meta]\nsections_order = []\n", "ok"
+					end,
 				})
 				editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
 				editor.open("menu")
@@ -217,6 +241,51 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 				package.loaded["ui.hotstring_editor"] = nil
 			end)
 		end
+	end)
+
+	helpers.it("routes a real editor save through the symlink-safe macOS writer", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local writes = 0
+		local file_system = {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return "[_meta]\nsections_order = []\n", "ok"
+			end,
+			write = function(candidate, content)
+				writes = writes + 1
+				helpers.assert_eq(candidate, path,
+					"the writer must keep the requested symlink pathname for adapter resolution")
+				helpers.assert_true(type(content) == "string" and content:find("%[_meta%]") ~= nil,
+					"the real TOML writer must pass its complete serialized payload")
+				return true
+			end,
+		}
+		local editor, dispatch = load_editor(nil, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, file_system)
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+		helpers.assert_eq(writes, 1,
+			"a save through a readable symlink must publish through FileSystem.write exactly once")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("never invokes the writer for a dangling symlink", function()
+		local writes = 0
+		local editor, dispatch = load_editor({
+			write = function() writes = writes + 1; return true end,
+			create_if_absent = function() writes = writes + 1; return true end,
+		}, { parse = function() return {} end }, {
+			read_with_status = function()
+				return nil, "error", "dangling final symlink"
+			end,
+		})
+		editor.init("/virtual/dangling.toml", { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+		helpers.assert_eq(writes, 0, "a dangling destination must authorize neither baseline nor save")
+		package.loaded["ui.hotstring_editor"] = nil
 	end)
 end)
 

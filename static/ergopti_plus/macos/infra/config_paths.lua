@@ -38,6 +38,7 @@ local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
 local text_utils = require("infra.text_utils")
+local FileSystem = require("adapters.file_system")
 local LOG        = "config_paths"
 
 
@@ -74,9 +75,6 @@ end
 -- The single key stored in paths.toml.
 local CONFIG_DIR_KEY = "ConfigDirPath"
 
--- POSIX error code that alone proves a personal file is absent
-local ENOENT_ERROR_CODE = 2
-
 -- Driver root — derived at module-load time so standalone source-tree launches
 -- can read their adjacent paths.toml before M.init(). M.init() may override it.
 local _src      = debug.getinfo(1, "S").source:sub(2)
@@ -95,6 +93,7 @@ end)()
 
 -- In-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded.
 local _bootstrap = nil
+local _bootstrap_status = nil
 
 -- Module-load path discovery lets early consumers resolve read-only paths, but
 -- it is not lifecycle initialization. Only M.init() may publish this sentinel.
@@ -144,7 +143,7 @@ local function parse_toml(content)
 		local trimmed = line:match("^%s*(.-)%s*$")
 		if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then
 			local key, val = trimmed:match('^(%S+)%s*=%s*"(.*)"$')
-			if key and val then result[key] = val end
+			if key then result[key] = val end
 		end
 	end
 	return result
@@ -152,14 +151,13 @@ end
 
 --- Reads and parses one bootstrap file.
 --- @param path string Absolute paths.toml path.
---- @return table|nil bootstrap Parsed table, or nil when absent/unreadable.
+--- @return table|nil bootstrap Parsed table.
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail
 local function read_bootstrap(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local raw = fh:read("*a")
-	fh:close()
-	if type(raw) ~= "string" then return nil end
-	return parse_toml(raw)
+	local raw, status, detail = FileSystem.read_with_status(path)
+	if status ~= "ok" then return nil, status, detail end
+	return parse_toml(raw), "ok"
 end
 
 --- Loads the primary bootstrap, falling back to the adjacent legacy file only
@@ -168,15 +166,17 @@ end
 --- @return string|nil source_path
 local function load_bootstrap()
 	local primary = paths_file()
-	local parsed = read_bootstrap(primary)
-	if parsed then return parsed, primary end
+	local parsed, status, detail = read_bootstrap(primary)
+	if status == "ok" then return parsed, primary, "ok" end
+	if status == "error" then return nil, primary, "error", detail end
 
 	local legacy = legacy_paths_file()
 	if _managed_paths_file and legacy ~= primary then
-		parsed = read_bootstrap(legacy)
-		if parsed then return parsed, legacy end
+		parsed, status, detail = read_bootstrap(legacy)
+		if status == "ok" then return parsed, legacy, "ok" end
+		if status == "error" then return nil, legacy, "error", detail end
 	end
-	return nil, nil
+	return nil, nil, "absent"
 end
 
 --- Returns the resolved config directory (with trailing slash).
@@ -186,7 +186,9 @@ end
 --- @return string
 local function config_dir()
 	if _bootstrap == nil then
-		_bootstrap = load_bootstrap() or {}
+		local loaded, _, status = load_bootstrap()
+		_bootstrap = loaded or {}
+		_bootstrap_status = status
 	end
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then return v end
@@ -305,40 +307,22 @@ end
 local function save_bootstrap()
 	local content = serialize_toml()
 	local target = paths_file()
-	local temporary = target .. ".tmp"
-	pcall(os.remove, temporary)
-
-	local ok_open, fh, open_err = pcall(io.open, temporary, "w")
-	if not ok_open or not fh then
-		local reason = tostring((ok_open and open_err) or fh or "open failed")
-		Logger.error(LOG, "Cannot open paths file for writing: '%s' (%s).", target, reason)
-		return false, reason
+	local replaced = false
+	if _bootstrap_status == "absent" then
+		local created, create_status = FileSystem.create_if_absent(target, content)
+		replaced = created == true
+		if create_status == "exists" then
+			return false, "paths.toml appeared concurrently"
+		end
+	else
+		replaced = FileSystem.write(target, content) == true
 	end
-
-	local ok_write, wrote, write_err = pcall(fh.write, fh, content)
-	if not ok_write or not wrote then
-		local reason = tostring((ok_write and write_err) or wrote or "write failed")
-		pcall(fh.close, fh)
-		pcall(os.remove, temporary)
-		Logger.error(LOG, "Cannot write paths file '%s' (%s).", target, reason)
-		return false, reason
-	end
-
-	local ok_close, closed, close_err = pcall(fh.close, fh)
-	if not ok_close or not closed then
-		local reason = tostring((ok_close and close_err) or closed or "close failed")
-		pcall(os.remove, temporary)
-		Logger.error(LOG, "Cannot flush paths file '%s' (%s).", target, reason)
-		return false, reason
-	end
-
-	local replaced, replace_err = replace_file(temporary, target)
 	if not replaced then
-		pcall(os.remove, temporary)
-		Logger.error(LOG, "Cannot publish paths file '%s' (%s).", target, tostring(replace_err))
-		return false, replace_err
+		Logger.error(LOG, "Cannot publish paths file '%s'.", target)
+		return false, "atomic write failed"
 	end
 
+	_bootstrap_status = "ok"
 	Logger.info(LOG, "Paths saved to '%s'.", target)
 	return true
 end
@@ -391,27 +375,15 @@ local function personal_hotstrings_dir()
 	-- Bootstrap an empty personal_hotstrings.toml on first use so the user always
 	-- has a file to open rather than a confusing ENOENT.
 	local toml_path = p .. "personal_hotstrings.toml"
-	local open_ok, existing, open_detail, open_code = pcall(io.open, toml_path, "r")
-	if open_ok and existing then
-		local close_ok, closed = pcall(existing.close, existing)
-		if not close_ok or closed ~= true then
-			Logger.error(LOG, "Personal hotstrings path probe did not commit "
-				.. "(failure content withheld).")
+	local _, read_status = FileSystem.read_with_status(toml_path)
+	if read_status == "absent" then
+		local _, create_status = FileSystem.create_if_absent(toml_path, "")
+		if create_status ~= "created" and create_status ~= "exists" then
+			Logger.error(LOG, "Personal hotstrings baseline did not commit.")
 		end
-	elseif open_ok and open_code == ENOENT_ERROR_CODE then
-		local create_ok, fh = pcall(io.open, toml_path, "w")
-		if create_ok and fh then
-			local write_ok, written = pcall(fh.write, fh, "")
-			local close_ok, closed = pcall(fh.close, fh)
-			if not write_ok or not written or not close_ok or closed ~= true then
-				Logger.error(LOG, "Personal hotstrings baseline did not commit.")
-			end
-		else
-			Logger.error(LOG, "Personal hotstrings baseline could not be opened for writing.")
-		end
-	else
+	elseif read_status ~= "ok" then
 		Logger.error(LOG, "Personal hotstrings path could not be read; baseline creation refused "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+			.. "(failure content withheld).")
 	end
 	return p
 end
@@ -451,16 +423,48 @@ function M.init(base_dir)
 
 	-- Read paths.toml, migrating an adjacent legacy override when present, or
 	-- creating a commented template when neither location exists.
-	local loaded, source_path = load_bootstrap()
-	if not loaded then
+	local loaded, source_path, load_status, load_detail = load_bootstrap()
+	if load_status == "error" then
+		_bootstrap = {}
+		_bootstrap_status = "error"
+		Logger.error(LOG, "paths.toml is unreadable or malformed; default publication refused (%s).",
+			tostring(load_detail))
+		return false
+	elseif load_status == "absent" then
 		Logger.info(LOG, "paths.toml not found — generating with defaults at '%s'.", paths_file())
 		_bootstrap = {}
-		save_bootstrap()
+		local _, create_status, create_detail = FileSystem.create_if_absent(paths_file(), serialize_toml())
+		if create_status == "exists" then
+			loaded, _, load_status, load_detail = load_bootstrap()
+			if load_status ~= "ok" then
+				Logger.error(LOG, "Concurrent paths.toml publication could not be loaded (%s).",
+					tostring(load_detail))
+				return false
+			end
+			_bootstrap = loaded
+		elseif create_status ~= "created" then
+			Logger.error(LOG, "paths.toml default publication failed (%s).", tostring(create_detail))
+			return false
+		end
+		_bootstrap_status = "ok"
 	else
 		_bootstrap = loaded
+		_bootstrap_status = "ok"
 		if source_path ~= paths_file() then
 			Logger.info(LOG, "Migrating paths from '%s' to '%s'.", source_path, paths_file())
-			save_bootstrap()
+			local _, create_status, create_detail = FileSystem.create_if_absent(paths_file(), serialize_toml())
+			if create_status == "exists" then
+				local concurrent, concurrent_source, concurrent_status, concurrent_detail = load_bootstrap()
+				if concurrent_status ~= "ok" then
+					Logger.error(LOG, "Concurrent paths.toml migration target could not be loaded (%s).",
+						tostring(concurrent_detail))
+					return false
+				end
+				_bootstrap = concurrent
+			elseif create_status ~= "created" then
+				Logger.error(LOG, "paths.toml migration failed (%s).", tostring(create_detail))
+				return false
+			end
 		else
 			Logger.debug(LOG, "Paths loaded from '%s'.", source_path)
 		end
@@ -525,6 +529,9 @@ end
 ---                           to mean "use the OS default".
 --- @return boolean changed True when the stored value actually moved.
 function M.set_config_dir(new_dir)
+	if _bootstrap_status == "error" then
+		return false, "paths.toml is unreadable or malformed"
+	end
 	if type(new_dir) ~= "string" then new_dir = "" end
 	if new_dir ~= "" and not new_dir:match("[/\\]$") then new_dir = new_dir .. "/" end
 

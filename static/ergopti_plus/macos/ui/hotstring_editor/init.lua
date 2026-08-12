@@ -25,6 +25,7 @@ local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
+local FileSystem    = require("adapters.file_system")
 local LOG           = "hotstring_editor"
 
 
@@ -46,9 +47,6 @@ local LOG           = "hotstring_editor"
 local PERSONAL_GROUP_FALLBACK = "personal"
 
 local STAR_CANONICAL    = "★"
-
--- POSIX error code that alone proves the configured file is absent
-local ENOENT_ERROR_CODE = 2
 
 -- Absolute path to the assets folder. The hotstring-editor frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the Windows
@@ -130,22 +128,15 @@ end
 local function ensure_file()
 	if type(_toml_path) ~= "string" or _toml_path == "" then return false end
 
-	local open_ok, fh, open_detail, open_code = pcall(io.open, _toml_path, "r")
-	if open_ok and fh then
-		local close_ok, closed = pcall(fh.close, fh)
-		if close_ok and closed == true then return true end
-		Logger.error(LOG, "Personal hotstrings file close did not commit; editor remains read-only "
+	local _, read_status = FileSystem.read_with_status(_toml_path)
+	if read_status == "ok" then return true end
+	if read_status ~= "absent" then
+		Logger.error(LOG, "Personal hotstrings file could not be read; editor remains read-only "
 			.. "(failure content withheld).")
 		return false
 	end
 
-	if not open_ok or open_code ~= ENOENT_ERROR_CODE then
-		Logger.error(LOG, "Personal hotstrings file could not be read; editor remains read-only "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
-		return false
-	end
-
-	local write_ok, written = pcall(toml_writer.write, _toml_path, empty_toml_data())
+	local write_ok, written = pcall(toml_writer.create_if_absent, _toml_path, empty_toml_data())
 	if not write_ok or written ~= true then
 		Logger.error(LOG, "Personal hotstrings baseline publication did not commit.")
 		return false
