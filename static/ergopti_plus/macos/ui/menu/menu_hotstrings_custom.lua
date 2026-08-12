@@ -16,6 +16,7 @@ local i18n   = require("infra.i18n")
 local Labels = require("menu.labels")
 local text_utils = require("infra.text_utils")
 local dialog = require("infra.dialog_util")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 
 
 
@@ -63,11 +64,8 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	return function()
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
 		if will_enable then
+			if not KeymapLifecycle.ensure_started(ctx, "enable custom hotstring section") then return end
 			if ctx.keymap and type(ctx.keymap.enable_section) == "function" then pcall(ctx.keymap.enable_section, group_name, sec_name) end
-			if not ctx.state.keymap then
-				ctx.state.keymap = true
-				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end
-			end
 		else
 			if ctx.keymap and type(ctx.keymap.disable_section) == "function" then pcall(ctx.keymap.disable_section, group_name, sec_name) end
 		end
@@ -87,6 +85,7 @@ end
 local function setGroupSectionsFn(ctx, group_name, enable)
 	return function()
 		local km = ctx.keymap
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable custom group sections") then return end
 		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
 		if type(secs) == "table" then
 			-- Collect first, apply once. Calling the per-section API in a loop
@@ -115,10 +114,6 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 		if enable then
 			ctx.state.hotstrings[group_name] = true
 			if type(km.enable_group) == "function" then pcall(km.enable_group, group_name) end
-			if not ctx.state.keymap then
-				ctx.state.keymap = true
-				if type(km.start) == "function" then pcall(km.start) end
-			end
 		end
 		ctx.save_prefs()
 		ctx.updateMenu()
@@ -585,6 +580,8 @@ function M.build_custom(ctx, counts)
 		checked = both_enabled or nil,
 		action      = function()
 			local will_enable = not both_enabled
+			if will_enable and not KeymapLifecycle.ensure_started(ctx,
+				"enable personal and custom hotstrings") then return end
 			-- Toggle all personal groups
 			for _, gname in ipairs(personal_group_names) do
 				state.hotstrings[gname] = will_enable
@@ -598,10 +595,6 @@ function M.build_custom(ctx, counts)
 			state.hotstrings["custom"] = will_enable
 			if will_enable then
 				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
-				if not state.keymap then
-					state.keymap = true
-					if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end
-				end
 			else
 				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
 			end

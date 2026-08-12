@@ -125,7 +125,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 				enable_group = function(group)
 					enabled_groups[#enabled_groups + 1] = group
 				end,
-				start = function() starts = starts + 1 end,
+				start = function() starts = starts + 1; return true end,
 			},
 			save_prefs = function() saves = saves + 1 end,
 			updateMenu = function() rebuilds = rebuilds + 1 end,
@@ -156,5 +156,34 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 			"disable-all must visit the same real-section set as enable-all")
 		helpers.assert_eq(saves, 2, "each bulk click must add exactly one persistence write")
 		helpers.assert_eq(rebuilds, 2, "each bulk click must add exactly one menu rebuild")
+	end)
+
+	helpers.it("publishes no hotstring mutation when keymap start is refused", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local starts, mutations, saves, rebuilds = 0, 0, 0, 0
+		local state = { hotstrings = {}, keymap = false }
+		local ctx = {
+			paused = false,
+			hotfiles = { "alpha.toml" },
+			get_group_name = function() return "alpha" end,
+			state = state,
+			keymap = {
+				start = function() starts = starts + 1; return false end,
+				get_sections = function() mutations = mutations + 1; return { { name = "one" } } end,
+				enable_section = function() mutations = mutations + 1 end,
+				enable_group = function() mutations = mutations + 1 end,
+			},
+			save_prefs = function() saves = saves + 1 end,
+			updateMenu = function() rebuilds = rebuilds + 1 end,
+		}
+
+		hotstrings.build_bulk_actions(ctx)[1].action()
+		helpers.assert_eq(starts, 1, "the user action must attempt exactly one strict start")
+		helpers.assert_eq(mutations, 0,
+			"sections and groups must remain untouched when no typing tap owns them")
+		helpers.assert_eq(state.keymap, false, "the menu must not publish a false enabled state")
+		helpers.assert_eq(next(state.hotstrings), nil, "no group state may be published")
+		helpers.assert_eq(saves, 0, "a refused action must not persist a lie")
+		helpers.assert_eq(rebuilds, 0, "a refused action must not render an enabled checkmark")
 	end)
 end)

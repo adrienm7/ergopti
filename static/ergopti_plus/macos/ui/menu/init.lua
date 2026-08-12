@@ -26,6 +26,7 @@ local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
@@ -500,6 +501,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function set_all_enabled(enabled)
+		if enabled and not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+			"enable all features") then
+			return false
+		end
 		-- 1. Set global states
 		state.keymap                 = enabled
 		state.gestures               = enabled
@@ -577,6 +582,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		
 		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
 		if type(updateMenu) == "function" then updateMenu() end
+		return true
 	end
 
 	local function reset_all_defaults()
