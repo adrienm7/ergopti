@@ -6,7 +6,7 @@
 --- day_rollover() must fully drain today.log before delegating to
 --- Rotation.rollover() for file deletion. read_new_entries() caps at
 --- INGEST_BATCH_LINES per call, so a single ingest_once() may leave data
---- behind. The drain loop must iterate until read_new_entries returns empty;
+--- behind. The drain loop must iterate until read_new_entries commits EOF;
 --- if the offset stalls (persistent SQL error), rollover must be skipped
 --- and today.log preserved to avoid data loss.
 ---
@@ -53,8 +53,8 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 	local stub_rotation = {
 		get_offset = function() return offset end,
 		read_new_entries = function()
-			if iter >= batches_until_empty then return {} end
-			return { { raw = "line" } }
+			if iter >= batches_until_empty then return {}, offset, "eof" end
+			return { { raw = "line" } }, offset, "batch"
 		end,
 		rollover = function(_path) rollover_called = true end,
 		get_date = function() return "2099-07-01" end,
@@ -79,9 +79,13 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 	local drained = false
 	local prev_offset = stub_rotation.get_offset()
 	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
-		local pending = stub_rotation.read_new_entries()
-		if #pending == 0 then
+		local pending, _, read_status = stub_rotation.read_new_entries()
+		if read_status == "failed" then
+			break
+		elseif #pending == 0 and read_status == "eof" then
 			drained = true
+			break
+		elseif #pending == 0 then
 			break
 		end
 		stub_ingest_once()
@@ -99,7 +103,7 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 		stub_logger.warn("LOG",
 			"day_rollover: today.log not fully drained — file preserved, rotation skipped.")
 	else
-		stub_rotation.rollover("/fake/data.sql")
+		stub_rotation.rollover("/fake/data.sql", "eof")
 	end
 
 	return {
@@ -192,9 +196,9 @@ local function load_real_day_rollover(stall)
 			if stall then
 				-- Always reports pending data without ever advancing the offset —
 				-- the exact "persistent SQL error" shape day_rollover must detect.
-				return { { entry = { type = "typing" } } }, offset
+				return { { entry = { type = "typing" } } }, offset, "batch"
 			end
-			return {}, offset
+			return {}, offset, "eof"
 		end,
 		get_offset = function() return offset end,
 		get_date   = function() return "2099-07-01" end,

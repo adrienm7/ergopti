@@ -60,7 +60,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 		local opens_after_appends = today_opens
 
 		-- Rollover closes the handle; the next append must reopen exactly once.
-		r.rollover(DATASQL)
+		r.rollover(DATASQL, r.READ_STATUS_EOF)
 		r.append_log({ type = "typing", timestamp = "2024-06-02 09:00:00.000", text = "y" })
 		local opens_after_rollover = today_opens
 

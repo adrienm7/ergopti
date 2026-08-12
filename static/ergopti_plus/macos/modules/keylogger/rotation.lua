@@ -18,13 +18,11 @@
 ---
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
---- - hs.json, hs.fs, hs.timer.
+--- - hs.json.
 --- ==============================================================================
 
 local M = {}
 
-local hs   = hs
-local fs   = require("hs.fs")
 local json = require("hs.json")
 
 local Logger = require("infra.logger")
@@ -42,6 +40,16 @@ local LOG    = "keylogger.rotation"
 
 --- Maximum JSONL lines consumed per ingest tick.
 local INGEST_BATCH_LINES = 5000
+
+--- Tail-read outcomes. Only READ_STATUS_EOF authorizes destructive rollover;
+--- an empty entry list alone is never proof that the journal was fully read.
+M.READ_STATUS_BATCH  = "batch"
+M.READ_STATUS_EOF    = "eof"
+M.READ_STATUS_FAILED = "failed"
+
+--- POSIX errno returned by io.open() when today.log does not exist. In the
+--- single-threaded Hammerspoon callback this is a committed empty-journal state.
+local ENOENT_ERROR_CODE = 2
 
 --- Shared state injected by M.init().
 local _state = nil
@@ -185,12 +193,17 @@ end
 -- ==============================================
 -- ==============================================
 
---- Read newly appended bytes of today.log past the stored watermark and
---- return them as a list of {entry, raw} items plus the post-read offset.
---- Stops after INGEST_BATCH_LINES entries to keep each tick short.
---- @return table, integer List of parsed entries, new byte offset.
+--- Read newly appended bytes of today.log past the stored watermark. The third
+--- result distinguishes a capped batch, committed EOF, and any I/O failure;
+--- callers must never infer EOF from an empty list. Stops after
+--- INGEST_BATCH_LINES entries to keep each tick short.
+--- @return table entries List of parsed {entry, raw} items.
+--- @return integer offset New byte offset, or the previous committed offset on failure.
+--- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") then return {}, _today_log_offset end
+	if not _require_init("read_new_entries") then
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
 
 	-- The offset is only reset by M.rollover(); resetting it here would cause
 	-- double-aggregation when day_rollover() calls ingest_once() at midnight
@@ -198,22 +211,51 @@ function M.read_new_entries()
 	local today = _today()
 	if not _today_log_date then _today_log_date = today end
 
-	local attrs = fs.attributes(_paths.today_log_path)
-	if not attrs then return {}, _today_log_offset end
-	local size = attrs.size or 0
-	if size <= _today_log_offset then return {}, _today_log_offset end
-
-	local fh, err = io.open(_paths.today_log_path, "r")
-	if not fh then
-		Logger.warn(LOG, "Cannot open today.log %s: %s.",
-			_paths.today_log_path, tostring(err))
-		return {}, _today_log_offset
+	local open_ok, fh, open_detail, open_code = pcall(io.open, _paths.today_log_path, "r")
+	if not open_ok or not fh then
+		if open_ok and open_code == ENOENT_ERROR_CODE then
+			return {}, _today_log_offset, M.READ_STATUS_EOF
+		end
+		Logger.warn(LOG, "Cannot open today.log; committed offset %d preserved "
+			.. "(failure content withheld; terminal type: %s).",
+			_today_log_offset, type(open_detail))
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
-	fh:seek("set", _today_log_offset)
+
+	local function fail_read(stage)
+		pcall(fh.close, fh)
+		Logger.warn(LOG, "today.log tail read failed at %s; committed offset %d preserved.",
+			stage, _today_log_offset)
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
+
+	local size_ok, size = pcall(fh.seek, fh, "end")
+	if not size_ok or type(size) ~= "number" then return fail_read("size query") end
+	if size < _today_log_offset then return fail_read("offset validation") end
+	if size == _today_log_offset then
+		local close_ok, closed = pcall(fh.close, fh)
+		if not close_ok or closed ~= true then
+			Logger.warn(LOG, "today.log EOF close failed; committed offset %d preserved.",
+				_today_log_offset)
+			return {}, _today_log_offset, M.READ_STATUS_FAILED
+		end
+		return {}, _today_log_offset, M.READ_STATUS_EOF
+	end
+
+	local seek_ok, start_offset = pcall(fh.seek, fh, "set", _today_log_offset)
+	if not seek_ok or start_offset ~= _today_log_offset then return fail_read("initial seek") end
+
 	local out, lines = {}, 0
+	local reached_eof = false
 	while lines < INGEST_BATCH_LINES do
-		local line = fh:read("*l")
-		if not line then break end
+		local read_ok, line, read_detail, read_code = pcall(fh.read, fh, "*l")
+		if not read_ok then return fail_read("line read") end
+		if line == nil then
+			if read_detail ~= nil or read_code ~= nil then return fail_read("line read") end
+			reached_eof = true
+			break
+		end
+		if type(line) ~= "string" then return fail_read("line type validation") end
 		local ok, entry = pcall(json.decode, line)
 		if ok and type(entry) == "table" and type(entry.type) == "string"
 		   and type(entry.timestamp) == "string" then
@@ -221,9 +263,19 @@ function M.read_new_entries()
 		end
 		lines = lines + 1
 	end
-	local new_offset = fh:seek("cur")
-	fh:close()
-	return out, new_offset
+
+	local offset_ok, new_offset = pcall(fh.seek, fh, "cur")
+	if not offset_ok or type(new_offset) ~= "number" then return fail_read("final seek") end
+	if new_offset > size then return fail_read("snapshot validation") end
+	if reached_eof and new_offset ~= size then return fail_read("EOF validation") end
+
+	local close_ok, closed = pcall(fh.close, fh)
+	if not close_ok or closed ~= true then
+		Logger.warn(LOG, "today.log tail-read close failed; committed offset %d preserved.",
+			_today_log_offset)
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
+	return out, new_offset, reached_eof and M.READ_STATUS_EOF or M.READ_STATUS_BATCH
 end
 
 
@@ -240,8 +292,15 @@ end
 --- so tomorrow starts fresh. The caller (log_manager) must drain the
 --- remaining today.log into the ingest pipeline before calling this.
 --- @param data_sql_path string Path to the append-only data.sql file.
-function M.rollover(data_sql_path)
-	if not _require_init("rollover") then return end
+--- @param read_status string Must be READ_STATUS_EOF from the immediately
+--- preceding drain check.
+--- @return boolean True when rollover ran, false when the EOF proof was absent.
+function M.rollover(data_sql_path, read_status)
+	if not _require_init("rollover") then return false end
+	if read_status ~= M.READ_STATUS_EOF then
+		Logger.warn(LOG, "rollover refused without a committed EOF status; today.log preserved.")
+		return false
+	end
 
 	-- Append a human-readable boundary marker to data.sql
 	local prev_date = _today_log_date or ""
@@ -263,6 +322,7 @@ function M.rollover(data_sql_path)
 	end
 	_today_log_offset = 0
 	_today_log_date   = new_date
+	return true
 end
 
 
