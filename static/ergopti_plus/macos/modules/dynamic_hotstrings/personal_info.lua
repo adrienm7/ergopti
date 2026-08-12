@@ -14,7 +14,6 @@
 local M = {}
 
 local hs       = hs
-local timer    = hs.timer
 local Logger   = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
 local LOG      = "personal_info"
@@ -408,14 +407,10 @@ local function do_expand(combo)
 		Logger.error(LOG, "Personal data injection failed: %s.", tostring(err))
 	end
 
-	-- Preserve the existing re-entry guard in this provenance-only change. Its
-	-- fixed delay is removed separately with a back-to-back behavioral repro.
-	timer.doAfter(0.15, function()
-		_replacing = false
-		if ok then
-			Logger.info(LOG, "Personal data injection completed.")
-		end
-	end)
+	-- Tagged synthetic events are filtered before interceptors, so ownership can
+	-- end with the transaction. A delay here would only hide real physical input.
+	_replacing = false
+	if ok then Logger.info(LOG, "Personal data injection completed.") end
 	return ok
 end
 
