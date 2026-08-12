@@ -32,6 +32,23 @@ local CASES = {
 	},
 }
 
+local DEQUEUE_RETRY_TIMER_FAILURES = {
+	{
+		label = "false",
+		install = function() hs.timer.doAfter = function() return false end end,
+	},
+	{
+		label = "nil",
+		install = function() hs.timer.doAfter = function() return nil end end,
+	},
+	{
+		label = "throw",
+		install = function()
+			hs.timer.doAfter = function() error("simulated dequeue retry timer failure") end
+		end,
+	},
+}
+
 --- Loads one real tooltip module with observable renderer and eventtap ports.
 --- @param spec table Tooltip case descriptor.
 --- @param faults table|nil Fault kind keyed by eventtap creation index.
@@ -1042,6 +1059,87 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 		context.tooltip.hide_forced()
 		if not ok then error(err, 0) end
 	end)
+
+	for _, timer_fault in ipairs(DEQUEUE_RETRY_TIMER_FAILURES) do
+		helpers.it("(tooltip-action-lease-hide-retry-arm-" .. timer_fault.label
+			.. ") preserves a physical cleanup owner", function()
+			local faults = { hide_stacked_result = false }
+			local context = load_tooltip(CASES[2], faults)
+			local previous_clock = hs.timer.secondsSinceEpoch
+			local previous_do_after = hs.timer.doAfter
+			local now = 100
+			local expiry_calls = 0
+			local lease = {}
+			hs.timer.secondsSinceEpoch = function() return now end
+
+			local ok, err = xpcall(function()
+				helpers.assert_eq(context.tooltip.show_stacked({
+					{
+						text = "timed literal winner",
+						duration = 0.01,
+						expire_at = 100.01,
+						lease_token = lease,
+						on_expire = function() expiry_calls = expiry_calls + 1 end,
+					},
+					{ text = "stale dimmed fallback", duration = 0, dimmed = true },
+				}, true), true)
+
+				local first_deadline = running_timers(context.timers)[1]
+				helpers.assert_not_nil(first_deadline,
+					"the positive control must own the winner deadline")
+				timer_fault.install()
+				now = 100.02
+				first_deadline.running = false
+				first_deadline.fn()
+
+				helpers.assert_eq(expiry_calls, 0,
+					"timer failure must not re-arbitrate while stale pixels remain")
+				helpers.assert_true(context.tooltip.is_visible(),
+					"the failed native hide must retain truthful visible state")
+				helpers.assert_true(context.tooltip.has_visible_lease(lease),
+					"the exact action lease must remain coupled to visible pixels")
+				helpers.assert_eq(#running_timers(context.timers), 0,
+					"an invalid retry result must not masquerade as a live timer")
+				helpers.assert_eq(#context.created, 4,
+					"timer failure must mount a fresh physical cleanup watcher set")
+				for index = 1, 2 do
+					helpers.assert_true(not context.created[index]:isEnabled(),
+						"the expired watcher generation must remain stopped")
+				end
+				for index = 3, 4 do
+					helpers.assert_true(context.created[index]:isEnabled(),
+						"the fallback watcher generation must remain active")
+				end
+
+				-- Recover the native surface before exercising the fallback callback.
+				-- The interaction still crosses the retained post-eventtap dispatcher.
+				faults.hide_stacked_result = true
+				hs.timer.doAfter = previous_do_after
+				local consumed = context.created[3].fn(hardware_key_event(0, {}, ""))
+				helpers.assert_eq(consumed, false,
+					"physical cleanup must never consume the user's event")
+				helpers.assert_true(context.tooltip.is_visible(),
+					"the eventtap callback must defer native cleanup until after return")
+				helpers.assert_true(context.renderer.stacked_visible,
+					"the eventtap callback must not perform synchronous canvas work")
+				drain_deferred_actions(context.timers)
+
+				helpers.assert_true(not context.tooltip.is_visible(),
+					"the fallback interaction must revoke the stale native surface")
+				helpers.assert_true(not context.renderer.stacked_visible)
+				helpers.assert_true(not context.tooltip.has_visible_lease(lease),
+					"physical cleanup must revoke the exact stale action lease")
+				helpers.assert_eq(expiry_calls, 0,
+					"fallback dismissal must not replay the expired owner callback")
+			end, debug.traceback)
+
+			hs.timer.secondsSinceEpoch = previous_clock
+			hs.timer.doAfter = previous_do_after
+			faults.hide_stacked_result = true
+			context.tooltip.hide_forced()
+			if not ok then error(err, 0) end
+		end)
+	end
 
 	helpers.it("(tooltip-watcher-reuse) owns and revokes a zero-delay dequeue timer", function()
 		local context = load_tooltip(CASES[2])
