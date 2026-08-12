@@ -32,6 +32,7 @@ local TextSender = require("adapters.text_sender")
 local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
+local Terminators      = require("modules.keymap.terminators")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -637,7 +638,7 @@ end
 function M.try_repeat_feature(chars, is_ignored)
 	if not require_state("try_repeat_feature") then return false end
 	if not _state.is_repeat_feature_enabled() then return false end
-	if chars ~= _state.magic_key then return false end
+	if not Terminators.matches_magic_event(chars, _state.magic_key) then return false end
 
 	local char_len = text_utils.utf8_len(chars)
 	local buf_len  = text_utils.utf8_len(_state.buffer)
@@ -683,13 +684,13 @@ function M.try_repeat_feature(chars, is_ignored)
 	local emitted, emit_err = pcall(SyntheticInput.with_transaction, transaction, function()
 		-- In ignored windows, the magic key is already on screen and must be deleted.
 		if is_ignored then
-			assert(TextSender.eraseChars(1, 0) ~= false,
+			assert(TextSender.eraseChars(char_len, 0) ~= false,
 				"repeat-key deletion could not be constructed")
 		end
 
 		if keylogger and type(keylogger.notify_synthetic) == "function" then
 			local notify_ok, notify_err = pcall(keylogger.notify_synthetic,
-				last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
+				last_char, "hotstring", is_ignored and char_len or 0, "repeat_key")
 			if not notify_ok then
 				Logger.error(LOG, "repeat-key notify_synthetic failed: %s.", tostring(notify_err))
 			end
