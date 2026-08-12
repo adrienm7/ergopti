@@ -1280,6 +1280,15 @@ function M.reconcile_observation_gap()
 end
 
 
+--- Performs the off-eventtap surface/engine cleanup for a context that must
+--- remain quarantined (for example an ignored or not-yet-classified window).
+--- Unlike reconcile_observation_gap(), this never reopens runtime interaction.
+--- @return boolean True after the full reset committed.
+function M.reset_quarantined_context()
+	return reset_predictions_impl(false, true)
+end
+
+
 --- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
 --- During an action-epoch quarantine this only invalidates hotstring/surface state;
 --- the throwing full engine reset is reserved for the async reconciler.

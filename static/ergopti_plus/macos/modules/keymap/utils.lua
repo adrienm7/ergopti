@@ -14,8 +14,8 @@
 --- 2. Seamless LLM Integration: The overlap solver (re-exported from shared)
 ---    aligns the in-flight buffer with the AI completion to prevent ghost-text
 ---    duplication.
---- 3. Window Caching: The ignored-window result is cached for 0.5s to avoid
----    hitting the OS on every single keystroke.
+--- 3. Window Caching: Focus watchers invalidate a cached classification and an
+---    off-eventtap refresh performs the expensive AX query.
 --- ==============================================================================
 
 local hs = hs
@@ -73,6 +73,9 @@ local IGNORED_WIN_TTL_SEC = 5.0
 -- arms exactly one. Declared above the closure that clears it — a local declared
 -- after a closure binds the nil global instead.
 local _ignored_win_refresh_armed = false
+local _ignored_win_refresh_handle = nil
+local _ignored_win_ttl_handle = nil
+local _ignored_win_refresh_generation = 0
 
 -- Key tokens whose keydown carries a character through getCharacters()
 -- ("return" -> CR, "tab" -> HT). The legacy physical_echo return value keeps
@@ -387,28 +390,54 @@ end
 -- =================================
 
 local _ignored_win_cache_time  = 0
-local _ignored_win_cache_value = false
+local _ignored_win_cache_value = nil
 -- Cache dirty flag: true when the cached value can no longer be trusted
 -- (focus change, first call, or TTL elapsed). Watchers set this to true
 -- synchronously whenever the focused window/app is known to have changed.
 local _ignored_win_cache_dirty = true
--- Lazy-init singletons for the focus-change watchers. Created on the first
--- is_ignored_window() call so that module load never forces Hammerspoon to
--- spin up the accessibility APIs when they are not needed yet.
+-- One cheap NSWorkspace watcher plus two narrowly scoped AX watchers. Never use
+-- hs.window.filter here: its first access enumerates every application's windows
+-- and has already stalled the Hammerspoon runloop for multiple seconds.
 local _ignored_win_app_watcher = nil
-local _ignored_win_win_filter  = nil
+local _ignored_win_focus_watcher = nil
+local _ignored_win_title_watcher = nil
+local _ignored_win_focus_owner = nil
+local _ignored_win_title_owner = nil
+local _ignored_win_titles_ref   = nil
+local _ignored_win_patterns_ref = nil
+local _ignored_win_context_generation = 0
+-- Tracking is opened explicitly by keymap.start(). Keeping the module closed
+-- before that lifecycle edge prevents a stray caller from arming AX callbacks
+-- before the owning event taps exist.
+local _ignored_win_stopped = true
+local _ignored_win_last_identity = nil
+local schedule_ignored_win_refresh
+local arm_ignored_win_ttl_refresh
 
 --- Invalidates the ignored-window cache. Called from focus-change watchers;
 --- also safe to call from anywhere else (tests, manual overrides).
 local function invalidate_ignored_win_cache()
+	if _ignored_win_stopped then return end
 	_ignored_win_cache_dirty = true
+	_ignored_win_cache_value = nil
+	_ignored_win_context_generation = _ignored_win_context_generation + 1
+	-- Every scheduled refresh carries this epoch. If native timer cancellation
+	-- fails, the old callback can still run but may not publish its stale probe.
+	_ignored_win_refresh_generation = _ignored_win_refresh_generation + 1
+	if _ignored_win_ttl_handle then
+		if TimerScheduler.cancel(_ignored_win_ttl_handle) == true then
+			_ignored_win_ttl_handle = nil
+		end
+	end
+	if schedule_ignored_win_refresh and _ignored_win_titles_ref then
+		schedule_ignored_win_refresh()
+	end
 end
 
---- Starts focus-change watchers on first use. Any failure is logged and
---- falls back to the TTL-only cache behavior — the ignored-window logic
---- must never crash the eventtap.
+--- Starts the cheap global application watcher. Context-specific AX watchers
+--- are bound by probe_ignored_window(), which already runs outside CGEventTap.
 local function ensure_ignored_win_watchers()
-	if _ignored_win_app_watcher and _ignored_win_win_filter then return end
+	if _ignored_win_app_watcher then return true end
 
 	-- Application-level: fires when a different app becomes/leaves frontmost.
 	if not _ignored_win_app_watcher then
@@ -430,125 +459,177 @@ local function ensure_ignored_win_watchers()
 		end
 	end
 
-	-- Window-level: fires on intra-app focus changes and title changes (some apps
-	-- reuse one window but change its title between contexts we need to re-evaluate).
-	if not _ignored_win_win_filter then
-		-- hs.window.filter.default enumerates every window on first use; time it so a
-		-- slow first-keystroke is attributable in the logs (keylogger-winfilter-lazy).
-		local t0 = hs.timer.absoluteTime()
-		local ok, filter = pcall(function()
-			local f = hs.window.filter.default
-			f:subscribe(
-				{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
-				invalidate_ignored_win_cache
-			)
-			return f
-		end)
-		if ok and filter then
-			_ignored_win_win_filter = filter
-			Logger.debug(LOG, "Ignored-window cache: window filter subscribed (%.1f ms).",
-				(hs.timer.absoluteTime() - t0) / 1e6)
-		else
-			Logger.warn(LOG, "Ignored-window cache: window filter setup failed — relying on TTL.")
-		end
-	end
+	return _ignored_win_app_watcher ~= nil
 end
 
---- Returns true when the frontmost window is on the ignore list.
---- The Hammerspoon console check is folded in here so that the single
---- frontmostApplication() call is covered by the cache — previously
---- a redundant uncached call was made in init.lua on every keystroke.
---- Cache invalidation is event-driven (hs.application.watcher +
---- hs.window.filter), with a long TTL as a safety net. In steady state
---- (user typing without switching apps/windows), this function performs
---- zero syscalls.
---- Accepts the current timestamp from the caller so that the
---- secondsSinceEpoch() syscall is not duplicated when init.lua already
---- holds a fresh `now` value.
+
+local function ui_watcher_event(name, fallback)
+	local watcher = hs.uielement and hs.uielement.watcher
+	return type(watcher) == "table" and watcher[name] or fallback
+end
+
+
+--- Stops one retained contextual watcher without dropping a failed capability.
+--- @param field string Module-local watcher selector.
+--- @param label string Diagnostic label.
+--- @return boolean settled
+local function stop_context_watcher(field, label)
+	local watcher
+	if field == "focus" then watcher = _ignored_win_focus_watcher
+	else watcher = _ignored_win_title_watcher end
+	if not watcher then return true end
+	local ok, err = pcall(function() watcher:stop() end)
+	if not ok then
+		Logger.error(LOG, "Ignored-window %s watcher stop failed: %s.", label, tostring(err))
+		return false
+	end
+	if field == "focus" then
+		_ignored_win_focus_watcher = nil
+		_ignored_win_focus_owner = nil
+	else
+		_ignored_win_title_watcher = nil
+		_ignored_win_title_owner = nil
+	end
+	return true
+end
+
+
+local function app_owner_key(app)
+	local ok, pid = pcall(function() return app:pid() end)
+	return ok and pid ~= nil and tostring(pid) or tostring(app)
+end
+
+
+local function window_owner_key(win)
+	local ok, window_id = pcall(function() return win:id() end)
+	return ok and window_id ~= nil and tostring(window_id) or tostring(win)
+end
+
+
+--- Binds AX watchers only to the current app/window; no global enumeration.
+--- @param app table Current focused-window application.
+--- @param win table Current focused window.
+--- @param watch_title boolean False only when every title is ignored (HS console).
+--- @return boolean ready True only when every required invalidation edge is live.
+local function ensure_ignored_win_context_watchers(app, win, watch_title)
+	local app_key = app_owner_key(app)
+	local win_key = window_owner_key(win)
+	if _ignored_win_title_owner ~= win_key and not stop_context_watcher("title", "title") then
+		return false
+	end
+	if _ignored_win_focus_owner ~= app_key and not stop_context_watcher("focus", "focus") then
+		return false
+	end
+
+	if not _ignored_win_focus_watcher then
+		local ok, watcher = pcall(function()
+			local w = app:newWatcher(function()
+				invalidate_ignored_win_cache()
+			end)
+			if not w then return nil end
+			w:start({ ui_watcher_event("focusedWindowChanged", "AXFocusedWindowChanged") })
+			return w
+		end)
+		if not ok or not watcher then
+			Logger.warn(LOG, "Ignored-window focused-window watcher setup failed.")
+			return false
+		end
+		_ignored_win_focus_watcher = watcher
+		_ignored_win_focus_owner = app_key
+	end
+
+	if watch_title ~= true then
+		if _ignored_win_title_watcher and not stop_context_watcher("title", "title") then
+			return false
+		end
+		return true
+	end
+	if not _ignored_win_title_watcher then
+		local ok, watcher = pcall(function()
+			local w = win:newWatcher(function()
+				invalidate_ignored_win_cache()
+			end)
+			if not w then return nil end
+			w:start({ ui_watcher_event("titleChanged", "AXTitleChanged") })
+			return w
+		end)
+		if not ok or not watcher then
+			Logger.warn(LOG, "Ignored-window title watcher setup failed.")
+			return false
+		end
+		_ignored_win_title_watcher = watcher
+		_ignored_win_title_owner = win_key
+	end
+	return true
+end
+
+--- Marks the cached classification unknown after an AX read failure.
+--- @return nil
+local function mark_ignored_win_unknown()
+	_ignored_win_cache_dirty = true
+	_ignored_win_cache_value = nil
+	_ignored_win_context_generation = _ignored_win_context_generation + 1
+	_ignored_win_last_identity = nil
+	return nil
+end
+
+--- Advances the text-context generation when an off-tap probe observes a
+--- different focused window even if the native watcher missed the transition.
+local function observe_ignored_win_identity(win, app_name, title)
+	local ok_id, window_id = pcall(function() return win:id() end)
+	-- A browser/editor can reuse one native window while its title crosses an
+	-- ignored rule. Window id alone therefore is not text-context identity.
+	local identity = tostring(ok_id and window_id or "<no-id>")
+		.. "\0" .. tostring(app_name) .. "\0" .. tostring(title)
+	if _ignored_win_last_identity ~= nil and identity ~= _ignored_win_last_identity then
+		_ignored_win_context_generation = _ignored_win_context_generation + 1
+	end
+	_ignored_win_last_identity = identity
+end
+
+--- Performs the expensive focused-window AX probe. Never call from CGEventTap.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
---- @param now number Current epoch timestamp (seconds) from the caller.
---- @return boolean
-function M.is_ignored_window(ignored_titles, ignored_patterns, now)
-	-- Fallback for callers that don't hold a pre-computed timestamp
+--- @param now number|nil Current epoch timestamp.
+--- @return boolean|nil ignored Nil means the classification could not be read.
+local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	if not now then now = hs.timer.secondsSinceEpoch() end
-
-	-- Lazy-init on first use so module load never pays the watcher startup cost.
-	ensure_ignored_win_watchers()
-
-	-- Fast path: cache is clean and TTL has not elapsed.
-	local ttl_elapsed = (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC
-	if not _ignored_win_cache_dirty and not ttl_elapsed then
-		return _ignored_win_cache_value
-	end
-
-	-- A TTL expiry is NOT a signal that anything changed — invalidation is
-	-- event-driven, and the TTL exists only as a safety net for an event the
-	-- watchers might have missed. Probing synchronously for it meant a
-	-- cross-process AX round-trip inside the keyDown tap every few seconds of
-	-- steady typing, for an answer that is almost always the one already cached.
-	-- Serve the cached value and refresh off the tap; a genuinely DIRTY cache
-	-- still probes synchronously below, because that one really did change.
-	-- The DIRTY branch below is served from cache too, and refreshed off the tap.
-	--
-	-- The TTL-expiry path was already moved off the keyDown callback, with a
-	-- comment naming "a cross-process AX round-trip inside the keyDown tap" as the
-	-- reason. The dirty path was left synchronous on the grounds that the window
-	-- really had changed — but a focus change is precisely the moment the newly
-	-- focused process is most likely to be busy answering something else, and
-	-- hs.window.timeout() is never set anywhere in this driver, so those AX calls
-	-- inherit the system messaging timeout rather than a short one we chose.
-	-- Accepting ONE stale keystroke after an app switch is the same trade already
-	-- accepted for TTL expiry.
-	if _ignored_win_cache_dirty and _ignored_win_cache_value ~= nil then
-		if not _ignored_win_refresh_armed then
-			_ignored_win_refresh_armed = true
-			TimerScheduler.after(0, function()
-				_ignored_win_refresh_armed = false
-				-- Cleared only here, off the tap, so the refresh below actually probes.
-				_ignored_win_cache_dirty = false
-				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
-			end)
-		end
-		return _ignored_win_cache_value
-	end
-
-	if not _ignored_win_cache_dirty then
-		if not _ignored_win_refresh_armed then
-			_ignored_win_refresh_armed = true
-			TimerScheduler.after(0, function()
-				_ignored_win_refresh_armed = false
-				_ignored_win_cache_dirty   = true
-				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
-			end)
-		end
-		_ignored_win_cache_time = now
-		return _ignored_win_cache_value
-	end
-
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
+	if not ensure_ignored_win_watchers() then return mark_ignored_win_unknown() end
 
 	-- Use the focused window directly rather than frontmostApplication() so that
 	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
 	-- the NSWorkspace frontmost app are evaluated against their own window title,
 	-- not the title of the previously active app.
 	local ok_win, win = pcall(hs.window.focusedWindow)
-	if not ok_win or not win then return false end
+	if not ok_win or not win then return mark_ignored_win_unknown() end
 
 	local ok_app, app = pcall(function() return win:application() end)
-	if not ok_app or not app then return false end
+	if not ok_app or not app then return mark_ignored_win_unknown() end
 
 	-- Always ignore the Hammerspoon console to prevent feedback loops;
 	-- folded here so it benefits from the event-driven cache as the rest.
-	if app:name() == "Hammerspoon" then
+	local ok_app_name, app_name = pcall(function() return app:name() end)
+	if not ok_app_name or type(app_name) ~= "string" then
+		return mark_ignored_win_unknown()
+	end
+	if app_name == "Hammerspoon" then
+		if not ensure_ignored_win_context_watchers(app, win, false) then
+			return mark_ignored_win_unknown()
+		end
+		observe_ignored_win_identity(win, app_name, "<hammerspoon>")
 		_ignored_win_cache_value = true
 		return true
 	end
 
 	local ok_title, title = pcall(function() return win:title() end)
-	if not ok_title or type(title) ~= "string" then return false end
+	if not ok_title or type(title) ~= "string" then return mark_ignored_win_unknown() end
+	if not ensure_ignored_win_context_watchers(app, win, true) then
+		return mark_ignored_win_unknown()
+	end
+	observe_ignored_win_identity(win, app_name, title)
 
 	-- Exact-title match.
 	if type(ignored_titles) == "table" and ignored_titles[title] then
@@ -560,10 +641,14 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	-- Pattern match.
 	if type(ignored_patterns) == "table" then
 		for _, pat in ipairs(ignored_patterns) do
-			if type(pat) == "string" and title:match(pat) then
+			local ok_match, matched = pcall(string.match, title, pat)
+			if type(pat) == "string" and ok_match and matched then
 				Logger.debug(LOG, "Window '%s' ignored (pattern '%s').", title, pat)
 				_ignored_win_cache_value = true
 				return true
+			end
+			if type(pat) == "string" and not ok_match then
+				Logger.warn(LOG, "Invalid ignored-window pattern '%s' — skipped.", pat)
 			end
 		end
 	end
@@ -571,40 +656,234 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	return false
 end
 
---- Prewarms the ignored-window watchers OFF the keystroke path.
---- hs.window.filter.default enumerates every open window on first use — a cold
---- cost measured at ~3 s on a busy desktop. When that enumeration is paid lazily
---- inside the FIRST keystroke (is_ignored_window → ensure_ignored_win_watchers),
---- it blocks the keyDown event tap long enough for macOS to disable the tap
---- ("macOS disabled the keyDown event tap — re-enabling"), dropping that
---- keystroke. Calling this from a deferred boot timer pays the enumeration on a
---- timer callback instead, so the first real keystroke is already warm.
---- Safe to call repeatedly: ensure_ignored_win_watchers() is idempotent.
-function M.prewarm_ignored_win_watchers()
-	Logger.start(LOG, "Prewarming ignored-window watchers off the keystroke path…")
-	local t0 = hs.timer.absoluteTime()
-	ensure_ignored_win_watchers()
-	Logger.success(LOG, "Ignored-window watchers prewarmed (%.1f ms).",
-		(hs.timer.absoluteTime() - t0) / 1e6)
+--- Arms one off-eventtap AX refresh. The callback probes directly instead of
+--- recursively re-entering the cache state machine; recursive refreshes could
+--- alternate dirty/clean flags forever without ever reading the focused window.
+--- @return boolean committed True when a refresh is armed or already pending.
+schedule_ignored_win_refresh = function()
+	if _ignored_win_stopped then return false end
+	if _ignored_win_refresh_armed then return true end
+	_ignored_win_refresh_armed = true
+	local generation = _ignored_win_refresh_generation
+	local callback_ran = false
+	local handle, committed = TimerScheduler.after(0, function()
+		callback_ran = true
+		_ignored_win_refresh_armed = false
+		_ignored_win_refresh_handle = nil
+		if _ignored_win_stopped then return end
+		if generation ~= _ignored_win_refresh_generation then
+			-- An invalidation overtook this callback. Re-arm the newest epoch now
+			-- that the one-slot scheduler is free rather than leaving dirty state
+			-- permanently fail-closed.
+			if _ignored_win_cache_dirty then schedule_ignored_win_refresh() end
+			return
+		end
+		local ok, result = xpcall(function()
+			return probe_ignored_window(
+				_ignored_win_titles_ref or {},
+				_ignored_win_patterns_ref or {},
+				hs.timer.secondsSinceEpoch())
+		end, debug.traceback)
+		if not ok then
+			mark_ignored_win_unknown()
+			Logger.error(LOG, "Ignored-window refresh failed: %s.", tostring(result))
+		end
+		arm_ignored_win_ttl_refresh()
+	end)
+	if committed ~= true then
+		_ignored_win_refresh_armed = false
+		_ignored_win_refresh_handle = nil
+		return false
+	end
+	if not callback_ran then _ignored_win_refresh_handle = handle end
+	return true
 end
 
---- Stops the ignored-window watchers and unsubscribes from the window filter.
+
+--- Keeps the cache fresh while no watcher event arrives. The timer itself does
+--- the AX probe off CGEventTap; a normal key therefore consumes a fresh boolean
+--- instead of paying one deliberately dropped classification every TTL period.
+--- @return boolean committed True when the next refresh is armed/already live.
+arm_ignored_win_ttl_refresh = function()
+	if _ignored_win_stopped then return false end
+	if _ignored_win_ttl_handle then
+		if _ignored_win_ttl_handle.fired ~= true then return true end
+		_ignored_win_ttl_handle = nil
+	end
+	local generation = _ignored_win_refresh_generation
+	local callback_ran = false
+	local handle, committed = TimerScheduler.after(IGNORED_WIN_TTL_SEC, function()
+		callback_ran = true
+		_ignored_win_ttl_handle = nil
+		if _ignored_win_stopped then return end
+		if generation ~= _ignored_win_refresh_generation then
+			if _ignored_win_cache_dirty then schedule_ignored_win_refresh()
+			else arm_ignored_win_ttl_refresh() end
+			return
+		end
+		local ok, result = xpcall(function()
+			return probe_ignored_window(
+				_ignored_win_titles_ref or {},
+				_ignored_win_patterns_ref or {},
+				hs.timer.secondsSinceEpoch())
+		end, debug.traceback)
+		if not ok then
+			mark_ignored_win_unknown()
+			Logger.error(LOG, "Ignored-window TTL probe failed: %s.", tostring(result))
+		end
+		arm_ignored_win_ttl_refresh()
+	end)
+	if committed ~= true then
+		_ignored_win_ttl_handle = nil
+		return false
+	end
+	if not callback_ran then _ignored_win_ttl_handle = handle end
+	return true
+end
+
+--- Returns the cached ignored-window classification without performing AX work.
+--- A dirty cache is unknown, not the previous window's answer: callers must pass
+--- the physical key through without transforming it until the timer refreshes.
+--- @param ignored_titles table Hash map of exact window titles to ignore.
+--- @param ignored_patterns table Array of Lua patterns matched against window titles.
+--- @param now number|nil Current epoch timestamp (seconds) from the caller.
+--- @return boolean|nil ignored Nil means the focused window is not yet classified.
+--- @return integer context_generation Increments on every focus/title invalidation.
+function M.is_ignored_window(ignored_titles, ignored_patterns, now)
+	if not now then now = hs.timer.secondsSinceEpoch() end
+	_ignored_win_titles_ref = type(ignored_titles) == "table" and ignored_titles or {}
+	_ignored_win_patterns_ref = type(ignored_patterns) == "table" and ignored_patterns or {}
+	if _ignored_win_stopped then return nil, _ignored_win_context_generation end
+
+	if _ignored_win_cache_dirty or _ignored_win_cache_value == nil then
+		schedule_ignored_win_refresh()
+		return nil, _ignored_win_context_generation
+	end
+
+	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+		-- The periodic timer should normally have refreshed first. If the main
+		-- runloop delayed it, never authorize the previous window's answer.
+		invalidate_ignored_win_cache()
+		return nil, _ignored_win_context_generation
+	end
+	return _ignored_win_cache_value, _ignored_win_context_generation
+end
+
+--- Reopens ignored-window tracking before the keymap taps start.
+--- Watchers and AX reads remain deferred; this method only publishes live refs.
+--- @param ignored_titles table Exact ignored-window titles.
+--- @param ignored_patterns table Ignored-window title patterns.
+function M.start_ignored_win_tracking(ignored_titles, ignored_patterns)
+	local next_titles = type(ignored_titles) == "table" and ignored_titles or {}
+	local next_patterns = type(ignored_patterns) == "table" and ignored_patterns or {}
+	if not _ignored_win_stopped then
+		_ignored_win_titles_ref = next_titles
+		_ignored_win_patterns_ref = next_patterns
+		return _ignored_win_context_generation
+	end
+	-- A failed native cancellation deliberately retains the exact capability for
+	-- retry. Do not reopen while such a callback can still publish old lifecycle
+	-- state; a second stop/start may settle the same handle.
+	if _ignored_win_refresh_handle then
+		if TimerScheduler.cancel(_ignored_win_refresh_handle) ~= true then return nil end
+		_ignored_win_refresh_handle = nil
+	end
+	if _ignored_win_ttl_handle then
+		if TimerScheduler.cancel(_ignored_win_ttl_handle) ~= true then return nil end
+		_ignored_win_ttl_handle = nil
+	end
+	if _ignored_win_app_watcher or _ignored_win_focus_watcher or _ignored_win_title_watcher then
+		-- A previous teardown retained an exact watcher capability because its
+		-- stop/unsubscribe raised. Reopening would mistake a half-dead object for
+		-- valid coverage; require the caller to retry stop() first.
+		return nil
+	end
+	_ignored_win_refresh_armed = false
+	_ignored_win_stopped = false
+	_ignored_win_context_generation = _ignored_win_context_generation + 1
+	_ignored_win_titles_ref = next_titles
+	_ignored_win_patterns_ref = next_patterns
+	_ignored_win_cache_dirty = true
+	_ignored_win_cache_value = nil
+	return _ignored_win_context_generation
+end
+
+--- Invalidates a clean classification after the runtime ignore rules mutate.
+function M.ignored_window_rules_changed()
+	invalidate_ignored_win_cache()
+end
+
+--- Prepares the narrow app/window AX watchers before the keyDown tap is armed.
+--- This intentionally avoids hs.window.filter.default: its cold global-window
+--- enumeration blocks the shared Hammerspoon runloop even when moved to a timer.
+--- Safe to call repeatedly: unchanged current owners reuse their exact watchers.
+--- @param ignored_titles table|nil Exact ignored-window titles.
+--- @param ignored_patterns table|nil Ignored-window title patterns.
+function M.prewarm_ignored_win_watchers(ignored_titles, ignored_patterns)
+	if _ignored_win_stopped then return false end
+	Logger.start(LOG, "Preparing ignored-window watchers before key capture…")
+	local t0 = hs.timer.absoluteTime()
+	if type(ignored_titles) == "table" then _ignored_win_titles_ref = ignored_titles end
+	if type(ignored_patterns) == "table" then _ignored_win_patterns_ref = ignored_patterns end
+	local classification = probe_ignored_window(
+		_ignored_win_titles_ref or {},
+		_ignored_win_patterns_ref or {},
+		hs.timer.secondsSinceEpoch())
+	local ttl_ready = arm_ignored_win_ttl_refresh()
+	if classification == nil or not ttl_ready then
+		Logger.warn(LOG, "Ignored-window prewarm incomplete; tracking remains fail-closed.")
+		return false
+	end
+	Logger.success(LOG, "Ignored-window watchers ready (%.1f ms).",
+		(hs.timer.absoluteTime() - t0) / 1e6)
+	return true
+end
+
+--- Stops every ignored-window watcher.
 --- Must be called from keymap/init.lua M.stop() to prevent callbacks from firing
 --- after the module is unloaded (watcher-leak-on-reload).
 function M.stop()
+	_ignored_win_stopped = true
+	_ignored_win_refresh_generation = _ignored_win_refresh_generation + 1
+	local settled = true
+	if _ignored_win_refresh_handle then
+		local cancelled = TimerScheduler.cancel(_ignored_win_refresh_handle)
+		if cancelled ~= true then
+			Logger.error(LOG, "Ignored-window refresh timer could not be cancelled during stop.")
+			settled = false
+		else
+			_ignored_win_refresh_handle = nil
+		end
+	end
+	_ignored_win_refresh_armed = _ignored_win_refresh_handle ~= nil
+	if _ignored_win_ttl_handle then
+		local cancelled = TimerScheduler.cancel(_ignored_win_ttl_handle)
+		if cancelled ~= true then
+			Logger.error(LOG, "Ignored-window TTL timer could not be cancelled during stop.")
+			settled = false
+		else
+			_ignored_win_ttl_handle = nil
+		end
+	end
 	if _ignored_win_app_watcher then
-		pcall(function() _ignored_win_app_watcher:stop() end)
-		_ignored_win_app_watcher = nil
-		Logger.debug(LOG, "Ignored-window cache: application watcher stopped.")
+		local stopped, stop_err = pcall(function() _ignored_win_app_watcher:stop() end)
+		if stopped then
+			_ignored_win_app_watcher = nil
+			Logger.debug(LOG, "Ignored-window cache: application watcher stopped.")
+		else
+			settled = false
+			Logger.error(LOG, "Ignored-window application watcher stop failed: %s.",
+				tostring(stop_err))
+		end
 	end
-	if _ignored_win_win_filter then
-		pcall(function()
-			_ignored_win_win_filter:unsubscribe(invalidate_ignored_win_cache)
-		end)
-		_ignored_win_win_filter = nil
-		Logger.debug(LOG, "Ignored-window cache: window filter unsubscribed.")
-	end
+	if not stop_context_watcher("title", "title") then settled = false end
+	if not stop_context_watcher("focus", "focus") then settled = false end
 	_ignored_win_cache_dirty = true
+	_ignored_win_cache_value = nil
+	_ignored_win_last_identity = nil
+	_ignored_win_titles_ref = nil
+	_ignored_win_patterns_ref = nil
+	return settled
 end
 
 return M

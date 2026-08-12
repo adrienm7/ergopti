@@ -58,6 +58,7 @@ local function load_gate()
 				handle.cancelled = true
 				handle.timer = nil
 			end
+			return true
 		end,
 	}
 
@@ -191,6 +192,38 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(#fixture.sent, 1)
 		helpers.assert_true(not fixture.replay.is_pending())
 		fixture.synthetic.cancel(tx)
+	end)
+
+	helpers.it("discard makes queued watchdog, fence, and completion callbacks inert", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r",
+			transaction = tx, min_delay = 0.08,
+		})
+
+		local watchdog = fixture.timers[1]
+		local fence = fixture.timers[2]
+		helpers.assert_not_nil(watchdog, "arm must retain the watchdog callback")
+		helpers.assert_not_nil(fence, "a delayed replay must retain the settle-fence callback")
+		helpers.assert_true(fixture.replay.is_pending())
+
+		fixture.replay.discard_pending("window context changed")
+		helpers.assert_true(not fixture.replay.is_pending(),
+			"discard must relinquish the consumed terminator immediately")
+
+		-- Model callbacks that were already queued by the native run loop before
+		-- cancellation settled. They must reject the discarded pending identity even
+		-- when invoked directly, rather than relying only on timer:stop().
+		watchdog.callback()
+		fence.callback()
+		fixture.synthetic.seal(tx)
+		fire_hs_lifecycle(fixture)
+
+		helpers.assert_eq(#fixture.sent, 0,
+			"no stale watchdog, fence, or completion may replay a discarded key")
+		helpers.assert_true(not fixture.replay.is_pending(),
+			"stale callbacks must not resurrect discarded ownership")
 	end)
 end)
 

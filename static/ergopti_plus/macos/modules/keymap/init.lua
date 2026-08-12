@@ -155,6 +155,9 @@ local _last_context_epoch = _last_action_epoch
 local _action_preview_refresh_pending = false
 local _context_reconcile_pending = false
 local _context_reconcile_timer = nil
+local _context_reconcile_quiet = false
+local _window_context_reconcile_pending = false
+local _last_window_context_generation = 0
 
 
 --- Reconciles only the keymap context for one action epoch.
@@ -203,9 +206,13 @@ local function reconcile_action_epoch_async(epoch)
 	-- the normal preview path here, off the eventtap, so every character typed in
 	-- that window participates in the first post-recovery prediction.
 	if _action_preview_refresh_pending then
-		LLMBridge.update_preview(CoreState.buffer)
-		if epoch ~= SyntheticInput.current_action_epoch() then return true end
-		_action_preview_refresh_pending = false
+		-- A window quarantine is independent from the action epoch. Do not consume
+		-- its catch-up marker until both gates are actually open.
+		if LLMBridge.is_runtime_available() and not _window_context_reconcile_pending then
+			LLMBridge.update_preview(CoreState.buffer)
+			if epoch ~= SyntheticInput.current_action_epoch() then return true end
+			if LLMBridge.is_runtime_available() then _action_preview_refresh_pending = false end
+		end
 	end
 	_last_action_epoch = epoch
 	return true
@@ -246,14 +253,58 @@ local function reconcile_observed_context_async()
 	_context_reconcile_timer = nil
 	if not _context_reconcile_pending then return end
 	_context_reconcile_pending = false
-	local ok, err = xpcall(LLMBridge.reconcile_observation_gap, debug.traceback)
-	if not ok then
+	local quiet = _context_reconcile_quiet
+	local keep_quarantined = _window_context_reconcile_pending
+	local ok, result = xpcall(function()
+		if keep_quarantined then return LLMBridge.reset_quarantined_context() end
+		return LLMBridge.reconcile_observation_gap()
+	end, debug.traceback)
+	if not ok or result ~= true then
 		-- Keep the runtime fail-closed; the watchdog will retry outside CGEventTap.
 		_context_reconcile_pending = true
-		Logger.error(LOG, "Typing-context reconciliation failed - %s.", tostring(err))
+		Logger.error(LOG, "Typing-context reconciliation failed - %s.", tostring(result))
 		return
 	end
-	Logger.warn(LOG, "Typing context invalidated - keystrokes were missed.")
+	_context_reconcile_quiet = false
+	if not keep_quarantined
+		and _action_preview_refresh_pending
+		and LLMBridge.is_runtime_available()
+	then
+		-- The first key in the newly classified normal window was processed while
+		-- the runtime latch was still closed. Replay the authoritative buffer once
+		-- after reopening so its tooltip/LLM request is not missing until key #2.
+		LLMBridge.update_preview(CoreState.buffer)
+		if LLMBridge.is_runtime_available() and not _window_context_reconcile_pending then
+			_action_preview_refresh_pending = false
+		end
+	end
+	if quiet then
+		Logger.debug(LOG, "Typing context invalidated after a focus transition.")
+	else
+		Logger.warn(LOG, "Typing context invalidated - keystrokes were missed.")
+	end
+end
+
+
+--- Arms external reconciliation after the constant-time context close.
+--- @param quiet boolean Log expected focus changes at DEBUG instead of WARNING.
+local function arm_observed_context_reconcile(quiet)
+	local was_pending = _context_reconcile_pending
+	_context_reconcile_pending = true
+	if quiet == true then
+		if not was_pending then _context_reconcile_quiet = true end
+	else
+		_context_reconcile_quiet = false
+	end
+	if _context_reconcile_timer then return end
+	local callback_ran = false
+	local ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
+		callback_ran = true
+		reconcile_observed_context_async()
+	end)
+	if ok and timer_or_err ~= nil and not callback_ran then
+		_context_reconcile_timer = timer_or_err
+	end
 end
 
 
@@ -270,16 +321,21 @@ local function invalidate_observed_context()
 	-- dropping it would silently eat the user's Enter — send it rather than lose it.
 	TerminatorReplay.flush_now("keyboard tap outage", true)
 	LLMBridge.set_runtime_quarantined(true)
-	_context_reconcile_pending = true
-	if _context_reconcile_timer then return end
-	local callback_ran = false
-	local ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
-		callback_ran = true
-		reconcile_observed_context_async()
-	end)
-	if ok and timer_or_err ~= nil and not callback_ran then
-		_context_reconcile_timer = timer_or_err
-	end
+	arm_observed_context_reconcile(false)
+end
+
+
+--- Severs text ownership at a focus/title boundary without replaying an old-app
+--- terminator into the new app. Reconciliation stays closed until AX says the
+--- destination is known-normal; ignored/unknown destinations never reopen LLM.
+local function invalidate_window_context()
+	CoreState.buffer = ""
+	cancel_action_preview_recovery()
+	CoreState.start_is_word_boundary = false
+	TerminatorReplay.discard_pending("window context changed", true)
+	LLMBridge.set_runtime_quarantined(true)
+	_window_context_reconcile_pending = true
+	arm_observed_context_reconcile(true)
 end
 
 
@@ -369,8 +425,9 @@ end
 --- Ignores a specific window title from hotstring processing.
 --- @param title string The exact window title to ignore.
 function M.ignore_window_title(title)
-	if type(title) == "string" then
+	if type(title) == "string" and not CoreState.ignored_window_titles[title] then
 		CoreState.ignored_window_titles[title] = true
+		km_utils.ignored_window_rules_changed()
 	end
 end
 
@@ -379,6 +436,7 @@ end
 function M.ignore_window_pattern(pattern)
 	if type(pattern) == "string" then
 		table.insert(CoreState.ignored_window_patterns, pattern)
+		km_utils.ignored_window_rules_changed()
 	end
 end
 
@@ -399,7 +457,6 @@ function M.register_preview_provider(fn)
 		table.insert(CoreState.preview_providers, fn)
 	end
 end
-
 
 -- ── Registry proxies ─────────────────────────────────────────────────────────
 
@@ -873,13 +930,28 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
 	-- as always-ignored, so we move the check before the expensive LLM/interceptor
 	-- path so typing in any HS dialog or webview incurs no processing overhead.
-	-- One clock read per keystroke, shared by the ignored-window cache below and
-	-- the inter-key delta. Two separate reads bought nothing: they are microseconds
-	-- apart, so the second value was identical for every purpose either consumer
-	-- has, and this is the hottest path in the driver.
+	-- One clock read per keystroke is shared by the ignored-window cache and the
+	-- inter-key delta. Ignored windows are a total pass-through boundary: no LLM,
+	-- interceptor, buffer, preview, or expansion runs there; only an unknown
+	-- classification may arm its off-tap AX refresh.
 	local now = hs.timer.secondsSinceEpoch()
 
-	if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now) then
+	local is_ignored, window_generation = km_utils.is_ignored_window(
+		CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
+	if type(window_generation) == "number"
+		and window_generation ~= _last_window_context_generation
+	then
+		_last_window_context_generation = window_generation
+		-- A focus/title transition severs every relationship between the rolling
+		-- buffer and the new cursor. Keep a held physical terminator untouched here:
+		-- replaying it after focus moved would inject the old app's key into the new.
+		invalidate_window_context()
+	end
+	if is_ignored == false and _window_context_reconcile_pending then
+		_window_context_reconcile_pending = false
+		arm_observed_context_reconcile(true)
+	end
+	if is_ignored ~= false then
 		return internal_loopback == true
 	end
 
@@ -898,11 +970,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	local flags = e:getFlags()
 
-	-- Cache hit guaranteed: is_ignored_window was already called above and returned
-	-- false (otherwise we would have early-exited). Re-call returns the same cached
-	-- value — needed here as `is_ignored` is passed on to LLM and later callers.
-	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
-
 	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
 	-- Tagged synthetic keys already returned above, so every event here is a real
 	-- input/control event and must retain the normal LLM semantics.
@@ -910,14 +977,14 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		-- F16 is an internal edge, never application input. A declined chain (for
 		-- example after a reset) is still consumed; only the first live delivery may
 		-- ask the engine to advance.
-		LLMBridge.handle_llm_keys(keyCode, flags, is_ignored)
+		LLMBridge.handle_llm_keys(keyCode, flags, false)
 		return true
 	end
 	-- F16 is an internal control channel only when its exact Quartz tag says so.
 	-- A physical/programmable F16 must never satisfy chain_pending ahead of the
 	-- delayed loopback that owns that edge.
 	if keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL then return false end
-	if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
+	if LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
 	-- 3. Run custom interceptors registered by external modules.
 	-- The character is read HERE rather than at step 8, because the interceptors
@@ -987,7 +1054,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			-- Remove the last UTF-8 character from the buffer safely.
 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
-			if not is_ignored then update_preview_with_action_recovery(CoreState.buffer) end
+			update_preview_with_action_recovery(CoreState.buffer)
 		else
 			-- Backspace pressed against an already-empty buffer: the user
 			-- has just deleted a character that lived to the LEFT of where
@@ -1043,7 +1110,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	local rescan_suppressed = now < CoreState.no_rescan_until
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
-		if not is_ignored then update_preview_with_action_recovery(CoreState.buffer) end
+		update_preview_with_action_recovery(CoreState.buffer)
 		return false
 	end
 
@@ -1066,60 +1133,21 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
-	_tc_is_ignored   = is_ignored
 
-	-- In ignored windows we still want repeatable features to work,
-	-- but must run them asynchronously to avoid blocking the event queue.
 	-- DEBUG-only sub-segment timing (Perf gate): attribute a slow keystroke to
 	-- trigger matching vs. preview rebuild in the HotPath warning line.
 	local hot_dbg = Perf.is_enabled()
-	if is_ignored then
-		-- Capture all five upvalues AND the buffer snapshot into the closure
-		-- at scheduling time. A second fast keystroke can overwrite the
-		-- upvalues AND grow CoreState.buffer before the deferred call runs,
-		-- causing the expansion to splice the wrong buffer state.
-		-- The snapshot is temporarily swapped in; if no expansion fires the
-		-- live buffer (which may have grown) is restored.
-		local buf_snapshot = CoreState.buffer
-		hs.timer.doAfter(0, (function(chars, len, dt, mult, ign, buf)
-			return function()
-				_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored
-					= chars, len, dt, mult, ign
-				local saved_buf = CoreState.buffer
-				CoreState.buffer = buf
-			local fired = run_trigger_checks()
-			-- When no expansion fired, restore the live buffer so chars
-			-- typed after the snapshot are not lost. When an expansion
-			-- DID fire, perform_text_replacement's buffer_action already
-			-- updated CoreState.buffer — append any chars typed after
-			-- the snapshot so they are not lost from the buffer (the
-			-- expansion only backspaces over the trigger on screen, so
-			-- later keystrokes remain visible and must stay tracked).
-			if not fired then
-				CoreState.buffer = saved_buf
-			else
-				local extra = saved_buf:sub(#buf + 1)
-				if extra ~= "" then
-					CoreState.buffer = CoreState.buffer .. extra
-				end
-			end
-			end
-		end)(_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored, buf_snapshot))
-	else
-		local ck0 = hot_dbg and HotPath.now() or nil
-		local fired = run_trigger_checks()
-		if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
-		if fired then return true end
-	end
+	local ck0 = hot_dbg and HotPath.now() or nil
+	local fired = run_trigger_checks()
+	if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
+	if fired then return true end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
-	if not is_ignored then
-		local pv0 = hot_dbg and HotPath.now() or nil
-		update_preview_with_action_recovery(CoreState.buffer)
-		if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
-	end
+	local pv0 = hot_dbg and HotPath.now() or nil
+	update_preview_with_action_recovery(CoreState.buffer)
+	if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
@@ -1418,15 +1446,6 @@ mouse_tap = eventtap.new(
 -- seconds of dead typing costs nothing worth measuring.
 local TAP_WATCHDOG_SEC = 1
 local _watchdog_timer  = nil
--- Post-boot window-filter prewarm timer. Held so M.stop() can cancel it: a reload
--- during the quiet window otherwise left it armed to fire into a torn-down engine.
-local _prewarm_timer   = nil
-
--- Delay before prewarming the ignored-window watchers off the keystroke path.
--- Short enough to almost always beat the user's first keystroke, long enough to
--- clear the heaviest synchronous boot deferrals first (see M.start).
-local WINFILTER_PREWARM_SEC = 1.0
-
 local tap_watchdog
 
 local function eventtap_is_enabled(name, event_tap)
@@ -1487,6 +1506,7 @@ local function watchdog_is_running(timer)
 		local ok, running = pcall(timer.running, timer)
 		return ok and running == true
 	end
+	-- The pure-Lua test adapter exposes native timer state as a boolean field.
 	return timer.running == true
 end
 
@@ -1542,7 +1562,6 @@ local function taps_are_enabled()
 		and eventtap_is_enabled("mouse", mouse_tap)
 end
 
-
 tap_watchdog = function()
 	-- Timer allocation in the HID callback is best-effort. This periodic path is
 	-- the independent retry that guarantees a closed observation-gap latch cannot
@@ -1578,10 +1597,30 @@ function M.start()
 		or eventtap_is_enabled("mouse", mouse_tap)
 	then
 		Logger.warn(LOG, "Keymap start found partial native ownership — rolling it back before retry.")
-		if M.stop() ~= true then
+		if M.stop(true) ~= true then
 			Logger.error(LOG, "Keymap start refused: partial ownership could not be rolled back.")
 			return false
 		end
+	end
+	local tracking_generation = km_utils.start_ignored_win_tracking(
+		CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
+	if type(tracking_generation) ~= "number" then
+		Logger.error(LOG, "Keymap start refused: ignored-window tracking is not settled.")
+		return false
+	end
+	_last_window_context_generation = tracking_generation
+	-- Establish the narrow current-app/current-window watchers before key capture.
+	-- The former deferred hs.window.filter.default setup still shared HS's runloop:
+	-- a key arriving during its multi-second global enumeration could time out the
+	-- tap. The replacement performs no global window enumeration and publishes a
+	-- clean cache before the tap starts; a transient AX failure stays fail-closed.
+	local prepared, prepare_result = xpcall(function()
+		return km_utils.prewarm_ignored_win_watchers(
+			CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
+	end, debug.traceback)
+	if not prepared or prepare_result ~= true then
+		Logger.warn(LOG, "Ignored-window watcher preparation incomplete; tracking remains fail-closed: %s.",
+			tostring(prepare_result))
 	end
 	if not _action_listener_registered then
 		-- Register the last fully safe epoch, not the current one. If an action
@@ -1591,7 +1630,7 @@ function M.start()
 			ACTION_EPOCH_LISTENER_ID, reconcile_action_epoch_async, _last_action_epoch)
 		if not listener_ok or listener_result ~= true then
 			Logger.error(LOG, "Keymap action-listener start failed: %s.", tostring(listener_result))
-			M.stop()
+			M.stop(true)
 			return false
 		end
 		_action_listener_registered = true
@@ -1615,7 +1654,7 @@ function M.start()
 	for _, spec in ipairs(tap_specs) do
 		if not start_eventtap(spec[1], spec[2]) then
 			Logger.error(LOG, "Keymap start rolled back after %s eventtap failure.", spec[1])
-			M.stop()
+			M.stop(true)
 			return false
 		end
 	end
@@ -1623,20 +1662,9 @@ function M.start()
 	-- Arm the independent backstop for any tap still observed disabled.
 	if not start_watchdog() then
 		Logger.error(LOG, "Keymap start rolled back after watchdog failure.")
-		M.stop()
+		M.stop(true)
 		return false
 	end
-
-	-- Prewarm the ignored-window watchers off the keystroke path. hs.window.filter
-	-- enumerates every open window on first use (~3 s cold); paid lazily inside the
-	-- first keyDown it blocks the tap long enough for macOS to disable it. A short
-	-- timer pays the cost on the main loop during the quiet post-boot window so the
-	-- user's first keystroke is already warm.
-	if _prewarm_timer then _prewarm_timer:stop() end
-	_prewarm_timer = hs.timer.doAfter(WINFILTER_PREWARM_SEC, function()
-		_prewarm_timer = nil
-		pcall(km_utils.prewarm_ignored_win_watchers)
-	end)
 
 	_started = true
 	Logger.success(LOG, "Keymap engine started.")
@@ -1644,7 +1672,8 @@ function M.start()
 end
 
 --- Stops the eventtap listeners and cleans up prediction state.
-function M.stop()
+--- @param teardown boolean|nil Also destroy ignored-window watchers on reload/quit.
+function M.stop(teardown)
 	Logger.start(LOG, "Stopping keymap engine…")
 	_started = false
 	local listener_stopped = true
@@ -1663,9 +1692,8 @@ function M.stop()
 		_context_reconcile_timer = nil
 	end
 	_context_reconcile_pending = false
-	-- Cancelled here, before km_utils.stop() below, so there is no window in which
-	-- the prewarm can fire into an engine that has already been torn down.
-	if _prewarm_timer then _prewarm_timer:stop(); _prewarm_timer = nil end
+	_context_reconcile_quiet = false
+	_window_context_reconcile_pending = false
 	-- Release a held terminator BEFORE the taps go down. Its release signal is a
 	-- synthetic echo arriving through the keyDown tap, so stopping first would
 	-- strand it until the watchdog expired — into a torn-down engine, or after a
@@ -1674,7 +1702,8 @@ function M.stop()
 	local replay_ok, replay_result = xpcall(function()
 		return TerminatorReplay.flush_now("keymap engine stopping")
 	end, debug.traceback)
-	local terminator_settled = replay_ok and replay_result ~= false
+	local terminator_settled = replay_ok
+		and (replay_result == true or TerminatorReplay.is_pending() == false)
 	if not terminator_settled then
 		Logger.error(LOG, "Pending terminator teardown did not commit (result: %s).", tostring(replay_result))
 	end
@@ -1699,12 +1728,20 @@ function M.stop()
 	end
 	-- Unsubscribe focus-change watchers so callbacks do not accumulate across
 	-- reloads (watcher-leak-on-reload).
-	km_utils.stop()
+	local filter_ok, filter_result = true, true
+	if teardown == true then
+		filter_ok, filter_result = xpcall(km_utils.stop, debug.traceback)
+	end
+	local window_filter_stopped = filter_ok and filter_result == true
+	if not window_filter_stopped then
+		Logger.error(LOG, "Ignored-window teardown did not settle (result: %s).",
+			tostring(filter_result))
+	end
 
 	-- CoreState.interceptors and CoreState.preview_providers are deliberately NOT
 	-- cleared here. Their only writers are M.register_interceptor and
 	-- M.register_preview_provider, called once at boot by dynamic_hotstrings;
-	-- M.start() restarts the taps, watchdog and prewarm but has no way to
+	-- M.start() restarts the taps, watchdog and window tracking but has no way to
 	-- re-register them. Wiping them on stop() therefore made a disable/enable
 	-- cycle ("Tout désactiver" then "Tout activer") permanently kill @-tag
 	-- expansion and the dynamic-hotstring preview until a full reload, while
@@ -1713,7 +1750,7 @@ function M.stop()
 	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
 	local stopped = listener_stopped and watchdog_stopped and terminator_settled
-		and taps_stopped and predictions_reset and escape_trap_stopped
+		and taps_stopped and predictions_reset and escape_trap_stopped and window_filter_stopped
 	if stopped then
 		Logger.success(LOG, "Keymap engine stopped.")
 	else
