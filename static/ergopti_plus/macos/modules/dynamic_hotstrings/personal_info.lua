@@ -415,6 +415,16 @@ local function do_expand(combo)
 	return ok
 end
 
+--- Returns whether the static registry owns a complete personal-info trigger.
+--- Both the interceptor and preview provider use this exact gate so a static
+--- `@x<magic>` collision cannot be declined by one and advertised by the other.
+--- @param full_trigger string Complete `@` combo including the magic key.
+--- @return boolean
+local function static_claims_full_trigger(full_trigger)
+	if not _keymap or type(_keymap.classify_trigger) ~= "function" then return false end
+	return (_keymap.classify_trigger(full_trigger)) == true
+end
+
 
 
 
@@ -475,7 +485,7 @@ local function interceptor(event, _km_buffer, ctx)
 		return nil
 	end
 
-	local char = event:getCharacters(false) or ""
+	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
 	if char == "" then return nil end
 
 	if _state == STATE_IDLE then
@@ -548,10 +558,7 @@ local function interceptor(event, _km_buffer, ctx)
 				-- question was answered by a full scan here and from cache there.
 				-- classify_trigger returns all three flags; only `exact` matters at this
 				-- point, because a prefix or suffix match does not claim the trigger.
-				local claimed = false
-				if _keymap and type(_keymap.classify_trigger) == "function" then
-					claimed = (_keymap.classify_trigger(full_trigger)) == true
-				end
+				local claimed = static_claims_full_trigger(full_trigger)
 				if claimed and full_trigger:sub(1, 1) == "@" then
 					_state = STATE_IDLE
 					_combo = ""
@@ -718,6 +725,10 @@ function M.start(base_dir, keymap_module, info_toml_path)
 			
 			local match = buf:match("@([a-z]+)$")
 			if match then
+				-- The interceptor owns collection entry. It may deliberately remain
+				-- IDLE because a static mapping already claims this `@` sequence.
+				if _state ~= STATE_COLLECTING or _combo ~= match then return nil end
+				if static_claims_full_trigger("@" .. match .. _trigger) then return nil end
 				local parts, fields = resolve_combo(match)
 				if #parts > 0 then
 					-- Masked part by part, not row by row: one @-combo can resolve to
