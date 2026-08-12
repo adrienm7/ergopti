@@ -96,6 +96,106 @@ helpers.describe("menu preference side effects are success-gated", function()
 end)
 
 helpers.describe("menu preferences: first-click rollback", function()
+	helpers.it("returns false only when a synchronous runtime setter raises", function()
+		local warnings = {}
+		local logger = helpers.make_logger_stub()
+		logger.warn = function(_, fmt, ...)
+			warnings[#warnings + 1] = string.format(fmt, ...)
+		end
+		package.loaded["infra.logger"] = logger
+		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+
+		local function sync_with(setter)
+			return MenuState.sync_state_to_modules({
+				hotstrings = {},
+				keymap = false,
+				preview_star_enabled = false,
+				keylogger_enabled = false,
+			}, {}, false, {
+				keymap = {
+					set_preview_star_enabled = setter,
+				},
+				hotstring_editor = {},
+				core_mods = {},
+				apply_metrics_shortcut = function() return true end,
+				apply_apps_time_shortcut = function() return true end,
+				save_prefs = function() return true end,
+			})
+		end
+
+		local nil_result = sync_with(function() end)
+		local throw_result = sync_with(function() error("runtime setter failure", 0) end)
+		package.loaded["infra.logger"] = nil
+		package.loaded["ui.menu.menu_state"] = nil
+
+		helpers.assert_eq(nil_result, true,
+			"a successful setter's nil return must not be confused with failure")
+		helpers.assert_eq(throw_result, false,
+			"a contained setter exception must make runtime synchronization fail")
+		helpers.assert_eq(#warnings, 1)
+		helpers.assert_contains(warnings[1], "keymap.set_preview_star_enabled failed")
+		helpers.assert_contains(warnings[1], "runtime setter failure")
+	end)
+
+	helpers.it("does not report rollback success when runtime restoration raises", function()
+		local warnings, errors = {}, {}
+		local logger = helpers.make_logger_stub()
+		logger.warn = function(_, fmt, ...)
+			warnings[#warnings + 1] = string.format(fmt, ...)
+		end
+		logger.error = function(_, fmt, ...)
+			errors[#errors + 1] = string.format(fmt, ...)
+		end
+		package.loaded["infra.logger"] = logger
+		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		local transaction = require("ui.menu.preferences_transaction")
+		local state = {
+			hotstrings = {},
+			keymap = false,
+			preview_star_enabled = false,
+			keylogger_enabled = false,
+		}
+		local rollback_successes = 0
+		local save = transaction.bind({ save = function() return false end }, {
+			path = "/virtual/config.toml",
+			state = state,
+			hotfiles = {},
+			core_modules = {},
+			initial_state = state,
+			initial_preferences = {},
+			restore_runtime = function(saved)
+				return MenuState.sync_state_to_modules(state, saved, false, {
+					keymap = {
+						set_preview_star_enabled = function()
+							error("rollback setter failure", 0)
+						end,
+					},
+					hotstring_editor = {},
+					core_mods = {},
+					apply_metrics_shortcut = function() return true end,
+					apply_apps_time_shortcut = function() return true end,
+					save_prefs = function() return true end,
+				})
+			end,
+			on_rollback = function() rollback_successes = rollback_successes + 1 end,
+		})
+
+		state.preview_star_enabled = true
+		local committed = save()
+		package.loaded["infra.logger"] = nil
+		package.loaded["ui.menu.menu_state"] = nil
+		package.loaded["ui.menu.preferences_transaction"] = nil
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(state.preview_star_enabled, false)
+		helpers.assert_eq(rollback_successes, 0,
+			"on_rollback must run only after every runtime setter completes")
+		helpers.assert_eq(#warnings, 1)
+		helpers.assert_contains(warnings[1], "rollback setter failure")
+		helpers.assert_eq(#errors, 2)
+		helpers.assert_contains(errors[2], "Preference rollback did not commit: false.")
+	end)
+
 	helpers.it("preserves retained nested table identities during rollback", function()
 		local transaction = require("ui.menu.preferences_transaction")
 		local state = { nested = { enabled = true, values = { 1, 2 } } }

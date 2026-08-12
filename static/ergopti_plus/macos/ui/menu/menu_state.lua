@@ -24,19 +24,6 @@ local LOG    = "menu_state"
 local KEYLOGGER_START_DELAY_SEC = 0.5
 local _keylogger_start_generation = 0
 
---- Calls fn(...) under pcall and logs a WARN when the call raises.
---- Falls through silently on success — the existing code never checked the
---- return value of the bare pcalls, so this preserves that contract.
---- @param label string Human-readable description for the warning (e.g. "set_delay").
---- @param fn function|nil The function to call. Silently skipped when nil/not-a-function.
---- @param ... any Arguments forwarded to fn.
-local function try(label, fn, ...)
-	if type(fn) ~= "function" then return end
-	local ok, err = pcall(fn, ...)
-	if not ok then
-		Logger.warn(LOG, "sync_state_to_modules: %s failed — %s", label, tostring(err))
-	end
-end
 
 
 
@@ -55,6 +42,24 @@ end
 --- @param config_absent boolean True when no config file was found on disk.
 --- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, save_prefs, apply_metrics_shortcut, apply_apps_time_shortcut, _metrics_hk_ref, _apps_time_hk_ref }.
 function M.sync_state_to_modules(state, saved, config_absent, deps)
+	local sync_failed = false
+
+	--- Calls a runtime setter under pcall and records any raised failure.
+	--- Successful setters may return nil; only a thrown error breaks the sync contract.
+	--- @param label string Human-readable description for the warning.
+	--- @param fn function|nil Function to call, or nil when the dependency is optional.
+	--- @param ... any Arguments forwarded to fn.
+	--- @return boolean completed True unless the setter raised.
+	local function try(label, fn, ...)
+		if type(fn) ~= "function" then return true end
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			sync_failed = true
+			Logger.warn(LOG, "sync_state_to_modules: %s failed — %s", label, tostring(err))
+		end
+		return ok
+	end
+
 	local keymap           = deps.keymap
 	local gestures         = deps.gestures
 	local hotstring_editor = deps.hotstring_editor
@@ -441,7 +446,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 
 	if config_absent and save_prefs() ~= true then return false end
-	return true
+	return not sync_failed
 end
 
 return M
