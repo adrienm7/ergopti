@@ -262,20 +262,37 @@ function M.new(ctx)
 	--- @param on_ok function Callback when requirements are satisfied.
 	--- @param on_fail function Callback when requirements cannot be met.
 	--- @param opts table|nil Options forwarded to check_requirements.
-	local function guarded_check_requirements(model_name, on_ok, on_fail, opts)
+	--- @param on_stale function|nil Callback receiving the invalidation reason.
+	local function guarded_check_requirements(model_name, on_ok, on_fail, opts, on_stale)
 		req_token = req_token + 1
 		local my_token = req_token
+		local request_backend = state.llm_backend
+		local function stale_reason()
+			if state.llm_backend ~= request_backend then return "backend" end
+			if my_token ~= req_token then return "request" end
+			return nil
+		end
 		models_mgr.check_requirements(model_name,
 			function(...)
-				if my_token ~= req_token then
-					Logger.debug(LOG, string.format("Stale ok-callback discarded (model=%s).", tostring(model_name)))
+				local reason = stale_reason()
+				if reason then
+					Logger.debug(LOG, string.format(
+						"Stale ok-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
+						tostring(reason), tostring(model_name), tostring(request_backend),
+						tostring(state.llm_backend)))
+					if type(on_stale) == "function" then on_stale(reason) end
 					return
 				end
 				if type(on_ok) == "function" then on_ok(...) end
 			end,
 			function(...)
-				if my_token ~= req_token then
-					Logger.debug(LOG, string.format("Stale fail-callback discarded (model=%s).", tostring(model_name)))
+				local reason = stale_reason()
+				if reason then
+					Logger.debug(LOG, string.format(
+						"Stale fail-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
+						tostring(reason), tostring(model_name), tostring(request_backend),
+						tostring(state.llm_backend)))
+					if type(on_stale) == "function" then on_stale(reason) end
 					return
 				end
 				if type(on_fail) == "function" then on_fail(...) end
@@ -460,6 +477,11 @@ function M.new(ctx)
 			-- Requirements failed — restore predictions so the user is not left stranded
 			Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
 			unlock_predictions()
+		end, nil, function(reason)
+			-- A superseding model request owns the existing prediction lock. A
+			-- backend change does not necessarily launch another model request, so
+			-- it must release the lock captured by this abandoned MLX switch.
+			if reason == "backend" then unlock_predictions() end
 		end)
 	end
 
