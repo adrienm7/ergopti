@@ -31,6 +31,7 @@ local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
+local FileSystem = require("adapters.file_system")
 
 local Defaults = require("platform.remap.defaults")
 
@@ -55,24 +56,16 @@ local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
 local TomlCodec = require("infra.toml.codec")
-local ENOENT_ERROR_CODE = 2
 
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,
---- and nil,'parse_error' when the file exists but cannot be decoded as TOML
+--- and a classified error when an existing path is unsafe or cannot be decoded
 --- (so callers can distinguish first-launch from corruption).
 function M._load_toml_file(path)
-	local open_ok, fh, open_detail, open_code = pcall(io.open, path, "r")
-	if not open_ok or not fh then
-		if open_ok and open_code == ENOENT_ERROR_CODE then return nil, "absent" end
+	local raw, read_status = FileSystem.read_with_status(path)
+	if read_status ~= "ok" then
+		if read_status == "absent" then return nil, "absent" end
 		Logger.error(LOG, "Cannot read Karabiner user config; treating it as unavailable "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
-		return nil, "read_error"
-	end
-	local read_ok, raw = pcall(fh.read, fh, "*a")
-	local close_ok, closed = pcall(fh.close, fh)
-	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then
-		Logger.error(LOG, "Karabiner user-config read did not commit; treating it as unavailable "
 			.. "(failure content withheld).")
 		return nil, "read_error"
 	end
@@ -402,7 +395,8 @@ end
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
 --- @param user_config_path string Absolute path to config_karabiner.toml.
---- @return table Full state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
+--- @return table|nil state Full state, or nil when the persisted source is unsafe.
+--- @return string status One of "ok", "absent", or "error".
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local data, err = M._load_toml_file(user_config_path)
 
@@ -411,10 +405,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 			-- File exists but is corrupt: _load_toml_file already logged the
 			-- error with the full path. Fall back to defaults so the driver can
 			-- run, but do NOT overwrite the corrupt file.
-			return M.build_default_state(tap_hold_keys, mod_combos)
+			return nil, "error"
 		end
 		Logger.info(LOG, "No user config found — initializing from defaults.")
-		return M.build_default_state(tap_hold_keys, mod_combos)
+		return M.build_default_state(tap_hold_keys, mod_combos), "absent"
 	end
 
 	local defaults = M.build_default_state(tap_hold_keys, mod_combos)
@@ -507,7 +501,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
-	}
+	}, "ok"
 end
 
 --- Persists the current full state to config_karabiner.toml.
@@ -521,12 +515,26 @@ end
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @return boolean True when the state reached disk, false when nothing was saved.
 function M.save_user_config(state, user_config_path, overwrite_corrupt)
+	local source, source_status
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
 		-- and is the only way to notice that the file went bad since boot.
-		local _, err = M._load_toml_file(user_config_path)
-		if err == "parse_error" or err == "read_error" then
-			Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
+		source, source_status = FileSystem.read_with_status(user_config_path)
+		if source_status == "error" then
+			Logger.error(LOG, "Refusing to overwrite the unsafe user config at '%s' — settings NOT saved.",
+				user_config_path)
+			return false
+		end
+		if source_status == "ok" then
+			local decoded_ok = pcall(TomlCodec.decode, source)
+			if not decoded_ok then
+				Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
+					user_config_path)
+				return false
+			end
+		end
+		if source_status ~= "absent" then
+			Logger.error(LOG, "Refusing to overwrite user config at '%s' after an unclassified read.",
 				user_config_path)
 			return false
 		end
@@ -552,29 +560,17 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 		return false
 	end
 
-	-- Atomic write via .tmp + rename.
-	local tmp = user_config_path .. ".tmp"
-	local open_ok, fh = pcall(io.open, tmp, "w")
-	if not open_ok or not fh then
-		Logger.error(LOG, "Cannot write user config at '%s'.", user_config_path)
-		return false
+	local expected_source
+	if not overwrite_corrupt then
+		expected_source = {
+			status = source_status,
+			content = source,
+		}
 	end
-	local write_ok, written = pcall(fh.write, fh, payload)
-	local close_ok, closed = pcall(fh.close, fh)
-	if not write_ok or not written or not close_ok or closed ~= true then
-		Logger.error(LOG, "Karabiner user-config staging did not commit; settings NOT saved "
-			.. "(failure content withheld).")
-		pcall(os.remove, tmp)
-		return false
-	end
-	-- This is the ONLY persistence path for every Karabiner setting, and the
-	-- rename is the step that actually publishes them. Discarding its result and
-	-- logging success unconditionally meant a failed save was indistinguishable
-	-- from a successful one until the next boot restored the old file.
-	local ok_rename, renamed = pcall(os.rename, tmp, user_config_path)
-	if not ok_rename or not renamed then
-		Logger.error(LOG, "Cannot publish user config to '%s' — settings NOT saved (staged at '%s').",
-			user_config_path, tmp)
+	local write_ok, written = pcall(FileSystem.write, user_config_path, payload, expected_source)
+	if not write_ok or written ~= true then
+		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
+			user_config_path)
 		return false
 	end
 	Logger.debug(LOG, "User config saved.")

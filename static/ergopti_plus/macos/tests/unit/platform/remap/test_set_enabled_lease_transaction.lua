@@ -34,6 +34,9 @@ local function load_enabled_remap(options)
 		stop_callbacks = {},
 		classifier_refreshes = 0,
 		classifier_clears = 0,
+		save_succeeds = options.save_succeeds ~= false,
+		lease_init = 0,
+		input_source_watchers = 0,
 		unbound = 0,
 		gesture_stop_attempts = 0,
 		lifecycle_stop_attempts = 0,
@@ -61,6 +64,7 @@ local function load_enabled_remap(options)
 		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
+			if options.config_error then return nil, "error" end
 			return {
 				enabled = options.initially_enabled ~= false,
 				tap_hold_config = {},
@@ -74,7 +78,18 @@ local function load_enabled_remap(options)
 		save_user_config = function(state)
 			calls.save = calls.save + 1
 			calls.saved_enabled[#calls.saved_enabled + 1] = state.enabled == true
-			return options.save_succeeds ~= false
+			return calls.save_succeeds
+		end,
+		build_default_state = function()
+			return {
+				enabled = true,
+				tap_hold_config = {},
+				mod_combos_config = {},
+				tap_hold_timeout_ms = 200,
+				sticky_timeout_ms = 1000,
+				simultaneous_threshold_ms = 50,
+				combo_symmetric = false,
+			}
 		end,
 		resolve_layout_actions = function() return 0 end,
 	}
@@ -108,6 +123,7 @@ local function load_enabled_remap(options)
 	}
 	package.loaded["platform.remap.lease_controller"] = {
 		init = function(phase_listener)
+			calls.lease_init = calls.lease_init + 1
 			calls.phase_listener = phase_listener
 			return true
 		end,
@@ -205,7 +221,9 @@ local function load_enabled_remap(options)
 			if options.hotkey_failure_index == calls.hotkey_attempts then return nil end
 			return "monitor"
 		end,
-		start_input_source_watcher = function() end,
+		start_input_source_watcher = function()
+			calls.input_source_watchers = calls.input_source_watchers + 1
+		end,
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
@@ -257,7 +275,7 @@ local function load_enabled_remap(options)
 			usleep = function() end,
 		},
 	})
-	remap.init({ expand_path = function(path) return path end })
+	calls.init_result = remap.init({ expand_path = function(path) return path end })
 	calls.stop, calls.start, calls.start_paused = 0, 0, 0
 	calls.build, calls.deploy, calls.execute, calls.save = 0, 0, 0, 0
 	calls.saved_enabled = {}
@@ -288,6 +306,7 @@ local function load_enabled_remap(options)
 		end
 	end
 	function calls.set_paused(value) paused_now = value == true end
+	function calls.set_save_succeeds(value) calls.save_succeeds = value == true end
 	return remap, calls
 end
 
@@ -575,6 +594,76 @@ helpers.describe("karabiner enable state is committed only after READY", functio
 		calls.finish_stop(true, "stopped")
 		helpers.assert_true(result == false)
 		helpers.assert_true(calls.unbound >= 4)
+	end)
+end)
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 1b/ Synchronous setters are transactional =======
+-- =========================================================
+-- =========================================================
+
+helpers.describe("karabiner synchronous setters commit disk before live state", function()
+	helpers.it("rolls back every setter class when persistence returns false", function()
+		local remap = load_enabled_remap({ save_succeeds = false })
+		local setters = {
+			{ call = function() return remap.set_tap_action("left_shift", "escape") end,
+				read = function() return remap.get_tap_action("left_shift") end, expected = "none" },
+			{ call = function() return remap.set_hold_action("left_shift", "layer") end,
+				read = function() return remap.get_hold_action("left_shift") end, expected = "none" },
+			{ call = function() return remap.set_tap_timeout("left_shift", 321) end,
+				read = function() return remap.get_tap_timeout("left_shift") end, expected = nil },
+			{ call = function() return remap.set_combo_tap_action("left_shift+right_shift", "escape") end,
+				read = function() return remap.get_combo_tap_action("left_shift+right_shift") end, expected = "none" },
+			{ call = function() return remap.set_combo_hold_action("left_shift+right_shift", "layer") end,
+				read = function() return remap.get_combo_hold_action("left_shift+right_shift") end, expected = "none" },
+			{ call = function() return remap.set_combo_combo_action("left_shift+right_shift", "escape") end,
+				read = function() return remap.get_combo_combo_action("left_shift+right_shift") end, expected = "none" },
+			{ call = function() return remap.set_tap_hold_timeout(321) end,
+				read = remap.get_tap_hold_timeout, expected = 200 },
+			{ call = function() return remap.set_sticky_timeout(4321) end,
+				read = remap.get_sticky_timeout, expected = 1000 },
+			{ call = function() return remap.set_simultaneous_threshold(87) end,
+				read = remap.get_simultaneous_threshold, expected = 50 },
+			{ call = function() return remap.set_combo_symmetric(true) end,
+				read = remap.get_combo_symmetric, expected = false },
+		}
+		for index, case in ipairs(setters) do
+			helpers.assert_eq(case.call(), false, "setter " .. index .. " must expose save refusal")
+			helpers.assert_eq(case.read(), case.expected,
+				"setter " .. index .. " must preserve its pre-save live value")
+		end
+	end)
+
+	helpers.it("reset publishes all defaults together or preserves every prior value", function()
+		local remap, calls = load_enabled_remap()
+		helpers.assert_true(remap.set_tap_action("left_shift", "escape"))
+		helpers.assert_true(remap.set_combo_symmetric(true))
+		helpers.assert_true(remap.set_tap_hold_timeout(321))
+		calls.set_save_succeeds(false)
+
+		helpers.assert_eq(remap.reset_to_defaults(), false)
+		helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+		helpers.assert_eq(remap.get_combo_symmetric(), true)
+		helpers.assert_eq(remap.get_tap_hold_timeout(), 321)
+	end)
+end)
+
+helpers.describe("karabiner init fails closed on unsafe persisted config", function()
+	helpers.it("arms no state, lease, watcher, or regeneration surface", function()
+		local remap, calls = load_enabled_remap({ config_error = true })
+		helpers.assert_eq(calls.init_result, false)
+		helpers.assert_eq(calls.lease_init, 0,
+			"an unreadable config may contain enabled=false, so no lease generation may be prepared")
+		helpers.assert_eq(calls.input_source_watchers, 0)
+		helpers.assert_eq(calls.build, 0)
+		helpers.assert_eq(calls.deploy, 0)
+		helpers.assert_eq(remap.get_enabled(), false,
+			"require_state must prove that no default state was published")
 	end)
 end)
 
