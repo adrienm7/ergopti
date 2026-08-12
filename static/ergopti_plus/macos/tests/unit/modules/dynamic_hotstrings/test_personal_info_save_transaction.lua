@@ -72,11 +72,21 @@ end
 
 --- Loads a fresh PersonalInfo instance with a controlled preview fence.
 --- @param config_path string Existing personal_info.toml path.
+--- @param logs string[] Captured privacy-safe diagnostic lines.
 --- @return table personal_info Real module instance.
 --- @return table fence Mutable fence state.
-local function load_personal_info(config_path)
+local function load_personal_info(config_path, logs)
+	local previous_logger = package.loaded["infra.logger"]
+	local Logger = helpers.make_logger_stub()
+	local function capture(_log, format_string, ...)
+		logs[#logs + 1] = string.format(format_string, ...)
+	end
+	Logger.warn = capture
+	Logger.error = capture
+	package.loaded["infra.logger"] = Logger
 	package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 	local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+	package.loaded["infra.logger"] = previous_logger
 	local fence = { allow = false, calls = 0, raises = false }
 	local keymap = {
 		get_trigger_char = function() return "★" end,
@@ -84,7 +94,7 @@ local function load_personal_info(config_path)
 		register_preview_provider = function() end,
 		invalidate_hotstring_preview = function()
 			fence.calls = fence.calls + 1
-			if fence.raises then error("simulated preview revocation crash") end
+			if fence.raises then error(tostring(fence.raises), 0) end
 			return fence.allow
 		end,
 	}
@@ -162,12 +172,14 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 		local config_path = os.tmpname()
 		local staged_path = config_path .. ".ergopti-save.tmp"
 		with_cleanup(function()
+			local private_sentinel = "PRIVATE-IBAN-SENTINEL"
+			local logs = {}
 			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
 			local file = assert(io.open(config_path, "wb"))
 			assert(file:write(initial))
 			assert(file:close())
 
-			local personal_info, fence = load_personal_info(config_path)
+			local personal_info, fence = load_personal_info(config_path, logs)
 			local live_info = personal_info.get_info()
 			helpers.assert_eq(live_info.first_name, "Alice")
 
@@ -187,17 +199,19 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			helpers.assert_eq(read_file(config_path), initial,
 				"a non-boolean fence result must preserve the committed TOML")
 
-			fence.raises = true
+			fence.raises = private_sentinel
 			helpers.assert_eq(personal_info.save_info({ first_name = "Bob" }), false,
 				"a throwing preview fence must become an exact rejected save")
 			helpers.assert_eq(live_info.first_name, "Alice",
 				"a throwing preview fence must preserve the old live expansion value")
 			helpers.assert_eq(read_file(config_path), initial,
 				"a throwing preview fence must preserve the committed TOML")
+			helpers.assert_true(not table.concat(logs, "\n"):find(private_sentinel, 1, true),
+				"a preview exception may contain personal data and must stay out of logs")
 			fence.raises = false
 
 			fence.allow = true
-			local rename_result = with_rename(function() return nil, "simulated rename failure" end,
+			local rename_result = with_rename(function() return nil, private_sentinel end,
 				function() return personal_info.save_info({ first_name = "Bob" }) end)
 			helpers.assert_eq(rename_result, false,
 				"a failed staged-file publication must reject the entire save")
@@ -205,6 +219,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				"a rename failure must not publish the candidate in memory")
 			helpers.assert_eq(read_file(config_path), initial,
 				"a rename failure must preserve the previous committed TOML")
+			helpers.assert_true(not table.concat(logs, "\n"):find(private_sentinel, 1, true),
+				"a filesystem failure may contain personal data and must stay out of logs")
 
 			local committed = with_rename(function(staged_path_arg, target_path_arg)
 				helpers.assert_eq(target_path_arg, config_path,
