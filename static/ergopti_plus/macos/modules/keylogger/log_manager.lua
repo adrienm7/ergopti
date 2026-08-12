@@ -216,6 +216,8 @@ end
 --- Compute every path the log manager touches once `device_id` is known.
 --- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
 --- @param device_id   string The current device's UUID.
+--- @return table Resolved path bundle. The caller publishes it only after the
+--- device identity transaction commits.
 local function _resolve_paths(metrics_dir, device_id)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
@@ -223,7 +225,7 @@ local function _resolve_paths(metrics_dir, device_id)
 	local by_dev  = md .. "by_device/" .. device_id .. "/"
 	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
 
-	_paths = {
+	return {
 		metrics_dir      = md,
 		by_device_dir    = by_dev,
 		device_json_path = by_dev .. "device.json",
@@ -250,6 +252,7 @@ end
 --- @param metrics_dir string The metrics root.
 --- @return table|nil device The fully populated device object, or nil when the
 --- identity scan did not commit.
+--- @return boolean needs_publication True only for a newly generated identity.
 local function _resolve_device(metrics_dir)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
@@ -302,7 +305,7 @@ local function _resolve_device(metrics_dir)
 		Logger.error(LOG, "Existing device identity scan failed; initialization refused.")
 		return nil
 	end
-	if matching_device then return matching_device end
+	if matching_device then return matching_device, false end
 	if unresolved_candidate then
 		Logger.error(LOG, "An existing device identity could not be owned; initialization refused.")
 		return nil
@@ -316,19 +319,25 @@ local function _resolve_device(metrics_dir)
 		host_signature = current_host,
 		created_at     = _now_ts(),
 		schema_version = 1,
-	}
+	}, true
 end
 
 --- Atomically write the device object back to disk.
-local function _write_device_json(obj)
-	local tmp = _paths.device_json_path .. ".tmp"
-	local f, err = io.open(tmp, "w")
-	if not f then
-		Logger.error(LOG, "Cannot write %s: %s.", tmp, tostring(err))
+local function _write_device_json(obj, device_json_path)
+	local encode_ok, encoded = pcall(json.encode, obj)
+	if not encode_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot encode device identity; initialization refused.")
 		return false
 	end
-	f:write(json.encode(obj)); f:close()
-	os.rename(tmp, _paths.device_json_path)
+
+	-- The shared adapter owns symlink-safe staging, write/flush/close checks,
+	-- path revalidation, and atomic rename. LogManager owns the higher-level
+	-- rule that no generated identity becomes session state before it returns true.
+	local write_ok, written = pcall(FileSystem.write, device_json_path, encoded)
+	if not write_ok or written ~= true then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false
+	end
 	return true
 end
 
@@ -1332,20 +1341,29 @@ function M.init(core_state)
 
 	Logger.start(LOG, "Initializing log manager…")
 
-	_device_obj = _resolve_device(core_state.LOG_DIR)
-	if not _device_obj then
+	local device_obj, needs_publication = _resolve_device(core_state.LOG_DIR)
+	if not device_obj then
 		Logger.error(LOG, "M.init(): device identity could not be resolved — log manager disabled.")
 		return false
 	end
+	local device_id = device_obj.device_id
+	local paths = _resolve_paths(core_state.LOG_DIR, device_id)
+
+	_mkdir_p(paths.metrics_dir)
+	_mkdir_p(paths.by_device_dir)
+	_mkdir_p(paths.tmpdir_dir)
+
+	if needs_publication and not _write_device_json(device_obj, paths.device_json_path) then
+		return false
+	end
+
+	-- Publish the shared state only after a new identity is durable (or an
+	-- existing identity was read and owned). Every public method remains behind
+	-- _require_state until this transaction commits.
 	_state = core_state
-	_device_id  = _device_obj.device_id
-	_resolve_paths(_state.LOG_DIR, _device_id)
-
-	_mkdir_p(_paths.metrics_dir)
-	_mkdir_p(_paths.by_device_dir)
-	_mkdir_p(_paths.tmpdir_dir)
-
-	_write_device_json(_device_obj)
+	_device_obj = device_obj
+	_device_id = device_id
+	_paths = paths
 	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
 
 	-- Initialise submodules.
