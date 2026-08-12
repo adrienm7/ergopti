@@ -47,8 +47,8 @@ local TEST_DELAY_MS  = 420
 local function load_window()
 	local store = { sets = 0, clears = 0 }
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
-		set_override   = function() store.sets   = store.sets   + 1 end,
-		clear_override = function() store.clears = store.clears + 1 end,
+		set_override   = function() store.sets   = store.sets   + 1 return true end,
+		clear_override = function() store.clears = store.clears + 1 return true end,
 		get_sections   = function() return {} end,
 		resolve        = function() return { delay = 0.5, color = "#000000" } end,
 		resolve_ext    = function() return { delay = 0.5, color = "#000000" } end,

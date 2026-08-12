@@ -31,6 +31,7 @@ local M = {}
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
+local FileSystem = require("adapters.file_system")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
@@ -60,6 +61,8 @@ local GLOBAL_DEFAULT_COLOR = nil
 -- from the shared canon by load_shared_defaults() — kept in one table so all
 -- per-category baselines stay visible in one place.
 local CATEGORY_DEFAULT_COLORS = {}
+
+local ENOENT_ERROR_CODE = 2
 
 
 -- =================================
@@ -105,24 +108,57 @@ end
 --- ====================================
 --- ====================================
 
+--- Reads a complete file and commits its bytes only after an exact close.
+--- @param path string Absolute path.
+--- @return string|nil content
+--- @return string status `committed`, `absent`, or `error`.
+local function read_complete_file(path)
+	local open_ok, f, open_err, open_code = pcall(io.open, path, "r")
+	if not open_ok then
+		Logger.error(LOG, "Override file open raised for '%s': %s.", path, tostring(f))
+		return nil, "error"
+	end
+	if not f then
+		if open_code == ENOENT_ERROR_CODE then return "", "absent" end
+		Logger.error(LOG, "Override file cannot be opened for reading: %s.", tostring(open_err))
+		return nil, "error"
+	end
+
+	local read_ok, content, read_err = pcall(f.read, f, "*a")
+	local close_ok, closed, close_err = pcall(f.close, f)
+	if not read_ok or type(content) ~= "string" then
+		Logger.error(LOG, "Override file read failed: %s.", tostring(read_ok and read_err or content))
+		return nil, "error"
+	end
+	if not close_ok or closed ~= true then
+		Logger.error(LOG, "Override file close failed: %s.", tostring(close_ok and close_err or closed))
+		return nil, "error"
+	end
+	return content, "committed"
+end
+
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
 --- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
 --- Unknown keys and malformed lines are silently ignored — the file is
 --- user-edited (and machine-written) so robustness matters more than strictness.
 --- @param path string Absolute path to the override file.
---- @return table, string|nil The parsed overrides and optional word-delimiter override.
+--- @return table overrides The parsed overrides.
+--- @return string|nil word_delimiters The optional word-delimiter override.
+--- @return string status `committed`, `absent`, or `error`.
 local function parse_overrides(path)
 	local result = {}
 	local word_delimiters = nil
-	local f = io.open(path, "r")
-	if not f then return result, nil end
+	local content, read_status = read_complete_file(path)
+	if read_status == "error" then return result, nil, "error" end
+	if read_status == "absent" then return result, nil, "absent" end
 
 	local current_cat = nil
 	local current_sec = nil
 	local in_global   = false
 
-	for raw in f:lines() do
+	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
+		raw = raw:gsub("\r$", "")
 		local line = raw:match("^%s*(.-)%s*$")
 		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
 
@@ -144,7 +180,7 @@ local function parse_overrides(path)
 			if wd then
 				-- Single-pass unescape so \\n decodes as backslash+n not newline
 				wd = wd:gsub('\\(.)', function(c)
-						return ({n="\n", t="\t", ['\\']='\\'})[c] or ('\\'..c)
+						return ({n="\n", r="\r", t="\t", ['\\']='\\', ['"']='"'})[c] or ('\\'..c)
 					end)
 				word_delimiters = wd
 			end
@@ -227,8 +263,18 @@ local function parse_overrides(path)
 		::continue::
 	end
 
-	pcall(function() f:close() end)
-	return result, word_delimiters
+	return result, word_delimiters, "committed"
+end
+
+--- Escapes a string for a TOML basic string.
+--- @param value string Raw string.
+--- @return string escaped
+local function escape_toml_string(value)
+	return value:gsub("\\", "\\\\")
+		:gsub('"', '\\"')
+		:gsub("\t", "\\t")
+		:gsub("\n", "\\n")
+		:gsub("\r", "\\r")
 end
 
 --- Serializes the in-memory override table back to TOML.
@@ -256,7 +302,7 @@ local function serialize_overrides(overrides, word_delimiters)
 		-- only the quote and the backslash escaped. string.format("%q") emits LUA
 		-- escapes — a tab becomes \9 — which round-trips through Lua and not
 		-- through `word_delimiters%s*=%s*"(.-)"`.
-		local escaped = word_delimiters:gsub("\\", "\\\\"):gsub('"', '\\"')
+		local escaped = escape_toml_string(word_delimiters)
 		table.insert(out, 'word_delimiters = "' .. escaped .. '"')
 		table.insert(out, "")
 	end
@@ -317,21 +363,30 @@ local function serialize_overrides(overrides, word_delimiters)
 	return table.concat(out, "\n")
 end
 
---- Persists the current in-memory overrides to disk.
---- Called by every setter that mutates `_state.overrides`.
+--- Clones an override tree so a setter can build an unpublished candidate.
+--- @param value any Value to clone.
+--- @return any clone
+local function clone_value(value)
+	if type(value) ~= "table" then return value end
+	local clone = {}
+	for key, child in pairs(value) do clone[key] = clone_value(child) end
+	return clone
+end
+
+--- Persists a candidate override state through the atomic file-system adapter.
+--- @param overrides table Candidate overrides.
+--- @param word_delimiters string|nil Candidate delimiter override.
 --- @return boolean True on success, false on I/O failure.
-local function save_to_disk()
+local function save_to_disk(overrides, word_delimiters)
 	if not _state then return false end
-	local content = serialize_overrides(_state.overrides, _state.word_delimiters)
-	local f, err = io.open(_state.path, "w")
-	if not f then
-		Logger.error(LOG, "Failed to open override file for writing: %s.", tostring(err))
+	if _state.writes_blocked then
+		Logger.error(LOG, "Override save refused because the source read did not commit.")
 		return false
 	end
-	local ok = pcall(function() f:write(content) end)
-	pcall(function() f:close() end)
-	if not ok then
-		Logger.error(LOG, "Failed to write override file content.")
+	local content = serialize_overrides(overrides, word_delimiters)
+	local ok, committed = pcall(FileSystem.write, _state.path, content)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Failed to commit override file atomically.")
 		return false
 	end
 	Logger.debug(LOG, "Override file written: '%s'.", _state.path)
@@ -359,7 +414,11 @@ local function get_toml_meta(category)
 		return cache[category]
 	end
 
-	local parsed = TomlReader.parse(toml_path)
+	local parse_ok, parsed, committed = pcall(TomlReader.parse, toml_path)
+	if not parse_ok or committed ~= true or type(parsed) ~= "table" then
+		Logger.error(LOG, "Category TOML read did not commit: '%s'.", toml_path)
+		return { sections = {} }
+	end
 	cache[category] = {
 		delay        = parsed.meta.delay,
 		color        = parsed.meta.color,
@@ -396,19 +455,25 @@ function M.init(opts)
 		return
 	end
 
-	local overrides, word_delimiters = parse_overrides(opts.override_path)
+	local overrides, word_delimiters, read_status = parse_overrides(opts.override_path)
 	_state = {
 		path            = opts.override_path,
 		toml_resolver   = opts.toml_resolver,
 		overrides       = overrides,
 		word_delimiters = word_delimiters,
+		writes_blocked  = read_status == "error",
 		toml_cache      = {},
 		-- Memo for M.resolve, cleared by the three writers that can change an
 		-- answer. Living in _state means M.init() resets it without a separate
 		-- lifecycle to remember.
 		resolve_cache   = {},
 	}
+	if read_status == "error" then
+		Logger.error(LOG, "Initialization degraded: override source is unreadable and writes are blocked.")
+		return false
+	end
 	Logger.success(LOG, "Initialized (override file: '%s').", opts.override_path)
+	return true
 end
 
 --- Returns the effective delay (seconds) and color (hex string) for a group.
@@ -490,8 +555,8 @@ function M.resolve_ext(ext_id, toml_path, section)
 	-- Read the extension TOML meta directly (bypasses the category-name resolver).
 	local cache_key = "ext:" .. toml_path
 	if not _state.toml_cache[cache_key] then
-		local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
-		if ok and parsed then
+		local ok, parsed, committed = pcall(TomlReader.parse, toml_path)
+		if ok and committed == true and type(parsed) == "table" then
 			_state.toml_cache[cache_key] = {
 				delay        = parsed.meta and parsed.meta.delay,
 				color        = parsed.meta and parsed.meta.color,
@@ -499,7 +564,9 @@ function M.resolve_ext(ext_id, toml_path, section)
 				sections     = (parsed.meta and parsed.meta.sections) or {},
 			}
 		else
-			_state.toml_cache[cache_key] = { sections = {} }
+			Logger.error(LOG, "Extension TOML read did not commit: '%s'.", toml_path)
+			return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
+				show_tooltip = true, has_override = false }
 		end
 	end
 	local meta     = _state.toml_cache[cache_key]
@@ -549,17 +616,14 @@ end
 --- @return boolean True on success.
 function M.set_override(category, section, field, value)
 	if not require_state("set_override") then return false end
-	-- Any write here can change what the cascade resolves to, so the memo goes
-	-- with it. Clearing the whole table rather than one key: an override on a
-	-- CATEGORY changes the answer for every section under it too.
-	if _state.resolve_cache then _state.resolve_cache = {} end
 	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
 		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
 		return false
 	end
 
-	_state.overrides[category] = _state.overrides[category] or { sections = {} }
-	local entry = _state.overrides[category]
+	local candidate = clone_value(_state.overrides)
+	candidate[category] = candidate[category] or { sections = {} }
+	local entry = candidate[category]
 	entry.sections = entry.sections or {}
 
 	if section then
@@ -569,9 +633,12 @@ function M.set_override(category, section, field, value)
 		entry[field] = value
 	end
 
+	if not save_to_disk(candidate, _state.word_delimiters) then return false end
+	_state.overrides = candidate
+	_state.resolve_cache = {}
 	Logger.debug(LOG, "Override set: %s%s.%s = %s.",
 		category, section and ("." .. section) or "", field, tostring(value))
-	return save_to_disk()
+	return true
 end
 
 --- Removes a user override for a field. Reverts to the TOML/global default.
@@ -581,11 +648,12 @@ end
 --- @return boolean True on success.
 function M.clear_override(category, section, field)
 	if not require_state("clear_override") then return false end
-	-- Any write here can change what the cascade resolves to, so the memo goes
-	-- with it. Clearing the whole table rather than one key: an override on a
-	-- CATEGORY changes the answer for every section under it too.
-	if _state.resolve_cache then _state.resolve_cache = {} end
-	local entry = _state.overrides[category]
+	if _state.writes_blocked then
+		Logger.error(LOG, "Override clear refused because the source read did not commit.")
+		return false
+	end
+	local candidate = clone_value(_state.overrides)
+	local entry = candidate[category]
 	if not entry then return true end
 
 	local target = section and (entry.sections or {})[section] or entry
@@ -600,11 +668,14 @@ function M.clear_override(category, section, field)
 		target.priority     = nil
 	end
 
+	if not save_to_disk(candidate, _state.word_delimiters) then return false end
+	_state.overrides = candidate
+	_state.resolve_cache = {}
 	Logger.debug(LOG, "Override cleared: %s%s%s.",
 		category,
 		section and ("." .. section) or "",
 		field and ("." .. field) or "")
-	return save_to_disk()
+	return true
 end
 
 --- Returns the absolute path of the override file (for diagnostics / UI).
@@ -633,13 +704,16 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") then return false end
-	-- Any write here can change what the cascade resolves to, so the memo goes
-	-- with it. Clearing the whole table rather than one key: an override on a
-	-- CATEGORY changes the answer for every section under it too.
-	if _state.resolve_cache then _state.resolve_cache = {} end
-	local overrides, word_delimiters = parse_overrides(_state.path)
+	local overrides, word_delimiters, read_status = parse_overrides(_state.path)
+	if read_status == "error" then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Override reload failed; prior memory retained and writes blocked.")
+		return false
+	end
 	_state.overrides       = overrides
 	_state.word_delimiters = word_delimiters
+	_state.writes_blocked  = false
+	_state.resolve_cache   = {}
 	Logger.debug(LOG, "Overrides reloaded from disk.")
 	return true
 end
@@ -661,7 +735,11 @@ function M.get_sections(category)
 	if not require_state("get_sections") then return {} end
 	local toml_path = _state.toml_resolver(category)
 	if type(toml_path) ~= "string" or toml_path == "" then return {} end
-	local parsed = TomlReader.parse(toml_path)
+	local ok, parsed, committed = pcall(TomlReader.parse, toml_path)
+	if not ok or committed ~= true or type(parsed) ~= "table" then
+		Logger.error(LOG, "Section-list TOML read did not commit: '%s'.", toml_path)
+		return {}
+	end
 	local out = {}
 	for _, name in ipairs(parsed.sections_order or {}) do
 		if name ~= "-" then
@@ -730,6 +808,59 @@ function M.get_default_word_delimiters()
 	return DEFAULT_WORD_DELIMITERS
 end
 
+--- Patches only the shared global delimiter key while preserving other bytes.
+--- @param existing string Complete committed source content.
+--- @param delimiters string|nil Candidate delimiter value.
+--- @return string content Candidate file content.
+local function patch_word_delimiters(existing, delimiters)
+	local lines = {}
+	for line in (existing .. "\n"):gmatch("([^\n]*)\n") do
+		table.insert(lines, (line:gsub("\r$", "")))
+	end
+	while #lines > 0 and lines[#lines] == "" do table.remove(lines) end
+
+	local in_global = false
+	local global_start = nil
+	local key_lines = {}
+	for index, line in ipairs(lines) do
+		local trimmed = line:match("^%s*(.-)%s*$") or ""
+		if trimmed == "[__global__]" then
+			in_global = true
+			global_start = index
+		elseif in_global and trimmed:sub(1, 1) == "[" then
+			in_global = false
+		elseif in_global and trimmed:match("^word_delimiters%s*=") then
+			table.insert(key_lines, index)
+		end
+	end
+	local new_line = delimiters
+		and ('word_delimiters = "' .. escape_toml_string(delimiters) .. '"')
+		or nil
+	if #key_lines > 0 then
+		if new_line then lines[key_lines[1]] = new_line end
+		local first_to_remove = new_line and 2 or 1
+		for index = #key_lines, first_to_remove, -1 do table.remove(lines, key_lines[index]) end
+	elseif new_line and global_start then
+		table.insert(lines, global_start + 1, new_line)
+	elseif new_line then
+		if #lines > 0 then table.insert(lines, "") end
+		table.insert(lines, "[__global__]")
+		table.insert(lines, new_line)
+	end
+
+	if not new_line and global_start then
+		local has_value = false
+		for index = global_start + 1, #lines do
+			local trimmed = (lines[index] or ""):match("^%s*(.-)%s*$") or ""
+			if trimmed:sub(1, 1) == "[" then break end
+			if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then has_value = true break end
+		end
+		if not has_value then table.remove(lines, global_start) end
+	end
+
+	return table.concat(lines, "\n") .. "\n"
+end
+
 --- Persists a new word-delimiter string to the [__global__] section of the
 --- override file and updates the in-memory value.
 --- Pass nil or the default string to clear the override (removes the key).
@@ -738,110 +869,32 @@ end
 function M.set_word_delimiters(delimiters)
 	if not require_state("set_word_delimiters") then return false end
 
-	-- Normalize: nil or exact default → remove stored override
+	local candidate
 	if delimiters == nil or delimiters == DEFAULT_WORD_DELIMITERS then
-		_state.word_delimiters = nil
+		candidate = nil
 	else
-		_state.word_delimiters = delimiters
+		candidate = delimiters
 	end
 
-	-- Patch the [__global__] section in the override file in-place.
-	local path = _state.path
-	local existing = ""
-	local f_in = io.open(path, "r")
-	if f_in then
-		existing = f_in:read("*a")
-		pcall(function() f_in:close() end)
-	end
-
-	-- Build the updated file content.
-	local lines = {}
-	for line in (existing .. "\n"):gmatch("([^\n]*)\n") do
-		table.insert(lines, line)
-	end
-	-- Strip trailing empty line that the gmatch above may produce
-	while #lines > 0 and lines[#lines] == "" do table.remove(lines) end
-
-	local in_global = false
-	local global_start = nil
-	local global_end   = nil
-	local key_line     = nil  -- index of existing word_delimiters line inside [__global__]
-
-	for i, line in ipairs(lines) do
-		local trimmed = line:match("^%s*(.-)%s*$") or ""
-		if trimmed == "[__global__]" then
-			in_global = true
-			global_start = i
-		elseif in_global and trimmed:sub(1, 1) == "[" then
-			in_global = false
-			global_end = i - 1
-		elseif in_global and trimmed:match("^word_delimiters%s*=") then
-			key_line = i
-		end
-	end
-	if in_global and not global_end then global_end = #lines end
-
-	-- Helper: escape a Lua string for TOML double-quoted value.
-	local function toml_escape(s)
-		return (s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\t", "\\t"):gsub("\n", "\\n"):gsub("\r", "\\r"))
-	end
-
-	local new_value_line = _state.word_delimiters and
-		('word_delimiters = "' .. toml_escape(_state.word_delimiters) .. '"') or nil
-
-	if key_line then
-		-- Replace or delete the existing key line
-		if new_value_line then
-			lines[key_line] = new_value_line
-		else
-			table.remove(lines, key_line)
-			-- Clean up a now-empty [__global__] section
-			if global_start and lines[global_start] and (lines[global_start]:match("^%[__global__%]")) then
-				-- Remove the section header too if nothing follows in the section
-				local next_real = nil
-				for i = global_start + 1, #lines do
-					local t = lines[i]:match("^%s*(.-)%s*$") or ""
-					if t ~= "" and t:sub(1, 1) ~= "#" then
-						next_real = t
-						break
-					end
-				end
-				if not next_real or next_real:sub(1, 1) == "[" then
-					-- Remove empty section header and any blank lines after it
-					while global_start <= #lines do
-						local t = lines[global_start]:match("^%s*(.-)%s*$") or ""
-						if t == "" or t == "[__global__]" then
-							table.remove(lines, global_start)
-						else
-							break
-						end
-					end
-				end
-			end
-		end
-	elseif new_value_line then
-		-- No existing [__global__] section — append it
-		if global_start then
-			-- Section exists but key was not present; insert after section header
-			table.insert(lines, global_start + 1, new_value_line)
-		else
-			-- Append new section at the end
-			table.insert(lines, "")
-			table.insert(lines, "[__global__]")
-			table.insert(lines, new_value_line)
-		end
-	end
-
-	local content = table.concat(lines, "\n") .. "\n"
-	local f_out, err = io.open(path, "w")
-	if not f_out then
-		Logger.error(LOG, "set_word_delimiters(): cannot write override file: %s.", tostring(err))
+	if _state.writes_blocked then
+		Logger.error(LOG, "Delimiter save refused because the source read did not commit.")
 		return false
 	end
-	pcall(function() f_out:write(content) end)
-	pcall(function() f_out:close() end)
-	Logger.debug(LOG, "word_delimiters persisted: %s.", _state.word_delimiters and
-		('"' .. tostring(_state.word_delimiters) .. '"') or "(default — key removed)")
+	local existing, read_status = read_complete_file(_state.path)
+	if read_status == "error" then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Delimiter save refused because the latest source read failed.")
+		return false
+	end
+	local content = patch_word_delimiters(existing or "", candidate)
+	local write_ok, committed = pcall(FileSystem.write, _state.path, content)
+	if not write_ok or committed ~= true then
+		Logger.error(LOG, "Failed to commit word_delimiters atomically.")
+		return false
+	end
+	_state.word_delimiters = candidate
+	Logger.debug(LOG, "word_delimiters persisted: %s.", candidate and
+		('"' .. tostring(candidate) .. '"') or "(default — key removed)")
 	return true
 end
 
@@ -867,7 +920,10 @@ local function load_shared_defaults()
 	-- in the headless unit harness.
 	local toml_path = Paths.shared("modules/hotstrings/defaults.toml")
 
-	local parsed   = TomlReader.parse(toml_path)
+	local parsed, committed = TomlReader.parse(toml_path)
+	if committed ~= true then
+		error("[hotstrings_config] _shared/modules/hotstrings/defaults.toml read did not commit: " .. toml_path)
+	end
 	local sections = (type(parsed) == "table") and parsed.sections or nil
 	if type(sections) ~= "table" then
 		error("[hotstrings_config] _shared/modules/hotstrings/defaults.toml not readable: " .. toml_path)
