@@ -675,8 +675,10 @@ end
 --- a final pathname that was absent during resolution.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
+--- @param expected_source table|nil Optional `{ status = "ok"|"absent", content = string }`
+---   snapshot that must still match after staging and immediately before rename.
 --- @return boolean true on success, false on any error.
-function M.write(path, content)
+function M.write(path, content, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "write(): path must be a non-empty string.")
 		return false
@@ -779,6 +781,21 @@ function M.write(path, content)
 			Logger.error(LOG, "write(): destination changed before publication — %s", tostring(revalidate_err))
 			preserve_staging_area("pre-publication revalidation failure", revalidate_err)
 			return false
+		end
+
+		if type(expected_source) == "table" then
+			local current, current_status, current_detail = M.read_with_status(path)
+			local source_unchanged = current_status == expected_source.status
+				and (current_status ~= "ok" or current == expected_source.content)
+			if not source_unchanged then
+				Logger.error(
+					LOG,
+					"write(): source changed before publication — %s",
+					tostring(current_detail or current_status)
+				)
+				cleanup_staging_if_safe("source precondition failure")
+				return false
+			end
 		end
 
 		local rename_ok, rename_err = os.rename(tmp_path, resolved_path)

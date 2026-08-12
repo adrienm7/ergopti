@@ -215,7 +215,12 @@ local function publish_content(path, content, file_adapter, expected_source)
 					.. tostring(current_detail or current_status)
 			end
 		end
-		local call_ok, written, write_detail = pcall(file_adapter.write, path, content)
+		local call_ok, written, write_detail = pcall(
+			file_adapter.write,
+			path,
+			content,
+			expected_source
+		)
 		if call_ok and written == true then return true end
 		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
 	end

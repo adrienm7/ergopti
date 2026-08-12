@@ -281,6 +281,65 @@ end)
 helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function()
 	local TMP = os.tmpname()
 
+	helpers.it("revalidates an expected source after staging and before rename", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w"))
+		assert(seed:write("observed source"))
+		assert(seed:close())
+		local adapter = make_adapter()
+		local original_open = io.open
+		local original_rename = os.rename
+		local renames = 0
+		local foreign_edit_committed = false
+
+		io.open = function(open_path, mode)
+			local fh, open_err = original_open(open_path, mode)
+			if fh and mode == "w"
+					and open_path:find(STAGING_LOCK_SUFFIX .. "/payload", 1, true) then
+				return {
+					write = function(_, value) return fh:write(value) end,
+					close = function()
+						local closed, close_err = fh:close()
+						local foreign = assert(original_open(path, "w"))
+						assert(foreign:write("foreign concurrent edit"))
+						assert(foreign:close())
+						foreign_edit_committed = true
+						return closed, close_err
+					end,
+				}
+			end
+			return fh, open_err
+		end
+		os.rename = function(old_path, new_path)
+			if new_path == path then renames = renames + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, written = xpcall(function()
+			return adapter.write(path, "our candidate", {
+				status = "ok",
+				content = "observed source",
+			})
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		if not call_ok then
+			os.remove(path)
+			error(written, 0)
+		end
+
+		helpers.assert_true(foreign_edit_committed,
+			"the fixture must replace the observed source only after staging closes")
+		helpers.assert_eq(written, false,
+			"a changed source must fail its publication precondition")
+		helpers.assert_eq(renames, 0,
+			"the source precondition must be checked before atomic rename")
+		local live = assert(original_open(path, "r"))
+		helpers.assert_eq(live:read("*a"), "foreign concurrent edit",
+			"the concurrent writer's complete bytes must survive")
+		live:close()
+		os.remove(path)
+	end)
+
 	helpers.it("write() produces a complete, readable file", function()
 		local adapter = make_adapter()
 		os.remove(TMP)
