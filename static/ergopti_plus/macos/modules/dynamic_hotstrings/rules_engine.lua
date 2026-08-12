@@ -50,9 +50,34 @@ local _km             = nil
 local _trigger        = "\u{2605}"
 local _is_injecting   = false
 local _personal_data  = nil
+-- A mutable resolver must run once for a visibly committed action. This
+-- snapshot binds its exact result to the bridge's opaque tooltip lease.
+local _preview_snapshot = nil
 -- Mutable section list kept as an upvalue so register_prefix_entries can
 -- update the real counts after personal data is injected.
 local _sections       = nil
+
+--- Revokes the prospective value and any committed row before semantics change.
+--- @param reason string Stable diagnostic context.
+--- @return boolean committed True only when mutation may proceed.
+local function invalidate_preview_snapshot(reason)
+	if not _km then
+		_preview_snapshot = nil
+		return true
+	end
+	if type(_km.invalidate_hotstring_preview) ~= "function" then
+		Logger.error(LOG, "%s could not revoke the dynamic preview: keymap fence is unavailable.", reason)
+		return false
+	end
+	local ok, committed = xpcall(_km.invalidate_hotstring_preview, debug.traceback)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "%s could not revoke the dynamic preview (result: %s).",
+			reason, tostring(committed))
+		return false
+	end
+	_preview_snapshot = nil
+	return true
+end
 
 
 
@@ -78,15 +103,22 @@ local function interceptor(event, km_buffer, ctx)
 	if _is_injecting or not _km then return nil end
 
 	local flags = (ctx and ctx.flags) or event:getFlags()
-	if flags.cmd or flags.ctrl then return nil end
+	if flags.cmd or flags.ctrl then
+		_preview_snapshot = nil
+		return nil
+	end
 
 	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
-	if not Terminators.matches_magic_event(char, _trigger) then return nil end
+	if not Terminators.matches_magic_event(char, _trigger) then
+		_preview_snapshot = nil
+		return nil
+	end
 
 	-- Gate on the group master toggle so that disabling the dynamichotstrings group
 	-- (or "Disable all hotstrings") stops date expansion even though date rules are
 	-- matched through the interceptor rather than registry mappings (M-9).
 	if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
+		_preview_snapshot = nil
 		return nil
 	end
 
@@ -95,7 +127,24 @@ local function interceptor(event, km_buffer, ctx)
 		and function(grp, sec) return is_sec_enabled(grp, sec) end
 		or nil
 
-	local match = SharedEngine.match_buffer(km_buffer or "", GROUP_NAME, guard)
+	local buffer = km_buffer or ""
+	local snapshot = _preview_snapshot
+	_preview_snapshot = nil -- every action identity is single-use
+	local match = nil
+	if snapshot and snapshot.buffer == buffer and snapshot.trigger == _trigger then
+		local section_live = not guard or guard(GROUP_NAME, snapshot.match.rule.section)
+		local lease_ok = false
+		if section_live and type(_km.owns_visible_magic_action) == "function" then
+			local ok_lease, owns = pcall(_km.owns_visible_magic_action, snapshot.token, buffer)
+			if not ok_lease then
+				Logger.error(LOG, "Dynamic preview lease check failed: %s.", tostring(owns))
+			else
+				lease_ok = owns == true
+			end
+		end
+		if lease_ok then match = snapshot.match end
+	end
+	if not match then match = SharedEngine.match_buffer(buffer, GROUP_NAME, guard) end
 	if not match then return nil end
 
 	local rule   = match.rule
@@ -333,16 +382,20 @@ end
 --- @param section string The UI section name linking this rule to a toggleable menu item.
 --- @param resolver function A callback function that returns the string to insert.
 function M.add_rule(suffix, section, resolver)
+	if not invalidate_preview_snapshot("Rule registration") then return false end
 	SharedEngine.add_rule(suffix, section, resolver)
+	return true
 end
 
 --- Internal method used by init.lua to inject personal data into the engine.
 --- @param personal_data table Dictionary containing personal information.
 --- @param trigger_char string The global trigger character to apply.
 function M.inject_data(personal_data, trigger_char)
+	if not invalidate_preview_snapshot("Personal-data update") then return false end
 	_personal_data = type(personal_data) == "table" and personal_data or {}
 	if type(trigger_char) == "string" and trigger_char ~= "" then _trigger = trigger_char end
 	register_prefix_entries()
+	return true
 end
 
 --- Live-updates the trigger character the interceptor listens for.
@@ -356,10 +409,12 @@ end
 function M.set_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
-		return
+		return false
 	end
+	if not invalidate_preview_snapshot("Trigger-key update") then return false end
 	_trigger = char
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
+	return true
 end
 
 --- Initializes the engine, wiring it into the keymap engine.
@@ -368,9 +423,11 @@ function M.start(keymap_module)
 	Logger.debug(LOG, "Starting dynamic rules engine…")
 	if type(keymap_module) ~= "table" then
 		Logger.error(LOG, "Keymap module missing, rules engine aborted.")
-		return
+		return false
 	end
+	if not invalidate_preview_snapshot("Rules-engine start") then return false end
 	_km = keymap_module
+	_preview_snapshot = nil
 
 	-- Register date rules via shared engine so both HS and Linux produce identical expansions
 	SharedEngine.register_date_rules(_trigger)
@@ -440,14 +497,25 @@ function M.start(keymap_module)
 			and function(grp, sec) return is_sec_enabled(grp, sec) end
 			or nil
 		_km.register_preview_provider(function(buf)
+			_preview_snapshot = nil
 			if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
 				return nil
 			end
-			return SharedEngine.preview(buf, GROUP_NAME, guard)
+			local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard)
+			if not match then return nil end
+			local token = {}
+			_preview_snapshot = {
+				buffer = buf,
+				trigger = _trigger,
+				match = match,
+				token = token,
+			}
+			return match.result, token
 		end)
 	end
 
 	Logger.info(LOG, "Dynamic rules engine started successfully.")
+	return true
 end
 
 --- Stops the engine and cleans up shared state.
@@ -455,8 +523,14 @@ function M.stop()
 	-- Clear the date rules registered at start time; without this, a subsequent
 	-- start() call would call register_date_rules() again and duplicate all three
 	-- rules in the shared engine (dynhotstrings-5).
+	-- Teardown must fail closed even if native pixels cannot be revoked: leaving
+	-- an interceptor live after pause/quit is worse than a stale surface that the
+	-- outer tooltip teardown can retry. Return the revocation result to the owner.
+	local revoked = invalidate_preview_snapshot("Rules-engine stop")
+	_preview_snapshot = nil
 	SharedEngine.reset_rules()
 	_km = nil
+	return revoked
 end
 
 return M
