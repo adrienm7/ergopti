@@ -45,7 +45,7 @@ helpers.describe("boot: core backend is synced before the model is pushed to the
 			"boot must call core_llm.set_backend(state.llm_backend) so the warmup targets the persisted backend")
 
 		-- Search AFTER merge so we hit the CALL, not the earlier function definition.
-		local sync_pos = src:find("sync_state_to_modules(saved, config_absent)", merge_pos, true)
+		local sync_pos = src:find("sync_state_to_modules(saved, false)", merge_pos, true)
 		helpers.assert_true(sync_pos ~= nil, "sync_state_to_modules call must be present")
 
 		helpers.assert_true(merge_pos < set_backend_pos,
