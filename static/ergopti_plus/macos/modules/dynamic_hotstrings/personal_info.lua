@@ -64,6 +64,9 @@ local ManifestReader = require("infra.manifest_reader")
 -- the three sites below cannot drift apart from each other or from the manifest.
 local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
 
+-- Same-directory staging keeps the final rename atomic on macOS
+local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
+
 -- Width of the placeholder a preview part falls back to when the shared field
 -- classification cannot be reached. Fixed rather than the value's own length:
 -- how long a secret is, is itself a hint about which one it is.
@@ -159,6 +162,97 @@ local function escape_toml(s)
 	return s
 end
 
+--- Builds an isolated candidate without publishing partial edits to live consumers.
+--- @param new_info table Updated personal-information fields.
+--- @return table candidate Complete candidate table.
+local function build_info_candidate(new_info)
+	local candidate = {}
+	for key, value in pairs(_info) do candidate[key] = value end
+	for key, value in pairs(new_info) do candidate[key] = value end
+	return candidate
+end
+
+--- Serializes one complete personal-information candidate.
+--- @param candidate table Complete personal-information table.
+--- @return string content TOML payload.
+local function serialize_config(candidate)
+	local lines = {
+		"# personal_info.toml — Personal information",
+		"# Auto-managed by the personal information editor.",
+		"# Do not edit manually unless you know what you are doing.",
+		"",
+		"[info]",
+	}
+	for key, value in pairs(candidate) do
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "[letters]"
+	for key, value in pairs(_letters) do
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	end
+	lines[#lines + 1] = ""
+	return table.concat(lines, "\n")
+end
+
+--- Revokes any visible or prospective preview before its source data changes.
+--- @return boolean committed True only when mutation may proceed safely.
+local function invalidate_preview_before_save()
+	-- The nil case is bootstrap-only: start() materialises a missing file before
+	-- registering this module's preview provider, so no visible promise exists.
+	if not _keymap then return true end
+	if type(_keymap.invalidate_hotstring_preview) ~= "function" then
+		Logger.error(LOG, "Personal-info save refused because the keymap preview fence is unavailable.")
+		return false
+	end
+	local ok, committed = xpcall(_keymap.invalidate_hotstring_preview, debug.traceback)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Personal-info save refused because preview revocation did not commit (result: %s).",
+			tostring(committed))
+		return false
+	end
+	return true
+end
+
+--- Removes an unpublished staging file and reports cleanup failure.
+--- @param staged_path string Staging file path.
+local function remove_staged_file(staged_path)
+	local ok, removed, remove_err = pcall(os.remove, staged_path)
+	if not ok or removed ~= true then
+		Logger.warn(LOG, "Could not remove the unpublished personal-info staging file (result: %s).",
+			tostring(remove_err or removed))
+	end
+end
+
+--- Writes and flushes a complete payload to its staging file.
+--- @param staged_path string Same-directory staging file path.
+--- @param content string Complete TOML payload.
+--- @return boolean committed True after write, flush, and close succeed.
+local function write_staged_config(staged_path, content)
+	local open_ok, file_or_err, open_err = pcall(io.open, staged_path, "wb")
+	if not open_ok or not file_or_err then
+		Logger.error(LOG, "Cannot open the personal-info staging file (result: %s).",
+			tostring(open_err or file_or_err))
+		return false
+	end
+	local file = file_or_err
+	local write_ok, write_committed, write_err = xpcall(function()
+		local written, err = file:write(content)
+		if not written then return false, err end
+		local flushed, flush_err = file:flush()
+		if flushed ~= true then return false, flush_err end
+		return true
+	end, debug.traceback)
+	local close_ok, close_committed, close_err = pcall(file.close, file)
+	if not write_ok or write_committed ~= true or not close_ok or close_committed ~= true then
+		Logger.error(LOG, "Personal-info staging write did not commit (write: %s, close: %s).",
+			tostring(write_err or write_committed), tostring(close_err or close_committed))
+		remove_staged_file(staged_path)
+		return false
+	end
+	return true
+end
+
 --- Reads personal_info.toml and returns a config table compatible with DEFAULT_CONFIG.
 --- @param toml_path string Absolute path to personal_info.toml.
 --- @return table config The loaded or default configuration.
@@ -198,43 +292,40 @@ local function load_config(toml_path)
 	}, false
 end
 
---- Persists updated info fields into personal_info.toml.
+--- Persists updated info fields through a preview-fenced atomic transaction.
 --- @param new_info table The updated fields to save.
+--- @return boolean committed True only after disk and live memory commit.
 function M.save_info(new_info)
-	if type(new_info) ~= "table" then return end
+	if type(new_info) ~= "table" then
+		Logger.error(LOG, "save_info(): expected a table, got %s — save refused.", type(new_info))
+		return false
+	end
+	if type(_info_toml_path) ~= "string" or _info_toml_path == "" then
+		Logger.error(LOG, "save_info() called before the personal-info path was initialized.")
+		return false
+	end
 	Logger.debug(LOG, "Saving personal info to '%s'…", _info_toml_path)
 
-	-- Merge the new values into the current info
-	for k, v in pairs(new_info) do
-		_info[k] = v
+	local candidate = build_info_candidate(new_info)
+	local content = serialize_config(candidate)
+	if not invalidate_preview_before_save() then return false end
+
+	local staged_path = _info_toml_path .. SAVE_TEMP_SUFFIX
+	if not write_staged_config(staged_path, content) then return false end
+	local rename_ok, renamed, rename_err = pcall(os.rename, staged_path, _info_toml_path)
+	if not rename_ok or renamed ~= true then
+		Logger.error(LOG, "Personal-info staged-file publication did not commit (result: %s).",
+			tostring(rename_err or renamed))
+		remove_staged_file(staged_path)
+		return false
 	end
 
-	local lines = {
-		"# personal_info.toml — Personal information",
-		"# Auto-managed by the personal information editor.",
-		"# Do not edit manually unless you know what you are doing.",
-		"",
-		"[info]",
-	}
-	for k, v in pairs(_info) do
-		lines[#lines + 1] = k .. ' = "' .. escape_toml(tostring(v)) .. '"'
-	end
-	lines[#lines + 1] = ""
-	lines[#lines + 1] = "[letters]"
-	for k, v in pairs(_letters) do
-		lines[#lines + 1] = k .. ' = "' .. escape_toml(tostring(v)) .. '"'
-	end
-	lines[#lines + 1] = ""
-
-	local fh = io.open(_info_toml_path, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot open personal_info.toml for writing.")
-		return
-	end
-	fh:write(table.concat(lines, "\n"))
-	fh:close()
+	-- Preserve the shared table identity held by dependent engines
+	for key in pairs(_info) do _info[key] = nil end
+	for key, value in pairs(candidate) do _info[key] = value end
 
 	Logger.info(LOG, "Personal info configuration saved successfully.")
+	return true
 end
 
 
