@@ -632,7 +632,7 @@ function M.get_trigger_char() return _trigger end
 function M.set_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
-		return
+		return false
 	end
 	_trigger = char
 	-- A pending combo was accumulated against the OLD trigger; keeping it would
@@ -640,6 +640,7 @@ function M.set_trigger_char(char)
 	_state = STATE_IDLE
 	_combo = ""
 	Logger.debug(LOG, "Trigger char: %s.", char)
+	return true
 end
 
 --- Opens the browser-based HTML form using the extracted UI module.

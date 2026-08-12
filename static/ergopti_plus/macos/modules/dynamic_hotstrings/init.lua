@@ -114,8 +114,33 @@ M.disable     = PersonalInfo.disable
 --- names one of a pair is how half a fix ships.
 --- @param char string The new trigger character.
 function M.set_trigger_char(char)
-	if type(RulesEngine.set_trigger_char) == "function" then RulesEngine.set_trigger_char(char) end
-	if type(PersonalInfo.set_trigger_char) == "function" then PersonalInfo.set_trigger_char(char) end
+	if type(char) ~= "string" or char == "" then
+		Logger.error(LOG, "set_trigger_char(): expected a non-empty string — both engines unchanged.")
+		return false
+	end
+	-- Verify the entire pair before the first write. A missing sibling API used to
+	-- advance RulesEngine alone and leave personal-info on the old key.
+	if type(RulesEngine.set_trigger_char) ~= "function"
+		or type(PersonalInfo.set_trigger_char) ~= "function"
+	then
+		Logger.error(LOG, "Trigger-key propagation refused: paired engine API is incomplete.")
+		return false
+	end
+
+	local previous = PersonalInfo.get_trigger_char()
+	if RulesEngine.set_trigger_char(char) ~= true then
+		Logger.error(LOG, "Trigger-key propagation refused: rules engine did not commit.")
+		return false
+	end
+	if PersonalInfo.set_trigger_char(char) ~= true then
+		-- Defensive rollback: PersonalInfo is normally a deterministic in-memory
+		-- write, but a future validation/fence must not create a half-commit.
+		local rolled_back = RulesEngine.set_trigger_char(previous) == true
+		Logger.error(LOG, "Trigger-key propagation incomplete: personal-info engine refused; "
+			.. "rules rollback %s.", rolled_back and "committed" or "FAILED")
+		return false
+	end
+	return true
 end
 
 return M
