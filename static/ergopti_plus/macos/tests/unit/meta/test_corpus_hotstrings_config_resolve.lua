@@ -89,6 +89,7 @@ local function fresh_module_for_vector(vector)
 	os.remove(override_path)
 	write_toml_meta(toml_path, vector.toml_category, vector.section, vector.toml_section)
 
+	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = override_path, toml_resolver = function() return toml_path end })

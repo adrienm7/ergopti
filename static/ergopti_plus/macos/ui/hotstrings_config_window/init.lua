@@ -30,6 +30,7 @@ local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local TomlReader        = require("infra.toml.reader")
+local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
 local Paths            = require("infra.paths")
 
@@ -142,16 +143,22 @@ local function list_toml_files(dir)
 	return out
 end
 
---- Parses the [_meta] block of an arbitrary TOML file and returns its effective
---- delay, color, and sections. This is used for personal files where the [_meta]
---- IS the canonical value (no user-override layer sits on top).
+--- Reads one committed TOML snapshot for all metadata and section derivations.
 --- @param toml_path string Absolute path to the TOML file.
---- @return table { delay = number|nil, color = string|nil, sections = table }
-local function read_file_meta(toml_path)
-	local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
-	if not ok or not parsed then
-		return { sections = {} }
+--- @return table|nil parsed
+local function read_committed_toml(toml_path)
+	local ok, parsed, committed = pcall(TomlReader.parse, toml_path)
+	if not ok or committed ~= true or type(parsed) ~= "table" then
+		Logger.error(LOG, "TOML UI read did not commit: '%s'.", toml_path)
+		return nil
 	end
+	return parsed
+end
+
+--- Derives the effective metadata from one committed TOML snapshot.
+--- @param parsed table Committed reader result.
+--- @return table metadata
+local function read_file_meta(parsed)
 	return {
 		delay        = parsed.meta and parsed.meta.delay,
 		color        = parsed.meta and parsed.meta.color,
@@ -161,13 +168,10 @@ local function read_file_meta(toml_path)
 	}
 end
 
---- Reads the sections list from an arbitrary TOML file (personal or extension).
---- Returns an array of { name, description } descriptors, skipping separators.
---- @param toml_path string Absolute path to the TOML file.
+--- Derives the sections list from one committed TOML snapshot.
+--- @param parsed table Committed reader result.
 --- @return table Array of { name = string, description = string }.
-local function read_file_sections(toml_path)
-	local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
-	if not ok or not parsed then return {} end
+local function read_file_sections(parsed)
 	local out = {}
 	for _, name in ipairs(parsed.sections_order or {}) do
 		if name ~= "-" then
@@ -384,47 +388,51 @@ local function build_state()
 	-- 3.2) Personal TOML files
 	local personal_files = list_toml_files(_config.personal_dir)
 	if #personal_files > 0 then
-		table.insert(out.groups, {
-			key   = "personal",
-			label = i18n.get("hs_config.group_personal"),
-		})
-
+		local personal_entries = {}
 		for _, toml_path in ipairs(personal_files) do
-			local file_stem   = stem(toml_path)
-			local file_meta   = read_file_meta(toml_path)
-			local file_secs   = read_file_sections(toml_path)
+			local parsed = read_committed_toml(toml_path)
+			if parsed then
+				local file_stem = stem(toml_path)
+				local file_meta = read_file_meta(parsed)
+				local file_secs = read_file_sections(parsed)
+				local effective = {
+					delay        = file_meta.delay,
+					color        = file_meta.color,
+					show_tooltip = file_meta.show_tooltip,
+					priority     = file_meta.priority,
+				}
 
-			-- Personal files: the [_meta] IS the effective value — no override layer.
-			-- We still present them uniformly so the UI can render them consistently.
-			local effective = {
-				delay        = file_meta.delay,
-				color        = file_meta.color,
-				show_tooltip = file_meta.show_tooltip,
-				priority     = file_meta.priority,
-			}
-
-			local entry = build_cat_entry(
-				"personal:" .. file_stem,
-				file_stem,
-				"personal",
-				effective,
-				file_meta,
-				nil,   -- no user override table for personal files
-				file_secs,
-				function(sec_name)
-					local sec_data = file_meta.sections[sec_name] or {}
-					return {
-						effective    = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
-						default_meta = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
-						override     = {},
-					}
-				end
-			)
-			-- Personal entries are never "overridden" — the file itself is the truth
-			entry.delay_overridden = false
-			entry.color_overridden = false
-			entry.personal_path    = toml_path
-			table.insert(out.categories, entry)
+				local entry = build_cat_entry(
+					"personal:" .. file_stem,
+					file_stem,
+					"personal",
+					effective,
+					file_meta,
+					nil,
+					file_secs,
+					function(sec_name)
+						local sec_data = file_meta.sections[sec_name] or {}
+						return {
+							effective = { delay = sec_data.delay, color = sec_data.color,
+								show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
+							default_meta = { delay = sec_data.delay, color = sec_data.color,
+								show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
+							override = {},
+						}
+					end
+				)
+				entry.delay_overridden = false
+				entry.color_overridden = false
+				entry.personal_path    = toml_path
+				table.insert(personal_entries, entry)
+			end
+		end
+		if #personal_entries > 0 then
+			table.insert(out.groups, {
+				key   = "personal",
+				label = i18n.get("hs_config.group_personal"),
+			})
+			for _, entry in ipairs(personal_entries) do table.insert(out.categories, entry) end
 		end
 	end
 
@@ -433,57 +441,50 @@ local function build_state()
 	local extensions = discover_extensions(_config.extensions_dir)
 	for _, ext in ipairs(extensions) do
 		local group_key = "ext:" .. ext.ext_id
-		table.insert(out.groups, {
-			key   = group_key,
-			label = ext.label,
-		})
-
+		local extension_entries = {}
 		for _, file_info in ipairs(ext.files) do
 			local toml_path = file_info.toml_path
 			local file_stem = file_info.title
 			local ext_id    = ext.ext_id
-			local file_secs = read_file_sections(toml_path)
-
-			local effective    = hotstrings_config.resolve_ext(ext_id, toml_path, nil)
-			local default_meta = (function()
-				local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
-				if ok and parsed then
-					return {
-						delay = parsed.meta and parsed.meta.delay,
-						color = parsed.meta and parsed.meta.color,
-						priority = parsed.meta and parsed.meta.priority,
-					}
-				end
-				return {}
-			end)()
-			local override = hotstrings_config.get_user_override("ext." .. ext_id, nil) or {}
-
-			local entry = build_cat_entry(
-				"ext:" .. ext_id .. ":" .. file_stem,
-				file_stem,
-				group_key,
-				effective,
-				default_meta,
-				override,
-				file_secs,
-				function(sec_name)
-					return {
-						effective    = hotstrings_config.resolve_ext(ext_id, toml_path, sec_name),
-						default_meta = (function()
-							local ok2, parsed2 = pcall(function() return TomlReader.parse(toml_path) end)
-							if ok2 and parsed2 and parsed2.meta and parsed2.meta.sections then
-								local s = parsed2.meta.sections[sec_name] or {}
-								return { delay = s.delay, color = s.color, show_tooltip = s.show_tooltip, priority = s.priority }
-							end
-							return {}
-						end)(),
-						override = hotstrings_config.get_user_override("ext." .. ext_id, sec_name) or {},
-					}
-				end
-			)
-			entry.ext_id      = ext_id
-			entry.ext_path    = toml_path
-			table.insert(out.categories, entry)
+			local parsed = read_committed_toml(toml_path)
+			if parsed then
+				local file_secs = read_file_sections(parsed)
+				local default_meta = {
+					delay = parsed.meta and parsed.meta.delay,
+					color = parsed.meta and parsed.meta.color,
+					priority = parsed.meta and parsed.meta.priority,
+				}
+				local effective = hotstrings_config.resolve_ext(ext_id, toml_path, nil)
+				local override = hotstrings_config.get_user_override("ext." .. ext_id, nil) or {}
+				local entry = build_cat_entry(
+					"ext:" .. ext_id .. ":" .. file_stem,
+					file_stem,
+					group_key,
+					effective,
+					default_meta,
+					override,
+					file_secs,
+					function(sec_name)
+						local sections = parsed.meta and parsed.meta.sections or {}
+						local section_meta = sections[sec_name] or {}
+						return {
+							effective = hotstrings_config.resolve_ext(ext_id, toml_path, sec_name),
+							default_meta = { delay = section_meta.delay, color = section_meta.color,
+								show_tooltip = section_meta.show_tooltip, priority = section_meta.priority },
+							override = hotstrings_config.get_user_override("ext." .. ext_id, sec_name) or {},
+						}
+					end
+				)
+				entry.ext_id   = ext_id
+				entry.ext_path = toml_path
+				table.insert(extension_entries, entry)
+			else
+				Logger.error(LOG, "Extension TOML omitted after an uncommitted read: '%s'.", toml_path)
+			end
+		end
+		if #extension_entries > 0 then
+			table.insert(out.groups, { key = group_key, label = ext.label })
+			for _, entry in ipairs(extension_entries) do table.insert(out.categories, entry) end
 		end
 	end
 
@@ -509,14 +510,29 @@ end
 --- @param field string "delay" or "color".
 --- @param value string|number|nil The new value, or nil to remove the field.
 local function patch_personal_toml(toml_path, section, field, value)
-	local f = io.open(toml_path, "r")
-	if not f then
-		Logger.error(LOG, "patch_personal_toml: cannot open '%s' for reading.", toml_path)
-		return
+	local open_ok, f, open_err = pcall(io.open, toml_path, "r")
+	if not open_ok or not f then
+		Logger.error(LOG, "patch_personal_toml: cannot open '%s' for reading — %s.",
+			toml_path, tostring(open_ok and open_err or f))
+		return false
+	end
+	local read_ok, content, read_err = pcall(f.read, f, "*a")
+	local close_ok, closed, close_err = pcall(f.close, f)
+	if not read_ok or type(content) ~= "string" then
+		Logger.error(LOG, "patch_personal_toml: read failed for '%s' — %s.",
+			toml_path, tostring(read_ok and read_err or content))
+		return false
+	end
+	if not close_ok or closed ~= true then
+		Logger.error(LOG, "patch_personal_toml: close failed for '%s' — %s.",
+			toml_path, tostring(close_ok and close_err or closed))
+		return false
 	end
 	local lines = {}
-	for raw in f:lines() do table.insert(lines, raw) end
-	pcall(function() f:close() end)
+	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
+		table.insert(lines, (raw:gsub("\r$", "")))
+	end
+	while #lines > 0 and lines[#lines] == "" do table.remove(lines) end
 
 	-- The header we are looking for depends on whether section is set
 	local target_header = section
@@ -580,16 +596,15 @@ local function patch_personal_toml(toml_path, section, field, value)
 		end
 	end
 
-	local out_f = io.open(toml_path, "w")
-	if not out_f then
-		Logger.error(LOG, "patch_personal_toml: cannot open '%s' for writing.", toml_path)
-		return
+	local write_ok, committed = pcall(FileSystem.write, toml_path, table.concat(lines, "\n") .. "\n")
+	if not write_ok or committed ~= true then
+		Logger.error(LOG, "patch_personal_toml: atomic publication failed for '%s'.", toml_path)
+		return false
 	end
-	pcall(function() out_f:write(table.concat(lines, "\n") .. "\n") end)
-	pcall(function() out_f:close() end)
 
 	Logger.debug(LOG, "Personal TOML patched: '%s' [%s] %s = %s.",
 		toml_path, section or "_meta", field, tostring(value))
+	return true
 end
 
 
@@ -657,10 +672,11 @@ end
 --- Personal categories patch the TOML file directly.
 --- Extension categories go through hotstrings_config.resolve_ext override keys.
 --- @param msg table The raw usercontent message.
+--- @return boolean committed True only when the requested mutation committed.
 local function on_message(msg)
-	if type(msg) ~= "table" then return end
+	if type(msg) ~= "table" then return false end
 	local body = msg.body
-	if type(body) ~= "table" or type(body.action) ~= "string" then return end
+	if type(body) ~= "table" or type(body.action) ~= "string" then return false end
 
 	local action  = body.action
 	local cat     = body.category
@@ -670,16 +686,14 @@ local function on_message(msg)
 	-- Global bulk operations affect all common categories only
 	if action == "reset_all" then
 		for _, c in ipairs(CATEGORY_ORDER) do
-			hotstrings_config.clear_override(c, nil, nil)
+			if hotstrings_config.clear_override(c, nil, nil) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
-				hotstrings_config.clear_override(c, s.name, nil)
+				if hotstrings_config.clear_override(c, s.name, nil) ~= true then return false end
 			end
-			-- Reset wipes file-level delays too, so the engine must be told each
-			-- category is back to its TOML default (same reason as set/clear_delay).
-			push_delay_to_engine(c)
 		end
+		for _, c in ipairs(CATEGORY_ORDER) do push_delay_to_engine(c) end
 		commit_and_push()
-		return
+		return true
 	end
 
 	if action == "set_all_grey" then
@@ -687,39 +701,43 @@ local function on_message(msg)
 		-- per-section colour override so the grey cascades down. Delays untouched.
 		local grey = "#6e6e73"
 		for _, c in ipairs(CATEGORY_ORDER) do
-			hotstrings_config.set_override(c, nil, "color", grey)
+			if hotstrings_config.set_override(c, nil, "color", grey) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
-				hotstrings_config.clear_override(c, s.name, "color")
+				if hotstrings_config.clear_override(c, s.name, "color") ~= true then return false end
 			end
 		end
 		commit_and_push()
-		return
+		return true
 	end
 
 	if action == "close" then
 		M.close()
-		return
+		return true
 	end
+
+	local committed = false
 
 	-- Per-category mutations — dispatch by group
 	if group == "personal" and type(body.personal_path) == "string" then
 		local toml_path = body.personal_path
 		if action == "set_delay" and type(body.ms) == "number" then
-			patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
+			committed = patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
-			patch_personal_toml(toml_path, sec, "delay", nil)
+			committed = patch_personal_toml(toml_path, sec, "delay", nil)
 		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
-			patch_personal_toml(toml_path, sec, "color", body.hex)
+			committed = patch_personal_toml(toml_path, sec, "color", body.hex)
 		elseif action == "clear_color" then
-			patch_personal_toml(toml_path, sec, "color", nil)
+			committed = patch_personal_toml(toml_path, sec, "color", nil)
 		elseif action == "set_tooltip" then
-			patch_personal_toml(toml_path, sec, "show_tooltip", body.show_tooltip == true)
+			committed = patch_personal_toml(toml_path, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
-			patch_personal_toml(toml_path, sec, "show_tooltip", nil)
+			committed = patch_personal_toml(toml_path, sec, "show_tooltip", nil)
 		elseif action == "set_priority" and type(body.priority) == "number" then
-			patch_personal_toml(toml_path, sec, "priority", body.priority)
+			committed = patch_personal_toml(toml_path, sec, "priority", body.priority)
 		elseif action == "clear_priority" then
-			patch_personal_toml(toml_path, sec, "priority", nil)
+			committed = patch_personal_toml(toml_path, sec, "priority", nil)
+		else
+			return false
 		end
 
 	elseif group and group:sub(1, 4) == "ext:" then
@@ -727,51 +745,54 @@ local function on_message(msg)
 		local ext_id       = body.ext_id
 		local override_key = ext_id and ("ext." .. ext_id) or cat
 		if action == "set_delay" and type(body.ms) == "number" then
-			hotstrings_config.set_override(override_key, sec, "delay", body.ms / 1000)
+			committed = hotstrings_config.set_override(override_key, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
-			hotstrings_config.clear_override(override_key, sec, "delay")
+			committed = hotstrings_config.clear_override(override_key, sec, "delay")
 		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
-			hotstrings_config.set_override(override_key, sec, "color", body.hex)
+			committed = hotstrings_config.set_override(override_key, sec, "color", body.hex)
 		elseif action == "clear_color" then
-			hotstrings_config.clear_override(override_key, sec, "color")
+			committed = hotstrings_config.clear_override(override_key, sec, "color")
 		elseif action == "set_tooltip" then
-			hotstrings_config.set_override(override_key, sec, "show_tooltip", body.show_tooltip == true)
+			committed = hotstrings_config.set_override(override_key, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
-			hotstrings_config.clear_override(override_key, sec, "show_tooltip")
+			committed = hotstrings_config.clear_override(override_key, sec, "show_tooltip")
 		elseif action == "set_priority" and type(body.priority) == "number" then
-			hotstrings_config.set_override(override_key, sec, "priority", body.priority)
+			committed = hotstrings_config.set_override(override_key, sec, "priority", body.priority)
 		elseif action == "clear_priority" then
-			hotstrings_config.clear_override(override_key, sec, "priority")
+			committed = hotstrings_config.clear_override(override_key, sec, "priority")
+		else
+			return false
 		end
 
 	else
 		-- Common built-in categories
 		if action == "set_delay" and type(body.ms) == "number" then
-			hotstrings_config.set_override(cat, sec, "delay", body.ms / 1000)
-			if sec == nil then push_delay_to_engine(cat) end
+			committed = hotstrings_config.set_override(cat, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
-			hotstrings_config.clear_override(cat, sec, "delay")
-			-- Clearing falls back to the TOML default, so re-resolve and push that
-			-- value rather than leaving the engine on the removed override.
-			if sec == nil then push_delay_to_engine(cat) end
+			committed = hotstrings_config.clear_override(cat, sec, "delay")
 		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
-			hotstrings_config.set_override(cat, sec, "color", body.hex)
+			committed = hotstrings_config.set_override(cat, sec, "color", body.hex)
 		elseif action == "clear_color" then
-			hotstrings_config.clear_override(cat, sec, "color")
+			committed = hotstrings_config.clear_override(cat, sec, "color")
 		elseif action == "set_tooltip" then
-			hotstrings_config.set_override(cat, sec, "show_tooltip", body.show_tooltip == true)
+			committed = hotstrings_config.set_override(cat, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
-			hotstrings_config.clear_override(cat, sec, "show_tooltip")
+			committed = hotstrings_config.clear_override(cat, sec, "show_tooltip")
 		elseif action == "set_priority" and type(body.priority) == "number" then
-			hotstrings_config.set_override(cat, sec, "priority", body.priority)
+			committed = hotstrings_config.set_override(cat, sec, "priority", body.priority)
 		elseif action == "clear_priority" then
-			hotstrings_config.clear_override(cat, sec, "priority")
+			committed = hotstrings_config.clear_override(cat, sec, "priority")
 		else
-			return
+			return false
 		end
 	end
 
+	if committed ~= true then return false end
+	if group ~= "personal" and (action == "set_delay" or action == "clear_delay") and sec == nil then
+		push_delay_to_engine(cat)
+	end
 	commit_and_push()
+	return true
 end
 
 -- Bridge-handler test seam: on_message is the only entry point that mutates the

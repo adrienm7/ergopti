@@ -38,7 +38,7 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 						delays = { default_sec = 0.05 },
 						colors = { global_default = "#cccccc", personal = "#aaaaaa" },
 					},
-				}
+				}, true
 			end,
 		}
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")

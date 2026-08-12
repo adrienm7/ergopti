@@ -28,6 +28,7 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 		fh:close()
 
 		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local cfg = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 		cfg.init({ override_path = path, toml_resolver = function() return nil end })
 
@@ -37,7 +38,6 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 		local reread = io.open(path, "r")
 		local content = reread and reread:read("*a") or ""
 		if reread then reread:close() end
-		os.remove(path)
 
 		-- Prove the save actually ran. Without this the two assertions below pass
 		-- against an init that failed and a set_override that wrote nothing at all.
@@ -48,8 +48,13 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 		helpers.assert_true(content:find("[__global__]", 1, true) ~= nil,
 			"the shared override file is written by BOTH drivers; a macOS save that drops "
 			.. "[__global__] silently discards the word delimiters the AutoHotkey side stored")
-		helpers.assert_true(content:find(DELIMS, 1, true) ~= nil,
-			"and the value itself must survive, not just the header")
+		helpers.assert_true(content:find('word_delimiters = " \\t,;:!?"', 1, true) ~= nil,
+			"control bytes must be preserved as valid TOML escapes, not raw bytes")
+		helpers.assert_eq(cfg.reload(), true,
+			"the rewritten shared file must remain readable")
+		helpers.assert_eq(cfg.get_word_delimiters(), DELIMS,
+			"the delimiter value itself must survive the serialized round trip")
+		os.remove(path)
 	end)
 
 end)

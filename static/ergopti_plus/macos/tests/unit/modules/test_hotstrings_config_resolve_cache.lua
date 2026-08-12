@@ -47,6 +47,7 @@ local helpers = require("tests.helpers")
 --- Builds a config module initialised against a stub TOML resolver.
 --- @return table module
 local function fresh_config()
+	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 	local cfg = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 
 	-- An override path that does not exist: parse_overrides yields empty
