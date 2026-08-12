@@ -349,6 +349,30 @@ function M.flush_now(reason, quiet)
 end
 
 
+--- Revokes a pending terminator without replaying it.
+---
+--- A focus/title ownership change makes the original target unknowable. Sending
+--- the key late is worse than dropping it because it can submit or mutate data in
+--- a different application. The pending identity is cleared before touching any
+--- timer; every watchdog/fence/completion callback already compares that exact
+--- object and therefore becomes inert even when native cancellation fails.
+--- @param reason string|nil Log context.
+--- @param quiet boolean|nil When true, perform only O(1) Lua state work (eventtap).
+--- @return boolean True when a pending replay was revoked.
+function M.discard_pending(reason, quiet)
+	local pending = _pending
+	if not pending then return false end
+	_pending = nil
+	if quiet ~= true then
+		if pending.watchdog then TimerScheduler.cancel(pending.watchdog) end
+		if pending.fence then TimerScheduler.cancel(pending.fence) end
+		if pending.retry then TimerScheduler.cancel(pending.retry) end
+		Logger.debug(LOG, "Pending terminator discarded (%s).", reason or "ownership changed")
+	end
+	return true
+end
+
+
 --- Returns true while a terminator is waiting to be replayed.
 --- @return boolean
 function M.is_pending()
