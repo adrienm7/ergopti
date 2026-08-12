@@ -130,7 +130,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 				end,
 				start = function() starts = starts + 1; return true end,
 			},
-			save_prefs = function() saves = saves + 1 end,
+			save_prefs = function() saves = saves + 1; return true end,
 			updateMenu = function() rebuilds = rebuilds + 1 end,
 		}
 
@@ -176,7 +176,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 				enable_section = function() mutations = mutations + 1 end,
 				enable_group = function() mutations = mutations + 1 end,
 			},
-			save_prefs = function() saves = saves + 1 end,
+			save_prefs = function() saves = saves + 1; return true end,
 			updateMenu = function() rebuilds = rebuilds + 1 end,
 		}
 
