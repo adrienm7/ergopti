@@ -637,7 +637,11 @@ function M.show_stacked(rows, is_enabled)
 		-- carrying an expire_at stamp is detected — checking only the first row
 		-- caused premature stop_dequeue() on partial-expiry rebuilds (M-09)
 		local is_rebuild = Dequeue.analyze_durations(rows, _dequeue_opts)
-		if not is_rebuild then
+		-- An absolute first-render deadline describes row time, not native watcher
+		-- ownership. Reuse is safe only when the current UI session still has every
+		-- dismissal watcher live; otherwise the canvas would publish without guards.
+		local reuse_watchers = is_rebuild and watchers_are_active()
+		if not reuse_watchers then
 			if not stop_dequeue() then
 				M.hide_forced()
 				return
@@ -663,7 +667,7 @@ function M.show_stacked(rows, is_enabled)
 			local now = hs.timer.secondsSinceEpoch()
 			_dequeue_rows = select(1, Dequeue.stamp_expiry_times(rows, now, _dequeue_opts))
 
-			if not render_with_watcher_ownership(_dequeue_rows, is_rebuild) then
+			if not render_with_watcher_ownership(_dequeue_rows, reuse_watchers) then
 				M.hide_forced()
 				return
 			end

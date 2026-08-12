@@ -890,6 +890,27 @@ helpers.describe("tooltip rendering is committed atomically", function()
 end)
 
 helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
+	helpers.it("(tooltip-watcher-first-deadline) mounts watchers for an absolute first render", function()
+		local context = load_tooltip(CASES[2])
+		local previous_clock = hs.timer.secondsSinceEpoch
+		hs.timer.secondsSinceEpoch = function() return 100 end
+		local ok, err = xpcall(function()
+			helpers.assert_eq(context.tooltip.show_stacked({
+				{ text = "absolute deadline", duration = 1, expire_at = 101 },
+				{ text = "longer row", duration = 2, expire_at = 102 },
+			}, true), true)
+			helpers.assert_eq(#context.created, CASES[2].watcher_count,
+				"deadline metadata cannot impersonate an already-mounted UI session")
+			for _, watcher in ipairs(context.created) do
+				helpers.assert_true(watcher:isEnabled(),
+					"every dismissal watcher must be live before visibility commits")
+			end
+		end, debug.traceback)
+		hs.timer.secondsSinceEpoch = previous_clock
+		context.tooltip.hide_forced()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("(tooltip-watcher-reuse) owns and revokes a zero-delay dequeue timer", function()
 		local context = load_tooltip(CASES[2])
 		local clock_reads = 0
