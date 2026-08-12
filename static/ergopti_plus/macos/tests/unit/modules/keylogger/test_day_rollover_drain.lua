@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_file_system = package.loaded["adapters.file_system"]
 
 
 
@@ -239,6 +240,10 @@ local function load_real_day_rollover(stall)
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		read = function() return nil end,
+	}
 
 	package.loaded["infra.i18n"] = { t = function(key) return key end }
 	package.loaded["infra.timings"] = {
@@ -418,3 +423,4 @@ helpers.describe("day_rollover source: loop + conditional rollover", function()
 end)
 
 print("[PASS] test_day_rollover_drain")
+package.loaded["adapters.file_system"] = saved_file_system
