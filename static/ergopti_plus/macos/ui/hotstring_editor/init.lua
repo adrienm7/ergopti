@@ -192,7 +192,7 @@ local function load_js_data(open_mode)
 
 	if _file_ready and type(_toml_path) == "string" then
 		local ok, parsed, parse_status = pcall(toml_reader.parse, _toml_path)
-		if ok and type(parsed) == "table" and parse_status ~= false then
+		if ok and type(parsed) == "table" and parse_status == true then
 			raw = parsed
 		else
 			_file_ready = false

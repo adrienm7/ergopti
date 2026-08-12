@@ -50,7 +50,7 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		-- Mock lib.toml_reader parse to return our data table directly
 		local old_toml_reader = package.loaded["infra.toml.reader"]
 		package.loaded["infra.toml.reader"] = {
-			parse = function(path) return data end
+			parse = function(path) return data, true end
 		}
 
 		Registry.init(state)
@@ -68,6 +68,40 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		helpers.assert_eq(count, 12, "total mappings should be 12")
 		
 		package.loaded["infra.toml.reader"] = old_toml_reader
+	end)
+end)
+
+helpers.describe("Registry — TOML read commitment", function()
+	helpers.it("registers nothing when the reader returns a table without exact commitment", function()
+		for key in pairs(package.loaded) do
+			if type(key) == "string" and key:match("^modules%.keymap%.registry") then
+				package.loaded[key] = nil
+			end
+		end
+		local old_toml_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function()
+				return {
+					sections_order = { "ghost" },
+					sections = { ghost = { trigger = "must-not-register" } },
+				}
+			end,
+		}
+
+		local Registry = require("modules.keymap.registry")
+		local state = {
+			groups = { existing = { enabled = true } },
+			mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+			mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+		}
+		Registry.init(state)
+		local loaded = Registry.load_toml("unreadable", "/controlled/unreadable.toml")
+
+		package.loaded["infra.toml.reader"] = old_toml_reader
+		helpers.assert_eq(loaded, false, "nil commitment must be a terminal load failure")
+		helpers.assert_eq(#state.mappings, 0, "the unreadable group must register no mappings")
+		helpers.assert_true(state.groups.existing ~= nil, "the previous registry must survive intact")
+		helpers.assert_nil(state.groups.unreadable, "an unreadable group must not be published")
 	end)
 end)
 
@@ -184,7 +218,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 
 		local old_toml = package.loaded["infra.toml.reader"]
 		local old_hcfg = package.loaded["modules.hotstrings.hotstrings_config"]
-		package.loaded["infra.toml.reader"]          = { parse = function() return toml_data end }
+		package.loaded["infra.toml.reader"]          = { parse = function() return toml_data, true end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
 
 		local state = {
