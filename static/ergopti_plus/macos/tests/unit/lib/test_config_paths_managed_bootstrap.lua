@@ -39,9 +39,37 @@ local function load_managed()
 
 	local ok, loaded = pcall(helpers.load_with_stubs, "infra.config_paths", {
 		fs = {
-			attributes = function() return { mode = "directory" } end,
+			attributes = function(path)
+				local file = io.open(path, "r")
+				if file then file:close(); return { mode = "file" } end
+				if path:match("paths%.toml$") or path:find("stage%-lock") then return nil end
+				return { mode = "directory" }
+			end,
+			symlinkAttributes = function(path)
+				local file = io.open(path, "r")
+				if file then file:close(); return { mode = "file" } end
+				if path:match("paths%.toml$") or path:find("stage%-lock") then return nil, "missing" end
+				return { mode = "directory" }
+			end,
 			mkdir = function() return true end,
-			dir = function() return function() return nil end end,
+			rmdir = function() return true end,
+			link = function(source, destination)
+				local source_file = io.open(source, "r")
+				if not source_file then return nil, "missing source" end
+				local content = source_file:read("*a"); source_file:close()
+				local target_file = io.open(destination, "w")
+				if not target_file then return nil, "cannot create destination" end
+				target_file:write(content); target_file:close()
+				return true
+			end,
+			dir = function(parent)
+				local entries = {}
+				if parent == BUNDLE_DIR:gsub("/$", "") and io.open(BUNDLE_DIR .. "paths.toml", "r") then
+					entries[#entries + 1] = "paths.toml"
+				end
+				local index = 0
+				return function() index = index + 1; return entries[index] end
+			end,
 		},
 	})
 	os.getenv = real_getenv

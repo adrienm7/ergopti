@@ -189,6 +189,61 @@ local function esc(s)
 	return s
 end
 
+-- Forward declaration: publish_content() revalidates through this helper.
+-- Declaring it first is required for Lua to capture the local rather than bind
+-- an unrelated `_G.read_existing`.
+local read_existing
+
+--- Publishes complete content through a platform adapter when one is supplied.
+--- The shared fallback remains for drivers that have not injected an adapter.
+--- When a caller edited an existing snapshot, it is re-read immediately before
+--- publication so a sibling writer cannot silently replace changes observed
+--- during serialization.
+--- @param path string Destination path.
+--- @param content string Complete TOML payload.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table|nil Optional `{ status, content }` precondition.
+--- @return boolean written
+--- @return string|nil error_message
+local function publish_content(path, content, file_adapter, expected_source)
+	if type(file_adapter) == "table" and type(file_adapter.write) == "function" then
+		if type(expected_source) == "table" then
+			local current, current_status, current_detail = read_existing(path, file_adapter)
+			if current_status ~= expected_source.status
+				or (current_status == "ok" and current ~= expected_source.content) then
+				return false, "source changed before publication: "
+					.. tostring(current_detail or current_status)
+			end
+		end
+		local call_ok, written, write_detail = pcall(file_adapter.write, path, content)
+		if call_ok and written == true then return true end
+		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
+	end
+
+	return publish(path, content, expected_source)
+end
+
+--- Reads existing content through a classified platform adapter when supplied.
+--- @param path string Source path.
+--- @param file_adapter table|nil Platform file adapter.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail
+read_existing = function(path, file_adapter)
+	if type(file_adapter) == "table" and type(file_adapter.read_with_status) == "function" then
+		local call_ok, content, status, detail = pcall(file_adapter.read_with_status, path)
+		if not call_ok then return nil, "error", tostring(content) end
+		if status == "ok" and type(content) == "string" then return content, "ok" end
+		if status == "absent" then return nil, "absent", detail end
+		return nil, "error", detail or "classified read failed"
+	end
+
+	local content, detail, status = read_batch_source(path)
+	if status == "absent" then return nil, "absent", detail end
+	if status ~= "ok" then return nil, "error", detail end
+	return content, "ok"
+end
+
 
 
 
@@ -203,7 +258,7 @@ end
 --- @param path string Destination file path.
 --- @param data table  The configuration dictionary.
 --- @return boolean, string|nil True on success, or false and error string.
-function M.write(path, data)
+function M.write(path, data, file_adapter, create_only)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Invalid path provided for TOML write.")
 		return false, "Invalid path provided."
@@ -295,10 +350,23 @@ function M.write(path, data)
 		end
 	end
 
-	local committed, commit_err = publish(path, table.concat(L, "\n"))
-	if not committed then
-		Logger.error(LOG, "TOML publication failed — %s.", tostring(commit_err))
-		return false, tostring(commit_err)
+	local payload = table.concat(L, "\n")
+	local published, publish_err
+	if create_only == true and type(file_adapter) == "table"
+			and type(file_adapter.create_if_absent) == "function" then
+		local call_ok, created, create_status, create_detail = pcall(
+			file_adapter.create_if_absent,
+			path,
+			payload
+		)
+		published = call_ok and (created == true or create_status == "exists")
+		publish_err = create_detail or create_status
+	else
+		published, publish_err = publish_content(path, payload, file_adapter)
+	end
+	if not published then
+		Logger.error(LOG, "Failed to publish TOML file: %s.", tostring(publish_err))
+		return false, "Erreur lors de la publication : " .. tostring(publish_err)
 	end
 
 	Logger.info(LOG, "TOML configuration saved successfully.")
@@ -323,7 +391,7 @@ end
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @return boolean, string|nil True on success, or false and an error string.
-function M.batch_write(path, updates)
+function M.batch_write(path, updates, file_adapter)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "batch_write: invalid path.")
 		return false, "Invalid path."
@@ -351,14 +419,14 @@ function M.batch_write(path, updates)
 		return "\"" .. tostring(v):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
 	end
 
-	-- Read existing lines. Only an exact ENOENT means a fresh file; permissions,
-	-- short reads and close failures must never turn a user's config into `{}`.
+	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
-	local source, source_err, source_status = read_batch_source(path)
-	if source == nil then
-		Logger.error(LOG, "batch_write: existing source was not committed — %s.", tostring(source_err))
-		return false, tostring(source_err)
+	local source, read_status, read_detail = read_existing(path, file_adapter)
+	if read_status == "error" then
+		Logger.error(LOG, "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
+		return false, tostring(read_detail)
 	end
+	if read_status == "absent" then source = "" end
 	for line in (source .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
 	if #lines == 1 and lines[1] == "" then lines = {} end
 
@@ -416,13 +484,13 @@ function M.batch_write(path, updates)
 	end
 
 	local content = table.concat(lines, "\n")
-	local committed, commit_err = publish(path, content, {
-		status = source_status,
+	local published, publish_err = publish_content(path, content, file_adapter, {
+		status = read_status,
 		content = source,
 	})
-	if not committed then
-		Logger.error(LOG, "batch_write: publication failed — %s.", tostring(commit_err))
-		return false, tostring(commit_err)
+	if not published then
+		Logger.error(LOG, "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
+		return false, tostring(publish_err)
 	end
 	Logger.info(LOG, "batch_write: wrote %d line(s) to '%s'.", #lines, path)
 	return true

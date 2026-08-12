@@ -33,10 +33,8 @@ local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
 local Logger    = require("infra.logger")
+local FileSystem = require("adapters.file_system")
 local LOG       = "preferences"
-
--- POSIX error code that alone proves a missing configuration path
-local ENOENT_ERROR_CODE = 2
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -431,18 +429,10 @@ end
 --- @return table The decoded preferences (empty when the file is absent or invalid).
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
-	local open_ok, fh, open_detail, open_code = pcall(io.open, prefs_file, "r")
-	if not open_ok or not fh then
-		if open_ok and open_code == ENOENT_ERROR_CODE then return {}, "absent" end
+	local content, read_status = FileSystem.read_with_status(prefs_file)
+	if read_status ~= "ok" then
+		if read_status == "absent" then return {}, "absent" end
 		Logger.error(LOG, "config.toml could not be read; treating it as corrupt "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
-		return {}, "corrupt"
-	end
-
-	local read_ok, content = pcall(fh.read, fh, "*a")
-	local close_ok, closed = pcall(fh.close, fh)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
-		Logger.error(LOG, "config.toml read did not commit; treating it as corrupt "
 			.. "(failure content withheld).")
 		return {}, "corrupt"
 	end

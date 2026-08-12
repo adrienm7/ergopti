@@ -25,6 +25,7 @@ if not ok_editor then ui_editor = nil end
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
+local FileSystem = require("adapters.file_system")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -68,7 +69,6 @@ local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
 
 -- Same-directory staging keeps the final rename atomic on macOS
 local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
-local ENOENT_ERROR_CODE = 2
 
 -- Width of the placeholder a preview part falls back to when the shared field
 -- classification cannot be reached. Fixed rather than the value's own length:
@@ -295,23 +295,13 @@ end
 --- @return boolean was_missing True if the file did not exist on disk and defaults were used.
 local function load_config(toml_path)
 	Logger.debug(LOG, "Loading personal info from '%s'…", toml_path)
-	local open_ok, fh, open_detail, open_code = pcall(io.open, toml_path, "r")
-	if not open_ok or not fh then
-		-- Only an exact ENOENT authorizes default creation. Any other open failure
-		-- may describe an existing file, so startup fails closed and leaves it intact.
-		local definitely_missing = open_ok and open_code == ENOENT_ERROR_CODE
-		if definitely_missing then
+	local content, read_status = FileSystem.read_with_status(toml_path)
+	if read_status ~= "ok" then
+		if read_status == "absent" then
 			Logger.info(LOG, "personal_info.toml not found — using default values.")
 			return DEFAULT_CONFIG, true
 		end
 		Logger.error(LOG, "personal_info.toml could not be read; startup refused "
-			.. "(failure content withheld; terminal type: %s).", type(open_detail))
-		return nil, false
-	end
-	local read_ok, content = pcall(fh.read, fh, "*a")
-	local close_ok, closed = pcall(fh.close, fh)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
-		Logger.error(LOG, "personal_info.toml read did not commit; startup refused "
 			.. "(failure content withheld).")
 		return nil, false
 	end
@@ -359,13 +349,8 @@ function M.save_info(new_info)
 	local content = serialize_config(candidate)
 	if not invalidate_preview_before_save() then return false end
 
-	local staged_path = _info_toml_path .. SAVE_TEMP_SUFFIX
-	if not write_staged_config(staged_path, content) then return false end
-	local rename_ok, renamed, rename_err = pcall(os.rename, staged_path, _info_toml_path)
-	if not rename_ok or renamed ~= true then
-		Logger.error(LOG, "Personal-info staged-file publication did not commit "
-			.. "(failure content withheld).")
-		remove_staged_file(staged_path)
+	if FileSystem.write(_info_toml_path, content) ~= true then
+		Logger.error(LOG, "Personal-info atomic publication did not commit.")
 		return false
 	end
 
@@ -853,7 +838,23 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- re-creation on the next launch (mirrors the AHK side's behaviour).
 	if was_missing then
 		Logger.info(LOG, "Writing default personal_info.toml at '%s'…", _info_toml_path)
-		if M.save_info({}) ~= true then
+		local candidate = {
+			trigger_char = config.trigger_char,
+			info = _info,
+			letters = _letters,
+		}
+		local _, create_status = FileSystem.create_if_absent(
+			_info_toml_path,
+			serialize_config(candidate)
+		)
+		if create_status == "exists" then
+			local concurrent = load_config(_info_toml_path)
+			if type(concurrent) ~= "table" then
+				return rollback_start(token, "concurrent default configuration load")
+			end
+			_info = concurrent.info
+			_letters = concurrent.letters
+		elseif create_status ~= "created" then
 			return rollback_start(token, "default configuration publication")
 		end
 	end

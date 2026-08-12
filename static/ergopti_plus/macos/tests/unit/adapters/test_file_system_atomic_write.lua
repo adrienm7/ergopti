@@ -50,7 +50,7 @@ end
 -- @param symlink_targets table|nil Optional final-link targets returned by lstat.
 -- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
 -- @param confirmed_absences table|nil Optional paths absent from their listed parent.
-local function make_adapter(symlink_targets, lstat_failures, confirmed_absences)
+local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override)
 	local staging_locks = {}
 	package.loaded["adapters.file_system"] = nil
 	package.loaded["infra.fs_dir"] = nil
@@ -112,10 +112,161 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences)
 				staging_locks[path] = nil
 				return true
 			end,
+			link = link_override,
 		},
 	})
 	return adapter, staging_locks
 end
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 0/ Classified reads + create-only ===========
+-- =====================================================
+-- =====================================================
+
+helpers.describe("adapters.file_system: classified reads and create-only publication", function()
+	helpers.it("distinguishes a proven absent file from unsafe lookups", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_classified"
+		local absent = root .. "/absent.toml"
+		local dangling = root .. "/dangling.toml"
+		local target = root .. "/missing-target.toml"
+		local inaccessible = root .. "/locked.toml"
+		local missing_parent = root .. "/missing/config.toml"
+		local directory = root .. "/directory"
+		HOST_MKDIR(root)
+		HOST_MKDIR(directory)
+
+		local adapter = make_adapter({
+			[dangling] = target,
+		}, {
+			[inaccessible] = true,
+		}, {
+			[absent] = true,
+			[target] = true,
+			[root .. "/missing"] = true,
+		})
+
+		local content, status = adapter.read_with_status(absent)
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "absent", "only a listed final-name absence may be classified absent")
+
+		content, status = adapter.read_with_status(dangling)
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "error", "a dangling symlink must never be classified absent")
+
+		content, status = adapter.read_with_status(directory)
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "error", "a directory at the requested pathname is not absence")
+
+		content, status = adapter.read_with_status(inaccessible)
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "error", "an lstat/EACCES-style failure is not absence")
+
+		content, status = adapter.read_with_status(missing_parent)
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "error", "a missing path prefix is not a creatable final-name absence")
+
+		HOST_RMDIR(directory)
+		HOST_RMDIR(root)
+	end)
+
+	helpers.it("requires read and close to commit before returning ok", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("seed"); seed:close()
+		local adapter = make_adapter({ [path] = { mode = "file" } })
+		local original_open = io.open
+		local close_calls = 0
+
+		io.open = function(open_path, mode)
+			if open_path == path and mode == "r" then
+				return {
+					read = function() return "complete" end,
+					close = function() close_calls = close_calls + 1; return nil, "flush failed" end,
+				}
+			end
+			return original_open(open_path, mode)
+		end
+		local call_ok, content, status = pcall(adapter.read_with_status, path)
+		io.open = original_open
+		os.remove(path)
+		if not call_ok then error(content) end
+
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "error", "a failed close must not publish read content")
+		helpers.assert_eq(close_calls, 1, "the read handle must be closed exactly once")
+	end)
+
+	helpers.it("rejects a regular file replaced after its bytes were read", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("old bytes"); seed:close()
+		local probes = 0
+		local adapter = make_adapter({
+			[path] = function()
+				probes = probes + 1
+				if probes == 1 then return { mode = "file", dev = 7, ino = 11 } end
+				return { mode = "file", dev = 7, ino = 12 }
+			end,
+		})
+
+		local content, status, detail = adapter.read_with_status(path)
+		helpers.assert_nil(content, "bytes from a replaced file must never be committed")
+		helpers.assert_eq(status, "error")
+		helpers.assert_true(type(detail) == "string" and detail:find("identity changed", 1, true) ~= nil,
+			"the failure must identify the ordinary-file replacement race")
+		os.remove(path)
+	end)
+
+	helpers.it("rejects removal of the ordinary target behind a stable symlink", function()
+		local link_path = os.tmpname():gsub("\\", "/")
+		local target_path = link_path .. ".target"
+		local seed = assert(io.open(target_path, "w")); seed:write("target bytes"); seed:close()
+		local target_probes = 0
+		local adapter = make_adapter({
+			[link_path] = { mode = "link", target = target_path, dev = 3, ino = 5 },
+			[target_path] = function()
+				target_probes = target_probes + 1
+				if target_probes == 1 then return { mode = "file", dev = 7, ino = 11 } end
+				os.remove(target_path)
+				return nil
+			end,
+		}, nil, { [target_path] = function() return target_probes > 1 end })
+
+		local content, status = adapter.read_with_status(link_path)
+		helpers.assert_nil(content, "a removed symlink target must not commit stale handle bytes")
+		helpers.assert_eq(status, "error", "target removal is not absence of the requested symlink")
+		os.remove(target_path)
+	end)
+
+	helpers.it("does not overwrite a target created between absence proof and publication", function()
+		local target = os.tmpname():gsub("\\", "/")
+		os.remove(target)
+		local confirmed_absences = { [target] = true }
+		local link_calls = 0
+		local adapter = make_adapter(nil, nil, confirmed_absences, function(_, destination, is_symlink)
+			link_calls = link_calls + 1
+			helpers.assert_eq(destination, target)
+			helpers.assert_eq(is_symlink, false)
+			confirmed_absences[target] = nil
+			local foreign = assert(io.open(target, "w"))
+			foreign:write("foreign winner")
+			foreign:close()
+			return nil, "File exists"
+		end)
+
+		local created, status = adapter.create_if_absent(target, "our defaults")
+		helpers.assert_eq(created, false, "the losing creator must report that it did not publish")
+		helpers.assert_eq(status, "exists", "a readable concurrent winner is an idempotent exists result")
+		helpers.assert_eq(link_calls, 1, "publication must use one create-only hard-link operation")
+		local fh = assert(io.open(target, "r"))
+		local content = fh:read("*a"); fh:close()
+		helpers.assert_eq(content, "foreign winner", "the concurrent winner must never be overwritten")
+		os.remove(target)
+	end)
+end)
 
 
 
