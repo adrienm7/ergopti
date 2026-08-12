@@ -81,6 +81,12 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["modules.llm"] = core
+	-- The pipeline test controls the focused-window classification boundary. A
+	-- newly loaded real keymap cache is deliberately unknown until its async AX
+	-- prewarm commits, which would make this fixture stop before backend dispatch.
+	package.loaded["modules.keymap.utils"] = {
+		is_ignored_window = function() return false end,
+	}
 
 	local tooltip = {
 		set_navigate_callback = function() end,
