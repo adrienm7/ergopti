@@ -91,12 +91,13 @@ helpers.describe("rotation — pre-init guard", function()
 			"an append before init must not advance the offset")
 	end)
 
-	helpers.it("read_new_entries before init returns empty list and offset 0", function()
+	helpers.it("read_new_entries before init returns a failed status at offset 0", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local entries, off = r.read_new_entries()
+		local entries, off, status = r.read_new_entries()
 		helpers.assert_eq(type(entries), "table")
 		helpers.assert_eq(#entries, 0)
 		helpers.assert_eq(off, 0)
+		helpers.assert_eq(status, r.READ_STATUS_FAILED)
 	end)
 
 	helpers.it("rollover before init does not crash", function()
@@ -270,7 +271,7 @@ helpers.describe("rotation — rollover", function()
 		-- succeed depending on the OS; either way, rollover must not throw.
 		-- Called directly. A rollover RESETS the offset — that is what it is for, and
 		-- an offset left where it was means the next read replays a whole day.
-		r.rollover("/tmp/test_data.sql")
+		r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF)
 		helpers.assert_eq(r.get_offset(), 0, "a rollover must reset the offset to zero")
 
 		-- Offset must be 0 after rollover regardless of io success.

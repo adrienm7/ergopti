@@ -1096,7 +1096,11 @@ function M.ingest_once()
 		return
 	end
 
-	local entries, new_offset = Rotation.read_new_entries()
+	local entries, new_offset, read_status = Rotation.read_new_entries()
+	if read_status == "failed" then
+		Logger.warn(LOG, "Ingest skipped because today.log tail read did not commit.")
+		return false
+	end
 	if #entries == 0 then
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
 		return
@@ -1240,11 +1244,22 @@ function M.day_rollover()
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
 	-- Rotation.rollover from deleting un-ingested lines.
 	local drained = false
+	local committed_eof = nil
 	local prev_offset = Rotation.get_offset()
 	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
-		local pending = Rotation.read_new_entries()
-		if #pending == 0 then
-			drained = true
+		local pending, _, read_status = Rotation.read_new_entries()
+		if read_status == "failed" then
+			Logger.warn(LOG,
+				"day_rollover: tail read failed — preserving today.log.")
+			break
+		elseif #pending == 0 then
+			if read_status == "eof" then
+				drained = true
+				committed_eof = read_status
+			else
+				Logger.warn(LOG,
+					"day_rollover: tail read did not commit EOF — preserving today.log.")
+			end
 			break
 		end
 		pcall(M.ingest_once)
@@ -1278,7 +1293,10 @@ function M.day_rollover()
 		return false
 	end
 
-	Rotation.rollover(_paths.data_sql_path)
+	if Rotation.rollover(_paths.data_sql_path, committed_eof) == false then
+		Logger.warn(LOG, "day_rollover: rotation rejected the EOF proof — today.log preserved.")
+		return false
+	end
 	Aggregator.reset_ngram_ctx()
 	if db then
 		db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
