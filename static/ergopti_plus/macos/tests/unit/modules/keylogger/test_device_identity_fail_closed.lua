@@ -57,8 +57,10 @@ local function run_unowned_case(failure)
 	end
 
 	local calls = {
+		classified_reads = 0,
+		raw_identity_reads = 0,
 		uuid_random = 0,
-		write_open = 0,
+		publication_calls = 0,
 		sqlite_init = 0,
 		aggregator_init = 0,
 		export_init = 0,
@@ -84,6 +86,19 @@ local function run_unowned_case(failure)
 		init = function() calls.export_init = calls.export_init + 1 end,
 	}
 	package.loaded["keylogger.metrics"] = {}
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function(path)
+			helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
+				"the classified read must inspect the enumerated device identity")
+			calls.classified_reads = calls.classified_reads + 1
+			if failure == "corrupt" then return "{broken-device-json", "ok" end
+			return nil, "error", failure
+		end,
+		write = function()
+			calls.publication_calls = calls.publication_calls + 1
+			return true
+		end,
+	}
 
 	local timer_handle = {
 		start = function() end,
@@ -125,17 +140,20 @@ local function run_unowned_case(failure)
 	local ok, failure_detail = xpcall(function()
 		io.open = function(path, mode)
 			if mode == "r" and path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX then
+				calls.raw_identity_reads = calls.raw_identity_reads + 1
 				if failure == "unreadable" then
 					return nil, "permission denied", 13
+				end
+				if failure == "dangling" then
+					return nil, "No such file or directory", 2
+				end
+				if failure == "directory" then
+					return nil, "Is a directory", 21
 				end
 				return {
 					read = function() return "{broken-device-json" end,
 					close = function() return true end,
 				}
-			end
-			if mode == "w" then
-				calls.write_open = calls.write_open + 1
-				return fake_writer()
 			end
 			return real_open(path, mode)
 		end
@@ -147,9 +165,13 @@ local function run_unowned_case(failure)
 		end
 
 		local initialized = module.init(make_state())
+		helpers.assert_eq(calls.classified_reads, 1,
+			"identity ownership must use the adapter's classified read boundary")
+		helpers.assert_eq(calls.raw_identity_reads, 0,
+			"identity ownership must not infer absence from raw io.open errno values")
 		helpers.assert_eq(calls.uuid_random, 0,
 			"read/decode failure must stop before a replacement UUID is generated")
-		helpers.assert_eq(calls.write_open, 0,
+		helpers.assert_eq(calls.publication_calls, 0,
 			"failed ownership must publish neither device.json nor sibling ledgers")
 		helpers.assert_eq(calls.sqlite_init, 0,
 			"SQLite must not bind to an identity selected after a failed read")
@@ -182,6 +204,7 @@ local function run_publication_case(failure)
 	end
 
 	local calls = {
+		classified_reads = 0,
 		removes = 0,
 		publication_calls = 0,
 		sqlite_init = 0,
@@ -213,6 +236,12 @@ local function run_publication_case(failure)
 	}
 	package.loaded["keylogger.metrics"] = {}
 	package.loaded["adapters.file_system"] = {
+		read_with_status = function(path)
+			helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
+				"the candidate device.json must cross the classified read boundary")
+			calls.classified_reads = calls.classified_reads + 1
+			return nil, "absent"
+		end,
 		write = function()
 			calls.publication_calls = calls.publication_calls + 1
 			return failure == nil
@@ -226,7 +255,14 @@ local function run_publication_case(failure)
 		end,
 		fs = {
 			attributes = function() return nil end,
-			dir = function() return function() return nil end end,
+			dir = function()
+				local entries = { ".", "..", "existing-device" }
+				local index = 0
+				return function()
+					index = index + 1
+					return entries[index]
+				end
+			end,
 		},
 		timer = {
 			absoluteTime = function() return 1000000 end,
@@ -240,6 +276,8 @@ local function run_publication_case(failure)
 	local ok, failure_detail = xpcall(function()
 		local initialized = module.init(make_state())
 		module.log_shortcut("cmd+c", "Finder")
+		helpers.assert_eq(calls.classified_reads, 1,
+			"only the adapter's proven-absent status may authorize a new identity")
 		if failure then
 			helpers.assert_eq(initialized, false,
 				"identity publication failure must make initialization fail closed")
@@ -292,6 +330,14 @@ helpers.describe("log_manager device identity ownership", function()
 	helpers.it("does not replace a corrupt device.json", function()
 		run_unowned_case("corrupt")
 	end)
+
+	helpers.it("does not replace a dangling device.json symlink", function()
+		run_unowned_case("dangling")
+	end)
+
+	helpers.it("does not replace a directory at device.json", function()
+		run_unowned_case("directory")
+	end)
 end)
 
 
@@ -309,7 +355,7 @@ helpers.describe("log_manager device identity publication", function()
 		run_publication_case("write")
 	end)
 
-	helpers.it("publishes once before exposing a new identity", function()
+	helpers.it("publishes once after a proven-absent candidate identity", function()
 		run_publication_case(nil)
 	end)
 end)

@@ -75,14 +75,6 @@ local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 --- covers 100 000 lines before giving up and preserving the file.
 local MAX_ROLLOVER_DRAIN_ITERS = 20
 
---- POSIX errno returned by io.open() when a candidate device.json is absent.
---- Only this outcome permits the identity scan to continue as if no file existed.
-local ENOENT_ERROR_CODE = 2
-
---- POSIX errno returned when an outer by_device entry is not a directory
---- (for example macOS metadata files). Such entries cannot own device.json.
-local ENOTDIR_ERROR_CODE = 20
-
 
 
 
@@ -272,17 +264,9 @@ local function _resolve_device(metrics_dir)
 			if entry ~= "." and entry ~= ".." then
 				local candidate_dir = by_root .. entry
 				local djpath = candidate_dir .. "/device.json"
-				local open_ok, fh, _, open_code = pcall(io.open, djpath, "r")
-				if not open_ok or not fh then
-					local safely_absent = open_ok
-						and (open_code == ENOENT_ERROR_CODE or open_code == ENOTDIR_ERROR_CODE)
-					if not safely_absent then unresolved = true end
-				else
-					local read_ok, raw = pcall(fh.read, fh, "*a")
-					local close_ok, closed = pcall(fh.close, fh)
-					if not read_ok or type(raw) ~= "string"
-						or not close_ok or closed ~= true
-					then
+				local raw, read_status = FileSystem.read_with_status(djpath)
+				if read_status ~= "absent" then
+					if read_status ~= "ok" or type(raw) ~= "string" then
 						unresolved = true
 					else
 						local decode_ok, obj = pcall(json.decode, raw)
