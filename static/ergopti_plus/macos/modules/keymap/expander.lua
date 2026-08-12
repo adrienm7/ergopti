@@ -325,8 +325,309 @@ function M.would_fire(m, buffer)
 	return eff_plain, typed, eff_repl, false
 end
 
-function M.try_auto_expand(m, char_len, is_ignored)
+--- Returns whether a mapping's runtime group currently permits it to fire.
+--- The explicit-validation path may bypass typing delay, never feature state.
+--- @param mapping table Registry mapping.
+--- @return boolean
+local function mapping_group_active(mapping)
+	if not mapping.group then return true end
+	local groups = _state and _state.groups
+	local group = groups and groups[mapping.group]
+	return not group or not not group.enabled
+end
+
+local NNBSP = "\xE2\x80\xAF"  -- U+202F, 3 UTF-8 bytes
+local NBSP  = "\xC2\xA0"      -- U+00A0, 2 UTF-8 bytes
+
+--- Resolves the pure matching half of a terminator expansion.
+---
+--- Both the emitter and the prospective magic-key resolver call this function.
+--- It owns terminator enablement, French typography stripping, word/case/no-op
+--- matching and consume state, so the tooltip cannot reconstruct a looser
+--- answer than the action path.
+--- @param mapping table Registry mapping.
+--- @param buffer string Buffer including the terminator event.
+--- @param chars string Terminator character(s) appended to the buffer.
+--- @param explicit_magic boolean|nil True when the configured magic action is
+---        being resolved. Bare `:`/`;` are then valid on non-Ergopti layouts.
+--- @return table|nil match Matching metadata, including a possible `is_noop`.
+local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
+	if type(mapping) ~= "table" or type(buffer) ~= "string" or type(chars) ~= "string" then
+		return nil
+	end
+	if not _registry.is_terminator(chars) then return nil end
+
+	local trigger = mapping.trigger
+	local tb = mapping.trigger_bytes
+	if type(trigger) ~= "string" or type(tb) ~= "number" then return nil end
+
+	local chars_bytes = #chars
+	local extra_bs_bytes = 0
+	local is_typo_endchar = (chars == ":" or chars == ";")
+	if is_typo_endchar and not explicit_magic then
+		local nnbsp_pos = #buffer - chars_bytes - #NNBSP + 1
+		local nbsp_pos  = #buffer - chars_bytes - #NBSP + 1
+		if nnbsp_pos >= 1 and buffer:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
+			extra_bs_bytes = #NNBSP
+		elseif nbsp_pos >= 1 and buffer:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
+			extra_bs_bytes = #NBSP
+		else
+			return nil
+		end
+	end
+
+	local effective_chars_bytes = chars_bytes + extra_bs_bytes
+	if #buffer < tb + effective_chars_bytes then return nil end
+	local buf_start = #buffer - effective_chars_bytes - tb + 1
+	local body = buffer:sub(1, buf_start + tb - 1)
+	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(mapping, body)
+	if not eff_plain and not is_noop then return nil end
+
+	return {
+		buf_start       = buf_start,
+		eff_plain       = eff_plain,
+		typed_trigger   = typed_trigger,
+		eff_repl        = eff_repl,
+		is_noop         = is_noop == true,
+		extra_bs_bytes  = extra_bs_bytes,
+		consume_term    = _registry.terminator_is_consumed(chars),
+	}
+end
+
+--- Resolves every static action reachable by pressing the magic key now.
+---
+--- This is the shared arbitration boundary for the keyboard engine and tooltip.
+--- It returns the exact first action the engine will attempt plus the remaining
+--- eligible rows. A strictly longer end-character mapping beats an auto mapping;
+--- equal length stays with the auto mapping. Group state, terminator state,
+--- auto-expand eligibility and case/word matching are all resolved here. The
+--- optional predicate is the eventtap's ordinary-auto timing gate; explicit
+--- magic mappings bypass it, while literal mappings that merely happen to end
+--- with a newly selected magic key retain their historical timing semantics.
+---
+--- `attempts` preserves the engine's fallback order. `candidates` contains each
+--- displayable candidate once, in the UI's end-char then star order.
+--- @param buffer string Buffer before the magic key is pressed.
+--- @param ordinary_auto_allowed function|nil Runtime eligibility for literal autos.
+--- @param event_chars string|nil Real physical payload at commit time. Preview
+---        callers omit it and resolve the configured logical action.
+--- @return table|nil resolution
+function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
+	if not require_state("resolve_magic_action") then return nil end
+	if type(buffer) ~= "string" then return nil end
+	if ordinary_auto_allowed ~= nil and type(ordinary_auto_allowed) ~= "function" then return nil end
+
+	local magic = _state.magic_key
+	if type(magic) ~= "string" or magic == "" then return nil end
+	if event_chars ~= nil and not Terminators.matches_magic_event(event_chars, magic) then return nil end
+	local physical_magic = event_chars or magic
+	local auto_buffer = nil
+	local star_attempts = {}
+	local literal_attempts = {}
+	local end_attempts = {}
+
+	do
+		local ok_tail, tail_offset = pcall(utf8.offset, buffer, -1)
+		local tail_char = (ok_tail and tail_offset) and buffer:sub(tail_offset) or nil
+		local star_bucket = tail_char and _registry.mappings_for_star_tail(tail_char) or nil
+		local bare_star_bucket = _registry.mappings_for_star_tail("")
+		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil
+		-- A bare magic-key mapping is globally shortest, so scanning it after the
+		-- tail-specific bucket preserves the registry's longest-first order without
+		-- rebuilding or linearly scanning the full magic-key bucket per preview.
+		for bucket_index = 1, 2 do
+			local bucket
+			if bucket_index == 1 then bucket = star_bucket else bucket = bare_star_bucket end
+			if bucket then
+				for _, mapping in ipairs(bucket) do
+					if mapping.auto and mapping.has_magic and mapping_group_active(mapping) then
+						local eff_plain, typed, eff_repl, is_noop = M.would_fire(mapping, auto_buffer)
+						if eff_plain or is_noop then
+							local action = {
+								mapping = mapping,
+								kind = "star",
+								eff_plain = eff_plain,
+								typed = typed,
+								eff_repl = eff_repl,
+								is_noop = is_noop == true,
+							}
+							star_attempts[#star_attempts + 1] = action
+						end
+					end
+				end
+			end
+		end
+
+		-- update_trigger_char deliberately leaves unrelated mappings untouched when
+		-- their literal suffix happens to equal the newly selected magic key. They
+		-- still fire through the ordinary auto path (including its timing gate), so
+		-- both the preview and magic dispatch must retain them in the same ledger.
+		local literal_tail_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
+			and tail_char and _registry.mappings_for_literal_magic_tail(tail_char) or nil
+		local literal_bare_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
+			and _registry.mappings_for_literal_magic_tail("") or nil
+		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. magic) end
+		for bucket_index = 1, 2 do
+			local literal_bucket = bucket_index == 1 and literal_tail_bucket or literal_bare_bucket
+			if literal_bucket then
+				for _, mapping in ipairs(literal_bucket) do
+					local timing_allowed, remaining_delay = true, nil
+					if ordinary_auto_allowed ~= nil then
+						timing_allowed, remaining_delay = ordinary_auto_allowed(mapping)
+					end
+					if mapping.auto and not mapping.has_magic and mapping_group_active(mapping)
+						and timing_allowed
+					then
+						local eff_plain, typed, eff_repl, is_noop = M.would_fire(mapping, auto_buffer)
+						if eff_plain or is_noop then
+							literal_attempts[#literal_attempts + 1] = {
+								mapping = mapping,
+								kind = "literal_auto",
+								eff_plain = eff_plain,
+								typed = typed,
+								eff_repl = eff_repl,
+								is_noop = is_noop == true,
+								remaining_delay = remaining_delay,
+							}
+						end
+					end
+				end
+			end
+		end
+
+		if buffer ~= "" and _registry.is_terminator(magic) then
+			local end_bucket = tail_char and _registry.mappings_for_tail(tail_char) or nil
+			if end_bucket then
+				local end_buffer = buffer .. physical_magic
+				for _, mapping in ipairs(end_bucket) do
+					if not mapping.auto and mapping_group_active(mapping) then
+						local match = resolve_terminator_match(mapping, end_buffer, physical_magic, true)
+						if match then
+							local action = {
+								mapping = mapping,
+								kind = "autocorrect",
+								eff_plain = match.eff_plain,
+								typed = match.typed_trigger,
+								eff_repl = match.eff_repl,
+								is_noop = match.is_noop,
+							}
+							end_attempts[#end_attempts + 1] = action
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if #star_attempts == 0 and #literal_attempts == 0 and #end_attempts == 0 then return nil end
+
+	-- True star mappings and literal autos come from two narrow indexes. Merge
+	-- only the actions that actually matched, using the rank assigned by the
+	-- registry's one canonical comparator; this preserves its length/priority/
+	-- group/sequence order without copying that comparator into the expander.
+	local auto_attempts = {}
+	for _, action in ipairs(star_attempts) do auto_attempts[#auto_attempts + 1] = action end
+	for _, action in ipairs(literal_attempts) do auto_attempts[#auto_attempts + 1] = action end
+	if #literal_attempts > 0 and #auto_attempts > 1 then
+		table.sort(auto_attempts, function(a, b)
+			return (a.mapping.registry_rank or math.huge) < (b.mapping.registry_rank or math.huge)
+		end)
+	end
+
+	local attempts = {}
+	local first_auto_len = 0
+	for _, action in ipairs(auto_attempts) do
+		if action.eff_plain then
+			first_auto_len = action.mapping.tlen
+			break
+		end
+	end
+	if first_auto_len > 0 then
+		for _, candidate in ipairs(end_attempts) do
+			if candidate.mapping.tlen > first_auto_len then
+				attempts[#attempts + 1] = candidate
+			end
+		end
+		for _, candidate in ipairs(auto_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+		-- Preserve the historical fallback: if every auto action declines during
+		-- commit, the engine gives every end-char candidate one final chance.
+		for _, candidate in ipairs(end_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+	else
+		for _, candidate in ipairs(end_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+		for _, candidate in ipairs(auto_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+	end
+
+	-- A no-op final action still mutates runtime state: try_*_expand calls
+	-- suppress_rescan(), which clears the buffer before returning false. Every
+	-- later attempt would therefore re-match against an empty buffer and cannot
+	-- fire. Keep the terminal attempt for that cleanup, but do not advertise or
+	-- dispatch actions beyond it.
+	local attempt_count = #attempts
+	local reachable_count = attempt_count
+	for index = 1, attempt_count do
+		local action = attempts[index]
+		action.reachable = true
+		if action.is_noop and action.mapping.final_result then
+			reachable_count = index
+			break
+		end
+	end
+	for index = reachable_count + 1, attempt_count do attempts[index] = nil end
+
+	local end_candidates = {}
+	local star_candidates = {}
+	local literal_candidates = {}
+	local candidates = {}
+	for _, action in ipairs(end_attempts) do
+		if action.reachable and action.eff_plain then
+			end_candidates[#end_candidates + 1] = action
+			candidates[#candidates + 1] = action
+		end
+	end
+	for _, action in ipairs(auto_attempts) do
+		if action.reachable and action.eff_plain then
+			if action.kind == "star" then
+				star_candidates[#star_candidates + 1] = action
+			else
+				literal_candidates[#literal_candidates + 1] = action
+			end
+			candidates[#candidates + 1] = action
+		end
+	end
+
+	local winner = nil
+	for _, action in ipairs(attempts) do
+		if action.eff_plain then winner = action; break end
+	end
+
+	return {
+		winner = winner,
+		attempts = attempts,
+		candidates = candidates,
+		star_candidates = star_candidates,
+		literal_candidates = literal_candidates,
+		end_candidates = end_candidates,
+	}
+end
+
+--- Commits one automatic mapping against either the live buffer or an exact
+--- prospective buffer supplied by magic-key arbitration.
+--- @param m table Mapping entry.
+--- @param char_len number Logical codepoint count of the current trigger event.
+--- @param is_ignored boolean Whether the physical event is already on screen.
+--- @param match_buffer string|nil Immutable buffer used for matching/splicing.
+--- @return boolean True when the expansion committed.
+function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	if not require_state("try_auto_expand") then return false end
+	local active_buffer = type(match_buffer) == "string" and match_buffer or _state.buffer
 
 	-- The `*` flag, and the only place it is checked. An entry that does not opt in
 	-- waits for a terminator — "ya" must not fire inside "yaourt". Neither
@@ -341,7 +642,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- lives in M.would_fire, which the tooltip preview calls too. Keeping it in one
 	-- place is what guarantees the preview cannot promise an expansion this
 	-- function then declines to perform.
-	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, _state.buffer)
+	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, active_buffer)
 
 	if not eff_plain then
 		-- No-op guard: when the plain-text expansion equals what was typed, signal
@@ -359,7 +660,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- 1-based byte index where the matched trigger starts, used below to splice the
 	-- replacement into the buffer. Derived from the same trigger_bytes would_fire
 	-- matched on, so the two can never disagree about where the trigger began.
-	local tstart_byte = #_state.buffer - m.trigger_bytes + 1
+	local tstart_byte = #active_buffer - m.trigger_bytes + 1
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
@@ -393,7 +694,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		deletes,
 		function() return emit_dispatch(m, to_type) end,
 		function()
-			_state.buffer = _state.buffer:sub(1, tstart_byte - 1) .. repl_text
+			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. repl_text
 		end,
 		m.final_result,
 		is_ignored,
@@ -427,66 +728,26 @@ end
 --- @param chars string The latest typed character(s) (potential terminator).
 --- @param char_len number UTF-8 length of `chars`.
 --- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+--- @param explicit_magic boolean|nil True when the configured magic action owns
+---        this event, allowing bare French punctuation on another input source.
 --- @return boolean True when the expansion fired.
-function M.try_terminator_expand(m, chars, char_len, is_ignored)
+function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 	if not require_state("try_terminator_expand") then return false end
+	local match = resolve_terminator_match(m, _state.buffer, chars, explicit_magic)
+	if not match then return false end
 
-	if not _registry.is_terminator(chars) then return false end
-
-	-- Byte-direct segment match: byte equality implies UTF-8 equality, so we skip
-	-- the utf8.offset pair entirely. trigger_bytes is precomputed; #chars is the
-	-- byte length of the terminator character(s) that were just typed.
-	local trigger     = m.trigger
-	local tb          = m.trigger_bytes
-	local chars_bytes = #chars
-	local buf         = _state.buffer
-
-	-- French-typography rule: ``:`` and ``;`` are emitted by the layout as
-	-- NNBSP+``:`` or NNBSP+``;``. The NNBSP (UTF-8: 0xE2 0x80 0xAF, 3 bytes)
-	-- or NBSP (UTF-8: 0xC2 0xA0, 2 bytes) lands in the buffer just before the
-	-- terminator, so the effective trigger is ``…trigger NNBSP :``.
-	-- We strip that nbsp from buf_start so matching finds the bare trigger,
-	-- and record extra_bs_bytes so the correct number of characters is deleted.
-	local NNBSP = "\xE2\x80\xAF"  -- U+202F, 3 UTF-8 bytes
-	local NBSP  = "\xC2\xA0"      -- U+00A0, 2 UTF-8 bytes
-	local extra_bs_bytes = 0
-	local is_typo_endchar = (chars == ":" or chars == ";")
-	if is_typo_endchar then
-		-- Check for NNBSP immediately before the terminator in the buffer.
-		local nnbsp_pos = #buf - chars_bytes - #NNBSP + 1
-		local nbsp_pos  = #buf - chars_bytes - #NBSP  + 1
-		if nnbsp_pos >= 1 and buf:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
-			extra_bs_bytes = #NNBSP
-		elseif nbsp_pos >= 1 and buf:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
-			extra_bs_bytes = #NBSP
-		else
-			-- Bare ``:`` / ``;`` without preceding nbsp: a mid-sequence char
-			-- (e.g. the ``:`` in ``:D``). Must not trigger expansion.
-			return false
-		end
-	end
-
-	local effective_chars_bytes = chars_bytes + extra_bs_bytes
-	if #buf < tb + effective_chars_bytes then return false end
-	local buf_start   = #buf - effective_chars_bytes - tb + 1
-
-	-- The whole match decision, taken on the BODY: the buffer with the terminator
-	-- — and any nbsp French typography inserted before it — cut off, so the tail
-	-- M.would_fire compares against is the trigger itself.
-	--
-	-- This path used to carry its own copy of that decision, and the copy was not
-	-- a copy: it handled "fold" and "exact" and had no "conform" branch at all, so
-	-- a conform entry typed with a capital ("Btw" then a space) compared unequal to
-	-- its lowercase canonical and simply never expanded on the terminator path.
-	-- Slicing the body and reusing the one predicate is what removes that class of
-	-- divergence instead of patching this instance of it.
-	local body = buf:sub(1, buf_start + tb - 1)
-	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(m, body)
+	local trigger        = m.trigger
+	local buf_start      = match.buf_start
+	local eff_plain      = match.eff_plain
+	local typed_trigger  = match.typed_trigger
+	local eff_repl       = match.eff_repl
+	local is_noop        = match.is_noop
+	local extra_bs_bytes = match.extra_bs_bytes
 
 	-- Precomputed trigger length; avoids a hot-path utf8.len call.
 	local trig_len    = m.tlen
 
-	local consume_term = _registry.terminator_is_consumed(chars)
+	local consume_term = match.consume_term
 
 	if not eff_plain then
 		-- No-op guard: when the replacement equals what is on screen, signal

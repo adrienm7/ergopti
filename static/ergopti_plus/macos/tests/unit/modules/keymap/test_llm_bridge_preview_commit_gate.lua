@@ -73,6 +73,17 @@ local function load_fixture(render_result, previews_enabled, options)
 	}
 	package.loaded["modules.keymap.expander"] = {
 		would_fire = function() return "replacement", "abc" end,
+		resolve_magic_action = function()
+			if options.no_match then return nil end
+			local action = {
+				mapping = mapping,
+				kind = "autocorrect",
+				eff_plain = "replacement",
+				eff_repl = "replacement",
+				typed = "abc",
+			}
+			return { winner = action, candidates = { action }, attempts = { action } }
+		end,
 		perform_text_replacement = function() return true end,
 	}
 	package.loaded["modules.llm"] = {
@@ -118,10 +129,20 @@ local function load_fixture(render_result, previews_enabled, options)
 		set_timeout = function() end,
 		tint = function() return {} end,
 		hide_forced_silent = function() return true end,
-		show_stacked = function(...)
+		has_visible_hotstring_lease = function(token)
+			if not fixture.tooltip_committed then return false end
+			for _, row in ipairs(fixture.visible_rows or {}) do
+				if row.lease_token == token then return true end
+			end
+			return false
+		end,
+		show_stacked = function(rows, ...)
 			fixture.renders = fixture.renders + 1
-			if type(render_result) == "function" then return render_result(fixture, ...) end
-			return render_result
+			local result = type(render_result) == "function"
+				and render_result(fixture, rows, ...) or render_result
+			fixture.tooltip_committed = result == true
+			fixture.visible_rows = result == true and rows or nil
+			return result
 		end,
 	}
 
@@ -199,8 +220,9 @@ helpers.describe("llm_bridge: deferred preview render owns downstream state", fu
 		helpers.assert_eq(#fixture.starts, 0)
 		drain(fixture)
 		helpers.assert_eq(#fixture.starts, 1)
-		helpers.assert_eq(fixture.starts[1], 1.05,
-			"the finite preview must preserve its timeout-plus-offset chain delay")
+		helpers.assert_eq(fixture.starts[1], 0.05,
+			"an explicit magic action stays visible until context changes, so chained LLM work "
+				.. "uses only its short no-finite-surface offset")
 		helpers.assert_eq(fixture.suggested, 0,
 			"persistence remains deferred even after the visual commit")
 		drain(fixture)
@@ -212,6 +234,38 @@ helpers.describe("llm_bridge: deferred preview render owns downstream state", fu
 		drain(fixture)
 		helpers.assert_eq(fixture.dismissed, 1,
 			"the committed row must become the one dismissible suggestion record")
+	end)
+
+	helpers.it("publishes an opaque provider snapshot only after its exact row commits", function()
+		local fixture = load_fixture(true, true, { no_match = true })
+		local token = {}
+		fixture.state.preview_providers = {
+			function() return "snapshot-value", token end,
+		}
+		fixture.bridge.update_preview(fixture.state.buffer)
+		helpers.assert_eq(fixture.bridge.owns_visible_magic_action(token, fixture.state.buffer), false,
+			"provider evaluation alone must not publish an action lease")
+		drain(fixture)
+		helpers.assert_eq(fixture.visible_rows[1].text, "snapshot-value")
+		helpers.assert_eq(fixture.visible_rows[1].trigger_label, "★",
+			"the provider row must advertise the key its interceptor consumes")
+		helpers.assert_eq(fixture.visible_rows[1].lease_token, token,
+			"the committed row must carry the provider's exact opaque identity")
+		helpers.assert_eq(fixture.bridge.owns_visible_magic_action(token, fixture.state.buffer), true)
+		helpers.assert_eq(fixture.bridge.owns_visible_magic_action({}, fixture.state.buffer), false,
+			"canvas visibility must not grant ownership to a sibling action")
+	end)
+
+	helpers.it("never publishes a provider snapshot when the tooltip rejects paint", function()
+		local fixture = load_fixture(false, true, { no_match = true })
+		local token = {}
+		fixture.state.preview_providers = {
+			function() return "uncommitted-value", token end,
+		}
+		fixture.bridge.update_preview(fixture.state.buffer)
+		drain(fixture)
+		helpers.assert_eq(fixture.bridge.owns_visible_magic_action(token, fixture.state.buffer), false,
+			"a provider cache is not an action promise until native pixels commit")
 	end)
 
 	helpers.it("does not reset a newer generation created during a failing render", function()

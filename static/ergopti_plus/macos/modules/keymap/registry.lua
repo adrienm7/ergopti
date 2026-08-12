@@ -272,7 +272,10 @@ end
 --- Rebuilds the per-tail-char bucket indexes from the (already sorted)
 --- _state.mappings list. Each mapping appears in mappings_by_tail_char
 --- under its last UTF-8 codepoint; has_magic mappings additionally appear
---- in mappings_by_star_tail_char under their star_base's last codepoint.
+--- in mappings_by_star_tail_char under their star_base's last codepoint. A
+--- fourth narrow list retains ordinary auto mappings whose literal suffix became
+--- the magic key after a runtime key change; they keep their ordinary timing
+--- semantics without forcing the hot path to rescan the full magic-key bucket.
 ---
 --- Buckets preserve the insertion order, which matches the sort order of
 --- _state.mappings (longest trigger first). Callers iterate a single bucket
@@ -282,6 +285,9 @@ local function rebuild_tail_indexes()
 	if not _state then return end
 	local tail_idx = {}
 	local star_idx = {}
+	local literal_magic_idx = {}
+	local magic = type(_state.magic_key) == "string" and _state.magic_key or ""
+	local magic_tail = magic ~= "" and text_utils.trig_lower(tail_codepoint(magic)) or nil
 	-- Mappings bucketed by the FIRST codepoint of their trigger. classify_trigger
 	-- answers "is `str` a prefix of some trigger?", which no existing index could
 	-- serve: the tail buckets answer the other two questions (a trigger that
@@ -289,7 +295,11 @@ local function rebuild_tail_indexes()
 	-- what a trigger starts with. Built here rather than in a second pass so the
 	-- three indexes can never describe different corpora.
 	local first_idx = {}
-	for _, m in ipairs(_state.mappings) do
+	for registry_rank, m in ipairs(_state.mappings) do
+		-- Rank is assigned by the canonical registry sort and lets the resolver
+		-- merge candidates coming from two independent O(1) indexes without
+		-- duplicating this module's collision comparator.
+		m.registry_rank = registry_rank
 		-- tail_char is already Unicode-lowercased (trig_lower) at add_raw() time, so
 		-- it is used directly as the bucket key. The expander's hot path queries the
 		-- same lowercase key via mappings_for_tail (also trig_lower), so an accented
@@ -313,7 +323,7 @@ local function rebuild_tail_indexes()
 			end
 			fbucket[#fbucket + 1] = m
 		end
-		if m.has_magic and m.star_base_tail_char then
+		if m.has_magic and m.star_base_tail_char ~= nil then
 			local sc = m.star_base_tail_char
 			local sbucket = star_idx[sc]
 			if not sbucket then
@@ -321,11 +331,27 @@ local function rebuild_tail_indexes()
 				star_idx[sc] = sbucket
 			end
 			sbucket[#sbucket + 1] = m
+		elseif m.auto and magic_tail ~= nil and tc == magic_tail
+		then
+			-- Mirror the star-base index: before the user presses magic, only
+			-- mappings whose body shares the current buffer's folded tail can match.
+			-- Removing the final codepoint (not #magic bytes) preserves fold-mode
+			-- literals such as stored `litA` with configured magic `a`.
+			local ok_base, base_offset = pcall(utf8.offset, m.trigger, -1)
+			local base = (ok_base and base_offset) and m.trigger:sub(1, base_offset - 1) or ""
+			local base_tail = base == "" and "" or text_utils.trig_lower(tail_codepoint(base))
+			local lbucket = literal_magic_idx[base_tail]
+			if not lbucket then
+				lbucket = {}
+				literal_magic_idx[base_tail] = lbucket
+			end
+			lbucket[#lbucket + 1] = m
 		end
 	end
 	_state.mappings_by_tail_char      = tail_idx
 	_state.mappings_by_star_tail_char = star_idx
 	_state.mappings_by_first_char     = first_idx
+	_state.mappings_by_literal_magic_tail = literal_magic_idx
 end
 
 
@@ -388,8 +414,22 @@ end
 --- @param tail_char string Single-codepoint UTF-8 string.
 --- @return table|nil Array of mapping entries, or nil.
 function M.mappings_for_star_tail(tail_char)
-	if not _state then return nil end
-	return _state.mappings_by_star_tail_char[tail_char]
+	if not _state or type(tail_char) ~= "string" then return nil end
+	-- star_base follows the same match-mode semantics as the full trigger. The
+	-- registration side stores a folded tail key, so the preview/resolver query
+	-- must fold too; otherwise a fold-mode `abc★` fires for `ABC★` while the
+	-- prospective lookup probes the raw `C` bucket and finds nothing.
+	return _state.mappings_by_star_tail_char[text_utils.trig_lower(tail_char)]
+end
+
+--- Returns ordinary auto mappings whose literal trigger currently ends with the
+--- configured magic key and whose body shares `tail_char`, in canonical order.
+--- @param tail_char string Folded at lookup like every other tail index.
+--- @return table|nil Array of mapping entries, or nil.
+function M.mappings_for_literal_magic_tail(tail_char)
+	if not _state or type(tail_char) ~= "string" then return nil end
+	local index = _state.mappings_by_literal_magic_tail
+	return index and index[text_utils.trig_lower(tail_char)] or nil
 end
 
 --- Returns all three trigger-membership flags in a single O(N) pass.
@@ -697,7 +737,11 @@ function M.add(trigger, replacement, opts)
 			-- Matching metadata for the preview path, where matches are tested
 			-- against star_base rather than the full trigger
 			star_base_bytes     = star_base and #star_base or nil,
-			star_base_tail_char = star_base and tail_codepoint(star_base) or nil,
+			-- Empty string is a real bucket key: a bare magic-key mapping remains
+			-- the shortest fallback for every magic-key press.
+			star_base_tail_char = star_base ~= nil
+				and (star_base == "" and "" or text_utils.trig_lower(tail_codepoint(star_base)))
+				or nil,
 		}
 		if _state.current_group then
 			entry.group = _state.current_group
@@ -733,7 +777,18 @@ function M.add(trigger, replacement, opts)
 	-- Title/UPPER replacement plain-text forms are computed lazily below, only on
 	-- the explicit-variant path (the case-conform path never needs them, which is
 	-- the bulk of the corpus at startup).
-	local lower_trig       = text_utils.trig_lower(trigger)
+	-- Case variants belong to the trigger BODY, never to the configured magic
+	-- action suffix. With an alphabetic key such as "a", uppercasing the whole
+	-- string registered "BTWA" while the physical action is still lowercase
+	-- "a", making the advertised uppercase expansion unreachable.
+	local case_suffix = ""
+	local case_body   = trigger
+	if owns_magic then
+		case_suffix = _state.magic_key
+		case_body = trigger:sub(1, #trigger - #case_suffix)
+	end
+	local lower_body       = text_utils.trig_lower(case_body)
+	local lower_trig       = lower_body .. case_suffix
 	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
 
 	-- ── Case-conform fast path (mirrors AHK CreateCaseSensitiveHotstrings) ──────
@@ -775,8 +830,14 @@ function M.add(trigger, replacement, opts)
 	elseif use_conform then
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, true)
 	else
-		local title_trigs = text_utils.trig_title(lower_trig)
-		local upper_trigs = text_utils.trig_upper(lower_trig)
+		local title_trigs = {}
+		for _, body in ipairs(text_utils.trig_title(lower_body)) do
+			title_trigs[#title_trigs + 1] = body .. case_suffix
+		end
+		local upper_trigs = {}
+		for _, body in ipairs(text_utils.trig_upper(lower_body)) do
+			upper_trigs[#upper_trigs + 1] = body .. case_suffix
+		end
 
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, false)
 
@@ -814,10 +875,13 @@ function M.add(trigger, replacement, opts)
 	local first_char_src = (is_strict or is_case_sensitive) and trigger or lower_trig
 	local first_char     = first_char_src:match("^[%z\1-\127\194-\244][\128-\191]*")
 	if first_char == "," then
-		local rest = lower_trig:sub(#first_char + 1)
-		if rest ~= "" then
-			local lower_rest = text_utils.trig_lower(rest)
-			local upper_rests = text_utils.trig_upper(rest)
+		local rest_body = lower_body:sub(#first_char + 1)
+		if rest_body ~= "" or case_suffix ~= "" then
+			local lower_rest = text_utils.trig_lower(rest_body) .. case_suffix
+			local upper_rests = {}
+			for _, body in ipairs(text_utils.trig_upper(rest_body)) do
+				upper_rests[#upper_rests + 1] = body .. case_suffix
+			end
 			-- Plain ";" alias (original behaviour)
 			add_with_space_variants(";" .. lower_rest, title_repl, plain_repl_title)
 			for _, ru in ipairs(upper_rests) do
@@ -935,7 +999,8 @@ function M.update_trigger_char(char)
 			m.has_magic           = true
 			m.star_base           = base
 			m.star_base_bytes     = #base
-			m.star_base_tail_char = tail_codepoint(base)
+			m.star_base_tail_char = base == "" and ""
+				or text_utils.trig_lower(tail_codepoint(base))
 			renamed = renamed + 1
 		else
 			-- Previously non-magic mappings must not suddenly gain has_magic

@@ -169,20 +169,19 @@ helpers.describe("keymap: one clock read and no wasted allocation per keystroke"
 	end)
 
 	helpers.it("builds the star buffer only when there is a bucket to match", function()
-		local src = helpers.read_driver_source("_preview_render_generation")
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		local at = code:find("local star_buf", 1, true)
-		helpers.assert_true(at ~= nil, "the star buffer must still be built when needed")
-
-		local line = code:sub(at, at + 160)
-		helpers.assert_true(line:find("star_bucket and", 1, true) ~= nil,
-			"the concatenation must be gated on the bucket. It ran on every keystroke, and the "
+		local bucket_at = code:find("local star_bucket", 1, true)
+		local bare_at = bucket_at and code:find("local bare_star_bucket", bucket_at, true) or nil
+		local concat_at = bare_at and code:find(
+			"auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil",
+			bare_at, true) or nil
+		helpers.assert_true(bucket_at ~= nil and bare_at ~= nil and concat_at ~= nil,
+			"the prospective resolver must still build the magic-key buffer when needed")
+		helpers.assert_true(bucket_at < bare_at and bare_at < concat_at,
+			"the concatenation must be short-circuit gated on both buckets. It ran on every keystroke, and the "
 				.. "overwhelmingly common case is an empty bucket — a string allocation bought "
 				.. "for nothing on the latency-critical path")
-
-		local bucket_at = code:find("local star_bucket", 1, true)
-		helpers.assert_true(bucket_at ~= nil and bucket_at < at,
-			"and the bucket must be resolved first, or the gate has nothing to test")
 	end)
 end)

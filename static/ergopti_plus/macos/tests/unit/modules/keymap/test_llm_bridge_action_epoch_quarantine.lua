@@ -119,6 +119,7 @@ local function load_fixture(reset_result)
 	}
 	package.loaded["modules.keymap.expander"] = {
 		would_fire = function() return nil end,
+		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,
 	}
 	package.loaded["infra.manifest_reader"] = {

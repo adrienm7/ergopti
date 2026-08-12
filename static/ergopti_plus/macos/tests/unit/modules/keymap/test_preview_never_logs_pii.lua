@@ -162,6 +162,9 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 		-- replacement to still appear.
 		local State = helpers.load_with_stubs("modules.keymap.state")
 
+		package.loaded["modules.keymap.registry"] = nil
+		package.loaded["modules.keymap.terminators"] = nil
+		package.loaded["modules.keymap.expander"] = nil
 		package.loaded["modules.keymap.llm_bridge"] = nil
 		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 
@@ -170,15 +173,18 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 		-- second instance would be initialised over a state the bridge never reads.
 		local Registry = package.loaded["modules.keymap.registry"]
 		helpers.assert_true(Registry ~= nil, "the bridge must have loaded the registry")
+		local Expander = package.loaded["modules.keymap.expander"]
+		helpers.assert_true(Expander ~= nil, "the bridge must have loaded the expander")
 
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		state.preview_providers         = {}
 		state.is_repeat_feature_enabled = function() return false end
 		Registry.init(state)
-		Registry.add("pub★", PUBLIC_REPL, {})
+		Registry.add("pub★", PUBLIC_REPL, { auto_expand = true })
 		Registry.sort_mappings()
 
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
+		Expander.init(state, Registry, Bridge)
 		Bridge.set_preview_star_enabled(true)
 		Bridge.set_preview_autocorrect_enabled(true)
 

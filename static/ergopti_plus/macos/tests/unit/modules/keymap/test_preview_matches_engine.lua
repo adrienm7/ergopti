@@ -302,14 +302,15 @@ helpers.describe("the preview only offers what a future keystroke can still fire
 		-- mapping_fires' typing-speed gate rejected a slow typist. Nothing retries
 		-- it: the auto path matches on the trigger's tail being the character just
 		-- typed, and any further keystroke pushes the trigger off the end.
-		local src = helpers.read_driver_source("function M.update_preview")
-		helpers.assert_true(src ~= nil, "llm_bridge source must be locatable")
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
+		helpers.assert_true(src ~= nil, "prospective resolver source must be locatable")
 		if not src then return end
 
-		local bucket_at = src:find("mappings_for_tail", 1, true)
-		helpers.assert_true(bucket_at ~= nil, "the autocorrect bucket walk must be locatable")
-		local window = src:sub(bucket_at, bucket_at + 1400)
-
+		local at = src:find("function M.resolve_magic_action", 1, true)
+		local window = src:sub(at, at + 6500)
+		helpers.assert_true(window:find("mapping%.auto%s+and%s+mapping%.has_magic") ~= nil,
+			"an auto mapping is prospectively reachable only when its trigger includes the "
+			.. "magic key; a completed ordinary auto trigger already had its one chance")
 		helpers.assert_true(window:find("not mapping%.auto") ~= nil,
 			"the autocorrect preview must skip auto mappings. Offering one shows the user an "
 			.. "expansion that no keystroke can produce — the engine already refused it on the "
@@ -319,7 +320,7 @@ helpers.describe("the preview only offers what a future keystroke can still fire
 	end)
 
 	helpers.it("still offers a terminator-driven mapping", function()
-		local src = helpers.read_driver_source("function M.update_preview")
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
 		if not src then return end
 
 		-- A non-auto mapping waits for a terminator, and ★ validates it with the
@@ -348,10 +349,13 @@ helpers.describe("neither side reimplements the match decision", function()
 		local src = helpers.read_driver_source("function M.update_preview")
 		if not src then return end
 
-		helpers.assert_true(src:find("expander%.would_fire") ~= nil,
-			"update_preview must obtain its matches from expander.would_fire, the same "
-			.. "function try_auto_expand uses, so the row shown is the replacement that "
-			.. "keystroke will actually produce")
+		helpers.assert_true(src:find(
+			"expander%.resolve_magic_action%(buf,%s*literal_preview_allowed%)") ~= nil,
+			"update_preview must consume the engine's prospective resolution rather than "
+				.. "rebuilding star/end-char candidates and arbitration in the UI layer")
+		helpers.assert_true(src:find("mappings_for_star_tail", 1, true) == nil
+			and src:find("mappings_for_tail", 1, true) == nil,
+			"the bridge must own no registry candidate walk of its own")
 	end)
 
 	helpers.it("the engine decides through the same function", function()
