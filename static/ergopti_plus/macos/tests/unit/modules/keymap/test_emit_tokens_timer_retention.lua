@@ -110,4 +110,3 @@ helpers.describe("emit_tokens deferred timer lifetime", function()
 			"the transaction retain must close after deferred output runs")
 	end)
 end)
-
