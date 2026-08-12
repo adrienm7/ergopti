@@ -98,17 +98,40 @@ const modulesWithStop = [
 
 modulesWithStop.forEach(f => {
     check(
-        `Lifecycle: ${f} exposes M.stop()`,
+        `Lifecycle: ${f} exposes M.stop(...)`,
         f,
-        /function M\.stop\(\)/
+        /function M\.stop\([^)]*\)/
     );
 });
 
-// --- Shutdown Hook Audit ---
+// --- Controlled teardown / native shutdown audit ---
+// Controlled reload/exit owns the retryable module teardown transaction. The
+// native Hammerspoon callback deliberately leaves local consumers live until
+// process exit while its asynchronous exact-lease fence and launcher EOF remain
+// armed; requiring direct stop calls from that callback would reintroduce the
+// missing-output window guarded by the Lua lifecycle tests.
 check(
-    'Shutdown: calls modules stop()',
+    'Controlled teardown: calls keymap, gestures, and shortcuts stop in order',
     'static/ergopti_plus/macos/init.lua',
-    /keymap\.stop\(\)[\s\S]*gestures\.stop\(\)[\s\S]*shortcuts\.stop\(\)/
+    /return keymap\.stop\(true\)[\s\S]*return gestures\.stop\(\)[\s\S]*return shortcuts\.stop\(\)/
+);
+
+check(
+    'Controlled teardown: runs through the retryable transaction',
+    'static/ergopti_plus/macos/init.lua',
+    /TeardownTransaction\.run\(_local_teardown_state, steps\)/
+);
+
+check(
+    'Termination coordinator: owns the controlled teardown callback',
+    'static/ergopti_plus/macos/init.lua',
+    /TerminationCoordinator\.init\([\s\S]*teardown\s*=\s*teardown_all_resources/
+);
+
+check(
+    'Native shutdown: exact-lease handoff remains armed',
+    'static/ergopti_plus/macos/init.lua',
+    /hs\.shutdownCallback\s*=\s*shutdown_all_resources/
 );
 
 // --- Code Quality Audit ---
