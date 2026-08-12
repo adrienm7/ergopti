@@ -64,9 +64,10 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 	helpers.it("retains keymap tap-state polling and restart", function()
 		local source = production_unit("local TAP_WATCHDOG_SEC = 1")
 
-		helpers.assert_contains(source, "hs.timer.new(TAP_WATCHDOG_SEC, tap_watchdog)")
-		helpers.assert_contains(source, "not t:isEnabled()")
-		helpers.assert_contains(source, "t:start()")
+		helpers.assert_contains(source,
+			"pcall(hs.timer.new, TAP_WATCHDOG_SEC, tap_watchdog)")
+		helpers.assert_contains(source, "not eventtap_is_enabled(name, t)")
+		helpers.assert_contains(source, "start_eventtap(name, t)")
 	end)
 
 	helpers.it("retains keylogger hook-state polling and restart", function()
