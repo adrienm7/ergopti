@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local NBSP = string.char(0xC2, 0xA0)
 
 -- A fake keymap module exposing exactly what PersonalInfo.start / RulesEngine.start
 -- consume, mirroring the shape used by test_date_rule_respects_group_disable.lua.
@@ -119,5 +120,21 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 			"interceptor must fire and consume on the keymap's custom trigger char")
 		helpers.assert_eq(fake_km.get_injected_count(), 1,
 			"the accepted trigger must execute exactly one replacement transaction")
+	end)
+
+	helpers.it("accepts the French composite event for a punctuation trigger", function()
+		package.loaded["modules.dynamic_hotstrings"] = nil
+		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
+		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		local DynHot = helpers.load_with_stubs("modules.dynamic_hotstrings")
+		local fake_km = make_fake_keymap(":")
+		local scratch_toml = os.tmpname()
+		DynHot.start("/tmp/", fake_km, scratch_toml)
+		os.remove(scratch_toml)
+
+		local result = fake_km.get_interceptor()(make_key_event(NBSP .. ":"), "td")
+		helpers.assert_eq(result, "consume",
+			"the date engine must accept the layout's single NBSP+colon keyDown payload")
+		helpers.assert_eq(fake_km.get_injected_count(), 1)
 	end)
 end)

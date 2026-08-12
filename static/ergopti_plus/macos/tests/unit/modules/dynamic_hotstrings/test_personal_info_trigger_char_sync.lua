@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local NBSP = string.char(0xC2, 0xA0)
 
 -- Deliberately not "★": every assertion here is about the module listening to the
 -- keymap rather than to its own TOML default.
@@ -152,6 +153,12 @@ helpers.describe("dynamic_hotstrings.set_trigger_char: both engines follow, not 
 		helpers.assert_eq(feed_at_combo(km, BOOT_TRIGGER), "consume",
 			"a rejected setter call must leave the previous trigger intact — failing open to "
 			.. "an empty trigger would disable the engine with no diagnostic")
+	end)
+
+	helpers.it("accepts the French composite event for a punctuation magic key", function()
+		local _, km = boot(":")
+		helpers.assert_eq(feed_at_combo(km, NBSP .. ":"), "consume",
+			"the @-tag engine must accept the layout's single NBSP+colon keyDown payload")
 	end)
 
 end)

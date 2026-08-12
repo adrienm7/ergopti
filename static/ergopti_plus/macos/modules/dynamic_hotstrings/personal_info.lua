@@ -16,6 +16,7 @@ local M = {}
 local hs       = hs
 local Logger   = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
+local Terminators = require("keymap.terminators")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -518,7 +519,7 @@ local function interceptor(event, _km_buffer, ctx)
 	end
 
 	if _state == STATE_COLLECTING then
-		if char == _trigger then
+		if Terminators.matches_magic_event(char, _trigger) then
 			-- The keymap buffer is the authority on what is actually on screen.
 			--
 			-- This state machine is fed exclusively from keyDown, so it resets on

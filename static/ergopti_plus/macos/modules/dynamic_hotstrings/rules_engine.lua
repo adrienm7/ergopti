@@ -24,6 +24,7 @@ local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 
 local SharedEngine = require("dynamic_hotstrings")
+local Terminators = require("keymap.terminators")
 local SyntheticInput = require("adapters.synthetic_input")
 
 local Logger = require("infra.logger")
@@ -80,7 +81,7 @@ local function interceptor(event, km_buffer, ctx)
 	if flags.cmd or flags.ctrl then return nil end
 
 	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
-	if char ~= _trigger then return nil end
+	if not Terminators.matches_magic_event(char, _trigger) then return nil end
 
 	-- Gate on the group master toggle so that disabling the dynamichotstrings group
 	-- (or "Disable all hotstrings") stops date expansion even though date rules are
