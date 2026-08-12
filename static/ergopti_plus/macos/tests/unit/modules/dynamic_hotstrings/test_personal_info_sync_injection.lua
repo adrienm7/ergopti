@@ -12,8 +12,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Source Invariant: the interceptor must NOT contain timer.doAfter(0, ...)
 ---    wrapping do_expand — a source-level check that fails on regression.
---- 2. The existing doAfter(0.15, ...) re-entry guard remains in this provenance
----    commit; its physical-input blind interval is removed by HS-M-02 separately.
+--- 2. Immutable event tags make a timing-based `_replacing` release unnecessary:
+---    the guard is released synchronously after the transaction is accepted.
 --- 3. The fallback keeps deletion, field values, and Tabs inside one explicit
 ---    replacement transaction, then seals or cancels it before returning.
 --- ==============================================================================
@@ -47,16 +47,20 @@ helpers.describe("personal_info interceptor — synchronous do_expand (dynhotstr
 		)
 	end)
 
-	helpers.it("retains the existing 0.15-second re-entry guard until HS-M-02", function()
+	helpers.it("releases _replacing synchronously without a timing window", function()
 		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function parse_toml_section")
 		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 		helpers.assert_true(
-			src:find("doAfter(0.15", 1, true) ~= nil,
-			"the provenance commit must not silently absorb the separate HS-M-02 behavior change"
+			src:find("doAfter(0.15", 1, true) == nil,
+			"ownership comes from event tags, so a release delay would only block a real follow-up key"
 		)
+		local protected_pos = src:find("local ok, err = pcall", 1, true)
+		local release_pos = src:find("_replacing = false", protected_pos or 1, true)
+		helpers.assert_true(protected_pos ~= nil and release_pos ~= nil and release_pos > protected_pos,
+			"do_expand must release its re-entry guard synchronously after the protected transaction")
 	end)
 
 end)
