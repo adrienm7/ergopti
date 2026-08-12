@@ -65,6 +65,7 @@ package.path = table.concat({
 }, ";")
 
 local helpers = require("tests.helpers")
+local ModuleIsolation = require("tests.support.module_isolation")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation from a red message
@@ -182,62 +183,11 @@ end
 
 helpers.reset_results()
 
--- Driver namespaces evicted from package.loaded between test FILES. A file
--- that stubs one of these modules and forgets to restore it would otherwise
--- contaminate whichever file the walker yields next — and the walk order
--- differs between NTFS and APFS, so the same commit was green locally and
--- red in CI. Cold-starting every file makes the suite order-independent by
--- construction. tests.* (helpers, stubs) and plain "hs" deliberately survive:
--- load_with_stubs manages those itself.
-local PURGE_PREFIXES = { "^modules%.", "^adapters%.", "^infra%.", "^ui%." }
-
---- Evicts every cached driver module so the next test file starts cold, and
---- installs a pristine hs stub: top-of-file require chains would otherwise
---- resolve paths through whatever hs the PREVIOUS file left in _G (e.g. a
---- scratch configdir), which is the same cross-file contamination in a
---- different coat.
-local function purge_driver_modules()
-	for key in pairs(package.loaded) do
-		if type(key) == "string" then
-			for _, pattern in ipairs(PURGE_PREFIXES) do
-				if key:find(pattern) then
-					package.loaded[key] = nil
-					break
-				end
-			end
-		end
-	end
-	package.loaded["hs"] = nil
-	package.loaded["tests.stubs.hs"] = nil
-	local hs_stub = require("tests.stubs.hs")
-	hs_stub.__reset()
-	_G.hs = hs_stub
-	package.loaded["hs"] = hs_stub
-
-	-- The shared logger core is required under a BARE name ("logger"), so the
-	-- prefix purge above never evicts it: its ring buffer and its five-second
-	-- suppression streak span the whole process. That is correct for the running
-	-- driver and wrong for a suite, because 630 modules run back to back in one
-	-- process — the last line of one file can suppress the identical first line of
-	-- the next, and the result then depends on the walk order, which differs
-	-- between NTFS and APFS. That is exactly the cross-file contamination this
-	-- function exists to remove.
-	--
-	-- Only the carry-over is cleared. The module is NOT evicted: doing that would
-	-- hand every test an isolation the driver never has, which is how a suite comes
-	-- to be green about behaviour that does not exist.
-	local ok_core, core = pcall(require, "logger")
-	if ok_core and type(core) == "table" then
-		pcall(core.reset_dedup)
-		pcall(core.ring_buffer_clear)
-	end
-end
-
 local total_modules = 0
 for _, dir in ipairs(TEST_DIRS) do
 	for _, mod_name in ipairs(discover_tests(dir)) do
 		total_modules = total_modules + 1
-		purge_driver_modules()
+		ModuleIsolation.purge(driver_root, shared_lua)
 		print(string.format("\n>>> Loading %s", mod_name))
 		local ok, err = pcall(require, mod_name)
 		if not ok then
