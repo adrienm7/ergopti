@@ -90,7 +90,7 @@ local function click_category_gate(outcome)
 			is_section_enabled = function() return true end,
 			disable_group = mutation_for(outcome, calls),
 		},
-		save_prefs = function() calls.saves = calls.saves + 1 end,
+		save_prefs = function() calls.saves = calls.saves + 1; return true end,
 		notify_feature = function() calls.success_notices = calls.success_notices + 1 end,
 		updateMenu = function() calls.updates = calls.updates + 1 end,
 	}
@@ -164,7 +164,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 					disable_section = mutation_for(outcome, calls),
 				},
 				hotstring_editor = { open = function() end },
-				save_prefs = function() calls.saves = calls.saves + 1 end,
+				save_prefs = function() calls.saves = calls.saves + 1; return true end,
 				notify_feature = function() calls.success_notices = calls.success_notices + 1 end,
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 			}
@@ -219,7 +219,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 				end,
 				disable_section = function() calls.legacy = calls.legacy + 1; return false end,
 			},
-			save_prefs = function() calls.saves = calls.saves + 1 end,
+			save_prefs = function() calls.saves = calls.saves + 1; return true end,
 			notify_feature = function() calls.success_notices = calls.success_notices + 1 end,
 			updateMenu = function() calls.updates = calls.updates + 1 end,
 		}
