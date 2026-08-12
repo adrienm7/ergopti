@@ -303,9 +303,9 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 		adapter.set_delivery_guard(function() error("guard failure") end)
 		adapter.bind("Ctrl+T", function() fired = fired + 1 end)
 
-		local ok = pcall(hs_stub.hotkey._bound[1].pressed_fn)
-		helpers.assert_eq(ok, true,
-			"native callback delivery must not leak a guard exception to Hammerspoon")
+		-- Call directly: an escaped exception fails the surrounding test harness,
+		-- while the fired counter proves the fail-closed behavioral result
+		hs_stub.hotkey._bound[1].pressed_fn()
 		helpers.assert_eq(fired, 0,
 			"an unreadable lifecycle state must deny the action rather than guess active")
 	end)
