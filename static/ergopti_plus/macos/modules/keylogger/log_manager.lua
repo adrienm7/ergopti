@@ -75,6 +75,14 @@ local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 --- covers 100 000 lines before giving up and preserving the file.
 local MAX_ROLLOVER_DRAIN_ITERS = 20
 
+--- POSIX errno returned by io.open() when a candidate device.json is absent.
+--- Only this outcome permits the identity scan to continue as if no file existed.
+local ENOENT_ERROR_CODE = 2
+
+--- POSIX errno returned when an outer by_device entry is not a directory
+--- (for example macOS metadata files). Such entries cannot own device.json.
+local ENOTDIR_ERROR_CODE = 20
+
 
 
 
@@ -237,9 +245,11 @@ end
 -- ==================================
 
 --- Loads `device.json` for the current host. Reuses an existing UUID if the
---- host_signature matches; otherwise generates a new UUID. KEYLOGGER_SPEC §16.1.
+--- host_signature matches; otherwise generates a new UUID only after every
+--- existing candidate was read and decoded successfully. KEYLOGGER_SPEC §16.1.
 --- @param metrics_dir string The metrics root.
---- @return table The fully populated device object.
+--- @return table|nil device The fully populated device object, or nil when the
+--- identity scan did not commit.
 local function _resolve_device(metrics_dir)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
@@ -247,20 +257,55 @@ local function _resolve_device(metrics_dir)
 	_mkdir_p(by_root)
 
 	local current_host = _host_signature()
-	for entry in fs.dir(by_root) do
-		if entry ~= "." and entry ~= ".." then
-			local djpath = by_root .. entry .. "/device.json"
-			local fh = io.open(djpath, "r")
-			if fh then
-				local raw = fh:read("*a"); fh:close()
-				local ok, obj = pcall(json.decode, raw)
-				if ok and type(obj) == "table"
-					and type(obj.device_id) == "string"
-					and obj.host_signature == current_host then
-					return obj
+	local dir_ok, iterator, dir_state = pcall(fs.dir, by_root)
+	if not dir_ok or type(iterator) ~= "function" then
+		Logger.error(LOG, "Cannot enumerate existing device identities; initialization refused.")
+		return nil
+	end
+
+	local scan_ok, matching_device, unresolved_candidate = pcall(function()
+		local unresolved = false
+		for entry in iterator, dir_state do
+			if entry ~= "." and entry ~= ".." then
+				local candidate_dir = by_root .. entry
+				local djpath = candidate_dir .. "/device.json"
+				local open_ok, fh, _, open_code = pcall(io.open, djpath, "r")
+				if not open_ok or not fh then
+					local safely_absent = open_ok
+						and (open_code == ENOENT_ERROR_CODE or open_code == ENOTDIR_ERROR_CODE)
+					if not safely_absent then unresolved = true end
+				else
+					local read_ok, raw = pcall(fh.read, fh, "*a")
+					local close_ok, closed = pcall(fh.close, fh)
+					if not read_ok or type(raw) ~= "string"
+						or not close_ok or closed ~= true
+					then
+						unresolved = true
+					else
+						local decode_ok, obj = pcall(json.decode, raw)
+						local valid = decode_ok and type(obj) == "table"
+							and type(obj.device_id) == "string" and obj.device_id ~= ""
+							and type(obj.host_signature) == "string" and obj.host_signature ~= ""
+						if not valid then
+							unresolved = true
+						elseif obj.host_signature == current_host then
+							return obj, false
+						end
+					end
 				end
 			end
 		end
+		return nil, unresolved
+	end)
+
+	if not scan_ok then
+		Logger.error(LOG, "Existing device identity scan failed; initialization refused.")
+		return nil
+	end
+	if matching_device then return matching_device end
+	if unresolved_candidate then
+		Logger.error(LOG, "An existing device identity could not be owned; initialization refused.")
+		return nil
 	end
 
 	return {
@@ -1260,17 +1305,21 @@ end
 function M.init(core_state)
 	if _state then
 		Logger.warn(LOG, "M.init() called twice — ignoring duplicate.")
-		return
+		return true
 	end
 	if type(core_state) ~= "table" or type(core_state.LOG_DIR) ~= "string" then
 		Logger.error(LOG, "M.init(): invalid core_state — log manager non-functional.")
-		return
+		return false
 	end
-	_state = core_state
 
 	Logger.start(LOG, "Initializing log manager…")
 
-	_device_obj = _resolve_device(_state.LOG_DIR)
+	_device_obj = _resolve_device(core_state.LOG_DIR)
+	if not _device_obj then
+		Logger.error(LOG, "M.init(): device identity could not be resolved — log manager disabled.")
+		return false
+	end
+	_state = core_state
 	_device_id  = _device_obj.device_id
 	_resolve_paths(_state.LOG_DIR, _device_id)
 
@@ -1379,6 +1428,7 @@ function M.init(core_state)
 
 	Logger.success(LOG, "Log manager initialized (device %s, name %s).",
 		_device_id:sub(1, 8) .. "…", _device_obj.name)
+	return true
 end
 
 --- Re-creates the ingest timer if it was stopped by M.stop() without a
