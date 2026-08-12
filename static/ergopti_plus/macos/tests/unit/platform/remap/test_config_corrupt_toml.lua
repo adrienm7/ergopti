@@ -72,7 +72,9 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 
 	helpers.it("returns nil,absent when the file is genuinely absent", function()
 		reset_captured()
-		local data, err = Config._load_toml_file("/nonexistent/path/ergopti_fake_config.toml")
+		local path = os.tmpname()
+		os.remove(path)
+		local data, err = Config._load_toml_file(path)
 		helpers.assert_nil(data, "absent file must return nil data")
 		helpers.assert_eq(err, "absent", "absent file must remain distinguishable from read failure")
 
@@ -108,12 +110,14 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 		local orig_decode = _toml_stub.decode
 		_toml_stub.decode = function(_raw) return nil end
 
-		local state = Config.load_user_config({}, {}, helpers.driver_root() .. "platform/remap/config.lua")
+		local state, status = Config.load_user_config(
+			{}, {}, helpers.driver_root() .. "platform/remap/config.lua")
 		_toml_stub.decode = orig_decode
 
-		-- Must still return a usable default state (no crash).
-		helpers.assert_true(type(state) == "table", "must return a state table even on corrupt config")
-		helpers.assert_eq(state.enabled, false, "default state must start disabled")
+		-- A caller must receive no publishable state: otherwise init can deploy
+		-- defaults over a persisted `enabled = false` decision it could not read.
+		helpers.assert_nil(state, "corrupt config must publish no live remap state")
+		helpers.assert_eq(status, "error")
 
 		-- Must NOT log the misleading "No user config found" INFO.
 		for _, entry in ipairs(captured) do
@@ -142,10 +146,11 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 			return nil  -- absent, not corrupt
 		end
 
-		local state = Config.load_user_config({}, {}, "/fake/first_launch.toml")
+		local state, status = Config.load_user_config({}, {}, "/fake/first_launch.toml")
 		Config._load_toml_file = orig_load
 
 		helpers.assert_true(type(state) == "table")
+		helpers.assert_eq(status, "absent")
 
 		-- Must emit the standard "No user config found" INFO.
 		local found = false

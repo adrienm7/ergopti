@@ -24,8 +24,8 @@
 
 local helpers = require("tests.helpers")
 
+local FileSystem = require("adapters.file_system")
 local Config = helpers.load_with_stubs("platform.remap.config")
--- Required AFTER Config so this is the very table config.lua just captured.
 local Logger = require("infra.logger")
 
 -- Unclosed table header plus a bare unquoted value: the shared codec returns a
@@ -137,43 +137,50 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 
 	helpers.it("refuses unreadable existing config and failed staging commits", function()
 		local path = os.tmpname()
-		local original = "PRIVATE-KARABINER-CONFIG-SENTINEL"
+		local original = "[karabiner]\nenabled = false\n"
 		write_file(path, original)
 		local original_open = io.open
-		local original_rename = os.rename
-		local renames = 0
+		local original_write = FileSystem.write
+		local publications = 0
 
 		io.open = function(candidate, mode)
 			if candidate == path and mode == "r" then return nil, "PRIVATE-READ-FAILURE", 13 end
 			return original_open(candidate, mode)
 		end
-		os.rename = function(...)
-			renames = renames + 1
-			return original_rename(...)
-		end
+		FileSystem.write = function() publications = publications + 1; return true end
 		local unreadable_result = Config.save_user_config(make_state(), path)
 		io.open = original_open
-		os.rename = original_rename
+		FileSystem.write = original_write
 		helpers.assert_eq(unreadable_result, false,
 			"an unreadable existing config must reject the save transaction")
-		helpers.assert_eq(renames, 0, "an unreadable source must authorize no publication")
+		helpers.assert_eq(publications, 0, "an unreadable source must authorize no publication")
 		helpers.assert_eq(read_file(path), original, "read refusal must preserve exact committed bytes")
 
-		local fake = {
-			write = function() return nil, "PRIVATE-WRITE-FAILURE", 28 end,
-			close = function() return true end,
-		}
-		io.open = function(candidate, mode)
-			if candidate == path then return original_open(candidate, mode) end
-			if candidate == path .. ".tmp" and mode == "w" then return fake end
-			return original_open(candidate, mode)
+		-- The first fixture mocked io.open, but the classifier is intentionally
+		-- stricter than raw stream access and may cache no conclusion from it.
+		-- Use a classified adapter snapshot for the publication-refusal half.
+		local original_read = FileSystem.read_with_status
+		local reads = 0
+		FileSystem.read_with_status = function(candidate)
+			reads = reads + 1
+			return original, "ok"
 		end
-		os.rename = function() renames = renames + 1; return true end
+		FileSystem.write = function(_, _, expected_source)
+			publications = publications + 1
+			if type(expected_source) ~= "table"
+					or expected_source.status ~= "ok"
+					or expected_source.content ~= original then
+				return false
+			end
+			return false
+		end
 		local write_result = Config.save_user_config(make_state(), path)
-		io.open = original_open
-		os.rename = original_rename
+		FileSystem.read_with_status = original_read
+		FileSystem.write = original_write
 		helpers.assert_eq(write_result, false, "a refused staging write must reject the save")
-		helpers.assert_eq(renames, 0, "a refused staging write must never reach rename")
+		helpers.assert_eq(reads, 1, "save must take one classified source snapshot")
+		helpers.assert_eq(publications, 1,
+			"the classified source may reach exactly one atomic adapter publication attempt")
 		helpers.assert_eq(read_file(path), original, "failed staging must preserve committed bytes")
 		cleanup(path)
 	end)
@@ -209,13 +216,26 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local path = os.tmpname()
 		os.remove(path)  -- os.tmpname creates the file on some builds
 
+		local payload
+		local write_assertion
+		local original_write = FileSystem.write
+		FileSystem.write = function(candidate, content, expected_source)
+			write_assertion = candidate == path
+				and type(expected_source) == "table"
+				and expected_source.status == "absent"
+				and expected_source.content == nil
+			payload = content
+			return true
+		end
 		local saved = Config.save_user_config(make_state(), path)
-		local written = read_file(path)
+		FileSystem.write = original_write
 		cleanup(path)
 
 		helpers.assert_eq(saved, true, "a first-launch save must succeed")
-		helpers.assert_true(written ~= nil and written:find("[tap_holds", 1, true) ~= nil,
-			"the encoded TOML must land on disk on first launch")
+		helpers.assert_true(write_assertion,
+			"first-launch publication must carry a proven-absent source precondition")
+		helpers.assert_true(payload ~= nil and payload:find("[tap_holds", 1, true) ~= nil,
+			"the encoded TOML must reach the atomic adapter on first launch")
 	end)
 
 	helpers.it("still rewrites a config that decodes cleanly", function()
@@ -223,12 +243,35 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local valid = "[karabiner]\nenabled = false\n"
 		write_file(path, valid)
 
+		local payload
+		local write_assertion
+		local original_read = FileSystem.read_with_status
+		local reads = 0
+		local original_write = FileSystem.write
+		FileSystem.read_with_status = function(candidate)
+			reads = reads + 1
+			return valid, "ok"
+		end
+		FileSystem.write = function(candidate, content, expected_source)
+			write_assertion = candidate == path
+				and type(expected_source) == "table"
+				and expected_source.status == "ok"
+				and expected_source.content == valid
+			payload = content
+			return true
+		end
+		local saved
 		local logged = with_captured_errors(function()
-			Config.save_user_config(make_state(), path)
+			saved = Config.save_user_config(make_state(), path)
 		end)
-		local payload = produced_payload(path, valid)
+		FileSystem.read_with_status = original_read
+		FileSystem.write = original_write
 		cleanup(path)
 
+		helpers.assert_eq(saved, true)
+		helpers.assert_eq(reads, 1, "save must take one classified source snapshot")
+		helpers.assert_true(write_assertion,
+			"the writer must revalidate the exact classified bytes before publication")
 		helpers.assert_true(payload ~= nil,
 			"a valid config must still be re-encoded and written — the guard must not block healthy saves")
 		helpers.assert_true(payload:find("enabled = true", 1, true) ~= nil,
@@ -243,10 +286,22 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 
 		-- Third argument = the reset-to-defaults escape hatch. Without it a user
 		-- whose file went bad could never repair it from the UI.
-		Config.save_user_config(make_state(), path, true)
-		local payload = produced_payload(path, CORRUPT_TOML)
+		local payload
+		local write_assertion
+		local original_write = FileSystem.write
+		FileSystem.write = function(candidate, content, expected_source)
+			write_assertion = candidate == path
+				and (expected_source == nil or expected_source == false)
+			payload = content
+			return true
+		end
+		local saved = Config.save_user_config(make_state(), path, true)
+		FileSystem.write = original_write
 		cleanup(path)
 
+		helpers.assert_eq(saved, true)
+		helpers.assert_true(write_assertion,
+			"the explicit reset intentionally discards the corrupt source snapshot")
 		helpers.assert_true(payload ~= nil,
 			"the explicit reset must be allowed to overwrite an unparseable config")
 		helpers.assert_true(payload:find("enabled = true", 1, true) ~= nil,
@@ -313,20 +368,19 @@ helpers.describe("karabiner setters — only the reset bypasses the corruption g
 		end
 	end
 
-	helpers.it("scans every persistence call site", function()
-		helpers.assert_true(total >= 10,
-			"expected the full set of Config.save_user_config() call sites, found " .. total ..
-			" — the scan pattern has drifted and the guard below would be vacuous")
+	helpers.it("keeps direct persistence outside the setter transaction helper bounded", function()
+		helpers.assert_eq(total, 2,
+			"only boot migration and first-launch publication may call the writer directly")
 	end)
 
-	helpers.it("only reset_to_defaults passes the overwrite_corrupt flag", function()
-		for _, owner in ipairs(bypassing) do
-			helpers.assert_eq(owner, "reset_to_defaults",
-				"'" .. owner .. "' passes overwrite_corrupt to save_user_config — every setter " ..
-				"except the explicit reset must refuse to clobber an unparseable config")
-		end
-		helpers.assert_eq(#bypassing, 1,
-			"exactly one call site (reset_to_defaults) may bypass the guard, found " .. #bypassing)
+	helpers.it("routes the reset-only bypass through the transactional helper", function()
+		helpers.assert_eq(#bypassing, 0,
+			"no direct writer call may bypass classified-source protection")
+		local reset_at = src:find("function M.reset_to_defaults", 1, true)
+		local reset_end = reset_at and src:find("\nend", reset_at, true)
+		local reset_body = reset_at and src:sub(reset_at, reset_end) or ""
+		helpers.assert_true(reset_body:find("end, true", 1, true) ~= nil,
+			"only reset_to_defaults may pass overwrite_corrupt=true into commit_state_mutation")
 	end)
 
 end)

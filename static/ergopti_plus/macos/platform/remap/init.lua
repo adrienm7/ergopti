@@ -37,6 +37,7 @@ local Watchers    = require("platform.remap.watchers")
 local Registrar   = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Timings     = require("infra.timings")
+local FileSystem  = require("adapters.file_system")
 
 -- The managed-output classifier is a lease prerequisite even when the
 -- keylogger feature is disabled. A load failure must keep generated rules
@@ -2729,18 +2730,6 @@ schedule_layout_refresh = function(
 	return true
 end
 
---- Checks whether a file exists at the given path without leaking a file descriptor.
---- io.open returns a handle on success; we must close it immediately or the GC is
---- the only thing preventing an fd leak for the lifetime of the process.
---- @param path string Absolute path to test.
---- @return boolean True if the file exists and can be opened for reading.
-local function file_exists(path)
-	local f = io.open(path, "r")
-	if f then f:close() end
-	return f ~= nil
-end
-
-
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
 
@@ -3011,6 +3000,53 @@ function M.set_enabled(value, on_done)
 end
 
 
+--- Persists a prospective state and publishes one live mutation only after the
+--- writer confirms success. The candidate has fresh nested config tables, so a
+--- failed save cannot leak a partial setter mutation through shared references.
+--- @param mutate function Receives a detached candidate state.
+--- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @return boolean committed
+local function commit_state_mutation(mutate, overwrite_corrupt)
+	local candidate = {}
+	for key, value in pairs(_state) do candidate[key] = value end
+	candidate.tap_hold_config = {}
+	for key, value in pairs(_state.tap_hold_config or {}) do
+		if type(value) == "table" then
+			local copy = {}; for item_key, item_value in pairs(value) do copy[item_key] = item_value end
+			candidate.tap_hold_config[key] = copy
+		else
+			candidate.tap_hold_config[key] = value
+		end
+	end
+	candidate.mod_combos_config = {}
+	for key, value in pairs(_state.mod_combos_config or {}) do
+		if type(value) == "table" then
+			local copy = {}; for item_key, item_value in pairs(value) do copy[item_key] = item_value end
+			candidate.mod_combos_config[key] = copy
+		else
+			candidate.mod_combos_config[key] = value
+		end
+	end
+	mutate(candidate)
+	local call_ok, saved = pcall(
+		Config.save_user_config,
+		candidate,
+		resolve_user_config(),
+		overwrite_corrupt
+	)
+	if not call_ok or saved ~= true then
+		Logger.error(LOG, "Karabiner setting mutation did not commit; live state was preserved.")
+		return false
+	end
+	_state.tap_hold_config = candidate.tap_hold_config
+	_state.mod_combos_config = candidate.mod_combos_config
+	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
+	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
+	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
+	_state.combo_symmetric = candidate.combo_symmetric
+	return true
+end
+
 --- Returns the current tap action id for a key.
 --- @param key_id string Key id as defined in tap_hold_keys.json.
 --- @return string action_id
@@ -3034,12 +3070,17 @@ end
 --- @param key_id string Key id.
 --- @param action_id string Action id from actions.json.
 function M.set_tap_action(key_id, action_id)
-	if not require_state("set_tap_action") then return end
-	local cfg = _state.tap_hold_config[key_id] or {}
-	-- Preserve any per-key timeout override — rebuilding the entry must not drop it.
-	_state.tap_hold_config[key_id] = { tap = action_id, hold = cfg.hold or "none", timeout_ms = cfg.timeout_ms }
-	Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id)
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_tap_action") then return false end
+	local committed = commit_state_mutation(function(candidate)
+		local cfg = candidate.tap_hold_config[key_id] or {}
+		candidate.tap_hold_config[key_id] = {
+			tap = action_id,
+			hold = cfg.hold or "none",
+			timeout_ms = cfg.timeout_ms,
+		}
+	end)
+	if committed then Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id) end
+	return committed
 end
 
 --- Sets the hold action for a key and saves the user config.
@@ -3047,12 +3088,17 @@ end
 --- @param key_id string Key id.
 --- @param action_id string Action id from actions.json.
 function M.set_hold_action(key_id, action_id)
-	if not require_state("set_hold_action") then return end
-	local cfg = _state.tap_hold_config[key_id] or {}
-	-- Preserve any per-key timeout override — rebuilding the entry must not drop it.
-	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = action_id, timeout_ms = cfg.timeout_ms }
-	Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id)
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_hold_action") then return false end
+	local committed = commit_state_mutation(function(candidate)
+		local cfg = candidate.tap_hold_config[key_id] or {}
+		candidate.tap_hold_config[key_id] = {
+			tap = cfg.tap or "none",
+			hold = action_id,
+			timeout_ms = cfg.timeout_ms,
+		}
+	end)
+	if committed then Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id) end
+	return committed
 end
 
 --- Returns the per-key tap/hold threshold override in milliseconds, or nil when
@@ -3072,17 +3118,26 @@ end
 --- @param key_id string Key id.
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)
-	if not require_state("set_tap_timeout") then return end
-	local cfg   = _state.tap_hold_config[key_id] or {}
+	if not require_state("set_tap_timeout") then return false end
 	local value = tonumber(ms)
 	if value and value > 0 then
 		value = math.floor(value)
 	else
 		value = nil  -- clear override → inherit the global timeout
 	end
-	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = cfg.hold or "none", timeout_ms = value }
-	Logger.debug(LOG, "Key '%s' tap/hold timeout override → %s.", key_id, value and (value .. " ms") or "global")
-	Config.save_user_config(_state, resolve_user_config())
+	local committed = commit_state_mutation(function(candidate)
+		local cfg = candidate.tap_hold_config[key_id] or {}
+		candidate.tap_hold_config[key_id] = {
+			tap = cfg.tap or "none",
+			hold = cfg.hold or "none",
+			timeout_ms = value,
+		}
+	end)
+	if committed then
+		Logger.debug(LOG, "Key '%s' tap/hold timeout override → %s.",
+			key_id, value and (value .. " ms") or "global")
+	end
+	return committed
 end
 
 
@@ -3120,8 +3175,8 @@ end
 --- @param slot string Slot being written ("tap" | "hold" | "combo").
 --- @param action_id string New action id for that slot.
 --- @return table Updated slot table.
-local function update_combo_slot(combo_id, slot, action_id)
-	local cfg   = _state.mod_combos_config[combo_id]
+local function update_combo_slot(config, combo_id, slot, action_id)
+	local cfg   = config[combo_id]
 	local tap   = (type(cfg) == "table" and cfg.tap)   or "none"
 	local hold  = (type(cfg) == "table" and cfg.hold)  or "none"
 	local combo = (type(cfg) == "table" and cfg.combo) or "none"
@@ -3137,10 +3192,13 @@ end
 --- @param combo_id string Combo id.
 --- @param action_id string Action id from actions.json.
 function M.set_combo_tap_action(combo_id, action_id)
-	if not require_state("set_combo_tap_action") then return end
-	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "tap", action_id)
-	Logger.debug(LOG, "Combo '%s' tap → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_combo_tap_action") then return false end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.mod_combos_config[combo_id] = update_combo_slot(
+			candidate.mod_combos_config, combo_id, "tap", action_id)
+	end)
+	if committed then Logger.debug(LOG, "Combo '%s' tap → '%s'.", combo_id, action_id) end
+	return committed
 end
 
 --- Sets the hold action for a modifier combo and saves the user config.
@@ -3148,10 +3206,13 @@ end
 --- @param combo_id string Combo id.
 --- @param action_id string Action id from actions.json.
 function M.set_combo_hold_action(combo_id, action_id)
-	if not require_state("set_combo_hold_action") then return end
-	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "hold", action_id)
-	Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_combo_hold_action") then return false end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.mod_combos_config[combo_id] = update_combo_slot(
+			candidate.mod_combos_config, combo_id, "hold", action_id)
+	end)
+	if committed then Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id) end
+	return committed
 end
 
 --- Sets the chord action for a modifier combo and saves the user config.
@@ -3159,10 +3220,13 @@ end
 --- @param combo_id string Combo id.
 --- @param action_id string Action id from actions.json.
 function M.set_combo_combo_action(combo_id, action_id)
-	if not require_state("set_combo_combo_action") then return end
-	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "combo", action_id)
-	Logger.debug(LOG, "Combo '%s' combo → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_combo_combo_action") then return false end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.mod_combos_config[combo_id] = update_combo_slot(
+			candidate.mod_combos_config, combo_id, "combo", action_id)
+	end)
+	if committed then Logger.debug(LOG, "Combo '%s' combo → '%s'.", combo_id, action_id) end
+	return committed
 end
 
 
@@ -3178,15 +3242,18 @@ end
 --- Logs an error and returns without saving if the value is invalid.
 --- @param ms number Timeout in milliseconds (must be a positive integer).
 function M.set_tap_hold_timeout(ms)
-	if not require_state("set_tap_hold_timeout") then return end
+	if not require_state("set_tap_hold_timeout") then return false end
 	local value = tonumber(ms)
 	if not value or value <= 0 then
 		Logger.error(LOG, "set_tap_hold_timeout: invalid value '%s' — ignoring.", tostring(ms))
-		return
+		return false
 	end
-	_state.tap_hold_timeout_ms = math.floor(value)
-	Logger.debug(LOG, "Tap/hold timeout: %d ms.", _state.tap_hold_timeout_ms)
-	Config.save_user_config(_state, resolve_user_config())
+	value = math.floor(value)
+	local committed = commit_state_mutation(function(candidate)
+		candidate.tap_hold_timeout_ms = value
+	end)
+	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
+	return committed
 end
 
 --- Returns the sticky/one-shot modifier timeout in milliseconds.
@@ -3200,15 +3267,18 @@ end
 --- Logs an error and returns without saving if the value is invalid.
 --- @param ms number Timeout in milliseconds (must be a positive integer).
 function M.set_sticky_timeout(ms)
-	if not require_state("set_sticky_timeout") then return end
+	if not require_state("set_sticky_timeout") then return false end
 	local value = tonumber(ms)
 	if not value or value <= 0 then
 		Logger.error(LOG, "set_sticky_timeout: invalid value '%s' — ignoring.", tostring(ms))
-		return
+		return false
 	end
-	_state.sticky_timeout_ms = math.floor(value)
-	Logger.debug(LOG, "Sticky timeout: %d ms.", _state.sticky_timeout_ms)
-	Config.save_user_config(_state, resolve_user_config())
+	value = math.floor(value)
+	local committed = commit_state_mutation(function(candidate)
+		candidate.sticky_timeout_ms = value
+	end)
+	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
+	return committed
 end
 
 --- Returns the current simultaneous-combo threshold in milliseconds.
@@ -3222,15 +3292,18 @@ end
 --- Logs an error and returns without saving if the value is invalid.
 --- @param ms number Threshold in milliseconds (must be a positive integer).
 function M.set_simultaneous_threshold(ms)
-	if not require_state("set_simultaneous_threshold") then return end
+	if not require_state("set_simultaneous_threshold") then return false end
 	local value = tonumber(ms)
 	if not value or value <= 0 then
 		Logger.error(LOG, "set_simultaneous_threshold: invalid value '%s' — ignoring.", tostring(ms))
-		return
+		return false
 	end
-	_state.simultaneous_threshold_ms = math.floor(value)
-	Logger.debug(LOG, "Simultaneous threshold: %d ms.", _state.simultaneous_threshold_ms)
-	Config.save_user_config(_state, resolve_user_config())
+	value = math.floor(value)
+	local committed = commit_state_mutation(function(candidate)
+		candidate.simultaneous_threshold_ms = value
+	end)
+	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
+	return committed
 end
 
 --- Returns true when combo symmetric mode is active (A+B = B+A).
@@ -3246,10 +3319,13 @@ end
 --- in the KE config and in the menu.
 --- @param value boolean
 function M.set_combo_symmetric(value)
-	if not require_state("set_combo_symmetric") then return end
-	_state.combo_symmetric = value == true
-	Logger.debug(LOG, "Combo symmetric: %s.", tostring(_state.combo_symmetric))
-	Config.save_user_config(_state, resolve_user_config())
+	if not require_state("set_combo_symmetric") then return false end
+	local normalized = value == true
+	local committed = commit_state_mutation(function(candidate)
+		candidate.combo_symmetric = normalized
+	end)
+	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
+	return committed
 end
 
 --- Resets all settings to their defaults and saves the user config.
@@ -3258,17 +3334,20 @@ end
 --- other setter refuses, so without this the user could never repair a corrupt
 --- config from the UI.
 function M.reset_to_defaults()
-	if not require_state("reset_to_defaults") then return end
+	if not require_state("reset_to_defaults") then return false end
 	Logger.start(LOG, "Resetting all settings to defaults…")
 	local defaults                   = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-	_state.tap_hold_config           = defaults.tap_hold_config
-	_state.mod_combos_config         = defaults.mod_combos_config
-	_state.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
-	_state.sticky_timeout_ms         = defaults.sticky_timeout_ms
-	_state.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
-	_state.combo_symmetric           = defaults.combo_symmetric
-	Config.save_user_config(_state, resolve_user_config(), true)
+	local committed = commit_state_mutation(function(candidate)
+		candidate.tap_hold_config           = defaults.tap_hold_config
+		candidate.mod_combos_config         = defaults.mod_combos_config
+		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
+		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
+		candidate.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
+		candidate.combo_symmetric           = defaults.combo_symmetric
+	end, true)
+	if not committed then return false end
 	Logger.success(LOG, "All settings reset to defaults.")
+	return true
 end
 
 
@@ -4027,13 +4106,6 @@ function M.init(file_system)
 		return
 	end
 
-	-- Controller initialization is memory-only: it validates dependencies and
-	-- prepares a generation token without spawning a task or touching Karabiner.
-	-- This is safe even when the persisted integration setting is disabled.
-	if not LeaseController.init(on_lease_phase) then
-		Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
-	end
-
 	-- Resolve the KE output path through the FileSystem port so path logic is
 	-- centralised in the adapter and not duplicated across modules.
 	-- The env-var override is checked first to support CI and headless testing.
@@ -4053,9 +4125,9 @@ function M.init(file_system)
 	-- (karabiner-init-breakdown).
 	local function timed(label, fn)
 		local t0 = hs.timer.absoluteTime()
-		local result = fn()
+		local results = table.pack(fn())
 		Logger.info(LOG, "init phase '%s': %.1f ms.", label, (hs.timer.absoluteTime() - t0) / 1e6)
-		return result
+		return table.unpack(results, 1, results.n)
 	end
 	M.AVAILABLE_ACTIONS    = timed("load_available_actions", function() return Config.load_available_actions(ACTIONS_FILE) end) or {}
 	M.TAP_HOLD_KEYS        = timed("load_tap_hold_keys",     function() return Config.load_tap_hold_keys(TAP_HOLD_FILE) end)    or {}
@@ -4067,10 +4139,21 @@ function M.init(file_system)
 		return
 	end
 
-	local first_launch = not file_exists(resolve_user_config())
-	local user_cfg     = timed("load_user_config", function()
+	local user_cfg, user_config_status = timed("load_user_config", function()
 		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	end)
+	if user_config_status == "error" or type(user_cfg) ~= "table" then
+		Logger.error(LOG, "Karabiner bridge initialization refused because its user config is unsafe.")
+		return false
+	end
+	local first_launch = user_config_status == "absent"
+
+	-- Establish no lease generation until the persisted enable/disable decision
+	-- is safely readable. An unreadable config may contain `enabled = false`.
+	if not LeaseController.init(on_lease_phase) then
+		Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
+		return false
+	end
 	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
 	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
 		tab_cfg.tap = "alt_tab_windows"
@@ -4241,6 +4324,7 @@ function M.init(file_system)
 	Logger.success(LOG,
 		"Karabiner bridge initialized (%d action(s), %d combo(s) active).",
 		#M.AVAILABLE_ACTIONS, active_combos)
+	return true
 end
 
 --- Releases local watchers and hotkeys only after an exact native fence.
