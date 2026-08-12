@@ -27,6 +27,15 @@ local function notify_start_failure()
 	end
 end
 
+--- Reports a rejected keymap-backed mutation without claiming it succeeded.
+local function notify_mutation_failure()
+	local ok, err = pcall(Notifications.notify,
+		I18n.get("common.error_title"), I18n.get("dialog.bulk_toggle.save_failed"), "error")
+	if not ok then
+		Logger.error(LOG, "Keymap mutation failure notification failed: %s.", tostring(err))
+	end
+end
+
 --- Ensures key capture is live before callers mutate user-visible feature state.
 --- Calling start on an already-started keymap is intentionally supported and
 --- cheap; it verifies reality instead of trusting a potentially stale menu bit.
@@ -59,6 +68,40 @@ function M.ensure_started(ctx, reason)
 	end
 
 	ctx.state.keymap = true
+	return true
+end
+
+--- Runs a registry mutation and publishes UI state only after exact true.
+--- @param ctx table Menu context.
+--- @param reason string|nil Diagnostic action label.
+--- @param mutation function Must return exact true on commitment.
+--- @param publish function|nil State/persistence/notification callback.
+--- @return boolean committed
+function M.commit_mutation(ctx, reason, mutation, publish)
+	if type(ctx) ~= "table" or type(mutation) ~= "function" then
+		Logger.error(LOG, "Keymap mutation refused (%s): callback is unavailable.",
+			tostring(reason or "menu action"))
+		notify_mutation_failure()
+		return false
+	end
+
+	local ok, result = xpcall(mutation, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Keymap mutation refused (%s): mutation did not commit (%s).",
+			tostring(reason or "menu action"), tostring(result))
+		notify_mutation_failure()
+		return false
+	end
+
+	if type(publish) == "function" then
+		local publish_ok, publish_err = xpcall(publish, debug.traceback)
+		if not publish_ok then
+			Logger.error(LOG, "Keymap mutation publication failed (%s): %s.",
+				tostring(reason or "menu action"), tostring(publish_err))
+			notify_mutation_failure()
+			return false
+		end
+	end
 	return true
 end
 
