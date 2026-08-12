@@ -52,6 +52,27 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 			"the public transaction must restore every mapping in the batch")
 	end)
 
+	helpers.it("withholds private callback failures while preserving rollback visibility", function()
+		local _, registry = fresh_registry()
+		local Logger = require("infra.logger")
+		local lines = {}
+		local previous_level = Logger.current_level
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = tostring(line) end)
+		local committed = registry.registry_transaction("private_registration", function()
+			error("PRIVATE_REGISTRY_SENTINEL", 0)
+		end)
+		Logger.set_sink(nil)
+		Logger.set_level(previous_level)
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_true(#lines > 0, "the failed transaction must remain visible")
+		local joined = table.concat(lines, "\n")
+		helpers.assert_true(joined:find("private_registration", 1, true) ~= nil)
+		helpers.assert_true(joined:find("PRIVATE_REGISTRY_SENTINEL", 1, true) == nil,
+			"a callback handling personal mappings may carry PII in its error object")
+	end)
+
 	helpers.it("returns exact booleans for committed and impossible group states", function()
 		local _, registry = fresh_registry()
 		registry.register_lua_group("atomic", "Atomic", {})
