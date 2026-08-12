@@ -32,7 +32,8 @@
 ---    a count summary is printed when the run breaks, using the same color/level.
 --- 6. Unified rotating file sink: one file per calendar day under <config>/logs/,
 ---    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
----    Files older than max_age_days are purged automatically on init.
+---    Files older than max_age_days are purged automatically on init and after
+---    the first successful write of each new calendar day.
 --- 7. Topical sub-files: lines are fan-out to per-subsystem logs (llm, karabiner…)
 ---    based on module tag matching, giving focused tail targets per feature area.
 --- 8. Timestamp format: HHhMMminSSsNNNms — matches the AHK driver exactly so both
@@ -66,6 +67,9 @@ local _log_dir = "/tmp/"
 -- stays off the boot critical path; the freshly-resolved log file is already
 -- writable by the time it runs.
 local LOG_PURGE_DELAY_SEC = 5.0
+
+-- Default retention window for the daily unified and errors-only logs
+local DEFAULT_LOG_RETENTION_DAYS = 14
 
 -- Seconds in a calendar day — the unit in which the retention window is expressed.
 local SECONDS_PER_DAY = 86400
@@ -220,6 +224,19 @@ local _file_handle    = nil
 local _last_log_date  = nil
 local _last_log_path  = nil
 
+-- Retention selected by init_log_path(). Kept beside the sink state so a
+-- midnight rollover can schedule the same housekeeping policy without relying
+-- on a process restart to call init_log_path() again
+local _log_retention_days = nil
+
+-- One-shot purge timers must remain Lua-owned until delivery. Hammerspoon's
+-- hs.timer userdata stops its NSTimer from __gc, so merely checking the handle
+-- returned by doAfter() still leaves the callback vulnerable to an arbitrary GC
+-- cycle. Slots are token-keyed because a config re-point and a midnight rollover
+-- may legitimately have separate purges pending at the same time.
+local _pending_purge_timers = {}
+local _next_purge_timer_token = 0
+
 -- Per-sub-file calendar date, playing for the topical fan-out the role
 -- _last_log_date plays for the main handle: it records the date this process last
 -- wrote to each sub-file, so the first write of a new day truncates it instead of
@@ -242,14 +259,75 @@ local _sub_handles    = {}
 local _log
 local _driver_sink
 
+--- Executes one purge boundary and makes an unexpected callback failure visible.
+--- Hammerspoon reports timer exceptions only to its Console, while the file log
+--- is the artifact users can export. This local guard is required because the
+--- boot purge is scheduled before process-wide timer wrapping is installed.
+--- @param log_dir string Absolute logs directory.
+--- @param max_age_days integer Retention window for daily logs.
+--- @return boolean completed True when the purge returned without raising.
+local function _execute_log_purge(log_dir, max_age_days)
+	local ok, err = xpcall(M._purge_old_logs, debug.traceback, log_dir, max_age_days)
+	if not ok then
+		_log("ERROR", "logger", "Old-log purge failed for \"%s\": %s.", log_dir, tostring(err))
+	end
+	return ok
+end
+
+--- Commits one deferred purge, or executes inline only in a headless environment.
+--- A protected constructor call is not sufficient evidence that a timer exists:
+--- the API can return nil without raising, so both outcomes are checked and
+--- logged. Rollover callers never opt into inline execution because they run on
+--- the write path and housekeeping must remain deferred.
+--- @param log_dir string Absolute logs directory.
+--- @param max_age_days integer Retention window for daily logs.
+--- @param inline_without_timer boolean Whether a missing timer may run inline.
+--- @return boolean committed True when a timer was committed or inline work completed.
+local function _schedule_log_purge(log_dir, max_age_days, inline_without_timer)
+	local hs_ref = rawget(_G, "hs")
+	local timer_ref = (type(hs_ref) == "table") and hs_ref.timer or nil
+	if type(timer_ref) ~= "table" or type(timer_ref.doAfter) ~= "function" then
+		if inline_without_timer then return _execute_log_purge(log_dir, max_age_days) end
+		_log("ERROR", "logger", "Old-log purge was not scheduled for \"%s\" — timer service unavailable.", log_dir)
+		return false
+	end
+
+	_next_purge_timer_token = _next_purge_timer_token + 1
+	local token = _next_purge_timer_token
+	local slot = { delivered = false, timer = nil }
+	_pending_purge_timers[token] = slot
+	local ok_schedule, timer_or_err = pcall(timer_ref.doAfter, LOG_PURGE_DELAY_SEC, function()
+		slot.delivered = true
+		_pending_purge_timers[token] = nil
+		_execute_log_purge(log_dir, max_age_days)
+	end)
+	if not ok_schedule then
+		_pending_purge_timers[token] = nil
+		_log("ERROR", "logger", "Old-log purge could not be scheduled for \"%s\": %s.", log_dir,
+			tostring(timer_or_err))
+		return false
+	end
+	if not timer_or_err then
+		_pending_purge_timers[token] = nil
+		_log("ERROR", "logger", "Old-log purge was not scheduled for \"%s\" — timer constructor returned no handle.",
+			log_dir)
+		return false
+	end
+	-- A faithful asynchronous timer cannot deliver before doAfter returns, but
+	-- test doubles and future ports may. Never resurrect a slot whose callback
+	-- already completed synchronously.
+	if not slot.delivered then slot.timer = timer_or_err end
+	return true
+end
+
 --- Configures the log file path under <config_dir>/hammerspoon/logs/ with
 --- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
---- max_age_days. Best-effort: any I/O error is swallowed so a permission
---- issue cannot block init.
+--- max_age_days. Best-effort: an I/O failure cannot block init, but every
+--- rejected or throwing asynchronous purge boundary is logged explicitly.
 --- @param config_dir string Absolute path to the user config directory (trailing slash optional).
 --- @param max_age_days integer Days to keep before purging (default 14).
 function M.init_log_path(config_dir, max_age_days)
-	max_age_days = max_age_days or 14
+	max_age_days = max_age_days or DEFAULT_LOG_RETENTION_DAYS
 	if type(config_dir) ~= "string" or config_dir == "" then return end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
@@ -274,6 +352,7 @@ function M.init_log_path(config_dir, max_age_days)
 		end
 	end
 	_log_dir = log_dir
+	_log_retention_days = max_age_days
 
 	-- Close every sub-file handle open on the OLD directory. They are keyed by
 	-- absolute path, so a re-point would otherwise keep writing the topical logs
@@ -300,15 +379,20 @@ function M.init_log_path(config_dir, max_age_days)
 	-- Old-log purge is pure housekeeping — defer it off the boot critical path.
 	-- The dated log file resolved just above is already writable, so nothing
 	-- downstream waits on the purge.
-	local hs_ref = rawget(_G, "hs")
-	if hs_ref and hs_ref.timer and type(hs_ref.timer.doAfter) == "function" then
-		hs_ref.timer.doAfter(LOG_PURGE_DELAY_SEC, function()
-			pcall(M._purge_old_logs, log_dir, max_age_days)
-		end)
-	else
-		-- Headless / no timer (unit tests): run inline so behaviour is unchanged.
-		pcall(M._purge_old_logs, log_dir, max_age_days)
-	end
+	_schedule_log_purge(log_dir, max_age_days, true)
+end
+
+--- Removes one stale log and records any OS refusal without fabricating success.
+--- @param path string Absolute file path selected by the retention policy.
+--- @return boolean removed True only when os.remove confirms deletion.
+local function _remove_stale_log(path)
+	local ok_remove, removed, remove_err = pcall(os.remove, path)
+	if ok_remove and removed then return true end
+
+	local reason = ok_remove and remove_err or removed
+	if reason == nil or reason == "" then reason = "unknown error" end
+	_log("WARNING", "logger", "Cannot remove stale log \"%s\": %s.", path, tostring(reason))
+	return false
 end
 
 --- Deletes stale log files under `log_dir`. Split out of init_log_path() so it can
@@ -386,15 +470,13 @@ function M._purge_old_logs(log_dir, max_age_days)
 				hour  = PURGE_NOON_HOUR,
 			})
 			if stamp and stamp < cutoff then
-				os.remove(log_dir .. name)
-				removed = removed + 1
+				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
 		elseif is_sub_file[name] then
 			local ok_attr, attrs = pcall(fs_ref.attributes, log_dir .. name)
 			if ok_attr and type(attrs) == "table" and attrs.modification
 				and os.date("%Y-%m-%d", attrs.modification) ~= today then
-				os.remove(log_dir .. name)
-				removed = removed + 1
+				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
 		end
 	end
@@ -502,6 +584,7 @@ end
 --- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
 local function _ensure_log_file()
 	local today = os.date("%Y-%m-%d")
+	local previous_date = _last_log_date
 	-- Recompute the dated paths when the calendar date changes so midnight
 	-- rollovers write to the new day's file rather than reopening yesterday's.
 	if _log_dir and _last_log_date ~= today then
@@ -525,6 +608,9 @@ local function _ensure_log_file()
 		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
 		fh:flush()
 	end)
+	if previous_date and previous_date ~= today and _log_retention_days then
+		_schedule_log_purge(_log_dir, _log_retention_days, false)
+	end
 	return _file_handle
 end
 
