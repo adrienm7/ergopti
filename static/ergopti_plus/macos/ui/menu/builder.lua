@@ -271,7 +271,7 @@ function M.generate(ctx, menu_mods, actions)
 					if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
 				end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
 			ctx.updateMenu()
 		end

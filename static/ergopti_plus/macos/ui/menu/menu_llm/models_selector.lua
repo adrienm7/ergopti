@@ -181,7 +181,7 @@ function M.build(ctx)
 					return
 				end
 				add_user_model(active_backend, name)
-				save_prefs()
+				if save_prefs() ~= true then return false end
 				switch_model(name)
 			end
 		end)
@@ -278,7 +278,8 @@ function M.build(ctx)
 		action       = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
 			state.llm_model = ""
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end
 	})
 
@@ -316,7 +317,8 @@ function M.build(ctx)
 			action       = function()
 				if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
 					models_mgr.prompt_hf_login(function()
-						save_prefs(); update_menu()
+						if save_prefs() ~= true then return false end
+						update_menu()
 					end)
 				end
 			end
@@ -355,7 +357,8 @@ function M.build(ctx)
 					if ok and choice == i18n.get("button.remove") then
 						remove_user_model(active_backend, m_name)
 						if state.llm_model == m_name then state.llm_model = "" end
-						save_prefs(); update_menu()
+						if save_prefs() ~= true then return false end
+						update_menu()
 					end
 				end
 			})

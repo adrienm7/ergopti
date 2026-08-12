@@ -473,7 +473,7 @@ function M.install(ctx)
 					deps.state.llm_model = target_model
 						invalidate_installed_cache()
 					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
-					pcall(deps.save_prefs)
+					if deps.save_prefs() ~= true then return false end
 					obj.start_server(target_model, function()
 						if on_success then pcall(on_success) end
 					end)
@@ -670,7 +670,7 @@ function M.install(ctx)
 			if exit_code == 0 then
 				pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), model), "success")
 				if download_window then pcall(download_window.complete, true, model) end
-				pcall(deps.save_prefs)
+				if deps.save_prefs() ~= true then return false end
 			else
 				if download_window then pcall(download_window.complete, false, model) end
 				pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")

@@ -62,7 +62,7 @@ local function select_profile(deps, state, pid)
 	state.llm_active_profile = pid
 	llm_mod.set_active_profile(pid)
 	sync_profiles(state)
-	pcall(deps.save_prefs)
+	if deps.save_prefs() ~= true then return false end
 	pcall(deps.update_menu)
 end
 
@@ -91,7 +91,7 @@ local function clone_builtin_profile(deps, state, src)
 	table.insert(state.llm_user_profiles, copy)
 	state.llm_active_profile = copy.id
 	sync_profiles(state)
-	pcall(deps.save_prefs)
+	if deps.save_prefs() ~= true then return false end
 	pcall(deps.update_menu)
 	-- Open the edit dialog immediately so the user lands in the prompt they can
 	-- edit, not back in the menu.
@@ -106,7 +106,7 @@ local function clone_builtin_profile(deps, state, src)
 						end
 					end
 					sync_profiles(state)
-					pcall(deps.save_prefs)
+					if deps.save_prefs() ~= true then return false end
 					pcall(deps.update_menu)
 				end
 			end)
@@ -259,7 +259,7 @@ local function build_profile_menu(deps, models_mgr)
 											end
 										end
 										sync_profiles(state)
-										pcall(deps.save_prefs)
+										if deps.save_prefs() ~= true then return false end
 										pcall(deps.update_menu)
 										pcall(notifications.notify, i18n.get("profiles.updated_title"), ProfileLabel.format(updated.label, state.llm_num_predictions), "success")
 									end
@@ -291,7 +291,7 @@ local function build_profile_menu(deps, models_mgr)
 								llm_mod.set_active_profile("basic")
 							end
 							sync_profiles(state)
-						pcall(deps.save_prefs)
+						if deps.save_prefs() ~= true then return false end
 						pcall(deps.update_menu)
 						end
 					end or nil,
@@ -335,7 +335,7 @@ local function build_profile_menu(deps, models_mgr)
 							state.llm_active_profile = new_profile.id
 							llm_mod.set_active_profile(new_profile.id)
 							sync_profiles(state)
-							pcall(deps.save_prefs)
+							if deps.save_prefs() ~= true then return false end
 							pcall(deps.update_menu)
 							pcall(notifications.notify, i18n.get("profiles.created_title"), ProfileLabel.format(new_profile.label, state.llm_num_predictions), "success")
 							Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))

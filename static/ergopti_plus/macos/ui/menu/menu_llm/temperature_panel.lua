@@ -66,7 +66,8 @@ function M.build(ctx, out)
 			if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
 				pcall(keymap.set_llm_auto_raise_temp, state.llm_auto_raise_temp)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end,
 	})
 end

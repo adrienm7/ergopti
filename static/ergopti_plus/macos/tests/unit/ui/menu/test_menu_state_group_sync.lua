@@ -97,4 +97,28 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		_G.hs.timer.doAfter = saved_doAfter
 		helpers.assert_eq(started.count, 1)        -- started exactly once, later
 	end)
+
+	helpers.it("discards an enabled timer superseded by rollback to disabled", function()
+		local started = 0
+		local deferred = {}
+		local old_do_after = _G.hs.timer.doAfter
+		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+		local deps = {
+			keymap = {}, hotstring_editor = {}, save_prefs = function() return true end,
+			apply_metrics_shortcut = function() return true end,
+			apply_apps_time_shortcut = function() return true end,
+			core_mods = { keylogger = {
+				set_options = function() end,
+				set_disabled_apps = function() end,
+				start = function() started = started + 1 end,
+				stop = function() end,
+			} },
+		}
+		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = true }, {}, false, deps)
+		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = false }, {}, false, deps)
+		deferred[1]()
+		_G.hs.timer.doAfter = old_do_after
+		helpers.assert_eq(started, 0,
+			"a failed enable rolled back to disabled must fence its deferred keylogger start")
+	end)
 end)

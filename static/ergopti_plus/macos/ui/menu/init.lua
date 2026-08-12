@@ -331,21 +331,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		pcall(notifications.notify, tostring(label), nil, is_enabled and "success" or "error")
 	end
 
+	-- Preference callbacks mutate shared tables and runtime engines before they
+	-- publish config.toml. Keep the last acknowledged state so a returned or
+	-- raised writer failure can reverse the whole user action in place.
+	local sync_state_to_modules
+	local transactional_save_prefs = nil
+	local llm_handler = nil
+
 	local function save_prefs()
-		return PreferencesTransaction.commit(
-			Preferences,
-			MenuPaths.get("ConfigTomlPath"),
-			state,
-			hotfiles,
-			core_mods,
-			Builder,
-			HotCounter,
-			function()
-				-- A persisted preference change alters the menu tree, so rebuild on
-				-- the next open only after disk publication actually committed.
-				_menu_dirty = true
-			end
-		)
+		if type(transactional_save_prefs) ~= "function" then
+			Logger.error(LOG, "Preference transaction used before its boot snapshot was seeded.")
+			return false
+		end
+		return transactional_save_prefs()
 	end
 
 
@@ -360,7 +358,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk_box = {}
 
 	local _metrics_hk = nil
-	local function apply_metrics_shortcut(mods, key)
+	local function apply_metrics_shortcut(mods, key, persist)
 		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
 		if mods and key then
 			state.metrics_shortcut = { mods = mods, key = key }
@@ -382,12 +380,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
 		if _metrics_hk_box then _metrics_hk_box[1] = _metrics_hk end
-		save_prefs()
-		if type(updateMenu) == "function" then updateMenu() end
+		if persist ~= false then
+			if save_prefs() ~= true then return false end
+			if type(updateMenu) == "function" then updateMenu() end
+		end
+		return true
 	end
 
 	local _apps_time_hk = nil
-	local function apply_apps_time_shortcut(mods, key)
+	local function apply_apps_time_shortcut(mods, key, persist)
 		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
 		if mods and key then
 			state.apps_time_shortcut = { mods = mods, key = key }
@@ -408,8 +409,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
 		if _apps_time_hk_box then _apps_time_hk_box[1] = _apps_time_hk end
-		save_prefs()
-		if type(updateMenu) == "function" then updateMenu() end
+		if persist ~= false then
+			if save_prefs() ~= true then return false end
+			if type(updateMenu) == "function" then updateMenu() end
+		end
+		return true
 	end
 
 	-- Build the dependency bag for MenuState.sync_state_to_modules
@@ -419,8 +423,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- (Boxes forward-declared above so apply_metrics/apps_time_shortcut can
 	-- capture them as upvalues at definition time.)
 
-	local function sync_state_to_modules(saved, config_absent)
-		MenuState.sync_state_to_modules(state, saved, config_absent, {
+	sync_state_to_modules = function(saved, config_absent, restoring)
+		return MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
@@ -430,6 +434,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
 			_metrics_hk              = _metrics_hk_box,
 			_apps_time_hk            = _apps_time_hk_box,
+			restoring                 = restoring == true,
 		})
 	end
 
@@ -451,13 +456,24 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 
-	local function clear_all_bindings()
+	local function clear_config_backed_bindings()
 		local disabled_action = "none"
 		if gestures and gestures_core_mod and type(gestures_core_mod.SINGLE_SLOTS) == "table" then
 			for _, slot in ipairs(gestures_core_mod.SINGLE_SLOTS) do
 				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, disabled_action) end
 			end
 		end
+		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
+			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
+			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
+				state.script_control_shortcuts[keyname] = disabled_action
+				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
+			end
+		end
+	end
+
+	local function clear_external_bindings()
+		local disabled_action = "none"
 		if karabiner then
 			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
 				pcall(karabiner.set_tap_action,  key_def.id, disabled_action)
@@ -471,13 +487,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
 		end
 		clear_keyboard_shortcut_settings()
-		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
-			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
-			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
-				state.script_control_shortcuts[keyname] = disabled_action
-				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
-			end
-		end
 	end
 
 	local function restore_factory_bindings()
@@ -580,14 +589,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		
-		-- 5. « Tout désactiver » also empties gesture / shortcut / tap-hold slots.
-		if not enabled then
-			clear_all_bindings()
-		end
+		-- Config-backed bindings must be in the candidate snapshot; rollback can
+		-- restore them because their runtimes are represented in Preferences.snapshot.
+		if not enabled then clear_config_backed_bindings() end
 
-		-- 6. Sync engines and Save
+		-- Publish the candidate state before destructive external effects. In
+		-- particular, clearing Karabiner bindings and hs.settings cannot be made
+		-- atomic by rolling back the config.toml snapshot alone.
+		if save_prefs() ~= true then return false end
+
+		-- 5. « Tout désactiver » also empties external tap-hold / keyboard slots.
+		if not enabled then clear_external_bindings() end
+
+		-- 6. Sync engines only after the candidate was acknowledged.
 		sync_state_to_modules(state, false)
-		save_prefs()
 		
 		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
 		if type(updateMenu) == "function" then updateMenu() end
@@ -669,9 +684,48 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_llm.set_backend, state.llm_backend)
 		end
 	end
-	sync_state_to_modules(saved, config_absent)
+	-- Do not ask MenuState to seed config.toml yet: the transaction must first be
+	-- initialized from the fully hydrated runtime. This is crucial for the first
+	-- user click after boot, before any successful save has occurred.
+	local initial_sync_ok = sync_state_to_modules(saved, false)
+	if initial_sync_ok ~= true then
+		Logger.error(LOG, "Initial preference synchronization did not complete.")
+	end
+	local snapshot_ok, initial_preferences = pcall(Preferences.snapshot, state, hotfiles, core_mods)
+	if not snapshot_ok or type(initial_preferences) ~= "table" then
+		initial_preferences = PreferencesTransaction.clone(state)
+		Logger.error(LOG, "Could not capture the initial runtime preference snapshot: %s.",
+			tostring(initial_preferences))
+	end
+	transactional_save_prefs = PreferencesTransaction.bind(Preferences, {
+		path                = MenuPaths.get("ConfigTomlPath"),
+		state               = state,
+		hotfiles            = hotfiles,
+		core_modules        = core_mods,
+		builder             = Builder,
+		hot_counter         = HotCounter,
+		initial_state       = state,
+		initial_preferences = initial_preferences,
+		restore_runtime     = function(snapshot)
+			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
+			if type(llm_handler) == "table"
+				and type(llm_handler.restore_preference_runtime) == "function" then
+				return llm_handler.restore_preference_runtime(snapshot) == true
+			end
+			return true
+		end,
+		on_commit           = function()
+			_menu_dirty = true
+		end,
+		on_rollback         = function()
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+		end,
+	})
+	if config_absent and save_prefs() ~= true then
+		Logger.error(LOG, "Could not seed the initial preference file.")
+	end
 
-	local llm_handler = nil
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
 			state          = state,

@@ -52,7 +52,7 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
 				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(notify_label, state[enabled_key])
 			ctx.updateMenu()
 		end or nil,
@@ -115,7 +115,7 @@ function M.build_management(ctx)
 				state.terminator_states[d.key] = enabled
 			end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
 	local function reset_terminators()
@@ -129,7 +129,7 @@ function M.build_management(ctx)
 				state.terminator_states[d.key] = def_on
 			end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
 	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() bulk_set_terminators(true)  end or nil }
@@ -167,7 +167,7 @@ function M.build_management(ctx)
 							end
 						end
 						state.terminator_states[k] = nv
-						ctx.save_prefs()
+						if ctx.save_prefs() ~= true then return false end
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 					end end)(def.key, lbl) or nil,
@@ -205,7 +205,7 @@ function M.build_management(ctx)
 						end
 					end
 					if type(state.terminator_states) == "table" then state.terminator_states[k] = nil end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end end)(ct.key) or nil,
 			},
@@ -276,7 +276,7 @@ function M.build_management(ctx)
 			if type(state.custom_terminators) ~= "table" then state.custom_terminators = {} end
 			table.insert(state.custom_terminators, { key = key, char = char, label = label, consume = consume })
 			state.terminator_states[key] = true
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end or nil,
 	}
@@ -326,7 +326,7 @@ function M.build_management(ctx)
 					state.delays[key] = new_sec
 					if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				end
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 			end or nil,
 		}
@@ -372,9 +372,10 @@ function M.build_management(ctx)
 				-- window writes to, so the two UIs never desync) then apply to the
 				-- running engine so the new delay takes effect without a restart.
 				local new_sec = val / 1000
-				pcall(hotstrings_config.set_override, category, nil, "delay", new_sec)
+				if hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
+					return false
+				end
 				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
-				ctx.save_prefs()
 				ctx.updateMenu()
 			end or nil,
 		}
@@ -410,7 +411,7 @@ function M.build_management(ctx)
 			-- false default tag until something else rebuilds the menu. Hand the
 			-- window an explicit refresh channel so the two UIs cannot desync.
 			win._on_config_changed = function()
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 			end
 			pcall(win.open)
@@ -458,7 +459,7 @@ function M.build_management(ctx)
 					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
 						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
 					end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.do_reload("menu")
 				end
 			end

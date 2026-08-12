@@ -91,7 +91,7 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 			if type(mutator) ~= "function" then return false end
 			return mutator(group_name, sec_name)
 		end, function()
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
 			ctx.updateMenu()
 		end)
@@ -119,7 +119,7 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 			return km.set_groups_sections_enabled(changes, enable)
 		end, function()
 			if enable then ctx.state.hotstrings[group_name] = true end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end)
 	end
@@ -266,7 +266,8 @@ function M.build_custom(ctx, counts)
 			state.custom_editor_shortcut = false
 			if ctx.hotstring_editor and type(ctx.hotstring_editor.clear_shortcut) == "function" then pcall(ctx.hotstring_editor.clear_shortcut) end
 		end
-		ctx.save_prefs(); ctx.updateMenu()
+		if ctx.save_prefs() ~= true then return false end
+		ctx.updateMenu()
 	end
 
 	-- Shortcut item: clicking it opens the customisation dialog directly
@@ -324,7 +325,8 @@ function M.build_custom(ctx, counts)
 			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 				pcall(ctx.hotstring_editor.set_default_section, nil)
 			end
-			ctx.save_prefs(); ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
 		end,
 	} }
 	if type(personal_secs) == "table" then
@@ -350,7 +352,8 @@ function M.build_custom(ctx, counts)
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
 							end
-							ctx.save_prefs(); ctx.updateMenu()
+							if ctx.save_prefs() ~= true then return false end
+							ctx.updateMenu()
 						end,
 					})
 				end
@@ -448,7 +451,8 @@ function M.build_custom(ctx, counts)
 				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
 					pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
 				end
-				ctx.save_prefs(); ctx.updateMenu()
+				if ctx.save_prefs() ~= true then return false end
+				ctx.updateMenu()
 			end or nil,
 			disabled = paused or nil,
 		},
@@ -603,7 +607,7 @@ function M.build_custom(ctx, counts)
 			else
 				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(base_title, will_enable)
 			ctx.updateMenu()
 		end,

@@ -61,7 +61,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_show_info_bar) == "function" then
 				pcall(keymap.set_llm_show_info_bar, state.llm_show_info_bar)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end,
 	})
 
@@ -82,7 +83,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_streaming) == "function" then
 				pcall(keymap.set_llm_streaming, state.llm_streaming)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	})
 
@@ -97,7 +99,8 @@ function M.build(ctx)
 			if keymap and type(keymap.set_llm_streaming_multi) == "function" then
 				pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end or nil,
 	})
 

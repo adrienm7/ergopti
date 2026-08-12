@@ -158,6 +158,7 @@ local CoreState = {
 	-- model name (captured against the OLD backend) to the NEW backend's
 	-- warmup() (F-MED-6). Mirrors detection_generation's pattern.
 	backend_generation     = 0,
+	profile_generation     = 0,
 }
 
 
@@ -433,6 +434,7 @@ end
 function M.set_active_profile(id)
 	if type(id) ~= "string" then return end
 	CoreState.active_profile_id = id
+	CoreState.profile_generation = CoreState.profile_generation + 1
 	if not CoreState.runtime_llm_enabled then
 		Logger.debug(LOG, "set_active_profile: runtime LLM disabled — skipping warmup for '%s'.", tostring(id))
 		return
@@ -446,9 +448,11 @@ function M.set_active_profile(id)
 		-- discard itself instead of dispatching `model` (resolved against the
 		-- OLD backend) to the NEW backend's warmup() (F-MED-6).
 		local my_backend_generation = CoreState.backend_generation
+		local my_profile_generation = CoreState.profile_generation
 		hs.timer.doAfter(0, function()
-			if CoreState.backend_generation ~= my_backend_generation then
-				Logger.debug(LOG, "set_active_profile: backend switched before deferred warmup fired — discarding stale dispatch for '%s'.",
+			if CoreState.backend_generation ~= my_backend_generation
+				or CoreState.profile_generation ~= my_profile_generation then
+				Logger.debug(LOG, "set_active_profile: backend/profile changed before deferred warmup fired — discarding stale dispatch for '%s'.",
 					tostring(model))
 				return
 			end

@@ -250,7 +250,7 @@ helpers.describe("menu boot: a corrupt config never triggers the factory save", 
 
 	helpers.it("the save is still reached for a genuine fresh install", function()
 		local src = helpers.read_driver_source("config_absent")
-		helpers.assert_true(src:find("if config_absent then save_prefs() end", 1, true) ~= nil,
+		helpers.assert_true(src:find("if config_absent and save_prefs() ~= true then", 1, true) ~= nil,
 			"a real fresh install must still persist its seeded defaults — narrowing the flag must "
 				.. "not disable the path it exists for")
 	end)

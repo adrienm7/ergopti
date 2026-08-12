@@ -378,7 +378,7 @@ function M.build(ctx)
 
 	local function set_channel(c)
 		state.update_channel = c
-		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
 		Updater.restart_background_checks(
 			c,
 			tonumber(state.update_check_interval_seconds) or Updater.get_check_interval(),
@@ -390,7 +390,7 @@ function M.build(ctx)
 	local function set_check_interval(seconds)
 		interval_sec = tonumber(seconds) or 0
 		state.update_check_interval_seconds = interval_sec
-		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
 		Updater.restart_background_checks(
 			state.update_channel or channel,
 			interval_sec,

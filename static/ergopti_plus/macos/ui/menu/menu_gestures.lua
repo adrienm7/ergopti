@@ -94,7 +94,7 @@ function M.build(ctx)
 					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
 				end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
 		end or nil,
@@ -148,7 +148,7 @@ function M.build(ctx)
 			local function apply_action()
 				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
 				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				return conflict
 			end
@@ -227,7 +227,7 @@ function M.build(ctx)
 				checked = (currentMode == "x1") or nil,
 				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			},
@@ -236,7 +236,7 @@ function M.build(ctx)
 				checked = (currentMode == "incremental") or nil,
 				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			}
@@ -257,7 +257,7 @@ function M.build(ctx)
 				checked = (currentSens == s) or nil,
 				action = function()
 					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, s) end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			})
@@ -314,7 +314,7 @@ function M.build(ctx)
 		else
 			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
 
@@ -323,7 +323,7 @@ function M.build(ctx)
 		for slot, action in pairs(defaults) do
 			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
 
@@ -333,7 +333,7 @@ function M.build(ctx)
 	local function cmd_circular_spaces()
 		if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
 			pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end
 	end

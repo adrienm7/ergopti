@@ -452,6 +452,84 @@ function M.load(prefs_file)
 	return flatten_from_disk(tbl), "ok"
 end
 
+--- Clones persisted values so nested menu tables cannot mutate an acknowledged
+--- rollback snapshot after it has been captured.
+--- @param value any Value to clone.
+--- @return any clone
+local function clone_value(value)
+	if type(value) ~= "table" then return value end
+	local clone = {}
+	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
+	return clone
+end
+
+--- Captures the complete flat preference snapshot represented by memory and
+--- runtime-owned registries. This is the exact payload save() serializes and the
+--- rollback owner later re-applies when publication fails.
+--- @param state table The current global state.
+--- @param hotfiles table List of hotstring files.
+--- @param core_mods table Loaded core modules.
+--- @return table snapshot Detached flat preference snapshot.
+function M.snapshot(state, hotfiles, core_mods)
+	state = type(state) == "table" and state or {}
+	core_mods = type(core_mods) == "table" and core_mods or {}
+	local existing = clone_value(state)
+
+	local section_states = {}
+	local keymap = core_mods.keymap
+	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
+		local name = M.get_group_name(f)
+		local secs = keymap and type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
+		if type(secs) == "table" then
+			section_states[name] = {}
+			for _, sec in ipairs(secs) do
+				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+					local is_en = keymap and type(keymap.is_section_enabled) == "function"
+						and keymap.is_section_enabled(name, sec.name) or false
+					section_states[name][sec.name] = is_en
+				end
+			end
+		end
+	end
+	existing.section_states = section_states
+
+	local gestures = core_mods.gestures
+	existing.gesture_actions = clone_value(
+		(gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
+	)
+	existing.gesture_modes = clone_value(
+		(gestures and type(gestures.get_all_modes) == "function") and gestures.get_all_modes() or {}
+	)
+	existing.gesture_sensitivities = clone_value(
+		(gestures and type(gestures.get_all_sensitivities) == "function")
+			and gestures.get_all_sensitivities() or {}
+	)
+	existing.gesture_action_parameters = clone_value(
+		(gestures and type(gestures.get_all_action_parameters) == "function")
+			and gestures.get_all_action_parameters() or {}
+	)
+	if gestures and type(gestures.get_space_wrap) == "function" then
+		existing.gesture_space_wrap = gestures.get_space_wrap()
+	else
+		existing.gesture_space_wrap = true
+	end
+
+	existing.shortcut_keys = {}
+	local shortcuts_mod = core_mods.shortcuts_mod
+	if shortcuts_mod and type(shortcuts_mod.list_shortcuts) == "function" then
+		local ok, list = pcall(shortcuts_mod.list_shortcuts)
+		if ok and type(list) == "table" then
+			for _, shortcut in ipairs(list) do
+				if type(shortcut) == "table" and shortcut.id then
+					existing.shortcut_keys[shortcut.id] = shortcut.enabled
+				end
+			end
+		end
+	end
+
+	return clone_value(existing)
+end
+
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
 --- file on disk.
@@ -464,57 +542,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		Logger.error(LOG, "Cannot save preferences without a destination path.")
 		return false
 	end
-	state = type(state) == "table" and state or {}
-	core_mods = type(core_mods) == "table" and core_mods or {}
-	local existing = {}
-
-	for k, v in pairs(state) do
-		existing[k] = v
-	end
-
-	local section_states = {}
-	local keymap = core_mods.keymap
-	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
-		local name = M.get_group_name(f)
-		local secs = keymap and type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
-		if type(secs) == "table" then
-			section_states[name] = {}
-			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					local is_en = keymap and type(keymap.is_section_enabled) == "function"
-								  and keymap.is_section_enabled(name, sec.name) or false
-					section_states[name][sec.name] = is_en
-				end
-			end
-		end
-	end
-	existing.section_states = section_states
-
-	local gestures = core_mods.gestures
-	existing.gesture_actions = (gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
-	existing.gesture_modes = (gestures and type(gestures.get_all_modes) == "function") and gestures.get_all_modes() or {}
-	existing.gesture_sensitivities = (gestures and type(gestures.get_all_sensitivities) == "function") and gestures.get_all_sensitivities() or {}
-	existing.gesture_action_parameters = (gestures and type(gestures.get_all_action_parameters) == "function") and gestures.get_all_action_parameters() or {}
-	-- Explicit if/else avoids the Lua nil-vs-false trap: `fn() or true` returns
-	-- true when fn() returns false, incorrectly overriding a disabled space-wrap.
-	if gestures and type(gestures.get_space_wrap) == "function" then
-		existing.gesture_space_wrap = gestures.get_space_wrap()
-	else
-		existing.gesture_space_wrap = true
-	end
-
-	existing.shortcut_keys = {}
-	local shortcuts_mod = core_mods.shortcuts_mod
-	if shortcuts_mod and type(shortcuts_mod.list_shortcuts) == "function" then
-		local ok, list = pcall(shortcuts_mod.list_shortcuts)
-		if ok and type(list) == "table" then
-			for _, s in ipairs(list) do
-				if type(s) == "table" and s.id then
-					existing.shortcut_keys[s.id] = s.enabled
-				end
-			end
-		end
-	end
+	local existing = M.snapshot(state, hotfiles, core_mods)
 
 	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
 	if not ok or type(encoded) ~= "string" then
@@ -530,7 +558,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 			tostring(prefs_file))
 		return false
 	end
-	return true
+	return true, existing
 end
 
 --- Merges the saved disk state into the current memory state.
