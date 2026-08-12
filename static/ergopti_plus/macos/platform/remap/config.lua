@@ -55,15 +55,27 @@ local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
 local TomlCodec = require("infra.toml.codec")
+local ENOENT_ERROR_CODE = 2
 
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,
 --- and nil,'parse_error' when the file exists but cannot be decoded as TOML
 --- (so callers can distinguish first-launch from corruption).
 function M._load_toml_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local raw = fh:read("*a"); fh:close()
+	local open_ok, fh, open_detail, open_code = pcall(io.open, path, "r")
+	if not open_ok or not fh then
+		if open_ok and open_code == ENOENT_ERROR_CODE then return nil, "absent" end
+		Logger.error(LOG, "Cannot read Karabiner user config; treating it as unavailable "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+		return nil, "read_error"
+	end
+	local read_ok, raw = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then
+		Logger.error(LOG, "Karabiner user-config read did not commit; treating it as unavailable "
+			.. "(failure content withheld).")
+		return nil, "read_error"
+	end
 	local ok, data = pcall(TomlCodec.decode, raw)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
@@ -395,7 +407,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local data, err = M._load_toml_file(user_config_path)
 
 	if not data then
-		if err == "parse_error" then
+		if err == "parse_error" or err == "read_error" then
 			-- File exists but is corrupt: _load_toml_file already logged the
 			-- error with the full path. Fall back to defaults so the driver can
 			-- run, but do NOT overwrite the corrupt file.
@@ -513,7 +525,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 		-- Re-reading before every save is cheap (a few KB, only on user action)
 		-- and is the only way to notice that the file went bad since boot.
 		local _, err = M._load_toml_file(user_config_path)
-		if err == "parse_error" then
+		if err == "parse_error" or err == "read_error" then
 			Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
 				user_config_path)
 			return false
@@ -542,12 +554,19 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 
 	-- Atomic write via .tmp + rename.
 	local tmp = user_config_path .. ".tmp"
-	local fh  = io.open(tmp, "w")
-	if not fh then
+	local open_ok, fh = pcall(io.open, tmp, "w")
+	if not open_ok or not fh then
 		Logger.error(LOG, "Cannot write user config at '%s'.", user_config_path)
 		return false
 	end
-	fh:write(payload); fh:close()
+	local write_ok, written = pcall(fh.write, fh, payload)
+	local close_ok, closed = pcall(fh.close, fh)
+	if not write_ok or not written or not close_ok or closed ~= true then
+		Logger.error(LOG, "Karabiner user-config staging did not commit; settings NOT saved "
+			.. "(failure content withheld).")
+		pcall(os.remove, tmp)
+		return false
+	end
 	-- This is the ONLY persistence path for every Karabiner setting, and the
 	-- rename is the step that actually publishes them. Discarding its result and
 	-- logging success unconditionally meant a failed save was indistinguishable

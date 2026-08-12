@@ -70,17 +70,30 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 			"corrupt TOML must emit a Logger.error with 'Cannot parse' (RED before fix: zero error logs)")
 	end)
 
-	helpers.it("returns nil (no error) when the file is genuinely absent", function()
+	helpers.it("returns nil,absent when the file is genuinely absent", function()
 		reset_captured()
 		local data, err = Config._load_toml_file("/nonexistent/path/ergopti_fake_config.toml")
 		helpers.assert_nil(data, "absent file must return nil data")
-		helpers.assert_nil(err, "absent file must NOT return 'parse_error'")
+		helpers.assert_eq(err, "absent", "absent file must remain distinguishable from read failure")
 
 		-- No error-level log must have been emitted.
 		for _, entry in ipairs(captured) do
 			helpers.assert_true(entry.level ~= "error",
 				"absent file must not emit Logger.error (got: " .. entry.msg .. ")")
 		end
+	end)
+
+	helpers.it("returns nil,read_error when an existing file cannot be opened", function()
+		reset_captured()
+		local original_open = io.open
+		io.open = function() return nil, "PRIVATE-READ-FAILURE", 13 end
+		local call_ok, data, err = pcall(Config._load_toml_file, "/controlled/config_karabiner.toml")
+		io.open = original_open
+
+		helpers.assert_true(call_ok, "a permission or transient-lock failure must not escape")
+		helpers.assert_nil(data, "an unreadable config must publish no decoded data")
+		helpers.assert_eq(err, "read_error",
+			"an unreadable existing file must never be indistinguishable from first launch")
 	end)
 
 end)

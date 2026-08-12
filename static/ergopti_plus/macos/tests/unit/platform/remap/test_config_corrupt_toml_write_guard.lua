@@ -135,6 +135,49 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 			"the refusal must be loud, naming the file: got " .. helpers.inspect(logged))
 	end)
 
+	helpers.it("refuses unreadable existing config and failed staging commits", function()
+		local path = os.tmpname()
+		local original = "PRIVATE-KARABINER-CONFIG-SENTINEL"
+		write_file(path, original)
+		local original_open = io.open
+		local original_rename = os.rename
+		local renames = 0
+
+		io.open = function(candidate, mode)
+			if candidate == path and mode == "r" then return nil, "PRIVATE-READ-FAILURE", 13 end
+			return original_open(candidate, mode)
+		end
+		os.rename = function(...)
+			renames = renames + 1
+			return original_rename(...)
+		end
+		local unreadable_result = Config.save_user_config(make_state(), path)
+		io.open = original_open
+		os.rename = original_rename
+		helpers.assert_eq(unreadable_result, false,
+			"an unreadable existing config must reject the save transaction")
+		helpers.assert_eq(renames, 0, "an unreadable source must authorize no publication")
+		helpers.assert_eq(read_file(path), original, "read refusal must preserve exact committed bytes")
+
+		local fake = {
+			write = function() return nil, "PRIVATE-WRITE-FAILURE", 28 end,
+			close = function() return true end,
+		}
+		io.open = function(candidate, mode)
+			if candidate == path then return original_open(candidate, mode) end
+			if candidate == path .. ".tmp" and mode == "w" then return fake end
+			return original_open(candidate, mode)
+		end
+		os.rename = function() renames = renames + 1; return true end
+		local write_result = Config.save_user_config(make_state(), path)
+		io.open = original_open
+		os.rename = original_rename
+		helpers.assert_eq(write_result, false, "a refused staging write must reject the save")
+		helpers.assert_eq(renames, 0, "a refused staging write must never reach rename")
+		helpers.assert_eq(read_file(path), original, "failed staging must preserve committed bytes")
+		cleanup(path)
+	end)
+
 	helpers.it("names the corrupt path so the user can go and repair it", function()
 		local path = os.tmpname()
 		write_file(path, CORRUPT_TOML)
