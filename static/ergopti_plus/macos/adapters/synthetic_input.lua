@@ -1109,10 +1109,11 @@ function M.register_action_listener(listener_id, callback, acknowledged_epoch)
 		"adapters.synthetic_input.register_action_listener: listener_id must be non-empty")
 	assert(type(callback) == "function",
 		"adapters.synthetic_input.register_action_listener: callback must be a function")
-	if _action_listeners[listener_id] == nil then
+	local previous = _action_listeners[listener_id]
+	local is_new = previous == nil
+	if is_new then
 		assert(_action_listener_count < M.CONSUMER_LIMIT,
 			"adapters.synthetic_input: action listener limit exhausted")
-		_action_listener_count = _action_listener_count + 1
 	end
 	if _action_dispatcher == nil then
 		local created_ok, dispatcher_or_err = pcall(new_delayed_timer, 0, function()
@@ -1167,10 +1168,32 @@ function M.register_action_listener(listener_id, callback, acknowledged_epoch)
 		failure_count = 0,
 		quarantined_epoch = nil,
 	}
+	if is_new then _action_listener_count = _action_listener_count + 1 end
 	if _action_listeners[listener_id].acknowledged_epoch ~= _action_epoch then
 		_action_listener_pending = true
-		start_action_dispatcher(0)
+		if not start_action_dispatcher(0) then
+			-- Registration is a commitment boundary for consumers such as keymap.
+			-- A listener that needs immediate catch-up but owns no scheduled native
+			-- dispatcher is not registered: restore the exact previous record/count
+			-- so callers can fail closed and retry without exhausting the fixed slot
+			-- budget one failed start at a time.
+			_action_listeners[listener_id] = previous
+			if is_new then _action_listener_count = _action_listener_count - 1 end
+			_action_listener_pending = false
+			for _, record in pairs(_action_listeners) do
+				if record.acknowledged_epoch ~= _action_epoch
+					and record.quarantined_epoch ~= _action_epoch then
+					_action_listener_pending = true
+					break
+				end
+			end
+			if _action_listener_count == 0 then
+				pcall(_action_dispatcher.stop, _action_dispatcher)
+			end
+			return false
+		end
 	end
+	return true
 end
 
 
