@@ -93,6 +93,9 @@ local function load_fixture()
 	end
 
 	helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
+	-- The captured eventtap is reachable only after the async focused-window
+	-- prewarm has committed. Keep that unrelated boundary known-normal here.
+	require("modules.keymap.utils").is_ignored_window = function() return false, 1 end
 	local hs_stub = require("hs")
 	local keydown = nil
 	for _, tap in ipairs(taps) do

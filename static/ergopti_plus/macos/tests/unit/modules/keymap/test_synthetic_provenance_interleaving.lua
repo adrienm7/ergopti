@@ -111,6 +111,10 @@ local function load_fixture()
 		eventtap = eventtap,
 		processInfo = { processID = CURRENT_PID },
 	})
+	-- This test owns event provenance, not asynchronous AX classification. Make
+	-- the already-loaded keymap utility report a known-normal window so invoking
+	-- the captured callback models the reachable post-prewarm runtime state.
+	require("modules.keymap.utils").is_ignored_window = function() return false, 1 end
 	local hs_stub = require("hs")
 	local synthetic = require("adapters.synthetic_input")
 	local keydown_tap = nil
