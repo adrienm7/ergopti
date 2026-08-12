@@ -116,14 +116,17 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 			state = { hotstrings = {}, keymap = false },
 			keymap = {
 				get_sections = function(group) return sections[group] end,
-				enable_section = function(group, section)
-					enabled_sections[#enabled_sections + 1] = group .. "/" .. section
-				end,
-				disable_section = function(group, section)
-					disabled_sections[#disabled_sections + 1] = group .. "/" .. section
-				end,
-				enable_group = function(group)
-					enabled_groups[#enabled_groups + 1] = group
+				set_groups_sections_enabled = function(changes, enabled)
+					for _, change in ipairs(changes) do
+						for _, section in ipairs(change.sections) do
+							local target = enabled and enabled_sections or disabled_sections
+							target[#target + 1] = change.name .. "/" .. section
+						end
+						if change.enable_group then
+							enabled_groups[#enabled_groups + 1] = change.name
+						end
+					end
+					return true
 				end,
 				start = function() starts = starts + 1; return true end,
 			},

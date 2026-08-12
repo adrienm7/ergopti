@@ -106,8 +106,11 @@ local fmt_count = Labels.fmt_count
 --- @param name string Group name.
 --- @return boolean
 local function groupEnabled(ctx, name)
-	return (ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" and ctx.keymap.is_group_enabled(name))
-		or (ctx.state.hotstrings[name] ~= false)
+	if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
+		local live = ctx.keymap.is_group_enabled(name)
+		if live ~= nil then return live == true end
+	end
+	return ctx.state.hotstrings[name] ~= false
 end
 
 --- Gets the display label for a group.
@@ -120,6 +123,22 @@ local function groupLabel(ctx, name)
 	return ctx.applyTriggerChar(lbl)
 end
 
+--- Returns only actionable section names for one registry group.
+--- @param keymap_api table|nil
+--- @param group_name string
+--- @return table
+local function section_names_for(keymap_api, group_name)
+	local sections = keymap_api and type(keymap_api.get_sections) == "function"
+		and keymap_api.get_sections(group_name) or nil
+	local names = {}
+	for _, section in ipairs(type(sections) == "table" and sections or {}) do
+		if type(section) == "table" and section.name ~= "-" and not section.is_module_placeholder then
+			names[#names + 1] = section.name
+		end
+	end
+	return names
+end
+
 --- Generates a function to toggle a hotstring group.
 --- @param ctx table Context.
 --- @param name string Group name.
@@ -128,15 +147,19 @@ local function toggleGroupFn(ctx, name)
 	return function()
 		local will_enable = not groupEnabled(ctx, name)
 		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable hotstring group") then return end
-		ctx.state.hotstrings[name] = will_enable
-		if will_enable then
-			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, name) end
-		else
-			if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, name) end
+		local mutator
+		if ctx.keymap then
+			if will_enable then mutator = ctx.keymap.enable_group else mutator = ctx.keymap.disable_group end
 		end
-		ctx.save_prefs()
-		ctx.notify_feature(groupLabel(ctx, name), ctx.state.hotstrings[name])
-		ctx.updateMenu()
+		KeymapLifecycle.commit_mutation(ctx, "toggle hotstring group", function()
+			if type(mutator) ~= "function" then return false end
+			return mutator(name)
+		end, function()
+			ctx.state.hotstrings[name] = will_enable
+			ctx.save_prefs()
+			ctx.notify_feature(groupLabel(ctx, name), will_enable)
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -149,15 +172,19 @@ end
 local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	return function()
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
-		if will_enable then
-			if not KeymapLifecycle.ensure_started(ctx, "enable hotstring section") then return end
-			if ctx.keymap and type(ctx.keymap.enable_section) == "function" then pcall(ctx.keymap.enable_section, group_name, sec_name) end
-		else
-			if ctx.keymap and type(ctx.keymap.disable_section) == "function" then pcall(ctx.keymap.disable_section, group_name, sec_name) end
+		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable hotstring section") then return end
+		local mutator
+		if ctx.keymap then
+			if will_enable then mutator = ctx.keymap.enable_section else mutator = ctx.keymap.disable_section end
 		end
-		ctx.save_prefs()
-		ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
-		ctx.updateMenu()
+		KeymapLifecycle.commit_mutation(ctx, "toggle hotstring section", function()
+			if type(mutator) ~= "function" then return false end
+			return mutator(group_name, sec_name)
+		end, function()
+			ctx.save_prefs()
+			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -172,24 +199,19 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 	return function()
 		local km = ctx.keymap
 		if enable and not KeymapLifecycle.ensure_started(ctx, "enable group sections") then return end
-		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
-		if type(secs) == "table" then
-			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					if enable and type(km.enable_section) == "function" then
-						pcall(km.enable_section, group_name, sec.name)
-					elseif not enable and type(km.disable_section) == "function" then
-						pcall(km.disable_section, group_name, sec.name)
-					end
-				end
-			end
-		end
-		if enable then
-			ctx.state.hotstrings[group_name] = true
-			if type(km.enable_group) == "function" then pcall(km.enable_group, group_name) end
-		end
-		ctx.save_prefs()
-		ctx.updateMenu()
+		local changes = { {
+			name = group_name,
+			sections = section_names_for(km, group_name),
+			enable_group = enable,
+		} }
+		KeymapLifecycle.commit_mutation(ctx, "set hotstring group sections", function()
+			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+			return km.set_groups_sections_enabled(changes, enable)
+		end, function()
+			if enable then ctx.state.hotstrings[group_name] = true end
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -203,27 +225,28 @@ local function setAllSectionsFn(ctx, enable)
 	return function()
 		local km = ctx.keymap
 		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstring sections") then return end
+		local changes = {}
 		for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			local secs = (km and type(km.get_sections) == "function") and km.get_sections(name) or nil
-			if type(secs) == "table" then
-				for _, sec in ipairs(secs) do
-					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						if enable and type(km.enable_section) == "function" then
-							pcall(km.enable_section, name, sec.name)
-						elseif not enable and type(km.disable_section) == "function" then
-							pcall(km.disable_section, name, sec.name)
-						end
-					end
-				end
-			end
-			if enable then
-				ctx.state.hotstrings[name] = true
-				if type(km.enable_group) == "function" then pcall(km.enable_group, name) end
+			local section_names = section_names_for(km, name)
+			if enable or #section_names > 0 then
+				changes[#changes + 1] = {
+					name = name,
+					sections = section_names,
+					enable_group = enable,
+				}
 			end
 		end
-		ctx.save_prefs()
-		ctx.updateMenu()
+		KeymapLifecycle.commit_mutation(ctx, "set all hotstring sections", function()
+			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+			return km.set_groups_sections_enabled(changes, enable)
+		end, function()
+			if enable then
+				for _, change in ipairs(changes) do ctx.state.hotstrings[change.name] = true end
+			end
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end)
 	end
 end
 
