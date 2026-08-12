@@ -26,6 +26,7 @@ if not ok_kl then keylogger = nil end
 local SharedEngine = require("dynamic_hotstrings")
 local Terminators = require("keymap.terminators")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -57,6 +58,29 @@ local _preview_snapshot = nil
 -- update the real counts after personal data is injected.
 local _sections       = nil
 
+--- Defers shared-resolver diagnostics beyond the key event callback.
+--- @param rule table Shared rule record.
+--- @param failure any Error object returned by pcall.
+--- @return boolean owned True after the diagnostic was scheduled or logged.
+local function report_resolver_failure(rule, failure)
+	local section = tostring(rule and rule.section or "unknown")
+	local suffix_length = type(rule and rule.suffix) == "string" and #rule.suffix or 0
+	local failure_size = #tostring(failure)
+	local schedule_ok, handle_or_err, committed = xpcall(function()
+		return TimerScheduler.after(0, function()
+			Logger.error(LOG, "Dynamic resolver failed in section '%s' "
+				.. "(%d-byte suffix; %d-byte failure content withheld).",
+				section, suffix_length, failure_size)
+		end)
+	end, debug.traceback)
+	if schedule_ok and committed == true then return true end
+	local scheduling_failure_size = #tostring(handle_or_err)
+	Logger.error(LOG, "Dynamic resolver diagnostic could not be deferred for section '%s' "
+		.. "(%d-byte scheduler detail and %d-byte failure content withheld).",
+		section, scheduling_failure_size, failure_size)
+	return true
+end
+
 --- Revokes the prospective value and any committed row before semantics change.
 --- @param reason string Stable diagnostic context.
 --- @return boolean committed True only when mutation may proceed.
@@ -71,8 +95,7 @@ local function invalidate_preview_snapshot(reason)
 	end
 	local ok, committed = xpcall(_km.invalidate_hotstring_preview, debug.traceback)
 	if not ok or committed ~= true then
-		Logger.error(LOG, "%s could not revoke the dynamic preview (result: %s).",
-			reason, tostring(committed))
+		Logger.error(LOG, "%s could not revoke the dynamic preview (details withheld).", reason)
 		return false
 	end
 	_preview_snapshot = nil
@@ -514,6 +537,16 @@ function M.start(keymap_module)
 		end)
 	end
 
+	-- Install the process-global reporter only after every fallible registration
+	-- above has completed. The Lua runloop cannot deliver an interceptor between
+	-- this assignment and return, so a failed start never leaks a stale owner
+	if type(SharedEngine.set_resolver_error_reporter) ~= "function"
+		or SharedEngine.set_resolver_error_reporter(report_resolver_failure) ~= true
+	then
+		Logger.error(LOG, "Shared resolver error reporter could not be installed; rules engine aborted.")
+		return false
+	end
+
 	Logger.info(LOG, "Dynamic rules engine started successfully.")
 	return true
 end
@@ -529,8 +562,9 @@ function M.stop()
 	local revoked = invalidate_preview_snapshot("Rules-engine stop")
 	_preview_snapshot = nil
 	SharedEngine.reset_rules()
+	local reporter_cleared = SharedEngine.set_resolver_error_reporter(nil) == true
 	_km = nil
-	return revoked
+	return revoked and reporter_cleared
 end
 
 return M

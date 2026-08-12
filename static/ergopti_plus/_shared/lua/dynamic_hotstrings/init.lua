@@ -42,6 +42,8 @@ local LOG = "dynamic_hotstrings.shared"
 
 --- @type table[] List of registered rules: {suffix, section, resolver}.
 local _rules = {}
+--- @type function|nil Platform reporter: (rule, failure) -> strict boolean.
+local _resolver_error_reporter = nil
 
 
 
@@ -124,6 +126,22 @@ function M.add_rule(suffix, section, resolver)
 end
 
 
+--- Installs the platform reporter used when a rule resolver raises.
+--- A nil reporter restores the portable direct-logger fallback.
+--- @param reporter function|nil Reporter returning true only after ownership.
+--- @return boolean committed
+function M.set_resolver_error_reporter(reporter)
+	if reporter ~= nil and type(reporter) ~= "function" then
+		Logger.error(LOG, "set_resolver_error_reporter: expected function or nil, got %s.",
+			type(reporter))
+		return false
+	end
+	_resolver_error_reporter = reporter
+	Logger.debug(LOG, "Resolver error reporter: %s.", reporter and "installed" or "direct logger")
+	return true
+end
+
+
 --- Returns the full list of registered rules (read-only reference).
 --- @return table[]
 function M.get_rules()
@@ -136,6 +154,28 @@ end
 function M.reset_rules()
 	_rules = {}
 	Logger.debug(LOG, "All rules cleared.")
+end
+
+
+--- Reports one resolver failure without preventing later sibling rules.
+--- @param rule table Failing rule record.
+--- @param failure any Error object returned by pcall.
+local function report_resolver_failure(rule, failure)
+	if rule.resolver_error_reported then return end
+	local failure_size = #tostring(failure)
+	if _resolver_error_reporter then
+		local reporter_ok, reported = pcall(_resolver_error_reporter, rule, failure)
+		if reporter_ok and reported == true then
+			rule.resolver_error_reported = true
+			return
+		end
+		Logger.error(LOG, "Resolver error reporter failed for section '%s' (details withheld).",
+			tostring(rule.section))
+	end
+	Logger.error(LOG, "Dynamic resolver failed in section '%s' "
+		.. "(%d-byte suffix; %d-byte failure content withheld).",
+		tostring(rule.section), #rule.suffix, failure_size)
+	rule.resolver_error_reported = true
 end
 
 
@@ -164,6 +204,7 @@ function M.match_buffer(buffer, group_name, is_section_enabled_fn)
 			local suf = rule.suffix
 			if #suf > 0 and buffer:sub(-(#suf)) == suf then
 				local ok, result = pcall(rule.resolver)
+				if not ok then report_resolver_failure(rule, result) end
 				if ok and type(result) == "string" and result ~= "" then
 					-- `result` is whatever the resolver produced, and the resolvers
 					-- registered against this engine include every @-tag: for "@i" it
