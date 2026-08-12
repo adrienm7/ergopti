@@ -74,6 +74,9 @@ end
 -- The single key stored in paths.toml.
 local CONFIG_DIR_KEY = "ConfigDirPath"
 
+-- POSIX error code that alone proves a personal file is absent
+local ENOENT_ERROR_CODE = 2
+
 -- Driver root — derived at module-load time so standalone source-tree launches
 -- can read their adjacent paths.toml before M.init(). M.init() may override it.
 local _src      = debug.getinfo(1, "S").source:sub(2)
@@ -388,12 +391,27 @@ local function personal_hotstrings_dir()
 	-- Bootstrap an empty personal_hotstrings.toml on first use so the user always
 	-- has a file to open rather than a confusing ENOENT.
 	local toml_path = p .. "personal_hotstrings.toml"
-	local existing  = io.open(toml_path, "r")
-	if not existing then
-		local fh = io.open(toml_path, "w")
-		if fh then fh:write("") fh:close() end
+	local open_ok, existing, open_detail, open_code = pcall(io.open, toml_path, "r")
+	if open_ok and existing then
+		local close_ok, closed = pcall(existing.close, existing)
+		if not close_ok or closed ~= true then
+			Logger.error(LOG, "Personal hotstrings path probe did not commit "
+				.. "(failure content withheld).")
+		end
+	elseif open_ok and open_code == ENOENT_ERROR_CODE then
+		local create_ok, fh = pcall(io.open, toml_path, "w")
+		if create_ok and fh then
+			local write_ok, written = pcall(fh.write, fh, "")
+			local close_ok, closed = pcall(fh.close, fh)
+			if not write_ok or not written or not close_ok or closed ~= true then
+				Logger.error(LOG, "Personal hotstrings baseline did not commit.")
+			end
+		else
+			Logger.error(LOG, "Personal hotstrings baseline could not be opened for writing.")
+		end
 	else
-		existing:close()
+		Logger.error(LOG, "Personal hotstrings path could not be read; baseline creation refused "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
 	end
 	return p
 end

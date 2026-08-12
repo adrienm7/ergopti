@@ -384,6 +384,7 @@ end
 --- Parses a given TOML file and returns a structured table.
 --- @param path string The absolute path to the TOML file.
 --- @return table The structured metadata and sections.
+--- @return boolean committed True only after the complete file was read and closed.
 function M.parse(path)
 	local empty_result = {
 		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
@@ -391,7 +392,7 @@ function M.parse(path)
 		sections = {}
 	}
 
-	if type(path) ~= "string" then return empty_result end
+	if type(path) ~= "string" then return empty_result, false end
 
 	-- Fast path: a precompiled snapshot of an unchanged file loads ~10x faster
 	-- than the character-level parse below. A miss (nil) or any provider error
@@ -399,7 +400,7 @@ function M.parse(path)
 	if _cache_provider and type(_cache_provider.load) == "function" then
 		local ok_load, cached = pcall(_cache_provider.load, path)
 		if ok_load and type(cached) == "table" then
-			return cached
+			return cached, true
 		end
 	end
 
@@ -408,7 +409,7 @@ function M.parse(path)
 	local ok, f = pcall(io.open, path, "r")
 	if not ok or not f then
 		Logger.warn(LOG, string.format("Impossible d'ouvrir le fichier : %s.", tostring(path)))
-		return empty_result
+		return empty_result, false
 	end
 
 	local result = {
@@ -584,11 +585,11 @@ function M.parse(path)
 		end
 	end)
 
-	if not read_ok then
-		Logger.error(LOG, string.format("Erreur de lecture du fichier : %s.", tostring(read_err)))
+	local close_ok, closed = pcall(f.close, f)
+	if not read_ok or not close_ok or closed ~= true then
+		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
+		return empty_result, false
 	end
-
-	pcall(function() f:close() end)
 
 	-- Rebuild sections_order from TOML metadata order when available;
 	-- otherwise fall back to the order sections appeared in the file.
@@ -636,7 +637,7 @@ function M.parse(path)
 	end
 
 	Logger.info(LOG, "TOML file parsed successfully.")
-	return result
+	return result, true
 end
 
 --- Injects an optional disk-cache provider so repeat parses of an unchanged
