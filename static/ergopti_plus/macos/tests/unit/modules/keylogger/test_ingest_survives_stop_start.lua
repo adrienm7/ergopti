@@ -96,12 +96,18 @@ local function load_log_manager()
 
 	package.loaded["infra.i18n"]    = { t = function(key) return key end }
 	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	local saved_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		read = function() return nil end,
+	}
 
 	package.loaded["modules.keylogger.log_manager"] = nil
 	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		fs      = { attributes = function() return nil end, dir = function() return function() return nil end end },
 		execute = function() return "" end,
 	})
+	package.loaded["adapters.file_system"] = saved_file_system
 	lm.init({
 		LOG_DIR = "/tmp/test_ingest_stop_start",
 		buffer_events = {}, buffer_text = "", rich_chunks = {},

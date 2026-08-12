@@ -205,7 +205,13 @@ local function start_real_keylogger()
 		execute  = function() return "" end,
 	}
 
+	local saved_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		read = function() return nil end,
+	}
 	local km = helpers.load_with_stubs("modules.keylogger.init", hs_overrides)
+	package.loaded["adapters.file_system"] = saved_file_system
 	local synthetic_input = require("adapters.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }

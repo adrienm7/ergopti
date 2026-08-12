@@ -101,6 +101,11 @@ local function load_fixture(options)
 		end,
 	}
 
+	local saved_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		read = function() return nil end,
+	}
 	local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		timer = timer_stub,
 		fs = {
@@ -109,6 +114,7 @@ local function load_fixture(options)
 		},
 		execute = function() return "" end,
 	})
+	package.loaded["adapters.file_system"] = saved_file_system
 	local state = {
 		LOG_DIR = "/tmp/ergopti_action_epoch_order",
 		buffer_events = { { "old", 20, {} } },

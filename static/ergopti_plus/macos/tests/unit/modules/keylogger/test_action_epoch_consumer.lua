@@ -106,6 +106,11 @@ local function load_timer_allocation_failure_fixture()
 		doAfter = function() return nil end,
 	}
 
+	local saved_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		read = function() return nil end,
+	}
 	local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		timer = timer_stub,
 		fs = {
@@ -114,6 +119,7 @@ local function load_timer_allocation_failure_fixture()
 		},
 		execute = function() return "" end,
 	})
+	package.loaded["adapters.file_system"] = saved_file_system
 	local hs_stub = _G.hs
 	hs_stub.keycodes.currentLayout = function() return "ABC" end
 	hs_stub.caffeinate = {
