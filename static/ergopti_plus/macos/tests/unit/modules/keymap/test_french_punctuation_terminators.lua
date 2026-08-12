@@ -98,6 +98,23 @@ helpers.describe("terminators: French punctuation arrives space-prefixed", funct
 		helpers.assert_true(not T.is_terminator("ab"),
 			"the tail probe must not turn arbitrary text into a terminator — only a genuinely "
 				.. "enabled terminator character may match")
+
+		local STAR = utf8.char(0x2605)
+		T.update_magic_key(":")
+		local ok, err = pcall(function()
+			helpers.assert_true(not T.is_terminator("x:"),
+				"even when ':' is the consumed magic terminator, an arbitrary suffix event must pass")
+			helpers.assert_true(not T.terminator_is_consumed("x:"),
+				"a rejected composite must never swallow both of its physical codepoints")
+			helpers.assert_true(T.is_terminator(":x"),
+				"the documented leading-codepoint IME terminator behavior must remain available")
+			helpers.assert_true(not T.matches_magic_event(":x", ":"),
+				"an IME payload must not acquire configured-magic identity from its first codepoint")
+			helpers.assert_true(not T.terminator_is_consumed(":x"),
+				"a leading consumed terminator may fire, but the full IME payload must be replayed")
+		end)
+		T.update_magic_key(STAR)
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("the consume verdict tracks the same tail", function()
@@ -113,6 +130,22 @@ helpers.describe("terminators: French punctuation arrives space-prefixed", funct
 				"the consume verdict for '" .. ch .. "' must not depend on whether the layout "
 					.. "prepended its typographic space")
 		end
+	end)
+
+	helpers.it("recognises only exact or known French composite magic events", function()
+		local T = terminators()
+		for _, ch in ipairs({ "?", "!", ":", ";", "%", "€" }) do
+			helpers.assert_true(T.matches_magic_event(ch, ch),
+				"an exact configured magic key must always validate itself")
+			helpers.assert_true(T.matches_magic_event(NBSP .. ch, ch),
+				"NBSP-prefixed French punctuation must validate its configured tail")
+			helpers.assert_true(T.matches_magic_event(NNBSP .. ch, ch),
+				"NNBSP-prefixed French punctuation must validate its configured tail")
+		end
+		helpers.assert_true(not T.matches_magic_event("x:", ":"),
+			"an arbitrary multi-codepoint event must never acquire magic-key identity by suffix")
+		helpers.assert_true(not T.matches_magic_event(NBSP .. "?", ":"),
+			"a known carrier for a different punctuation key must not validate the configured key")
 	end)
 end)
 

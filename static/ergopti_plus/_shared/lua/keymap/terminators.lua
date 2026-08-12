@@ -34,6 +34,20 @@ local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 o
 local M   = {}
 local LOG = "keymap.terminators"
 
+-- French macOS layouts deliver spaced punctuation as one multi-codepoint
+-- keyDown payload. Keep the exact carrier spellings beside the terminator
+-- matcher so every magic-key consumer recognises the same physical action.
+local NBSP  = "\xC2\xA0"      -- U+00A0 NO-BREAK SPACE
+local NNBSP = "\xE2\x80\xAF"  -- U+202F NARROW NO-BREAK SPACE
+local ERGOPTI_SPACED_OUTPUTS = {
+	[":"] = true,
+	[";"] = true,
+	["!"] = true,
+	["?"] = true,
+	["%"] = true,
+	["€"] = true,
+}
+
 -- Use the canonical logger shim so shared code never reaches for a platform-
 -- specific module name (lib.logger is macOS-only; logger.shim is platform-neutral
 -- and falls back to print when no real logger is on the search path).
@@ -125,8 +139,23 @@ local function last_codepoint(s)
 	return s:sub(-1)
 end
 
-
-
+--- Returns true when one physical keyDown payload denotes `magic_key`.
+---
+--- Equality is intentionally strict except for the two exact typographic-space
+--- carriers emitted with French spaced punctuation. A suffix test would also
+--- accept unrelated text such as `"x:"`, letting an IME/composed event trigger
+--- an action the user did not press.
+--- @param chars string Physical event characters.
+--- @param magic_key string Configured logical magic key.
+--- @return boolean
+function M.matches_magic_event(chars, magic_key)
+	if type(chars) ~= "string" or type(magic_key) ~= "string" or magic_key == "" then
+		return false
+	end
+	if chars == magic_key then return true end
+	if not ERGOPTI_SPACED_OUTPUTS[magic_key] then return false end
+	return chars == NBSP .. magic_key or chars == NNBSP .. magic_key
+end
 
 -- =========================================
 -- =========================================
@@ -154,26 +183,28 @@ function M.is_terminator(chars)
 		-- French sentence ending: the correction silently did not fire while the
 		-- tooltip had already advertised the row.
 		local last = last_codepoint(chars)
-		if last ~= chars and _chars_set[last] then return true end
+		local known_carrier = chars == NBSP .. last or chars == NNBSP .. last
+		if last ~= chars and known_carrier and _chars_set[last] then return true end
 	end
 	return false
 end
 
 --- Returns true if `chars` matches an enabled terminator that should be consumed
---- (i.e., not re-typed after the expansion fires). Also recognises the first
---- codepoint of multi-codepoint events for the same reason as is_terminator().
+--- (i.e., not re-typed after the expansion fires). Multi-codepoint events are
+--- consumed only for the exact NBSP/NNBSP carrier spellings emitted by the
+--- Ergopti layout. A leading terminator may still trigger an IME composition via
+--- is_terminator(), but the complete payload must then be replayed intact.
 --- @param chars string The typed character(s) to check.
 --- @return boolean
 function M.terminator_is_consumed(chars)
 	if _consume_set[chars] then return true end
 	if #chars > 0 then
-		local first = first_codepoint(chars)
-		if first ~= chars and _consume_set[first] then return true end
-		-- Same tail probe as is_terminator, and it must stay in step with it:
-		-- a terminator recognised by one and not the other either gets consumed
-		-- when it should be re-typed, or re-typed when it should be consumed.
+		-- The tail alias is narrower than detection by design: only a known
+		-- typographic carrier may transfer the consume policy to a multi-codepoint
+		-- event. Generic IME suffixes must be replayed rather than swallowed.
 		local last = last_codepoint(chars)
-		if last ~= chars and _consume_set[last] then return true end
+		local known_carrier = chars == NBSP .. last or chars == NNBSP .. last
+		if last ~= chars and known_carrier and _consume_set[last] then return true end
 	end
 	return false
 end
