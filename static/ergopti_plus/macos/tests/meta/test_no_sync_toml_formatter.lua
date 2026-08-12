@@ -126,6 +126,7 @@ helpers.describe("no driver source runs the Python TOML formatter synchronously"
 		for _, dir in ipairs(SOURCE_DIRS) do
 			collect_lua_files(root .. "/" .. dir, files)
 		end
+		collect_lua_files(helpers.shared("lua"), files)
 		files[#files + 1] = root .. "/init.lua"
 
 		helpers.assert_true(#files > 0,

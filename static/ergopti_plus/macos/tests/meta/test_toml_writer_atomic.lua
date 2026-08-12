@@ -58,8 +58,8 @@ helpers.describe("_shared/lua/toml_codec/writer.lua: atomic write (toml-non-atom
 	helpers.it("M.write calls os.rename to atomically replace the target", function()
 		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
 		helpers.assert_true(
-			src:find("os%.rename%s*%(") ~= nil,
-			"writer.lua must call os.rename(tmp_path, path) for atomic replacement (toml-non-atomic-write)")
+			src:find("pcall%s*%(%s*os%.rename") ~= nil,
+			"writer.lua must protected-call os.rename for atomic replacement (toml-non-atomic-write)")
 	end)
 
 	helpers.it("M.write does NOT open the target path directly with 'w' mode", function()

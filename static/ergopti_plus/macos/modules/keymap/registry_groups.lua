@@ -294,9 +294,9 @@ function M.load_toml(name, path)
 	return run_transaction("load_toml:" .. name, function()
 		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
-		local toml_reader  = require("infra.toml.reader")
-		local ok, data     = pcall(toml_reader.parse, path)
-		if not ok or type(data) ~= "table" then
+		local toml_reader       = require("infra.toml.reader")
+		local ok, data, committed = pcall(toml_reader.parse, path)
+		if not ok or type(data) ~= "table" or committed ~= true then
 			Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
 			return false
 		end

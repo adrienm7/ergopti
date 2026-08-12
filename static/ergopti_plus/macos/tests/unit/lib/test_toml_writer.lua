@@ -253,25 +253,14 @@ end)
 -- ==========================================================================
 -- ==========================================================================
 
-helpers.describe("toml_writer: get_format_script_path uses correct repo-root pattern", function()
-	helpers.it("shared writer source uses 'static[/\\\\]' to strip path, not 'static[/\\\\]drivers[/\\\\]'", function()
-		-- The writer lives under static/ergopti_plus/_shared/lua/toml_codec/.
-		-- The old gsub pattern `static[/\]drivers[/\].*` never matched that path,
-		-- so get_format_script_path() returned the full source path unchanged
-		-- instead of stripping back to the repo root.
+helpers.describe("toml_writer: no synchronous formatter", function()
+	helpers.it("shared writer does not invoke the cosmetic Python formatter", function()
 		local shared_writer_path = helpers.shared("lua/toml_codec/writer.lua")
 		local fh = io.open(shared_writer_path, "r")
 		helpers.assert_true(fh ~= nil, "_shared/lua/toml_codec/writer.lua must be readable")
 		local src = fh:read("*a"); fh:close()
-
-		-- Must NOT contain the old wrong pattern
 		helpers.assert_true(
-			src:find("static[^/\n]*drivers", 1, false) == nil,
-			"writer.lua must not reference 'static/.../drivers' in the repo-root strip pattern")
-
-		-- Must contain the correct pattern that strips from 'static/' onward
-		helpers.assert_true(
-			src:find('"static[', 1, true) ~= nil or src:find("'static[", 1, true) ~= nil,
-			"writer.lua must strip from 'static[/\\\\]' to reach the repo root")
+			src:find("format_toml.py", 1, true) == nil and src:find("os.execute", 1, true) == nil,
+			"writer.lua must publish serialized TOML directly without blocking the main loop")
 	end)
 end)

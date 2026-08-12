@@ -154,7 +154,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 					helpers.assert_eq(candidate, path, "the baseline must target the configured path")
 					return true
 				end,
-			}, { parse = function() return { sections = {}, sections_order = {} } end })
+			}, { parse = function() return { sections = {}, sections_order = {} }, true end })
 			editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
 			helpers.assert_eq(writes, 1, "exact absence must publish exactly one baseline")
 		end, function()
@@ -187,6 +187,36 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 			os.remove(path)
 			package.loaded["ui.hotstring_editor"] = nil
 		end)
+	end)
+
+	helpers.it("requires an exact committed parser result before enabling Save", function()
+		for _, parse_status in ipairs({ false, "nil" }) do
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb"))
+			assert(file:write("[_meta]\nsections_order = []\n"))
+			assert(file:close())
+			local writes = 0
+			with_cleanup(function()
+				local editor, dispatch = load_editor({
+					write = function() writes = writes + 1; return true end,
+				}, {
+					parse = function()
+						local data = { sections = {}, sections_order = {} }
+						if parse_status == "nil" then return data end
+						return data, false
+					end,
+				})
+				editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+				editor.open("menu")
+				dispatch({ action = "ready" })
+				dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+				helpers.assert_eq(writes, 0,
+					"parser status " .. tostring(parse_status) .. " must keep Save fenced")
+			end, function()
+				os.remove(path)
+				package.loaded["ui.hotstring_editor"] = nil
+			end)
+		end
 	end)
 end)
 
