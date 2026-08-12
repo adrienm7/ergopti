@@ -147,7 +147,9 @@ local function run_scenario()
 		helpers.assert_eq(#effects.errors, 1,
 			"the first provider failure must become one deferred ERROR")
 		helpers.assert_true(effects.errors[1]:find("Preview provider #1 raised", 1, true) ~= nil)
-		helpers.assert_true(effects.errors[1]:find("simulated provider crash", 1, true) ~= nil)
+		helpers.assert_true(effects.errors[1]:find("content withheld", 1, true) ~= nil)
+		helpers.assert_true(effects.errors[1]:find("simulated provider crash", 1, true) == nil,
+			"provider exceptions can contain personal data and must stay out of logs")
 
 		Bridge.update_preview(state.buffer)
 		drain_scheduled()
