@@ -253,6 +253,8 @@ local reset_buffer_on_navigation = LLM_DEFAULTS and LLM_DEFAULTS.llm_reset_on_na
 -- for the overflow policy.
 local _provider_plain_cache      = {}
 local _provider_plain_cache_size = 0
+-- Weak identities avoid retaining a provider after its registry releases it
+local _provider_error_reported = setmetatable({}, { __mode = "k" })
 
 --- Returns the plain-text projection of a raw provider replacement, using a
 --- module-local memoization table so the per-keystroke preview path does no
@@ -274,6 +276,31 @@ local function provider_plain(raw)
 	_provider_plain_cache[raw] = plain
 	_provider_plain_cache_size = _provider_plain_cache_size + 1
 	return plain
+end
+
+--- Reports one provider failure outside the latency-critical eventtap callback.
+--- @param provider function Provider identity used by the one-shot latch.
+--- @param provider_index number Stable index for diagnosis.
+--- @param failure any Error object returned by pcall.
+local function report_preview_provider_failure(provider, provider_index, failure)
+	if _provider_error_reported[provider] then return end
+	local failure_text = tostring(failure)
+	local schedule_ok, handle_or_err, committed = xpcall(function()
+		return TimerScheduler.after(0, function()
+			Logger.error(LOG, "Preview provider #%d raised; static fallback retained: %s.",
+				provider_index, failure_text)
+		end)
+	end, debug.traceback)
+	if schedule_ok and committed == true then
+		_provider_error_reported[provider] = true
+		return
+	end
+
+	-- Timer creation failure is already exceptional. Report synchronously so the
+	-- original provider error cannot disappear together with its diagnostic
+	_provider_error_reported[provider] = true
+	Logger.error(LOG, "Preview provider #%d raised and its deferred diagnostic failed (%s): %s.",
+		provider_index, tostring(handle_or_err), failure_text)
 end
 
 
@@ -596,13 +623,17 @@ function M.update_preview(buf)
 	-- consumes its records without scanning registry buckets or re-arbitrating.
 	local matches = {}
 	local winner_match = nil
-	for _, provider in ipairs(_state.preview_providers) do
+	for provider_index, provider in ipairs(_state.preview_providers) do
 		-- The optional second result is an opaque action identity. It lets a
 		-- side-effectful provider bind the successfully rendered row to the exact
 		-- result its interceptor must later consume without changing the long-lived
 		-- provider API's first (string) return value.
 		local ok, res, provider_action_token = pcall(provider, buf)
-		if ok and res then
+		if not ok then
+			report_preview_provider_failure(provider, provider_index, res)
+			goto continue_provider
+		end
+		if res then
 			local provider_text = type(res) == "table" and res.text or res
 			local action_token = provider_action_token
 				or (type(res) == "table" and res.action_token or nil)
