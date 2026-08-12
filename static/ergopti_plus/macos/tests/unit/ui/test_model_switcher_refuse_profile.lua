@@ -1,57 +1,97 @@
 --- tests/unit/ui/test_model_switcher_refuse_profile.lua
 
---- Regression test for ui-menu-llm-core-5: apply_recommended_prompt_profile()
---- refuse-branch called `state.llm_active_profile = cur_profile` followed by
---- `llm_mod.set_active_profile(cur_profile)` without calling save_prefs() or
---- update_menu(). Since the profile was already cur_profile, the setter was
---- redundant, but calling it without persisting left LLM internal state
---- (profile parameters loaded by set_active_profile) out of sync with what
---- was on disk.
----
---- Fix: removed the redundant setter call in the refuse-branch. The profile
---- did not change, so no setter, save, or menu update is needed.
+--- ==============================================================================
+--- MODULE: Model Switcher Profile Decision Regression
+--- DESCRIPTION:
+--- Proves through the real profile-decision callback that refusing a suggested
+--- profile has no effects while accepting it commits every required effect.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to ui/menu/menu_llm/model_switcher.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local MODEL_ADVANCED_PARAMS_THRESHOLD_B")
-helpers.assert_true(src ~= nil, "ui/menu/menu_llm/model_switcher.lua source must be locatable")
+local function build_fixture(dialog_choice)
+	local noop = function() end
+	local calls = {
+		profiles = {},
+		saves = 0,
+		updates = 0,
+	}
+	local state = {
+		llm_active_profile = "basic",
+		llm_model = "old-model",
+		llm_num_predictions = 1,
+	}
 
--- Locate the refuse branch by finding "Profile kept at" log message.
-local refuse_pos = src:find("Profile kept at", 1, true)
-helpers.assert_true(
-	refuse_pos ~= nil,
-	"model_switcher.lua must contain the 'Profile kept at' log (ui-menu-llm-core-5)"
-)
+	package.loaded["infra.logger"] = {
+		debug = noop,
+		info = noop,
+		warn = noop,
+		error = noop,
+	}
+	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["infra.dialog_util"] = {
+		block_alert = function() return dialog_choice end,
+	}
+	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["ui.menu.menu_llm.profile_label"] = {
+		format = function(label) return label end,
+	}
+	package.loaded["modules.llm"] = {
+		DEFAULT_STATE = { llm_num_predictions = 1 },
+		set_active_profile = function(profile_id)
+			calls.profiles[#calls.profiles + 1] = profile_id
+		end,
+		set_llm_model_mlx = noop,
+		set_llm_model_ollama = noop,
+	}
+	package.loaded["ui.menu.menu_llm.model_switcher"] = nil
 
--- Extract a window around the refuse branch.
-local refuse_block = src:sub(refuse_pos - 50, refuse_pos + 200)
+	local switcher = require("ui.menu.menu_llm.model_switcher").new({
+		state = state,
+		models_mgr = {
+			get_presets = function() return {} end,
+			get_model_info = function()
+				return { params = 3, type = "chat" }
+			end,
+			get_actual_model_name = function(name) return name end,
+			check_requirements = function() end,
+		},
+		keymap = {},
+		save_prefs = function()
+			calls.saves = calls.saves + 1
+			return true
+		end,
+		update_menu = function() calls.updates = calls.updates + 1 end,
+	})
 
--- Test 1: The redundant set_active_profile(cur_profile) must not appear in the refuse block.
-local has_redundant_setter = refuse_block:find("set_active_profile(cur_profile)", 1, true) ~= nil
-helpers.assert_true(
-	not has_redundant_setter,
-	"model_switcher.lua refuse-branch must not call set_active_profile(cur_profile) (ui-menu-llm-core-5)"
-)
+	return switcher, state, calls
+end
 
--- Test 2: save_prefs() must not be called in the refuse block either (profile unchanged).
-local has_save_in_refuse = refuse_block:find("save_prefs()", 1, true) ~= nil
-helpers.assert_true(
-	not has_save_in_refuse,
-	"model_switcher.lua refuse-branch must not call save_prefs() — profile unchanged (ui-menu-llm-core-5)"
-)
+helpers.describe("model switcher: suggested profile decision", function()
+	helpers.it("leaves state and runtime untouched when the user refuses", function()
+		local switcher, state, calls = build_fixture("button.cancel")
 
--- Test 3: The accept-branch must still call save_prefs() and update_menu().
-local accept_pos = src:find("Profile changed to", 1, true)
-helpers.assert_true(accept_pos ~= nil, "model_switcher.lua must contain the 'Profile changed to' accept log (ui-menu-llm-core-5)")
-local accept_block = src:sub(accept_pos, accept_pos + 200)
-local has_save = accept_block:find("save_prefs()", 1, true) ~= nil
-local has_menu = accept_block:find("update_menu()", 1, true) ~= nil
-helpers.assert_true(
-	has_save and has_menu,
-	"model_switcher.lua accept-branch must still call save_prefs() and update_menu() (ui-menu-llm-core-5)"
-)
+		switcher.apply_recommended_prompt_profile("candidate-model")
 
-print("[PASS] test_model_switcher_refuse_profile")
+		helpers.assert_eq(state.llm_active_profile, "basic")
+		helpers.assert_eq(calls.profiles, {},
+			"refusal must not reload the already-active profile into runtime")
+		helpers.assert_eq(calls.saves, 0,
+			"refusal must not publish an unchanged preference")
+		helpers.assert_eq(calls.updates, 0,
+			"refusal must not redraw an unchanged menu")
+	end)
+
+	helpers.it("sets, saves, and renders the accepted profile exactly once", function()
+		local switcher, state, calls = build_fixture("button.confirm")
+
+		switcher.apply_recommended_prompt_profile("candidate-model")
+
+		helpers.assert_eq(state.llm_active_profile, "advanced")
+		helpers.assert_eq(calls.profiles, { "advanced" })
+		helpers.assert_eq(calls.saves, 1)
+		helpers.assert_eq(calls.updates, 1)
+	end)
+end)
+
+return true
