@@ -3,20 +3,20 @@
 --- ==============================================================================
 --- MODULE: Karabiner FD-Leak Regression Test
 --- DESCRIPTION:
---- Regression guard ensuring that the first_launch file-existence check in
---- platform/remap/init.lua never leaks an open file descriptor.
+--- Regression guard ensuring that first-launch detection in
+--- platform/remap/init.lua never opens a file descriptor of its own.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Root Cause: A naive `io.open(path) == nil` inline pattern leaves the
 ---    returned handle open for the entire process lifetime; the GC is the only
 ---    thing that eventually closes it, which is not acceptable in a long-running
 ---    Hammerspoon process.
---- 2. Fix Invariant: The correct pattern is a dedicated helper function that
----    calls `f:close()` before returning — the source must contain the sequence
----    `if f then f:close() end` adjacent to the `io.open` call.
+--- 2. Fix Invariant: The boot path delegates to Config.load_user_config(), whose
+---    status distinguishes absent configuration from read failure. The entry
+---    point performs no raw `io.open` at all.
 --- 3. Source-Scan Strategy: Loading the full module requires a live macOS env
----    (Karabiner-Elements paths, hs.json, etc.). A source scan is simpler,
----    more portable, and directly encodes the invariant we care about.
+---    (Karabiner-Elements paths, hs.json, etc.). This scan pins the delegation
+---    boundary while the config tests exercise its status semantics.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -44,24 +44,16 @@ helpers.describe("karabiner/init.lua: no fd-leak in first_launch detection", fun
 	if not src then return end
 
 
-	-- =====================================================================
-	-- ===== 1.1) Explicit close present =====
-	-- =====================================================================
+	-- ======================================
+	-- ===== 1.1) Delegated status load =====
+	-- ======================================
 
-	helpers.it("file_exists helper calls f:close() after io.open", function()
-		-- The canonical safe pattern: open → guard → close → return.
-		-- We require all three tokens to appear together in the helper body.
-		local has_io_open  = src:find("io.open(", 1, true) ~= nil
-		local has_close    = src:find("f:close()", 1, true) ~= nil
-		local has_guard_if = src:find("if f then", 1, true) ~= nil or
-		                     src:find("if f ~= nil then", 1, true) ~= nil
-
-		helpers.assert_true(has_io_open,
-			"expected io.open() call in karabiner/init.lua — helper may have been removed")
-		helpers.assert_true(has_close,
-			"expected f:close() in karabiner/init.lua — fd-leak fix missing")
-		helpers.assert_true(has_guard_if,
-			"expected nil guard before f:close() — unconditional close would crash on missing file")
+	helpers.it("delegates first-launch classification without opening a file", function()
+		local code = src:gsub("%-%-[^\n]*", "")
+		helpers.assert_true(code:find("Config.load_user_config", 1, true) ~= nil,
+			"first-launch detection must use the status-bearing config loader")
+		helpers.assert_true(code:find("io.open(", 1, true) == nil,
+			"the boot entry point must not reacquire a raw descriptor for existence detection")
 	end)
 
 
@@ -83,17 +75,19 @@ helpers.describe("karabiner/init.lua: no fd-leak in first_launch detection", fun
 	end)
 
 
-	-- =====================================================================
-	-- ===== 1.3) Helper is a named local function =====
-	-- =====================================================================
+	-- =====================================
+	-- ===== 1.3) Error before absence =====
+	-- =====================================
 
-	helpers.it("file-existence check is a named local function, not inlined", function()
-		-- Require a local function declaration that wraps io.open, rather than an
-		-- ad-hoc inline expression scattered through M.init.
-		local has_local_fn = src:match("local%s+function%s+file_exists%s*%(") ~= nil
-
-		helpers.assert_true(has_local_fn,
-			"expected `local function file_exists(...)` — check must live in a named helper, not be inlined")
+	helpers.it("distinguishes unreadable configuration from an absent first launch", function()
+		local code = src:gsub("%-%-[^\n]*", "")
+		local load_at = code:find("Config.load_user_config", 1, true)
+		local error_at = load_at and code:find('user_config_status == "error"', load_at, true)
+		local absent_at = load_at and code:find('local first_launch = user_config_status == "absent"', load_at, true)
+		helpers.assert_true(load_at ~= nil and error_at ~= nil and absent_at ~= nil,
+			"the status-bearing load, error refusal, and absent classification must all remain present")
+		helpers.assert_true(error_at < absent_at,
+			"an unreadable config must be refused before the absent status can seed defaults")
 	end)
 
 end)
