@@ -460,6 +460,12 @@ end
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
 function M.save(prefs_file, state, hotfiles, core_mods)
+	if type(prefs_file) ~= "string" or prefs_file == "" then
+		Logger.error(LOG, "Cannot save preferences without a destination path.")
+		return false
+	end
+	state = type(state) == "table" and state or {}
+	core_mods = type(core_mods) == "table" and core_mods or {}
 	local existing = {}
 
 	for k, v in pairs(state) do
@@ -515,42 +521,16 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
 		Logger.error(LOG, "Cannot encode preferences — settings NOT saved: %s.", tostring(encoded))
-		return
+		return false
 	end
 
-	local tmp_path = prefs_file .. ".tmp"
-	local file_ok, fh = pcall(io.open, tmp_path, "w")
-	if not file_ok or not fh then
-		Logger.error(LOG, "Cannot open '%s' for writing — settings NOT saved.", tostring(tmp_path))
-		return
+	local write_ok, written = pcall(FileSystem.write, prefs_file, encoded)
+	if not write_ok or written ~= true then
+		Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
+			tostring(prefs_file))
+		return false
 	end
-	fh:write(encoded)
-	pcall(function() fh:close() end)
-	-- os.rename overwrites existing files on POSIX. The test host can be
-	-- Windows, whose C runtime refuses an overwrite, so retain the previous
-	-- file as a recoverable backup until the replacement succeeds.
-	local renamed_ok, renamed = pcall(os.rename, tmp_path, prefs_file)
-	if (not renamed_ok or not renamed) and package.config:sub(1, 1) == "\\" then
-		local backup = prefs_file .. ".bak"
-		pcall(os.remove, backup)
-		local moved_old = os.rename(prefs_file, backup)
-		if moved_old then
-			renamed_ok, renamed = pcall(os.rename, tmp_path, prefs_file)
-			if renamed_ok and renamed then
-				pcall(os.remove, backup)
-			else
-				pcall(os.rename, backup, prefs_file)
-			end
-		end
-	end
-	if not renamed_ok or not renamed then
-		-- The third and last silent exit. The temp file is left behind on purpose:
-		-- it holds the settings that failed to land, so the failure is recoverable
-		-- by hand instead of merely reported.
-		Logger.error(LOG, "Cannot replace '%s' — settings NOT saved (staged at '%s').",
-			tostring(prefs_file), tostring(tmp_path))
-		return
-	end
+	return true
 end
 
 --- Merges the saved disk state into the current memory state.
