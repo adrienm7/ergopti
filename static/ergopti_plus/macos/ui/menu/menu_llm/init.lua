@@ -843,14 +843,14 @@ function M.create(deps)
 										else
 												Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
 										end
+										if save_prefs() ~= true then return false end
 										-- The first activation is when the user expects to see the
-										-- backend’s deps install — fire the deps bootstrap here.
-										-- It's idempotent and silent when the venv is already in
-										-- sync, so toggling LLM on/off in succession costs nothing.
+										-- backend’s deps install. It must remain after persistence:
+										-- a rejected config write rolls the candidate state back and
+										-- must not launch an unrelated setup process.
 										if state.llm_enabled then
 												check_backend_deps(state.llm_backend)
 										end
-										if save_prefs() ~= true then return false end
 										update_menu()
 										pcall(function() notifications.notify(state.llm_enabled and i18n.get("notify.llm_enabled") or i18n.get("notify.llm_disabled"), i18n.get("notify.llm_suggestions")) end)
 										return true
