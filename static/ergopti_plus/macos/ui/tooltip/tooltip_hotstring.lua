@@ -431,6 +431,32 @@ local function arm_dequeue_timer(retry_delay_sec)
 	return true
 end
 
+--- Transfers cleanup to physical-input watchers when no retry timer can exist.
+--- The visible rows keep owning their exact action lease, but timed dequeue is
+--- abandoned so the next deferred mouse or keyboard dismissal can force-hide
+--- the stale native surface without doing canvas work inside CGEventTap.
+--- @return boolean recovered Whether a complete watcher set owns cleanup.
+local function arm_interaction_cleanup_fallback()
+	local watchers_ready = select(1, activate_watchers_safely())
+	-- The failed timer is no longer a dequeue owner. Clearing this guard makes
+	-- every watcher dismissal authoritative while _visible_rows preserves the
+	-- exact lease-to-pixels truth contract until native hide succeeds.
+	_dequeue_rows = nil
+	if watchers_ready then
+		Logger.warn(LOG,
+			"Tooltip dequeue retry unavailable; cleanup transferred to physical input.")
+		return true
+	end
+
+	Logger.error(LOG,
+		"Tooltip cleanup has no asynchronous owner after dequeue retry failure.")
+	-- One final non-HID cleanup attempt is safer than publishing a logical hide
+	-- while native pixels remain. A refusal keeps _visible_rows and visibility
+	-- intact, so the stale pixels never advertise an action lease we discarded.
+	M.hide_forced()
+	return false
+end
+
 
 
 
@@ -746,7 +772,9 @@ _dequeue_tick = function()
 				-- native canvas. Restore the exact owner while old pixels remain so
 				-- their action lease cannot be cleared by premature re-arbitration
 				_dequeue_rows = owned_rows
-				arm_dequeue_timer(NATIVE_HIDE_RETRY_SEC)
+				if not arm_dequeue_timer(NATIVE_HIDE_RETRY_SEC) then
+					arm_interaction_cleanup_fallback()
+				end
 				return
 			end
 			local callback_ok, callback_err = xpcall(owner_expired, debug.traceback)
