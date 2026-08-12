@@ -213,6 +213,9 @@ helpers.describe("Preferences.load: corrupt is not absent", function()
 	end)
 end)
 
+package.loaded["adapters.file_system"] = nil
+package.loaded["infra.preferences"] = nil
+
 
 
 

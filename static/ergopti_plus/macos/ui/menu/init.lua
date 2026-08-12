@@ -33,6 +33,7 @@ local TrayMenu      = require("adapters.tray_menu")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local TerminationCoordinator = require("infra.termination_coordinator")
+local PreferencesTransaction = require("ui.menu.preferences_transaction")
 
 local LOG = "menu"
 local load_errors = {}
@@ -331,12 +332,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function save_prefs()
-		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
-		if type(Builder.invalidate_cache) == "function" then Builder.invalidate_cache() end
-		if type(HotCounter.invalidate_cache) == "function" then HotCounter.invalidate_cache() end
-		-- A persisted preference change (group/section toggle, trigger char, …)
-		-- alters the menu tree → force a rebuild on the next open.
-		_menu_dirty = true
+		return PreferencesTransaction.commit(
+			Preferences,
+			MenuPaths.get("ConfigTomlPath"),
+			state,
+			hotfiles,
+			core_mods,
+			Builder,
+			HotCounter,
+			function()
+				-- A persisted preference change alters the menu tree, so rebuild on
+				-- the next open only after disk publication actually committed.
+				_menu_dirty = true
+			end
+		)
 	end
 
 
