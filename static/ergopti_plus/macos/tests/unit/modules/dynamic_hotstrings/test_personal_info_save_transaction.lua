@@ -4,7 +4,7 @@
 --- MODULE: Personal Information Save Transaction Regression
 --- DESCRIPTION:
 --- Exercises the real personal-information save path across its preview fence,
---- staged file commit, live table publication, and editor callback. A rejected
+--- canonical filesystem commit, live table publication, and editor callback. A rejected
 --- transition must preserve the old in-memory and on-disk value, while the UI
 --- remains open so the user can retry without losing the submitted form.
 --- ==============================================================================
@@ -31,19 +31,6 @@ local function read_file(path)
 	return content
 end
 
---- Replaces os.rename for one protected call and restores it before asserting.
---- @param replacement function Temporary rename implementation.
---- @param callback function Protected operation.
---- @return any result Callback result.
-local function with_rename(replacement, callback)
-	local original = os.rename
-	os.rename = replacement
-	local ok, result = pcall(callback)
-	os.rename = original
-	if not ok then error(result, 0) end
-	return result
-end
-
 --- Runs cleanup even when the behavioral assertions fail.
 --- @param callback function Test body.
 --- @param cleanup function Cleanup body.
@@ -54,36 +41,21 @@ local function with_cleanup(callback, cleanup)
 	if not cleanup_ok then error(cleanup_err, 0) end
 end
 
---- Runs one callback while selected filesystem primitives are replaced.
---- @param replacements table Replacement functions keyed by primitive name.
+--- Runs one callback while selected adapter methods are replaced.
+--- @param adapter table Adapter table captured by the module under test.
+--- @param replacements table Replacement functions keyed by method name.
 --- @param callback function Protected operation.
 --- @return any result Callback result.
-local function with_filesystem_overrides(replacements, callback)
-	local original_open = io.open
-	local original_rename = os.rename
-	io.open = replacements.open or original_open
-	os.rename = replacements.rename or original_rename
+local function with_adapter_overrides(adapter, replacements, callback)
+	local originals = {}
+	for name, replacement in pairs(replacements) do
+		originals[name] = adapter[name]
+		adapter[name] = replacement
+	end
 	local ok, result = xpcall(callback, debug.traceback)
-	io.open = original_open
-	os.rename = original_rename
+	for name, original in pairs(originals) do adapter[name] = original end
 	if not ok then error(result, 0) end
 	return result
-end
-
---- Emulates successful replacement on the Windows test host.
---- Production uses the native same-directory rename on macOS.
---- @param staged_path string Staged file path.
---- @param target_path string Destination file path.
---- @return boolean committed True after replacement.
-local function replace_file_for_test(staged_path, target_path)
-	local staged = assert(io.open(staged_path, "rb"))
-	local content = assert(staged:read("*a"))
-	assert(staged:close())
-	local target = assert(io.open(target_path, "wb"))
-	assert(target:write(content))
-	assert(target:close())
-	assert(os.remove(staged_path))
-	return true
 end
 
 --- Loads a fresh PersonalInfo instance with a controlled preview fence.
@@ -184,9 +156,8 @@ end
 -- ===================================================
 
 helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-gate)", function()
-	helpers.it("publishes neither memory nor disk until preview revocation and rename commit", function()
+	helpers.it("publishes neither memory nor disk until preview revocation and filesystem commit", function()
 		local config_path = os.tmpname()
-		local staged_path = config_path .. ".ergopti-save.tmp"
 		with_cleanup(function()
 			local private_sentinel = "PRIVATE-IBAN-SENTINEL"
 			local logs = {}
@@ -196,6 +167,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			assert(file:close())
 
 			local personal_info, fence = load_personal_info(config_path, logs)
+			local file_system = require("adapters.file_system")
 			local live_info = personal_info.get_info()
 			helpers.assert_eq(live_info.first_name, "Alice")
 
@@ -227,28 +199,49 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			fence.raises = false
 
 			fence.allow = true
-			local rename_result = with_rename(function() return nil, private_sentinel end,
+			local writes = 0
+			local rename_result = with_adapter_overrides(file_system, {
+				write = function(path, content)
+					writes = writes + 1
+					helpers.assert_eq(path, config_path,
+						"the rejected publication must target the configured TOML")
+					helpers.assert_true(content:find('first_name = "Bob"', 1, true) ~= nil,
+						"the rejected publication must receive the complete candidate")
+					return false, private_sentinel
+				end,
+			},
 				function() return personal_info.save_info({ first_name = "Bob" }) end)
 			helpers.assert_eq(rename_result, false,
-				"a failed staged-file publication must reject the entire save")
+				"a failed atomic publication must reject the entire save")
+			helpers.assert_eq(writes, 1,
+				"one save attempt must cross the filesystem publication boundary once")
 			helpers.assert_eq(live_info.first_name, "Alice",
-				"a rename failure must not publish the candidate in memory")
+				"a publication failure must not publish the candidate in memory")
 			helpers.assert_eq(read_file(config_path), initial,
-				"a rename failure must preserve the previous committed TOML")
+				"a publication failure must preserve the previous committed TOML")
 			helpers.assert_true(not table.concat(logs, "\n"):find(private_sentinel, 1, true),
 				"a filesystem failure may contain personal data and must stay out of logs")
 
-			local committed = with_rename(function(staged_path_arg, target_path_arg)
-				helpers.assert_eq(target_path_arg, config_path,
-					"the native publication must target the configured TOML")
-				helpers.assert_true(read_file(staged_path_arg):find('first_name = "Bob"', 1, true) ~= nil,
-					"the complete candidate must exist in the staging file before publication")
-				helpers.assert_eq(read_file(target_path_arg), initial,
-					"the old committed TOML must remain intact until the rename boundary")
-				return replace_file_for_test(staged_path_arg, target_path_arg)
-			end,
+			local successful_writes = 0
+			local committed = with_adapter_overrides(file_system, {
+				write = function(path, content)
+					successful_writes = successful_writes + 1
+					helpers.assert_eq(path, config_path,
+						"the accepted publication must target the configured TOML")
+					helpers.assert_true(content:find('first_name = "Bob"', 1, true) ~= nil,
+						"the filesystem port must receive the complete candidate")
+					helpers.assert_eq(read_file(path), initial,
+						"the old committed TOML must remain intact until the port accepts publication")
+					local target = assert(io.open(path, "wb"))
+					assert(target:write(content))
+					assert(target:close())
+					return true
+				end,
+			},
 				function() return personal_info.save_info({ first_name = "Bob" }) end)
 			helpers.assert_eq(committed, true, "a complete transaction must report an exact commit")
+			helpers.assert_eq(successful_writes, 1,
+				"one accepted save must cross the filesystem publication boundary once")
 			helpers.assert_true(personal_info.get_info() == live_info,
 				"a successful save must preserve the shared live-table identity")
 			helpers.assert_eq(live_info.first_name, "Bob",
@@ -257,7 +250,6 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				"the committed TOML must contain the accepted candidate")
 			helpers.assert_eq(fence.calls, 5, "every valid save attempt must cross the preview fence")
 		end, function()
-			os.remove(staged_path)
 			os.remove(config_path)
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 		end)
@@ -265,7 +257,6 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 
 	helpers.it("fails closed when an existing configuration cannot be read", function()
 		local config_path = os.tmpname()
-		local staged_path = config_path .. ".ergopti-save.tmp"
 		with_cleanup(function()
 			local private_sentinel = "PRIVATE-EXISTING-CONFIG-SENTINEL"
 			local read_failure = "PRIVATE-READ-FAILURE"
@@ -282,26 +273,24 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			package.loaded["infra.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-			local original_open = io.open
-			local original_rename = os.rename
+			local file_system = require("adapters.file_system")
 			local registrations = 0
-			local renames = 0
+			local publications = 0
 			local keymap = {
 				get_trigger_char = function() return "★" end,
 				register_interceptor = function() registrations = registrations + 1 end,
 				register_preview_provider = function() registrations = registrations + 1 end,
 			}
 
-			local started = with_filesystem_overrides({
-				open = function(path, mode)
-					if path == config_path and mode == "r" then
-						return nil, read_failure, 13
-					end
-					return original_open(path, mode)
+			local started = with_adapter_overrides(file_system, {
+				read_with_status = function(path)
+					helpers.assert_eq(path, config_path,
+						"startup must classify the configured personal-info path")
+					return nil, "error", read_failure
 				end,
-				rename = function(...)
-					renames = renames + 1
-					return original_rename(...)
+				create_if_absent = function()
+					publications = publications + 1
+					return true, "created"
 				end,
 			}, function()
 				return personal_info.start("", keymap, config_path)
@@ -311,14 +300,13 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				"an existing-but-unreadable configuration must fail startup closed")
 			helpers.assert_eq(registrations, 0,
 				"failed configuration ownership must publish no keyboard callback")
-			helpers.assert_eq(renames, 0,
+			helpers.assert_eq(publications, 0,
 				"an unreadable existing configuration must never reach publication")
 			helpers.assert_eq(read_file(config_path), private_sentinel,
 				"read failure must preserve the user's exact committed bytes")
 			helpers.assert_true(not table.concat(logs, "\n"):find(read_failure, 1, true),
 				"the read failure may contain personal data and must stay out of logs")
 		end, function()
-			os.remove(staged_path)
 			os.remove(config_path)
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 		end)
@@ -327,7 +315,6 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 	helpers.it("requires exact default-file publication before registering callbacks", function()
 		local config_path = os.tmpname()
 		os.remove(config_path)
-		local staged_path = config_path .. ".ergopti-save.tmp"
 		with_cleanup(function()
 			local write_failure = "PRIVATE-DEFAULT-WRITE-FAILURE"
 			local logs = {}
@@ -339,19 +326,28 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			package.loaded["infra.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-			local original_open = io.open
+			local file_system = require("adapters.file_system")
 			local registrations = 0
+			local publications = 0
 			local keymap = {
 				get_trigger_char = function() return "★" end,
 				register_interceptor = function() registrations = registrations + 1 end,
 				register_preview_provider = function() registrations = registrations + 1 end,
 			}
 
-			local started = with_filesystem_overrides({
-				open = function(path, mode)
-					if path == config_path and mode == "r" then return nil, "missing", 2 end
-					if path == staged_path and mode == "wb" then return nil, write_failure, 13 end
-					return original_open(path, mode)
+			local started = with_adapter_overrides(file_system, {
+				read_with_status = function(path)
+					helpers.assert_eq(path, config_path,
+						"startup must classify the configured personal-info path")
+					return nil, "absent"
+				end,
+				create_if_absent = function(path, content)
+					publications = publications + 1
+					helpers.assert_eq(path, config_path,
+						"default publication must target the configured TOML")
+					helpers.assert_true(content:find("[info]", 1, true) ~= nil,
+						"default publication must receive the complete configuration")
+					return false, "error", write_failure
 				end,
 			}, function()
 				return personal_info.start("", keymap, config_path)
@@ -361,12 +357,13 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				"a missing config is not initialized until default publication commits")
 			helpers.assert_eq(registrations, 0,
 				"a failed default publication must publish no keyboard callback")
+			helpers.assert_eq(publications, 1,
+				"a missing configuration must attempt exactly one create-only publication")
 			helpers.assert_eq(io.open(config_path, "rb"), nil,
 				"failed default publication must not create a committed config")
 			helpers.assert_true(not table.concat(logs, "\n"):find(write_failure, 1, true),
 				"the write failure may contain personal data and must stay out of logs")
 		end, function()
-			os.remove(staged_path)
 			os.remove(config_path)
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 		end)
