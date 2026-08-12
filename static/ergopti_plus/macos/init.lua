@@ -1129,7 +1129,10 @@ Boot.mark("Final mapping sort + tail-index rebuild")
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
-keymap.start()
+local keymap_started = keymap.start()
+if keymap_started ~= true then
+	error("keymap.start did not commit")
+end
 Boot.mark("Keymap engine started")
 
 

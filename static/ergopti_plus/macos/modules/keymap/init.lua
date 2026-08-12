@@ -146,6 +146,7 @@ local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
 local loopback_keyup_tap = nil
+local _started = false
 
 local ACTION_EPOCH_LISTENER_ID = "modules.keymap.action_epoch"
 local _action_listener_registered = false
@@ -1426,7 +1427,123 @@ local _prewarm_timer   = nil
 -- clear the heaviest synchronous boot deferrals first (see M.start).
 local WINFILTER_PREWARM_SEC = 1.0
 
-local function tap_watchdog()
+local tap_watchdog
+
+local function eventtap_is_enabled(name, event_tap)
+	if not event_tap or type(event_tap.isEnabled) ~= "function" then
+		Logger.error(LOG, "Keymap %s eventtap has no verifiable native state.", name)
+		return false, false
+	end
+	local ok, enabled = pcall(event_tap.isEnabled, event_tap)
+	if not ok then
+		Logger.error(LOG, "Keymap %s eventtap state probe failed: %s.", name, tostring(enabled))
+		return false, false
+	end
+	return enabled == true, true
+end
+
+
+local function start_eventtap(name, event_tap)
+	if not event_tap or type(event_tap.start) ~= "function" then
+		Logger.error(LOG, "Keymap %s eventtap cannot be started.", name)
+		return false
+	end
+	local ok, result = pcall(event_tap.start, event_tap)
+	if not ok then
+		Logger.error(LOG, "Keymap %s eventtap start failed: %s.", name, tostring(result))
+		return false
+	end
+	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
+	if not state_ok or not enabled then
+		Logger.error(LOG, "Keymap %s eventtap start did not commit.", name)
+		return false
+	end
+	return true
+end
+
+
+local function stop_eventtap(name, event_tap)
+	if not event_tap or type(event_tap.stop) ~= "function" then
+		Logger.error(LOG, "Keymap %s eventtap cannot be stopped.", name)
+		return false
+	end
+	local ok, result = pcall(event_tap.stop, event_tap)
+	if not ok then
+		Logger.error(LOG, "Keymap %s eventtap stop failed: %s.", name, tostring(result))
+		return false
+	end
+	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
+	if not state_ok or enabled then
+		Logger.error(LOG, "Keymap %s eventtap stop did not commit.", name)
+		return false
+	end
+	return true
+end
+
+
+local function watchdog_is_running(timer)
+	if not timer then return false end
+	if type(timer.running) == "function" then
+		local ok, running = pcall(timer.running, timer)
+		return ok and running == true
+	end
+	return timer.running == true
+end
+
+
+local function stop_watchdog()
+	local timer = _watchdog_timer
+	if not timer then return true end
+	if type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Keymap watchdog has no stop capability.")
+		return false
+	end
+	local ok, result = pcall(timer.stop, timer)
+	if not ok then
+		Logger.error(LOG, "Keymap watchdog stop failed: %s.", tostring(result))
+		return false
+	end
+	if watchdog_is_running(timer) then
+		Logger.error(LOG, "Keymap watchdog stop did not commit.")
+		return false
+	end
+	_watchdog_timer = nil
+	return true
+end
+
+
+local function start_watchdog()
+	if not stop_watchdog() then return false end
+	local ok_new, timer = pcall(hs.timer.new, TAP_WATCHDOG_SEC, tap_watchdog)
+	if not ok_new or not timer or type(timer.start) ~= "function" then
+		Logger.error(LOG, "Keymap watchdog creation failed: %s.", tostring(timer))
+		return false
+	end
+	_watchdog_timer = timer
+	local ok_start, result = pcall(timer.start, timer)
+	if not ok_start then
+		Logger.error(LOG, "Keymap watchdog start failed: %s.", tostring(result))
+		stop_watchdog()
+		return false
+	end
+	if not watchdog_is_running(timer) then
+		Logger.error(LOG, "Keymap watchdog start did not commit.")
+		stop_watchdog()
+		return false
+	end
+	return true
+end
+
+
+local function taps_are_enabled()
+	return eventtap_is_enabled("keyDown", tap)
+		and eventtap_is_enabled("loopbackKeyUp", loopback_keyup_tap)
+		and eventtap_is_enabled("flagsChanged", shift_tap)
+		and eventtap_is_enabled("mouse", mouse_tap)
+end
+
+
+tap_watchdog = function()
 	-- Timer allocation in the HID callback is best-effort. This periodic path is
 	-- the independent retry that guarantees a closed observation-gap latch cannot
 	-- strand predictions forever.
@@ -1434,13 +1551,12 @@ local function tap_watchdog()
 		reconcile_observed_context_async()
 	end
 	local function revive(name, t)
-		if t and type(t.isEnabled) == "function" and not t:isEnabled() then
+		if t and not eventtap_is_enabled(name, t) then
 			-- The passive mouse tap only resets predictive state and its recovery never
 			-- interrupts typing, so reserve WARNING for the typing-critical taps
 			local recovery_logger = name == "mouse" and Logger.debug or Logger.warn
 			recovery_logger(LOG, "macOS disabled the %s event tap — re-enabling.", name)
-			pcall(function() t:start() end)
-			return true
+			return start_eventtap(name, t)
 		end
 		return false
 	end
@@ -1454,12 +1570,30 @@ end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
+	if _started and taps_are_enabled() and watchdog_is_running(_watchdog_timer) then return true end
+	if _started or _action_listener_registered or _watchdog_timer
+		or eventtap_is_enabled("keyDown", tap)
+		or eventtap_is_enabled("loopbackKeyUp", loopback_keyup_tap)
+		or eventtap_is_enabled("flagsChanged", shift_tap)
+		or eventtap_is_enabled("mouse", mouse_tap)
+	then
+		Logger.warn(LOG, "Keymap start found partial native ownership — rolling it back before retry.")
+		if M.stop() ~= true then
+			Logger.error(LOG, "Keymap start refused: partial ownership could not be rolled back.")
+			return false
+		end
+	end
 	if not _action_listener_registered then
 		-- Register the last fully safe epoch, not the current one. If an action
 		-- occurred while taps were stopped, the adapter immediately schedules the
 		-- async reset instead of falsely acknowledging that unreset token.
-		SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
-			reconcile_action_epoch_async, _last_action_epoch)
+		local listener_ok, listener_result = pcall(SyntheticInput.register_action_listener,
+			ACTION_EPOCH_LISTENER_ID, reconcile_action_epoch_async, _last_action_epoch)
+		if not listener_ok or listener_result ~= true then
+			Logger.error(LOG, "Keymap action-listener start failed: %s.", tostring(listener_result))
+			M.stop()
+			return false
+		end
 		_action_listener_registered = true
 		observe_action_epoch(SyntheticInput.current_action_epoch())
 	end
@@ -1472,15 +1606,26 @@ function M.start()
 		Perf.set_enabled(true)
 		Logger.info(LOG, "Perf sampling auto-enabled (DEBUG log level active).")
 	end
-	tap:start()
-	loopback_keyup_tap:start()
-	shift_tap:start()
-	mouse_tap:start()
+	local tap_specs = {
+		{ "keyDown", tap },
+		{ "loopbackKeyUp", loopback_keyup_tap },
+		{ "flagsChanged", shift_tap },
+		{ "mouse", mouse_tap },
+	}
+	for _, spec in ipairs(tap_specs) do
+		if not start_eventtap(spec[1], spec[2]) then
+			Logger.error(LOG, "Keymap start rolled back after %s eventtap failure.", spec[1])
+			M.stop()
+			return false
+		end
+	end
 
 	-- Arm the independent backstop for any tap still observed disabled.
-	if _watchdog_timer then _watchdog_timer:stop() end
-	_watchdog_timer = hs.timer.new(TAP_WATCHDOG_SEC, tap_watchdog)
-	_watchdog_timer:start()
+	if not start_watchdog() then
+		Logger.error(LOG, "Keymap start rolled back after watchdog failure.")
+		M.stop()
+		return false
+	end
 
 	-- Prewarm the ignored-window watchers off the keystroke path. hs.window.filter
 	-- enumerates every open window on first use (~3 s cold); paid lazily inside the
@@ -1493,17 +1638,26 @@ function M.start()
 		pcall(km_utils.prewarm_ignored_win_watchers)
 	end)
 
+	_started = true
 	Logger.success(LOG, "Keymap engine started.")
+	return true
 end
 
 --- Stops the eventtap listeners and cleans up prediction state.
 function M.stop()
 	Logger.start(LOG, "Stopping keymap engine…")
+	_started = false
+	local listener_stopped = true
 	if _action_listener_registered then
-		SyntheticInput.unregister_action_listener(ACTION_EPOCH_LISTENER_ID)
-		_action_listener_registered = false
+		local ok, result = pcall(SyntheticInput.unregister_action_listener, ACTION_EPOCH_LISTENER_ID)
+		listener_stopped = ok and result ~= false
+		if listener_stopped then
+			_action_listener_registered = false
+		else
+			Logger.error(LOG, "Keymap action-listener stop did not commit (result: %s).", tostring(result))
+		end
 	end
-	if _watchdog_timer then _watchdog_timer:stop(); _watchdog_timer = nil end
+	local watchdog_stopped = stop_watchdog()
 	if _context_reconcile_timer then
 		pcall(function() _context_reconcile_timer:stop() end)
 		_context_reconcile_timer = nil
@@ -1517,11 +1671,20 @@ function M.stop()
 	-- strand it until the watchdog expired — into a torn-down engine, or after a
 	-- reload, or never. The user pressed that key; it must not evaporate because
 	-- the engine was toggled off a few milliseconds later.
-	TerminatorReplay.flush_now("keymap engine stopping")
-	tap:stop()
-	loopback_keyup_tap:stop()
-	shift_tap:stop()
-	mouse_tap:stop()
+	local replay_ok, replay_result = xpcall(function()
+		return TerminatorReplay.flush_now("keymap engine stopping")
+	end, debug.traceback)
+	local terminator_settled = replay_ok and replay_result ~= false
+	if not terminator_settled then
+		Logger.error(LOG, "Pending terminator teardown did not commit (result: %s).", tostring(replay_result))
+	end
+	CoreState.buffer = ""
+	CoreState.start_is_word_boundary = false
+	cancel_action_preview_recovery()
+	local taps_stopped = stop_eventtap("keyDown", tap)
+	if not stop_eventtap("loopbackKeyUp", loopback_keyup_tap) then taps_stopped = false end
+	if not stop_eventtap("flagsChanged", shift_tap) then taps_stopped = false end
+	if not stop_eventtap("mouse", mouse_tap) then taps_stopped = false end
 	local reset_ok, reset_result = xpcall(LLMBridge.reset_for_teardown, debug.traceback)
 	local predictions_reset = reset_ok and reset_result == true
 	if not predictions_reset then
@@ -1549,7 +1712,8 @@ function M.stop()
 	-- They are already inert while stopped: both are only consulted from
 	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
-	local stopped = predictions_reset and escape_trap_stopped
+	local stopped = listener_stopped and watchdog_stopped and terminator_settled
+		and taps_stopped and predictions_reset and escape_trap_stopped
 	if stopped then
 		Logger.success(LOG, "Keymap engine stopped.")
 	else
