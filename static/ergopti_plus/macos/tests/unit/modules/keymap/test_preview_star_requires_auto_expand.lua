@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_preview_star_requires_auto_expand.lua
 
 --- ==============================================================================
---- MODULE: Regression â€” star preview requires an auto-expand engine action
+--- MODULE: Regression — star preview requires an auto-expand engine action
 --- DESCRIPTION:
 --- Uses the real registry, bridge, and expander with one valid auto-expand
 --- control mapping and one non-auto star mapping. The latter is present in the

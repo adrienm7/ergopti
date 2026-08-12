@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_preview_star_tail_casefold.lua
 
 --- ==============================================================================
---- MODULE: Regression â€” star-tail preview uses registry case-fold semantics
+--- MODULE: Regression — star-tail preview uses registry case-fold semantics
 --- DESCRIPTION:
 --- Builds a real fold-mode star mapping, asks the real expander what the typed
 --- uppercase buffer would emit, then renders the real bridge preview for that
