@@ -68,6 +68,8 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
 local CONFIG_DIR          = hs.configdir .. "/data"
 local CATEGORIES_FILE     = CONFIG_DIR .. "/app_categories.json"
+local CATEGORIES_TEMP_FILE = CATEGORIES_FILE .. ".tmp"
+local ENOENT_ERROR_CODE    = 2
 --- Fallback category assigned to an uncategorised app on first edit.
 ---
 --- A FUNCTION rather than a module-level constant, and it reads the same i18n key
@@ -125,29 +127,80 @@ end
 -- ==========================================
 
 local function load_categories()
-	local f = io.open(CATEGORIES_FILE, "r")
-	if f then
-		local content = f:read("*a"); f:close()
-		local ok, data = pcall(json.decode, content)
-		if ok and type(data) == "table" then return data end
+	local open_ok, file, open_detail, open_code = pcall(io.open, CATEGORIES_FILE, "r")
+	if not open_ok or not file then
+		if open_ok and open_code == ENOENT_ERROR_CODE then return {}, "absent" end
+		Logger.error(LOG, "App categories could not be opened; edit refused "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+		return nil, "failed"
 	end
-	return {}
+
+	local read_ok, content = pcall(file.read, file, "*a")
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		Logger.error(LOG, "App categories read did not commit; edit refused "
+			.. "(failure content withheld).")
+		return nil, "failed"
+	end
+
+	local decode_ok, data = pcall(json.decode, content)
+	if not decode_ok or type(data) ~= "table" then
+		Logger.error(LOG, "App categories contain invalid JSON; edit refused.")
+		return nil, "failed"
+	end
+	return data, "ok"
 end
 
 local function save_categories(data)
-	os.execute("mkdir -p " .. text_utils.shell_quote(CONFIG_DIR))
-	local f = io.open(CATEGORIES_FILE, "w")
-	if f then f:write(json.encode(data)); f:close() end
+	local encode_ok, encoded = pcall(json.encode, data)
+	if not encode_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "App categories encode failed; changes were not saved.")
+		return false
+	end
+
+	local mkdir_ok = pcall(os.execute, "mkdir -p " .. text_utils.shell_quote(CONFIG_DIR))
+	if not mkdir_ok then
+		Logger.error(LOG, "Cannot prepare the app-categories directory; changes were not saved.")
+		return false
+	end
+	local open_ok, file = pcall(io.open, CATEGORIES_TEMP_FILE, "w")
+	if not open_ok or not file then
+		Logger.error(LOG, "Cannot open the app-categories staging file; changes were not saved.")
+		return false
+	end
+
+	local write_ok, written = pcall(file.write, file, encoded)
+	local flush_ok, flushed = pcall(file.flush, file)
+	local close_ok, closed = pcall(file.close, file)
+	if not write_ok or not written or not flush_ok or flushed ~= true
+		or not close_ok or closed ~= true
+	then
+		pcall(os.remove, CATEGORIES_TEMP_FILE)
+		Logger.error(LOG, "App-categories staging write did not commit; changes were not saved.")
+		return false
+	end
+
+	local rename_ok, renamed = pcall(os.rename, CATEGORIES_TEMP_FILE, CATEGORIES_FILE)
+	if not rename_ok or renamed ~= true then
+		pcall(os.remove, CATEGORIES_TEMP_FILE)
+		Logger.error(LOG, "App-categories publication did not commit; changes were not saved.")
+		return false
+	end
+	return true
 end
 
 local function push_categories_to_ui()
-	if not M._wv then return end
+	if not M._wv then return false end
+	local categories = load_categories()
+	if not categories then return false end
 	M._wv:evaluateJavaScript(string.format(
-		"window.updateUserCategories(%s);", json.encode(load_categories())))
+		"window.updateUserCategories(%s);", json.encode(categories)))
+	return true
 end
 
 local function list_existing_categories()
 	local cats = load_categories()
+	if not cats then return nil end
 	local general = i18n.get("metrics_apps.general_category")
 	local seen = { [general] = true }
 	local result = { general }
@@ -174,13 +227,16 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score)
 		return
 	end
 	local cats = load_categories()
+	if not cats then return false end
 	cats[app_name] = { type = chosen_cat, score = score }
-	save_categories(cats)
+	if not save_categories(cats) then return false end
 	push_categories_to_ui()
+	return true
 end
 
 function M.prompt_category(app_name, default_cat, default_score)
 	local existing = list_existing_categories()
+	if not existing then return false end
 	local choices  = {}
 
 	table.insert(choices, { text = i18n.get("metrics_apps.new_category_item"), subText = i18n.get("metrics_apps.new_category_create_subtext"), _kind = "new" })
@@ -215,13 +271,13 @@ function M.prompt_category(app_name, default_cat, default_score)
 					c2.text, i18n.get("button.ok"), i18n.get("common.cancel"))
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
 					local cats = load_categories()
+					if not cats then return end
 					for _, entry in pairs(cats) do
 						if type(entry) == "table" and entry.type == c2.text then
 							entry.type = new_name
 						end
 					end
-					save_categories(cats)
-					push_categories_to_ui()
+					if save_categories(cats) then push_categories_to_ui() end
 				end
 			end)
 			sub:placeholderText(i18n.get("metrics_apps.rename_chooser_placeholder"))
@@ -253,6 +309,7 @@ local function prompt_pick_app()
 		chooser = hs.chooser.new(function(choice)
 			if not choice then return end
 			local cats    = load_categories()
+			if not cats then return end
 			local current = cats[choice.text] or { type = default_app_category(), score = 0 }
 			M.prompt_category(choice.text, current.type, current.score)
 		end)
@@ -390,6 +447,10 @@ local function load_and_inject()
 	if not M._wv then return end
 
 	local user_cats = load_categories()
+	if not user_cats then
+		Logger.warn(LOG, "Apps dashboard refresh refused because categories are unreadable.")
+		return
+	end
 
 	-- App icon collection (capped to keep first paint fast).
 	local app_icons    = {}
