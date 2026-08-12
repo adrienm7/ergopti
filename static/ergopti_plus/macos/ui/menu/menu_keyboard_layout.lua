@@ -26,6 +26,7 @@ local Logger        = require("infra.logger")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local LOG           = "menu.keyboard_layout"
@@ -659,10 +660,12 @@ function M.build(ctx)
 							pcall(ctx.keymap.disable_section, "magic_key", "replace")
 						end
 					else
+						if not KeymapLifecycle.ensure_started(ctx, "enable magic-key replacement") then
+							return
+						end
 						if type(ctx.keymap.enable_section) == "function" then
 							pcall(ctx.keymap.enable_section, "magic_key", "replace")
 						end
-						if type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end
 					end
 				end
 				ctx.do_reload("menu")

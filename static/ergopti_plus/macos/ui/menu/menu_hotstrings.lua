@@ -14,6 +14,7 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG           = "menu_hotstrings"
 
 --- Resolves a description value that may be a plain string or a multilingual table.
@@ -125,13 +126,11 @@ end
 --- @return function
 local function toggleGroupFn(ctx, name)
 	return function()
-		ctx.state.hotstrings[name] = not groupEnabled(ctx, name)
-		if ctx.state.hotstrings[name] then
+		local will_enable = not groupEnabled(ctx, name)
+		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable hotstring group") then return end
+		ctx.state.hotstrings[name] = will_enable
+		if will_enable then
 			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, name) end
-			if not ctx.state.keymap then 
-				ctx.state.keymap = true
-				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
-			end
 		else
 			if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, name) end
 		end
@@ -151,11 +150,8 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	return function()
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
 		if will_enable then
+			if not KeymapLifecycle.ensure_started(ctx, "enable hotstring section") then return end
 			if ctx.keymap and type(ctx.keymap.enable_section) == "function" then pcall(ctx.keymap.enable_section, group_name, sec_name) end
-			if not ctx.state.keymap then 
-				ctx.state.keymap = true
-				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
-			end
 		else
 			if ctx.keymap and type(ctx.keymap.disable_section) == "function" then pcall(ctx.keymap.disable_section, group_name, sec_name) end
 		end
@@ -175,6 +171,7 @@ end
 local function setGroupSectionsFn(ctx, group_name, enable)
 	return function()
 		local km = ctx.keymap
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable group sections") then return end
 		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
 		if type(secs) == "table" then
 			for _, sec in ipairs(secs) do
@@ -190,10 +187,6 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 		if enable then
 			ctx.state.hotstrings[group_name] = true
 			if type(km.enable_group) == "function" then pcall(km.enable_group, group_name) end
-			if not ctx.state.keymap then
-				ctx.state.keymap = true
-				if type(km.start) == "function" then pcall(km.start) end
-			end
 		end
 		ctx.save_prefs()
 		ctx.updateMenu()
@@ -209,6 +202,7 @@ end
 local function setAllSectionsFn(ctx, enable)
 	return function()
 		local km = ctx.keymap
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstring sections") then return end
 		for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			local secs = (km and type(km.get_sections) == "function") and km.get_sections(name) or nil
@@ -227,10 +221,6 @@ local function setAllSectionsFn(ctx, enable)
 				ctx.state.hotstrings[name] = true
 				if type(km.enable_group) == "function" then pcall(km.enable_group, name) end
 			end
-		end
-		if enable and not ctx.state.keymap then
-			ctx.state.keymap = true
-			if type(km.start) == "function" then pcall(km.start) end
 		end
 		ctx.save_prefs()
 		ctx.updateMenu()

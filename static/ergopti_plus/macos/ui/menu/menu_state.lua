@@ -15,6 +15,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG    = "menu_state"
 
 -- Delay before starting the keylogger engine. Its start (~1.3 s of SQLite +
@@ -257,7 +258,10 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if keymap then
 		if state.keymap then
 			local _t_km = hs.timer.secondsSinceEpoch()
-			if type(keymap.start) == "function" then try("keymap.start", keymap.start) end
+			if not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+				"synchronize menu state") then
+				state.keymap = false
+			end
 			Logger.info(LOG, "Keymap engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_km) * 1000)
 
 			-- Recover from a stale paused state when script control is not paused
