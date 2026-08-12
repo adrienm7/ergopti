@@ -151,8 +151,8 @@ local function run_transaction(label, mutation)
 	local ok, committed = xpcall(mutation, debug.traceback)
 	if ok and committed == true then return true end
 	restore_registry(snapshot)
-	Logger.error(LOG, "Registry mutation '%s' rolled back: %s.",
-		tostring(label), tostring(committed))
+	Logger.error(LOG, "Registry mutation '%s' rolled back "
+		.. "(details withheld; terminal type: %s).", tostring(label), type(committed))
 	return false
 end
 
