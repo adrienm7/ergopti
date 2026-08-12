@@ -207,8 +207,8 @@ local function invalidate_preview_before_save()
 	end
 	local ok, committed = xpcall(_keymap.invalidate_hotstring_preview, debug.traceback)
 	if not ok or committed ~= true then
-		Logger.error(LOG, "Personal-info save refused because preview revocation did not commit (result: %s).",
-			tostring(committed))
+		Logger.error(LOG, "Personal-info save refused because preview revocation did not commit "
+			.. "(failure content withheld).")
 		return false
 	end
 	return true
@@ -219,8 +219,8 @@ end
 local function remove_staged_file(staged_path)
 	local ok, removed, remove_err = pcall(os.remove, staged_path)
 	if not ok or removed ~= true then
-		Logger.warn(LOG, "Could not remove the unpublished personal-info staging file (result: %s).",
-			tostring(remove_err or removed))
+		Logger.warn(LOG, "Could not remove the unpublished personal-info staging file "
+			.. "(failure content withheld).")
 	end
 end
 
@@ -231,8 +231,7 @@ end
 local function write_staged_config(staged_path, content)
 	local open_ok, file_or_err, open_err = pcall(io.open, staged_path, "wb")
 	if not open_ok or not file_or_err then
-		Logger.error(LOG, "Cannot open the personal-info staging file (result: %s).",
-			tostring(open_err or file_or_err))
+		Logger.error(LOG, "Cannot open the personal-info staging file (failure content withheld).")
 		return false
 	end
 	local file = file_or_err
@@ -245,8 +244,7 @@ local function write_staged_config(staged_path, content)
 	end, debug.traceback)
 	local close_ok, close_committed, close_err = pcall(file.close, file)
 	if not write_ok or write_committed ~= true or not close_ok or close_committed ~= true then
-		Logger.error(LOG, "Personal-info staging write did not commit (write: %s, close: %s).",
-			tostring(write_err or write_committed), tostring(close_err or close_committed))
+		Logger.error(LOG, "Personal-info staging write did not commit (failure content withheld).")
 		remove_staged_file(staged_path)
 		return false
 	end
@@ -314,8 +312,8 @@ function M.save_info(new_info)
 	if not write_staged_config(staged_path, content) then return false end
 	local rename_ok, renamed, rename_err = pcall(os.rename, staged_path, _info_toml_path)
 	if not rename_ok or renamed ~= true then
-		Logger.error(LOG, "Personal-info staged-file publication did not commit (result: %s).",
-			tostring(rename_err or renamed))
+		Logger.error(LOG, "Personal-info staged-file publication did not commit "
+			.. "(failure content withheld).")
 		remove_staged_file(staged_path)
 		return false
 	end
