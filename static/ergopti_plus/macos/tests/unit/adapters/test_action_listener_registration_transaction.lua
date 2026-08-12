@@ -62,10 +62,11 @@ end
 helpers.describe("synthetic action listener registration is transactional", function()
 	helpers.it("does not leak a capacity slot when dispatcher creation throws", function()
 		local SyntheticInput = load_with_third_timer_failure()
-		local ok = pcall(SyntheticInput.register_action_listener,
-			"failed", function() end)
-		helpers.assert_eq(ok, false,
-			"the control must exercise the native dispatcher allocation failure")
+		local failure = helpers.assert_throws(function()
+			SyntheticInput.register_action_listener("failed", function() end)
+		end, "the control must exercise the native dispatcher allocation failure")
+		helpers.assert_contains(tostring(failure), "action dispatcher allocation failed",
+			"the injected constructor failure must be the observed cause")
 
 		for index = 1, SyntheticInput.CONSUMER_LIMIT do
 			helpers.assert_true(SyntheticInput.register_action_listener(

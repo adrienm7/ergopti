@@ -236,10 +236,9 @@ helpers.describe("logger rollover purge integrity", function()
 
 			captured = {}
 			timer_mode = "throw"
-			local constructor_ok = pcall(
-				Logger.init_log_path, TEST_CONFIG_DIR .. "throw/", RETENTION_DAYS)
-			helpers.assert_true(constructor_ok,
-				"a timer-constructor exception must not escape init_log_path")
+			-- Call directly so an escaped constructor exception fails the test; the
+			-- captured file line below proves the required recovery side effect
+			Logger.init_log_path(TEST_CONFIG_DIR .. "throw/", RETENTION_DAYS)
 			helpers.assert_true(any_line_contains(captured, "[ERROR]", "timer constructor failure"),
 				"a timer-constructor exception must be recorded in the file logger")
 		end, debug.traceback)
