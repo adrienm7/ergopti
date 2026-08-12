@@ -396,7 +396,7 @@ local function teardown_all_resources(termination_kind)
 			run = function()
 				if type(keymap) ~= "table" then return true end
 				if type(keymap.stop) ~= "function" then error("keymap.stop is unavailable") end
-				return keymap.stop()
+				return keymap.stop(true)
 			end,
 		},
 		{
