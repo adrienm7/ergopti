@@ -140,19 +140,12 @@ local LM = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		if dir then mkdir_p(dir) end
 		return ""
 	end,
-	fs = {
-		-- nil attributes = "db.sqlite and data.sql do not exist yet".
-		attributes = function() return nil end,
-		dir = function()
-			local entries = { ".", "..", DEVICE_ID }
-			local i = 0
-			return function()
-				i = i + 1
-				return entries[i]
-			end
-		end,
-	},
 })
+-- Keep the canonical filesystem stub intact: the production identity reader
+-- now classifies every path component through symlinkAttributes(). Replacing
+-- hs.fs with an attributes/dir-only double makes that safety check fail before
+-- this scenario reaches the SQLite fallback it is meant to exercise
+hs.fs.__set_entries(SCRATCH_DIR .. "by_device/", { ".", "..", DEVICE_ID })
 local Rotation = require("modules.keylogger.rotation")
 
 
