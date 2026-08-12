@@ -68,6 +68,7 @@ local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
 
 -- Same-directory staging keeps the final rename atomic on macOS
 local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
+local ENOENT_ERROR_CODE = 2
 
 -- Width of the placeholder a preview part falls back to when the shared field
 -- classification cannot be reached. Fixed rather than the value's own length:
@@ -290,17 +291,30 @@ end
 
 --- Reads personal_info.toml and returns a config table compatible with DEFAULT_CONFIG.
 --- @param toml_path string Absolute path to personal_info.toml.
---- @return table config The loaded or default configuration.
+--- @return table|nil config The loaded/default configuration, or nil on read failure.
 --- @return boolean was_missing True if the file did not exist on disk and defaults were used.
 local function load_config(toml_path)
 	Logger.debug(LOG, "Loading personal info from '%s'…", toml_path)
-	local fh = io.open(toml_path, "r")
-	if not fh then
-		Logger.info(LOG, "personal_info.toml not found — using default values.")
-		return DEFAULT_CONFIG, true
+	local open_ok, fh, open_detail, open_code = pcall(io.open, toml_path, "r")
+	if not open_ok or not fh then
+		-- Only an exact ENOENT authorizes default creation. Any other open failure
+		-- may describe an existing file, so startup fails closed and leaves it intact.
+		local definitely_missing = open_ok and open_code == ENOENT_ERROR_CODE
+		if definitely_missing then
+			Logger.info(LOG, "personal_info.toml not found — using default values.")
+			return DEFAULT_CONFIG, true
+		end
+		Logger.error(LOG, "personal_info.toml could not be read; startup refused "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+		return nil, false
 	end
-	local content = fh:read("*a")
-	fh:close()
+	local read_ok, content = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		Logger.error(LOG, "personal_info.toml read did not commit; startup refused "
+			.. "(failure content withheld).")
+		return nil, false
+	end
 
 	local info    = parse_toml_section(content, "info")
 	local letters = parse_toml_section(content, "letters")
@@ -839,7 +853,9 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- re-creation on the next launch (mirrors the AHK side's behaviour).
 	if was_missing then
 		Logger.info(LOG, "Writing default personal_info.toml at '%s'…", _info_toml_path)
-		M.save_info({})
+		if M.save_info({}) ~= true then
+			return rollback_start(token, "default configuration publication")
+		end
 	end
 
 	_state     = STATE_IDLE

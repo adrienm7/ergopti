@@ -54,6 +54,22 @@ local function with_cleanup(callback, cleanup)
 	if not cleanup_ok then error(cleanup_err, 0) end
 end
 
+--- Runs one callback while selected filesystem primitives are replaced.
+--- @param replacements table Replacement functions keyed by primitive name.
+--- @param callback function Protected operation.
+--- @return any result Callback result.
+local function with_filesystem_overrides(replacements, callback)
+	local original_open = io.open
+	local original_rename = os.rename
+	io.open = replacements.open or original_open
+	os.rename = replacements.rename or original_rename
+	local ok, result = xpcall(callback, debug.traceback)
+	io.open = original_open
+	os.rename = original_rename
+	if not ok then error(result, 0) end
+	return result
+end
+
 --- Emulates successful replacement on the Windows test host.
 --- Production uses the native same-directory rename on macOS.
 --- @param staged_path string Staged file path.
@@ -240,6 +256,115 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			helpers.assert_true(read_file(config_path):find('first_name = "Bob"', 1, true) ~= nil,
 				"the committed TOML must contain the accepted candidate")
 			helpers.assert_eq(fence.calls, 5, "every valid save attempt must cross the preview fence")
+		end, function()
+			os.remove(staged_path)
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	helpers.it("fails closed when an existing configuration cannot be read", function()
+		local config_path = os.tmpname()
+		local staged_path = config_path .. ".ergopti-save.tmp"
+		with_cleanup(function()
+			local private_sentinel = "PRIVATE-EXISTING-CONFIG-SENTINEL"
+			local read_failure = "PRIVATE-READ-FAILURE"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(private_sentinel))
+			assert(file:close())
+
+			local logs = {}
+			local Logger = helpers.make_logger_stub()
+			Logger.warn = function(_log, format_string, ...)
+				logs[#logs + 1] = string.format(format_string, ...)
+			end
+			Logger.error = Logger.warn
+			package.loaded["infra.logger"] = Logger
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+			local original_open = io.open
+			local original_rename = os.rename
+			local registrations = 0
+			local renames = 0
+			local keymap = {
+				get_trigger_char = function() return "★" end,
+				register_interceptor = function() registrations = registrations + 1 end,
+				register_preview_provider = function() registrations = registrations + 1 end,
+			}
+
+			local started = with_filesystem_overrides({
+				open = function(path, mode)
+					if path == config_path and mode == "r" then
+						return nil, read_failure, 13
+					end
+					return original_open(path, mode)
+				end,
+				rename = function(...)
+					renames = renames + 1
+					return original_rename(...)
+				end,
+			}, function()
+				return personal_info.start("", keymap, config_path)
+			end)
+
+			helpers.assert_eq(started, false,
+				"an existing-but-unreadable configuration must fail startup closed")
+			helpers.assert_eq(registrations, 0,
+				"failed configuration ownership must publish no keyboard callback")
+			helpers.assert_eq(renames, 0,
+				"an unreadable existing configuration must never reach publication")
+			helpers.assert_eq(read_file(config_path), private_sentinel,
+				"read failure must preserve the user's exact committed bytes")
+			helpers.assert_true(not table.concat(logs, "\n"):find(read_failure, 1, true),
+				"the read failure may contain personal data and must stay out of logs")
+		end, function()
+			os.remove(staged_path)
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	helpers.it("requires exact default-file publication before registering callbacks", function()
+		local config_path = os.tmpname()
+		os.remove(config_path)
+		local staged_path = config_path .. ".ergopti-save.tmp"
+		with_cleanup(function()
+			local write_failure = "PRIVATE-DEFAULT-WRITE-FAILURE"
+			local logs = {}
+			local Logger = helpers.make_logger_stub()
+			Logger.warn = function(_log, format_string, ...)
+				logs[#logs + 1] = string.format(format_string, ...)
+			end
+			Logger.error = Logger.warn
+			package.loaded["infra.logger"] = Logger
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+			local original_open = io.open
+			local registrations = 0
+			local keymap = {
+				get_trigger_char = function() return "★" end,
+				register_interceptor = function() registrations = registrations + 1 end,
+				register_preview_provider = function() registrations = registrations + 1 end,
+			}
+
+			local started = with_filesystem_overrides({
+				open = function(path, mode)
+					if path == config_path and mode == "r" then return nil, "missing", 2 end
+					if path == staged_path and mode == "wb" then return nil, write_failure, 13 end
+					return original_open(path, mode)
+				end,
+			}, function()
+				return personal_info.start("", keymap, config_path)
+			end)
+
+			helpers.assert_eq(started, false,
+				"a missing config is not initialized until default publication commits")
+			helpers.assert_eq(registrations, 0,
+				"a failed default publication must publish no keyboard callback")
+			helpers.assert_eq(io.open(config_path, "rb"), nil,
+				"failed default publication must not create a committed config")
+			helpers.assert_true(not table.concat(logs, "\n"):find(write_failure, 1, true),
+				"the write failure may contain personal data and must stay out of logs")
 		end, function()
 			os.remove(staged_path)
 			os.remove(config_path)
