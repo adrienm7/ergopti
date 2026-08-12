@@ -162,7 +162,6 @@ end
 --- @param failure any Error object returned by pcall.
 local function report_resolver_failure(rule, failure)
 	if rule.resolver_error_reported then return end
-	local failure_size = #tostring(failure)
 	if _resolver_error_reporter then
 		local reporter_ok, reported = pcall(_resolver_error_reporter, rule, failure)
 		if reporter_ok and reported == true then
@@ -172,6 +171,10 @@ local function report_resolver_failure(rule, failure)
 		Logger.error(LOG, "Resolver error reporter failed for section '%s' (details withheld).",
 			tostring(rule.section))
 	end
+	-- An error object may define a throwing or expensive __tostring metamethod.
+	-- The fallback needs only a privacy-safe size hint, so never execute foreign
+	-- code while reporting the resolver that already failed.
+	local failure_size = type(failure) == "string" and #failure or 0
 	Logger.error(LOG, "Dynamic resolver failed in section '%s' "
 		.. "(%d-byte suffix; %d-byte failure content withheld).",
 		tostring(rule.section), #rule.suffix, failure_size)
