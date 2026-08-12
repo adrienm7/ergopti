@@ -688,6 +688,7 @@ function M.update_preview(buf)
 		local any_enabled   = false
 		local min_timeout   = nil
 		local primary_match = winner_match or matches[1]
+		local winner_expired_during_build = false
 		-- Re-order matches so end-char (↵) rows come first, then star (★) rows,
 		-- then providers. End-char triggers usually have a shorter delay (the
 		-- user types space/tab quickly) so they need maximum visibility on top.
@@ -754,7 +755,10 @@ function M.update_preview(buf)
 			local row_timeout = 0
 			if m.type == "literal_auto" and m.expires_at then
 				row_timeout = math.max(0, m.expires_at - epoch_fn())
-				if row_timeout <= 0 then enabled = false end
+				if row_timeout <= 0 then
+					enabled = false
+					if m.is_winner then winner_expired_during_build = true end
+				end
 			end
 
 			if enabled then
@@ -818,6 +822,38 @@ function M.update_preview(buf)
 				Logger.debug(LOG, "Hotstring '%s' → '%s' [%s].",
 					tostring(m.input), m.plain_repl, m.type)
 			end
+		end
+
+		if winner_expired_during_build then
+			-- Resolution and row construction straddle a clock boundary. No row
+			-- derived from the old winner may paint, because its dimmed fallback is
+			-- now the action the engine would actually execute
+			invalidate_pending_preview()
+			local refresh_generation = _preview_render_generation
+			local schedule_ok, handle_or_err, refresh_committed = xpcall(function()
+				return TimerScheduler.after(0, function()
+					local callback_ok, callback_err = xpcall(function()
+						if refresh_generation ~= _preview_render_generation then return end
+						if _state.buffer == buf then
+							M.update_preview(buf)
+						else
+							M.reset_predictions(false)
+						end
+					end, debug.traceback)
+					if not callback_ok then
+						Logger.error(LOG, "Hotstring winner-expiry refresh raised: %s.",
+							tostring(callback_err))
+					end
+				end)
+			end, debug.traceback)
+			if not schedule_ok or refresh_committed ~= true then
+				Logger.error(LOG, "Hotstring winner-expiry refresh could not be scheduled (result: %s).",
+					tostring(handle_or_err))
+				if refresh_generation == _preview_render_generation then
+					M.reset_predictions(false)
+				end
+			end
+			return
 		end
 
 		local tooltip_timeout = min_timeout or INFINITE_TOOLTIP_SEC
