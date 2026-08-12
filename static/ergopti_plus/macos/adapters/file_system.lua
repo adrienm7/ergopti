@@ -307,7 +307,9 @@ local function revalidate_write_path(requested_path, expected_path, chain)
 
 	local current_path, _, resolve_err = resolve_write_path(requested_path)
 	if not current_path then return false, resolve_err end
-	if current_path ~= expected_path then return false, "resolved target changed before publication" end
+	if normalize_path(current_path) ~= normalize_path(expected_path) then
+		return false, "resolved target changed before publication"
+	end
 	return true
 end
 
@@ -430,7 +432,10 @@ function M.read_with_status(path)
 		return nil, "error", "path must be a non-empty string"
 	end
 
-	local requested_path = normalize_path(path)
+	-- Preserve the caller's component order until every preceding symlink has
+	-- resolved. POSIX applies `..` to the link target in `link/../file`; lexical
+	-- normalization here would silently inspect a different pathname.
+	local requested_path = path
 	local resolved_path, classification, detail, chain, final_identity = classify_read_path(requested_path)
 	if classification == "absent" then return nil, "absent", detail end
 	if classification ~= "present" then
@@ -585,7 +590,9 @@ function M.create_if_absent(path, content)
 		return false, "error", "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
-	local requested_path = normalize_path(path)
+	-- Keep `.`/`..` components intact until classify_read_path() has resolved
+	-- every preceding symlink, matching resolve_write_path() and kernel ordering.
+	local requested_path = path
 
 	local existing, read_status, read_detail = M.read_with_status(requested_path)
 	if read_status == "ok" then return false, "exists" end

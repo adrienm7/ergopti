@@ -174,6 +174,104 @@ helpers.describe("adapters.file_system: classified reads and create-only publica
 		HOST_RMDIR(root)
 	end)
 
+	helpers.it("resolves dot-dot after an intermediate symlink before a classified read", function()
+		local request_root = os.tmpname():gsub("\\", "/") .. "_read_request"
+		local target_root = os.tmpname():gsub("\\", "/") .. "_read_target"
+		local target_subdirectory = target_root .. "/sub"
+		local link_path = request_root .. "/link"
+		local requested_path = link_path .. "/../preferences.toml"
+		local kernel_target = target_root .. "/preferences.toml"
+		local lexically_collapsed_target = request_root .. "/preferences.toml"
+		local content, status
+		local call_ok, call_err = xpcall(function()
+			os.remove(request_root)
+			os.remove(target_root)
+			assert(HOST_MKDIR(request_root))
+			assert(HOST_MKDIR(target_root))
+			assert(HOST_MKDIR(target_subdirectory))
+
+			local kernel_file = assert(io.open(kernel_target, "w"))
+			assert(kernel_file:write("kernel target")); assert(kernel_file:close())
+			local collapsed_file = assert(io.open(lexically_collapsed_target, "w"))
+			assert(collapsed_file:write("lexically collapsed target")); assert(collapsed_file:close())
+
+			local adapter = make_adapter({ [link_path] = target_subdirectory })
+			content, status = adapter.read_with_status(requested_path)
+		end, debug.traceback)
+		os.remove(kernel_target)
+		os.remove(lexically_collapsed_target)
+		HOST_RMDIR(target_subdirectory)
+		HOST_RMDIR(target_root)
+		HOST_RMDIR(request_root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(status, "ok")
+		helpers.assert_eq(content, "kernel target",
+			"classified reads must apply dot-dot to the symlink target, not the link's parent")
+	end)
+
+	helpers.it("resolves dot-dot after an intermediate symlink before create-only publication", function()
+		local request_root = os.tmpname():gsub("\\", "/") .. "_create_request"
+		local target_root = os.tmpname():gsub("\\", "/") .. "_create_target"
+		local target_subdirectory = target_root .. "/sub"
+		local link_path = request_root .. "/link"
+		local requested_path = link_path .. "/../personal_shortcuts.toml"
+		local kernel_target = target_root .. "/personal_shortcuts.toml"
+		local lexically_collapsed_target = request_root .. "/personal_shortcuts.toml"
+		local staging_locks = {}
+		local created, status, kernel_content, collapsed_content, published_path
+		local call_ok, call_err = xpcall(function()
+			os.remove(request_root)
+			os.remove(target_root)
+			assert(HOST_MKDIR(request_root))
+			assert(HOST_MKDIR(target_root))
+			assert(HOST_MKDIR(target_subdirectory))
+
+			local collapsed_file = assert(io.open(lexically_collapsed_target, "w"))
+			assert(collapsed_file:write("foreign collapsed file")); assert(collapsed_file:close())
+
+			local adapter = nil
+			adapter, staging_locks = make_adapter(
+				{ [link_path] = target_subdirectory },
+				nil,
+				nil,
+				function(source, destination, is_symlink)
+					helpers.assert_eq(is_symlink, false)
+					published_path = destination
+					local source_file = assert(io.open(source, "r"))
+					local payload = source_file:read("*a"); assert(source_file:close())
+					local destination_file = assert(io.open(destination, "w"))
+					assert(destination_file:write(payload)); assert(destination_file:close())
+					return true
+				end
+			)
+			created, status = adapter.create_if_absent(requested_path, "our defaults")
+
+			local kernel_file = io.open(kernel_target, "r")
+			if kernel_file then kernel_content = kernel_file:read("*a"); kernel_file:close() end
+			local collapsed_read = assert(io.open(lexically_collapsed_target, "r"))
+			collapsed_content = collapsed_read:read("*a"); collapsed_read:close()
+		end, debug.traceback)
+		os.remove(kernel_target)
+		os.remove(lexically_collapsed_target)
+		for lock_path in pairs(staging_locks) do
+			os.remove(lock_path .. "/payload")
+			HOST_RMDIR(lock_path)
+		end
+		HOST_RMDIR(target_subdirectory)
+		HOST_RMDIR(target_root)
+		HOST_RMDIR(request_root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(created, true, "the POSIX destination is absent and must be creatable")
+		helpers.assert_eq(status, "created")
+		helpers.assert_eq(published_path, kernel_target,
+			"create-only publication must target the symlink target's parent")
+		helpers.assert_eq(kernel_content, "our defaults")
+		helpers.assert_eq(collapsed_content, "foreign collapsed file",
+			"the lexically collapsed sibling belongs to another pathname and must remain untouched")
+	end)
+
 	helpers.it("requires read and close to commit before returning ok", function()
 		local path = os.tmpname():gsub("\\", "/")
 		local seed = assert(io.open(path, "w")); seed:write("seed"); seed:close()
