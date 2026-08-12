@@ -227,3 +227,48 @@ helpers.describe("menu_paths: paths.toml wins over the OS default", function()
 				.. "generates on first boot is exactly that shape")
 	end)
 end)
+
+
+
+
+
+-- ==============================================================
+-- ==============================================================
+-- ======= 4/ Personal Bootstrap Preserves Existing Bytes =======
+-- ==============================================================
+-- ==============================================================
+
+helpers.describe("menu_paths: personal bootstrap distinguishes absence from unreadability", function()
+	helpers.it("never creates or truncates after an existing-file read refusal", function()
+		local base = make_tmp_dir()
+		local home = make_tmp_dir():gsub("[/\\]$", "")
+		local Paths = load_paths({ home = home, paths_toml = nil, base_dir = base })
+		Paths.init(base, function() end)
+		local personal_dir = home .. "/.config/ergopti_plus/hotstrings/"
+		os.execute('mkdir "' .. personal_dir .. '"')
+		local personal_path = personal_dir .. "personal_hotstrings.toml"
+		local sentinel = "PRIVATE-PATH-BOOTSTRAP-SENTINEL"
+		local fixture = assert(io.open(personal_path, "wb"))
+		assert(fixture:write(sentinel))
+		assert(fixture:close())
+		local original_open = io.open
+		local write_opens = 0
+		io.open = function(path, mode)
+			if path == personal_path and mode == "r" then return nil, "PRIVATE-READ-FAILURE", 13 end
+			if path == personal_path and mode == "w" then write_opens = write_opens + 1 end
+			return original_open(path, mode)
+		end
+		local call_ok, resolved = pcall(Paths.get, "PersonalTomlPath")
+		io.open = original_open
+
+		helpers.assert_true(call_ok, "a read refusal must not escape path resolution")
+		helpers.assert_eq(resolved, personal_path, "path resolution itself must remain deterministic")
+		helpers.assert_eq(write_opens, 0,
+			"an unproven absence must never reach the baseline writer")
+		local preserved = assert(io.open(personal_path, "rb"))
+		helpers.assert_eq(assert(preserved:read("*a")), sentinel,
+			"path lookup must preserve every committed personal-hotstrings byte")
+		assert(preserved:close())
+		os.remove(personal_path)
+	end)
+end)

@@ -47,6 +47,9 @@ local PERSONAL_GROUP_FALLBACK = "personal"
 
 local STAR_CANONICAL    = "★"
 
+-- POSIX error code that alone proves the configured file is absent
+local ENOENT_ERROR_CODE = 2
+
 -- Absolute path to the assets folder. The hotstring-editor frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the Windows
 -- WebView2 host and this macOS host render the exact same UI; we resolve it
@@ -61,6 +64,7 @@ local _usercontent     = nil
 local _hotkey          = nil
 local _is_focused      = false
 local _pending_mode    = "menu"
+local _file_ready      = false
 -- Personal source-default priority, read from _shared/modules/hotstrings/priority.json by
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
@@ -121,18 +125,32 @@ local function empty_toml_data()
 	}
 end
 
---- Ensures the configuration file exists. Creates it with default data if missing.
+--- Ensures the configuration file exists without replacing an unreadable source.
+--- @return boolean ready True only after a readable file or exact missing-file creation.
 local function ensure_file()
-	if type(_toml_path) ~= "string" or _toml_path == "" then return end
-	
-	local fh = io.open(_toml_path, "r")
-	if fh then 
-		fh:close()
-		return 
+	if type(_toml_path) ~= "string" or _toml_path == "" then return false end
+
+	local open_ok, fh, open_detail, open_code = pcall(io.open, _toml_path, "r")
+	if open_ok and fh then
+		local close_ok, closed = pcall(fh.close, fh)
+		if close_ok and closed == true then return true end
+		Logger.error(LOG, "Personal hotstrings file close did not commit; editor remains read-only "
+			.. "(failure content withheld).")
+		return false
 	end
-	
-	-- The file does not exist, safely create an empty baseline
-	pcall(toml_writer.write, _toml_path, empty_toml_data())
+
+	if not open_ok or open_code ~= ENOENT_ERROR_CODE then
+		Logger.error(LOG, "Personal hotstrings file could not be read; editor remains read-only "
+			.. "(failure content withheld; terminal type: %s).", type(open_detail))
+		return false
+	end
+
+	local write_ok, written = pcall(toml_writer.write, _toml_path, empty_toml_data())
+	if not write_ok or written ~= true then
+		Logger.error(LOG, "Personal hotstrings baseline publication did not commit.")
+		return false
+	end
+	return true
 end
 
 
@@ -169,12 +187,18 @@ end
 --- @param open_mode string The mode in which the editor was opened ("shortcut" or "menu").
 --- @return table The structured data for the JS frontend.
 local function load_js_data(open_mode)
-	ensure_file()
+	_file_ready = ensure_file()
 	local raw = {}
-	
-	if type(_toml_path) == "string" then
-		local ok, parsed = pcall(toml_reader.parse, _toml_path)
-		if ok and type(parsed) == "table" then raw = parsed end
+
+	if _file_ready and type(_toml_path) == "string" then
+		local ok, parsed, parse_status = pcall(toml_reader.parse, _toml_path)
+		if ok and type(parsed) == "table" and parse_status ~= false then
+			raw = parsed
+		else
+			_file_ready = false
+			Logger.error(LOG, "Personal hotstrings parse failed; editor remains read-only "
+				.. "(failure content withheld).")
+		end
 	end
 	
 	local sections = {}
@@ -309,6 +333,11 @@ local function handle_message(msg)
 
 	if action == "save" then
 		if type(_toml_path) ~= "string" or _toml_path == "" then return end
+		if not _file_ready then
+			Logger.error(LOG, "Personal hotstrings save refused because the source is not readable.")
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
+			return
+		end
 		
 		local toml_data = js_to_toml(data)
 		local ok_write, err = pcall(toml_writer.write, _toml_path, toml_data)
@@ -453,7 +482,7 @@ function M.init(toml_path, keymap_mod, update_menu_fn, default_priority)
 	_keymap      = keymap_mod
 	_update_menu = update_menu_fn
 	if type(default_priority) == "number" then _default_priority = default_priority end
-	ensure_file()
+	_file_ready = ensure_file()
 end
 
 --- Checks if the editor window is currently open.
