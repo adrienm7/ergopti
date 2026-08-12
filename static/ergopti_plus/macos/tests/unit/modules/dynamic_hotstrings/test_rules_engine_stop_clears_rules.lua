@@ -10,40 +10,35 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to modules/dynamic_hotstrings/rules_engine.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local function register_prefix_entries")
-helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/rules_engine.lua source must be locatable")
+local function fake_keymap()
+	return {
+		register_lua_group = function() end,
+		set_post_load_hook = function() end,
+		register_interceptor = function() end,
+		register_preview_provider = function() end,
+	}
+end
 
--- Locate the stop() function body.
-local stop_start = src:find("function M.stop()", 1, true)
-helpers.assert_true(
-	stop_start ~= nil,
-	"rules_engine.lua must define M.stop() (dynhotstrings-5)"
-)
+helpers.describe("rules_engine.stop clears shared rule ownership", function()
+	helpers.it("a stop/start cycle registers one date-rule set, never two", function()
+		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
+		local SharedEngine = helpers.load_with_stubs("dynamic_hotstrings")
+		local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 
-local stop_body = src:sub(stop_start, stop_start + 300)
+		SharedEngine.reset_rules()
+		RulesEngine.start(fake_keymap())
+		helpers.assert_eq(#SharedEngine.get_rules(), 3,
+			"the first start must install the three canonical date rules")
+		RulesEngine.stop()
+		helpers.assert_eq(#SharedEngine.get_rules(), 0,
+			"stop must release every shared rule, not merely clear the keymap handle")
 
--- Test 1: reset_rules() must be called inside stop().
-local has_reset = stop_body:find("reset_rules()", 1, true) ~= nil
-helpers.assert_true(
-	has_reset,
-	"rules_engine.lua M.stop() must call SharedEngine.reset_rules() to prevent rule duplication on reload (dynhotstrings-5)"
-)
+		RulesEngine.start(fake_keymap())
+		helpers.assert_eq(#SharedEngine.get_rules(), 3,
+			"restart must not append a duplicate date-rule set")
+		RulesEngine.stop()
+	end)
+end)
 
--- Test 2: _km = nil must still be present (the original cleanup must not have been removed).
-local has_km_nil = stop_body:find("_km = nil", 1, true) ~= nil
-helpers.assert_true(
-	has_km_nil,
-	"rules_engine.lua M.stop() must still clear _km = nil (dynhotstrings-5)"
-)
-
--- Test 3: SharedEngine is required at the top of the file.
-local has_shared_engine = src:find("SharedEngine", 1, true) ~= nil
-helpers.assert_true(
-	has_shared_engine,
-	"rules_engine.lua must reference SharedEngine (dynhotstrings-5)"
-)
-
-print("[PASS] test_rules_engine_stop_clears_rules")
+return true
