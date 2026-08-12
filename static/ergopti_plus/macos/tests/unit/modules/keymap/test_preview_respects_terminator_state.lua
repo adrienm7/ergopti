@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_preview_respects_terminator_state.lua
 
 --- ==============================================================================
---- MODULE: Regression â€” end-character preview respects enabled terminators
+--- MODULE: Regression — end-character preview respects enabled terminators
 --- DESCRIPTION:
 --- Uses the real terminator catalogue, registry, bridge, and expander. It toggles
 --- Enter and the magic terminator in opposite directions so a preview resolver

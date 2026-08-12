@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_preview_cross_kind_winner.lua
 
 --- ==============================================================================
---- MODULE: Regression â€” preview uses the engine winner across mapping kinds
+--- MODULE: Regression — preview uses the engine winner across mapping kinds
 --- DESCRIPTION:
 --- Drives the real keymap eventtap with a shorter star mapping and a longer
 --- end-character mapping that both match the same screen buffer. The engine
