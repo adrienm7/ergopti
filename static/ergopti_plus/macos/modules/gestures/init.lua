@@ -805,6 +805,7 @@ function M.start()
 	if ok_cw and cw_module then
 		sleep_watcher = cw_module.new(function(event)
 			if event == cw_module.systemDidWake or event == cw_module.screensDidUnlock then
+				if not CoreState.enabled or CoreState.suspended then return end
 				Logger.info(LOG, "Wake-from-sleep detected (event=%d) — recycling watchers", event)
 				kickstart_hid()
 				recycle_watchers()
