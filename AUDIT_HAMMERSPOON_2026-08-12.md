@@ -11,9 +11,12 @@ that revision were opened and re-derived directly.
 This was an audit-and-fix campaign, not a read-only review. Each promoted issue
 below has a reachable action/state sequence, a root-cause explanation, and a
 named regression test that drives the affected production boundary. At this
-baseline the implemented ledger contains **41 confirmed and fixed findings: 1
-Critical, 22 High, 15 Medium and 3 Low**. These are final source/test totals,
-not a claim that macOS-only runtime gaps are clean.
+baseline the ledger contains **41 confirmed findings: 40 fully fixed and one
+(`HS-H-18`) only partially fixed: 1 Critical, 22 High, 15 Medium and 3 Low**. A
+2026-08-13 post-merge adversarial replay proved that the pathname and symlink
+half of `HS-H-18` is closed, while a non-cooperating writer can still publish
+between the last source check and `rename(2)`. These are source/test totals, not
+a claim that macOS-only runtime gaps are clean.
 
 The most important outcome is the Karabiner ownership model. ErgoptiPlus no
 longer treats “Karabiner” as one process that it may kill. It owns one exact,
@@ -97,8 +100,9 @@ capture remain release gates, not optional polish.
    then tested dangling links, directories, missing prefixes and first-writer
    races through the central adapter.
 10. Replayed POSIX component ordering with an intermediate symlink plus `..`,
-    and revalidated both the observed pathname and source bytes after staging so
-    neither lexical collapse nor a concurrent writer can redirect publication.
+    closing lexical redirection and narrowing stale writes with a final source
+    recheck. The 2026-08-13 reconciliation explicitly leaves the final
+    check-to-rename interval open against non-cooperating writers (`HS-H-18`).
 11. Audited more than one hundred menu preference save sites as one transaction
     class, including first-click failure, LLM backend/profile/warmup ordering,
     hotkey stores, deferred keylogger start and gesture registries.
@@ -831,6 +835,7 @@ before the first config-path consumer.
 
 ### `HS-H-18` — Lexical path collapse and stale source snapshots could redirect or overwrite a transaction
 
+**Status:** Partially fixed; non-cooperating-writer CAS remains open.
 **Severity:** High. **Confidence:** High. **Guarantees:** G1, G2, G3.
 **Locations:** `adapters/file_system.lua:187-313,402-477,672-833`;
 `_shared/lua/toml_codec/writer.lua:52-108,200-249,427-499`.
@@ -849,7 +854,7 @@ symlink resolution, and an atomic rename was mistaken for a compare-and-swap.
 Atomicity prevents torn bytes but does not establish that the destination,
 symlink chain or source snapshot is still the one the user edited.
 
-**Implemented fix.** Component order is preserved until each preceding symlink
+**Implemented fix (bounded).** Component order is preserved until each preceding symlink
 is resolved; only the substituted target is normalized. Reads revalidate both
 the observed link chain and final regular-file identity after close. Writes use
 a private same-directory staging area, revalidate links before and after
@@ -859,6 +864,20 @@ snapshot through the macOS adapter and require literal success for write, close
 and rename. A retarget/refusal preserves the last committed bytes and, when
 ownership is uncertain, preserves the staging sidecar rather than unlinking a
 pathname that may now belong to another process.
+
+**2026-08-13 adversarial correction.** The precondition is a last-moment check,
+not an atomic compare-and-swap. A writer that does not participate in an
+Ergopti-owned serialization protocol can publish after that read and before
+`os.rename`, and its complete successor is then overwritten. Darwin's public
+`RENAME_SWAP` exchanges names atomically but takes no expected inode/hash, so it
+cannot close this condition. The four-day-old detached CAS prototype was
+discarded: beyond preserving the same fundamental TOCTOU, it temporarily
+removed the live pathname and could overwrite a foreign recovery sidecar. A
+strong repair requires a single transaction authority or an explicitly
+cooperative writer protocol plus native multi-process/APFS validation; it is
+not honestly implementable as another Lua rename sequence.
+Primary references: Apple's open-source Darwin [`rename(2)` manual](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)
+and [Secure Coding Guide on TOCTOU](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html).
 
 **Fix commits.** `46bc59b9f`, `ce407718a`, `fa5becaff`, `3cb2c4a23` and
 `a21930037` establish the transaction from codec through platform pathname.
@@ -1599,7 +1618,7 @@ wrong location is never laundered into a refutation.
 | A nil `io.open` handle proves `personal_info.toml` is absent | **Refuted.** It can also be permission denial or another read failure. Final `personal_info.lua:296-317` authorizes defaults only for exact `ENOENT`; the behavioral test preserves an unreadable existing file byte-for-byte (`HS-H-16`). |
 | An `ENOENT`-looking final lookup proves any config pathname is safe to create | **Refuted.** The final name may sit behind a dangling link, an unreadable parent, a missing prefix or a component that is not a directory. `FileSystem.read_with_status()` requires an lstat-style component walk plus a successful parent listing that excludes the final basename; the multi-consumer matrix is `HS-H-17`. |
 | Normalizing `link/../file` before resolving `link` is equivalent to POSIX pathname resolution | **Refuted behaviorally.** POSIX resolves the link first, so `..` applies to the link target. `test_file_system_atomic_write.lua:177-271,620-666` creates both possible targets, observes only the kernel-ordered one and proves the lexical foreign file remains untouched (`HS-H-18`). |
-| Atomic rename alone prevents lost updates | **Refuted.** Rename prevents torn bytes, not a stale writer overwriting a newer complete file. The final adapter and TOML batch writer carry and revalidate `{status, content}` after staging and before publication (`HS-H-18`). |
+| Atomic rename alone prevents lost updates | **Refuted, and not fully repaired.** Rename prevents torn bytes, not a stale writer overwriting a newer complete file. The adapter's `{status, content}` recheck narrows the interval but cannot atomically bind the comparison to publication; `HS-H-18` remains open against non-cooperating writers. |
 | A corrupt Karabiner config should silently reset so the menu remains usable | **Refuted as destructive.** Ordinary setters preserve and surface corrupt/unreadable bytes; only the explicit reset-to-defaults action is authorized to replace them. The absent, corrupt, unreadable and valid controls are enumerated under `HS-H-19`. |
 | A protected `save_prefs()` call proves a menu preference committed | **Refuted.** `pcall` only proves no exception escaped; false and nil are ordinary failure results. Final menu callers require literal true, otherwise the boot-seeded state and represented runtimes roll back and success-only work is withheld (`HS-H-20`). |
 | Provider/resolver failures require constructing one timer per failed event | **Refuted at final source.** Both producers enqueue numeric metadata into the bounded mailbox; one keymap-lifecycle pump owns all deferred delivery. `test_hid_diagnostic_mailbox.lua` asserts zero producer-side timer/logger/stringification work and no duplicate pump. |

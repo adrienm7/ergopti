@@ -860,9 +860,12 @@ function M.write(path, content)
 	return write_atomic(path, content, nil)
 end
 
---- Writes only if the classified source still matches immediately before publish.
---- This macOS extension keeps compare-before-write semantics outside the shared
---- two-argument FileSystem port contract.
+--- Performs a last-moment classified-source check before atomic publication.
+--- This is intentionally NOT described as pathname compare-and-swap: public
+--- Darwin rename APIs cannot bind an expected inode/content hash to replacement,
+--- so a non-cooperating writer may still publish between the check and rename.
+--- This macOS extension keeps that bounded compare-before-write behavior outside
+--- the shared two-argument FileSystem port contract.
 --- @param path string Absolute destination path.
 --- @param content string UTF-8 content.
 --- @param expected_source table `{ status = "ok"|"absent", content = string|nil }`.
