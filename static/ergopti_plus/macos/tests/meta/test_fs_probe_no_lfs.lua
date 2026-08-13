@@ -45,6 +45,18 @@ helpers.describe("hs.fs lfs-free probe classifies directory / file / missing", f
 		helpers.assert_eq(attr.mode, "file")
 	end)
 
+	helpers.it("reports an empty existing file as a file", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local handle, open_err = io.open(path, "w")
+		helpers.assert_true(handle ~= nil, "empty-file fixture must open: " .. tostring(open_err))
+		if handle then handle:close() end
+		local attr = hs.fs.__probe_no_lfs(path)
+		os.remove(path)
+		helpers.assert_type(attr, "table", "a zero-byte regular file must probe to a table")
+		helpers.assert_eq(attr.mode, "file",
+			"the Windows CRT returns nil for read(0) at EOF; that is not a directory")
+	end)
+
 	helpers.it("reports a missing path as nil", function()
 		helpers.assert_nil(hs.fs.__probe_no_lfs(this_dir .. "/__ergopti_no_such_entry__.xyz"))
 	end)

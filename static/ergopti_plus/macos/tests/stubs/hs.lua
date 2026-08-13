@@ -334,6 +334,13 @@ end
 local function probe_fs_without_lfs(path)
 	local fh = io.open(path, "r")
 	if fh then
+		-- The Windows CRT refuses directory handles. An opened zero-byte regular
+		-- file returns nil for read(0), so applying the POSIX discriminator here
+		-- would misclassify every empty file (including stable fcntl sidecars).
+		if package.config:sub(1, 1) == "\\" then
+			fh:close()
+			return { mode = "file" }
+		end
 		local zero = fh:read(0)
 		fh:close()
 		if zero then return { mode = "file" } end
@@ -483,6 +490,11 @@ M.fs = {
 	end,
 	symlinkAttributes = fs_symlink_attributes,
 	link = fs_link,
+	-- Production delegates to non-blocking fcntl locks. The shared stub has no
+	-- cross-process kernel, so the default healthy adapter contract succeeds;
+	-- contention/cleanup semantics are exercised with explicit overrides.
+	lock = function(_) return true end,
+	unlock = function(_) return true end,
 	rmdir = fs_rmdir,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,

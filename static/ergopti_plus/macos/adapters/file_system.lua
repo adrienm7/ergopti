@@ -31,9 +31,16 @@ local _temp_sequence = 0
 
 local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 local STAGING_PAYLOAD_NAME = "payload"
+local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
+
+-- fcntl locks are per process, so a second Lua entry in this Hammerspoon
+-- process could otherwise appear to reacquire its own kernel lock. The handle
+-- is retained until explicit release; macOS releases the kernel lock if the
+-- process dies, while the stable empty lock file intentionally remains.
+local _held_write_locks = {}
 
 
 
@@ -669,6 +676,94 @@ function M.create_if_absent(path, content)
 	return true, "created"
 end
 
+--- Acquires the stable, adjacent fcntl mutex used by Ergopti replacement writers.
+--- The lock pathname is never removed: unlink/recreate would split contenders
+--- across different inodes. hs.fs.lock uses non-blocking F_SETLK, and the kernel
+--- releases it automatically when a Hammerspoon process exits or is killed.
+--- This serializes cooperating Ergopti writers only; it cannot constrain an
+--- arbitrary editor that ignores advisory locks.
+--- @param resolved_path string Symlink-resolved destination path.
+--- @return table|nil owner Retained `{ path, handle }` lock owner.
+--- @return string|nil error_message
+local function acquire_cooperative_write_lock(resolved_path)
+	if not hs or not hs.fs or type(hs.fs.lock) ~= "function"
+		or type(hs.fs.unlock) ~= "function" then
+		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
+	end
+
+	local lock_path = resolved_path .. WRITE_LOCK_SUFFIX
+	if _held_write_locks[lock_path] ~= nil then
+		return nil, "cooperative write lock is already held by this Hammerspoon process"
+	end
+
+	local before, inspect_err = inspect_path(lock_path)
+	if inspect_err ~= nil then return nil, inspect_err end
+	if before ~= nil and before.mode ~= "file" then
+		return nil, "cooperative write lock pathname is not a regular file: " .. lock_path
+	end
+
+	-- a+ creates the stable empty inode when absent and never truncates an
+	-- existing one. The preceding lstat rejects an existing symlink or directory.
+	-- A non-cooperating process can still replace a pathname after this check;
+	-- advisory serialization deliberately makes no guarantee about that actor.
+	local open_ok, handle, open_err = pcall(io.open, lock_path, "a+")
+	if not open_ok or handle == nil then
+		return nil, tostring((open_ok and open_err) or handle or "lock open failed")
+	end
+
+	local function close_unowned_handle()
+		if type(handle.close) == "function" then pcall(handle.close, handle) end
+	end
+
+	local call_ok, locked, lock_err = pcall(hs.fs.lock, handle, "w")
+	if not call_ok or locked ~= true then
+		close_unowned_handle()
+		return nil, tostring((call_ok and lock_err) or locked or "write lock refused")
+	end
+
+	local owner = { path = lock_path, handle = handle }
+	_held_write_locks[lock_path] = owner
+	return owner
+end
+
+--- Releases one cooperative writer mutex exactly once.
+--- Either a successful unlock or a successful close proves the kernel lock no
+--- longer belongs to this process. If both fail, retain the owner and fail all
+--- same-process re-entry closed instead of pretending the mutex was released.
+--- @param owner table|nil Owner returned by acquire_cooperative_write_lock().
+--- @return boolean released
+--- @return string|nil error_message
+local function release_cooperative_write_lock(owner)
+	if owner == nil then return true end
+	if type(owner) ~= "table" or type(owner.path) ~= "string" or owner.handle == nil then
+		return false, "invalid cooperative write-lock owner"
+	end
+	if _held_write_locks[owner.path] ~= owner then
+		return false, "cooperative write-lock ownership changed before release"
+	end
+
+	local unlock_ok, unlocked, unlock_err = pcall(hs.fs.unlock, owner.handle)
+	local close_ok, closed, close_err = false, nil, nil
+	if type(owner.handle.close) == "function" then
+		close_ok, closed, close_err = pcall(owner.handle.close, owner.handle)
+	end
+	local unlocked_exactly = unlock_ok and unlocked == true
+	local closed_exactly = close_ok and closed == true
+	if unlocked_exactly or closed_exactly then
+		_held_write_locks[owner.path] = nil
+		if unlocked_exactly and closed_exactly then return true end
+		return true, tostring(unlocked_exactly
+			and (close_err or closed or "lock handle close failed")
+			or (unlock_err or unlocked or "explicit unlock failed"))
+	end
+
+	return false, string.format(
+		"unlock failed (%s); close failed (%s)",
+		tostring(unlock_ok and (unlock_err or unlocked) or unlocked),
+		tostring(close_ok and (close_err or closed) or closed)
+	)
+end
+
 --- Writes content to a file atomically (temp file + rename), overwriting any
 --- existing content. Creates parent directories when they do not exist.
 --- A crash or process kill mid-write can never leave a torn/truncated file at
@@ -679,7 +774,9 @@ end
 --- write through an observed link lands on its resolved target instead of
 --- replacing that link with a plain file. The observed chain is revalidated
 --- around publication; this is not a claim of compare-and-swap semantics for
---- a final pathname that was absent during resolution.
+--- a final pathname that was absent during resolution. Replacement writers in
+--- Ergopti processes are serialized by one stable adjacent advisory fcntl lock;
+--- external writers that ignore that lock remain outside the guarantee.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
@@ -695,6 +792,7 @@ local function write_atomic(path, content, expected_source)
 	local resolved_path = nil
 	local symlink_chain = nil
 	local payload_published = false
+	local write_lock = nil
 
 	local function preserve_staging_area(context, reason)
 		if not staging_area then return false end
@@ -739,6 +837,23 @@ local function write_atomic(path, content, expected_source)
 
 		local dir = parent_dir(resolved_path)
 		if dir then ensure_dir(dir) end
+
+		write_lock, resolve_err = acquire_cooperative_write_lock(resolved_path)
+		if not write_lock then
+			Logger.error(
+				LOG,
+				"write(): cannot acquire cooperative publication lock for '%s' — %s",
+				resolved_path,
+				tostring(resolve_err)
+			)
+			return false, tostring(resolve_err or "cooperative write lock failed")
+		end
+		local route_unchanged, route_err = revalidate_write_path(path, resolved_path, symlink_chain)
+		if not route_unchanged then
+			Logger.error(LOG, "write(): destination changed while acquiring its lock — %s",
+				tostring(route_err))
+			return false, tostring(route_err or "destination changed while acquiring write lock")
+		end
 
 		staging_area, resolve_err = reserve_staging_area(resolved_path)
 		if not staging_area then
@@ -836,16 +951,29 @@ local function write_atomic(path, content, expected_source)
 		cleanup_staging_if_safe("successful publication")
 		return true
 	end)
+	if not ok and staging_area then
+		local cleanup_ok, cleanup_err = pcall(cleanup_staging_if_safe, "unexpected error")
+		if not cleanup_ok then
+			Logger.warn(LOG, "write(): unexpected cleanup error for '%s' — %s", path, tostring(cleanup_err))
+		end
+	end
+
+	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
+	write_lock = nil
+	if not lock_released then
+		Logger.error(LOG, "write(): cooperative publication lock for '%s' was not released — %s",
+			tostring(resolved_path or path), tostring(lock_release_err))
+	elseif lock_release_err ~= nil then
+		Logger.warn(LOG, "write(): cooperative publication lock cleanup for '%s' was partial — %s",
+			tostring(resolved_path or path), tostring(lock_release_err))
+	end
 
 	if not ok then
-		if staging_area then
-			local cleanup_ok, cleanup_err = pcall(cleanup_staging_if_safe, "unexpected error")
-			if not cleanup_ok then
-				Logger.warn(LOG, "write(): unexpected cleanup error for '%s' — %s", path, tostring(cleanup_err))
-			end
-		end
 		Logger.error(LOG, "write(): unexpected error on '%s' — %s", path, tostring(result))
 		return false, tostring(result)
+	end
+	if not lock_released then
+		return false, tostring(lock_release_err or "cooperative write lock release failed")
 	end
 	if result == true then return true end
 	return false, result_err or "atomic write failed"
