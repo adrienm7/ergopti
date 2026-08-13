@@ -1895,6 +1895,30 @@ The 2026-08-12 Hammerspoon audit found the same class as [[project-ahk-unreadabl
 
 On macOS, use `adapters.file_system.read_with_status(path)`, which returns only `"ok"`, `"absent"`, or `"error"` after lstat/parent-listing, complete read and close, and symlink revalidation. Creation uses `create_if_absent(path, content)`: its create-only publication never overwrites a winner and returns `"created"`, a stable readable `"exists"`, or `"error"`. Replacement uses `FileSystem.write`, which stages beside the resolved destination and revalidates the symlink chain. Domain state, caches, notifications, reloads, and native remap regeneration publish only after the exact filesystem commitment; a pcall that merely did not raise is not commitment. Readers that parse a file must likewise require the TOML reader's second result to be exactly `true`, never nil or merely not-false.
 
+`FileSystem.write_if_unchanged()` is deliberately only a **last-moment conflict
+check**, not a linearizable pathname compare-and-swap. Darwin exposes
+`RENAME_EXCL` (publish only when the destination is absent) and `RENAME_SWAP`
+(unconditionally exchange two existing names), but no public rename operation
+accepts an expected inode, generation or content hash. Consequently another,
+non-cooperating writer can still replace the destination between the final read
+and `rename(2)`. Never describe the current adapter or a `RENAME_SWAP` helper as
+closing that interval. A strong guarantee requires one transaction authority
+(for example a single-writer service/database) or an explicitly cooperative
+locking protocol followed by every writer; advisory locking cannot constrain an
+arbitrary editor.
+Primary references are Darwin's [`rename(2)` manual](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)
+and Apple's [TOCTOU guidance](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html).
+
+The detached `ergopti-verify-fs-cas-v2` prototype from 2026-08-09 was rejected
+on 2026-08-13. Its own 40 modeled cases passed, but an adversarial interleaving
+showed it overwrote a foreign `OLD` sidecar and still returned success. Its
+`rename(live, old)` then `link(new, live)` publication also exposed an observable
+missing-`live` interval that a crash could make permanent, and
+`lstat -> open -> lstat` remained vulnerable to pathname ABA. Do not revive or
+port that implementation. Preserve the current complete-file rename and
+classified-path protections while treating cross-process lost-update exclusion
+as an open architecture constraint, not a completed CAS fix.
+
 Regression tests must drive behavior, not grep spelling: preserve sentinel bytes under EACCES, directory, dangling-link and malformed-content cases; inject `write -> nil`, `close -> false`, and `rename -> false`; simulate a file appearing or changing between read and publication; then assert the file, live state, cache, UI, timer/submodule startup, and user notification all remain uncommitted. Related [[project-ahk-unreadable-config-persists-defaults]], [[project-hs-karabiner-exact-lease-isolation]], [[feedback-regression-tests]].
 
 ### project-audit-ahk-2026-07-21-adversarial
