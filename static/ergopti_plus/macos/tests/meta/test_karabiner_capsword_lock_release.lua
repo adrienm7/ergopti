@@ -54,17 +54,17 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
 		helpers.assert_true(src:match("local task%s*\n") ~= nil,
 			"the callback must forward-declare its GC-pinned task handle")
-		helpers.assert_true(src:find("pcall(\n\t\ths.task.new", 1, true) ~= nil,
-			"hs.task.new can raise and must be protected before the lock is released")
-		helpers.assert_true(src:find("task = ok_new and task_or_err or nil", 1, true) ~= nil,
+		helpers.assert_true(src:find("TaskLifecycle.native", 1, true) ~= nil,
+			"native task construction and callbacks must be protected before the lock is released")
+		helpers.assert_true(src:find("task = task_or_err", 1, true) ~= nil,
 			"the protected constructor result must become the exact retained handle")
 	end)
 
 	helpers.it("_capsword_check_pending is released when task:start() returns false", function()
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
-		helpers.assert_true(src:find("pcall(function() return task:start() end)", 1, true) ~= nil,
+		helpers.assert_true(src:find("TaskLifecycle.start(task, \"CapsWord variable probe\")", 1, true) ~= nil,
 			"task:start() can raise as well as return false and must be protected")
-		helpers.assert_true(src:find("abandon_probe(task, ok_start", 1, true) ~= nil,
+		helpers.assert_true(src:find("abandon_probe(task,", 1, true) ~= nil,
 			"both start failure modes must invalidate the generation and release the lock")
 	end)
 

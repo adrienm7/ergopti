@@ -57,9 +57,9 @@ helpers.describe("menu_about: install task must be forward-declared (F-CRIT-2)",
 	helpers.it("forward-declares the install task before the hs.task.new closure", function()
 		local src = read_src()
 		local decl_pos = src:find("local unzip_task", 1, true)
-		local new_pos  = src:find("unzip_task = hs.task.new", 1, true)
+		local new_pos  = src:find("unzip_task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_pos ~= nil, "install task must be forward-declared as `local unzip_task`")
-		helpers.assert_true(new_pos ~= nil, "install task must be assigned via `unzip_task = hs.task.new`")
+		helpers.assert_true(new_pos ~= nil, "install task must be assigned via `unzip_task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
 			"the local declaration must come BEFORE the hs.task.new closure so the callback captures the upvalue")
 	end)

@@ -75,8 +75,8 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		local fake_kl = {
 			set_options       = function() end,
 			set_disabled_apps = function() end,
-			start             = function() started.count = started.count + 1 end,
-			stop              = function() end,
+			start             = function() started.count = started.count + 1; return true end,
+			stop              = function() return true end,
 		}
 
 		local saved_doAfter = _G.hs.timer.doAfter
@@ -86,7 +86,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		MenuState.sync_state_to_modules(
 			{ hotstrings = {}, keylogger_enabled = true },
 			{}, false,
-			{ keymap = {}, hotstring_editor = {}, core_mods = { keylogger = fake_kl }, save_prefs = function() end }
+			{ keymap = {}, hotstring_editor = {}, core_mods = { keylogger = fake_kl }, save_prefs = function() return true end }
 		)
 
 		helpers.assert_eq(started.count, 0)        -- not started inline
@@ -110,8 +110,8 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			core_mods = { keylogger = {
 				set_options = function() end,
 				set_disabled_apps = function() end,
-				start = function() started = started + 1 end,
-				stop = function() end,
+				start = function() started = started + 1; return true end,
+				stop = function() return true end,
 			} },
 		}
 		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = true }, {}, false, deps)
@@ -120,5 +120,29 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		_G.hs.timer.doAfter = old_do_after
 		helpers.assert_eq(started, 0,
 			"a failed enable rolled back to disabled must fence its deferred keylogger start")
+	end)
+
+	helpers.it("rolls persisted enabled state back when deferred start is rejected", function()
+		local deferred = {}
+		local save_calls = 0
+		local old_do_after = _G.hs.timer.doAfter
+		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+		local state = { hotstrings = {}, keylogger_enabled = true }
+		MenuState.sync_state_to_modules(state, {}, false, {
+			keymap = {}, hotstring_editor = {},
+			save_prefs = function() save_calls = save_calls + 1; return true end,
+			core_mods = { keylogger = {
+				set_options = function() end,
+				set_disabled_apps = function() end,
+				start = function() return false end,
+			} },
+		})
+
+		for _, fn in ipairs(deferred) do fn() end
+		_G.hs.timer.doAfter = old_do_after
+		helpers.assert_eq(false, state.keylogger_enabled,
+			"a rejected deferred start must not leave the restored checkmark enabled")
+		helpers.assert_eq(1, save_calls,
+			"the compensating disabled state must be persisted for the next boot")
 	end)
 end)

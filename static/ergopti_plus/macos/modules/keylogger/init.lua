@@ -1437,7 +1437,7 @@ end
 function M.start(script_control)
 	if CoreState.is_enabled then
 		Logger.warn(LOG, "M.start() called while already running — ignoring.")
-		return
+		return true
 	end
 	Logger.start(LOG, "Starting keylogger engine…")
 	_script_control = script_control
@@ -1483,6 +1483,40 @@ function M.start(script_control)
 		-- are stable for the process lifetime, so a one-shot init is sufficient.
 		Watchers.init(CoreState, _is_paused)
 	end
+
+	-- Security-critical application lifecycle must commit before any keyboard
+	-- hook or persistence producer is enabled. A missing app watcher would leave
+	-- the secure-field context stale while the keylogger continued recording.
+	if not _process_lifecycle_registered then
+		ProcessLifecycle.onAppActivate(function(app_name, app_object)
+			local context_ok, context_err = xpcall(function()
+				ContextTracker.app_watcher_cb(app_name,
+					hs.application.watcher.activated, app_object)
+			end, debug.traceback)
+			if not context_ok then
+				CoreState.is_secure_field = true
+				Logger.error(LOG, "Application context refresh failed — logging disabled: %s.",
+					tostring(context_err))
+				return
+			end
+			if BROWSER_APP_SET[app_name] then
+				local filter_ok, filter_err = xpcall(ensure_browser_window_filter,
+					debug.traceback)
+				if not filter_ok then
+					Logger.error(LOG, "Optional browser window-filter setup failed: %s.",
+						tostring(filter_err))
+				end
+			end
+		end)
+		_process_lifecycle_registered = true
+	end
+	if ProcessLifecycle.start() ~= true then
+		CoreState.is_secure_field = true
+		if type(LogManager.stop) == "function" then Logger.pcall(LOG, LogManager.stop) end
+		Logger.error(LOG, "Keylogger start aborted: application lifecycle watcher is unavailable.")
+		return false
+	end
+
 	-- Re-wire and re-arm on every start so stop/start cycles keep the bridge
 	-- and ingest loop alive. Both calls are idempotent when already running.
 	KcBridge.set_log_manager(LogManager)
@@ -1497,27 +1531,15 @@ function M.start(script_control)
 		_action_listener_registered = true
 	end
 
+	-- The application watcher reports only future transitions; it does not
+	-- synchronously publish the app/field that is focused at start. Keep every
+	-- persistence sink closed until the deferred foreground capture commits.
+	CoreState.is_secure_field = true
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 
 	CoreState.recent_typing_eff  = {}
 	CoreState.recent_typing_phys = {}
-
-	-- Application lifecycle. The browser window-filter is created LAZILY on the first
-	-- browser activation (see ensure_browser_window_filter) so the keylogger never
-	-- pays hs.window.filter's whole-window-tree enumeration at start.
-	if not _process_lifecycle_registered then
-		ProcessLifecycle.onAppActivate(function(app_name, app_object)
-			if BROWSER_APP_SET[app_name] then ensure_browser_window_filter() end
-			ContextTracker.app_watcher_cb(app_name, hs.application.watcher.activated, app_object)
-		end)
-		_process_lifecycle_registered = true
-	end
-	ProcessLifecycle.start()
-
-	-- Evaluate the current window's private status on the next tick (independent of
-	-- the lazy browser filter), keeping it off the synchronous start path.
-	hs.timer.doAfter(0, ContextTracker.update_private_status)
 
 	-- System sleep/wake/lock watcher
 	if not _caffeinate_watcher then
@@ -1566,7 +1588,11 @@ function M.start(script_control)
 
 	-- Bootstrap: capture the current app context and load/rebuild today's index
 	hs.timer.doAfter(0, function()
-		pcall(ContextTracker.capture_frontmost_app)
+		local ok_capture, captured = Logger.pcall(LOG, ContextTracker.capture_frontmost_app)
+		if not ok_capture or captured ~= true then
+			CoreState.is_secure_field = true
+			Logger.error(LOG, "Initial application context was unavailable — logging remains disabled.")
+		end
 		Logger.success(LOG, "Keylogger engine started.")
 	end)
 
@@ -1575,6 +1601,7 @@ function M.start(script_control)
 	-- No deferred rebuild dance is needed at boot — the ingest tick will
 	-- catch up on any today.log entries written by a previous keylogger
 	-- session that did not get flushed before exit.
+	return true
 end
 
 --- Re-synchronises the cached app/secure-field context with reality.
@@ -1601,8 +1628,12 @@ end
 --- Idempotent: calling it while not running is a no-op.
 function M.stop()
 	if not CoreState.is_enabled then
-		Logger.warn(LOG, "M.stop() called while not running — ignoring.")
-		return
+		if ProcessLifecycle.stop() ~= true then
+			Logger.error(LOG, "Keylogger remains stopped, but application-watcher cleanup is pending.")
+			return false
+		end
+		Logger.warn(LOG, "M.stop() called while not running — lifecycle cleanup verified.")
+		return true
 	end
 	Logger.start(LOG, "Stopping keylogger engine…")
 
@@ -1615,7 +1646,10 @@ function M.stop()
 	-- currently open interval before shutdown so reloads do not erase it.
 	pcall(ContextTracker.close_active_app)
 	LogManager.flush_buffer()
-	ProcessLifecycle.stop()
+	local lifecycle_stopped = ProcessLifecycle.stop() == true
+	if not lifecycle_stopped then
+		Logger.error(LOG, "Keylogger stopped fail-closed; application-watcher cleanup is pending.")
+	end
 
 	KeyboardHook.stop()
 	_event_tap = nil
@@ -1638,6 +1672,7 @@ function M.stop()
 	pcall(LogManager.stop)
 
 	Logger.success(LOG, "Keylogger engine stopped.")
+	return lifecycle_stopped
 end
 
 return M

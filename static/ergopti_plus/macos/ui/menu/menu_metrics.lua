@@ -29,6 +29,9 @@ local dialog        = require("infra.dialog_util")
 local kl_mod        = require("modules.keylogger")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
+local Logger        = require("infra.logger")
+
+local LOG = "menu_metrics"
 
 
 
@@ -103,7 +106,7 @@ function M.build(ctx)
 		return script_control and type(script_control.is_paused) == "function"
 			and script_control.is_paused() or false
 	end
-	if state.keylogger_enabled then
+		if state.keylogger_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
@@ -515,9 +518,24 @@ function M.build(ctx)
 				if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
 					pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
 				end
-				if Keylogger and type(Keylogger.start) == "function" then
-					pcall(Keylogger.start, script_control)
-				end
+			local start_ok, started = false, false
+			if Keylogger and type(Keylogger.start) == "function" then
+				start_ok, started = pcall(Keylogger.start, script_control)
+			end
+			if not start_ok or started ~= true then
+				-- The preference was published before runtime activation. Compensate
+				-- transactionally so the checkmark cannot claim Metrics is active while
+				-- its security-context watcher (and therefore the engine) is absent.
+				state.keylogger_enabled = false
+				local rollback_saved = save_prefs() == true
+				state.keylogger_enabled = false
+				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
+					tostring(rollback_saved))
+				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
+				if WpmWidget and type(WpmWidget.stop) == "function" then pcall(WpmWidget.stop) end
+				updateMenu()
+				return false
+			end
 				if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
 					pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
 				end
@@ -534,12 +552,18 @@ function M.build(ctx)
 				if state.keylogger_menubar_wpm and not paused_now() and WpmMenubar and type(WpmMenubar.start) == "function" then pcall(WpmMenubar.start) end
 				if state.keylogger_float_wpm and not paused_now() and WpmWidget and type(WpmWidget.start) == "function" then pcall(WpmWidget.start, state.keylogger_float_graph) end
 			else
-				if Keylogger and type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
+			if Keylogger and type(Keylogger.stop) == "function" then
+				local stop_ok, stopped = pcall(Keylogger.stop)
+				if not stop_ok or stopped ~= true then
+					Logger.error(LOG, "Metrics is disabled, but native keylogger cleanup remains pending.")
+				end
+			end
 				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
 				if WpmWidget and type(WpmWidget.stop) == "function" then pcall(WpmWidget.stop) end
 			end
 
-			updateMenu()
+		updateMenu()
+		return true
 		end,
 		menu = menu,
 	}

@@ -25,6 +25,7 @@ local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "menu_apps"
 
@@ -248,7 +249,8 @@ function M.build(ctx)
 				-- `setEnvironment` on the `open` process itself does not propagate
 				-- to the app it spawns; `--env KEY=VALUE` does.
 				local task
-				task = hs.task.new(
+				task = TaskLifecycle.native(
+					"Bundled app launch",
 					"/usr/bin/open",
 					function(code, _, stderr)
 						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
@@ -264,11 +266,10 @@ function M.build(ctx)
 						app_path,
 					}
 				)
+				if not task then return end
 				M._active_tasks[task] = true
-				local ok_start, err = pcall(function() task:start() end)
-				if not ok_start then
+				if not TaskLifecycle.start(task, "Bundled app launch") then
 					M._active_tasks[task] = nil
-					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
 				end
 			end,
 		})

@@ -43,8 +43,7 @@ function M.activate(hwnd_or_spec)
 		if type(hwnd_or_spec) == "string" then
 			local app = hs.application.get(hwnd_or_spec)
 			if app then
-				app:activate()
-				return true
+				return app:activate() == true
 			end
 			return false
 		end
@@ -52,8 +51,10 @@ function M.activate(hwnd_or_spec)
 		local win = type(hwnd_or_spec) == "userdata" and hwnd_or_spec
 			or (hs.window and hs.window.get and hs.window.get(hwnd_or_spec))
 		if win then
-			win:focus()
-			return true
+			-- hs.window:focus() returns the window object for chaining, not a
+			-- boolean. Reject nil/false without requiring literal true.
+			local focused = win:focus()
+			return focused ~= nil and focused ~= false
 		end
 		return false
 	end)

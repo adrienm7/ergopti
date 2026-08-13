@@ -57,7 +57,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			sync_failed = true
 			Logger.warn(LOG, "sync_state_to_modules: %s failed — %s", label, tostring(err))
 		end
-		return ok
+		return ok, err
 	end
 
 	local keymap           = deps.keymap
@@ -329,12 +329,26 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				if keylogger_generation ~= _keylogger_start_generation then return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
-				try("keylogger.start", kl.start, _shortcuts_ref)
+				local start_ok, started = try("keylogger.start", kl.start, _shortcuts_ref)
+				if not start_ok or started ~= true then
+					state.keylogger_enabled = false
+					sync_failed = true
+					local persist_ok, persisted = pcall(save_prefs)
+					if not persist_ok or persisted ~= true then
+						Logger.error(LOG, "Deferred keylogger start failed and its disabled rollback could not be persisted.")
+					end
+					Logger.error(LOG, "Deferred keylogger start was rejected; Metrics remains disabled.")
+				end
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
 			end)
 		else
-			if type(kl.stop) == "function" then try("keylogger.stop", kl.stop) end
+			if type(kl.stop) == "function" then
+				local stop_ok, stopped = try("keylogger.stop", kl.stop)
+				if not stop_ok or stopped ~= true then
+					Logger.error(LOG, "Keylogger is disabled, but native lifecycle cleanup remains pending.")
+				end
+			end
 		end
 	end
 	local cipher_ok, TextCipher = pcall(require, "modules.keylogger.text_cipher")
