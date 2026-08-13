@@ -59,6 +59,19 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip visual style is shared across drivers via _shared/modules/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different
 - [project-hs-karabiner-exact-lease-isolation](#project-hs-karabiner-exact-lease-isolation) — Ergopti owns token-scoped Karabiner rules and variables, never Karabiner's shared UI, services, grabber, or VirtualHID processes
 - [project-hs-wrap-selection-clipboard-ownership](#project-hs-wrap-selection-clipboard-ownership) — A macOS wrap key is consumed only after Cmd+V and an exact all-type clipboard restore are both owned
+- [project-hs-clipboard-transaction-ownership](#project-hs-clipboard-transaction-ownership) — Every macOS clipboard borrower owns the all-type snapshot before mutation and retains failed restoration until exact commit
+- [project-hs-native-task-lifecycle-contract](#project-hs-native-task-lifecycle-contract) — Native task construction, start and callbacks are three separate failure boundaries owned by TaskLifecycle or ShellRunner
+- [project-hs-process-lifecycle-transaction](#project-hs-process-lifecycle-transaction) — Watchers publish only after native activation and retain refused teardown handles as callback-inert cleanup debt
+- [project-hs-timer-commit-contract](#project-hs-timer-commit-contract) — Every TimerScheduler caller must consume `(handle, committed)` and retain an uncommitted live candidate as cleanup debt
+- [project-hs-stateful-native-test-doubles](#project-hs-stateful-native-test-doubles) — A shared Hammerspoon double must preserve independently observable native state; intentional failure belongs in the individual test
+- [project-release-gates-scan-versioned-input](#project-release-gates-scan-versioned-input) — Repository source/parity gates enumerate the Git index, not arbitrary untracked runtime or personal files in a developer worktree
+- [project-hs-kc-ledger-process-lifecycle](#project-hs-kc-ledger-process-lifecycle) — Metrics OFF keeps the Karabiner physical-key ledger draining; only process shutdown owns its teardown
+- [project-hs-input-source-single-owner](#project-hs-input-source-single-owner) — `hs.keycodes.inputSourceChanged` is a setter, so one broker must multiplex every subscriber
+- [project-hs-ordered-startup-transaction](#project-hs-ordered-startup-transaction) — Required input owners commit in order and roll back in reverse before boot can publish success
+- [project-hs-keylogger-append-commit](#project-hs-keylogger-append-commit) — A non-throwing file-write refusal must retain the exact detached snapshot and FIFO head
+- [project-hs-http-timeout-before-dispatch](#project-hs-http-timeout-before-dispatch) — An asynchronous request is not dispatchable until its deadline capability has committed
+- [project-hs-ignored-window-pass-through](#project-hs-ignored-window-pass-through) — Ignored/private applications intentionally bypass every Ergopti text feature, including repeat and preview
+- [project-hs-native-result-contracts](#project-hs-native-result-contracts) — A successful pcall is not operational success; interpret each Hammerspoon API's exact documented result
 - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — The first-run wizard must write the canonical HS config schema, and the "ready" notification was removed
 - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Ou vivent les defauts du module keymap, et pourquoi une seule place
 - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — Every macOS keyboard injector uses one exact-tag transaction adapter; source PID, timing and character equality are never synthetic identity
@@ -70,7 +83,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-prefix-index-rebuild-cost-is-cold-disk](#project-prefix-index-rebuild-cost-is-cold-disk) — The prefix-watcher index rebuild's cost is the cold-disk TOML read, NOT parse CPU — build the index from the in-memory `_HS_CACHE_ROWS`, the same way HSE registration does.
 - [project-suspend-pause-invariant](#project-suspend-pause-invariant) — La pause doit TOUT taire (aucun tooltip/LLM/keylogger/widget). Le Suspend AHK ne desarme que les hotkeys — InputHooks, timers et OnMessage le contournent et exigent des gardes `A_IsSuspended` explicites.
 - [project-macos-llm-runtime-enable-gate](#project-macos-llm-runtime-enable-gate) — macOS must not warm up or load an LLM model from profile/model restoration alone; only the live runtime enable gate may authorize warmup side-effects.
-- [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — Never run blocking work (osascript / hs.execute subprocesses) synchronously inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and the shortcut dies. Defer with hs.timer.doAfter(0, …).
+- [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — An eventtap producer may do only bounded in-memory work. `hs.timer.doAfter(0, …)` exits the callback but is not a thread hop; shell, filesystem, logger sinks and other blocking work need an owned asynchronous worker with exact completion/ACK semantics.
 - [project-macos-script-control-tap-lifecycle](#project-macos-script-control-tap-lifecycle) — The script-control eventtap (AltGr+Enter/Backspace/Escape) is keycode-based and must survive layout switches AND pause — never restart it via `shortcuts.stop()`/`shortcuts.start()`, and never let a pause-driven layout switch regenerate the Karabiner config.
 - [project-touchdevice-dormancy-is-kernel](#project-touchdevice-dormancy-is-kernel) — Definitive answer that macOS touchdevice subsystem CANNOT be activated before first physical touch — it is a kernel-driver gate
 - [project-ui-dynamic-buttons](#project-ui-dynamic-buttons) — AHK UIs must use Gui_HarmoniseButtonWidths instead of hardcoded w-values; HS auto-sizes via CSS padding
@@ -1909,20 +1922,20 @@ arbitrary editor.
 Primary references are Darwin's [`rename(2)` manual](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)
 and Apple's [TOCTOU guidance](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html).
 
-Replacement writers that do cooperate now share one stable adjacent
-`<resolved_path>.ergoptiplus-write-lock-v1` inode. Both `FileSystem.write()` and
-`FileSystem.write_if_unchanged()` open it without truncation and take the
+Writers that do cooperate now share one stable adjacent
+`<resolved_path>.ergoptiplus-write-lock-v1` inode. `FileSystem.write()`,
+`FileSystem.write_if_unchanged()` and `FileSystem.create_if_absent()` open it
+without truncation and take the
 non-blocking exclusive [`hs.fs.lock`](https://www.hammerspoon.org/docs/hs.fs.html#lock)
-before staging, source comparison and rename. The pathname is intentionally
+before staging, source comparison and publication. The pathname is intentionally
 never unlinked: recreating it could split contenders across two inodes. A
 module-local owner table also rejects same-process re-entry because POSIX record
 locks are process-associated. `unlock` plus close runs on every protected exit;
 if Hammerspoon is killed, Darwin releases the process's `fcntl(F_SETLK)` lock,
 so there is no PID/age-based stale-lock deletion. Contention is a visible
-fail-closed save, not a blocking wait. This closes the compare/rename interval
-between cooperating Ergopti **replacement** writers, including the unconditional
-reset sibling. It does not make `create_if_absent()` advisory-lock-aware and does
-not constrain any external writer.
+fail-closed save, not a blocking wait. This closes the compare/publication
+interval among cooperating Ergopti writers, including the create-only bootstrap
+and unconditional-reset siblings. It does not constrain any external writer.
 
 The detached `ergopti-verify-fs-cas-v2` prototype from 2026-08-09 was rejected
 on 2026-08-13. Its own 40 modeled cases passed, but an adversarial interleaving
@@ -2148,7 +2161,7 @@ _Profilers boot/hot-path macOS, chemin rapide case-conform, cache du menubar, sn
 
 <sub>slug: `project_hs_perf_profilers_and_case_conform`</sub>
 
-**Profilers.** `lib/boot_profiler.lua` (`Boot.begin()` / `Boot.mark(phase)`) journalise `+delta ms (total ms)` par phase en INFO. `lib/hotpath_profiler.lua` (`HotPath.now()` / `HotPath.log_if_slow(label, t0, detail)`) n'emet un WARNING que si un segment depasse le seuil (5 ms par defaut) ; cable dans `keymap/init.lua` `onKeyDown` et `tooltip_llm.show_predictions`. **Les deux lisent l'horloge via `adapters.timer_scheduler` (`now()` / `now_ns()`), JAMAIS `hs.timer.*` directement** : le garde `tests/meta/test_port_adapter_coverage` compte les occurrences de `hs.` (y compris en commentaire) dans `modules/`+`lib/`. Les adapters sont exemptes ; tout nouveau code lib/modules doit router ses appels OS par eux.
+**Profilers.** `infra/boot_profiler.lua` (`Boot.begin()` / `Boot.mark(phase)`) journalise `+delta ms (total ms)` par phase en INFO. `infra/hotpath_profiler.lua` (`HotPath.now()` / `HotPath.log_if_slow(label, t0, detail)`) n'emet un WARNING que si un segment depasse le seuil (`DEFAULT_SLOW_MS = 20` aujourd'hui) ; cable dans `modules/keymap/init.lua` `onKeyDown` et `ui/tooltip/tooltip_llm.lua` `show_predictions`. **Les deux lisent l'horloge via `adapters.timer_scheduler` (`now()` / `now_ns()`), JAMAIS `hs.timer.*` directement** : le garde `tests/meta/test_port_adapter_coverage` compte les occurrences de `hs.` (y compris en commentaire) dans `modules/`+`infra/`. Les adapters sont exemptes ; tout nouveau code infra/modules doit router ses appels OS par eux. Ces chemins et ce seuil sont derives du code au 2026-08-13 ; re-verifier avant toute conclusion de performance.
 
 **Chemin rapide case-conform** (`registry.lua` + `expander.lua` + `text_utils.conform_replacement`). Un declencheur auto, insensible a la casse, texte simple, sans caractere shift-symbole (`, ' .`) et non termine par la touche magique est enregistre comme UNE entree minuscule (`m.case_conform = true`) au lieu du trio minuscule/Titre/MAJUSCULE ; `try_auto_expand` conforme la casse du remplacement au declencheur tape (casse mixte → `conform_replacement` renvoie nil → pas de tir, comportement identique a l'ancien sans variante). Les buckets de caractere final sont passes de `:lower()` ASCII a `text_utils.trig_lower` Unicode (enregistrement ET `mappings_for_tail`/`rebuild_tail_indexes`) pour qu'un « Ê » final majuscule tombe dans le bucket « ê » — REQUIS pour que les entrees conform matchent des declencheurs accentues capitalises. **Realite du gain :** concentre sur `autocorrection` (~316 conform, ~630 entrees evitees) ; `magickey` n'en profite quasiment pas car ~1587/2119 de ses entrees sont deliberement `is_case_sensitive = true`. L'estimation d'agent « diviser le corpus par deux » etait fausse. Regression : `tests/unit/modules/keymap/test_case_conform.lua`.
 
@@ -2188,6 +2201,18 @@ Generated configuration is merged rather than replacing the user's document. Pro
 
 Regression coverage: `tests/meta/test_karabiner_stock_process_isolation.lua` scans every production runtime source for stock-process mutations and legacy ownership markers; `tests/unit/platform/remap/test_lease_controller.lua`, `tests/unit/platform/remap/test_guardian_auto_recovery.lua`, native `KarabinerLeaseWorkerTests`, `test_generator_managed_lease.lua`, `test_disabled_legacy_cleanup.lua`, and `test_kc_suppression_requires_live_lease.lua` exercise token isolation, abrupt EOF/SIGKILL, guardian restart, outer/inner loss, direct-child timeouts, approval loss, heartbeat recovery, migration, disabled mode, and lease-bound resources. `tools/test/test-macos-remap-launchagent.cjs` verifies that the exact `com.ergoptiplus.remap-guardian` plist is packaged with `RunAtLoad` and `KeepAlive`. A source grep alone is insufficient for async cleanup: native `testGuardianLeavesPersonalKarabinerProcesses` keeps unrelated UI, Core Service/grabber, console-server, observer, and VirtualHID-named sibling processes alive while the real POSIX executor fences only the exact token twice.
 
+Gesture click-lock is a separate local ownership transaction. Both release
+eventtaps must be constructed, started and proven enabled before the synthetic
+mouse-down is posted or held state becomes visible. Their callbacks capture one
+generation; failed or state-mismatched stops remain exact, callback-inert cleanup
+debt and block a successor. Before gestures disable their taps or mark
+themselves stopped, `Actions.force_cleanup` must emit the matching synthetic
+mouse-up for every held left/right click. A Hammerspoon quit, pause, partial
+acquisition failure or refused release must never leave macOS believing a
+virtual mouse button is still down. `test_actions_click_acquisition_transaction.lua`
+drives the pre-output acquisition and retained-debt contract;
+`test_gestures_stop_force_cleanup.lua` pins root stop ordering.
+
 ### project-hs-wrap-selection-clipboard-ownership
 
 _A macOS wrap key is consumed only after Cmd+V and an exact all-type clipboard restore are both owned_
@@ -2223,6 +2248,481 @@ never replace it with a delay or a caller-side unconditional consume. Regression
 coverage is behavioral in
 `tests/unit/modules/shortcuts/test_wrap_selection_atomic_transaction.lua` and
 `tests/unit/modules/shortcuts/test_actions_system.lua`.
+
+### project-hs-clipboard-transaction-ownership
+
+_Every macOS clipboard borrower owns the all-type snapshot before mutation and
+retains failed restoration until exact commit_
+
+<sub>slug: `project_hs_clipboard_transaction_ownership`</sub>
+
+`hs.pasteboard.setContents()` and `writeAllData()` return booleans. A successful
+`pcall` around either method proves only that Lua did not throw; a literal
+`false` still means the native operation refused. Conversely,
+`clearContents()` is a void operation, so a non-throw is its complete contract.
+Every borrower must snapshot all UTI-keyed data with `readAllData()` before the
+first possible mutation, publish a generation owner before entering a
+mutate-then-refuse boundary, and publish its user-visible effect only after the
+native result required by that API commits.
+
+A failed rollback is not the end of the transaction. The exact all-type
+snapshot and its generation remain owned, later borrowers stay excluded, and a
+strongly retained timer retries restoration. A stale callback may restore only
+its own snapshot and can never release a newer generation. This applies to
+keymap replacement, `adapters/text_sender.lua`, wrap/transform actions, web
+search, path/pixel copy and healthcheck copy; using a text-only snapshot in a
+sibling silently loses images, RTF and file URLs.
+
+**Why:** the pre-2026-08-13 paths frequently treated `pcall == true` as native
+success, captured only text, or released ownership after
+`writeAllData(false)`. A hotstring could consume its trigger without pasting a
+replacement and permanently replace the user's non-text clipboard without any
+exception reaching the logger.
+
+**How to apply:** use the shared clipboard/transaction helpers, branch on the
+documented result of each native method, retain restore ownership before
+publishing `Cmd+V`, and test mutate-then-false as well as throws. The causal
+suite includes `test_clipboard_native_result_contract.lua`,
+`test_text_sender_clipboard_serial.lua`,
+`test_clipboard_synthetic_telemetry.lua` and
+`test_wrap_selection_atomic_transaction.lua`.
+
+Related: [[project_hs_wrap_selection_clipboard_ownership]],
+[[project_hs_native_result_contracts]].
+
+### project-hs-native-task-lifecycle-contract
+
+_Native task construction, start and callbacks are three separate failure
+boundaries owned by TaskLifecycle or ShellRunner_
+
+<sub>slug: `project_hs_native_task_lifecycle_contract`</sub>
+
+For `hs.task`, construction may throw or return `nil`, `task:start()` may throw
+or return false, and completion/stream callbacks run after the initiating frame
+has returned. Those are independent contracts. A caller that guards only
+construction can still publish an in-flight latch for a process that never
+started; a caller that guards start can still lose a callback traceback to the
+Hammerspoon Console.
+
+`adapters/task_lifecycle.lua` is the normal owner. It protects construction,
+wraps both callback kinds with `xpcall(debug.traceback)`, and commits start only
+for a truthy native result. `adapters/shell_runner.lua` is the sole lower-level
+raw owner with an equivalent contract. Feature callers still own their exact
+task pin, rollback and cancellation generation; the adapter cannot guess which
+UI lock, prediction owner or temporary resource belongs to them.
+
+**Why:** sibling sites once implemented different subsets of the lifecycle.
+The result was a nil-index error, permanently busy UI, or missing completion
+with no Ergopti file-log entry. A test scoped to one function stayed green while
+another raw `hs.task.new` site retained the same defect.
+
+**How to apply:** never add a raw task outside the two owners. Test nil/throw
+construction, false/throw start, throwing completion, throwing stream and the
+feature-specific rollback. `test_task_lifecycle.lua` drives the behavior;
+`test_raw_task_start_contract.lua` inventories the whole production tree.
+
+Related: [[project_hs_timer_callback_errors_invisible]],
+[[project_hs_process_lifecycle_transaction]].
+
+### project-hs-process-lifecycle-transaction
+
+_Watchers publish only after native activation and retain refused teardown
+handles as callback-inert cleanup debt_
+
+<sub>slug: `project_hs_process_lifecycle_transaction`</sub>
+
+`adapters/process_lifecycle.lua` treats creation, subscription/start, active
+publication and teardown as one transaction. A candidate handle is retained
+before an operation that may partially register and then throw. It becomes
+active only after the documented truthy native result. Stop invalidates the
+generation first; if native unsubscribe/stop refuses, the inert exact handle
+and a cleanup-pending flag remain available for retry instead of being dropped.
+The next start must settle that debt before acquiring a replacement.
+
+Each subscriber is invoked independently under a logged traceback boundary so
+one bad callback neither hides from the file log nor prevents healthy siblings.
+Security-sensitive consumers add their own fail-closed ordering: keylogger
+context is refreshed (or forced secure on failure) before optional browser
+filter setup, the lifecycle watcher commits before the keyboard hook, and the
+keylogger publishes success only after `KeyboardHook.isRunning()` proves the
+native tap is enabled. Invoking `KeyboardHook.start()` is not a commit: native
+construction/start may be contained by the adapter while leaving no live tap.
+If that final commitment fails, the keylogger must run its full stop transaction
+so application watching, persistence producers and partial hooks cannot survive
+behind an enabled feature flag.
+
+**Why:** publishing a watcher before native start, or nil-ing it after a refused
+stop, creates state that says “inactive” while callbacks or native resources may
+still exist. A stale non-secure keylogger context is the high-impact form of the
+same ownership error.
+
+**How to apply:** keep acquisition and cleanup transactional, generation-fence
+every native callback, and require an exact retry path for retained teardown
+debt. Use `test_process_lifecycle_running_guard.lua` and
+`test_activation_callback_fail_closed.lua` as the behavioral controls.
+
+A scheduler-wide/process-wide drain is not an independent teardown sibling. If
+one owner refuses cleanup, controlled reload/exit keeps the same Lua VM alive;
+running `TimerScheduler.cancelAll()` anyway destroys timers that the failed
+owner still needs for retry or diagnostics. Root therefore uses
+`TeardownTransaction.run_with_finalizer()`: all independent owners must settle
+before the global drain runs, and a refused finalizer alone remains retryable.
+`test_teardown_transaction.lua` behaviorally drives owner refusal, sibling
+progress, owner recovery and finalizer retry;
+`test_root_teardown_timer_finalizer.lua` pins the root dependency wiring.
+
+Related: [[project_hs_native_task_lifecycle_contract]],
+[[project_hs_native_result_contracts]].
+
+### project-hs-timer-commit-contract
+
+_Every `TimerScheduler` caller must consume `(handle, committed)` and retain an
+uncommitted live candidate as cleanup debt_
+
+<sub>slug: `project_hs_timer_commit_contract`</sub>
+
+`adapters/timer_scheduler.lua` deliberately returns an exact handle even when
+native activation did not commit. A timer can become active and then throw, and
+its rollback can itself return false or throw. In that state the handle is not a
+usable timer, but it is still the only capability that can release the native
+producer. Testing only the first return value confuses cleanup ownership with
+successful acquisition.
+
+Hammerspoon's native `hs.timer:start()` and `:stop()` are chainable: both return
+the timer object, not a boolean state verdict. Commitment therefore requires the
+separate `timer:running()` probe (`true` after start, `false` after stop). A
+truthy method result with the opposite probed state is failure and the exact
+candidate stays owned. Faithful failure-injection doubles must be able to vary
+the chainable return and native state independently; a stub that always changes
+state whenever it returns `self` cannot expose this class.
+
+Every caller therefore captures both returns and publishes feature state only
+when `committed == true`. The scheduler retains any candidate whose native timer
+remains non-nil; a feature that has a conflicting successor must also retain the
+candidate's local identity, generation-fence before cancellation, and block that
+successor until the exact capability settles. One-shot user actions must
+pre-acquire every required timer before their first visible mutation; otherwise
+a late scheduling refusal can publish half an output.
+
+The rule applies equally to recurring watchers, HTTP deadlines, warmup/retry
+chains, progressive LLM reveals, clipboard restoration, terminator replay,
+sticky modifiers and deferred menu work. `test_timer_scheduler.lua` drives the
+adapter's activate-then-throw and stop-refusal behavior;
+`test_recurring_timer_single_owner.lua` inventories recurring production owners,
+and each feature needs a behavioral failure-injection test as well.
+
+A composite feature must pre-acquire its complete producer set before publishing
+success or its first irreversible output. A timer plus eventtap, a pathwatcher
+plus fallback poller, or several hardware watchers is one transaction: publish
+each exact candidate before its native `start`, roll back siblings in reverse,
+retain refused cleanup as callback-inert debt, and block a successor until that
+debt settles. A callback spawned by a watcher belongs to the watcher's lifecycle
+too; wake/unlock one-shots must not outlive keylogger shutdown, and a click-hold
+must not post `mouseDown` before both release taps commit.
+
+Commitment is transitive through user-facing callers. A menu that persists ON
+and ignores the feature's new `false` return still defeats a correct lifecycle
+module; the caller must compensate the saved preference and repaint OFF. Likewise
+a generation check before `evaluateJavaScript()` is insufficient because WebKit
+yields again: the inner completion must recheck the captured generation and
+exact webview before clipboard, delete or state mutation. The Healthcheck
+two-window completion test and WPM menu lifecycle test are the canonical guards.
+The Apps metrics dashboard is the sibling warning: every focus/prefill/retry,
+bridge callback, native close and inner WebKit completion must carry the same
+generation plus exact webview. `test_metrics_apps_live_update.lua` must keep
+firing old callbacks after close/reopen; merely proving that a subscription or
+timer call exists is a false green.
+
+Structural ownership guards must inventory both `doEvery` and `hs.timer.new`.
+The latter is a repeating primitive even when code intends to stop it after its
+first callback. The pre-fix guard searched only `doEvery` and produced a false
+green while raw WPM, healthcheck, metrics, KC bridge and UI-restore owners
+remained outside the transaction contract. The repaired inventory finds both
+forms; `test_wpm_lifecycle_transactions.lua`,
+`test_metrics_typing_timer_transaction.lua`,
+`test_healthcheck_timer_transaction.lua`,
+`test_kc_bridge_lifecycle_transaction.lua` and
+`test_ui_restore_timer_transaction.lua` drive their actual activation,
+rollback, stale-delivery and cleanup-debt behavior. Allowlisted low-level owners
+still need their own behavioral tests: an allowlist proves inventory, not
+safety.
+
+The final allowlist sweep found four additional raw owners that still inferred
+commitment from a chainable timer method or from handle presence: keylogger
+ingest, the keymap tap watchdog, remap's fallback layout poll, and the
+early-boot launcher backstop. Each now publishes its candidate before start,
+requires `running() == true`, fences queued delivery by identity plus commit
+state, and retains the exact candidate until stop is followed by
+`running() == false`. Their causal guards are
+`test_log_manager_init_transaction.lua`, `test_start_commit_transaction.lua`,
+`test_watchers_teardown_retry.lua`, and `test_launcher_guard.lua`. Do not treat
+the recurring-owner allowlist as a waiver from this behavioral proof.
+
+Related: [[project_hs_process_lifecycle_transaction]],
+[[project_hs_native_result_contracts]].
+
+### project-hs-stateful-native-test-doubles
+
+_A shared Hammerspoon double must preserve independently observable native state;
+intentional failure belongs in the individual test_
+
+<sub>slug: `project_hs_stateful_native_test_doubles`</sub>
+
+A catch-all method stub is unsafe for any native API whose correctness depends on
+write/read-back or on different return shapes. The former shared `hs.canvas`
+double returned one function for every key. Numeric element reads were therefore
+functions, `isShowing()` returned a canvas table instead of a boolean, and the
+real renderer correctly logged failures. The E2E runner still exited green
+because it asserted keyboard output but did not treat those logger lines as test
+failures. One crash regression then relied on that global defect as its own fault
+injector, coupling unrelated tests to a false-green environment.
+
+Shared doubles must retain the state production independently observes: numeric
+elements, frame, visibility, native lifecycle and callback ownership. A test that
+needs a refusal, throw or malformed status injects that fault locally and asserts
+the downstream public postcondition. For canvas this is guarded by
+`tests/unit/ui/test_hs_canvas_stub_contract.lua`; the tooltip crash test injects
+its own failing renderer. Review a green E2E transcript for unexpected ERROR
+lines as well as its exit code—an exception caught by production is still a
+failed test environment when the scenario expected success.
+
+### project-release-gates-scan-versioned-input
+
+_Repository source/parity gates enumerate the Git index, not arbitrary untracked
+runtime or personal files in a developer worktree_
+
+<sub>slug: `project_release_gates_scan_versioned_input`</sub>
+
+A release gate that claims to validate repository source must derive its input
+set from `git ls-files --cached`, including newly staged files but excluding
+untracked editor output, private configuration, build residue and runtime-created
+directories. Walking the raw filesystem made three unrelated gates fail because
+the user's untracked `macos/hammerspoon/personal_shortcuts.lua` used CRLF and an
+empty scratch `macos/p/` directory plus that personal directory enlarged the
+driver-tree union. Adding those names to an ignore list or raising the parity
+baseline would encode one machine's residue and let a future tracked source tree
+escape review.
+
+The index-derived set must itself be non-empty and each driver/source-class gate
+keeps its existing floors. Do not substitute `git ls-files` without `--cached`
+when validating a pending commit: a newly staged source file is part of the
+candidate release even before it exists at `HEAD`. Working-copy tests may still
+open the current bytes at those indexed paths, so unstaged edits to tracked files
+remain covered.
+
+### project-hs-kc-ledger-process-lifecycle
+
+_Metrics OFF keeps the Karabiner physical-key ledger draining; only process
+shutdown owns its teardown_
+
+<sub>slug: `project_hs_kc_ledger_process_lifecycle`</sub>
+
+Karabiner appends physical keycodes to an append-only hand-off log whether the
+keylogger feature is enabled or not. `modules/keylogger/kc_bridge.lua` must
+therefore keep its pathwatcher plus fallback poller alive for the Hammerspoon
+process lifetime. While Metrics is OFF it advances the byte cursor and discards
+records because their original app/time context is unavailable. Stopping those
+producers on ordinary feature OFF leaves the cursor stale; the next ON then
+replays disabled-period input in one burst and attributes it to the current app
+and time.
+
+`modules/keylogger/init.lua`'s `stop()` owns only feature resources. The terminal
+`shutdown()` boundary first tears those down and then stops the exact KC bridge;
+root controlled reload/quit calls `shutdown()`. An abrupt process death needs no
+Lua cleanup because the OS releases both native readers, while the independent
+Karabiner lease guardian separately fences Ergopti remaps. Never solve the
+ledger problem by stopping stock Karabiner processes.
+
+The historical `KcBridge.start()` EOF resync already absorbed ordinary OFF/ON
+backlog, so “feature OFF always replayed keys” is a rejected overstatement. The
+reachable restart defect was a failed resync open/seek/close that still rearmed
+readers; restart must now fail closed until EOF is proven, otherwise later I/O
+recovery can attribute disabled-period rows to the current app and time.
+
+Producer liveness and persistence permission are separate. The bridge used to
+reconstruct a partial policy from pause plus `context_allows_logging()`, which
+does not include the Metrics enable flag; after ON → secure-field filter OFF →
+OFF, the always-on bridge could therefore append while it should only advance
+the cursor. KC now receives the canonical root `M.may_persist()` predicate and
+fails closed if the function is missing or raises. Never copy individual privacy
+gates into another sink.
+
+Cold init is a distinct cursor state. If the first EOF open/seek/close fails but
+the watcher/poller are already active, later `start()` must not return merely
+because producers exist. `_cursor_trusted` records exact EOF proof independently
+and is re-established before persistence can become eligible. The restart and
+cold-init tests must remain separate because `_watchers_active` differs.
+
+The bridge's pathwatcher and poller are one acquisition transaction: publish
+each exact candidate before activation, roll the watcher back if the poller
+fails, generation-fence queued callbacks, retain refused cleanup debt and block
+a successor until it settles. `test_kc_bridge_offset_advances_while_disabled.lua`
+proves the semantic OFF/ON behavior;
+`test_kc_bridge_lifecycle_transaction.lua` proves partial acquisition and
+teardown ownership; `test_init_shutdown_quit_ke.lua` pins terminal root wiring.
+
+Related: [[project-hs-karabiner-exact-lease-isolation]],
+[[project-hs-timer-commit-contract]].
+
+### project-hs-input-source-single-owner
+
+_`hs.keycodes.inputSourceChanged` is a process-wide setter, so one broker must
+multiplex every Ergopti subscriber_
+
+<sub>slug: `project_hs_input_source_single_owner`</sub>
+
+Calling `hs.keycodes.inputSourceChanged(callback)` does not add a listener: it
+replaces the previous callback. Independent registration by keylogger and remap
+watchers silently evicted whichever subsystem initialized first, so a layout
+switch could refresh Karabiner while leaving logged context stale, or vice versa.
+
+`adapters/input_source_broker.lua` is the sole native setter. Subscribers use
+stable IDs; dispatch runs a mutation-safe snapshot under independent logged
+traceback boundaries. The final unsubscribe unsets the native slot, and an
+unset refusal keeps an inert cleanup obligation for retry. The whole-tree guard
+`test_input_source_single_native_owner.lua` must enumerate every direct setter,
+while `test_input_source_broker.lua` drives replacement, callback failure and
+teardown behavior.
+
+Related: [[project_hs_process_lifecycle_transaction]].
+
+### project-hs-ordered-startup-transaction
+
+_Required input owners commit in order and roll back in reverse before boot can
+publish success_
+
+<sub>slug: `project_hs_ordered_startup_transaction`</sub>
+
+Root startup is not a list of best-effort `pcall`s. If gestures commit and the
+shortcuts or script-control tap then returns false or throws, continuing boot
+publishes a keyboard with only part of its control plane alive. Required steps
+must return exact success; an optional unavailable feature must be declared as
+such rather than silently downgraded by its caller.
+
+`infra/startup_transaction.lua` starts ordered descriptors, records each exact
+commit, and rolls committed predecessors back in reverse on the first refusal.
+Rollback failures remain visible cleanup debt and boot fails closed. The root
+source guard connects the non-loadable native bootstrap to the behavioral
+coordinator tests; neither a source grep nor a successful later subsystem proves
+that an earlier partial owner was released.
+
+The same literal-success rule applies below the root. An injected `M.init()` that
+can reject dependencies must return a boolean, duplicate init is successful only
+for the identical dependency set, and its caller must stop on `~= true`. Logging
+an init error and then enabling the parent feature is a split state, not graceful
+degradation; keylogger `ContextTracker` and `Watchers` are the canonical tests.
+
+Related: [[project_hs_process_lifecycle_transaction]],
+[[project-macos-script-control-tap-lifecycle]].
+
+### project-hs-keylogger-append-commit
+
+_A non-throwing file-write refusal must retain the exact detached snapshot and
+FIFO head_
+
+<sub>slug: `project_hs_keylogger_append_commit`</sub>
+
+Lua file methods can return `nil, error` for `ENOSPC`, permission loss or a
+broken volume without throwing. `pcall(fh.write)` proves only that the call
+returned. The keylogger's append transaction commits only after unbuffered-mode
+configuration and `write` both report their documented success.
+
+The eventtap-safe flush swaps live typing state into an in-memory FIFO. The drain
+never advances that head on a non-throwing refusal, so OFF, quit or a later log
+entry cannot discard or overtake the only detached snapshot. Exact ownership is
+encoded behaviorally in `test_log_manager_append_transaction.lua`; tests that
+only spy for a call to `write` are false green for this class.
+
+Related: [[project_hs_native_result_contracts]],
+[[project-macos-eventtap-no-blocking]].
+
+### project-hs-http-timeout-before-dispatch
+
+_An asynchronous request is not dispatchable until its deadline capability has
+committed_
+
+<sub>slug: `project_hs_http_timeout_before_dispatch`</sub>
+
+Network dispatch before timeout acquisition creates a request that can remain
+active forever if timer construction or start refuses. The inverse cleanup race
+also matters: a terminal response can win while native timer stop refuses, and
+a successor must not reuse that slot over the retained deadline capability.
+
+`adapters/http_client.lua` acquires the timeout transaction before POST/GET,
+tracks request activity independently from Hammerspoon's normally nil return,
+and generation-fences synchronous, duplicate and superseded completions. Timer
+cleanup debt blocks the next request until exact release. Backend-specific hard
+deadlines follow the same ordering. `test_http_client_timeout_transaction.lua`
+drives constructor/start failure, partial acquisition, terminal stop refusal and
+synchronous completion; the older superseded-response test covers a separate
+generation property and does not prove deadline ownership.
+
+Related: [[project_hs_timer_commit_contract]].
+
+### project-hs-ignored-window-pass-through
+
+_Ignored/private applications intentionally bypass every Ergopti text feature,
+including repeat and preview_
+
+<sub>slug: `project_hs_ignored_window_pass_through`</sub>
+
+The early ignored-window boundary in `modules/keymap/init.lua` is a privacy and
+text-ownership decision, not an optimization. Known ignored destinations pass
+physical input through before modifier/text reads, keylogger delivery,
+interceptors, hotstrings, repeat or tooltip preview. An unknown classification
+is quarantined rather than guessed normal. Crossing normal → ignored/unknown →
+normal discards the old text buffer because Ergopti did not observe edits made
+inside the destination.
+
+**Why:** an older audit proposed routing repeat around the early return. That
+would make a feature active in an application where every other Ergopti text
+feature is deliberately disabled, and could combine pre-private text with
+unobserved private edits. The surviving `_tc_is_ignored` plumbing below the
+early return is dead cleanup, not permission to revive output.
+
+**How to apply:** do not special-case repeat, preview or another text feature
+around the total pass-through boundary. Drive the real eventtap ordering with
+`test_ignored_window_deferred_buffer_snapshot.lua`; a source grep of an
+`is_ignored` argument is not proof of reachability.
+
+Related: [[project_hs_synthetic_injection_choke_point]].
+
+### project-hs-native-result-contracts
+
+_A successful pcall is not operational success; interpret each Hammerspoon
+API's exact documented result_
+
+<sub>slug: `project_hs_native_result_contracts`</sub>
+
+There is no repository-wide rule that “native success equals literal true”.
+The contract belongs to each API:
+
+- pasteboard `setContents()` / `writeAllData()` and application
+  launch/activation use booleans, so false is failure;
+- pasteboard `clearContents()` is void, so non-throw is success;
+- `hs.window:focus()` returns the window object for chaining, so that non-false
+  object is success and an exact-true check is itself a regression;
+- watcher start/subscribe methods return their object, so acquisition needs a
+  truthy result plus retained exact-handle ownership.
+
+`pcall` and `xpcall` report only whether an exception escaped. Code that tests
+only their first return value silently converts ordinary native refusal into a
+success notification, consumed key, skipped fallback or leaked lifecycle.
+
+**Why:** this class produced clipboard data loss, stale process watchers and an
+application fallback that stopped after a refused activation. It also produced
+a plausible but false proposed fix requiring literal true from
+`hs.window:focus()`.
+
+**How to apply:** check Hammerspoon's documented return contract before writing
+the branch, preserve the operational value separately from protected-call
+success, and include false/nil/object controls in the test. See
+`test_activation_return_contract.lua`,
+`test_clipboard_native_result_contract.lua` and
+`test_process_lifecycle_running_guard.lua`.
+
+Related: [[project_hs_clipboard_transaction_ownership]],
+[[project_hs_process_lifecycle_transaction]].
 
 ### project-hs-onboarding-config-schema
 
@@ -2465,7 +2965,9 @@ Root-caused 2026-06-15 from a live bug report: the AI menu was disabled, yet `ap
 
 ### project-macos-eventtap-no-blocking
 
-_Never run blocking work (osascript / hs.execute subprocesses) synchronously inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and the shortcut dies. Defer with hs.timer.doAfter(0, …)._
+_An eventtap producer may do only bounded in-memory work. Leaving the callback with
+`hs.timer.doAfter(0, …)` prevents that callback from owning the later work, but it
+does not move the work off Hammerspoon's main run loop._
 
 <sub>slug: `project_macos_eventtap_no_blocking`</sub>
 
@@ -2473,9 +2975,39 @@ The script-control shortcut (AltGr+Enter → pause / resume) is an `hs.eventtap`
 
 **Why it's a trap:** a CGEventTap callback that does not return fast enough is disabled by macOS with `kCGEventTapDisabledByTimeout`. Once disabled the tap stops receiving events entirely — so after the _first_ AltGr+Enter (which still toggled), the tap was dead and AltGr+Enter did **nothing at all** (« rien du tout »), neither pause nor resume. The bug only surfaced once `ab20abd52` made the layout switch actually fire (before, a separate regression meant `set_input_source` silently no-op'd), so the blocking call had never really run inside the tap before — a textbook « fixing one bug unmasks another » sequence.
 
-**Fix:** the layout switch is deferred onto the next run-loop cycle so the eventtap callback returns immediately. The decision + deferral lives in `menu_keyboard_layout.schedule_pause_layout_switch(is_paused, state, schedule?)` (scheduler injectable for tests; defaults to `hs.timer.doAfter(0, …)`), and `ui/menu/init.lua`'s `_on_pause_change` listener calls it. Regression test in `tests/unit/ui/menu/test_menu_keyboard_layout.lua` asserts the switch is _scheduled_, never run synchronously.
+**Historical-site fix:** the layout switch is deferred onto the next run-loop cycle so the eventtap callback returns immediately. The decision + deferral lives in `menu_keyboard_layout.schedule_pause_layout_switch(is_paused, state, schedule?)` (scheduler injectable for tests; defaults to `hs.timer.doAfter(0, …)`), and `ui/menu/init.lua`'s `_on_pause_change` listener calls it. Regression test in `tests/unit/ui/menu/test_menu_keyboard_layout.lua` asserts the switch is _scheduled_, never run synchronously. This is sufficient for the narrow callback-timeout ownership claim, not proof that a later blocking operation cannot stall the same main loop.
 
-**How to apply:** any work done inside an `hs.eventtap` callback — or anything it calls synchronously (listeners, menu rebuilds, layout switches) — must be cheap. If it shells out, touches TIS / Carbon, or does heavy I/O, wrap it in `hs.timer.doAfter(0, …)`. The gesture click-hold release path learned the same lesson the same day (deferred synthetic mouse events off the keyDown). See [[project-suspend-pause-invariant]] for the pause reactor that drives `_on_pause_change`.
+**Same class found 2026-08-13 — the logger sink itself.** The real keyDown path
+calls `Logger.trace` / `Logger.done` / `Logger.debug` for accepted expansions and
+`HotPath.log_if_slow` before returning. `infra/logger.lua` then performs console
+output, file-open/date checks, `fh:write`, topical fan-out, every-fortieth DEBUG
+`flush`, and immediate WARNING/ERROR mirror/notification work synchronously.
+Batching DEBUG flushes reduced one cost but did not establish zero I/O in the
+callback. The structural guard `tests/unit/test_hot_path_costs.lua:40-82` was a
+false green because it looked only for `immediate == false`, a DEBUG-derived
+argument and `FLUSH_EVERY_N_DEBUG`. This is audit `HS-H-34`; the blind guard is
+`HS-M-20`.
+
+**Required architecture:** publish already-redacted immutable records into a
+bounded in-memory mailbox; start one persistent out-of-process writer before any
+input tap; retain each ordered batch until explicit ACK; retry the exact head on
+refusal; and reserve WARNING/ERROR ownership independently from DEBUG overflow.
+The worker owns rotation, unified/topical/error fan-out, open/write/flush/close
+and purge. Fail closed before input activation if that ownership cannot be
+established. A timer-only drain was prototyped and rejected: it exits the
+eventtap stack but still performs disk I/O on Hammerspoon's main loop.
+
+**How to apply:** inventory the complete transitive call graph of every
+`hs.eventtap` callback. Producers may classify, mutate bounded memory and enqueue;
+they must not shell out, touch filesystem sinks, render UI, notify, or call a
+logger that does those things synchronously. Use `doAfter(0)` only when the
+guarantee is specifically “after eventtap return” and the later operation is
+known cheap. For blocking work, use an owned task/worker plus generation and
+ACK/terminal-result fencing. Regression tests must drive the real callback and
+assert zero harmful operations before it returns; finding a scheduling string is
+not causal proof. The gesture click-hold release path learned the narrow
+return-order lesson the same day. See [[project-suspend-pause-invariant]] for the
+pause reactor that drives `_on_pause_change`.
 
 ### project-macos-script-control-tap-lifecycle
 
@@ -2485,7 +3017,16 @@ _The script-control eventtap (AltGr+Enter/Backspace/Escape) is keycode-based and
 
 AltGr (right_command / right_option) + Enter / Backspace / Escape → pause-toggle / reload / quit are served by one `hs.eventtap` in `modules/shortcuts/script_control.lua` (`handle_key`), keyed on **physical key codes** (Karabiner sentinels F13/F14/F15 + a right-cmd fallback). It is layout-independent and is the one thing that must work in EVERY state (paused, mid-layout-switch, KE-off).
 
-**Trap 1 — `stop()`/`start()` is not a round-trip.** `shortcuts.stop()` stops all three sub-systems including ScriptControl; `shortcuts.start()` starts only Bindings + KeyboardShortcuts (ScriptControl has its own `start_script_control`). So a `stop(); start()` used as a "rebind" **kills the script-control eventtap and never revives it** — AltGr+Enter dies on the first layout switch and neither resume nor the menu button brings it back. **Rebind layout-dependent hotkeys with `pause_bindings()` / `resume_bindings()`** and leave the keycode-based eventtap untouched.
+**Trap 1 — lifecycle ownership is intentionally asymmetric.** The aggregate
+`shortcuts.start()` now commits Bindings and KeyboardShortcuts together; the
+dedicated ScriptControl tap still has its own `start_script_control()` and must
+not be tied to the user's Shortcuts preference. A feature toggle, pause or layout
+rebind therefore uses `pause_bindings()` / `resume_bindings()` and leaves the
+keycode-based eventtap untouched. A full terminal `shortcuts.stop()` may release
+all three only as part of the root teardown transaction. The pre-2026-08-13 text
+that said aggregate start owned Bindings alone was implementation history, not a
+current contract; preserving it would reintroduce the cold-boot missing-hotkey
+bug while trying to protect ScriptControl.
 
 **Trap 2 — the pause-layout feature triggers the input-source watcher.** With `layout_pause_switch_enabled`, every pause switches the macOS layout, which fires Karabiner's `start_input_source_watcher`; that used to `regenerate()` the FULL Ergopti config and re-arm the binding hotkeys, silently undoing the pause (full remapping back, user shortcuts live mid-pause). The watcher callback now short-circuits on `script_control.is_paused()`, leaving the paused KE config (`Generator.build_paused_script_control_rules`, right_command + right_option × 3 slots) in place until the real resume regenerates it.
 
@@ -2591,9 +3132,16 @@ _Hammerspoon swallows a throw inside an `hs.timer` callback — that silent-deat
 
 <sub>slug: `project_hs_timer_callback_errors_invisible`</sub>
 
-Hammerspoon runs timer callbacks under its own protected call and prints the traceback to its **Console**, not through `lib.logger` — so the collected file log used to just stop mid-path with no `[ERROR]`. This masked the « vert mais aucune prédiction » bug: `prediction_engine.perform_check` (fired by an `hs.timer.delayed`) called `StreamingHandler.ngram_predict`, a function the production `streaming_handler.lua` never implemented. Calling a `nil` field threw, the timer swallowed it, and the log showed `Request signature accepted` but never the dispatch `[START] LLM request`. **Worse, the unit test stubbed `ngram_predict`, so the suite stayed green while production crashed on every keystroke-driven request.**
+Hammerspoon runs timer callbacks under its own protected call and prints the traceback to its **Console**, not through `infra.logger` — so the collected file log used to just stop mid-path with no `[ERROR]`. This masked the « vert mais aucune prédiction » bug: `prediction_engine.perform_check` (fired by an `hs.timer.delayed`) called `StreamingHandler.ngram_predict`, a function the production `streaming_handler.lua` never implemented. Calling a `nil` field threw, the timer swallowed it, and the log showed `Request signature accepted` but never the dispatch `[START] LLM request`. **Worse, the unit test stubbed `ngram_predict`, so the suite stayed green while production crashed on every keystroke-driven request.**
 
-**Mitigation now in place:** `lib/logger.lua` `M.install_runtime_error_capture()` wraps `hs.timer.{doAfter,new,delayed.new}` callbacks in `xpcall` (logging ERROR + traceback) and tees `print()` into the file log. Do not remove it — and do not assume it covers eventtaps.
+**Mitigation now in place:** `infra/logger.lua` `M.install_runtime_error_capture()` wraps `hs.timer.{doAfter,new,delayed.new}` callbacks in `xpcall` (logging ERROR + traceback) and tees `print()` into the file log. `init.lua` installs it before runtime modules start. Do not remove it — and do not assume it covers raw `hs.task`, arbitrary watcher subscribers, pre-install callbacks, eventtaps, or a local `pcall` whose failure is deliberately discarded. Those boundaries still need their own logged ownership contract.
+
+**Separate guarantee:** making a callback failure visible does not make the
+logger safe to call from an eventtap. As re-derived in `HS-H-34`, the current
+sink performs synchronous console/filesystem work. Preserve this capture scope,
+but move persistence behind the ACKed worker described in
+[[project-macos-eventtap-no-blocking]]; otherwise an error-reporting improvement
+can itself extend the callback stall it is trying to diagnose.
 
 **Still on you — keep test stubs faithful to the real module's exported surface.** A stub that provides a method production doesn't have turns a hard crash into a green test. When stubbing a singleton (`StreamingHandler`, `PromptBuilder`, `AppFilter`, `ApiCommon`), mirror only the functions the real module actually exports, and add a regression that drives the real call path. `test_prediction_engine.lua` §8 asserts StreamingHandler exposes no `ngram_predict` and that `perform_check` reaches `fetch_llm_prediction`.
 
