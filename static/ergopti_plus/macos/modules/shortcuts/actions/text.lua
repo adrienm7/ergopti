@@ -191,6 +191,12 @@ end
 local _transform_in_flight = false
 -- Same guard for the wrap path, declared beside its sibling so the pair stays visible.
 local _wrap_in_flight      = false
+-- The restore timer is retained explicitly. A one-shot native timer that is only
+-- referenced by a local in wrap_selection may be collected before it restores the
+-- user's clipboard, and a late callback from an older wrap must never release the
+-- ownership bit of a newer one.
+local _wrap_restore_timer  = nil
+local _wrap_generation     = 0
 local TRANSFORM_LOCK_TIMEOUT_SEC = 2.0
 
 -- Identity of the transform that currently owns the clipboard. The failsafe
@@ -439,40 +445,212 @@ function M.build_active_wrap_pairs(symbol_states, custom_symbols)
 	return result
 end
 
+--- Defers wrap diagnostics so a pasteboard/timer failure never opens and flushes
+--- the file logger from the keyDown eventtap that called wrap_selection.
+--- @param level string Logger method name.
+--- @param message string Format string.
+--- @param ... any Format arguments.
+--- @return boolean scheduled
+local function defer_wrap_diagnostic(level, message, ...)
+	local args = table.pack(...)
+	if type(SyntheticInput.defer_after_callback) ~= "function" then return false end
+	local ok, scheduled = pcall(SyntheticInput.defer_after_callback,
+		"wrap selection diagnostic", function()
+			local sink = Logger[level]
+			if type(sink) == "function" then
+				pcall(sink, LOG, message, table.unpack(args, 1, args.n))
+			end
+		end)
+	return ok and scheduled == true
+end
+
+
 --- Replaces an already-read, non-empty selection with ``left .. sel .. right``
---- via the clipboard. The caller MUST have confirmed a selection exists (use
---- read_ax_selection); this never types a bare symbol, so it is only ever called
---- on the path that has decided to suppress the original keystroke.
+--- via one atomic clipboard transaction. True means the Cmd+V action and the
+--- exact all-type clipboard restore are both armed, so the caller may consume
+--- the physical wrap symbol. False means no paste was committed and the caller
+--- must let that symbol pass through.
 --- @param sel string The current selection text (non-empty).
 --- @param left string Opening symbol to prepend.
 --- @param right string Closing symbol to append.
+--- @return boolean committed
 function M.wrap_selection(sel, left, right)
-	-- The missed sibling of _transform_in_flight, twenty lines up in this same
-	-- file. Without it a second wrap fired while the first is still holding the
-	-- clipboard snapshots the text the FIRST one just wrote, then "restores" it
-	-- 250 ms later — so the user's real clipboard is replaced by a wrapped
-	-- fragment of their own selection and is gone for good.
 	if _wrap_in_flight then
-		Logger.debug(LOG, "Wrap already in flight — ignoring the second request.")
-		return
+		defer_wrap_diagnostic("debug", "Wrap declined: another clipboard transaction is active.")
+		return false
 	end
+	if type(sel) ~= "string" or sel == ""
+		or type(left) ~= "string" or type(right) ~= "string" then
+		defer_wrap_diagnostic("error", "Wrap declined: invalid selection or delimiter arguments.")
+		return false
+	end
+
+	_wrap_generation = _wrap_generation + 1
+	local transaction = {
+		generation = _wrap_generation,
+		active = true,
+		committed = false,
+		paste_dispatched = false,
+		mutated = false,
+		prior = nil,
+		prior_empty = true,
+		timer = nil,
+	}
 	_wrap_in_flight = true
-	Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
-	local prior = pasteboard.getContents()
-	pcall(pasteboard.setContents, left .. sel .. right)
-	timer.doAfter(0, function()
-		SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
-		timer.doAfter(0.25, function()
-			pcall(function()
-				if prior and prior ~= "" then pasteboard.setContents(prior)
-				else pasteboard.clearContents() end
-			end)
-			-- Released only after the restore, so the window the guard covers is
-			-- exactly the window in which `prior` is the value that must survive.
+	local schedule_restore
+	local attempt_restore
+
+	local function restore_prior()
+		local ok, result
+		if transaction.prior_empty then
+			ok, result = pcall(pasteboard.clearContents)
+		else
+			ok, result = pcall(pasteboard.writeAllData, transaction.prior)
+		end
+		if not ok or result == false then return false, tostring(result) end
+		return true
+	end
+
+	local function release()
+		transaction.active = false
+		if transaction.generation == _wrap_generation then
 			_wrap_in_flight = false
-			Logger.done(LOG, "Selection wrapped.")
+		end
+	end
+
+	local function detach_timer(should_stop)
+		local handle = transaction.timer
+		transaction.timer = nil
+		if _wrap_restore_timer == handle then _wrap_restore_timer = nil end
+		if should_stop and handle and type(handle.stop) == "function" then
+			pcall(handle.stop, handle)
+		end
+	end
+
+	local function rollback(reason, detail)
+		detach_timer(true)
+		local restored, restore_error = true, nil
+		if transaction.mutated then
+			restored, restore_error = restore_prior()
+			if restored then transaction.mutated = false end
+		end
+		defer_wrap_diagnostic("error", "Wrap transaction aborted at %s: %s.",
+			reason, tostring(detail or "operation failed"))
+		if not restored then
+			defer_wrap_diagnostic("error",
+				"Wrap rollback could not restore the original clipboard: %s.",
+				tostring(restore_error))
+			-- The clipboard still belongs to this transaction. Keep the ownership
+			-- latch closed and reuse the same autonomous recovery path as a failed
+			-- post-paste restore; otherwise a second wrap can snapshot corrupted data.
+			transaction.committed = true
+			attempt_restore(true)
+			return false
+		end
+		release()
+		return false
+	end
+
+	local function finish_restore()
+		transaction.mutated = false
+		release()
+		if transaction.paste_dispatched then
+			pcall(Logger.debug, LOG, "Selection wrapped and clipboard restored.")
+		end
+	end
+
+	schedule_restore = function(delay)
+		local handle = nil
+		local callback_ran = false
+		local timer_ok, timer_or_error = pcall(timer.doAfter, delay, function()
+			callback_ran = true
+			if not transaction.active or not transaction.committed
+				or transaction.generation ~= _wrap_generation
+				or _wrap_restore_timer ~= handle then
+				return
+			end
+			transaction.timer = nil
+			_wrap_restore_timer = nil
+			attempt_restore(true)
 		end)
-	end)
+		if not timer_ok or timer_or_error == nil or timer_or_error == false then
+			return false, timer_or_error
+		end
+		handle = timer_or_error
+		if callback_ran then
+			if type(handle.stop) == "function" then pcall(handle.stop, handle) end
+			return false, "restore timer fired before transaction commit"
+		end
+		transaction.timer = handle
+		_wrap_restore_timer = handle
+		return true
+	end
+
+	attempt_restore = function(allow_lifecycle_fallback)
+		if not transaction.active or not transaction.committed
+			or transaction.generation ~= _wrap_generation then
+			return false
+		end
+		local restored, restore_error = restore_prior()
+		if restored then
+			finish_restore()
+			return true
+		end
+		defer_wrap_diagnostic("error", "Wrap clipboard restore failed: %s.",
+			tostring(restore_error))
+		local retry_scheduled = select(1, schedule_restore(PASTE_SETTLE_SEC))
+		if retry_scheduled then return false end
+
+		-- A native timer allocation can fail transiently. The shared lifecycle
+		-- dispatcher has independent retained primary/backup handles, so use it as
+		-- one last autonomous restore route without releasing clipboard ownership.
+		if allow_lifecycle_fallback
+			and type(SyntheticInput.defer_after_callback) == "function" then
+			local defer_ok, deferred = pcall(SyntheticInput.defer_after_callback,
+				"wrap clipboard restore retry", function()
+					attempt_restore(false)
+				end)
+			if defer_ok and deferred == true then return false end
+		end
+		defer_wrap_diagnostic("error",
+			"Wrap clipboard restore remains pending; no retry dispatcher was available.")
+		return false
+	end
+
+	local snapshot_ok, prior_or_error = pcall(pasteboard.readAllData)
+	if not snapshot_ok then
+		return rollback("clipboard snapshot", prior_or_error)
+	end
+	if prior_or_error ~= nil and type(prior_or_error) ~= "table" then
+		return rollback("clipboard snapshot", "readAllData returned " .. type(prior_or_error))
+	end
+	transaction.prior = prior_or_error
+	transaction.prior_empty = prior_or_error == nil or next(prior_or_error) == nil
+
+	-- Mark the clipboard conservatively before the call: a throwing pasteboard
+	-- implementation may have changed its contents before reporting the error.
+	transaction.mutated = true
+	local write_ok, write_result = pcall(pasteboard.setContents, left .. sel .. right)
+	if not write_ok or write_result == false then
+		return rollback("clipboard write", write_result)
+	end
+
+	-- Arm restoration before publishing Cmd+V. If allocation fails, rolling the
+	-- clipboard back and passing the user's physical symbol is still possible.
+	local timer_scheduled, timer_error = schedule_restore(RESTORE_DELAY_SEC)
+	if not timer_scheduled then
+		return rollback("restore timer", timer_error)
+	end
+
+	local emit_ok, emitted_or_error = pcall(
+		SyntheticInput.emit_key_stroke, { "cmd" }, "v", KEYSTROKE_NO_DELAY_US)
+	if not emit_ok or emitted_or_error ~= true then
+		return rollback("paste dispatch", emitted_or_error)
+	end
+
+	transaction.paste_dispatched = true
+	transaction.committed = true
+	return true
 end
 
 --- Wraps the current selection with left/right symbols, or types the symbol if

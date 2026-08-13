@@ -888,9 +888,25 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 		end
 
 		-- Resolve the live symbol table on every keystroke so menu changes take effect immediately
-		local pairs_tbl = type(get_wrap_pairs) == "function"
-			and get_wrap_pairs() or text_acts.WRAP_PAIRS
+		local ok_pairs, pairs_tbl = pcall(function()
+			return type(get_wrap_pairs) == "function" and get_wrap_pairs() or text_acts.WRAP_PAIRS
+		end)
+		if not ok_pairs or type(pairs_tbl) ~= "table" then
+			if not ok_pairs then
+				SyntheticInput.defer_after_callback("wrap-pair lookup diagnostic", function()
+					Logger.error(LOG, "Could not resolve active wrap pairs: %s.", tostring(pairs_tbl))
+				end)
+			end
+			return finish_tap(false, fence_events)
+		end
 		local pair = pairs_tbl[ch]
+		if pair ~= nil and (type(pair) ~= "table" or type(pair.left) ~= "string"
+			or type(pair.right) ~= "string") then
+			SyntheticInput.defer_after_callback("wrap-pair validation diagnostic", function()
+				Logger.error(LOG, "Invalid active wrap pair for key %q.", ch)
+			end)
+			return finish_tap(false, fence_events)
+		end
 
 		-- Probe the selection ONLY for configured wrap symbols (avoids an AX call on
 		-- every other keystroke). nil = nothing selected OR the app hides
@@ -904,7 +920,20 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 		end
 
 		if decision ~= "wrap" then return finish_tap(false, fence_events) end
-		text_acts.wrap_selection(sel, pair.left, pair.right)
+		local ok_wrap, wrapped_or_err = pcall(
+			text_acts.wrap_selection, sel, pair.left, pair.right)
+		if not ok_wrap then
+			SyntheticInput.defer_after_callback("wrap-selection diagnostic", function()
+				Logger.error(LOG, "Could not wrap the active selection: %s.",
+					tostring(wrapped_or_err))
+			end)
+			return finish_tap(false, fence_events)
+		end
+		-- A match is not an output. wrap_selection may deliberately decline while a
+		-- clipboard transaction is already in flight (or after an adapter failure).
+		-- Suppress the physical symbol and invalidate the AX cache only after the
+		-- callee confirms that it actually scheduled the replacement.
+		if wrapped_or_err ~= true then return finish_tap(false, fence_events) end
 		mark_wrap_selection_consumed()
 		return finish_tap(true, fence_events)
 	end)

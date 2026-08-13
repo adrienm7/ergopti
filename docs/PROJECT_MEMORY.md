@@ -58,6 +58,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-hs-perf-profilers-and-case-conform](#project-hs-perf-profilers-and-case-conform) — Profilers boot/hot-path macOS, chemin rapide case-conform, cache du menubar, snapshot TOML, et le piege Escape arme au premier affichage
 - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip visual style is shared across drivers via _shared/modules/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different
 - [project-hs-karabiner-exact-lease-isolation](#project-hs-karabiner-exact-lease-isolation) — Ergopti owns token-scoped Karabiner rules and variables, never Karabiner's shared UI, services, grabber, or VirtualHID processes
+- [project-hs-wrap-selection-clipboard-ownership](#project-hs-wrap-selection-clipboard-ownership) — A macOS wrap key is consumed only after Cmd+V and an exact all-type clipboard restore are both owned
 - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — The first-run wizard must write the canonical HS config schema, and the "ready" notification was removed
 - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Ou vivent les defauts du module keymap, et pourquoi une seule place
 - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — Every macOS keyboard injector uses one exact-tag transaction adapter; source PID, timing and character equality are never synthetic identity
@@ -2147,6 +2148,42 @@ The guardian retries an exact fence until two successful transports span the con
 Generated configuration is merged rather than replacing the user's document. Profiles, devices, parameters, virtual-HID settings, and untagged complex modifications remain personal data. Current managed rules are removed only by exact marker. Historical unleased blocks are migrated only when the complete canonical structure is provable; ambiguity must fail closed without deleting or rewriting a personal rule. Disabled boot may clean a proven historical block but must not start a lease, lease-dependent Lua watcher, hotkey, UI, or stock Karabiner process. The separately registered Ergopti guardian may remain idle, but without a durable token record it has no remap authority and no effect on personal Karabiner rules.
 
 Regression coverage: `tests/meta/test_karabiner_stock_process_isolation.lua` scans every production runtime source for stock-process mutations and legacy ownership markers; `tests/unit/platform/remap/test_lease_controller.lua`, `tests/unit/platform/remap/test_guardian_auto_recovery.lua`, native `KarabinerLeaseWorkerTests`, `test_generator_managed_lease.lua`, `test_disabled_legacy_cleanup.lua`, and `test_kc_suppression_requires_live_lease.lua` exercise token isolation, abrupt EOF/SIGKILL, guardian restart, outer/inner loss, direct-child timeouts, approval loss, heartbeat recovery, migration, disabled mode, and lease-bound resources. `tools/test/test-macos-remap-launchagent.cjs` verifies that the exact `com.ergoptiplus.remap-guardian` plist is packaged with `RunAtLoad` and `KeepAlive`. A source grep alone is insufficient for async cleanup: native `testGuardianLeavesPersonalKarabinerProcesses` keeps unrelated UI, Core Service/grabber, console-server, observer, and VirtualHID-named sibling processes alive while the real POSIX executor fences only the exact token twice.
+
+### project-hs-wrap-selection-clipboard-ownership
+
+_A macOS wrap key is consumed only after Cmd+V and an exact all-type clipboard restore are both owned_
+
+<sub>slug: `project_hs_wrap_selection_clipboard_ownership`</sub>
+
+`modules/shortcuts/actions/system.lua` runs the selection-wrap path from a raw
+keyboard eventtap. It may suppress the user's physical delimiter only when
+`modules/shortcuts/actions/text.lua` returns literal `true`. A missing/invalid
+pair table, an AX/clipboard/timer/synthetic-input exception, an in-flight wrap,
+or any ordinary false/nil result must pass the original delimiter through and
+must not invalidate the cached AX selection. A match is not an output.
+
+`wrap_selection()` owns one generation-scoped clipboard transaction. It
+snapshots every pasteboard type with `readAllData()`, mutates the clipboard,
+strongly retains the exact restore timer before publishing Cmd+V, and returns
+true only after the paste dispatch succeeds. Every earlier failure restores the
+whole snapshot before releasing the latch. If that rollback fails, the latch
+stays closed and an autonomous retry keeps ownership until exact restoration;
+a stale retained callback cannot release a newer generation. Diagnostics are
+queued off the HID callback so an adapter failure cannot turn error reporting
+into an eventtap timeout.
+
+**Why:** the earlier implementation protected only the happy-path overlap. It
+ignored `setContents`/timer/emit results, saved text instead of all pasteboard
+types, left one-shot timers unretained, and the eventtap consumed the physical
+key regardless of whether any paste was scheduled. A failed operation could
+therefore produce missing output or permanently replace an image/RTF/file-URL
+clipboard while logging nothing.
+
+**How to apply:** preserve the literal-true handoff and the transaction order;
+never replace it with a delay or a caller-side unconditional consume. Regression
+coverage is behavioral in
+`tests/unit/modules/shortcuts/test_wrap_selection_atomic_transaction.lua` and
+`tests/unit/modules/shortcuts/test_actions_system.lua`.
 
 ### project-hs-onboarding-config-schema
 
