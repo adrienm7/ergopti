@@ -35,6 +35,12 @@ local function fresh_harness()
 		layout_changes = {},
 		read_lifecycle = {},
 		launches = {},
+		bundle_launch_result = true,
+		name_launch_result = true,
+		activation_result = true,
+		activations = 0,
+		ordered_windows = {},
+		focused_window = nil,
 	}
 
 	local function raw_timer(kind, callback)
@@ -169,13 +175,20 @@ local function fresh_harness()
 		frontmostApplication = function() return front_app end,
 		launchOrFocusByBundleID = function(bundle_id)
 			h.launches[#h.launches + 1] = bundle_id
-			return true
+			return h.bundle_launch_result
 		end,
 		launchOrFocus = function(name)
 			h.launches[#h.launches + 1] = name
-			return true
+			return h.name_launch_result
 		end,
-		get = function() return nil end,
+		get = function()
+			return {
+				activate = function()
+					h.activations = h.activations + 1
+					return h.activation_result
+				end,
+			}
+		end,
 	}
 
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
@@ -193,6 +206,10 @@ local function fresh_harness()
 			doEvery = function(_delay, callback) return raw_timer("poll", callback) end,
 		},
 		application = application,
+		window = {
+			orderedWindows = function() return h.ordered_windows end,
+			focusedWindow = function() return h.focused_window end,
+		},
 	})
 	return h
 end
@@ -392,6 +409,27 @@ end)
 -- =========================================
 
 helpers.describe("watchers app-switch teardown is exact and retryable", function()
+	helpers.it("falls through false launch results to the application object", function()
+		local h = fresh_harness()
+		h.bundle_launch_result = false
+		h.name_launch_result = false
+		h.activation_result = true
+		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
+		local watcher = h.app_watchers[1]
+		watcher.callback("Other", 1, {
+			bundleID = function() return "com.example.other" end,
+			name = function() return "Other" end,
+		})
+
+		local switched = h.hotkeys[1].callback()
+
+		helpers.assert_eq(true, switched)
+		helpers.assert_eq(2, #h.launches,
+			"both false launch APIs must fall through instead of masquerading as success")
+		helpers.assert_eq(1, h.activations,
+			"the final application-object fallback must remain reachable")
+	end)
+
 	helpers.it("keeps a failed watcher inert and refuses a duplicate until retry", function()
 		local h = fresh_harness()
 		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
@@ -424,6 +462,51 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 		h.hotkeys[2].callback()
 		helpers.assert_eq(h.launches[1], "com.example.front",
 			"the replacement watcher remains functional after successful cleanup")
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Window Focus Results =========
+-- =========================================
+-- =========================================
+
+helpers.describe("watchers window switching honours native focus results", function()
+	helpers.it("continues after one candidate refuses focus", function()
+		local h = fresh_harness()
+		local attempts = {}
+		local focused = {
+			id = function() return 1 end,
+			isStandard = function() return true end,
+			isMinimized = function() return false end,
+		}
+		local refused = {
+			id = function() return 2 end,
+			isStandard = function() return true end,
+			isMinimized = function() return false end,
+			focus = function() attempts[#attempts + 1] = 2; return false end,
+		}
+		local accepted = {
+			id = function() return 3 end,
+			isStandard = function() return true end,
+			isMinimized = function() return false end,
+			focus = function() attempts[#attempts + 1] = 3; return true end,
+		}
+		h.focused_window = focused
+		h.ordered_windows = { focused, refused, accepted }
+		helpers.assert_true(h.watchers.start_alt_tab_windows_hotkey() ~= nil)
+
+		local switched = h.hotkeys[1].callback()
+
+		helpers.assert_eq(true, switched)
+		helpers.assert_eq(2, #attempts,
+			"a false focus result must not suppress a later eligible window")
+		helpers.assert_eq(2, attempts[1])
+		helpers.assert_eq(3, attempts[2])
 	end)
 end)
 

@@ -11,9 +11,9 @@
 --- raises "table index is nil". Hammerspoon swallows hs.task callback errors to
 --- the Console (never the file logger), so the KE install wedges silently.
 ---
---- Fix: forward-declare each handle before the hs.task.new call:
+--- Fix: forward-declare each handle before the strict constructor call:
 ---   local task
----   task = hs.task.new(...)
+---   task = TaskLifecycle.native(label, path, callback, args)
 --- and guard the pin clear: if task then M._active_tasks[task] = nil end
 ---
 --- This test pins the ROOT CAUSE (declaration order) — it fails on the inline form
@@ -51,8 +51,9 @@ helpers.describe("karabiner/onboarding: all four hs.task closures forward-declar
 
 	helpers.it("all four async task sites use the split forward-declaration pattern", function()
 		local src = read_src()
-		-- Each site must have:  "local task\n\ttask = hs.task.new("  (two separate lines)
-		local _, fwd_count = src:gsub("local task%s*\n%s*task = hs%.task%.new%(", "")
+		-- Each site must keep the declaration above TaskLifecycle.native so the
+		-- callback captures the local while construction remains protected.
+		local _, fwd_count = src:gsub("local task%s*\n%s*task = TaskLifecycle%.native", "")
 		helpers.assert_true(fwd_count >= 4,
 			"expected at least 4 forward-declared `local task` sites in onboarding.lua; got " .. tostring(fwd_count))
 	end)

@@ -38,6 +38,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -248,7 +249,7 @@ end
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function verify_sha256_async(path, expected_sha, callback)
 	local task
-	task = hs.task.new("/usr/bin/shasum", function(rc, stdout)
+	task = TaskLifecycle.native("Karabiner installer checksum", "/usr/bin/shasum", function(rc, stdout)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "shasum exit code " .. tostring(rc))
@@ -265,7 +266,7 @@ local function verify_sha256_async(path, expected_sha, callback)
 		end
 		callback(true, nil)
 	end, { "-a", "256", path })
-	if not task or not task:start() then
+	if not task or not TaskLifecycle.start(task, "Karabiner installer checksum") then
 		callback(false, "Failed to start shasum task.")
 	else
 		M._active_tasks[task] = true
@@ -284,7 +285,7 @@ local function download_async(url, dest, callback)
 		hs.execute("/bin/mkdir -p " .. text_utils.shell_quote(parent))
 	end
 	local task
-	task = hs.task.new("/usr/bin/curl", function(rc, _, stderr)
+	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl", function(rc, _, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
@@ -292,7 +293,7 @@ local function download_async(url, dest, callback)
 		end
 		callback(true, nil)
 	end, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
-	if not task or not task:start() then
+	if not task or not TaskLifecycle.start(task, "Karabiner installer download") then
 		callback(false, "Failed to start curl task.")
 	else
 		M._active_tasks[task] = true
@@ -304,7 +305,7 @@ end
 --- @param callback function fun(ok: boolean, mount_point_or_err: string)
 local function mount_dmg_async(dmg_path, callback)
 	local task
-	task = hs.task.new("/usr/bin/hdiutil", function(rc, stdout, stderr)
+	task = TaskLifecycle.native("Karabiner installer DMG mount", "/usr/bin/hdiutil", function(rc, stdout, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
@@ -321,7 +322,7 @@ local function mount_dmg_async(dmg_path, callback)
 		end
 		callback(true, mount_point)
 	end, { "attach", "-nobrowse", dmg_path })
-	if not task or not task:start() then
+	if not task or not TaskLifecycle.start(task, "Karabiner installer DMG mount") then
 		callback(false, "Failed to start hdiutil task.")
 	else
 		M._active_tasks[task] = true
@@ -367,7 +368,7 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 		pkg_path
 	)
 	local task
-	task = hs.task.new("/usr/bin/osascript", function(rc, _, stderr)
+	task = TaskLifecycle.native("Karabiner package install", "/usr/bin/osascript", function(rc, _, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
@@ -375,7 +376,7 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 		end
 		callback(true, nil)
 	end, { "-e", script })
-	if not task or not task:start() then
+	if not task or not TaskLifecycle.start(task, "Karabiner package install") then
 		callback(false, "Failed to start osascript task.")
 	else
 		M._active_tasks[task] = true

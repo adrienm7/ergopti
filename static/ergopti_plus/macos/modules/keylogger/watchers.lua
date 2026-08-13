@@ -27,6 +27,7 @@ local M = {}
 local hs      = hs
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
+local TaskLifecycle = require("adapters.task_lifecycle")
 local LOG     = "keylogger.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
@@ -140,24 +141,27 @@ local function poll_system_load()
 	if (now_ms - _last_system_load_poll_ms) < SYSTEM_LOAD_POLL_INTERVAL_MS then return end
 	_last_system_load_poll_ms = now_ms
 
-	pcall(function()
-		-- Declared before the closure so the callback can release its own pin
-		-- (closure-before-local rule) rather than binding a nil global.
-		local load_task
-		load_task = hs.task.new("/usr/bin/top", function(_, stdout, _)
-			if load_task then _active_tasks[load_task] = nil end
+	-- Declared before the closure so the callback can release its own pin
+	-- (closure-before-local rule) rather than binding a nil global.
+	local load_task
+	load_task = TaskLifecycle.native("Keylogger system-load sample", "/usr/bin/top", function(_, stdout, _)
+		if load_task then _active_tasks[load_task] = nil end
+		Logger.pcall(LOG, function()
+			stdout = type(stdout) == "string" and stdout or ""
 			local cpu_user = stdout:match("CPU usage:%s*([%d%.]+)%%%s*user")
 			local mem_used = stdout:match("PhysMem:%s*([%d%.A-Z]+)%s+used")
 			LogManager.log_system_event("system_load", {
 				cpu_user_percent = tonumber(cpu_user),
 				mem_used         = mem_used,
 			})
-		end, { "-l", "1", "-n", "0" })
-		if load_task then
-			_active_tasks[load_task] = true
-			if not load_task:start() then _active_tasks[load_task] = nil end
+		end)
+	end, { "-l", "1", "-n", "0" })
+	if load_task then
+		_active_tasks[load_task] = true
+		if not TaskLifecycle.start(load_task, "Keylogger system-load sample") then
+			_active_tasks[load_task] = nil
 		end
-	end)
+	end
 end
 
 --- Idle check: runs every IDLE_CHECK_INTERVAL_SEC seconds.

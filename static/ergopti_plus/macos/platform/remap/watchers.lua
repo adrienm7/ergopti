@@ -27,6 +27,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("infra.logger")
+local TaskLifecycle  = require("adapters.task_lifecycle")
 local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
@@ -394,17 +395,12 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 		return
 
 	end
-	local ok_new, task_or_err = pcall(
-		hs.task.new,
+	local task_or_err = TaskLifecycle.native("CapsWord variable probe",
 		KARABINER_CLI,
 		function(...) Logger.pcall(LOG, finish_probe, ...) end,
 		{"--get-variable", capsword_variable_name}
 	)
-	task = ok_new and task_or_err or nil
-	if not ok_new then
-		abandon_probe(nil, "CapsWord check task creation raised: " .. tostring(task_or_err))
-		return
-	end
+	task = task_or_err
 	-- Nil means the CLI binary is absent; release the lock immediately so the guard is not permanent.
 	if not task then
 		abandon_probe(nil, "CapsWord check task is nil; CLI binary absent (karabiner-capsword-lock-leak).")
@@ -413,11 +409,9 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 	-- If task:start() returns false the callback never fires — release the lock so subsequent
 	-- pointer events are not permanently blocked (karabiner-capsword-lock-leak).
 	_active_tasks[task] = true
-	local ok_start, started_or_err = pcall(function() return task:start() end)
-	if not ok_start or not started_or_err then
-		abandon_probe(task, ok_start
-			and "CapsWord check task failed to start (karabiner-capsword-lock-leak)."
-			or "CapsWord check task start raised: " .. tostring(started_or_err))
+	if not TaskLifecycle.start(task, "CapsWord variable probe") then
+		abandon_probe(task,
+			"CapsWord check task failed to start (karabiner-capsword-lock-leak).")
 		return
 	end
 	-- Started OK, but the async task fires its callback only on process EXIT. Arm a watchdog
@@ -642,6 +636,17 @@ local function read_current_layout_from_hitoolbox()
 	return parse_layout_name(raw)
 end
 
+--- Reads Hammerspoon's cached layout exactly once under exception protection.
+--- @return string|nil The layout name, or nil when the native read failed.
+local function read_current_layout_safe()
+	local ok, layout = pcall(hs.keycodes.currentLayout)
+	if ok and type(layout) == "string" and layout ~= "" then return layout end
+	if not ok then
+		Logger.error(LOG, "Cached input-layout read failed: %s.", tostring(layout))
+	end
+	return nil
+end
+
 --- Reads the current keyboard layout name ASYNCHRONOUSLY via the ShellRunner
 --- adapter (off the main run loop). The previous fallback poll spawned a
 --- SYNCHRONOUS `defaults` subprocess on the main loop every LAYOUT_POLL_SEC for
@@ -759,7 +764,7 @@ function M.start_input_source_watcher(on_change)
 
 	-- Seed the initial known layout from HIToolbox
 	_last_known_layout = read_current_layout_from_hitoolbox()
-		or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
+		or read_current_layout_safe()
 		or nil
 	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
 
@@ -774,7 +779,7 @@ function M.start_input_source_watcher(on_change)
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
 		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
 		local new_layout = read_current_layout_from_hitoolbox()
-			or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
+			or read_current_layout_safe()
 			or "<unknown>"
 		fire_layout_change(on_change, new_layout, watcher_gen)
 	end
@@ -1033,7 +1038,13 @@ local function cycle_windows_in_app()
 		end
 	end
 
-	visible[next_idx]:focus()
+	local ok_focus, focus_result = pcall(function() return visible[next_idx]:focus() end)
+	-- hs.window:focus() returns the window object, not literal true.
+	if not ok_focus or focus_result == nil or focus_result == false then
+		Logger.warn(LOG, "Window cycle focus was refused: %s.", tostring(focus_result))
+		return false
+	end
+	return true
 end
 
 --- Starts app-activation tracking for direct previous-app switching.
@@ -1108,8 +1119,10 @@ local function focus_previous_window(screen_id)
 				on_screen = w_screen ~= nil and w_screen:id() == screen_id
 			end
 			if on_screen then
-				w:focus()
-				return true
+				local ok_focus, focus_result = pcall(function() return w:focus() end)
+				if ok_focus and focus_result ~= nil and focus_result ~= false then return true end
+				Logger.warn(LOG, "Previous-window focus was refused for window %s: %s.",
+					tostring(wid), tostring(focus_result))
 			end
 		end
 	end
@@ -1147,20 +1160,20 @@ local function focus_previous_app_direct()
 	if type(_previous_bundle_id) == "string"
 		and _previous_bundle_id ~= ""
 		and type(hs.application.launchOrFocusByBundleID) == "function" then
-		local ok = pcall(hs.application.launchOrFocusByBundleID, _previous_bundle_id)
-		if ok then return true end
+		local ok, result = pcall(hs.application.launchOrFocusByBundleID, _previous_bundle_id)
+		if ok and result == true then return true end
 	end
 
 	if type(_previous_app_name) == "string" and _previous_app_name ~= "" then
-		local ok = pcall(hs.application.launchOrFocus, _previous_app_name)
-		if ok then return true end
+		local ok, result = pcall(hs.application.launchOrFocus, _previous_app_name)
+		if ok and result == true then return true end
 	end
 
 	if type(_previous_bundle_id) == "string" and _previous_bundle_id ~= "" then
 		local target = hs.application.get(_previous_bundle_id)
 		if target then
-			target:activate()
-			return true
+			local ok_activate, activate_result = pcall(function() return target:activate() end)
+			return ok_activate and activate_result == true
 		end
 	end
 
@@ -1186,10 +1199,12 @@ end
 local function bind_f17(chord, label, action)
 	Logger.trace(LOG, "Registering %s hotkey (%s)…", label, chord)
 	local handle = Registrar.bind(chord, function()
-		local ok, err = pcall(action)
+		local ok, result = pcall(action)
 		if not ok then
-			Logger.warn(LOG, "%s callback failed: %s", chord, tostring(err))
+			Logger.warn(LOG, "%s callback failed: %s", chord, tostring(result))
+			return false
 		end
+		return result
 	end)
 	if not handle then
 		Logger.error(LOG, "%s could not be bound — the %s action is unreachable from a key.", chord, label)

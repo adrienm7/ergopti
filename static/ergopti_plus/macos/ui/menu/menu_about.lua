@@ -29,6 +29,7 @@ local dialog    = require("infra.dialog_util")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
 local ManifestMenu = require("infra.manifest_menu")
+local TaskLifecycle = require("adapters.task_lifecycle")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -184,7 +185,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	-- Hammerspoon's hs.task pcall to the Console, wedging the update at
 	-- "installing" forever (the project_lua_closure_before_local_nil_global class).
 	local unzip_task
-	unzip_task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
+	unzip_task = TaskLifecycle.native("Update archive extraction", "/usr/bin/unzip", function(exit_code, _, stderr)
 		if unzip_task then M._active_tasks[unzip_task] = nil end  -- guarded clear: never write a nil key
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
@@ -247,9 +248,18 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		-- Short delay lets the log flush before hs.reload tears everything down.
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
+	if not unzip_task then
+		Updater.set_update_state("idle")
+		update_menu_fn()
+		return
+	end
 
 	M._active_tasks[unzip_task] = true
-	unzip_task:start()
+	if not TaskLifecycle.start(unzip_task, "Update archive extraction") then
+		M._active_tasks[unzip_task] = nil
+		Updater.set_update_state("idle")
+		update_menu_fn()
+	end
 end
 
 --- One-click update entry point.
