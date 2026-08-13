@@ -1270,6 +1270,73 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 			"passthrough must stay physical so keymap buffer/preview observe the same character")
 	end)
 
+	helpers.it("a declined wrap passes the physical symbol and preserves the cached selection (HS-H-01)", function()
+		local ax_reads, wrap_attempts = 0, 0
+		local fixture = load_h01_system({
+			text_actions = {
+				WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+				read_ax_selection = function()
+					ax_reads = ax_reads + 1
+					return "selected"
+				end,
+				wrap_selection = function()
+					wrap_attempts = wrap_attempts + 1
+					return false
+				end,
+			},
+		})
+		fixture.system.bind_wrap_text_if_selected(nil)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+		local pending_before = fixture.synthetic.stats().pending
+
+		local first_consume, first_returned = tap.fn(
+			physical_key_down(fixture, 25, "(", {}))
+		local second_consume, second_returned = tap.fn(
+			physical_key_down(fixture, 25, "(", {}))
+
+		helpers.assert_true(not first_consume and not second_consume,
+			"a declined replacement must leave both original physical symbols untouched")
+		helpers.assert_nil(first_returned)
+		helpers.assert_nil(second_returned)
+		helpers.assert_eq(wrap_attempts, 2,
+			"declining is not a fire; the cached live selection must remain eligible")
+		helpers.assert_eq(ax_reads, 1,
+			"the second attempt must reuse, not invalidate, the still-live AX cache")
+		helpers.assert_eq(fixture.synthetic.stats().pending, pending_before,
+			"passthrough stays physical and must not enqueue an owned replay")
+	end)
+
+	helpers.it("a successful wrap consumes the cached selection exactly once (HS-H-01)", function()
+		local ax_reads, wrap_attempts = 0, 0
+		local fixture = load_h01_system({
+			text_actions = {
+				WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+				read_ax_selection = function()
+					ax_reads = ax_reads + 1
+					return "selected"
+				end,
+				wrap_selection = function()
+					wrap_attempts = wrap_attempts + 1
+					return true
+				end,
+			},
+		})
+		fixture.system.bind_wrap_text_if_selected(nil)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+
+		local first_consume = tap.fn(physical_key_down(fixture, 25, "(", {}))
+		local second_consume = tap.fn(physical_key_down(fixture, 25, "(", {}))
+
+		helpers.assert_true(first_consume,
+			"a replacement confirmed as scheduled must consume its physical symbol")
+		helpers.assert_true(not second_consume,
+			"the stale selection must become a cached negative after the first wrap")
+		helpers.assert_eq(wrap_attempts, 1,
+			"the consumed AX selection must never be wrapped a second time")
+		helpers.assert_eq(ax_reads, 1,
+			"the cached negative must avoid a second synchronous AX read inside the TTL")
+	end)
+
 	helpers.it("F19 state is immediate, while owned F19/scroll events never control volume (HS-H-01)", function()
 		local cleanup_count = 0
 		local click_held = true
