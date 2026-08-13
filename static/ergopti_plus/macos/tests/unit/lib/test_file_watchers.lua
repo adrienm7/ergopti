@@ -29,14 +29,17 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		helpers.assert_true(type(FW.start) == "function", "must expose start()")
 	end)
 
-	helpers.it("arms watchers and pins them all in _G.script_watchers", function()
+	helpers.it("arms watchers under one pinned lifecycle owner", function()
 		local FW = require("infra.file_watchers")
 
 		-- Stub the OS-touching hs surface M.start uses.
 		local prev_pw, prev_timer, prev_attr = hs.pathwatcher, hs.timer, hs.fs.attributes
-		local armed = 0
+		local armed, stopped = 0, 0
 		hs.pathwatcher = { new = function(_path, _cb)
-			return { start = function() armed = armed + 1 end }
+			local watcher = {}
+			function watcher:start() armed = armed + 1; return watcher end
+			function watcher:stop() stopped = stopped + 1; return watcher end
+			return watcher
 		end }
 		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end, secondsSinceEpoch = function() return 0 end }
 		-- No personal dir tree, no per-file entries: attributes returns nil so the
@@ -54,11 +57,79 @@ helpers.describe("infra/file_watchers — arming contract", function()
 
 		helpers.assert_true(ok, "start() must not throw: " .. tostring(err))
 		helpers.assert_true(type(_G.script_watchers) == "table", "_G.script_watchers must be populated")
-		-- dir_watcher + project_watcher at minimum (personal dir absent in this stub).
-		helpers.assert_true(#_G.script_watchers >= 2 and #_G.script_watchers == armed,
-			"every armed watcher must be pinned in _G.script_watchers (armed=" .. armed
-			.. ", pinned=" .. #_G.script_watchers .. ")")
+		-- One owner prevents the shared debounce timer from becoming an
+		-- order-dependent sibling of the native pathwatchers at teardown.
+		helpers.assert_eq(1, #_G.script_watchers, "one composite owner must be pinned")
+		helpers.assert_eq(true, _G.script_watchers[1]:stop(), "the owner must settle native cleanup")
+		helpers.assert_eq(armed, stopped, "the owner must transitively stop every armed watcher")
 		_G.script_watchers = nil
+	end)
+
+	helpers.it("revokes a pending reload before teardown and retains failed timer cleanup for retry", function()
+		for _, failure in ipairs({ "false", "throw" }) do
+			package.loaded["infra.file_watchers"] = nil
+			local FW = require("infra.file_watchers")
+			local prev_pw, prev_timer, prev_attr, prev_reload =
+				hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+			local callbacks = {}
+			local reloads = 0
+			local timer_stops = 0
+			local pending_callback
+			local clock = 0
+
+			hs.pathwatcher = { new = function(_path, callback)
+				callbacks[#callbacks + 1] = callback
+				local watcher = {}
+				function watcher:start() return watcher end
+				function watcher:stop() return watcher end
+				return watcher
+			end }
+			hs.timer = {
+				doAfter = function(_delay, callback)
+					pending_callback = callback
+					local timer = {}
+					function timer:stop()
+						timer_stops = timer_stops + 1
+						if timer_stops == 1 then
+							if failure == "throw" then error("timer stop failed") end
+							return false
+						end
+						return timer
+					end
+					return timer
+				end,
+				secondsSinceEpoch = function() return clock end,
+			}
+			hs.fs.attributes = function(_path) return nil end
+			hs.reload = function() reloads = reloads + 1 end
+
+			_G.script_watchers = nil
+			FW.start({
+				hotstrings_dir = "/fake/hotstrings/",
+				base_dir = "/fake/base/",
+				personal_hotstrings_dir = "/fake/personal",
+			})
+			helpers.assert_eq(1, #_G.script_watchers,
+				"one lifecycle owner must own every native watcher and the shared debounce timer")
+			clock = 10
+			callbacks[#callbacks]({ "/fake/base/modules/change.lua" })
+			helpers.assert_true(type(pending_callback) == "function", "a relevant change must arm the debounce")
+
+			local owner = _G.script_watchers[1]
+			helpers.assert_eq(false, owner:stop(),
+				"a failed timer cancellation must keep the exact owner retryable (" .. failure .. ")")
+			pending_callback()
+			helpers.assert_eq(0, reloads,
+				"a callback already queued by macOS must be inert after logical teardown (" .. failure .. ")")
+			helpers.assert_eq(true, owner:stop(),
+				"the retained timer capability must settle on a later retry (" .. failure .. ")")
+			helpers.assert_eq(2, timer_stops,
+				"cleanup must retry the same timer exactly once after failure (" .. failure .. ")")
+
+			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
+				prev_pw, prev_timer, prev_attr, prev_reload
+			_G.script_watchers = nil
+		end
 	end)
 
 	helpers.it("watch_personal_hotstrings_dir terminates on a self-referential directory cycle (F-LOW-4)", function()

@@ -76,7 +76,7 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 			"only the coordinator may exit after proving the exact fence")
 	end)
 
-	helpers.it("falls back to the coordinator when timer scheduling throws or returns nil", function()
+	helpers.it("falls back to the coordinator when timer scheduling throws or returns no handle", function()
 		local saved_do_after = _G.hs.timer.doAfter
 		local saved_exit = os.exit
 		local direct_exits = 0
@@ -86,6 +86,7 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		for _, case in ipairs({
 			{ label = "throw", schedule = function() error("timer scheduling fault") end },
 			{ label = "nil", schedule = function() return nil end },
+			{ label = "false", schedule = function() return false end },
 		}) do
 			quit_spy = { count = 0, result = true }
 			_G.hs.timer.doAfter = case.schedule

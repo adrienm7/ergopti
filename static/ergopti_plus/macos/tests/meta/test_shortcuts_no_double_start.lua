@@ -36,16 +36,11 @@ end
 
 helpers.describe("shortcuts/script_control.lua: double-start guard (shortcuts-watcher-leak)", function()
 
-	helpers.it("M.start() checks _tap before creating a new eventtap", function()
+	helpers.it("M.start() requires the complete committed native pair before reusing it", function()
 		local src = read_source("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
-		-- The fix adds: if _tap then Logger.warn(...) return end
-		-- before the pcall(hs.eventtap.new, ...) call
-		local start_fn = src:match("function M%.start%(.-\nend")
-			or src:match("function M%.start%([^%)]*%)(.-)%nend")
-		-- Look for _tap guard anywhere in M.start body
 		helpers.assert_true(
-			src:match("if _tap then[^\n]*\n[^\n]*warn") ~= nil,
-			"script_control M.start() must guard against double-start by checking if _tap is already set (shortcuts-watcher-leak)")
+			src:find("if _tap and _tap_committed and _tap_watchdog and _tap_watchdog_committed then", 1, true) ~= nil,
+			"script_control M.start() may reuse only one fully committed tap/watchdog pair (shortcuts-watcher-leak)")
 	end)
 
 end)

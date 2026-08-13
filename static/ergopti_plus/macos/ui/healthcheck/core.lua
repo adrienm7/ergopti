@@ -34,6 +34,7 @@ local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "healthcheck"
 
@@ -57,6 +58,8 @@ local _window = nil
 -- Poll timer for the copy-button JS flag; module-level so show_window() can
 -- stop the PREVIOUS timer when reopening (a local would be orphaned on reopen).
 local _poll_timer = nil
+local _window_generation = 0
+local _continuation_timers = {}
 
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
@@ -85,11 +88,81 @@ local function event_tap_timeout_telemetry(runtime_version)
 end
 
 local function _stop_poll()
-	if _poll_timer then
-		_poll_timer:stop()
-		_poll_timer = nil
-		Logger.debug(LOG, "Copy-button poll timer stopped.")
+	if not _poll_timer then return true end
+	local handle = _poll_timer
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Copy-button poll timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
 	end
+	if _poll_timer == handle then _poll_timer = nil end
+	Logger.debug(LOG, "Copy-button poll timer stopped.")
+	return true
+end
+
+--- Cancels every delayed window continuation independently.
+--- @return boolean settled True only when all exact handles were released.
+local function stop_continuations()
+	local snapshot = {}
+	for handle in pairs(_continuation_timers) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		local ok, cancelled = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if ok and cancelled == true then
+			_continuation_timers[handle] = nil
+		else
+			settled = false
+			Logger.error(LOG, "Healthcheck continuation cleanup failed; exact handle retained: %s.",
+				tostring(ok and cancelled or cancelled))
+		end
+	end
+	return settled
+end
+
+--- Schedules one exact window-generation continuation.
+--- @param delay number Delay in seconds.
+--- @param generation integer Window generation.
+--- @param webview table Exact webview owner.
+--- @param callback function Continuation body.
+--- @param label string Diagnostic label.
+--- @return boolean committed True only when the timer was armed.
+local function schedule_continuation(delay, generation, webview, callback, label)
+	local handle
+	local timer_committed = false
+	local ok, candidate, committed = xpcall(function()
+		return TimerScheduler.after(delay, function()
+			if timer_committed ~= true then return end
+			if handle and handle.timer ~= nil then
+				-- One-shot delivery is already fenced by TimerScheduler. Retain the
+				-- cleanup capability without turning a committed focus action into a no-op.
+				Logger.error(LOG, "%s retained timer cleanup debt.", label)
+			else
+				if handle then _continuation_timers[handle] = nil end
+			end
+			if generation ~= _window_generation or _window ~= webview then return end
+			callback()
+		end)
+	end, debug.traceback)
+	handle = candidate
+	if type(handle) == "table" then _continuation_timers[handle] = true end
+	if not ok or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" then
+			local cancel_ok, cancelled = xpcall(function()
+				return TimerScheduler.cancel(handle)
+			end, debug.traceback)
+			if cancel_ok and cancelled == true then _continuation_timers[handle] = nil end
+		end
+		Logger.error(LOG, "%s timer was not committed: %s.", label,
+			tostring(ok and committed or candidate))
+		return false
+	end
+	timer_committed = true
+	return true
 end
 
 
@@ -191,6 +264,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.input_source_broker",
+		contract = { "subscribe", "unsubscribe", "is_subscribed" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.process_lifecycle",
 		contract = { "start", "stop" },
 		wired    = true,
@@ -217,6 +295,11 @@ local ADAPTER_SPECS = {
 			"current_action_epoch", "register_action_listener", "enter_callback",
 			"leave_callback",
 		},
+		wired    = true,
+	},
+	{
+		id       = "adapters.task_lifecycle",
+		contract = { "guard_callback", "create", "native", "start" },
 		wired    = true,
 	},
 	{
@@ -392,9 +475,15 @@ function M.show_window()
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
-		_stop_poll()
-		pcall(function() _window:delete() end)
+		local previous = _window
 		_window = nil
+		_window_generation = _window_generation + 1
+		local poll_stopped = _stop_poll()
+		local continuations_stopped = stop_continuations()
+		if not poll_stopped or not continuations_stopped then
+			Logger.error(LOG, "Healthcheck reopen retained timer cleanup debt.")
+		end
+		pcall(function() previous:delete() end)
 	end
 
 	local ok_snap, snapshot = pcall(M.run)
@@ -490,6 +579,9 @@ function M.show_window()
 		return
 	end
 	Logger.debug(LOG, "Webview created.")
+	_window_generation = _window_generation + 1
+	local generation = _window_generation
+	_window = wv
 
 	local masks = hs.webview.windowMasks
 	local ok_style, style_err = pcall(function()
@@ -514,10 +606,16 @@ function M.show_window()
 
 	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
+			if generation ~= _window_generation or _window ~= wv then return end
 			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
-				_stop_poll()
 				_window = nil
+				_window_generation = _window_generation + 1
+				local poll_stopped = _stop_poll()
+				local continuations_stopped = stop_continuations()
+				if not poll_stopped or not continuations_stopped then
+					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
+				end
 			end
 		end)
 	end)
@@ -525,6 +623,7 @@ function M.show_window()
 
 	local ok_ncb, ncb_err = pcall(function()
 		wv:navigationCallback(function(action, _)
+			if generation ~= _window_generation or _window ~= wv then return end
 			Logger.debug(LOG, "Navigation callback: action='%s'.", tostring(action))
 			if action == "didFinishNavigation" then
 				-- Render the report from the snapshot JSON, then wire the
@@ -554,10 +653,14 @@ function M.show_window()
 				-- Stop any previous poll timer before arming a new one; a second
 				-- didFinishNavigation (re-navigation or webview redraw) would otherwise
 				-- orphan the existing timer and leave two timers polling in parallel.
-				_stop_poll()
+				if not _stop_poll() then
+					Logger.error(LOG, "Copy-button poll restart refused: prior cleanup remains pending.")
+					return
+				end
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
-				_poll_timer = hs.timer.new(0.2, function()
-					if not wv then _stop_poll(); return end
+				local poll_ok, poll_candidate, poll_committed = xpcall(function()
+					return TimerScheduler.every(0.2, function()
+					if generation ~= _window_generation or _window ~= wv then return end
 					-- Wrap in pcall: a natively-closed webview is NOT nil in Lua but
 					-- becomes "dead userdata" — a stale Lua handle whose backing C object
 					-- is gone. :evaluateJavaScript() on a dead userdata raises a runtime
@@ -565,6 +668,10 @@ function M.show_window()
 					-- (healthcheck-webview-dead-userdata).
 					local ok_ev, ev_err = pcall(function()
 						wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
+							-- evaluateJavaScript yields to WebKit. The window may close or
+							-- be replaced before this completion arrives, so the entry fence
+							-- above is insufficient on its own.
+							if generation ~= _window_generation or _window ~= wv then return end
 							if result == true then
 								Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
 								local ok_write, write_result = pcall(hs.pasteboard.setContents, plain)
@@ -576,20 +683,33 @@ function M.show_window()
 									end)
 									return
 								end
-								_stop_poll()
-								if _window then
-									pcall(function() _window:delete() end)
-									_window = nil
+								local window = _window
+								_window = nil
+								_window_generation = _window_generation + 1
+								local poll_stopped = _stop_poll()
+								local continuations_stopped = stop_continuations()
+								if not poll_stopped or not continuations_stopped then
+									Logger.error(LOG, "Healthcheck copy-close retained timer cleanup debt.")
 								end
+								if window then pcall(function() window:delete() end) end
 							end
 						end)
 					end)
 					if not ok_ev then
 						Logger.warn(LOG, "evaluateJavaScript on dead webview — stopping poll: %s.", tostring(ev_err))
-						_stop_poll()
+						if not _stop_poll() then
+							Logger.error(LOG, "Dead-webview poll cleanup remains pending.")
+						end
 					end
-				end)
-				_poll_timer:start()
+					end)
+				end, debug.traceback)
+				if type(poll_candidate) == "table" then _poll_timer = poll_candidate end
+				if not poll_ok or type(poll_candidate) ~= "table" or poll_committed ~= true then
+					if type(poll_candidate) == "table" then _stop_poll() end
+					Logger.error(LOG, "Copy-button poll timer was not committed: %s.",
+						tostring(poll_ok and poll_committed or poll_candidate))
+					return
+				end
 				Logger.debug(LOG, "Copy-button poll timer started.")
 			end
 		end)
@@ -604,15 +724,13 @@ function M.show_window()
 		Logger.error(LOG, "wv:show() failed — window will not appear: %s.", tostring(sh_err))
 	end
 
-	_window = wv
-
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if ok_ui and ui_builder then
 		Logger.debug(LOG, "Delegating focus to ui_builder.force_focus().")
 		ui_builder.force_focus(wv, true)
 	else
 		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(ui_builder))
-		hs.timer.doAfter(0.08, function()
+		if not schedule_continuation(0.08, generation, wv, function()
 			pcall(hs.focus)
 			local ok_win, win = pcall(function() return wv:hswindow() end)
 			if ok_win and win and type(win.focus) == "function" then
@@ -620,7 +738,9 @@ function M.show_window()
 			else
 				pcall(function() wv:bringToFront() end)
 			end
-		end)
+		end, "Healthcheck fallback focus") then
+			Logger.error(LOG, "Healthcheck fallback focus could not be scheduled.")
+		end
 	end
 
 	Logger.success(LOG, "Healthcheck window opened.")

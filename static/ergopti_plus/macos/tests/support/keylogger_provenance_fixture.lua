@@ -30,6 +30,7 @@ end
 function M.load_keylogger()
 	local flushes = {}
 	local state
+	local foreground_captures = 0
 	-- These adapters capture the active hs table and Quartz property constants at
 	-- require-time. This fixture deliberately uses the production instances, so it
 	-- owns their reload rather than making the generic helper erase intentional
@@ -47,8 +48,8 @@ function M.load_keylogger()
 	package.loaded["infra.dialog_util"] = { alert = function() end }
 
 	package.loaded["modules.keylogger.log_manager"] = {
-		init = function(core_state) state = core_state end,
-		ensure_ingest_running = function() end,
+		init = function(core_state) state = core_state; return true end,
+		ensure_ingest_running = function() return true end,
 		defer_flush_buffer = function() return true end,
 		flush_buffer = function()
 			if not state then return true end
@@ -61,42 +62,72 @@ function M.load_keylogger()
 			state.rich_chunks = {}
 			return true
 		end,
+		stop = function() return true end,
 	}
 	package.loaded["modules.keylogger.context_tracker"] = {
-		init = function(core_state) state = core_state end,
+		init = function(core_state, _log_manager, is_paused)
+			state = core_state
+			return type(core_state) == "table" and type(is_paused) == "function"
+		end,
 		update_private_status = function() end,
 		app_watcher_cb = function() end,
 		update_ax_observer = function() end,
+		capture_frontmost_app = function()
+			foreground_captures = foreground_captures + 1
+			state.is_secure_field = false
+			return true
+		end,
 	}
+	local kc_running = false
 	package.loaded["modules.keylogger.kc_bridge"] = {
-		init = function() end,
-		set_log_manager = function() end,
-		start = function() end,
-		stop = function() end,
+		init = function(core_state, _pathwatcher, _timer, _log_manager, may_persist)
+			return type(core_state) == "table" and type(may_persist) == "function"
+		end,
+		set_log_manager = function(log_manager) return type(log_manager) == "table" end,
+		start = function() kc_running = true; return true end,
+		stop = function() kc_running = false; return true end,
+		is_running = function() return kc_running end,
+		is_ke_managed_output_kc = function() return false end,
 	}
+	local hardware_running = false
 	package.loaded["modules.keylogger.watchers"] = {
-		init = function() end,
-		init_hardware_watchers = function() end,
-		stop_hardware_watchers = function() end,
+		init = function(core_state, is_paused)
+			return type(core_state) == "table" and type(is_paused) == "function"
+		end,
+		init_hardware_watchers = function()
+			hardware_running = true
+			return true
+		end,
+		stop_hardware_watchers = function()
+			hardware_running = false
+			return true
+		end,
+		is_running = function() return hardware_running end,
 		check_idle = function() end,
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
 	package.loaded["adapters.process_lifecycle"] = {
-		onAppActivate = function() end,
-		start = function() end,
-		stop = function() end,
+		onAppActivate = function(callback) return type(callback) == "function" end,
+		start = function() return true end,
+		stop = function() return true end,
 	}
 	package.loaded["adapters.keyboard_hook"] = {
-		start = function() end,
-		stop = function() end,
+		start = function() return true end,
+		stop = function() return true end,
 		isRunning = function() return true end,
+	}
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function(id, callback)
+			return type(id) == "string" and type(callback) == "function"
+		end,
+		unsubscribe = function() return true end,
 	}
 
 	local keylogger = helpers.load_with_stubs("modules.keylogger.init")
 	state = find_upvalue(keylogger.notify_synthetic, "CoreState")
 
-	return {
+	local fixture = {
 		keylogger = keylogger,
 		state = state,
 		flushes = flushes,
@@ -104,6 +135,23 @@ function M.load_keylogger()
 		synthetic_input = require("adapters.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 	}
+	function fixture.start(script_control)
+		local timers = fixture.hs.timer.__timers
+		local prior_count = #timers
+		helpers.assert_eq(keylogger.start(script_control), true,
+			"the provenance fixture must start before enabling persistence")
+		for index = prior_count + 1, #timers do
+			if timers[index].delay == 0 and timers[index].running then
+				timers[index]:fire()
+			end
+		end
+		helpers.assert_eq(foreground_captures, 1,
+			"the deferred foreground-context capture must settle before input")
+		helpers.assert_eq(state.is_secure_field, false,
+			"the foreground-context settlement must commit a loggable fixture state")
+		return true
+	end
+	return fixture
 end
 
 --- Emits one callback-owned key pair and returns its key-down event.

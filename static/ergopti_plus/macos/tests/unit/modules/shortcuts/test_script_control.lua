@@ -288,13 +288,13 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 		-- Load shortcuts/init.lua with stubs to verify the API surface
 		package.loaded["modules.shortcuts.bindings"] = {
 			DEFAULT_CHATGPT_URL = "https://test",
-			start = function() end, stop = function() end,
+			start = function() return true end, stop = function() return true end,
 			enable = function() end, disable = function() end,
 			is_enabled = function() return true end,
 			list_shortcuts = function() return {} end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-			start = function() end, stop = function() end,
+			start = function() return true end, stop = function() return true end,
 			set_action = function() end, get_action = function() return "none" end,
 			get_slot_label = function() return "" end,
 			get_assignments = function() return {} end,

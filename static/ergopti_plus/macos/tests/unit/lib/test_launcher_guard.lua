@@ -309,7 +309,7 @@ helpers.describe("launcher guard — boot race closure", function()
 		with_guard(managed_environment(), function(guard, hs_stub)
 			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
 			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
-			hs_stub.timer.doEvery = function() return nil end
+			hs_stub.timer.new = function() return nil end
 			local quit_reasons = {}
 
 			local started = guard.init(function(reason)
@@ -322,6 +322,169 @@ helpers.describe("launcher guard — boot race closure", function()
 				"missing retained-instance recovery must enter the one-shot emergency path")
 			helpers.assert_true(hs_stub.application.watcher.__watchers[1].stopped == 1,
 				"failed initialization must release the already-armed watcher")
+		end)
+	end)
+
+	helpers.it("retains and fences a backstop whose start activates then raises", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local native = nil
+			local start_calls = 0
+			local stop_calls = 0
+			local callback_calls = 0
+			hs_stub.timer.new = function(_, callback)
+				native = { running = false }
+				function native:start()
+					start_calls = start_calls + 1
+					self.running = true
+					launcher.running = false
+					callback_calls = callback_calls + 1
+					callback()
+					error("active backstop start failure")
+				end
+				function native:stop()
+					stop_calls = stop_calls + 1
+					if stop_calls <= 2 then return false end
+					self.running = false
+					return self
+				end
+				return native
+			end
+			local quit_reasons = {}
+
+			local started = guard.init(function(reason)
+				quit_reasons[#quit_reasons + 1] = reason
+			end)
+
+			helpers.assert_true(not started)
+			helpers.assert_eq(quit_reasons[1], "launcher_backstop_unavailable",
+				"a callback fired inside uncommitted start must remain logically inert")
+			helpers.assert_eq(callback_calls, 1,
+				"the fixture must exercise the re-entrant native callback")
+			helpers.assert_eq(start_calls, 1,
+				"a failed native candidate must never be replaced by a successor")
+			helpers.assert_eq(stop_calls, 2,
+				"initial rollback and emergency cleanup must retry the same candidate")
+			helpers.assert_true(native.running,
+				"explicit cleanup refusal must leave the exact candidate retained")
+			helpers.assert_true(guard.stop(),
+				"a later lifecycle pass must retry retained early-boot cleanup debt")
+			helpers.assert_eq(stop_calls, 3)
+			helpers.assert_true(not native.running)
+		end)
+	end)
+
+	helpers.it("rolls back a backstop whose native start returns false", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local native = nil
+			local start_calls = 0
+			local stop_calls = 0
+			hs_stub.timer.new = function(_, callback)
+				native = { running = false }
+				function native:start()
+					start_calls = start_calls + 1
+					self.running = true
+					callback()
+					return false
+				end
+				function native:stop()
+					stop_calls = stop_calls + 1
+					self.running = false
+					return self
+				end
+				return native
+			end
+			local quit_reasons = {}
+
+			local started = guard.init(function(reason)
+				quit_reasons[#quit_reasons + 1] = reason
+			end)
+
+			helpers.assert_true(not started)
+			helpers.assert_eq(quit_reasons[1], "launcher_backstop_unavailable")
+			helpers.assert_eq(start_calls, 1)
+			helpers.assert_eq(stop_calls, 1,
+				"an explicitly refused start must roll back its exact native object")
+			helpers.assert_true(not native.running)
+			helpers.assert_true(guard.stop())
+			helpers.assert_eq(stop_calls, 1,
+				"successful rollback must not leave a phantom cleanup owner")
+		end)
+	end)
+
+	helpers.it("rejects a chainable backstop start whose native state stays stopped", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local native = nil
+			local start_calls = 0
+			local stop_calls = 0
+			hs_stub.timer.new = function(_, callback)
+				native = { callback = callback, live = false }
+				function native:start()
+					start_calls = start_calls + 1
+					return self
+				end
+				function native:stop()
+					stop_calls = stop_calls + 1
+					self.live = false
+					return self
+				end
+				function native:running() return self.live end
+				return native
+			end
+			local quit_reasons = {}
+
+			helpers.assert_eq(guard.init(function(reason)
+				quit_reasons[#quit_reasons + 1] = reason
+			end), false)
+			helpers.assert_eq(quit_reasons[1], "launcher_backstop_unavailable")
+			helpers.assert_eq(start_calls, 1)
+			helpers.assert_eq(stop_calls, 1,
+				"false native commitment must roll back the exact candidate")
+			helpers.assert_eq(native.live, false)
+			helpers.assert_true(guard.stop())
+			helpers.assert_eq(stop_calls, 1,
+				"settled rollback must not retain phantom cleanup debt")
+		end)
+	end)
+
+	helpers.it("retains and fences a chainably stopped live backstop", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local native = nil
+			local stop_calls = 0
+			hs_stub.timer.new = function(_, callback)
+				native = { callback = callback, live = false }
+				function native:start() self.live = true; return self end
+				function native:stop()
+					stop_calls = stop_calls + 1
+					if stop_calls == 1 then return self end
+					self.live = false
+					return self
+				end
+				function native:running() return self.live end
+				return native
+			end
+			local quit_count = 0
+			helpers.assert_true(guard.init(function() quit_count = quit_count + 1 end))
+
+			helpers.assert_eq(guard.stop(), false,
+				"a chainable stop result cannot hide still-running native state")
+			helpers.assert_true(native.live,
+				"the exact backstop must remain retained for cleanup retry")
+			launcher.running = false
+			native.callback()
+			helpers.assert_eq(quit_count, 0,
+				"logical fencing must precede an ineffective native stop")
+			helpers.assert_true(guard.stop(),
+				"the next lifecycle pass must retry the same backstop")
+			helpers.assert_eq(stop_calls, 2)
+			helpers.assert_eq(native.live, false)
 		end)
 	end)
 end)

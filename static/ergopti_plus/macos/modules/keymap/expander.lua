@@ -91,6 +91,31 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
+	-- The preview refresh belongs to the same replacement transaction as its
+	-- Quartz output. A second raw doAfter timer could be refused independently,
+	-- leaving a successful chained expansion with no preview, and its callback
+	-- could outlive a stop/re-init. Transaction completion already provides the
+	-- required post-eventtap ordering, so make it the sole refresh authority.
+	if not is_ignored then
+		local preview_state = _state
+		local preview_llm = _llm
+		local registered, register_err = pcall(SyntheticInput.on_complete,
+			transaction, function(_completed_tx, status)
+				if status ~= "complete"
+					or _state ~= preview_state or _llm ~= preview_llm then return end
+				local ok, err = pcall(preview_llm.update_preview, preview_state.buffer)
+				if not ok then
+					Logger.error(LOG, "Replacement preview refresh failed: %s.", tostring(err))
+				end
+			end)
+		if not registered then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Replacement preview completion could not be registered: %s.",
+				tostring(register_err))
+			return false, transaction
+		end
+	end
+
 	local ok, emit_count, emitted_str, logical_text = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
@@ -156,25 +181,6 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		if not ok_set then
 			Logger.error(LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
 		end
-	end
-
-	-- Re-evaluate preview on the updated buffer to support chained autocorrections.
-	-- Deferred via doAfter(0) so all synthetic echoes produced by the expansion
-	-- (deletes + chars) have already been processed by onKeyDownRaw before the
-	-- watcher armed by update_preview sees any keyDown event. Without this
-	-- deferral the synthetic chars trigger the preview watcher and call
-	-- hide_forced(), destroying the chained preview immediately (E2 audit fix).
-	if not is_ignored then
-		hs.timer.doAfter(0, function()
-			-- Deferring moved this call off the eventtap stack and onto a timer, where a
-			-- throw reaches only the HS Console and never the file logger. It is the one
-			-- update_preview call site of four still outside a pcall — the same guard the
-			-- notify_synthetic and buffer_action calls above already carry.
-			local ok, err = pcall(_llm.update_preview, _state.buffer)
-			if not ok then
-				Logger.error(LOG, "Deferred update_preview failed: %s.", tostring(err))
-			end
-		end)
 	end
 
 	-- Named constant rather than a bare 1.0: it is deliberately DOUBLE the module

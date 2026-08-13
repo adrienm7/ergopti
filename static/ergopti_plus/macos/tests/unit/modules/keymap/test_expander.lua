@@ -302,9 +302,12 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 			false, false, "test"
 		)
 		local consume, events = SyntheticInput.leave_callback(replaced)
-		-- update_preview is now deferred via hs.timer.doAfter(0) (E2 audit fix)
-		-- so we must fire pending timers before asserting on llm.previews.
-		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
+		-- Dispatch confirmation and its lifecycle callback occupy two run-loop
+		-- turns; neither may publish the preview from the eventtap itself.
+		if hs and hs.timer and hs.timer.__fire_all then
+			hs.timer.__fire_all()
+			hs.timer.__fire_all()
+		end
 
 		helpers.assert_eq(emit_called, true)
 		helpers.assert_eq(buf_called,  true)
@@ -315,6 +318,43 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		helpers.assert_eq(s.buffer, "hewrld")
 		-- update_preview must be called on the rebuilt buffer.
 		helpers.assert_eq(llm.previews[#llm.previews], "hewrld")
+	end)
+
+	helpers.it("refreshes chained preview only from committed replacement completion", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+		local s = make_state("old")
+		local llm = make_llm()
+		E.init(s, make_registry({}, {}), llm)
+
+		SyntheticInput.enter_callback()
+		local replaced = E.perform_text_replacement(
+			0,
+			function()
+				SyntheticInput.emit_key_strokes("new")
+				return 3, "new"
+			end,
+			function() s.buffer = "new" end,
+			false, false, "completion-preview"
+		)
+		helpers.assert_true(replaced)
+
+		-- A standalone doAfter refresh could run here while the replacement batch
+		-- was still owned by the eventtap return path. Completion ownership must
+		-- keep the new preview unpublished until that exact batch commits.
+		if hs and hs.timer and hs.timer.__fire_all then
+			hs.timer.__fire_all()
+			hs.timer.__fire_all()
+		end
+		helpers.assert_eq(#llm.previews, 0)
+
+		local consume = SyntheticInput.leave_callback(replaced)
+		helpers.assert_true(consume)
+		if hs and hs.timer and hs.timer.__fire_all then
+			hs.timer.__fire_all()
+			hs.timer.__fire_all()
+		end
+		helpers.assert_eq(#llm.previews, 1)
+		helpers.assert_eq(llm.previews[1], "new")
 	end)
 
 	helpers.it("does not arm the LLM timer when LLM is disabled", function()

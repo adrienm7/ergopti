@@ -40,11 +40,13 @@ helpers.assert_true(
 
 -- Test 3: _stop_poll() is called in the window-reopen cleanup path — i.e.,
 -- inside the `if _window then` block — so the OLD timer is stopped before the
--- old webview is deleted. The cleanup pattern: _stop_poll() then _window:delete().
-local window_cleanup = src:find("_stop_poll()\n\t\tpcall(function() _window:delete()", 1, true)
-	or src:find("_stop_poll()\r\n\t\tpcall(function() _window:delete()", 1, true)
+-- old webview is deleted. Compare semantic anchors so retained-cleanup logging
+-- between the two operations cannot turn this test into a spelling pin.
+local reopen_start = src:find("if _window then", 1, true)
+local stop_poll = reopen_start and src:find("_stop_poll()", reopen_start, true)
+local delete_previous = reopen_start and src:find("previous:delete()", reopen_start, true)
 helpers.assert_true(
-	window_cleanup ~= nil,
+	stop_poll ~= nil and delete_previous ~= nil and stop_poll < delete_previous,
 	"healthcheck.lua must call _stop_poll() before deleting the old window (lib-health-1 reopen cleanup)"
 )
 

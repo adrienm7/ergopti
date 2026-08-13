@@ -28,13 +28,13 @@ local DATASQL = "/tmp/ergopti_rotation_persistent_data.sql"
 
 --- A no-op file handle so the spy touches no real disk.
 local function fake_handle()
-	return {
-		write = function() end,
-		flush = function() end,
-		close = function() end,
-		read  = function() return nil end,
-		lines = function() return function() return nil end end,
-	}
+	local handle = {}
+	function handle:setvbuf(mode) return mode == "no" end
+	function handle:write() return self end
+	function handle:close() return true end
+	function handle:read() return nil end
+	function handle:lines() return function() return nil end end
+	return handle
 end
 
 helpers.describe("rotation — persistent today.log handle (no per-append open/close)", function()

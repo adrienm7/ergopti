@@ -483,10 +483,15 @@ local function schedule_fence_retry(token, reason, next_attempt)
 		return
 	end
 	if _fence_retries[token] then return end
+	if not retry_timer_cleanup() then
+		Logger.error(LOG, "Exact Karabiner writer fence retry blocked by timer cleanup debt.")
+		release_poison_settlements(token, "writer-fence-cleanup-pending")
+		return
+	end
 
 	local retry_handle = nil
 	local fired_before_return = false
-	local timer_ok, timer_or_err = pcall(
+	local timer_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		VARIABLE_WRITER_RETRY_DELAY_SEC,
 		function()
@@ -501,7 +506,7 @@ local function schedule_fence_retry(token, reason, next_attempt)
 		end
 	)
 	retry_handle = timer_or_err
-	if not timer_ok or type(timer_or_err) ~= "table"
+	if not timer_ok or timer_committed ~= true or type(timer_or_err) ~= "table"
 		or timer_or_err.fired == true or fired_before_return then
 		if type(timer_or_err) == "table" then cancel_timer_safely(timer_or_err, "fence retry") end
 		Logger.error(LOG, "Could not arm exact Karabiner writer-fence retry: %s",
@@ -625,6 +630,10 @@ end
 --- @return string|nil reason Stable failure reason.
 --- @return boolean fatal Whether an accepted batch must fence instead of retry.
 local function start_batch(batch)
+	if not retry_timer_cleanup() then
+		Logger.error(LOG, "Karabiner variable writer blocked by timer cleanup debt.")
+		return false, "timer-cleanup-pending", false
+	end
 	-- A failed native terminate keeps its exact ShellRunner capability here. Retry
 	-- it before exposing another writer instead of losing the only safe handle and
 	-- falling back to process-name discovery, which could target personal Karabiner.
@@ -676,7 +685,7 @@ local function start_batch(batch)
 	_active_handle = handle_or_err
 	local child_started = false
 	local watchdog_fired_before_start = false
-	local timer_ok, timeout_or_err = pcall(
+	local timer_ok, timeout_or_err, timeout_committed = pcall(
 		TimerScheduler.after,
 		VARIABLE_WRITER_TIMEOUT_SEC,
 		function()
@@ -691,7 +700,7 @@ local function start_batch(batch)
 			poison_token(batch.token, "writer-timeout", batch)
 		end
 	)
-	if not timer_ok or type(timeout_or_err) ~= "table"
+	if not timer_ok or timeout_committed ~= true or type(timeout_or_err) ~= "table"
 		or timeout_or_err.fired == true or watchdog_fired_before_start then
 		-- terminate() is also the ShellRunner GC-pin release for a task that was
 		-- constructed but deliberately never started.
@@ -756,6 +765,10 @@ end
 --- @param failure_reason string Failure that requested recovery.
 --- @return boolean scheduled True only for a live retry timer.
 schedule_retry = function(batch, failure_reason)
+	if not retry_timer_cleanup() then
+		Logger.error(LOG, "Karabiner variable writer retry blocked by timer cleanup debt.")
+		return false
+	end
 	if _poisoned_tokens[batch.token] then
 		poison_token(batch.token, "retry-on-poisoned-token", nil)
 		return false
@@ -774,7 +787,7 @@ schedule_retry = function(batch, failure_reason)
 	local retry_handle = nil
 	local fired_before_return = false
 	local token = batch.token
-	local timer_ok, timer_or_err = pcall(
+	local timer_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		VARIABLE_WRITER_RETRY_DELAY_SEC,
 		function()
@@ -789,7 +802,7 @@ schedule_retry = function(batch, failure_reason)
 		end
 	)
 	retry_handle = timer_or_err
-	if not timer_ok or type(timer_or_err) ~= "table"
+	if not timer_ok or timer_committed ~= true or type(timer_or_err) ~= "table"
 		or timer_or_err.fired == true or fired_before_return then
 		if type(timer_or_err) == "table" then cancel_timer_safely(timer_or_err, "retry") end
 		Logger.error(LOG, "Could not arm Karabiner variable-writer retry timer: %s",

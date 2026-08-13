@@ -32,17 +32,25 @@ helpers.describe("healthcheck copy button: native refusal is not success", funct
 		package.loaded["healthcheck.snapshot"] = {}
 		package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["ui.ui_builder"] = {
-			build_injected_html = function() return "<html></html>" end,
-			get_app_geometry = function() return { width = 740, height = 560 } end,
-			force_focus = function() end,
-		}
-
 		local navigation_callback = nil
 		local poll_callback = nil
 		local deleted = 0
 		local reset_requests = 0
 		local poll_stops = 0
+		package.loaded["ui.ui_builder"] = {
+			build_injected_html = function() return "<html></html>" end,
+			get_app_geometry = function() return { width = 740, height = 560 } end,
+			force_focus = function() end,
+		}
+		package.loaded["adapters.timer_scheduler"] = {
+			every = function(_delay, callback)
+				poll_callback = callback
+				return { timer = {} }, true
+			end,
+			cancel = function(handle) handle.timer = nil; return true end,
+			after = function() error("the configured focus helper must avoid fallback scheduling") end,
+		}
+
 		local wv = {}
 		for _, method in ipairs({
 			"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
@@ -66,12 +74,10 @@ helpers.describe("healthcheck copy button: native refusal is not success", funct
 		end
 		hs_stub.json.encode = function() return "{}" end
 		hs_stub.pasteboard.setContents = function() return false end
-		hs_stub.timer.new = function(_delay, callback)
-			poll_callback = callback
-			return {
-				start = function() end,
-				stop = function() poll_stops = poll_stops + 1 end,
-			}
+		package.loaded["adapters.timer_scheduler"].cancel = function(handle)
+			poll_stops = poll_stops + 1
+			handle.timer = nil
+			return true
 		end
 
 		local healthcheck = require("ui.healthcheck.core")

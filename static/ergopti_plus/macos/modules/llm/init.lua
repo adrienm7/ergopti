@@ -144,6 +144,10 @@ local CoreState = {
 	llm_model_mlx          = M.DEFAULT_STATE.llm_model_mlx,
 	runtime_llm_enabled    = false,
 	background_bootstrap_started = false,
+	background_bootstrap_timer = nil,
+	api_entries_load_timer = nil,
+	api_entries_load_generation = 0,
+	api_entries_load_started = false,
 	last_backend_check     = 0,
 	backend_check_interval = 10,
 	-- Monotonically-increasing counter that lets on_both_done() discard stale
@@ -364,7 +368,43 @@ end
 -- very next run-loop tick, long before any keystroke can trigger a prediction, but
 -- no longer gates eventtap setup. Routed through the TimerScheduler adapter (not a
 -- raw timer call) per the module OS-API purity convention.
-TimerScheduler.after(0, function() pcall(M.load_api_entries) end)
+local function schedule_api_entries_load()
+	local prior = CoreState.api_entries_load_timer
+	if type(prior) == "table" then
+		if prior.committed == true then return true end
+		if prior.timer ~= nil and TimerScheduler.cancel(prior) ~= true then
+			Logger.error(LOG, "Persisted API-entry load cleanup remains pending.")
+			return false
+		end
+		if CoreState.api_entries_load_timer == prior then CoreState.api_entries_load_timer = nil end
+	end
+	if CoreState.api_entries_load_started then return true end
+
+	CoreState.api_entries_load_generation = CoreState.api_entries_load_generation + 1
+	local generation = CoreState.api_entries_load_generation
+	local handle
+	local committed
+	local schedule_ok, schedule_err = xpcall(function()
+		handle, committed = TimerScheduler.after(0, function()
+			if CoreState.api_entries_load_timer == handle and handle.timer == nil then
+				CoreState.api_entries_load_timer = nil
+			end
+			if committed ~= true or generation ~= CoreState.api_entries_load_generation then return end
+			local loaded = Logger.pcall(LOG, M.load_api_entries)
+			if loaded == true then CoreState.api_entries_load_started = true end
+		end)
+	end, debug.traceback)
+	if type(handle) == "table" and handle.timer ~= nil then CoreState.api_entries_load_timer = handle end
+	if not schedule_ok or committed ~= true then
+		Logger.error(LOG, "Persisted API-entry load timer did not commit: %s.",
+			tostring(schedule_ok and handle or schedule_err))
+		return false
+	end
+	CoreState.api_entries_load_timer = handle
+	return true
+end
+
+schedule_api_entries_load()
 
 --- Primes the backend model and its KV cache with the active profile's system prompt.
 --- Must be called after both model and profile are configured; runs async so it does
@@ -550,16 +590,60 @@ end
 --- Schedules the background backend probes explicitly once boot state has
 --- confirmed that LLM is actually enabled for this session.
 function M.start_background_network_bootstrap()
+	if schedule_api_entries_load() ~= true then
+		Logger.error(LOG, "Background LLM bootstrap refused — persisted API entries are not owned.")
+		return false
+	end
 	if CoreState.background_bootstrap_started then
 		Logger.debug(LOG, "start_background_network_bootstrap: already started — skipping duplicate call.")
-		return
+		return true
 	end
-	CoreState.background_bootstrap_started = true
-	Logger.debug(LOG, "Scheduling background LLM network bootstrap.")
-	hs.timer.doAfter(0, function()
-		pcall(function() M.auto_detect_backend() end)
-		pcall(function() M.warm_up_connections() end)
+
+	local prior = CoreState.background_bootstrap_timer
+	if prior then
+		if prior.committed == true then
+			Logger.debug(LOG, "start_background_network_bootstrap: already scheduled — skipping duplicate call.")
+			return true
+		end
+		-- A prior activation may have raised after making its native timer live.
+		-- Never publish a sibling until that exact cleanup capability settles.
+		if TimerScheduler.cancel(prior) ~= true then
+			Logger.error(LOG, "Background LLM bootstrap cleanup remains pending.")
+			return false
+		end
+		if CoreState.background_bootstrap_timer == prior then
+			CoreState.background_bootstrap_timer = nil
+		end
+	end
+
+	-- Forward-declare before the closure so Lua captures this local rather than
+	-- resolving a later declaration as the nil global `bootstrap_timer`.
+	local bootstrap_timer
+	local committed
+	bootstrap_timer, committed = TimerScheduler.after(0, function()
+		if CoreState.background_bootstrap_timer == bootstrap_timer
+			and bootstrap_timer.timer == nil then
+			CoreState.background_bootstrap_timer = nil
+		end
+		if CoreState.background_bootstrap_started then return end
+		CoreState.background_bootstrap_started = true
+		Logger.pcall(LOG, M.auto_detect_backend)
+		Logger.pcall(LOG, M.warm_up_connections)
 	end)
+
+	if bootstrap_timer and bootstrap_timer.timer ~= nil then
+		CoreState.background_bootstrap_timer = bootstrap_timer
+	end
+	if committed ~= true then
+		if not bootstrap_timer or bootstrap_timer.timer == nil then
+			CoreState.background_bootstrap_timer = nil
+		end
+		Logger.error(LOG, "Background LLM network bootstrap scheduling was refused.")
+		return false
+	end
+	CoreState.background_bootstrap_timer = bootstrap_timer
+	Logger.debug(LOG, "Background LLM network bootstrap scheduled.")
+	return true
 end
 
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON

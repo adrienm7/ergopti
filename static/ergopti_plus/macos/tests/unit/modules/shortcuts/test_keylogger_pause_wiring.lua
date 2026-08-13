@@ -68,7 +68,7 @@ end)
 
 helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2e-pause-suspend-1 regression)", function()
 
-	helpers.it("keylogger/init.lua timer/watcher callbacks all call _is_paused()", function()
+	helpers.it("each keylogger timer/watcher gate checks the injected pause predicate", function()
 		-- The sensor callbacks (check_idle, perform_maintenance, caffeinate_cb,
 		-- wifi/battery/spaces/audio watcher lambdas) were extracted into the
 		-- self-contained watchers.lua, which receives _is_paused as an injected
@@ -83,18 +83,30 @@ helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2
 		end
 		local init_src = read_src("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
 		helpers.assert_true(init_src ~= nil, "keylogger/init.lua must be readable")
-		local src = init_src .. "\n" .. (read_src("local function poll_mouse_distance") or "")
-		-- Every top-level callback must start with _is_paused(). We assert the
-		-- helper exists and is used more than once (once per callback).
-		local count = 0
-		for _ in src:gmatch("_is_paused%(%)") do count = count + 1 end
-		-- 1 definition + at least 7 usage sites = at minimum 8 occurrences
-		helpers.assert_true(count >= 8,
-			string.format(
-				"_is_paused() must appear at least 8 times across keylogger init/watchers (definition + 7 callbacks) — got %d",
-				count
-			)
-		)
+		local watchers_src = read_src("local function poll_mouse_distance")
+		helpers.assert_true(watchers_src ~= nil, "keylogger/watchers.lua must be readable")
+
+		-- Count floors silently became stale when callbacks were consolidated behind
+		-- hardware_callback_allowed(). Name every persistence-capable boundary and
+		-- require its own direct or shared pause gate instead.
+		local boundaries = {
+			{ start = "function M.check_idle()", finish = "function M.perform_maintenance()" },
+			{ start = "function M.perform_maintenance()", finish = "local function hardware_callback_allowed" },
+			{ start = "local function hardware_callback_allowed", finish = "local function run_hardware_callback" },
+			{ start = "local function schedule_context_refresh", finish = "local function stop_object_watcher" },
+			{ start = "function M.caffeinate_cb(event)", finish = "function M.init_hardware_watchers()" },
+		}
+		for _, boundary in ipairs(boundaries) do
+			local start_at = watchers_src:find(boundary.start, 1, true)
+			local finish_at = start_at and watchers_src:find(boundary.finish,
+				start_at + #boundary.start, true)
+			helpers.assert_true(start_at ~= nil and finish_at ~= nil,
+				"pause-guard boundary must remain locatable: " .. boundary.start)
+			local body = watchers_src:sub(start_at, finish_at - 1)
+			helpers.assert_true(body:find("_is_paused()", 1, true) ~= nil,
+				"persistence-capable boundary must consult pause directly or through its gate: "
+					.. boundary.start)
+		end
 	end)
 
 end)

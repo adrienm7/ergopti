@@ -26,10 +26,20 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		package.loaded["adapters.synthetic_input"] = {
 			emit_key_stroke = function() return true end,
 		}
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_delay, callback)
+				local handle = { timer = {}, callback = callback }
+				timers[#timers + 1] = handle
+				return handle, true
+			end,
+			cancel = function(handle)
+				if handle then handle.timer = nil end
+				return true
+			end,
+		}
 
 		local TS = helpers.load_with_stubs("adapters.text_sender", {
 			eventtap = { keyStroke = function() end, keyStrokes = function() end },
-			timer    = { doAfter = function(_d, fn) timers[#timers + 1] = fn; return { stop = function() end } end },
 		})
 
 		TS.send(("a"):rep(50), { mode = "clipboard" })  -- call #1: saves ORIGINAL, arms restore
@@ -40,12 +50,13 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		helpers.assert_eq(saves, 1)
 
 		-- Fire the surviving (last) restore; the clipboard must be the user's ORIGINAL.
-		pcall(timers[#timers])
+		pcall(timers[#timers].callback)
 		helpers.assert_true(#restores >= 1, "a restore must fire")
 		helpers.assert_eq(restores[#restores], "ORIGINAL")
 
 		package.loaded["adapters.clipboard"]   = nil
 		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["adapters.text_sender"] = nil
 	end)
 end)
@@ -55,6 +66,7 @@ local function load_failure_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
+		"adapters.timer_scheduler",
 		"infra.logger", "infra.timings",
 	}) do package.loaded[name] = nil end
 	local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
@@ -98,21 +110,36 @@ local function load_failure_fixture(options)
 		end,
 	}
 	local timer_calls = 0
-	local sender = helpers.load_with_stubs("adapters.text_sender", {
-		timer = {
-			doAfter = function(_delay, callback)
-				timer_calls = timer_calls + 1
-				local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
-				if outcome == "throw" then error("injected timer failure") end
-				if outcome == "nil" then return nil end
-				local handle = { callback = callback, stopped = false }
-				function handle:stop() self.stopped = true end
-				timers[#timers + 1] = handle
-				if options.timer_synchronously then callback() end
-				return handle
-			end,
-		},
-	})
+	local cancel_calls = 0
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(_delay, callback)
+			timer_calls = timer_calls + 1
+			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
+			if outcome == "throw" then error("injected timer failure") end
+			local handle = { callback = callback, stopped = false, timer = {} }
+			timers[#timers + 1] = handle
+			if outcome == "nil" then
+				handle.timer = nil
+				return handle, false
+			end
+			if options.timer_synchronously then
+				callback()
+				return handle, false
+			end
+			return handle, outcome ~= "uncommitted"
+		end,
+		cancel = function(handle)
+			cancel_calls = cancel_calls + 1
+			local cancel_outcome = options.cancel_results and options.cancel_results[cancel_calls]
+			if options.cancel_returns_false or cancel_outcome == false then return false end
+			if handle then
+				handle.stopped = true
+				handle.timer = nil
+			end
+			return true
+		end,
+	}
+	local sender = helpers.load_with_stubs("adapters.text_sender", {})
 	return {
 		sender = sender,
 		original = original,
@@ -120,6 +147,7 @@ local function load_failure_fixture(options)
 		timers = timers,
 		restores = function() return restores end,
 		emits = function() return emits end,
+		cancel_calls = function() return cancel_calls end,
 	}
 end
 
@@ -149,6 +177,23 @@ helpers.describe("text_sender clipboard path fails closed at native boundaries",
 		helpers.assert_eq(f.sender.send(("z"):rep(60), { mode = "clipboard" }), false)
 		helpers.assert_eq(f.emits(), 0)
 		helpers.assert_true(f.current() == f.original)
+	end)
+
+	helpers.it("retains an uncommitted timer whose exact rollback is refused", function()
+		local f = load_failure_fixture({
+			timer_outcomes = { "uncommitted" },
+			cancel_results = { false, false, true },
+		})
+		helpers.assert_eq(f.sender.send(("u"):rep(60), { mode = "clipboard" }), false)
+		helpers.assert_eq(f.emits(), 0)
+		helpers.assert_true(f.current() == f.original)
+		helpers.assert_eq(f.cancel_calls(), 2,
+			"failed acquisition and synchronous clipboard rollback both retry the exact timer")
+
+		helpers.assert_eq(f.sender.send(("v"):rep(60), { mode = "clipboard" }), true,
+			"the next send must retry retained cleanup before arming its own restore")
+		helpers.assert_eq(f.cancel_calls(), 3)
+		helpers.assert_eq(f.emits(), 1)
 	end)
 
 	helpers.it("bounds synchronous timer and fallback callbacks instead of recursing", function()

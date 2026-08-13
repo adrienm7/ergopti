@@ -60,14 +60,17 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 				end,
 			},
 			timer = {
-				doAfter = function(_delay, _fn)
-					-- Timeout timer is irrelevant to this race; return an inert handle.
-					return { stop = function() end }
+				new = function(_delay, _fn)
+					local timer = {}
+					function timer:start() return self end
+					function timer:stop() return self end
+					return timer
 				end,
 			},
 		}
 
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 
@@ -112,11 +115,17 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 				end,
 			},
 			timer = {
-				doAfter = function(_delay, _fn) return { stop = function() end } end,
+				new = function(_delay, _fn)
+					local timer = {}
+					function timer:start() return self end
+					function timer:stop() return self end
+					return timer
+				end,
 			},
 		}
 
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 

@@ -1547,6 +1547,8 @@ mouse_tap = eventtap.new(
 -- seconds of dead typing costs nothing worth measuring.
 local TAP_WATCHDOG_SEC = 1
 local _watchdog_timer  = nil
+local _watchdog_generation = 0
+local _watchdog_committed = false
 local tap_watchdog
 
 local function eventtap_is_enabled(name, event_tap)
@@ -1602,29 +1604,39 @@ end
 
 
 local function watchdog_is_running(timer)
-	if not timer then return false end
-	if type(timer.running) == "function" then
-		local ok, running = pcall(timer.running, timer)
-		return ok and running == true
+	if not timer then return false, false end
+	local member_ok, member_or_err = pcall(function() return timer.running end)
+	if not member_ok then return false, false end
+	if type(member_or_err) == "function" then
+		local ok, running = pcall(member_or_err, timer)
+		return ok and running == true, ok and type(running) == "boolean"
 	end
 	-- The pure-Lua test adapter exposes native timer state as a boolean field.
-	return timer.running == true
+	if type(timer) == "table" and type(member_or_err) == "boolean" then
+		return member_or_err == true, true
+	end
+	return false, false
 end
 
 
 local function stop_watchdog()
 	local timer = _watchdog_timer
+	-- Fence every callback generation before crossing the native stop boundary.
+	_watchdog_generation = _watchdog_generation + 1
+	_watchdog_committed = false
 	if not timer then return true end
-	if type(timer.stop) ~= "function" then
-		Logger.error(LOG, "Keymap watchdog has no stop capability.")
+	local method_ok, stop_method = pcall(function() return timer.stop end)
+	if not method_ok or type(stop_method) ~= "function" then
+		Logger.error(LOG, "Keymap watchdog has no stop capability: %s.", tostring(stop_method))
 		return false
 	end
-	local ok, result = pcall(timer.stop, timer)
+	local ok, result = pcall(stop_method, timer)
 	if not ok then
 		Logger.error(LOG, "Keymap watchdog stop failed: %s.", tostring(result))
 		return false
 	end
-	if watchdog_is_running(timer) then
+	local running, state_ok = watchdog_is_running(timer)
+	if not state_ok or running then
 		Logger.error(LOG, "Keymap watchdog stop did not commit.")
 		return false
 	end
@@ -1635,13 +1647,20 @@ end
 
 local function start_watchdog()
 	if not stop_watchdog() then return false end
-	local ok_new, timer = pcall(hs.timer.new, TAP_WATCHDOG_SEC, tap_watchdog)
-	if not ok_new or not timer or type(timer.start) ~= "function" then
+	local candidate = nil
+	local generation = _watchdog_generation + 1
+	local ok_new, timer = pcall(hs.timer.new, TAP_WATCHDOG_SEC, function()
+		Logger.pcall(LOG, tap_watchdog, candidate, generation)
+	end)
+	local method_ok, start_method = pcall(function() return timer and timer.start end)
+	if not ok_new or not timer or not method_ok or type(start_method) ~= "function" then
 		Logger.error(LOG, "Keymap watchdog creation failed: %s.", tostring(timer))
 		return false
 	end
-	_watchdog_timer = timer
-	local ok_start, result = pcall(timer.start, timer)
+	candidate = timer
+	_watchdog_timer = candidate
+	_watchdog_generation = generation
+	local ok_start, result = pcall(start_method, timer)
 	if not ok_start then
 		Logger.error(LOG, "Keymap watchdog start failed: %s.", tostring(result))
 		stop_watchdog()
@@ -1652,6 +1671,7 @@ local function start_watchdog()
 		stop_watchdog()
 		return false
 	end
+	_watchdog_committed = true
 	return true
 end
 
@@ -1663,7 +1683,13 @@ local function taps_are_enabled()
 		and eventtap_is_enabled("mouse", mouse_tap)
 end
 
-tap_watchdog = function()
+tap_watchdog = function(timer, generation)
+	if _started ~= true
+		or _watchdog_committed ~= true
+		or _watchdog_timer ~= timer
+		or _watchdog_generation ~= generation then
+		return
+	end
 	-- Timer allocation in the HID callback is best-effort. This periodic path is
 	-- the independent retry that guarantees a closed observation-gap latch cannot
 	-- strand predictions forever.
@@ -1690,7 +1716,8 @@ end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
-	if _started and taps_are_enabled() and watchdog_is_running(_watchdog_timer)
+	if _started and _watchdog_committed == true
+		and taps_are_enabled() and watchdog_is_running(_watchdog_timer)
 		and diagnostic_mailbox_is_running()
 	then
 		return true

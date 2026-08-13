@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test that locks down the contract: once core_llm reports a
 --- permanent load failure via is_backend_load_failed(), the warmup retry loop
---- must stop arming new hs.timer.doAfter calls.
+--- must stop arming new TimerScheduler one-shot calls.
 ---
 --- Before this behaviour was introduced, try_warmup() would schedule the next
 --- retry unconditionally after each warmup attempt. When the backend entered a
@@ -15,16 +15,16 @@
 ---
 --- APPROACH:
 --- 1. Stub lib.timings so the module loads cleanly without the shared TOML file.
---- 2. Inject a custom hs.timer.doAfter that records every scheduling call and
+--- 2. Inject a custom TimerScheduler.after that records every scheduling call and
 ---    captures the callback so we can fire it synchronously.
---- 3. Load warmup_controller via helpers.load_with_stubs with the timer override.
+--- 3. Load warmup_controller with the scheduler module stubbed in package.loaded.
 --- 4. Call M.init() with a core_llm stub whose is_backend_load_failed() starts
 ---    false (backend "still loading") and get_current_model() returns a valid name.
 --- 5. Call schedule_warmup_with_retry() — this arms the initial timer (call #1).
 --- 6. Fire the initial timer callback: is_backend_load_failed() is still false,
 ---    so try_warmup() runs a warmup attempt and schedules a retry (call #2).
 --- 7. Flip is_backend_load_failed() to true, then fire the retry callback.
---- 8. Assert that no further hs.timer.doAfter call was made (count stays at 2).
+--- 8. Assert that no further TimerScheduler.after call was made (count stays at 2).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -36,29 +36,34 @@ local helpers = require("tests.helpers")
 -- =============================================
 -- =============================================
 
---- Builds an isolated hs.timer stub that records doAfter calls and lets tests
+--- Builds an isolated timer-scheduler stub that records after calls and lets tests
 --- fire callbacks synchronously by index. A fresh instance is created per
 --- describe block so call counts never bleed between suites.
---- @return table Stub with doAfter, _calls, _fire(n), and _count().
+--- @return table Stub with after, cancel, _calls, _fire(n), and _count().
 local function make_timer_stub()
 	local stub = {
-		_calls = {},  -- { delay, fn } for every doAfter invocation
+		_calls = {},
 	}
 
-	function stub.doAfter(delay, fn)
-		stub._calls[#stub._calls + 1] = { delay = delay, fn = fn }
-		-- Return a minimal timer handle; warmup_controller does not use the handle
-		return { stop = function() end }
+	function stub.after(delay, fn)
+		local handle = { active = true }
+		stub._calls[#stub._calls + 1] = { delay = delay, fn = fn, handle = handle }
+		return handle, true
+	end
+
+	function stub.cancel(handle)
+		if type(handle) == "table" then handle.active = false end
+		return true
 	end
 
 	--- Fires the Nth scheduled callback (1-based).
 	--- @param n number Index into the call list.
 	function stub._fire(n)
 		local entry = stub._calls[n]
-		if entry and entry.fn then entry.fn() end
+		if entry and entry.handle.active and entry.fn then entry.fn() end
 	end
 
-	--- Returns the number of doAfter calls recorded so far.
+	--- Returns the number of after calls recorded so far.
 	--- @return number Total scheduling calls.
 	function stub._count()
 		return #stub._calls
@@ -91,19 +96,15 @@ local TIMINGS_STUB = {
 
 helpers.describe("warmup_controller — retry loop terminates after mark_load_failed()", function()
 
-	--- Loads a fresh warmup_controller with the given timer stub wired in.
-	--- @param timer_stub table Custom hs.timer replacement.
+	--- Loads a fresh warmup_controller with the given scheduler stub wired in.
+	--- @param timer_stub table Custom TimerScheduler replacement.
 	--- @return table The loaded warmup_controller module.
 	local function load_controller(timer_stub)
 		-- Stub lib.timings before requiring the module so the TOML is never read
 		package.loaded["infra.timings"] = TIMINGS_STUB
+		package.loaded["adapters.timer_scheduler"] = timer_stub
 		package.loaded["modules.llm.warmup_controller"] = nil
-
-		local M = helpers.load_with_stubs(
-			"modules.llm.warmup_controller",
-			{ timer = timer_stub }
-		)
-		return M
+		return require("modules.llm.warmup_controller")
 	end
 
 	helpers.it("no additional timer is armed after is_backend_load_failed() returns true", function()

@@ -97,26 +97,24 @@ helpers.describe("Audit-hs-final fixes", function()
 
 
 	-- ========================================================
-	-- ===== 5) actions.lua: leftMouseTap doAfter race fixed
+	-- ===== 5) actions.lua: leftMouseTap deferred race removed
 	-- ========================================================
 
-	helpers.it("actions.lua leftMouseTap must guard on leftClickHeld before re-toggling", function()
+	helpers.it("actions.lua leftMouseTap must not defer a re-toggle after mouseUp", function()
 		-- The synthetic click-hold subsystem was extracted into actions_click.lua;
 		-- read both so the guard assertion survives that move (move-resilient).
 		local src = (read_src("local function switch_to_previous_window_precise") or "") ..
 			"\n" .. (read_src("local function start_click_key_watcher") or "")
 		assert(src ~= "", "gestures actions/actions_click source must be readable")
-		-- The bug: doAfter(0, M.toggle_left_click) fired unconditionally. If
-		-- click_key_watcher had already set leftClickHeld=false, the deferred
-		-- call re-engaged an infinite hold.
-		-- The fix: guard inside the deferred closure.
+		-- The original fix guarded the deferred toggle. Removing that deferral is
+		-- stronger: the callback now fences state and passes physical mouseUp on.
 		assert(
 			not src:find("doAfter%(0, M%.toggle_left_click%)", 1, false),
-			"actions.lua: bare doAfter(0, M.toggle_left_click) must be replaced with a guarded closure"
+			"actions.lua: bare doAfter(0, M.toggle_left_click) must never return"
 		)
 		assert(
-			src:find("if leftClickHeld then M%.toggle_left_click", 1, false),
-			"actions.lua: the deferred leftMouseUp handler must check leftClickHeld before toggling"
+			not src:find("if leftClickHeld then M%.toggle_left_click", 1, false),
+			"actions.lua: leftMouseUp must not depend on an in-process deferred re-toggle"
 		)
 	end)
 
@@ -174,7 +172,7 @@ helpers.describe("Audit-hs-final fixes", function()
 			.. "hand-written pcall wrappers is what let the third one be forgotten"
 		)
 		assert(
-			src:find("local ok, err = pcall%(action%)", 1, false),
+			src:find("local%s+[%w_]+%s*,%s*[%w_]+%s*=%s*pcall%(action%)", 1, false),
 			"karabiner/watchers.lua: bind_f17 must pcall the action — an exception in a hotkey "
 			.. "callback is delivered to the Hammerspoon Console, never to the driver's log"
 		)

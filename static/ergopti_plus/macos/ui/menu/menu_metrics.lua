@@ -106,22 +106,112 @@ function M.build(ctx)
 		return script_control and type(script_control.is_paused) == "function"
 			and script_control.is_paused() or false
 	end
-		if state.keylogger_enabled then
+
+	--- Persists one WPM state transition without letting a menu callback throw.
+	--- @param label string Diagnostic operation label.
+	--- @return boolean committed True only when persistence returned exact true.
+	local function save_wpm_preferences(label)
+		local ok, result = xpcall(save_prefs, debug.traceback)
+		if ok and result == true then return true end
+		Logger.error(LOG, "%s preference persistence failed: %s.", label,
+			tostring(ok and result or result))
+		return false
+	end
+
+	--- Invokes one WPM lifecycle method through its exact boolean contract.
+	--- @param label string Diagnostic component label.
+	--- @param module table WPM component module.
+	--- @param method string `start` or `stop`.
+	--- @param ... any Lifecycle arguments.
+	--- @return boolean committed True only when the method returned exact true.
+	local function call_wpm_lifecycle(label, module, method, ...)
+		if type(module) ~= "table" or type(module[method]) ~= "function" then
+			Logger.error(LOG, "%s %s is unavailable.", label, method)
+			return false
+		end
+		local args = table.pack(...)
+		local ok, result = xpcall(function()
+			return module[method](table.unpack(args, 1, args.n))
+		end, debug.traceback)
+		if ok and result == true then return true end
+		Logger.error(LOG, "%s %s did not commit: %s.", label, method,
+			tostring(ok and result or result))
+		return false
+	end
+
+	--- Removes a visibility preference after its runtime activation was rejected.
+	--- @param state_key string Visibility preference key.
+	--- @param label string Diagnostic component label.
+	--- @return boolean Always false, for direct propagation to the caller.
+	local function compensate_rejected_wpm_start(state_key, label)
+		state[state_key] = false
+		local persisted = save_wpm_preferences(label .. " activation rollback")
+		Logger.error(LOG, "%s remains disabled after rejected activation; rollback persisted=%s.",
+			label, tostring(persisted))
+		return false
+	end
+
+	--- Reconciles a saved WPM visibility preference with the current pause state.
+	--- A failed start is compensated immediately so the menu cannot advertise an
+	--- active feature whose recurring producer was never committed.
+	--- @param state_key string Visibility preference key.
+	--- @param label string Diagnostic component label.
+	--- @param module table WPM component module.
+	--- @param ... any Start arguments.
+	--- @return boolean settled Runtime commitment/cleanup result.
+	local function sync_wpm_visibility(state_key, label, module, ...)
+		if state[state_key] and not paused then
+			if not call_wpm_lifecycle(label, module, "start", ...) then
+				return compensate_rejected_wpm_start(state_key, label)
+			end
+			return true
+		end
+		return call_wpm_lifecycle(label, module, "stop")
+	end
+
+	--- Applies an interactive WPM visibility toggle transactionally.
+	--- @param state_key string Visibility preference key.
+	--- @param label string Diagnostic component label.
+	--- @param module table WPM component module.
+	--- @param ... any Start arguments.
+	--- @return boolean committed True only when persistence and lifecycle settle.
+	local function toggle_wpm_visibility(state_key, label, module, ...)
+		local previous = state[state_key] == true
+		local desired = not previous
+		state[state_key] = desired
+		if not save_wpm_preferences(label .. " toggle") then
+			state[state_key] = previous
+			updateMenu()
+			return false
+		end
+
+		local settled
+		if desired and not paused_now() then
+			settled = call_wpm_lifecycle(label, module, "start", ...)
+			if not settled then compensate_rejected_wpm_start(state_key, label) end
+		else
+			-- OFF and paused-ON both require a quiescent runtime. A refused native
+			-- stop remains owned and fenced by the module, so retaining OFF is the
+			-- truthful user-visible state while later builds retry the exact debt.
+			settled = call_wpm_lifecycle(label, module, "stop")
+		end
+		updateMenu()
+		return settled
+	end
+
+	if state.keylogger_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 		end
-		if state.keylogger_menubar_wpm and not paused then WpmMenubar.start() else WpmMenubar.stop() end
+		sync_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)
 
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 		end
-		if state.keylogger_float_wpm and not paused then
-			WpmWidget.start(state.keylogger_float_graph)
-		else
-			WpmWidget.stop()
-		end
+		sync_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
+			state.keylogger_float_graph)
 	end
 
 
@@ -328,18 +418,11 @@ function M.build(ctx)
 	-- `check` rows since 2026-08-07: the label, the tick and the greying are the
 	-- manifest's, so these supply only what the click does.
 	local function cmd_wpm_menubar()
-		state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
-		if save_prefs() ~= true then return false end
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 		end
-		if state.keylogger_menubar_wpm and not paused_now() then
-			WpmMenubar.start()
-		else
-			WpmMenubar.stop()
-		end
-		updateMenu()
+		return toggle_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)
 	end
 
 	local function cmd_menubar_colors()
@@ -351,7 +434,10 @@ function M.build(ctx)
 		end
 		-- Only restart when the readout is actually shown: colouring a menubar
 		-- item that is not there would start it as a side effect.
-		if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() end
+		if state.keylogger_menubar_wpm and not paused_now()
+			and not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
+			compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
+		end
 		updateMenu()
 	end
 
@@ -361,14 +447,12 @@ function M.build(ctx)
 			checked  = state.keylogger_float_wpm,
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_widget", STATE_GETTERS),
 			fn       = function()
-				state.keylogger_float_wpm = not state.keylogger_float_wpm
-				if save_prefs() ~= true then return false end
 				local WpmWidget = require("ui.wpm.wpm_widget")
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) else WpmWidget.stop() end
-				updateMenu()
+				return toggle_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
+					state.keylogger_float_graph)
 			end,
 		})
 	end
@@ -385,7 +469,11 @@ function M.build(ctx)
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) end
+				if state.keylogger_float_wpm and not paused_now()
+					and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+						state.keylogger_float_graph) then
+					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+				end
 				updateMenu()
 			end,
 		})
@@ -403,7 +491,11 @@ function M.build(ctx)
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) end
+				if state.keylogger_float_wpm and not paused_now()
+					and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+						state.keylogger_float_graph) then
+					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+				end
 				updateMenu()
 			end,
 		})
@@ -501,11 +593,23 @@ function M.build(ctx)
 				if res ~= i18n.get("button.activate") then return end
 			end
 
-			state.keylogger_enabled = not state.keylogger_enabled
-			if save_prefs() ~= true then return false end
-
+			local desired_enabled = not state.keylogger_enabled
 			local ok_kl, Keylogger = pcall(require, "modules.keylogger")
 			if not ok_kl then Keylogger = nil end
+			local lifecycle_method = desired_enabled and "start" or "stop"
+			if type(Keylogger) ~= "table" or type(Keylogger[lifecycle_method]) ~= "function" then
+				-- Validate the security lifecycle capability before publishing either
+				-- memory or disk. In particular, OFF without a stop boundary would leave
+				-- key capture active behind an unchecked menu item.
+				Logger.error(LOG, "Metrics %s is unavailable; state remains unchanged.",
+					lifecycle_method)
+				updateMenu()
+				return false
+			end
+
+			state.keylogger_enabled = desired_enabled
+			if save_prefs() ~= true then return false end
+
 			local ok_wm, WpmMenubar = pcall(require, "ui.wpm.wpm_menubar")
 			if not ok_wm then WpmMenubar = nil end
 			local ok_ww, WpmWidget = pcall(require, "ui.wpm.wpm_widget")
@@ -518,24 +622,23 @@ function M.build(ctx)
 				if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
 					pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
 				end
-			local start_ok, started = false, false
-			if Keylogger and type(Keylogger.start) == "function" then
-				start_ok, started = pcall(Keylogger.start, script_control)
-			end
-			if not start_ok or started ~= true then
-				-- The preference was published before runtime activation. Compensate
-				-- transactionally so the checkmark cannot claim Metrics is active while
-				-- its security-context watcher (and therefore the engine) is absent.
-				state.keylogger_enabled = false
-				local rollback_saved = save_prefs() == true
-				state.keylogger_enabled = false
-				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
-					tostring(rollback_saved))
-				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
-				if WpmWidget and type(WpmWidget.stop) == "function" then pcall(WpmWidget.stop) end
-				updateMenu()
-				return false
-			end
+				local start_ok, started = pcall(Keylogger.start, script_control)
+				if not start_ok or started ~= true then
+					-- The preference was published before runtime activation. Compensate
+					-- transactionally so the checkmark cannot claim Metrics is active while
+					-- its security-context watcher (and therefore the engine) is absent.
+					state.keylogger_enabled = false
+					local rollback_saved = save_prefs() == true
+					state.keylogger_enabled = false
+					Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
+						tostring(rollback_saved))
+					if WpmMenubar then
+						call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+					end
+					if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
+					updateMenu()
+					return false
+				end
 				if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
 					pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
 				end
@@ -549,21 +652,45 @@ function M.build(ctx)
 				-- global mouse eventtap or the menubar's 0.5s timer until resume
 				-- (« pause = tout éteint », F-L10) — this call site was the one place
 				-- that still started both unconditionally on re-enable (F-LOW-13).
-				if state.keylogger_menubar_wpm and not paused_now() and WpmMenubar and type(WpmMenubar.start) == "function" then pcall(WpmMenubar.start) end
-				if state.keylogger_float_wpm and not paused_now() and WpmWidget and type(WpmWidget.start) == "function" then pcall(WpmWidget.start, state.keylogger_float_graph) end
+				local wpm_committed = true
+				if state.keylogger_menubar_wpm and not paused_now() then
+					if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
+						compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
+						wpm_committed = false
+					end
+				end
+				if state.keylogger_float_wpm and not paused_now() then
+					if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+						state.keylogger_float_graph) then
+						compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+						wpm_committed = false
+					end
+				end
+				if not wpm_committed then
+					updateMenu()
+					return false
+				end
 			else
-			if Keylogger and type(Keylogger.stop) == "function" then
+				local runtime_settled = true
 				local stop_ok, stopped = pcall(Keylogger.stop)
 				if not stop_ok or stopped ~= true then
 					Logger.error(LOG, "Metrics is disabled, but native keylogger cleanup remains pending.")
+					runtime_settled = false
+				end
+				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop") then
+					runtime_settled = false
+				end
+				if not call_wpm_lifecycle("WPM widget", WpmWidget, "stop") then
+					runtime_settled = false
+				end
+				if not runtime_settled then
+					updateMenu()
+					return false
 				end
 			end
-				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
-				if WpmWidget and type(WpmWidget.stop) == "function" then pcall(WpmWidget.stop) end
-			end
 
-		updateMenu()
-		return true
+			updateMenu()
+			return true
 		end,
 		menu = menu,
 	}

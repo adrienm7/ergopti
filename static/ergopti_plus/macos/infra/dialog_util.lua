@@ -30,6 +30,33 @@ local OPEN_BIN = "/usr/bin/open"
 local LOG    = "dialog_util"
 
 local M = {}
+local focus_timer_state = {}
+
+--- Cancels one exact deferred-focus timer and retains failed cleanup for retry.
+--- @param handle table TimerScheduler handle.
+--- @return boolean settled True only when the native timer was released.
+local function cancel_focus_timer(handle)
+	local ok, result_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and result_or_err == true then
+		focus_timer_state[handle] = nil
+		return true
+	end
+	focus_timer_state[handle] = false
+	Logger.error(LOG, "Deferred dialog-focus timer cleanup remains pending: %s.",
+		tostring(result_or_err))
+	return false
+end
+
+--- Retries only rejected/fired timer cleanup; committed pending nudges stay live.
+local function retry_focus_timer_cleanup()
+	local snapshot = {}
+	for handle, committed in pairs(focus_timer_state) do
+		if committed ~= true then snapshot[#snapshot + 1] = handle end
+	end
+	for _, handle in ipairs(snapshot) do cancel_focus_timer(handle) end
+end
 
 
 
@@ -55,6 +82,7 @@ local M = {}
 ---   actually focuses the dialog; this third mechanism only helps the case where
 ---   the runloop keeps turning.
 local function focus_hammerspoon(defer_open)
+	retry_focus_timer_cleanup()
 	local function do_focus()
 		local ok, err = pcall(function() return hs.focus(true) end)
 		if not ok then
@@ -79,7 +107,7 @@ local function focus_hammerspoon(defer_open)
 	-- lands on whatever the user switched to instead. That is why only the
 	-- non-blocking wrapper asks for it.
 	if not defer_open then return end
-	pcall(function()
+	local schedule_ok, handle_or_err, committed = xpcall(function()
 		local bundlePath = hs.processInfo.bundlePath
 		if bundlePath then
 			-- Asynchronous, and argv rather than a shell string. `open` waits on
@@ -92,12 +120,32 @@ local function focus_hammerspoon(defer_open)
 			-- The GC pitfall the old comment worried about is handled by the spawner:
 			-- it pins the task in its own long-lived table before starting it and
 			-- releases it in the completion callback.
-			TimerScheduler.after(0.1, function()
-				local handle = ShellRunner.spawn(OPEN_BIN, { bundlePath })
-				if handle then handle.start() end
+			local candidate = nil
+			local handle, timer_committed = TimerScheduler.after(0.1, function()
+				if focus_timer_state[candidate] ~= true then return end
+				focus_timer_state[candidate] = false
+				if candidate.timer == nil then
+					focus_timer_state[candidate] = nil
+				else
+					cancel_focus_timer(candidate)
+				end
+				local spawn_handle = ShellRunner.spawn(OPEN_BIN, { bundlePath })
+				if spawn_handle then spawn_handle.start() end
 			end)
+			candidate = handle
+			return handle, timer_committed
 		end
-	end)
+		return nil, false
+	end, debug.traceback)
+	local candidate = handle_or_err
+	if type(candidate) == "table" then focus_timer_state[candidate] = committed == true end
+	if not schedule_ok or type(candidate) ~= "table" or committed ~= true then
+		if type(candidate) == "table" then cancel_focus_timer(candidate) end
+		Logger.error(LOG, "Deferred dialog-focus timer could not be committed: %s.",
+			tostring(handle_or_err))
+		return false
+	end
+	return true
 end
 
 --- Focus-aware wrapper around hs.dialog.blockAlert.

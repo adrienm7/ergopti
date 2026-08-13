@@ -65,9 +65,9 @@ check(
 
 // Check Hammerspoon Fixes
 check(
-    'HS: click_key_watcher includes flagsChanged',
-    'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
-    /hs\.eventtap\.event\.types\.flagsChanged/
+	'HS: click_key_watcher includes flagsChanged through its event-types alias',
+	'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
+	/local function construct_click_key_watcher\([\s\S]*local ev_types = hs\.eventtap\.event\.types[\s\S]*construct_eventtap\(\{\s*ev_types\.keyDown\s*,\s*ev_types\.flagsChanged\s*\}/
 );
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);

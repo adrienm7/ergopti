@@ -47,6 +47,46 @@ local function make_tmp_dir()
 	return p .. "/"
 end
 
+--- Builds the exact FileSystem port surface this resolver exercises.
+---
+--- The stock Windows Lua runner cannot expose Hammerspoon's hard-link primitive,
+--- so the production create-only adapter correctly fails closed there. These
+--- resolver tests own no concurrent writer; this fixture preserves the port's
+--- status/commit contract while using their private real directories.
+--- @return table file_system Faithful first-run bootstrap port.
+local function make_bootstrap_file_system()
+	local file_system = {}
+
+	function file_system.read_with_status(path)
+		local fh, open_err, open_code = io.open(path, "r")
+		if not fh then
+			if open_code == 2 then return nil, "absent", open_err end
+			return nil, "error", open_err
+		end
+		local content, read_err = fh:read("*a")
+		local closed, close_err = fh:close()
+		if type(content) ~= "string" then return nil, "error", read_err end
+		if closed ~= true then return nil, "error", close_err end
+		return content, "ok"
+	end
+
+	function file_system.create_if_absent(path, content)
+		local _, status, detail = file_system.read_with_status(path)
+		if status == "ok" then return false, "exists" end
+		if status ~= "absent" then return false, "error", detail end
+
+		local fh, open_err = io.open(path, "w")
+		if not fh then return false, "error", open_err end
+		local written, write_err = fh:write(type(content) == "string" and content or "")
+		local closed, close_err = fh:close()
+		if not written then return false, "error", write_err end
+		if closed ~= true then return false, "error", close_err end
+		return true, "created"
+	end
+
+	return file_system
+end
+
 --- Loads menu_paths with a controlled environment.
 --- @param opts table {home: string|nil, paths_toml: string|nil, base_dir: string}
 --- @return table The freshly required module.
@@ -71,8 +111,12 @@ local function load_paths(opts)
 
 	package.loaded["ui.menu.menu_paths"] = nil
 	package.loaded["infra.config_paths"] = nil
-	local mod = helpers.load_with_stubs("ui.menu.menu_paths")
+	local previous_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = make_bootstrap_file_system()
+	local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_paths")
+	package.loaded["adapters.file_system"] = previous_file_system
 	os.getenv = real_getenv
+	if not ok then error(mod, 0) end
 	return mod
 end
 
@@ -171,13 +215,13 @@ helpers.describe("menu_paths: a resolved path's parent directory exists on disk"
 		local base = make_tmp_dir()
 		local home = make_tmp_dir():gsub("[/\\]$", "")
 		local Paths = load_paths({ home = home, paths_toml = nil, base_dir = base })
-		Paths.init(base, function() end)
+		helpers.assert_true(Paths.init(base, function() end),
+			"path resolver initialization must commit before its directory contract is tested")
 
 		helpers.assert_true(dir_exists(Paths.get_config_dir()),
 			"get_config_dir() must name a directory that exists after init")
-		helpers.assert_true(type(Paths.get_default_config_dir()) == "string"
-			and Paths.get_default_config_dir() ~= "",
-			"get_default_config_dir() must always answer, it is the wizard's pre-fill")
+		helpers.assert_true(dir_exists(Paths.get_default_config_dir()),
+			"get_default_config_dir() must name a real directory, it is the wizard's pre-fill")
 	end)
 end)
 

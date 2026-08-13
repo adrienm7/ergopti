@@ -20,6 +20,9 @@ local helpers = require("tests.helpers")
 --- that background checks actually arm.
 local function fresh_packaged()
 	package.loaded["modules.updater"] = nil
+	-- TimerScheduler captures the current hs timer table and owns a live-handle
+	-- registry, so every fresh updater fixture needs the matching fresh adapter
+	package.loaded["adapters.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.updater", {
 		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
 	})

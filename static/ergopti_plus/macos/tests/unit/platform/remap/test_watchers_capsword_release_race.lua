@@ -31,6 +31,9 @@ local function fresh_harness(options)
 	options = options or {}
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["adapters.shell_runner"] = nil
+	-- TaskLifecycle captures `hs` at require time, so each harness must bind a
+	-- fresh instance to the task constructor below rather than its predecessor.
+	package.loaded["adapters.task_lifecycle"] = nil
 
 	local h = {
 		clock = 1000,
@@ -55,7 +58,7 @@ local function fresh_harness(options)
 			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
 			h.timers[#h.timers + 1] = handle
 			if options.timer_unavailable then handle.fired = true end
-			return handle
+			return handle, options.timer_uncommitted ~= true
 		end,
 		cancel = function(handle)
 			if not handle then return true end
@@ -427,6 +430,18 @@ helpers.describe("watchers CapsWord resource failures are fail-closed", function
 		helpers.assert_eq(#h.tasks, 2, "both pointer events must reach task construction")
 		helpers.assert_true(h.tasks[1].fake.terminated and h.tasks[2].fake.terminated,
 			"each refused probe is reclaimed by exact handle")
+	end)
+
+	helpers.it("CapsWord watcher: uncommitted watchdog cannot publish a live probe", function()
+		local h = fresh_harness({ timer_uncommitted = true })
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 1)
+		helpers.assert_true(h.tasks[1].fake.terminated,
+			"a task without an exactly committed watchdog must be reclaimed")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2,
+			"the rejected watchdog must release the pending guard for retry")
+		helpers.assert_true(h.tasks[2].fake.terminated)
 	end)
 
 	helpers.it("CapsWord watcher: eventtap constructor failure returns nil without installing a hook", function()

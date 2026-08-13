@@ -16,6 +16,7 @@ local JsonCodec  = require("adapters.json_codec")
 local text_utils = require("infra.text_utils")
 local NetworkInfo = require("adapters.network_info")
 local Notifier    = require("adapters.notifier")
+local TimerScheduler = require("adapters.timer_scheduler")
 local Version    = require("updater.version")
 local ReleaseParser = require("updater.release_parser")
 local LOG        = "updater"
@@ -68,7 +69,9 @@ local _update_state       = "idle"
 local _cached_release     = nil
 local _last_notified_tag  = ""
 local _bg_timer           = nil
+local _bg_timer_committed = false
 local _boot_timer         = nil  -- one-shot boot-check; tracked so stop_background_checks() can cancel it
+local _boot_timer_committed = false
 local _check_interval_sec = DEFAULT_INTERVAL_SEC
 -- Monotonic counter; bumped on start/stop. Async callbacks capture their own
 -- generation before launching asyncGet and discard their response when the
@@ -337,7 +340,8 @@ local function notify_new_version(tag, update_menu_fn)
 	Notifier.send(title, { body = body, kind = "info" })
 end
 
-local function background_tick(channel, update_menu_fn)
+local function background_tick(channel, update_menu_fn, generation)
+	if generation ~= _poll_generation then return end
 	if M.is_local_source() or _check_interval_sec <= 0 then return end
 	local reachable = NetworkInfo.isInternetReachable()
 	if NetworkInfo.hasInternetProbeResult() and not reachable then
@@ -348,10 +352,9 @@ local function background_tick(channel, update_menu_fn)
 	local url = M.release_api_url(channel)
 	-- Capture generation before the async call so a channel switch mid-flight
 	-- can be detected and the stale response discarded.
-	local gen = _poll_generation
 	hs.http.asyncGet(url, fetch_headers(channel), function(status, body, response_headers)
-		if gen ~= _poll_generation then
-			Logger.debug(LOG, "Background check: stale response discarded (gen %d != %d).", gen, _poll_generation)
+		if generation ~= _poll_generation then
+			Logger.debug(LOG, "Background check: stale response discarded (gen %d != %d).", generation, _poll_generation)
 			return
 		end
 		body = resolve_fetch_body(channel, status, body, response_headers)
@@ -378,45 +381,113 @@ local function background_tick(channel, update_menu_fn)
 end
 
 function M.stop_background_checks()
-	-- Bump generation to invalidate any in-flight asyncGet callbacks.
+	Logger.start(LOG, "Stopping background update checks…")
+	-- Invalidate both in-flight HTTP completions and callbacks from an exact
+	-- recurring handle whose native stop refuses or raises
 	_poll_generation = _poll_generation + 1
+	local settled = true
 	if _bg_timer then
-		pcall(function() _bg_timer:stop() end)
-		_bg_timer = nil
+		local ok_cancel, cancelled = pcall(TimerScheduler.cancel, _bg_timer)
+		if ok_cancel and cancelled == true then
+			_bg_timer = nil
+			_bg_timer_committed = false
+		else
+			settled = false
+			Logger.error(LOG, "Recurring update timer stop failed; retained for retry — %s.",
+				tostring(ok_cancel and cancelled or cancelled))
+		end
 	end
 	if _boot_timer then
-		pcall(function() _boot_timer:stop() end)
-		_boot_timer = nil
+		local ok_cancel, cancelled = pcall(TimerScheduler.cancel, _boot_timer)
+		if ok_cancel and cancelled == true then
+			_boot_timer = nil
+			_boot_timer_committed = false
+		else
+			settled = false
+			Logger.error(LOG, "Boot update timer stop failed; retained for retry — %s.",
+				tostring(ok_cancel and cancelled or cancelled))
+		end
 	end
+	if not settled then
+		Logger.error(LOG, "Background update checks could not stop completely.")
+		return false
+	end
+	Logger.success(LOG, "Background update checks stopped.")
+	return true
 end
 
 function M.start_background_checks(channel, interval_sec, update_menu_fn)
-	M.stop_background_checks()
+	if M.stop_background_checks() ~= true then
+		Logger.error(LOG, "Background update checks cannot start while prior timer cleanup is pending.")
+		return false
+	end
 	-- Clear any cached release from a previous channel so stale update data from
 	-- one channel does not bleed into another when the user switches channels.
 	M.clear_cached_release()
 	M.set_check_interval(interval_sec)
 	if M.is_local_source() then
 		Logger.debug(LOG, "Local source — background checks disabled.")
-		return
+		return true
 	end
 	if _check_interval_sec <= 0 then
 		Logger.debug(LOG, "Check interval 0 — background checks disabled.")
-		return
+		return true
 	end
 	local first_delay = math.min(BOOT_CHECK_DELAY_SEC, _check_interval_sec)
 	Logger.start(LOG, "Background update checks every %ds (first in %ds).", _check_interval_sec, first_delay)
-	_bg_timer = hs.timer.doEvery(_check_interval_sec, function()
-		background_tick(channel, update_menu_fn)
-	end)
-	_boot_timer = hs.timer.doAfter(first_delay, function()
-		_boot_timer = nil
-		background_tick(channel, update_menu_fn)
-	end)
+	local generation = _poll_generation
+	local recurring_candidate
+	local ok_schedule, recurring_handle, recurring_committed = pcall(
+		TimerScheduler.every, _check_interval_sec, function()
+			if generation ~= _poll_generation
+				or _bg_timer ~= recurring_candidate
+				or not _bg_timer_committed then
+				return
+			end
+			background_tick(channel, update_menu_fn, generation)
+		end)
+	recurring_candidate = recurring_handle
+	if ok_schedule and type(recurring_handle) == "table" then
+		_bg_timer = recurring_handle
+		_bg_timer_committed = recurring_committed == true
+	end
+	if not ok_schedule or type(recurring_handle) ~= "table" or recurring_committed ~= true then
+		M.stop_background_checks()
+		Logger.error(LOG, "Recurring update timer could not be armed; background checks remain stopped — %s.",
+			tostring(ok_schedule and recurring_committed or recurring_handle))
+		return false
+	end
+
+	local boot_candidate
+	local ok_boot, boot_handle, boot_committed = pcall(
+		TimerScheduler.after, first_delay, function()
+			if generation ~= _poll_generation
+				or _boot_timer ~= boot_candidate
+				or not _boot_timer_committed then
+				return
+			end
+			_boot_timer = nil
+			_boot_timer_committed = false
+			background_tick(channel, update_menu_fn, generation)
+		end)
+	boot_candidate = boot_handle
+	if ok_boot and type(boot_handle) == "table" then
+		_boot_timer = boot_handle
+		_boot_timer_committed = boot_committed == true
+	end
+	if not ok_boot or type(boot_handle) ~= "table" or boot_committed ~= true then
+		M.stop_background_checks()
+		Logger.error(LOG, "Boot update timer could not be armed; background checks remain stopped — %s.",
+			tostring(ok_boot and boot_committed or boot_handle))
+		return false
+	end
+
+	Logger.success(LOG, "Background update checks started.")
+	return true
 end
 
 function M.restart_background_checks(channel, interval_sec, update_menu_fn)
-	M.start_background_checks(channel, interval_sec, update_menu_fn)
+	return M.start_background_checks(channel, interval_sec, update_menu_fn)
 end
 
 return M

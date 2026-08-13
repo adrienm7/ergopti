@@ -69,6 +69,7 @@ helpers.describe("shortcuts.actions.system", function()
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 		-- load_with_stubs builds a FRESH stub table per call, so the one captured
 		-- at the top of this file is not the one the module just bound. Read the
@@ -114,6 +115,7 @@ end)
 
 local function load_capslock_fixture(toggle_impl)
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.key_state"] = {
 		toggle_capslock = toggle_impl,
@@ -143,6 +145,7 @@ local function load_capslock_fixture(toggle_impl)
 	local system = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local function cleanup()
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.key_state"] = nil
 		package.loaded["infra.logger"] = nil
@@ -219,6 +222,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	local function make_sys_with_alert_spy()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 
 		local show_calls      = {}
 		local close_all_calls = 0
@@ -248,6 +252,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	helpers.it("closes the banner on manual toggle OFF", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 
 		local close_calls = 0
 
@@ -268,6 +273,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	helpers.it("closes the banner on stop_awake", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 
 		local close_calls = 0
 
@@ -292,6 +298,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	helpers.it("closes only its own alert when an id was captured (never closeAll)", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 
 		local close_all_calls = 0
 		local closed_ids      = {}
@@ -320,6 +327,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	helpers.it("calls closeAll even when hs.alert.show returned nil (no ID captured)", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 
 		local close_all_calls = 0
 
@@ -344,6 +352,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	local function activate_with_watcher()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
@@ -362,7 +371,11 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		local captured = { cb = nil }
 		hs.eventtap.new = function(_types, cb)
 			captured.cb = cb
-			return { start = function() end, stop = function() end }
+			local tap = { enabled = false }
+			function tap:start() self.enabled = true; return self end
+			function tap:stop() self.enabled = false; return self end
+			function tap:isEnabled() return self.enabled end
+			return tap
 		end
 
 		sys.toggle_awake()   -- ON → builds and "starts" the watcher, capturing its callback
@@ -427,6 +440,7 @@ local function fake_activity_event()
 	helpers.it("_emit_activity_keystroke pumps one tagged F18 pair without advancing the action epoch (keep-awake-non-action)", function()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 
@@ -564,6 +578,7 @@ end)
 helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local PAIRS = { ["("] = { left = "(", right = ")" }, [")"] = { left = "(", right = ")" } }
 
@@ -614,6 +629,7 @@ end)
 local function make_sys_screenshot_spies(window_override)
 	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
@@ -903,6 +919,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		if selection == "" then selection = nil end
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
@@ -927,7 +944,11 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		local eventtap = extend_contract(contract.eventtap, {
 			new = function(_types, cb)
 				captured.cb = cb
-				return { start = function() end, stop = function() end }
+				local tap = { enabled = false }
+				function tap:start() self.enabled = true; return self end
+				function tap:stop() self.enabled = false; return self end
+				function tap:isEnabled() return self.enabled end
+				return tap
 			end,
 		})
 		local timer = extend_contract(contract.timer, {
@@ -1083,6 +1104,7 @@ local SyntheticInputStack = require("tests.support.synthetic_input_stack")
 local function load_h01_system(options)
 	options = options or {}
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
 	package.loaded["adapters.shell_runner"] = nil

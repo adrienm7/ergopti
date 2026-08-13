@@ -213,8 +213,11 @@ helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5
 			"api_mlx.lua must declare _pgid_pending_timeout for the safety-timeout handle")
 	end)
 
-	helpers.it("reset_endpoints arms a TimerScheduler.after(15", function()
+	helpers.it("reset_endpoints arms the canonical 15-second PGID timeout", function()
 		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
+		helpers.assert_true(
+			src:find("local PGID_PENDING_TIMEOUT_SEC%s*=%s*15%.0", 1, false) ~= nil,
+			"api_mlx.lua must keep the canonical PGID-pending timeout at 15 seconds")
 		-- Find the reset_endpoints function body
 		local idx = src:find("function M%.reset_endpoints%(", 1, false)
 		helpers.assert_true(idx ~= nil, "reset_endpoints must exist in api_mlx.lua")
@@ -223,8 +226,8 @@ helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5
 		local _, stop = rest:find("\nend\n")
 		local body = stop and rest:sub(1, stop) or rest
 		helpers.assert_true(
-			body:find("TimerScheduler%.after%(15", 1, false) ~= nil,
-			"reset_endpoints must call TimerScheduler.after(15...) to arm the PGID-pending safety timeout")
+			body:find("TimerScheduler%.after%(PGID_PENDING_TIMEOUT_SEC", 1, false) ~= nil,
+			"reset_endpoints must arm its PGID-pending safety timeout from the canonical constant")
 	end)
 
 	helpers.it("timeout callback clears _server_pgid_pending", function()

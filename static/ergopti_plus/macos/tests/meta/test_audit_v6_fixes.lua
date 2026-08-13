@@ -231,9 +231,21 @@ helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (a
 
 	helpers.it("the asynchronous restore retains writeAllData", function()
 		local src = read_unit("local function invalidate_ignored_win_cache")
-		local timer_pos = src:find("_paste_pending_timer = hs.timer.doAfter", 1, true)
-		helpers.assert_not_nil(timer_pos, "the clipboard restore timer must remain present")
-		local restore = src:sub(timer_pos, timer_pos + 700)
+		local timer_pos = src:find("local function schedule_paste_restore", 1, true)
+		local timer_end = timer_pos and src:find(
+			"\n--- Retains autonomous recovery after a restore failure", timer_pos, true)
+		helpers.assert_not_nil(timer_pos,
+			"the clipboard restore scheduler transaction must remain present")
+		helpers.assert_not_nil(timer_end,
+			"the clipboard restore scheduler transaction must remain independently bounded")
+		local restore = src:sub(timer_pos, timer_end - 1)
+		helpers.assert_true(restore:find("TimerScheduler.after", 1, true) ~= nil,
+			"the restore must use the retained scheduler owner, not an untracked native timer")
+		helpers.assert_true(restore:find("timer_committed ~= true", 1, true) ~= nil,
+			"an uncommitted restore timer must be rejected before publication")
+		helpers.assert_true(
+			restore:find("_paste_pending_timer = timer_or_error", 1, true) ~= nil,
+			"the exact committed timer must remain retained until callback or cancellation")
 		helpers.assert_true(restore:find("restore_owned_clipboard", 1, true) ~= nil,
 			"the timer must delegate to the retained exact-restore helper")
 		local helper_pos = src:find("local function restore_owned_clipboard", 1, true)

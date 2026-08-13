@@ -145,4 +145,39 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		helpers.assert_eq(1, save_calls,
 			"the compensating disabled state must be persisted for the next boot")
 	end)
+
+	helpers.it("contains rollback persistence refusal and exceptions", function()
+		for _, outcome in ipairs({ "false", "throw" }) do
+			local deferred = {}
+			local save_calls = 0
+			local old_do_after = _G.hs.timer.doAfter
+			_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+			local state = { hotstrings = {}, keylogger_enabled = true }
+			MenuState.sync_state_to_modules(state, {}, false, {
+				keymap = {}, hotstring_editor = {},
+				save_prefs = function()
+					save_calls = save_calls + 1
+					if outcome == "throw" then error("injected persistence failure") end
+					return false
+				end,
+				core_mods = { keylogger = {
+					set_options = function() end,
+					set_disabled_apps = function() end,
+					start = function() return false end,
+				} },
+			})
+
+			local callback_ok, callback_err = true, nil
+			for _, callback in ipairs(deferred) do
+				local fired, fire_err = pcall(callback)
+				if not fired then callback_ok, callback_err = false, fire_err end
+			end
+			_G.hs.timer.doAfter = old_do_after
+			helpers.assert_eq(true, callback_ok,
+				"a " .. outcome .. " rollback persistence result must remain inside the guarded timer callback: "
+					.. tostring(callback_err))
+			helpers.assert_eq(false, state.keylogger_enabled)
+			helpers.assert_eq(1, save_calls)
+		end
+	end)
 end)

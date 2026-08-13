@@ -45,6 +45,9 @@ local _armed = {}
 
 -- Handle of the auto-cancel timer; nil while disarmed.
 local _timer = nil
+local _timer_committed = false
+local _timer_generation = 0
+local _timer_cleanup_debt = {}
 
 
 
@@ -75,19 +78,60 @@ local function armed_description()
 	return #names > 0 and table.concat(names, "+") or "none"
 end
 
+--- Cancels one exact timer and retains it when native cleanup refuses.
+--- @param handle table|nil TimerScheduler handle.
+--- @param reason string Cleanup context for diagnostics.
+--- @return boolean settled True only when no native timer remains owned.
+local function cancel_timer_exact(handle, reason)
+	if type(handle) ~= "table" then return true end
+	local ok, result_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and result_or_err == true then
+		_timer_cleanup_debt[handle] = nil
+		return true
+	end
+	_timer_cleanup_debt[handle] = true
+	Logger.error(LOG, "Sticky modifier timer cleanup remains pending during %s: %s.",
+		tostring(reason), tostring(result_or_err))
+	return false
+end
+
+--- Retries every exact timer left by an earlier cleanup refusal.
+--- @return boolean settled True only when no cleanup debt remains.
+local function retry_timer_cleanup()
+	local snapshot = {}
+	for handle in pairs(_timer_cleanup_debt) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if cancel_timer_exact(handle, "cleanup retry") ~= true then settled = false end
+	end
+	return settled
+end
+
+--- Fences and releases the currently published timer without changing modifiers.
+--- @return boolean settled True only when the timer was released exactly.
+local function retire_current_timer()
+	_timer_generation = _timer_generation + 1
+	_timer_committed = false
+	local handle = _timer
+	_timer = nil
+	if not handle then return true end
+	return cancel_timer_exact(handle, "timer replacement")
+end
+
 --- Drops the armed set, the injector and the auto-cancel timer.
 --- Safe to call when nothing is armed.
 --- @param reason string What released them, for the log line.
 local function release(reason)
-	if _timer then
-		TimerScheduler.cancel(_timer)
-		_timer = nil
-	end
+	local settled = retire_current_timer()
+	if retry_timer_cleanup() ~= true then settled = false end
 	Injector.disarm()
 	if has_armed() then
 		Logger.done(LOG, "Sticky modifiers released — %s (%s).", reason, armed_description())
 	end
 	_armed = {}
+	return settled
 end
 
 
@@ -119,6 +163,16 @@ function M.toggle(modifiers, timeout_sec)
 		Logger.error(LOG, "toggle(): no usable auto-cancel delay (%s) — refusing to arm.", tostring(timeout_sec))
 		return false
 	end
+	if retry_timer_cleanup() ~= true then
+		Logger.error(LOG, "toggle(): prior auto-cancel timer cleanup is still pending — refusing a successor arm.")
+		return false
+	end
+	if retire_current_timer() ~= true then
+		Injector.disarm()
+		_armed = {}
+		Logger.error(LOG, "toggle(): current auto-cancel timer could not be retired — modifier arm revoked.")
+		return false
+	end
 
 	for _, name in ipairs(modifiers) do
 		_armed[name] = (not _armed[name]) or nil
@@ -130,18 +184,46 @@ function M.toggle(modifiers, timeout_sec)
 		return true
 	end
 
+	local arm_generation = _timer_generation + 1
+	_timer_generation = arm_generation
 	if not Injector.arm(_armed, function()
-			Logger.debug(LOG, "Sticky modifiers consumed by the next keystroke.")
-			release("consumed")
+		if arm_generation ~= _timer_generation then return end
+		Logger.debug(LOG, "Sticky modifiers consumed by the next keystroke.")
+		release("consumed")
 		end) then
 		_armed = {}
 		return false
 	end
 
-	if _timer then TimerScheduler.cancel(_timer) end
-	_timer = TimerScheduler.after(timeout_sec, function()
-		release("auto-cancelled after inactivity")
-	end)
+	local timer_candidate = nil
+	local schedule_ok, handle_or_err, committed = xpcall(function()
+		local timer_committed
+		timer_candidate, timer_committed = TimerScheduler.after(timeout_sec, function()
+			if _timer ~= timer_candidate or _timer_committed ~= true
+				or arm_generation ~= _timer_generation then return end
+			release("auto-cancelled after inactivity")
+		end)
+		return timer_candidate, timer_committed
+	end, debug.traceback)
+	timer_candidate = handle_or_err
+	if type(timer_candidate) == "table" and timer_candidate.timer ~= nil then
+		_timer = timer_candidate
+	end
+	if not schedule_ok or type(timer_candidate) ~= "table" or committed ~= true then
+		_timer_generation = _timer_generation + 1
+		_timer_committed = false
+		if type(timer_candidate) == "table" then
+			cancel_timer_exact(timer_candidate, "failed acquisition rollback")
+		end
+		_timer = nil
+		Injector.disarm()
+		_armed = {}
+		Logger.error(LOG, "toggle(): auto-cancel timer did not commit — modifier arm revoked: %s.",
+			tostring(handle_or_err))
+		return false
+	end
+	_timer = timer_candidate
+	_timer_committed = true
 
 	Logger.trace(LOG, "Sticky modifiers armed (%s), auto-cancel in %.3fs.", armed_description(), timeout_sec)
 	return true

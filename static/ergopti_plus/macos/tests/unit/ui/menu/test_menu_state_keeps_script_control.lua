@@ -98,8 +98,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 		local called_start   = false
 
 		local spy_shortcuts = {
-			pause_bindings  = function() called_pause  = true end,
-			resume_bindings = function() called_resume = true end,
+			pause_bindings  = function() called_pause  = true; return true end,
+			resume_bindings = function() called_resume = true; return true end,
 			stop            = function() called_stop   = true end,
 			start           = function() called_start  = true end,
 		}
@@ -137,8 +137,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 		local called_stop    = false
 
 		local spy_shortcuts = {
-			pause_bindings  = function() called_pause  = true end,
-			resume_bindings = function() called_resume = true end,
+			pause_bindings  = function() called_pause  = true; return true end,
+			resume_bindings = function() called_resume = true; return true end,
 			stop            = function() called_stop   = true end,
 			start           = function() end,
 		}

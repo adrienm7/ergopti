@@ -27,11 +27,20 @@ helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)
 	-- touches hs.screen, so the menubar is safe to drive headless.
 	local function load_menubar()
 		package.loaded["modules.keylogger"] = { get_live_stats = function() return {} end }
+		package.loaded["adapters.timer_scheduler"] = nil
 		local starts = { n = 0 }
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 			timer = {
 				new = function(_interval, _fn)
-					return { start = function() starts.n = starts.n + 1 end, stop = function() end }
+					local timer = { active = false }
+					timer.start = function()
+						starts.n = starts.n + 1
+						timer.active = true
+						return timer
+					end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
 				end,
 				absoluteTime = function() return 0 end,
 			},
@@ -90,7 +99,7 @@ helpers.describe("wpm_widget.start() guards redundant restarts at source", funct
 		local src = read_src()
 		-- The guard must key off BOTH _running and the graph mode, so a genuine
 		-- graph-mode change still falls through to redraw.
-		helpers.assert_true(src:find("if _running and _show_graph == want_graph then return end", 1, true) ~= nil,
+		helpers.assert_true(src:find("if _running and _show_graph == want_graph then return true end", 1, true) ~= nil,
 			"start() must early-return on (already running AND same graph mode) — not on _running alone")
 	end)
 

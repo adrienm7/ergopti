@@ -157,9 +157,11 @@ helpers.describe("bundled Ollama executable contract", function()
 					end
 					return "", true
 				end,
-				task = { new = function(bin)
+				task = { new = function(bin, _done, _stream, _args)
 					task_bins[#task_bins + 1] = bin
-					return { start = function() return true end }
+					local task = {}
+					function task:start() return self end
+					return task
 				end },
 				timer = { doAfter = function() return { stop = function() end } end },
 			}
@@ -167,6 +169,7 @@ helpers.describe("bundled Ollama executable contract", function()
 
 		local commands, task_bins = {}, {}
 		package.loaded["modules.llm.ollama_binary"] = nil
+		package.loaded["adapters.task_lifecycle"] = nil
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
 			hs_overrides(false, commands, task_bins))
 		local manager = Manager.new({}, {}, function() return 0 end)
@@ -177,6 +180,7 @@ helpers.describe("bundled Ollama executable contract", function()
 		end
 
 		package.loaded["modules.llm.ollama_binary"] = nil
+		package.loaded["adapters.task_lifecycle"] = nil
 		Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
 			hs_overrides(true, commands, task_bins))
 		manager = Manager.new({}, {}, function() return 0 end)
@@ -207,6 +211,7 @@ helpers.describe("bundled Ollama executable contract", function()
 			append_log = function() end, hide = function() end,
 		}
 		package.loaded["modules.llm.ollama_binary"] = nil
+		package.loaded["adapters.task_lifecycle"] = nil
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 			fs = { attributes = function(path, attribute)
 				if path == FIXTURE_BIN then
@@ -216,13 +221,14 @@ helpers.describe("bundled Ollama executable contract", function()
 				if attribute == "mode" then return "file" end
 				return { mode = "directory", permissions = "rwxr-xr-x" }
 			end },
-			task = { new = function(_, callback, args)
+			task = { new = function(_, callback, _stream, args)
 				task_args = args
 				task_done = callback
-				return {
+				local task = {
 					setStreamingCallback = function() return true end,
-					start = function() return true end,
 				}
+				function task:start() return self end
+				return task
 			end },
 		})
 		helpers.assert_true(set_upvalue(Checker.check_and_install_deps,

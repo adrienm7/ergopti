@@ -40,10 +40,25 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DRIVERS = ['macos', 'windows', 'linux'];
+
+const TRACKED_PREFIX = 'static/ergopti_plus/';
+
+// The architecture is the commit candidate, not every local directory under
+// the checkout. `--cached` includes newly staged files while excluding runtime
+// and personal artifacts that Git will never ship.
+const trackedFiles = execFileSync(
+	'git',
+	['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'],
+	{ cwd: ROOT, encoding: 'utf8' }
+)
+	.split('\0')
+	.filter(Boolean)
+	.map((rel) => rel.split(path.sep).join('/'));
 
 // Not architecture: virtualenvs, caches, build output and macOS app bundles.
 // Counting them would move the ratio for reasons that have nothing to do with
@@ -62,16 +77,17 @@ const isIgnored = (segment) => IGNORED.some((re) => re.test(segment));
 
 /** Depth-≤2 directory paths of a driver, POSIX-style, architecture only. */
 function treeOf(driver) {
-	const base = path.join(SP, driver);
 	const out = new Set();
-	if (!fs.existsSync(base)) return out;
-	for (const top of fs.readdirSync(base, { withFileTypes: true })) {
-		if (!top.isDirectory() || isIgnored(top.name)) continue;
-		out.add(top.name);
-		for (const sub of fs.readdirSync(path.join(base, top.name), { withFileTypes: true })) {
-			if (!sub.isDirectory() || isIgnored(sub.name)) continue;
-			out.add(`${top.name}/${sub.name}`);
-		}
+	const prefix = `${TRACKED_PREFIX}${driver}/`;
+	for (const file of trackedFiles) {
+		if (!file.startsWith(prefix)) continue;
+		const parts = file.slice(prefix.length).split('/');
+		const top = parts[0];
+		if (parts.length < 2 || isIgnored(top)) continue;
+		out.add(top);
+		const sub = parts[1];
+		if (parts.length < 3 || isIgnored(sub)) continue;
+		out.add(`${top}/${sub}`);
 	}
 	return out;
 }
@@ -182,15 +198,9 @@ const CANONICAL = JSON.parse(
 ).features;
 
 /** True when `dir` contains at least one driver source file, at any depth. */
-function containsSource(dir) {
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		if (entry.isDirectory()) {
-			if (containsSource(path.join(dir, entry.name))) return true;
-		} else if (/\.(lua|ahk)$/.test(entry.name)) {
-			return true;
-		}
-	}
-	return false;
+function containsSource(relDir) {
+	const prefix = `${relDir}/`;
+	return trackedFiles.some((file) => file.startsWith(prefix) && /\.(lua|ahk)$/.test(file));
 }
 
 /**
@@ -210,9 +220,9 @@ function containsSource(dir) {
  * and that is a deliberate floor rather than an oversight.
  */
 function hasFeature(driver, feature) {
-	const base = path.join(SP, driver, feature.tree, feature.name);
-	if (fs.existsSync(base) && fs.statSync(base).isDirectory()) return containsSource(base);
-	return ['.lua', '.ahk'].some((ext) => fs.existsSync(base + ext));
+	const base = `${TRACKED_PREFIX}${driver}/${feature.tree}/${feature.name}`;
+	if (containsSource(base)) return true;
+	return ['.lua', '.ahk'].some((ext) => trackedFiles.includes(base + ext));
 }
 
 const canonicalOnAll = CANONICAL.filter((f) => DRIVERS.every((d) => hasFeature(d, f)));

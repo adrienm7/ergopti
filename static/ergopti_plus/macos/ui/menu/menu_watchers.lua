@@ -48,12 +48,15 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 --- @param on_reload function Callback invoked when a relevant file change is detected.
 --- @param get_suppress_until function Returns the epoch timestamp until which events are suppressed.
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
---- @return userdata|nil The hs.pathwatcher object, or nil on failure.
+--- @return table|nil Composite watcher/timer lifecycle owner, or nil on failure.
 function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore, ignored_dirs, self_written_files)
 	-- Single debounce/poll timer shared across all pathwatcher callbacks; cancelled
 	-- and restarted on every new event so that a burst of changes produces only
 	-- one reload fired once the burst settles.
 	local _debounce_timer = nil
+	local _timer_cleanup_backlog = {}
+	local _lifecycle_active = true
+	local _lifecycle_generation = 0
 	-- Consecutive hold re-polls with no new file activity; reset to 0 by any real
 	-- file event (reload_config) and by a fired reload, capped by
 	-- GIT_SETTLE_MAX_DEFERRALS so only a quiet-but-stuck state can bypass the hold.
@@ -72,19 +75,52 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	-- local-after-closure trap: a closure only captures a local declared above it).
 	local fire_reload
 
+	--- Stops one exact native capability without dropping it after uncertainty.
+	--- @param handle table|userdata Native pathwatcher or timer.
+	--- @param label string Diagnostic owner.
+	--- @return boolean stopped
+	local function stop_capability(handle, label)
+		local ok, result = pcall(function() return handle:stop() end)
+		if not ok or result == false then
+			Logger.error(LOG, "%s stop failed; exact capability retained for retry: %s",
+				tostring(label), tostring(result))
+			return false
+		end
+		return true
+	end
+
 	local function arm_reload()
+		if not _lifecycle_active then return false end
+		_lifecycle_generation = _lifecycle_generation + 1
+		local generation = _lifecycle_generation
 		-- Cancel any pending timer and restart it; the reload fires only once the
 		-- burst settles.
 		if _debounce_timer then
-			pcall(function() _debounce_timer:stop() end)
-		end
-		_debounce_timer = hs.timer.doAfter(DEBOUNCE_SEC, function()
+			if not stop_capability(_debounce_timer, "Superseded menu debounce timer") then
+				_timer_cleanup_backlog[#_timer_cleanup_backlog + 1] = _debounce_timer
+			end
 			_debounce_timer = nil
+		end
+		local timer
+		local ok, timer_or_err = pcall(hs.timer.doAfter, DEBOUNCE_SEC, function()
+			if not _lifecycle_active or generation ~= _lifecycle_generation then return end
+			if _debounce_timer == timer then _debounce_timer = nil end
 			fire_reload()
 		end)
+		timer = ok and timer_or_err or nil
+		local timer_type = type(timer)
+		if not ok or (timer_type ~= "table" and timer_type ~= "userdata")
+			or type(timer.stop) ~= "function" then
+			Logger.error(LOG, "Could not arm menu debounce timer: %s",
+				tostring(ok and "timer unavailable" or timer_or_err))
+			return false
+		end
+		_debounce_timer = timer
+		return true
 	end
 
 	fire_reload = function()
+		if not _lifecycle_active then return end
 		-- Hold the reload while base_dir is still being written FROM ANY SOURCE, so
 		-- the driver never reloads init.lua against a half-updated tree (the freeze).
 		-- Two signals, shared with infra/file_watchers through reload_gate: quiescence
@@ -104,7 +140,10 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 			return
 		end
 		burst_paths, burst_count, defer_count = {}, 0, 0
-		ui_restore.defer_reload(on_reload)
+		local reload_generation = _lifecycle_generation
+		ui_restore.defer_reload(function()
+			if _lifecycle_active and reload_generation == _lifecycle_generation then on_reload() end
+		end)
 	end
 
 	--- The files the driver rewrites itself, as a set keyed by path. config.toml is
@@ -140,6 +179,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	end
 
 	local function reload_config(files)
+		if not _lifecycle_active then return end
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
 		if hs.timer.secondsSinceEpoch() < get_suppress_until() then return end
@@ -187,7 +227,37 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	if ok_w and watcher then
 		pcall(function() watcher:start() end)
 		Logger.debug(LOG, "Config pathwatcher started on '%s'.", base_dir)
-		return watcher
+		-- The returned object is the sole lifecycle owner. Keeping the timer as a
+		-- sibling would let the pathwatcher enqueue another reload between stops.
+		local owner = {}
+		function owner:stop()
+			_lifecycle_active = false
+			_lifecycle_generation = _lifecycle_generation + 1
+			local all_stopped = true
+			if _debounce_timer then
+				if stop_capability(_debounce_timer, "Menu debounce timer") then
+					_debounce_timer = nil
+				else
+					all_stopped = false
+				end
+			end
+			for index = #_timer_cleanup_backlog, 1, -1 do
+				if stop_capability(_timer_cleanup_backlog[index], "Superseded menu debounce timer") then
+					table.remove(_timer_cleanup_backlog, index)
+				else
+					all_stopped = false
+				end
+			end
+			if watcher then
+				if stop_capability(watcher, "Menu config pathwatcher") then
+					watcher = nil
+				else
+					all_stopped = false
+				end
+			end
+			return all_stopped
+		end
+		return owner
 	else
 		Logger.warn(LOG, "Failed to create config pathwatcher for '%s'.", base_dir)
 		return nil

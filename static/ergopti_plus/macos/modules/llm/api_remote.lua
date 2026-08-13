@@ -46,6 +46,7 @@ local _infer_client  = _http_adapter.new()   -- used for inference POST requests
 local _check_client  = _http_adapter.new()   -- used for health-check GET requests
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -865,16 +866,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			-- `not streaming`, which is a tautology for a backend that never streams —
 			-- the equivalent condition here is simply "more than one result".
 			if #results > 1 then
-				local function reveal_next(idx)
-					if initial_identity ~= _identity_generation then return end
-					if idx > #results then return end
-					local subset = {}
-					for j = 1, idx do subset[j] = results[j] end
-					local is_final = (idx == #results)
-					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
-					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
-				end
-				reveal_next(1)
+				ProgressiveReveal.deliver(results, on_success, ms, function()
+					if initial_identity ~= _identity_generation then return false end
+					return not initial_request_id
+						or type(request_id_provider) ~= "function"
+						or request_id_provider() == initial_request_id
+				end)
 			else
 				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end

@@ -65,6 +65,8 @@ local function load_controller(options)
 		next_timer_fired = false,
 		next_after_callback_sync = false,
 		next_after_error = nil,
+		next_after_committed = nil,
+		next_every_committed = nil,
 		uuid_values = options.uuid_values or UUIDS,
 		settings_store = options.settings_store or {},
 		settings_get_failures = options.settings_get_failures or 0,
@@ -152,7 +154,10 @@ local function load_controller(options)
 				ctx.next_after_callback_sync = false
 				fn()
 			end
-			return handle
+			local committed = ctx.next_after_committed
+			if committed == nil then committed = true end
+			ctx.next_after_committed = nil
+			return handle, committed
 		end,
 		every = function(_delay, fn)
 			local handle = {
@@ -164,7 +169,10 @@ local function load_controller(options)
 			}
 			ctx.next_timer_fired = false
 			ctx.timers[#ctx.timers + 1] = handle
-			return handle
+			local committed = ctx.next_every_committed
+			if committed == nil then committed = true end
+			ctx.next_every_committed = nil
+			return handle, committed
 		end,
 		cancel = function(handle)
 			ctx.cancel_attempts = ctx.cancel_attempts + 1
@@ -1297,6 +1305,42 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 		helpers.assert_eq(controller.status(), "fencing")
 		helpers.assert_nil(started_ok,
 			"READY cannot publish a live phase without its retained liveness source")
+		helpers.assert_not_nil(find_native_revoke(ctx, variables))
+	end)
+
+	helpers.it("rolls back an uncommitted heartbeat timer before refusing READY", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		local variables = controller.variables()
+		local started_ok = nil
+		controller.start(function(ok) started_ok = ok end)
+		ctx.next_every_committed = false
+		ctx.chunk(1, "READY\n")
+		local candidate = ctx.timers[#ctx.timers]
+
+		helpers.assert_eq(controller.status(), "fencing",
+			"an explicit uncommitted result must never publish an active lease")
+		helpers.assert_nil(started_ok,
+			"READY remains unsettled until the exact failed generation is fenced")
+		helpers.assert_true(candidate.cancelled,
+			"the uncommitted candidate must be rolled back through its exact handle")
+		helpers.assert_not_nil(find_native_revoke(ctx, variables),
+			"missing heartbeat ownership must fail the generation closed")
+	end)
+
+	helpers.it("rolls back an uncommitted ACK timer and rejects worker activation", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		local variables = controller.variables()
+		ctx.next_after_committed = false
+		local started = controller.start()
+		local candidate = ctx.timers[#ctx.timers]
+
+		helpers.assert_eq(started, false,
+			"a worker without its committed READY timeout cannot be accepted")
+		helpers.assert_eq(controller.status(), "fencing")
+		helpers.assert_true(candidate.cancelled,
+			"the uncommitted ACK candidate must be rolled back exactly")
 		helpers.assert_not_nil(find_native_revoke(ctx, variables))
 	end)
 

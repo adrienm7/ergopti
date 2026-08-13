@@ -27,7 +27,6 @@
 local M = {}
 
 local hs            = hs
-local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
@@ -39,6 +38,7 @@ local text_utils = require("infra.text_utils")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "shortcuts.actions.system"
 
@@ -138,6 +138,14 @@ local awake_alert_shown = false
 -- Pending "return the cursor to where it was" timer. Declared above every closure
 -- that touches it: a local declared below one binds the nil global instead.
 local _awake_return_timer = nil
+local _awake_generation = 0
+
+-- Eventtap acquisition is implemented below with the factory helpers. These
+-- declarations must remain above keep-awake's closures or Lua would resolve the
+-- names as nil globals when the user first toggles the feature.
+local wrap_tap
+local acquire_tap
+local _failed_tap_cleanup = {}
 
 local function close_awake_alert()
 	local id    = awake_alert_id
@@ -153,8 +161,42 @@ local function close_awake_alert()
 	end
 end
 
+
+--- Cancels the exact pending cursor-return timer without dropping cleanup debt.
+--- The generation fence makes a refused native stop harmless until retry.
+--- @return boolean settled True only when the timer accepted cancellation.
+local function cancel_awake_return_timer()
+	if not _awake_return_timer then return true end
+	local stop_ok, stop_result = xpcall(TimerScheduler.cancel, debug.traceback,
+		_awake_return_timer)
+	if stop_ok and stop_result == true then
+		_awake_return_timer = nil
+		return true
+	end
+	Logger.error(LOG, "Keep-awake cursor-return timer cleanup remains pending: %s.",
+		tostring(stop_result))
+	return false
+end
+
+
+--- Cancels the exact pending jitter tick without dropping cleanup debt.
+--- @return boolean settled True only when the scheduler proves cleanup.
+local function cancel_awake_tick_timer()
+	if not awake_timer then return true end
+	local stop_ok, stop_result = xpcall(TimerScheduler.cancel, debug.traceback,
+		awake_timer)
+	if stop_ok and stop_result == true then
+		awake_timer = nil
+		return true
+	end
+	Logger.error(LOG, "Keep-awake jitter timer cleanup remains pending: %s.",
+		tostring(stop_result))
+	return false
+end
+
 -- Forward declaration required because schedule_awake_tick calls itself recursively
 local schedule_awake_tick
+local stop_awake_input_watcher
 
 -- AX selection cache for the wrap-text eventtap: read_ax_selection() is two
 -- synchronous cross-process Accessibility calls, and the eventtap fires on
@@ -234,20 +276,21 @@ M._emit_activity_keystroke = emit_activity_keystroke
 
 --- Schedules the next keep-awake tick at a random interval.
 --- Each tick moves the mouse slightly around the recorded origin, then returns.
-schedule_awake_tick = function()
-	if not awake_active then return end
-
-	if awake_timer and type(awake_timer.stop) == "function" then
-		pcall(function() awake_timer:stop() end)
-		awake_timer = nil
-	end
+schedule_awake_tick = function(generation)
+	generation = generation or _awake_generation
+	if awake_timer and cancel_awake_tick_timer() ~= true then return false end
 
 	-- math.random(m, n) requires integer bounds in Lua 5.4; the tick bounds come from
 	-- Timings.sec() which returns floats, so use the float-safe uniform form instead.
 	local span = AWAKE_TICK_MAX_SEC - AWAKE_TICK_MIN_SEC
 	local interval = AWAKE_TICK_MIN_SEC + math.random() * span
-	awake_timer = timer.doAfter(interval, function()
-		if not awake_active then return end
+	local scheduled_handle
+	local committed
+	scheduled_handle, committed = TimerScheduler.after(interval, function()
+		if awake_timer == scheduled_handle and scheduled_handle.timer == nil then
+			awake_timer = nil
+		end
+		if not awake_active or generation ~= _awake_generation then return end
 
 		local origin = awake_origin_pos
 		if not origin then
@@ -275,11 +318,31 @@ schedule_awake_tick = function()
 			-- that, the cursor was still teleported back to its remembered origin
 			-- up to AWAKE_RETURN_DELAY_SEC after the user turned the feature off —
 			-- a pointer that moves on its own once the feature is disabled.
-			if _awake_return_timer then pcall(function() _awake_return_timer:stop() end) end
-			_awake_return_timer = timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
-				_awake_return_timer = nil
+			if _awake_return_timer and cancel_awake_return_timer() ~= true then
+				_awake_generation = _awake_generation + 1
+				awake_active = false
+				stop_awake_input_watcher()
+				close_awake_alert()
+				Logger.error(LOG,
+					"Keep-awake auto-disabled because prior cursor-return cleanup did not settle.")
+				return
+			end
+			local return_generation = _awake_generation
+			local return_handle
+			local return_committed
+			return_handle, return_committed = TimerScheduler.after(AWAKE_RETURN_DELAY_SEC, function()
+				if _awake_return_timer == return_handle and return_handle.timer == nil then
+					_awake_return_timer = nil
+				end
+				if return_generation ~= _awake_generation or not awake_active then return end
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
+			_awake_return_timer = return_handle
+			if return_committed ~= true then
+				if return_handle.timer == nil then _awake_return_timer = nil end
+				Logger.error(LOG, "Keep-awake cursor-return timer did not commit; restoring immediately.")
+				pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y})
+			end
 
 			-- Declare user activity so the OS resets its display-idle / power assertion
 			pcall(hs.caffeinate.declareUserActivity)
@@ -291,16 +354,30 @@ schedule_awake_tick = function()
 		-- covers display sleep, not app-level presence.
 		emit_activity_keystroke()
 
-		schedule_awake_tick()
+		if schedule_awake_tick(generation) ~= true then
+			_awake_generation = _awake_generation + 1
+			awake_active = false
+			stop_awake_input_watcher()
+			cancel_awake_return_timer()
+			close_awake_alert()
+			Logger.error(LOG, "Keep-awake auto-disabled because its next jitter tick could not be armed.")
+		end
 	end)
+	awake_timer = scheduled_handle
+	if committed ~= true then
+		if scheduled_handle.timer == nil then awake_timer = nil end
+		Logger.error(LOG, "Keep-awake jitter timer did not commit.")
+		return false
+	end
+	return true
 end
 
 --- Stops the input-activity watcher without touching keep-awake state.
-local function stop_awake_input_watcher()
-	if awake_input_watcher then
-		pcall(function() awake_input_watcher:stop() end)
-		awake_input_watcher = nil
-	end
+stop_awake_input_watcher = function()
+	if not awake_input_watcher then return true end
+	local settled = awake_input_watcher:delete()
+	if settled == true then awake_input_watcher = nil end
+	return settled == true
 end
 
 
@@ -311,13 +388,12 @@ end
 local function auto_disable_awake(expected_started_at)
 	if not awake_active or awake_started_at ~= expected_started_at then return end
 
+	_awake_generation = _awake_generation + 1
 	awake_active = false
 	stop_awake_input_watcher()
+	cancel_awake_return_timer()
 
-	if awake_timer and type(awake_timer.stop) == "function" then
-		pcall(function() awake_timer:stop() end)
-		awake_timer = nil
-	end
+	cancel_awake_tick_timer()
 
 	close_awake_alert()
 
@@ -346,24 +422,18 @@ end
 --- When active, jiggles the mouse periodically to prevent the display from sleeping.
 function M.toggle_awake()
 	if awake_active then
+		_awake_generation = _awake_generation + 1
 		awake_active = false
 
-		stop_awake_input_watcher()
+		local watcher_settled = stop_awake_input_watcher()
+		local return_timer_settled = cancel_awake_return_timer()
 
-		if awake_timer and type(awake_timer.stop) == "function" then
-			pcall(function() awake_timer:stop() end)
-			awake_timer = nil
-		end
+		local tick_timer_settled = cancel_awake_tick_timer()
 
 		-- Cancel the pending cursor return too. Stopping only the tick timer left
 		-- a scheduled "put the pointer back" firing up to AWAKE_RETURN_DELAY_SEC
 		-- after the user switched the feature off — a cursor that moves by itself
 		-- once nothing is supposed to be moving it.
-		if _awake_return_timer then
-			pcall(function() _awake_return_timer:stop() end)
-			_awake_return_timer = nil
-		end
-
 		-- Log the keep-awake duration as a special passive period AND tag the
 		-- focused app so the dashboard can subtract it from per-app stats
 		-- when the user opted out of counting keep-awake time.
@@ -390,36 +460,16 @@ function M.toggle_awake()
 		-- the no-handle path, which falls back to closeAll).
 		close_awake_alert()
 		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
+		return watcher_settled and return_timer_settled and tick_timer_settled
 	else
-		awake_active = true
-		awake_started_at = hs.timer.secondsSinceEpoch()
-		-- Capture the focused app at toggle-on so we can credit the keep-awake
-		-- duration back to it on toggle-off.
-		local _ok_app, _front = pcall(hs.application.frontmostApplication)
-		if _ok_app and _front and type(_front.name) == "function" then
-			awake_focused_app = _front:name()
+		-- A prior activate-then-throw may have left an inert exact timer awaiting
+		-- native cleanup. Settle that debt before acquiring a new watcher or timer.
+		if stop_awake_input_watcher() ~= true
+			or cancel_awake_tick_timer() ~= true
+			or cancel_awake_return_timer() ~= true then
+			Logger.error(LOG, "Keep-awake activation blocked by retained native cleanup debt.")
+			return false
 		end
-		math.randomseed(os.time())
-
-		close_awake_alert()
-		local _ok_alert, _alert_id = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
-		if _ok_alert then
-			awake_alert_id    = _alert_id
-			-- Record that a banner is up even when the build gave us no id, so the
-			-- teardown can still reach it via the no-handle fallback.
-			awake_alert_shown = true
-		end
-
-		-- Record the current mouse position as the jitter origin
-		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
-		if ok_pos and pos then
-			awake_origin_pos = {x = pos.x, y = pos.y}
-
-			-- Move 1 px to immediately register OS activity without visible displacement
-			local dx = (math.random(0, 1) == 0) and -1 or 1
-			pcall(hs.mouse.absolutePosition, {x = pos.x + dx, y = pos.y})
-		end
-
 		-- Watch for any real keyboard or touchpad activity (key press, scroll,
 		-- swipe, tap, pinch, rotate...). We cut silently (no alert) since the user
 		-- is clearly back — the visual noise would be worse than the keep-awake itself.
@@ -435,7 +485,7 @@ function M.toggle_awake()
 				table.insert(watch_types, ev[name])
 			end
 		end
-		awake_input_watcher = eventtap.new(watch_types, function(_ev)
+		local watcher = acquire_tap(watch_types, function(_ev)
 			local is_physical, fence_events = classify_physical_event(
 				_ev, "shortcuts.keep_awake")
 			if not is_physical or not awake_active then
@@ -485,30 +535,68 @@ function M.toggle_awake()
 			SyntheticInput.defer_after_callback(
 				"keep-awake auto-deactivation", auto_disable_awake, awake_started_at)
 			return finish_tap(false, fence_events)
-		end)
-		-- Start immediately so keyboard, scroll, gesture and click detection are
-		-- all live as soon as activation returns to the run loop.
-		if awake_active and awake_input_watcher then
-			pcall(function() awake_input_watcher:start() end)
+		end, "keep-awake input watcher")
+		if not watcher then
+			Logger.error(LOG, "Keep-awake activation refused because its input watcher did not commit.")
+			return false
+		end
+		awake_input_watcher = watcher
+		local next_generation = _awake_generation + 1
+		if schedule_awake_tick(next_generation) ~= true then
+			if watcher:delete() ~= true then _failed_tap_cleanup[watcher] = true end
+			awake_input_watcher = nil
+			return false
 		end
 
-		schedule_awake_tick()
+		-- Publish visible state only after the watcher has proved it is live. A tap
+		-- that activates and then returns false/throws is rolled back by acquire_tap.
+		_awake_generation = next_generation
+		awake_active = true
+		awake_started_at = hs.timer.secondsSinceEpoch()
+		-- Capture the focused app at toggle-on so we can credit the keep-awake
+		-- duration back to it on toggle-off.
+		local _ok_app, _front = pcall(hs.application.frontmostApplication)
+		if _ok_app and _front and type(_front.name) == "function" then
+			awake_focused_app = _front:name()
+		end
+		math.randomseed(os.time())
+
+		close_awake_alert()
+		local _ok_alert, _alert_id = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
+		if _ok_alert then
+			awake_alert_id    = _alert_id
+			-- Record that a banner is up even when the build gave us no id, so the
+			-- teardown can still reach it via the no-handle fallback.
+			awake_alert_shown = true
+		end
+
+		-- Record the current mouse position as the jitter origin
+		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
+		if ok_pos and pos then
+			awake_origin_pos = {x = pos.x, y = pos.y}
+
+			-- Move 1 px to immediately register OS activity without visible displacement
+			local dx = (math.random(0, 1) == 0) and -1 or 1
+			pcall(hs.mouse.absolutePosition, {x = pos.x + dx, y = pos.y})
+		end
+
 		Logger.info(LOG, "Keep-awake enabled.")
+		return true
 	end
 end
 
 --- Stops keep-awake cleanly; called when the bindings module shuts down.
 function M.stop_awake()
+	_awake_generation = _awake_generation + 1
 	awake_active = false
 
-	stop_awake_input_watcher()
+	local watcher_settled = stop_awake_input_watcher()
+	local return_timer_settled = cancel_awake_return_timer()
 
-	if awake_timer and type(awake_timer.stop) == "function" then
-		pcall(function() awake_timer:stop() end)
-		awake_timer = nil
-	end
+	local tick_timer_settled = cancel_awake_tick_timer()
 
 	close_awake_alert()
+	return watcher_settled and return_timer_settled and tick_timer_settled
 end
 
 --- Toggles the hardware CapsLock state through Hammerspoon's HID API.
@@ -535,18 +623,109 @@ end
 -- =============================================
 -- =============================================
 
---- Wraps an already-started eventtap in a fake-hotkey object with a :delete() method.
+--- Wraps an eventtap in a fake-hotkey owner with an exact, retryable delete.
 --- This lets the bindings registry treat eventtaps and hs.hotkeys uniformly.
---- @param tap userdata The hs.eventtap to wrap (must already be started).
+--- @param tap userdata The exact hs.eventtap candidate.
+--- @param label string Diagnostic owner label.
 --- @return table Fake-hotkey compatible object.
-local function wrap_tap(tap)
-	return {
-		delete = function()
-			if tap and type(tap.stop) == "function" then
-				pcall(function() tap:stop() end)
-			end
-		end
+wrap_tap = function(tap, label)
+	local owner = {
+		tap = tap,
+		label = label,
+		delivering = false,
+		released = false,
 	}
+
+	--- Invalidates delivery before stopping and retains refusal for a retry.
+	--- @return boolean settled True only when the exact tap is proven disabled.
+	function owner:delete()
+		self.delivering = false
+		if self.released then return true end
+		if not self.tap or type(self.tap.stop) ~= "function"
+			or type(self.tap.isEnabled) ~= "function" then
+			Logger.error(LOG, "Eventtap '%s' has no complete teardown contract.", self.label)
+			return false
+		end
+
+		local stop_ok, stop_result = xpcall(function() return self.tap:stop() end,
+			debug.traceback)
+		local probe_ok, enabled = xpcall(function() return self.tap:isEnabled() end,
+			debug.traceback)
+		if stop_ok and stop_result ~= false and probe_ok and enabled == false then
+			self.released = true
+			self.tap = nil
+			_failed_tap_cleanup[self] = nil
+			return true
+		end
+
+		Logger.error(LOG,
+			"Eventtap '%s' teardown did not settle (stop=%s, enabled=%s).",
+			self.label, tostring(stop_result), tostring(enabled))
+		return false
+	end
+
+	return owner
+end
+
+
+--- Retries every failed acquisition rollback before a successor is constructed.
+--- @return boolean settled True when no native cleanup debt remains.
+local function settle_failed_tap_cleanup()
+	local owners = {}
+	for owner in pairs(_failed_tap_cleanup) do owners[#owners + 1] = owner end
+	local settled = true
+	for _, owner in ipairs(owners) do
+		if owner:delete() ~= true then settled = false end
+	end
+	return settled
+end
+
+
+--- Creates and starts one eventtap as an acquisition transaction.
+--- @param types table Native event types.
+--- @param callback function User callback.
+--- @param label string Diagnostic owner label.
+--- @return table|nil owner Committed fake-hotkey owner, or nil on refusal.
+acquire_tap = function(types, callback, label)
+	if settle_failed_tap_cleanup() ~= true then
+		Logger.error(LOG, "Eventtap '%s' cannot start while prior cleanup remains pending.", label)
+		return nil
+	end
+
+	local owner
+	local function guarded_callback(...)
+		if not owner or owner.delivering ~= true then return false end
+		local ok, first, second = xpcall(callback, debug.traceback, ...)
+		if not ok then
+			Logger.error(LOG, "Eventtap '%s' callback failed: %s.", label, tostring(first))
+			return false
+		end
+		return first, second
+	end
+
+	local create_ok, tap_or_err = xpcall(function()
+		return eventtap.new(types, guarded_callback)
+	end, debug.traceback)
+	if not create_ok or tap_or_err == nil or tap_or_err == false then
+		Logger.error(LOG, "Eventtap '%s' construction failed: %s.", label, tostring(tap_or_err))
+		return nil
+	end
+	owner = wrap_tap(tap_or_err, label)
+
+	local start_ok, start_result = xpcall(function() return owner.tap:start() end,
+		debug.traceback)
+	local probe_ok, enabled = xpcall(function() return owner.tap:isEnabled() end,
+		debug.traceback)
+	if start_ok and start_result ~= false and probe_ok and enabled == true then
+		owner.delivering = true
+		return owner
+	end
+
+	Logger.error(LOG,
+		"Eventtap '%s' activation did not commit (start=%s, enabled=%s).",
+		label, tostring(start_result), tostring(enabled))
+	if owner:delete() ~= true then _failed_tap_cleanup[owner] = true end
+	return nil
 end
 
 
@@ -587,8 +766,7 @@ end
 --- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_instant_screenshot()
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.at_hash")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -606,9 +784,7 @@ function M.bind_instant_screenshot()
 		local scheduled = SyntheticInput.defer_after_callback(
 			"instant screenshot", capture_frontmost_window)
 		return finish_tap(scheduled, fence_events)
-	end)
-	tap:start()
-	return wrap_tap(tap)
+	end, "instant screenshot")
 end
 
 --- Maps F19 + scroll wheel to system volume up/down.
@@ -618,8 +794,7 @@ function M.bind_layer_scroll()
 	local layer_held  = false
 	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
-	local key_tap
-	key_tap = hs.eventtap.new(
+	local key_owner = acquire_tap(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
 			local is_physical, fence_events = classify_physical_event(
@@ -650,11 +825,12 @@ function M.bind_layer_scroll()
 				end)
 			end
 			return finish_tap(false, fence_events)
-		end
+		end,
+		"F19 layer key"
 	)
+	if not key_owner then return nil end
 
-	local scroll_tap
-	scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+	local scroll_owner = acquire_tap({hs.eventtap.event.types.scrollWheel}, function(event)
 		local is_physical, fence_events = classify_physical_event(
 			event, "shortcuts.f19_scroll")
 		if not is_physical or not layer_held then
@@ -688,15 +864,23 @@ function M.bind_layer_scroll()
 			end
 		end)
 		return finish_tap(scheduled, fence_events)
-	end)
-
-	pcall(function() key_tap:start() end)
-	pcall(function() scroll_tap:start() end)
+	end, "F19 layer scroll")
+	if not scroll_owner then
+		if key_owner:delete() ~= true then _failed_tap_cleanup[key_owner] = true end
+		return nil
+	end
 
 	return {
 		delete = function()
-			if key_tap    and type(key_tap.stop)    == "function" then pcall(function() key_tap:stop() end) end
-			if scroll_tap and type(scroll_tap.stop) == "function" then pcall(function() scroll_tap:stop() end) end
+			layer_held = false
+			local settled = true
+			if key_owner then
+				if key_owner:delete() == true then key_owner = nil else settled = false end
+			end
+			if scroll_owner then
+				if scroll_owner:delete() == true then scroll_owner = nil else settled = false end
+			end
+			return settled
 		end
 	}
 end
@@ -707,8 +891,7 @@ end
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_cmd_star(on_trigger)
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.cmd_star")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -780,9 +963,7 @@ function M.bind_cmd_star(on_trigger)
 			pcall(on_trigger, table.concat(parts, "+"), app_name)
 		end)
 		return finish_tap(scheduled, fence_events)
-	end)
-	tap:start()
-	return wrap_tap(tap)
+	end, "Cmd+star")
 end
 
 
@@ -862,8 +1043,7 @@ end
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.wrap_text")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -936,9 +1116,7 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 		if wrapped_or_err ~= true then return finish_tap(false, fence_events) end
 		mark_wrap_selection_consumed()
 		return finish_tap(true, fence_events)
-	end)
-	tap:start()
-	return wrap_tap(tap)
+	end, "selection wrapping")
 end
 
 

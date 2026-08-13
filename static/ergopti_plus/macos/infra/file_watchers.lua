@@ -9,9 +9,9 @@
 --- orchestrator stays thin; behaviour is unchanged.
 ---
 --- FEATURES & RATIONALE:
---- 1. GC-rooting: every watcher is pinned in the _G.script_watchers global so the
----    collector cannot destroy it mid-session; init.lua's shutdown callback stops
----    them by walking that same global, so the contract is preserved.
+--- 1. GC-rooting: one composite owner is pinned in _G.script_watchers so neither
+---    its native watchers nor their shared timer can be collected or stopped in
+---    the wrong order; init.lua stops that owner through the same global.
 --- 2. Debounced reload: rapid successive saves collapse into a single reload via a
 ---    0.5 s timer, and the reload is deferred through ui_restore so open UI is
 ---    snapshotted/closed first.
@@ -152,8 +152,15 @@ function M.start(ctx)
 		return false, nil
 	end
 
-	-- Global table pins the watchers so the GC cannot destroy them mid-session.
+	-- Global table pins one composite owner so the native watchers and their
+	-- shared debounce timer are revoked as one lifecycle. A separate timer owner
+	-- would make shutdown order-dependent: the watcher could enqueue another
+	-- reload between the two stop calls.
 	_G.script_watchers = _G.script_watchers or {}
+	local lifecycle_active = true
+	local lifecycle_generation = 0
+	local native_watchers = {}
+	local timer_cleanup_backlog = {}
 
 	-- Drop FSEvents replays delivered during the post-boot suppress window (see
 	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
@@ -162,6 +169,54 @@ function M.start(ctx)
 	local suppress_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
 
 	local reload_timer = nil
+
+	--- Stops one exact native capability without discarding it on uncertainty.
+	--- Hammerspoon stop methods return their receiver, while test doubles may
+	--- return nil; only an exception or explicit false proves cancellation failed.
+	--- @param handle table|userdata Native watcher or timer.
+	--- @param label string Diagnostic owner.
+	--- @return boolean stopped
+	local function stop_capability(handle, label)
+		local ok, result = pcall(function() return handle:stop() end)
+		if not ok or result == false then
+			Logger.error(LOG, "%s stop failed; exact capability retained for retry: %s",
+				tostring(label), tostring(result))
+			return false
+		end
+		return true
+	end
+
+	local owner = {}
+	function owner:stop()
+		-- Logical revocation precedes native cleanup. A callback already queued by
+		-- FSEvents/NSTimer is therefore inert even when native stop is uncertain.
+		lifecycle_active = false
+		lifecycle_generation = lifecycle_generation + 1
+		local all_stopped = true
+		if reload_timer then
+			if stop_capability(reload_timer, "File-watcher debounce timer") then
+				reload_timer = nil
+			else
+				all_stopped = false
+			end
+		end
+		for index = #timer_cleanup_backlog, 1, -1 do
+			if stop_capability(timer_cleanup_backlog[index], "Superseded file-watcher debounce timer") then
+				table.remove(timer_cleanup_backlog, index)
+			else
+				all_stopped = false
+			end
+		end
+		for index = #native_watchers, 1, -1 do
+			if stop_capability(native_watchers[index], "File watcher") then
+				table.remove(native_watchers, index)
+			else
+				all_stopped = false
+			end
+		end
+		return all_stopped
+	end
+	table.insert(_G.script_watchers, owner)
 	-- Consecutive hold re-polls with NO new file activity; reset to 0 by any real
 	-- file event (note_change) and by a fired reload, capped by
 	-- GIT_SETTLE_MAX_DEFERRALS so only a genuinely stuck state (a stale index.lock,
@@ -184,16 +239,40 @@ function M.start(ctx)
 	local fire_reload
 
 	local function arm_timer(msg)
-		if reload_timer then reload_timer:stop() end
+		if not lifecycle_active then return false end
+		lifecycle_generation = lifecycle_generation + 1
+		local generation = lifecycle_generation
+		if reload_timer then
+			if not stop_capability(reload_timer, "Superseded file-watcher debounce timer") then
+				timer_cleanup_backlog[#timer_cleanup_backlog + 1] = reload_timer
+			end
+			reload_timer = nil
+		end
 		-- Bare literal 0.5: a cross-driver single-source gate pins this poll tick
 		-- to Linux's _debounce_sec (do not replace it with a named constant).
-		reload_timer = hs.timer.doAfter(0.5, function() fire_reload(msg) end)
+		local timer
+		local ok, timer_or_err = pcall(hs.timer.doAfter, 0.5, function()
+			if not lifecycle_active or generation ~= lifecycle_generation then return end
+			if reload_timer == timer then reload_timer = nil end
+			fire_reload(msg)
+		end)
+		timer = ok and timer_or_err or nil
+		local timer_type = type(timer)
+		if not ok or (timer_type ~= "table" and timer_type ~= "userdata")
+			or type(timer.stop) ~= "function" then
+			Logger.error(LOG, "Could not arm file-watcher debounce timer: %s",
+				tostring(ok and "timer unavailable" or timer_or_err))
+			return false
+		end
+		reload_timer = timer
+		return true
 	end
 
 	--- Records a batch of changed paths and (re)arms the settle poll.
 	--- @param msg string Notification message for the eventual reload.
 	--- @param changed table|nil Absolute paths that changed in this event.
 	local function note_change(msg, changed)
+		if not lifecycle_active then return end
 		local now = hs.timer.secondsSinceEpoch()
 		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
 		-- the boot window these are the previous session's changes, not a new edit.
@@ -214,6 +293,7 @@ function M.start(ctx)
 	end
 
 	fire_reload = function(msg)
+		if not lifecycle_active then return end
 		-- Hold the reload while the working tree is still being written FROM ANY
 		-- SOURCE, so hs.reload() never re-execs init.lua against a half-updated,
 		-- internally inconsistent tree (which errors during boot and, via repeated
@@ -240,7 +320,9 @@ function M.start(ctx)
 		end
 		-- Tree is settled and consistent: clear the burst and reload.
 		burst_paths, burst_count, defer_count = {}, 0, 0
+		local reload_generation = lifecycle_generation
 		ui_restore.defer_reload(function()
+			if not lifecycle_active or reload_generation ~= lifecycle_generation then return end
 			-- Re-check at FIRE time, not only at schedule time. defer_reload holds
 			-- the reload for as long as a UI stays open — seconds, or minutes if
 			-- the user leaves a window up — and the verdict computed before that
@@ -280,7 +362,7 @@ function M.start(ctx)
 		if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
 	end)
 	dir_watcher:start()
-	table.insert(_G.script_watchers, dir_watcher)
+	native_watchers[#native_watchers + 1] = dir_watcher
 
 	-- ONE recursive watcher on the personal root, filtered exactly like the
 	-- directory watcher above.
@@ -311,7 +393,7 @@ function M.start(ctx)
 		end)
 	if ok_personal and personal_watcher then
 		personal_watcher:start()
-		table.insert(_G.script_watchers, personal_watcher)
+		native_watchers[#native_watchers + 1] = personal_watcher
 	else
 		Logger.warn(LOG, "Could not watch the personal hotstrings root '%s'.", personal_root)
 	end
@@ -335,7 +417,7 @@ function M.start(ctx)
 		end
 	end)
 	project_watcher:start()
-	table.insert(_G.script_watchers, project_watcher)
+	native_watchers[#native_watchers + 1] = project_watcher
 
 
 

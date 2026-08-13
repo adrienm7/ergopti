@@ -90,12 +90,70 @@ helpers.describe("retryable local teardown transaction", function()
 		helpers.assert_eq(calls.quit_only, 1)
 	end)
 
+	helpers.it("defers a global finalizer until every resource owner settles", function()
+		local transaction = load_transaction()
+		local state = transaction.new_state()
+		local attempts = { refusing = 0, healthy = 0, finalizer = 0 }
+		local owner_refuses = true
+		local finalizer_refuses = true
+		local owner_steps = {
+			{
+				name = "refusing-owner",
+				run = function()
+					attempts.refusing = attempts.refusing + 1
+					return not owner_refuses
+				end,
+			},
+			{
+				name = "healthy-owner",
+				run = function()
+					attempts.healthy = attempts.healthy + 1
+					return true
+				end,
+			},
+		}
+		local global_finalizer = {
+			name = "global-finalizer",
+			run = function()
+				attempts.finalizer = attempts.finalizer + 1
+				return not finalizer_refuses
+			end,
+		}
+
+		helpers.assert_eq(false,
+			transaction.run_with_finalizer(state, owner_steps, global_finalizer))
+		helpers.assert_eq(1, attempts.refusing)
+		helpers.assert_eq(1, attempts.healthy,
+			"independent owners must still make teardown progress")
+		helpers.assert_eq(0, attempts.finalizer,
+			"a global drain must not invalidate resources retained by a failed owner")
+
+		owner_refuses = false
+		helpers.assert_eq(false,
+			transaction.run_with_finalizer(state, owner_steps, global_finalizer))
+		helpers.assert_eq(2, attempts.refusing)
+		helpers.assert_eq(1, attempts.healthy,
+			"a settled owner must not be repeated")
+		helpers.assert_eq(1, attempts.finalizer,
+			"the global drain may run once every owner has settled")
+
+		finalizer_refuses = false
+		helpers.assert_eq(true,
+			transaction.run_with_finalizer(state, owner_steps, global_finalizer))
+		helpers.assert_eq(2, attempts.refusing)
+		helpers.assert_eq(1, attempts.healthy)
+		helpers.assert_eq(2, attempts.finalizer,
+			"a failed finalizer must remain retryable without repeating owners")
+	end)
+
 	helpers.it("rejects malformed, duplicate, and re-entrant transactions", function()
 		local transaction, errors = load_transaction()
 		local state = transaction.new_state()
 		local calls = 0
 		local step = { name = "same", run = function() calls = calls + 1 end }
 
+		helpers.assert_true(transaction.run_with_finalizer(state, { step }, nil) == false)
+		helpers.assert_eq(calls, 0)
 		helpers.assert_true(transaction.run(state, { step, step }) == false)
 		helpers.assert_eq(calls, 0)
 		state.running = true

@@ -30,6 +30,14 @@ local BOOT_TRIGGER  = "µ"
 local LIVE_TRIGGER  = "§"
 local STALE_TRIGGER = "★"
 
+local function empty_temp_file()
+	local path = os.tmpname()
+	local fh, err = io.open(path, "w")
+	helpers.assert_not_nil(fh, "the PersonalInfo fixture must materialize its empty TOML: " .. tostring(err))
+	fh:close()
+	return path
+end
+
 
 --- A fake keymap exposing what both engines consume, capturing EVERY registered
 --- interceptor rather than only the last: this module registers one and its
@@ -79,7 +87,11 @@ local function boot(trigger, preview_fence)
 	local DynHot = helpers.load_with_stubs("modules.dynamic_hotstrings")
 	local km     = make_fake_keymap(trigger, preview_fence)
 	-- A scratch path so no personal_info.toml is materialised into the real tree.
-	DynHot.start("", km, os.tmpname())
+	local scratch_toml = empty_temp_file()
+	local started = DynHot.start("", km, scratch_toml)
+	os.remove(scratch_toml)
+	helpers.assert_eq(started, true,
+		"the trigger fixture must commit both engines before inspecting their interceptors")
 	DynHot.enable()
 	return DynHot, km
 end

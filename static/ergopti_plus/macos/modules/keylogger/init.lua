@@ -28,6 +28,8 @@ local Timings  = require("infra.timings")
 local Manifest = require("infra.manifest_reader")
 local i18n     = require("infra.i18n")
 local dialog   = require("infra.dialog_util")
+local TeardownTransaction = require("infra.teardown_transaction")
+local InputSourceBroker = require("adapters.input_source_broker")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
@@ -75,6 +77,7 @@ local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
 -- How often the tap watchdog checks that the event tap is still running (seconds).
 -- Mirrors the keymap module's watchdog cadence (script_control TAP_WATCHDOG_INTERVAL_SEC = 2).
 local TAP_WATCHDOG_INTERVAL_SEC = 5
+local INPUT_SOURCE_SUBSCRIBER_ID = "modules.keylogger"
 
 -- Keycodes for all modifier keys (these should not be logged as characters)
 local MODIFIER_KEYCODES = {
@@ -290,11 +293,18 @@ local CoreState = {
 -- the real upvalue rather than a nil global.
 local _is_paused
 
--- Passed as a CLOSURE, not as the function value: _is_paused is declared further
--- down, and a reference here would hand over the nil global of that name instead
--- (the local-after-use trap this driver keeps hitting). The closure resolves it
--- at call time, by which point the real local exists.
-KcBridge.init(CoreState, nil, nil, nil, function() return _is_paused() end)
+-- Passed as a closure because M.may_persist is published later in this module.
+-- A filesystem callback delivered during module construction must fail closed;
+-- after construction, the bridge reaches the same enable/pause/privacy gate as
+-- every other persistence sink instead of reconstructing only part of it.
+local kc_bridge_initialized = KcBridge.init(
+	CoreState, nil, nil, nil, function()
+		if type(M.may_persist) ~= "function" then return false end
+		return M.may_persist()
+	end)
+if kc_bridge_initialized ~= true then
+	error("KC bridge failed to acquire its always-on drain producers")
+end
 
 -- Tracks whether LogManager/ContextTracker have been initialized
 local _state                = nil
@@ -305,6 +315,7 @@ local _script_control       = nil
 local _idle_timer           = nil
 local _maintenance_timer    = nil
 local _tap_watchdog_timer   = nil
+local _foreground_bootstrap_timer = nil
 local _win_filter           = nil
 local _process_lifecycle_registered = false
 
@@ -345,6 +356,9 @@ local _caffeinate_watcher   = nil
 -- layout only changes when the OS says so, so it is read once and refreshed from
 -- the notification below.
 local _cached_layout        = nil
+-- Cleanup obligation for the named input-source broker subscriber. This is
+-- published before subscribe(): the setter may replace the native callback and
+-- only then throw or return a refusal.
 local _layout_listener      = nil
 
 -- Cached module references to avoid pcall(require, ...) on every keystroke
@@ -353,6 +367,12 @@ local _keymap_mod = nil
 local ACTION_EPOCH_LISTENER_ID = "modules.keylogger.action_epoch"
 local _action_listener_registered = false
 local _last_action_epoch = SyntheticInput.current_action_epoch()
+local _teardown_state = TeardownTransaction.new_state()
+local _process_lifecycle_cleanup_required = false
+local _keyboard_hook_cleanup_required = false
+local _log_manager_cleanup_required = false
+local _runtime_generation = 0
+local _kc_bridge_shutdown_complete = false
 
 
 --- Splits human typing from one logical automation action.
@@ -1431,6 +1451,226 @@ function M.show_metrics()
 	end
 end
 
+--- Probes the documented native running state of one timer.
+--- @param handle table|userdata Native timer.
+--- @param expected boolean Required running state.
+--- @return boolean matches True only when the exact state is observable and matches.
+local function timer_running_matches(handle, expected)
+	local readable, method_or_state = pcall(function() return handle.running end)
+	if not readable then return false end
+	if type(method_or_state) == "function" then
+		local ok, running = xpcall(function() return method_or_state(handle) end,
+			debug.traceback)
+		return ok and type(running) == "boolean" and running == expected
+	end
+	-- Narrow table doubles historically exposed the state as a boolean field.
+	-- Real Hammerspoon timers take the documented method branch above.
+	return type(handle) == "table"
+		and type(method_or_state) == "boolean"
+		and method_or_state == expected
+end
+
+--- Stops one retained timer and clears it only after exact inactive-state proof.
+--- @param handle table|userdata|nil Native timer.
+--- @param clear function Clears the owning module field after commitment.
+--- @return boolean stopped True when no retry debt remains.
+local function stop_retained_timer(handle, clear)
+	if not handle then return true end
+	if type(handle.stop) ~= "function" then return false end
+	local stopped, result = xpcall(function() return handle:stop() end, debug.traceback)
+	if not stopped or not result or not timer_running_matches(handle, false) then return false end
+	clear()
+	return true
+end
+
+--- Stops the retained caffeinate watcher through its documented object result.
+--- The watcher API exposes no running-state method, so exact-handle identity is
+--- the strongest state contract available after a non-throwing stop.
+--- @return boolean stopped True when no retry debt remains.
+local function stop_caffeinate_watcher()
+	local watcher = _caffeinate_watcher
+	if not watcher then return true end
+	if type(watcher.stop) ~= "function" then return false end
+	local stopped, result = xpcall(function() return watcher:stop() end, debug.traceback)
+	if not stopped or result ~= watcher then return false end
+	if _caffeinate_watcher == watcher then _caffeinate_watcher = nil end
+	return true
+end
+
+--- Constructs, publishes, and commits one repeating native timer.
+--- @param interval number Repeat interval in seconds.
+--- @param callback function Generation-fenced callback.
+--- @param publish function Publishes the exact candidate before start.
+--- @return boolean committed True only when running() proves activation.
+local function acquire_recurring_timer(interval, callback, publish)
+	local created, candidate = xpcall(function()
+		return hs.timer.new(interval, callback)
+	end, debug.traceback)
+	if not created or not candidate then return false end
+	publish(candidate)
+	local started, result = xpcall(function()
+		if type(candidate.start) ~= "function" then error("timer has no start method") end
+		return candidate:start()
+	end, debug.traceback)
+	return started and result ~= nil and result ~= false
+		and timer_running_matches(candidate, true)
+end
+
+--- Invokes a native callback only for the currently committed runtime generation.
+--- @param generation integer Generation captured before native construction.
+--- @param label string Callback label for diagnostics.
+--- @param callback function Callback body.
+--- @param ... any Native callback arguments.
+local function invoke_runtime_callback(generation, label, callback, ...)
+	if generation ~= _runtime_generation or not CoreState.is_enabled then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function()
+		callback(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback raised: %s.", label, tostring(err))
+	end
+end
+
+--- Runs every keylogger cleanup owner independently and retains failed steps.
+--- @return boolean complete True only when every runtime owner is released.
+local function teardown_runtime()
+	_runtime_generation = _runtime_generation + 1
+	CoreState.is_enabled = false
+	CoreState.is_secure_field = true
+	local steps = {
+		{
+			name = "input-source-subscription",
+			run = function()
+				if not _layout_listener then return true end
+				if InputSourceBroker.unsubscribe(INPUT_SOURCE_SUBSCRIBER_ID) ~= true then
+					return false
+				end
+				_layout_listener = nil
+				return true
+			end,
+		},
+		{
+			name = "action-listener",
+			run = function()
+				if not _action_listener_registered then return true end
+				if SyntheticInput.unregister_action_listener(ACTION_EPOCH_LISTENER_ID) == false then
+					return false
+				end
+				_action_listener_registered = false
+				return true
+			end,
+		},
+		{
+			name = "active-app-interval",
+			run = function()
+				if not _state or type(ContextTracker.close_active_app) ~= "function" then return true end
+				return ContextTracker.close_active_app() ~= false
+			end,
+		},
+		{
+			name = "buffer-flush",
+			run = function()
+				if not _state or type(LogManager.flush_buffer) ~= "function" then return true end
+				return LogManager.flush_buffer() ~= false
+			end,
+		},
+		{
+			name = "process-lifecycle",
+			run = function()
+				if not _process_lifecycle_cleanup_required then return true end
+				if ProcessLifecycle.stop() ~= true then return false end
+				_process_lifecycle_cleanup_required = false
+				return true
+			end,
+		},
+		{
+			name = "keyboard-hook",
+			run = function()
+				if not _keyboard_hook_cleanup_required then return true end
+				if KeyboardHook.stop() ~= true then return false end
+				_keyboard_hook_cleanup_required = false
+				_event_tap = nil
+				return true
+			end,
+		},
+		{
+			name = "foreground-bootstrap",
+			run = function()
+				return stop_retained_timer(_foreground_bootstrap_timer, function()
+					_foreground_bootstrap_timer = nil
+				end)
+			end,
+		},
+		{
+			name = "browser-window-filter",
+			run = function()
+				if not _win_filter then return true end
+				if type(_win_filter.unsubscribeAll) ~= "function" then return false end
+				if _win_filter:unsubscribeAll() == false then return false end
+				_win_filter = nil
+				return true
+			end,
+		},
+		{
+			name = "maintenance-timer",
+			run = function()
+				return stop_retained_timer(_maintenance_timer, function()
+					_maintenance_timer = nil
+				end)
+			end,
+		},
+		{
+			name = "idle-timer",
+			run = function()
+				return stop_retained_timer(_idle_timer, function() _idle_timer = nil end)
+			end,
+		},
+		{
+			name = "tap-watchdog",
+			run = function()
+				return stop_retained_timer(_tap_watchdog_timer, function()
+					_tap_watchdog_timer = nil
+				end)
+			end,
+		},
+		{
+			name = "caffeinate-watcher",
+			run = stop_caffeinate_watcher,
+		},
+		{
+			name = "ax-observer",
+			run = function()
+				local observer = CoreState.ax_observer
+				if not observer then return true end
+				if type(observer.stop) ~= "function" then return false end
+				if observer:stop() == false then return false end
+				if CoreState.ax_observer == observer then CoreState.ax_observer = nil end
+				return true
+			end,
+		},
+		{
+			name = "hardware-watchers",
+			run = function()
+				if not _state then return true end
+				return Watchers.stop_hardware_watchers() == true
+			end,
+		},
+		{
+			name = "log-manager",
+			run = function()
+				if not _log_manager_cleanup_required then return true end
+				if type(LogManager.stop) ~= "function" or LogManager.stop() ~= true then
+					return false
+				end
+				_log_manager_cleanup_required = false
+				return true
+			end,
+		},
+	}
+	return TeardownTransaction.run(_teardown_state, steps)
+end
+
 --- Starts the keylogger engine and all background daemons.
 --- Idempotent: calling it a second time while running is a no-op.
 --- @param script_control table The module used to check expansion pauses.
@@ -1439,6 +1679,11 @@ function M.start(script_control)
 		Logger.warn(LOG, "M.start() called while already running — ignoring.")
 		return true
 	end
+	if not teardown_runtime() then
+		Logger.error(LOG, "Keylogger start refused: prior cleanup remains pending.")
+		return false
+	end
+	_teardown_state = TeardownTransaction.new_state()
 	Logger.start(LOG, "Starting keylogger engine…")
 	_script_control = script_control
 
@@ -1448,19 +1693,20 @@ function M.start(script_control)
 	-- so one read plus a listener replaces one read per word.
 	local ok_layout, layout = pcall(hs.keycodes.currentLayout)
 	_cached_layout = (ok_layout and type(layout) == "string") and layout or "Unknown"
-	if type(hs.keycodes.inputSourceChanged) == "function" then
-		_layout_listener = true
-		pcall(hs.keycodes.inputSourceChanged, function()
+	local startup_prepared, startup_prepare_err = xpcall(function()
+	if type(InputSourceBroker.subscribe) ~= "function" then
+		error("input-source broker is unavailable")
+	end
+	_layout_listener = true
+	local subscribed = InputSourceBroker.subscribe(INPUT_SOURCE_SUBSCRIBER_ID,
+		function()
 			local ok_new, new_layout = pcall(hs.keycodes.currentLayout)
 			if ok_new and type(new_layout) == "string" then
 				_cached_layout = new_layout
 				Logger.debug(LOG, "Layout cache refreshed: %s.", new_layout)
 			end
 		end)
-	else
-		Logger.warn(LOG, "hs.keycodes.inputSourceChanged unavailable — the logged layout "
-			.. "will stay at '%s' for this session.", tostring(_cached_layout))
-	end
+	if subscribed ~= true then error("input-source subscription failed") end
 
 	-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
 	local ok_km, km = pcall(require, "modules.keymap")
@@ -1474,14 +1720,21 @@ function M.start(script_control)
 	-- Initialise sub-modules on first start (deferred from require-time
 	-- so metrics directories are only created when the feature is on)
 	if not _state then
-		_state = true
-		LogManager.init(CoreState)
+		_log_manager_cleanup_required = true
+		if LogManager.init(CoreState) ~= true then
+			error("log manager refused initialization")
+		end
 		-- The context tracker owns three OS watchers that pause does NOT tear down,
 		-- so it needs the same pause predicate as the watcher layer below.
-		ContextTracker.init(CoreState, LogManager, _is_paused)
+		if ContextTracker.init(CoreState, LogManager, _is_paused) ~= true then
+			error("keylogger context tracker initialization failed")
+		end
 		-- The watcher layer needs the shared state and the pause predicate; both
 		-- are stable for the process lifetime, so a one-shot init is sufficient.
-		Watchers.init(CoreState, _is_paused)
+		if Watchers.init(CoreState, _is_paused) ~= true then
+			error("keylogger watcher initialization failed")
+		end
+		_state = true
 	end
 
 	-- Security-critical application lifecycle must commit before any keyboard
@@ -1510,91 +1763,184 @@ function M.start(script_control)
 		end)
 		_process_lifecycle_registered = true
 	end
-	if ProcessLifecycle.start() ~= true then
+	end, debug.traceback)
+	if not startup_prepared then
 		CoreState.is_secure_field = true
-		if type(LogManager.stop) == "function" then Logger.pcall(LOG, LogManager.stop) end
-		Logger.error(LOG, "Keylogger start aborted: application lifecycle watcher is unavailable.")
+		Logger.error(LOG, "Keylogger preparation failed: %s", tostring(startup_prepare_err))
+		if not teardown_runtime() then
+			Logger.error(LOG, "Keylogger preparation rollback remains incomplete.")
+		end
 		return false
 	end
-
-	-- Re-wire and re-arm on every start so stop/start cycles keep the bridge
-	-- and ingest loop alive. Both calls are idempotent when already running.
-	KcBridge.set_log_manager(LogManager)
-	KcBridge.start()
-	LogManager.ensure_ingest_running()
-	if not _action_listener_registered then
-		-- No typing buffer is live while disabled, so synchronize the local token
-		-- before registration. The stable ID makes repeated start calls harmless.
-		reconcile_action_epoch(SyntheticInput.current_action_epoch())
-		SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
-			reconcile_action_epoch)
-		_action_listener_registered = true
-	end
-
-	-- The application watcher reports only future transitions; it does not
-	-- synchronously publish the app/field that is focused at start. Keep every
-	-- persistence sink closed until the deferred foreground capture commits.
-	CoreState.is_secure_field = true
-	CoreState.is_enabled    = true
-	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
-
-	CoreState.recent_typing_eff  = {}
-	CoreState.recent_typing_phys = {}
-
-	-- System sleep/wake/lock watcher
-	if not _caffeinate_watcher then
-		_caffeinate_watcher = hs.caffeinate.watcher.new(Watchers.caffeinate_cb)
-	end
-	_caffeinate_watcher:start()
-
-	Watchers.init_hardware_watchers()
-
-	-- Main event tap
-	KeyboardHook.start({
-		eventTypes = {
-			hs.eventtap.event.types.keyDown,
-			hs.eventtap.event.types.keyUp,
-			hs.eventtap.event.types.flagsChanged,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.scrollWheel,
-		},
-		onEvent = handle_key,
-	})
-	_event_tap = true
-
-	-- Independent backstop: restart a tap that remains disabled after native or
-	-- lifecycle recovery (for example after wake, unlock, or a security prompt).
-	if not _tap_watchdog_timer then
-		_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC, function()
-			if not CoreState.is_enabled then return end
-			if not KeyboardHook.isRunning() then
-				Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
-				KeyboardHook.start()
-			end
-		end)
-	end
-	_tap_watchdog_timer:start()
-
-	-- Idle detection timer
-	if not _idle_timer then _idle_timer = hs.timer.new(IDLE_CHECK_INTERVAL_SEC, Watchers.check_idle) end
-	_idle_timer:start()
-
-	-- Maintenance timer (day rotation + mouse distance)
-	if not _maintenance_timer then
-		_maintenance_timer = hs.timer.new(MAINTENANCE_INTERVAL_SEC, Watchers.perform_maintenance)
-	end
-	_maintenance_timer:start()
-
-	-- Bootstrap: capture the current app context and load/rebuild today's index
-	hs.timer.doAfter(0, function()
-		local ok_capture, captured = Logger.pcall(LOG, ContextTracker.capture_frontmost_app)
-		if not ok_capture or captured ~= true then
-			CoreState.is_secure_field = true
-			Logger.error(LOG, "Initial application context was unavailable — logging remains disabled.")
+	local acquired, acquire_err = xpcall(function()
+		_runtime_generation = _runtime_generation + 1
+		local runtime_generation = _runtime_generation
+		_process_lifecycle_cleanup_required = true
+		if ProcessLifecycle.start() ~= true then
+			error("application lifecycle watcher is unavailable")
 		end
+		KcBridge.set_log_manager(LogManager)
+		if KcBridge.start() ~= true then error("KC bridge refused startup") end
+		_kc_bridge_shutdown_complete = false
+		-- A normal OFF stops LogManager but deliberately preserves its initialized
+		-- state. ensure_ingest_running() then reacquires the timer/database on ON;
+		-- publish that cleanup obligation before the call so a partial throw and the
+		-- next OFF both release the exact rearmed owner.
+		_log_manager_cleanup_required = true
+		if LogManager.ensure_ingest_running() ~= true then
+			error("log ingest refused startup")
+		end
+		if not _action_listener_registered then
+			reconcile_action_epoch(SyntheticInput.current_action_epoch())
+			if SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
+				reconcile_action_epoch) == false then
+				error("action listener refused startup")
+			end
+			_action_listener_registered = true
+		end
+
+		CoreState.is_secure_field = true
+		CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+		CoreState.recent_typing_eff = {}
+		CoreState.recent_typing_phys = {}
+
+		local caffeinate_created, caffeinate_candidate = xpcall(function()
+			return hs.caffeinate.watcher.new(function(...)
+				invoke_runtime_callback(runtime_generation, "Caffeinate watcher",
+					Watchers.caffeinate_cb, ...)
+			end)
+		end, debug.traceback)
+		if not caffeinate_created or not caffeinate_candidate then
+			error("caffeinate watcher construction failed")
+		end
+		_caffeinate_watcher = caffeinate_candidate
+		local caffeinate_started, caffeinate_result = xpcall(function()
+			if type(caffeinate_candidate.start) ~= "function" then
+				error("caffeinate watcher has no start method")
+			end
+			return caffeinate_candidate:start()
+		end, debug.traceback)
+		if not caffeinate_started or caffeinate_result ~= caffeinate_candidate then
+			error("caffeinate watcher refused startup")
+		end
+		if Watchers.init_hardware_watchers() ~= true then
+			error("hardware watchers refused startup")
+		end
+
+		local keyboard_hook_options = {
+			eventTypes = {
+				hs.eventtap.event.types.keyDown,
+				hs.eventtap.event.types.keyUp,
+				hs.eventtap.event.types.flagsChanged,
+				hs.eventtap.event.types.leftMouseDown,
+				hs.eventtap.event.types.rightMouseDown,
+				hs.eventtap.event.types.scrollWheel,
+			},
+			onEvent = handle_key,
+		}
+		_keyboard_hook_cleanup_required = true
+		if KeyboardHook.start(keyboard_hook_options) ~= true
+			or KeyboardHook.isRunning() ~= true then
+			error("keyboard event tap is unavailable")
+		end
+		_event_tap = true
+
+		local watchdog_committed = acquire_recurring_timer(TAP_WATCHDOG_INTERVAL_SEC,
+			function()
+				invoke_runtime_callback(runtime_generation, "Event tap watchdog", function()
+				if not KeyboardHook.isRunning() then
+					CoreState.is_secure_field = true
+					Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
+					local restart_ok, restarted = Logger.pcall(LOG, KeyboardHook.start)
+					local state_ok, running = Logger.pcall(LOG, KeyboardHook.isRunning)
+					if restart_ok and restarted == true and state_ok and running == true then
+						local capture_ok, captured = Logger.pcall(LOG,
+							ContextTracker.capture_frontmost_app)
+						if not capture_ok or captured ~= true then
+							CoreState.is_secure_field = true
+							Logger.error(LOG,
+								"Keylogger event tap recovered without a trusted context.")
+						end
+					else
+						Logger.error(LOG,
+							"Keylogger event tap restart failed — persistence disabled until recovery.")
+					end
+				end
+				end)
+			end, function(candidate) _tap_watchdog_timer = candidate end)
+		if not watchdog_committed then
+			error("event tap watchdog refused startup")
+		end
+
+		local idle_committed = acquire_recurring_timer(IDLE_CHECK_INTERVAL_SEC,
+			function()
+				invoke_runtime_callback(runtime_generation, "Idle timer", Watchers.check_idle)
+			end, function(candidate) _idle_timer = candidate end)
+		if not idle_committed then
+			error("idle timer refused startup")
+		end
+		local maintenance_committed = acquire_recurring_timer(MAINTENANCE_INTERVAL_SEC,
+			function()
+				invoke_runtime_callback(runtime_generation, "Maintenance timer",
+					Watchers.perform_maintenance)
+			end, function(candidate) _maintenance_timer = candidate end)
+		if not maintenance_committed then
+			error("maintenance timer refused startup")
+		end
+
+		local bootstrap_candidate
+		local bootstrap_activation_in_progress = true
+		local bootstrap_delivered_before_commit = false
+		local bootstrap_delivered = false
+		local bootstrap_committed = acquire_recurring_timer(0, function()
+			if bootstrap_activation_in_progress then
+				bootstrap_delivered_before_commit = true
+				return
+			end
+			invoke_runtime_callback(runtime_generation, "Foreground-context bootstrap", function()
+				if bootstrap_delivered then
+					if _foreground_bootstrap_timer == bootstrap_candidate then
+						stop_retained_timer(bootstrap_candidate, function()
+							_foreground_bootstrap_timer = nil
+						end)
+					end
+					return
+				end
+				bootstrap_delivered = true
+				if not stop_retained_timer(bootstrap_candidate, function()
+					_foreground_bootstrap_timer = nil
+				end) then
+					Logger.error(LOG,
+						"Foreground-context bootstrap cleanup remains pending.")
+				end
+				local ok_capture, captured = Logger.pcall(LOG,
+					ContextTracker.capture_frontmost_app)
+				if not ok_capture or captured ~= true then
+					CoreState.is_secure_field = true
+					Logger.error(LOG,
+						"Initial application context was unavailable — logging remains disabled.")
+				end
+			end)
+		end, function(candidate)
+			bootstrap_candidate = candidate
+			_foreground_bootstrap_timer = candidate
+		end)
+		bootstrap_activation_in_progress = false
+		if not bootstrap_committed or bootstrap_delivered_before_commit then
+			error("foreground-context bootstrap timer refused startup")
+		end
+
+		CoreState.is_enabled = true
 		Logger.success(LOG, "Keylogger engine started.")
-	end)
+	end, debug.traceback)
+	if not acquired then
+		CoreState.is_secure_field = true
+		Logger.error(LOG, "Keylogger start aborted: %s", tostring(acquire_err))
+		if not teardown_runtime() then
+			Logger.error(LOG, "Keylogger startup rollback remains incomplete.")
+		end
+		return false
+	end
 
 	-- New persistence model: data.sql is the canonical source of truth and
 	-- the SQLite cache in tmpdir is reconstructed by log_manager.M.init().
@@ -1627,52 +1973,37 @@ end
 --- Halts all tracking, stops all timers and watchers, and flushes the buffer.
 --- Idempotent: calling it while not running is a no-op.
 function M.stop()
-	if not CoreState.is_enabled then
-		if ProcessLifecycle.stop() ~= true then
-			Logger.error(LOG, "Keylogger remains stopped, but application-watcher cleanup is pending.")
-			return false
+	local was_enabled = CoreState.is_enabled
+	if was_enabled then Logger.start(LOG, "Stopping keylogger engine…") end
+	local complete = teardown_runtime()
+	if complete then
+		if was_enabled then
+			Logger.success(LOG, "Keylogger engine stopped.")
+		else
+			Logger.warn(LOG, "M.stop() called while not running — cleanup verified.")
 		end
-		Logger.warn(LOG, "M.stop() called while not running — lifecycle cleanup verified.")
-		return true
+	else
+		Logger.error(LOG, "Keylogger stopped fail-closed; cleanup remains pending.")
 	end
-	Logger.start(LOG, "Stopping keylogger engine…")
+	return complete
+end
 
-	CoreState.is_enabled = false
-	if _action_listener_registered then
-		SyntheticInput.unregister_action_listener(ACTION_EPOCH_LISTENER_ID)
-		_action_listener_registered = false
+--- Terminates feature resources and the always-on physical-key ledger drain.
+--- Feature OFF intentionally calls M.stop() so the bridge keeps advancing its
+--- file cursor; only process teardown may call this terminal lifecycle method.
+--- @return boolean complete True only when feature and bridge cleanup both commit.
+function M.shutdown()
+	local feature_complete = teardown_runtime()
+	if not _kc_bridge_shutdown_complete then
+		local stopped, result = xpcall(KcBridge.stop, debug.traceback)
+		if stopped and result == true then
+			_kc_bridge_shutdown_complete = true
+		else
+			Logger.error(LOG, "KC bridge terminal cleanup remains pending: %s.",
+				tostring(result))
+		end
 	end
-	-- App-switch rows are normally created only on focus changes. Close the
-	-- currently open interval before shutdown so reloads do not erase it.
-	pcall(ContextTracker.close_active_app)
-	LogManager.flush_buffer()
-	local lifecycle_stopped = ProcessLifecycle.stop() == true
-	if not lifecycle_stopped then
-		Logger.error(LOG, "Keylogger stopped fail-closed; application-watcher cleanup is pending.")
-	end
-
-	KeyboardHook.stop()
-	_event_tap = nil
-	if _caffeinate_watcher   then _caffeinate_watcher:stop();   _caffeinate_watcher = nil end
-	if _win_filter           then _win_filter:unsubscribeAll(); _win_filter         = nil end
-	if _idle_timer           then _idle_timer:stop();           _idle_timer         = nil end
-	if _maintenance_timer    then _maintenance_timer:stop();     _maintenance_timer  = nil end
-	if _tap_watchdog_timer   then _tap_watchdog_timer:stop();   _tap_watchdog_timer = nil end
-
-	if CoreState.ax_observer then
-		pcall(function() CoreState.ax_observer:stop() end)
-		CoreState.ax_observer = nil
-	end
-
-	Watchers.stop_hardware_watchers()
-	KcBridge.stop()
-
-	-- Close the SQLite cache cleanly (drains any pending today.log entries
-	-- one last time before stopping). Safe to call even if init never ran.
-	pcall(LogManager.stop)
-
-	Logger.success(LOG, "Keylogger engine stopped.")
-	return lifecycle_stopped
+	return feature_complete and _kc_bridge_shutdown_complete
 end
 
 return M

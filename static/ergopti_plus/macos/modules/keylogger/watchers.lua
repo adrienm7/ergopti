@@ -28,6 +28,7 @@ local hs      = hs
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
@@ -46,6 +47,8 @@ local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keylogger", "micro_idle_timeout_m
 local SESSION_TIMEOUT_MS         = Timings.ms("keylogger", "session_timeout_ms")
 -- Minimum gap between system-load polls to avoid spawning top too often (5 min)
 local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keylogger", "system_load_poll_ms")
+-- macOS needs one runloop turn after wake/unlock before AX reports foreground truth
+local CONTEXT_REFRESH_DELAY_SEC = 0.05
 
 -- Injected shared state and the pause predicate, both wired in M.init().
 local _state     = nil
@@ -59,6 +62,14 @@ local _wifi_watcher         = nil
 local _battery_watcher      = nil
 local _spaces_watcher       = nil
 local _audio_watcher_active = false
+local _audio_callback_installed = false
+local _hardware_watchers_enabled = false
+local _hardware_generation = 0
+local _context_refresh_generation = 0
+
+-- Wake/unlock continuations share the hardware lifecycle. A handle remains in
+-- this table until TimerScheduler confirms exact native cancellation.
+local _context_refresh_timers = {}
 
 -- Day boundary tracker for the midnight rotation
 local _current_day          = os.date("%Y-%m-%d")
@@ -95,19 +106,20 @@ function M.init(core_state, is_paused_fn)
 	Logger.start(LOG, "Initializing keylogger watchers…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — watchers non-functional.")
-		return
+		return false
 	end
 	if type(is_paused_fn) ~= "function" then
 		Logger.error(LOG, "M.init(): is_paused_fn must be a function — watchers non-functional.")
-		return
+		return false
 	end
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		return _state == core_state and _is_paused == is_paused_fn
 	end
 	_state     = core_state
 	_is_paused = is_paused_fn
 	Logger.success(LOG, "Keylogger watchers initialized.")
+	return true
 end
 
 
@@ -236,181 +248,440 @@ function M.perform_maintenance()
 	poll_mouse_distance()
 end
 
+--- Returns whether one hardware callback still belongs to the live runtime.
+--- @param generation integer Generation captured when its watcher was created.
+--- @return boolean allowed True only for the committed, enabled generation.
+local function hardware_callback_allowed(generation)
+	return _hardware_watchers_enabled == true
+		and generation == _hardware_generation
+		and _state ~= nil
+		and _state.is_enabled == true
+		and not _is_paused()
+end
+
+--- Contains a native hardware callback and routes failures to the file logger.
+--- @param label string Hardware source for diagnostics.
+--- @param generation integer Generation captured by the callback.
+--- @param callback function Callback body.
+local function run_hardware_callback(label, generation, callback)
+	local ok, err = xpcall(function()
+		if not hardware_callback_allowed(generation) then return end
+		callback()
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s watcher callback failed: %s.", label, tostring(err))
+	end
+end
+
+--- Cancels every wake/unlock continuation while retaining refused handles.
+--- @return boolean settled True only when every exact timer was released.
+local function cancel_context_refresh_timers()
+	local snapshot = {}
+	for handle in pairs(_context_refresh_timers) do
+		snapshot[#snapshot + 1] = handle
+	end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		local ok, cancelled = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if ok and cancelled == true then
+			_context_refresh_timers[handle] = nil
+		else
+			settled = false
+			Logger.error(LOG,
+				"Context-refresh timer cleanup failed; exact timer retained: %s.",
+				tostring(ok and cancelled or cancelled))
+		end
+	end
+	return settled
+end
+
+--- Schedules one lifecycle-owned post-wake foreground-context refresh.
+--- @param reason string Wake or unlock diagnostic label.
+--- @return boolean committed True only when a timer owns the continuation.
+local function schedule_context_refresh(reason)
+	_context_refresh_generation = _context_refresh_generation + 1
+	local refresh_generation = _context_refresh_generation
+	local hardware_generation = _hardware_generation
+	local timer_committed = false
+	if not cancel_context_refresh_timers() then
+		_state.is_secure_field = true
+		Logger.error(LOG, "%s context refresh blocked by prior timer cleanup debt.", reason)
+		return false
+	end
+
+	local handle
+	local scheduled, candidate, committed = xpcall(function()
+		return TimerScheduler.after(CONTEXT_REFRESH_DELAY_SEC, function()
+			if timer_committed ~= true then return end
+			-- TimerScheduler fences the user callback before native stop. A refused
+			-- stop leaves handle.timer live; retain it and fail closed until teardown
+			if handle and handle.timer ~= nil then
+				_state.is_secure_field = true
+				Logger.error(LOG,
+					"%s context refresh blocked by timer cleanup debt.", reason)
+				return
+			end
+			if handle then _context_refresh_timers[handle] = nil end
+			if refresh_generation ~= _context_refresh_generation
+			or hardware_generation ~= _hardware_generation
+			or _hardware_watchers_enabled ~= true
+			or _state == nil
+			or _state.is_enabled ~= true
+			or _is_paused()
+			then
+				return
+			end
+			if _state.active_app_name then return end
+
+			local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
+			if not ok_tracker or type(tracker) ~= "table"
+			or type(tracker.capture_frontmost_app) ~= "function"
+			then
+				_state.is_secure_field = true
+				Logger.error(LOG, "%s context refresh could not load the context tracker.", reason)
+				return
+			end
+			local ok_capture, captured = xpcall(tracker.capture_frontmost_app, debug.traceback)
+			if not ok_capture or captured ~= true then
+				_state.is_secure_field = true
+				Logger.error(LOG, "%s context refresh failed: %s.", reason,
+					tostring(ok_capture and captured or captured))
+			end
+		end)
+	end, debug.traceback)
+	handle = candidate
+	if type(handle) == "table" then _context_refresh_timers[handle] = true end
+	if not scheduled or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" then
+			local cancel_ok, cancelled = xpcall(function()
+				return TimerScheduler.cancel(handle)
+			end, debug.traceback)
+			if cancel_ok and cancelled == true then
+				_context_refresh_timers[handle] = nil
+			end
+		end
+		_state.is_secure_field = true
+		Logger.error(LOG, "%s context refresh timer was not committed: %s.", reason,
+			tostring(scheduled and committed or candidate))
+		return false
+	end
+	timer_committed = true
+	return true
+end
+
+--- Stops one retained object watcher and clears it only after exact success.
+--- Hammerspoon's object watchers return themselves from start() and stop().
+--- @param handle table|userdata|nil Native watcher candidate.
+--- @param clear function Clears the owning field after stop commitment.
+--- @return boolean settled True only when no native watcher remains owned.
+local function stop_object_watcher(handle, clear)
+	if not handle then return true end
+	local ok, result = xpcall(function()
+		if type(handle.stop) ~= "function" then error("watcher has no stop method") end
+		return handle:stop()
+	end, debug.traceback)
+	if not ok or (result ~= true and result ~= handle) then
+		Logger.error(LOG, "Hardware watcher stop failed; exact handle retained: %s.",
+			tostring(ok and result or result))
+		return false
+	end
+	clear()
+	return true
+end
+
+--- Stops the singleton audio watcher and removes its installed callback.
+--- @return boolean settled True only when both resources are released.
+local function stop_audio_watcher()
+	local watcher = hs.audiodevice and hs.audiodevice.watcher
+	if not _audio_watcher_active and not _audio_callback_installed then return true end
+	if not watcher then return false end
+
+	if _audio_watcher_active then
+		local ok_stop, stop_err = xpcall(watcher.stop, debug.traceback)
+		local ok_state, running = xpcall(watcher.isRunning, debug.traceback)
+		if not ok_stop or not ok_state or running ~= false then
+			Logger.error(LOG, "Audio watcher stop failed; ownership retained: %s.",
+				tostring(not ok_stop and stop_err or running))
+			return false
+		end
+		_audio_watcher_active = false
+	end
+
+	if _audio_callback_installed then
+		local ok_callback, callback_err = xpcall(function()
+			watcher.setCallback(nil)
+		end, debug.traceback)
+		if not ok_callback then
+			Logger.error(LOG, "Audio watcher callback removal failed: %s.",
+				tostring(callback_err))
+			return false
+		end
+		_audio_callback_installed = false
+	end
+	return true
+end
+
+--- Releases every hardware capability independently so one refusal cannot hide
+--- cleanup opportunities for its siblings.
+--- @return boolean settled True only when every exact capability was released.
+local function cleanup_hardware_resources()
+	local settled = true
+	if not stop_audio_watcher() then settled = false end
+	if not stop_object_watcher(_spaces_watcher, function() _spaces_watcher = nil end) then
+		settled = false
+	end
+	if not stop_object_watcher(_battery_watcher, function() _battery_watcher = nil end) then
+		settled = false
+	end
+	if not stop_object_watcher(_wifi_watcher, function() _wifi_watcher = nil end) then
+		settled = false
+	end
+	return settled
+end
+
+--- Creates and starts one object watcher while publishing ownership first.
+--- @param label string Hardware source for diagnostics.
+--- @param constructor function Native watcher constructor.
+--- @param publish function Stores the candidate in its lifecycle field.
+--- @return boolean committed True only when native start returned its handle.
+local function start_object_watcher(label, constructor, publish)
+	local ok_new, candidate = xpcall(constructor, debug.traceback)
+	if not ok_new or candidate == nil or candidate == false then
+		Logger.error(LOG, "%s watcher construction failed: %s.", label, tostring(candidate))
+		return false
+	end
+	publish(candidate)
+	local ok_start, result = xpcall(function()
+		if type(candidate.start) ~= "function" then error("watcher has no start method") end
+		return candidate:start()
+	end, debug.traceback)
+	if not ok_start or (result ~= true and result ~= candidate) then
+		Logger.error(LOG, "%s watcher start failed: %s.", label,
+			tostring(ok_start and result or result))
+		return false
+	end
+	return true
+end
+
 --- Handles system sleep, wake, lock, and unlock events.
 --- @param event number The caffeinate watcher event constant.
 function M.caffeinate_cb(event)
-	if not require_state("caffeinate_cb") then return end
-	if _is_paused() then return end
-	local now = hs.timer.absoluteTime() / 1000000
-	if event == hs.caffeinate.watcher.systemWillSleep
-	or event == hs.caffeinate.watcher.screensDidSleep
-	then
-		LogManager.log_system_event("sleep", { battery_level = _state.current_battery_level })
-		-- Arm passive-time accounting: any wake/unlock will close this window
-		_state.passive_started_at  = now
-		_state.passive_kind        = "sleep"
-		if _state.active_app_name then
-			LogManager.log_app_switch(
-				_state.active_app_name, "SYSTEM_SLEEP",
-				now - (_state.active_app_start or now)
-			)
-			_state.active_app_name = nil
+	if not require_state("caffeinate_cb") then return false end
+	local callback_ok, result_or_err = xpcall(function()
+		if _state.is_enabled ~= true or _hardware_watchers_enabled ~= true or _is_paused() then
+			return true
 		end
-
-	elseif event == hs.caffeinate.watcher.systemDidWake
-	or     event == hs.caffeinate.watcher.screensDidWake
-	then
-		LogManager.log_system_event("wake")
-		if _state.passive_started_at then
-			LogManager.log_passive_period(
-				_state.passive_kind or "sleep",
-				math.floor(now - _state.passive_started_at)
-			)
-			_state.passive_started_at = nil
-			_state.passive_kind       = nil
-		end
-		_state.active_app_start = now
-		-- macOS can resume without an application-activated notification. The
-		-- foreground app must be re-primed or its post-wake interval is omitted
-		-- from app_time_ms until the next manual app switch
-		hs.timer.doAfter(0.05, function()
-			if not _state.active_app_name then
-				local ok, tracker = pcall(require, "modules.keylogger.context_tracker")
-				if ok and tracker then pcall(tracker.capture_frontmost_app) end
+		local now = hs.timer.absoluteTime() / 1000000
+		if event == hs.caffeinate.watcher.systemWillSleep
+		or event == hs.caffeinate.watcher.screensDidSleep
+		then
+			LogManager.log_system_event("sleep", { battery_level = _state.current_battery_level })
+			_state.passive_started_at  = now
+			_state.passive_kind        = "sleep"
+			if _state.active_app_name then
+				LogManager.log_app_switch(
+					_state.active_app_name, "SYSTEM_SLEEP",
+					now - (_state.active_app_start or now)
+				)
+				_state.active_app_name = nil
 			end
-		end)
 
-	elseif event == hs.caffeinate.watcher.screensDidLock then
-		LogManager.log_system_event("lock")
-		_state.passive_started_at = now
-		_state.passive_kind       = "lock"
-		if _state.active_app_name then
-			LogManager.log_app_switch(
-				_state.active_app_name, "SYSTEM_LOCK",
-				now - (_state.active_app_start or now)
-			)
-			_state.active_app_name = nil
-		end
-
-	elseif event == hs.caffeinate.watcher.screensDidUnlock then
-		LogManager.log_system_event("unlock")
-		if _state.passive_started_at then
-			LogManager.log_passive_period(
-				_state.passive_kind or "lock",
-				math.floor(now - _state.passive_started_at)
-			)
-			_state.passive_started_at = nil
-			_state.passive_kind       = nil
-		end
-		_state.active_app_start = now
-		-- Unlock has the same missing-activation edge case as wake. Re-prime
-		-- asynchronously so macOS has restored the foreground window first
-		hs.timer.doAfter(0.05, function()
-			if not _state.active_app_name then
-				local ok, tracker = pcall(require, "modules.keylogger.context_tracker")
-				if ok and tracker then pcall(tracker.capture_frontmost_app) end
+		elseif event == hs.caffeinate.watcher.systemDidWake
+		or     event == hs.caffeinate.watcher.screensDidWake
+		then
+			LogManager.log_system_event("wake")
+			if _state.passive_started_at then
+				LogManager.log_passive_period(
+					_state.passive_kind or "sleep",
+					math.floor(now - _state.passive_started_at)
+				)
+				_state.passive_started_at = nil
+				_state.passive_kind       = nil
 			end
-		end)
+			_state.active_app_start = now
+			schedule_context_refresh("Wake")
+
+		elseif event == hs.caffeinate.watcher.screensDidLock then
+			LogManager.log_system_event("lock")
+			_state.passive_started_at = now
+			_state.passive_kind       = "lock"
+			if _state.active_app_name then
+				LogManager.log_app_switch(
+					_state.active_app_name, "SYSTEM_LOCK",
+					now - (_state.active_app_start or now)
+				)
+				_state.active_app_name = nil
+			end
+
+		elseif event == hs.caffeinate.watcher.screensDidUnlock then
+			LogManager.log_system_event("unlock")
+			if _state.passive_started_at then
+				LogManager.log_passive_period(
+					_state.passive_kind or "lock",
+					math.floor(now - _state.passive_started_at)
+				)
+				_state.passive_started_at = nil
+				_state.passive_kind       = nil
+			end
+			_state.active_app_start = now
+			schedule_context_refresh("Unlock")
+		end
+		return true
+	end, debug.traceback)
+	if not callback_ok then
+		_state.is_secure_field = true
+		Logger.error(LOG, "Caffeinate watcher callback failed: %s.", tostring(result_or_err))
+		return false
 	end
+	return result_or_err == true
 end
 
---- Starts WiFi, battery, spaces, and audio device watchers.
+--- Starts Wi-Fi, battery, spaces, and audio device watchers as one transaction.
+--- @return boolean committed True only when every available watcher committed.
 function M.init_hardware_watchers()
-	if not require_state("init_hardware_watchers") then return end
-	Logger.trace(LOG, "Starting hardware watchers…")
+	if not require_state("init_hardware_watchers") then return false end
+	if _hardware_watchers_enabled then return true end
+	Logger.debug(LOG, "Starting hardware watcher transaction…")
 
-	if hs.wifi and hs.wifi.watcher then
-		local ok, w = pcall(function()
-			return hs.wifi.watcher.new(function()
-				if _is_paused() then return end
-				local ssid = hs.wifi.currentNetwork()
-				LogManager.log_system_event("wifi_change", { ssid = ssid or "Disconnected" })
-				Logger.debug(LOG, "Wi-Fi changed: %s.", ssid or "Disconnected")
-			end)
-		end)
-		if ok and w then _wifi_watcher = w; _wifi_watcher:start() end
+	_hardware_generation = _hardware_generation + 1
+	_context_refresh_generation = _context_refresh_generation + 1
+	if not cancel_context_refresh_timers() or not cleanup_hardware_resources() then
+		Logger.error(LOG, "Hardware watcher start refused: prior cleanup remains pending.")
+		return false
 	end
+	local generation = _hardware_generation
 
-	if hs.battery and hs.battery.watcher then
-		local ok, w = pcall(function()
-			return hs.battery.watcher.new(function()
-				if _is_paused() then return end
-				local level      = hs.battery.percentage()
-				local is_charging = hs.battery.isCharging()
-				local source     = hs.battery.powerSource()
-				_state.current_battery_level = level
-				LogManager.log_system_event("power_change", {
-					source      = source,
-					level       = level,
-					is_charging = is_charging,
-				})
-				Logger.debug(LOG, "Battery: %s%% (%s, charging=%s).",
-					tostring(level), tostring(source), tostring(is_charging))
-			end)
-		end)
-		if ok and w then
-			_battery_watcher = w
-			_battery_watcher:start()
-			-- Snapshot current battery level immediately on start
-			_state.current_battery_level = hs.battery.percentage()
-		end
-	end
-
-	if hs.spaces and hs.spaces.watcher then
-		pcall(function()
-			_spaces_watcher = hs.spaces.watcher.new(function(space_id)
-				if _is_paused() then return end
-				LogManager.log_system_event("space_change", { space_id = space_id })
-			end)
-			_spaces_watcher:start()
-		end)
-	end
-
-	-- Audio device watcher: logs volume and mute changes
-	if hs.audiodevice and hs.audiodevice.watcher then
-		local ok = pcall(function()
-			hs.audiodevice.watcher.setCallback(function(event_code)
-				if _is_paused() then return end
-				-- "vOut " = output volume changed, "mOut " = output mute toggled
-				if event_code == "vOut " or event_code == "mOut " then
-					local device = hs.audiodevice.defaultOutputDevice()
-					if device then
-						local vol   = device:volume()
-						local muted = device:muted()
-						_state.current_audio_volume = vol
-						LogManager.log_system_event("audio_change", {
-							volume     = vol,
-							muted      = muted,
-							event_code = event_code,
+	local committed, commit_err = xpcall(function()
+		if hs.wifi and hs.wifi.watcher then
+			if not start_object_watcher("Wi-Fi", function()
+				return hs.wifi.watcher.new(function()
+					run_hardware_callback("Wi-Fi", generation, function()
+						local ssid = hs.wifi.currentNetwork()
+						LogManager.log_system_event("wifi_change", {
+							ssid = ssid or "Disconnected",
 						})
-						Logger.debug(LOG, "Audio: volume=%.0f%%, muted=%s.", vol or 0, tostring(muted))
-					end
-				end
+						Logger.debug(LOG, "Wi-Fi changed: %s.", ssid or "Disconnected")
+					end)
+				end)
+			end, function(candidate) _wifi_watcher = candidate end) then
+				error("Wi-Fi watcher refused startup")
+			end
+		end
+
+		if hs.battery and hs.battery.watcher then
+			if not start_object_watcher("Battery", function()
+				return hs.battery.watcher.new(function()
+					run_hardware_callback("Battery", generation, function()
+						local level       = hs.battery.percentage()
+						local is_charging = hs.battery.isCharging()
+						local source      = hs.battery.powerSource()
+						_state.current_battery_level = level
+						LogManager.log_system_event("power_change", {
+							source      = source,
+							level       = level,
+							is_charging = is_charging,
+						})
+						Logger.debug(LOG, "Battery: %s%% (%s, charging=%s).",
+							tostring(level), tostring(source), tostring(is_charging))
+					end)
+				end)
+			end, function(candidate) _battery_watcher = candidate end) then
+				error("battery watcher refused startup")
+			end
+			local ok_level, level = pcall(hs.battery.percentage)
+			if ok_level then _state.current_battery_level = level end
+		end
+
+		if hs.spaces and hs.spaces.watcher then
+			if not start_object_watcher("Spaces", function()
+				return hs.spaces.watcher.new(function(space_id)
+					run_hardware_callback("Spaces", generation, function()
+						LogManager.log_system_event("space_change", { space_id = space_id })
+					end)
+				end)
+			end, function(candidate) _spaces_watcher = candidate end) then
+				error("spaces watcher refused startup")
+			end
+		end
+
+		if hs.audiodevice and hs.audiodevice.watcher then
+			local watcher = hs.audiodevice.watcher
+			if type(watcher.setCallback) ~= "function"
+			or type(watcher.start) ~= "function"
+			or type(watcher.stop) ~= "function"
+			or type(watcher.isRunning) ~= "function"
+			then
+				error("audio watcher lifecycle API is incomplete")
+			end
+			-- Publish possible ownership first because setCallback may install the
+			-- function and then throw, leaving rollback as the only remover
+			_audio_callback_installed = true
+			watcher.setCallback(function(event_code)
+				run_hardware_callback("Audio", generation, function()
+					if event_code ~= "vOut " and event_code ~= "mOut " then return end
+					local device = hs.audiodevice.defaultOutputDevice()
+					if not device then return end
+					local volume = device:volume()
+					local muted = device:muted()
+					_state.current_audio_volume = volume
+					LogManager.log_system_event("audio_change", {
+						volume     = volume,
+						muted      = muted,
+						event_code = event_code,
+					})
+					Logger.debug(LOG, "Audio: volume=%.0f%%, muted=%s.",
+						volume or 0, tostring(muted))
+				end)
 			end)
-			hs.audiodevice.watcher.start()
+			-- Publish possible ownership before start because native activation can
+			-- precede a thrown error and the singleton exposes no returned handle
 			_audio_watcher_active = true
-			-- Snapshot current volume immediately
-			local device = hs.audiodevice.defaultOutputDevice()
-			if device then _state.current_audio_volume = device:volume() end
-		end)
-		if not ok then Logger.warn(LOG, "Failed to start audio device watcher.") end
+			watcher.start()
+			if watcher.isRunning() ~= true then error("audio watcher did not start") end
+
+			local ok_device, device = pcall(hs.audiodevice.defaultOutputDevice)
+			if ok_device and device then
+				local ok_volume, volume = pcall(function() return device:volume() end)
+				if ok_volume then _state.current_audio_volume = volume end
+			end
+		end
+	end, debug.traceback)
+
+	if not committed then
+		_hardware_generation = _hardware_generation + 1
+		_hardware_watchers_enabled = false
+		local rolled_back = cleanup_hardware_resources()
+		Logger.error(LOG, "Hardware watcher transaction failed: %s.", tostring(commit_err))
+		if not rolled_back then
+			Logger.error(LOG, "Hardware watcher rollback remains incomplete.")
+		end
+		return false
 	end
 
-	Logger.done(LOG, "Hardware watchers started.")
+	_hardware_watchers_enabled = true
+	Logger.debug(LOG, "Hardware watcher transaction committed.")
+	return true
 end
 
---- Stops all hardware watchers cleanly.
+--- Stops all hardware watchers and post-wake continuations cleanly.
+--- @return boolean settled True only when every owned capability was released.
 function M.stop_hardware_watchers()
-	if not require_state("stop_hardware_watchers") then return end
-	Logger.trace(LOG, "Stopping hardware watchers…")
-	if _wifi_watcher    then _wifi_watcher:stop();    _wifi_watcher    = nil end
-	if _battery_watcher then _battery_watcher:stop(); _battery_watcher = nil end
-	if _spaces_watcher  then pcall(function() _spaces_watcher:stop() end); _spaces_watcher = nil end
-	if _audio_watcher_active then
-		pcall(function() hs.audiodevice.watcher.stop() end)
-		_audio_watcher_active = false
+	if not require_state("stop_hardware_watchers") then return false end
+	Logger.debug(LOG, "Stopping hardware watcher transaction…")
+	_hardware_watchers_enabled = false
+	_hardware_generation = _hardware_generation + 1
+	_context_refresh_generation = _context_refresh_generation + 1
+	local timers_stopped = cancel_context_refresh_timers()
+	local watchers_stopped = cleanup_hardware_resources()
+	local settled = timers_stopped and watchers_stopped
+	if settled then
+		Logger.debug(LOG, "Hardware watcher transaction stopped.")
+	else
+		Logger.error(LOG, "Hardware watcher cleanup remains pending.")
 	end
-	Logger.done(LOG, "Hardware watchers stopped.")
+	return settled
 end
 
 return M

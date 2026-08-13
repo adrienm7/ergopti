@@ -77,6 +77,7 @@ do
 end
 
 local Logger             = require("infra.logger")
+local TimerScheduler     = require("adapters.timer_scheduler")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -147,6 +148,7 @@ local reload_guard       = require("infra.reload_guard")
 local EmergencyExit      = require("infra.emergency_exit")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local TeardownTransaction = require("infra.teardown_transaction")
+local StartupTransaction = require("infra.startup_transaction")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
@@ -434,10 +436,10 @@ local function teardown_all_resources(termination_kind)
 			run = function()
 				local module = package.loaded["modules.keylogger"]
 				if module == nil then return true end
-				if type(module) ~= "table" or type(module.stop) ~= "function" then
-					error("modules.keylogger.stop is unavailable")
+				if type(module) ~= "table" or type(module.shutdown) ~= "function" then
+					error("modules.keylogger.shutdown is unavailable")
 				end
-				return module.stop()
+				return module.shutdown()
 			end,
 		},
 		{
@@ -505,8 +507,19 @@ local function teardown_all_resources(termination_kind)
 			return module.stop_watchers()
 		end,
 	}
+	local timer_finalizer = {
+		name = "timer-scheduler",
+		run = function() return TimerScheduler.cancelAll() end,
+	}
 
-	local completed = TeardownTransaction.run(_local_teardown_state, steps)
+	-- Scheduler handles belong to the modules above until every owner has
+	-- settled. A broad drain before then would invalidate their retained retry
+	-- capabilities while a failed teardown keeps this Lua process alive.
+	local completed = TeardownTransaction.run_with_finalizer(
+		_local_teardown_state,
+		steps,
+		timer_finalizer
+	)
 	if completed then
 		Logger.info(LOG, "Hammerspoon local teardown completed.")
 	else
@@ -717,15 +730,10 @@ end
 -- ====================================
 -- ===================================
 
--- Pre-start modules so they are active before menu.lua reads saved prefs
--- Menu.lua will honor saved state and stop/start them as needed
-Logger.debug(LOG, "Starting gestures module…")
-gestures.start()
-Logger.debug(LOG, "Starting shortcuts module…")
-shortcuts.start()
-Logger.info(LOG, "Main modules initialized successfully.")
-Boot.mark("Gestures + shortcuts pre-start")
-
+-- Pre-start modules so they are active before menu.lua reads saved prefs.
+-- Menu.lua will honor saved state and stop/start them as needed. All three
+-- input owners share one transaction because continuing after a refused start
+-- leaves a half-functional keyboard while the boot log still claims success.
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button eventtap) is
 -- armed as early as its real dependencies allow. M.start() only stores the
 -- keymap/shortcuts/gestures/karabiner module TABLES for later pause/resume
@@ -736,8 +744,38 @@ Boot.mark("Gestures + shortcuts pre-start")
 -- recourse exists for the entire remainder of a slow boot, instead of only
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
-Logger.debug(LOG, "Starting script control engine…")
-shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
+local prestart_committed = StartupTransaction.run({
+	{
+		name = "gestures",
+		allow_unavailable = true,
+		start = function()
+			Logger.debug(LOG, "Starting gestures module…")
+			return gestures.start()
+		end,
+		stop = gestures.stop,
+	},
+	{
+		name = "shortcuts",
+		start = function()
+			Logger.debug(LOG, "Starting shortcuts module…")
+			return shortcuts.start()
+		end,
+		stop = shortcuts.pause_bindings,
+	},
+	{
+		name = "script_control",
+		start = function()
+			Boot.mark("Gestures + shortcuts pre-start")
+			Logger.debug(LOG, "Starting script control engine…")
+			return shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
+		end,
+		stop = shortcuts.stop_script_control,
+	},
+})
+if prestart_committed ~= true then
+	error("input subsystem pre-start did not commit")
+end
+Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Script control engine started (panic-button eventtap)")
 
 -- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the

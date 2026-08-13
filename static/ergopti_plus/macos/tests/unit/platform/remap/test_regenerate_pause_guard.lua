@@ -126,7 +126,7 @@ local function load_karabiner(paused)
 		start_alt_tab_monitor_hotkey = function() return "monitor" end,
 		start_alt_tab_apps_hotkey = function() return "apps" end,
 		stop_alt_tab_apps_tracker = function() return true end,
-		start_input_source_watcher = function() end,
+		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
 	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }

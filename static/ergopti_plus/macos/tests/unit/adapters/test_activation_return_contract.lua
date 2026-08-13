@@ -73,39 +73,57 @@ end)
 helpers.describe("file-manager shortcut: a refused running app falls through", function()
 	helpers.it("tries the next activation path after app:activate() false", function()
 		local shell_opens = 0
-		package.loaded["adapters.shell_runner"] = {
-			open = function() shell_opens = shell_opens + 1; return true end,
+		local saved_shell_runner = package.loaded["adapters.shell_runner"]
+		local slots = {
+			"adapters.window_manager",
+			"adapters.app_launcher",
+			"adapters.timer_scheduler",
+			"adapters.clipboard",
+			"infra.config_paths",
+			"infra.dialog_util",
+			"modules.shortcuts.actions.apps",
 		}
-		package.loaded["adapters.window_manager"] = {
-			activate = function() return false end,
-		}
-		package.loaded["adapters.app_launcher"] = {
-			launch = function() return false end,
-		}
-		package.loaded["adapters.timer_scheduler"] = {
-			after = function() return true end,
-		}
-		package.loaded["adapters.clipboard"] = {
-			get_text = function() return "" end,
-		}
-		package.loaded["infra.config_paths"] = {
-			get_config_dir = function() return "/tmp/ergopti" end,
-		}
-		package.loaded["infra.dialog_util"] = { alert = function() end }
+		local saved = {}
+		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
 
-		local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
-			application = {
-				runningApplications = function()
-					return {
-						{
-							name = function() return "Finder" end,
-							activate = function() return false end,
-						},
-					}
-				end,
-			},
-		})
-		actions.open_finder()
+		local ok, err = xpcall(function()
+			package.loaded["adapters.shell_runner"] = {
+				open = function() shell_opens = shell_opens + 1; return true end,
+			}
+			package.loaded["adapters.window_manager"] = {
+				activate = function() return false end,
+			}
+			package.loaded["adapters.app_launcher"] = {
+				launch = function() return false end,
+			}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() return true end,
+			}
+			package.loaded["adapters.clipboard"] = {
+				get_text = function() return "" end,
+			}
+			package.loaded["infra.config_paths"] = {
+				get_config_dir = function() return "/tmp/ergopti" end,
+			}
+			package.loaded["infra.dialog_util"] = { alert = function() end }
+
+			local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
+				application = {
+					runningApplications = function()
+						return {
+							{
+								name = function() return "Finder" end,
+								activate = function() return false end,
+							},
+						}
+					end,
+				},
+			})
+			actions.open_finder()
+		end, debug.traceback)
+		package.loaded["adapters.shell_runner"] = saved_shell_runner
+		for _, slot in ipairs(slots) do package.loaded[slot] = saved[slot] end
+		if not ok then error(err, 0) end
 
 		helpers.assert_eq(1, shell_opens,
 			"false activation must reach the final path-open fallback instead of being "

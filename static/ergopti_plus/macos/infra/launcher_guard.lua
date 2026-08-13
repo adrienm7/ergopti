@@ -67,6 +67,7 @@ local _launcher_app = nil
 local _emergency_quit = nil
 local _app_watcher = nil
 local _backstop_timer = nil
+local _backstop_committed = false
 
 
 
@@ -94,6 +95,54 @@ local function stop_resource(resource, label)
 	return true
 end
 
+--- Verifies one recurring native timer's observable running state. The boolean
+--- branch exists only for the pure-Lua test adapter; unreadable userdata fails
+--- closed because a chainable start/stop result is not a native-state verdict.
+--- @param timer_handle table|userdata Native timer candidate.
+--- @param expected boolean Required running state.
+--- @return boolean matches
+--- @return string|nil detail
+local function backstop_running_matches(timer_handle, expected)
+	local member_ok, member_or_err = pcall(function() return timer_handle.running end)
+	if not member_ok then return false, tostring(member_or_err) end
+	if type(member_or_err) == "boolean" and type(timer_handle) == "table" then
+		if member_or_err == expected then return true end
+		return false, string.format("running state was %s", tostring(member_or_err))
+	end
+	if type(member_or_err) ~= "function" then return false, "running() unavailable" end
+	local probe_ok, running_or_err = xpcall(function()
+		return member_or_err(timer_handle)
+	end, debug.traceback)
+	if not probe_ok or type(running_or_err) ~= "boolean" then
+		return false, tostring(running_or_err)
+	end
+	if running_or_err ~= expected then
+		return false, string.format("running() returned %s", tostring(running_or_err))
+	end
+	return true
+end
+
+--- Stops the exact PID-backstop timer and retains it until running() proves the
+--- native capability is inactive.
+--- @param timer_handle table|userdata Exact timer owned by this module.
+--- @return boolean stopped
+local function stop_backstop_timer(timer_handle)
+	if not timer_handle then return true end
+	local stop_ok, stopped_or_err = xpcall(function()
+		return timer_handle:stop()
+	end, debug.traceback)
+	local state_stopped, state_detail = backstop_running_matches(timer_handle, false)
+	if not stop_ok or stopped_or_err == false or not state_stopped then
+		Logger.error(LOG,
+			"Failed to stop launcher process-instance backstop; retaining it for retry: %s",
+			tostring(not stop_ok and stopped_or_err
+				or (stopped_or_err == false and "stop returned false")
+				or state_detail))
+		return false
+	end
+	return true
+end
+
 --- Releases every native liveness handle held strongly by this module.
 --- Failed native stops remain retained so a later teardown pass can retry the
 --- same object; logical callbacks are fenced separately by lifecycle state.
@@ -101,8 +150,10 @@ end
 local function release_resources()
 	local watcher = _app_watcher
 	local timer = _backstop_timer
+	-- A queued tick must become inert before native stop can throw or refuse
+	_backstop_committed = false
 	local watcher_stopped = stop_resource(watcher, "application watcher")
-	local timer_stopped = stop_resource(timer, "process-instance backstop")
+	local timer_stopped = stop_backstop_timer(timer)
 	if watcher_stopped and _app_watcher == watcher then _app_watcher = nil end
 	if timer_stopped and _backstop_timer == timer then _backstop_timer = nil end
 	return watcher_stopped and timer_stopped
@@ -324,20 +375,45 @@ end
 --- retained liveness probe is part of the safety mechanism, not optional telemetry.
 --- @return boolean armed Whether the backstop is retained.
 local function arm_backstop_timer()
-	if not hs or not hs.timer or type(hs.timer.doEvery) ~= "function" then
+	if not hs or not hs.timer or type(hs.timer.new) ~= "function" then
 		Logger.error(LOG, "Launcher process-instance backstop is unavailable.")
 		return false
 	end
 
-	local ok, timer_or_err = xpcall(function()
-		return hs.timer.doEvery(BACKSTOP_INTERVAL_SEC, guarded_backstop_check)
+	local candidate = nil
+	local construct_ok, candidate_or_err = xpcall(function()
+		return hs.timer.new(BACKSTOP_INTERVAL_SEC, function()
+			if _backstop_committed ~= true or _backstop_timer ~= candidate then return end
+			guarded_backstop_check()
+		end)
 	end, debug.traceback)
-	if not ok or not timer_or_err then
+	if not construct_ok or not candidate_or_err then
 		Logger.error(LOG, "Failed to arm launcher process-instance backstop: %s",
-			tostring(timer_or_err or "timer constructor returned nil"))
+			tostring(candidate_or_err or "timer constructor returned nil"))
 		return false
 	end
-	_backstop_timer = timer_or_err
+
+	candidate = candidate_or_err
+	-- This raw timer is required before the runtime callback wrapper and adapter
+	-- exist. Publish exact ownership before start so partial activation remains
+	-- stoppable even if start() then raises
+	_backstop_timer = candidate
+	local start_ok, started_or_err = xpcall(function()
+		if type(candidate.start) ~= "function" then
+			error("timer candidate has no start method")
+		end
+		return candidate:start()
+	end, debug.traceback)
+	local state_started, state_detail = backstop_running_matches(candidate, true)
+	if not start_ok or not started_or_err or not state_started then
+		Logger.error(LOG, "Failed to start launcher process-instance backstop: %s",
+			tostring(not start_ok and started_or_err
+				or (not started_or_err and "timer start returned false")
+				or state_detail))
+		release_resources()
+		return false
+	end
+	_backstop_committed = true
 	return true
 end
 

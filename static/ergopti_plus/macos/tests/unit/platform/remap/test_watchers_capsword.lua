@@ -85,6 +85,9 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	local function make_watchers_with_throwing_task()
 		package.loaded["platform.remap.watchers"] = nil
 		package.loaded["adapters.shell_runner"] = nil
+		-- TaskLifecycle captures `hs` at require time, so every fresh watcher
+		-- harness must reload it beside the watcher and ShellRunner siblings.
+		package.loaded["adapters.task_lifecycle"] = nil
 		package.loaded["platform.remap.ke_variables"] = {
 			supersede_capsword_activation = function() return false, 0 end,
 			capsword_revision = function() return 0 end,

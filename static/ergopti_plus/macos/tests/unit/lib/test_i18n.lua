@@ -75,6 +75,42 @@ local function reset_state()
 	hs.reload = _orig_hs_reload
 end
 
+--- Reloads i18n with a deterministic transactional timer adapter.
+--- @param failure string|nil settled|debt for the next acquisition.
+--- @return table i18n
+--- @return table controller
+local function load_i18n_with_scheduler(failure)
+	local controller = { failure = failure, cancel_refusals = failure == "debt" and 1 or 0, calls = {} }
+	local scheduler = {}
+	function scheduler.after(delay, callback)
+		local handle = { timer = {}, committed = false, fired = false }
+		controller.calls[#controller.calls + 1] = { delay = delay, callback = callback, handle = handle }
+		local mode = controller.failure
+		controller.failure = nil
+		if mode == "settled" then
+			handle.timer = nil
+			handle.fired = true
+			return handle, false
+		elseif mode == "debt" then
+			return handle, false
+		end
+		handle.committed = true
+		return handle, true
+	end
+	function scheduler.cancel(handle)
+		if controller.cancel_refusals > 0 then
+			controller.cancel_refusals = controller.cancel_refusals - 1
+			return false
+		end
+		handle.timer = nil
+		handle.committed = false
+		handle.fired = true
+		return true
+	end
+	package.loaded["adapters.timer_scheduler"] = scheduler
+	return load_i18n(), controller
+end
+
 
 
 
@@ -392,6 +428,27 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		end
 		helpers.assert_eq(reload_count, 1,
 			"only one reload after rapid locale switches")
+	end)
+
+	helpers.it("set_locale() leaves memory and settings unchanged when reload scheduling refuses", function()
+		local i18n = load_i18n_with_scheduler("settled")
+		helpers.assert_eq(i18n.set_locale("de"), false)
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(hs.settings.get("i18n_locale"))
+	end)
+
+	helpers.it("set_locale() blocks a sibling while exact timer cleanup is pending", function()
+		local i18n, controller = load_i18n_with_scheduler("debt")
+		helpers.assert_eq(i18n.set_locale("de"), false)
+		helpers.assert_eq(i18n.set_locale("en"), false)
+		helpers.assert_eq(#controller.calls, 1)
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(hs.settings.get("i18n_locale"))
+
+		helpers.assert_true(i18n.set_locale("en"))
+		helpers.assert_eq(#controller.calls, 2)
+		helpers.assert_eq(i18n.get_locale(), "en")
+		helpers.assert_eq(hs.settings.get("i18n_locale"), "en")
 	end)
 
 	helpers.it("set_locale() ignores unknown codes", function()

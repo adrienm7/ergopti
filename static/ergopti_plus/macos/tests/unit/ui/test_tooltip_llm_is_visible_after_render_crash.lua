@@ -25,16 +25,28 @@ local helpers = require("tests.helpers")
 helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions render crash (F-MED-24)", function()
 	--- Loads tooltip_llm with a stubbed lib.logger so ERROR-level calls are
 	--- observable, and returns the module plus the captured error messages.
-	--- The stock hs.canvas stub used by tests/stubs/hs.lua returns a callable
-	--- from any :method() call on the mock canvas — `minimumTextSize(...)`.w
-	--- therefore yields a function value, and comparing it against a number in
-	--- show_predictions' width-calc loop raises. That is a genuine crash deep
-	--- inside the pcall-wrapped body, which is exactly the failure mode this
-	--- regression covers — no additional stubbing is needed to trigger it.
+	--- Installs an explicit failing renderer. The shared hs.canvas double must
+	--- remain contract-faithful so E2E renders can detect real native-state bugs;
+	--- using a deliberately broken global canvas stub as this test's fault
+	--- injector made unrelated tooltip renders log errors while the suite passed.
 	local function load_tooltip_llm_with_logger_spy()
 		local logged_errors = {}
+		package.loaded["ui.tooltip.renderer"] = {
+			canvas = {
+				minimumTextSize = function()
+					error("simulated tooltip measurement failure")
+				end,
+			},
+			ELEM_INFO = 6,
+			hide = function() return true end,
+			set_element_text = function() return true end,
+			render = function() return false end,
+		}
 		package.loaded["infra.logger"] = nil
 		local Tooltip = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
+		-- Tooltip captured the fault injector; release the cache slot so it cannot
+		-- become another order-dependent fixture for later modules.
+		package.loaded["ui.tooltip.renderer"] = nil
 		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end

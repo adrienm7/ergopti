@@ -33,9 +33,12 @@ helpers.describe("keylogger: event-id counter is restorable + restored on rollba
 	end)
 
 	helpers.it("ingest snapshots the counter before build_inserts and restores it on rollback", function()
-		local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
-		local fh = io.open(path, "r"); helpers.assert_true(fh ~= nil, "cannot open log_manager.lua")
-		local src = fh:read("*a"); fh:close()
+		-- The declaration uniquely selects log_manager.lua while remaining stable if
+		-- the module moves or is split into another driver-relative path
+		local src = helpers.read_driver_source(
+			"local saved_event_id = SqliteWriter.get_next_event_id()")
+		helpers.assert_true(src ~= nil and src ~= "",
+			"the ingest event-id snapshot owner must be locatable by its declaration")
 
 		local snap_pos    = src:find("local saved_event_id = SqliteWriter.get_next_event_id()", 1, true)
 		local build_pos   = src:find("SqliteWriter.build_inserts", 1, true)

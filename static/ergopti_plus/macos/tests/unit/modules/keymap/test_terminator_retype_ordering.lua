@@ -99,13 +99,14 @@ local function load_fixture()
 				timer = {},
 			}
 			scheduled[#scheduled + 1] = handle
-			return handle
+			return handle, true
 		end,
 		cancel = function(handle)
 			if type(handle) == "table" then
 				handle.cancelled = true
 				handle.timer = nil
 			end
+			return true
 		end,
 	}
 	package.loaded["adapters.text_sender"] = {
@@ -127,6 +128,8 @@ local function load_fixture()
 	}
 
 	local clipboard_writes = {}
+	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
+	hs_stub.pasteboard.writeAllData = function() return true end
 	hs_stub.pasteboard.setContents = function(value)
 		if value ~= "" then clipboard_writes[#clipboard_writes + 1] = value end
 		return true
@@ -252,7 +255,11 @@ helpers.describe("terminator replay lands after its tagged replacement", functio
 		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
 		helpers.assert_true(fixture.replay.is_pending(),
 			"handoff alone cannot prove that the target consumed the second paste")
-		local settle_delay = fixture.scheduled[#fixture.scheduled].delay
+		-- Two paste-worthy segments advance the target-settle cursor twice.  A
+		-- clipboard-restore timer is appended when the second paste runs, so "last
+		-- scheduled" is no longer the ordering fence and would exercise the wrong
+		-- capability.
+		local settle_delay = token_delay * 2
 		helpers.assert_true(settle_delay > token_delay)
 		helpers.assert_eq(fire_scheduled_delay(fixture, settle_delay), 1)
 

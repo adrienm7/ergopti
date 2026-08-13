@@ -19,13 +19,32 @@ local RESET_MODULES = {
 	"modules.keylogger.context_tracker", "modules.keylogger.kc_bridge",
 	"modules.keylogger.watchers", "adapters.process_lifecycle",
 	"adapters.keyboard_hook", "adapters.event_provenance",
-	"adapters.synthetic_input", "infra.logger", "infra.timings",
+	"adapters.synthetic_input", "adapters.input_source_broker",
+	"infra.logger", "infra.timings",
 	"infra.manifest_reader", "infra.i18n", "infra.dialog_util",
 	"keylogger.metrics", "modules.keymap",
 }
 
 
 local function noop() end
+
+local function lifecycle_watcher()
+	local watcher = { _running = false }
+	function watcher:start()
+		self._running = true
+		return self
+	end
+	function watcher:stop()
+		self._running = false
+		return self
+	end
+	return watcher
+end
+
+local function timer_is_running(timer)
+	if type(timer.running) == "function" then return timer:running() end
+	return timer.running == true
+end
 
 local function api(overrides)
 	return setmetatable(overrides or {}, {
@@ -35,6 +54,33 @@ local function api(overrides)
 			return value
 		end,
 	})
+end
+
+local function context_api()
+	local state = nil
+	return api({
+		init = function(core_state) state = core_state; return true end,
+		capture_frontmost_app = function()
+			if state then state.is_secure_field = false end
+			return true
+		end,
+	})
+end
+
+local function start_and_settle_context(keylogger, script_control)
+	local timers = _G.hs.timer.__timers
+	local prior_count = #timers
+	helpers.assert_eq(keylogger.start(script_control), true,
+		"the action-epoch fixture must start before driving its event callback")
+	local settled = 0
+	for index = prior_count + 1, #timers do
+		if timers[index].delay == 0 and timer_is_running(timers[index]) then
+			timers[index]:fire()
+			settled = settled + 1
+		end
+	end
+	helpers.assert_eq(settled, 1,
+		"exactly the deferred foreground-context capture must settle before input")
 end
 
 
@@ -87,24 +133,36 @@ local function load_timer_allocation_failure_fixture()
 	}
 
 	local now_ns = 1000000000
+	local timer_stub = { __timers = {}, fail_one_shot = false }
 	local function timer_handle(delay, callback)
-		local handle = { delay = delay, callback = callback, running = false }
+		local handle = { delay = delay, callback = callback, _running = false }
 		function handle:start()
-			self.running = true
+			self._running = true
 			return self
 		end
-		function handle:stop() self.running = false end
+		function handle:stop()
+			self._running = false
+			return self
+		end
+		function handle:running() return self._running end
+		function handle:fire()
+			if self._running and self.callback then self.callback() end
+		end
+		timer_stub.__timers[#timer_stub.__timers + 1] = handle
 		return handle
 	end
-	local timer_stub = {
-		absoluteTime = function()
+	timer_stub.absoluteTime = function()
 			now_ns = now_ns + 1000000
 			return now_ns
-		end,
-		secondsSinceEpoch = function() return os.time() end,
-		new = timer_handle,
-		doAfter = function() return nil end,
-	}
+		end
+	timer_stub.secondsSinceEpoch = function() return os.time() end
+	timer_stub.new = timer_handle
+	timer_stub.doAfter = function(delay, callback)
+		if timer_stub.fail_one_shot then return nil end
+		local handle = timer_handle(delay, callback)
+		handle:start()
+		return handle
+	end
 
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
@@ -124,7 +182,7 @@ local function load_timer_allocation_failure_fixture()
 	hs_stub.keycodes.currentLayout = function() return "ABC" end
 	hs_stub.caffeinate = {
 		watcher = {
-			new = function() return { start = noop, stop = noop } end,
+			new = lifecycle_watcher,
 		},
 	}
 
@@ -144,6 +202,7 @@ local function load_timer_allocation_failure_fixture()
 		register_action_listener = function(id, callback)
 			helpers.assert_eq(id, "modules.keylogger.action_epoch")
 			listener = callback
+			return true
 		end,
 		unregister_action_listener = function()
 			listener = nil
@@ -165,14 +224,31 @@ local function load_timer_allocation_failure_fixture()
 	package.loaded["adapters.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
+			return true
 		end,
-		stop = noop,
+		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api()
-	package.loaded["modules.keylogger.context_tracker"] = api()
-	package.loaded["modules.keylogger.kc_bridge"] = api()
-	package.loaded["modules.keylogger.watchers"] = api()
+	package.loaded["adapters.process_lifecycle"] = api({
+		start = function() return true end,
+		stop = function() return true end,
+	})
+	package.loaded["modules.keylogger.context_tracker"] = context_api()
+	package.loaded["modules.keylogger.kc_bridge"] = api({
+		init = function() return true end,
+		set_log_manager = function() return true end,
+		start = function() return true end,
+		stop = function() return true end,
+	})
+	package.loaded["modules.keylogger.watchers"] = api({
+		init = function() return true end,
+		init_hardware_watchers = function() return true end,
+		stop_hardware_watchers = function() return true end,
+	})
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
+	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
 	package.loaded["infra.timings"] = {
 		ms = function(_section, key)
@@ -197,7 +273,8 @@ local function load_timer_allocation_failure_fixture()
 	package.loaded["infra.dialog_util"] = { alert = noop }
 
 	local keylogger = require("modules.keylogger.init")
-	keylogger.start({ is_paused = function() return false end })
+	start_and_settle_context(keylogger, { is_paused = function() return false end })
+	timer_stub.fail_one_shot = true
 	core_state.session_start_time = 1
 
 	local function physical_key(char)
@@ -234,9 +311,7 @@ local function load_fixture()
 	hs_stub.keycodes.currentLayout = function() return "ABC" end
 	hs_stub.caffeinate = {
 		watcher = {
-			new = function()
-				return { start = noop, stop = noop }
-			end,
+			new = lifecycle_watcher,
 		},
 	}
 	_G.hs = hs_stub
@@ -261,6 +336,7 @@ local function load_fixture()
 			helpers.assert_eq(id, "modules.keylogger.action_epoch")
 			register_calls = register_calls + 1
 			listener = callback
+			return true
 		end,
 		unregister_action_listener = function(id)
 			helpers.assert_eq(id, "modules.keylogger.action_epoch")
@@ -284,30 +360,56 @@ local function load_fixture()
 	package.loaded["adapters.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
+			return true
 		end,
-		stop = noop,
+		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api()
+	package.loaded["adapters.process_lifecycle"] = api({
+		start = function() return true end,
+		stop = function() return true end,
+	})
 
 	local core_state = nil
 	local deferred_calls = 0
 	local synchronous_flushes = 0
 	local synchronous_appends = 0
 	package.loaded["modules.keylogger.log_manager"] = api({
-		init = function(state) core_state = state end,
+		init = function(state) core_state = state; return true end,
+		ensure_ingest_running = function() return true end,
+		stop = function() return true end,
 		defer_flush_buffer = function()
 			deferred_calls = deferred_calls + 1
 			return true
 		end,
-		flush_buffer = function() synchronous_flushes = synchronous_flushes + 1 end,
+		flush_buffer = function()
+			synchronous_flushes = synchronous_flushes + 1
+			return true
+		end,
 		append_log = function() synchronous_appends = synchronous_appends + 1 end,
 	})
-	package.loaded["modules.keylogger.context_tracker"] = api()
-	package.loaded["modules.keylogger.kc_bridge"] = api()
-	package.loaded["modules.keylogger.watchers"] = api()
+	package.loaded["modules.keylogger.context_tracker"] = context_api()
+	package.loaded["modules.keylogger.kc_bridge"] = api({
+		init = function() return true end,
+		set_log_manager = function() return true end,
+		start = function() return true end,
+		stop = function() return true end,
+	})
+	package.loaded["modules.keylogger.watchers"] = api({
+		init = function() return true end,
+		init_hardware_watchers = function() return true end,
+		stop_hardware_watchers = function() return true end,
+	})
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
+	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.logger"] = api()
+	package.loaded["infra.logger"] = api({
+		pcall = function(_module_name, fn, ...)
+			return pcall(fn, ...)
+		end,
+	})
 	package.loaded["infra.timings"] = {
 		ms = function(_section, key)
 			local values = {
@@ -331,7 +433,7 @@ local function load_fixture()
 	}
 
 	local keylogger = require("modules.keylogger.init")
-	keylogger.start({ is_paused = function() return false end })
+	start_and_settle_context(keylogger, { is_paused = function() return false end })
 
 	local function action_event(provenance)
 		helpers.assert_type(handle_key, "function")

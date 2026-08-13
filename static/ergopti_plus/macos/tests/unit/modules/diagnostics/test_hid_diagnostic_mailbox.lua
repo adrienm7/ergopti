@@ -28,27 +28,36 @@ local function load_fixture()
 	local effects = {
 		arm_calls = 0,
 		cancel_calls = 0,
+		cancelled_handles = {},
+		handles = {},
 		logs = {},
 		pump = nil,
+		pumps = {},
 	}
 	local controls = {
 		arm_mode = "ok",
 		cancel_mode = "ok",
 		fail_diagnostic_logs = 0,
 	}
-	local handle = { id = "diagnostic-pump" }
 	local Scheduler = {}
 	function Scheduler.every(_interval, callback)
 		effects.arm_calls = effects.arm_calls + 1
+		local handle = { id = "diagnostic-pump-" .. tostring(effects.arm_calls) }
+		effects.handles[#effects.handles + 1] = handle
 		if controls.arm_mode == "throw" then error("SCHEDULER_ARM_SECRET", 0) end
-		if controls.arm_mode == "false" then return handle, false end
 		if controls.arm_mode == "nil" then return nil, nil end
 		effects.pump = callback
+		effects.pumps[#effects.pumps + 1] = callback
+		-- The adapter returns this exact surface after native start activates then
+		-- raises and its first internal rollback stop refuses
+		if controls.arm_mode == "false" or controls.arm_mode == "activate_then_throw" then
+			return handle, false
+		end
 		return handle, true
 	end
 	function Scheduler.cancel(candidate)
 		effects.cancel_calls = effects.cancel_calls + 1
-		helpers.assert_eq(candidate, handle, "stop must cancel the exact pump handle")
+		effects.cancelled_handles[#effects.cancelled_handles + 1] = candidate
 		if controls.cancel_mode == "throw" then error("SCHEDULER_CANCEL_SECRET", 0) end
 		if controls.cancel_mode == "false" then return false end
 		if controls.cancel_mode == "nil" then return nil end
@@ -149,6 +158,8 @@ helpers.describe("HID diagnostic mailbox: delivery", function()
 			helpers.assert_eq(Mailbox.status().pending, 0)
 			helpers.assert_true(Mailbox.stop())
 			helpers.assert_eq(fixture.effects.cancel_calls, 1)
+			helpers.assert_eq(fixture.effects.cancelled_handles[1], fixture.effects.handles[1],
+				"stop must cancel the exact pump handle")
 		end)
 	end)
 
@@ -243,11 +254,15 @@ helpers.describe("HID diagnostic mailbox: lifecycle", function()
 				helpers.assert_eq(Mailbox.stop(), false)
 				helpers.assert_true(Mailbox.is_running(),
 					"a failed cancel must retain ownership for retry")
+				helpers.assert_eq(fixture.effects.cancelled_handles[1], fixture.effects.handles[1],
+					"a refused stop must retain the exact pump capability")
 
 				fixture.controls.cancel_mode = "ok"
 				helpers.assert_true(Mailbox.stop())
 				helpers.assert_eq(Mailbox.is_running(), false)
 				helpers.assert_eq(fixture.effects.cancel_calls, 2)
+				helpers.assert_eq(fixture.effects.cancelled_handles[2], fixture.effects.handles[1],
+					"the retry must target the originally retained capability")
 			end)
 		end)
 	end
@@ -266,6 +281,45 @@ helpers.describe("HID diagnostic mailbox: lifecycle", function()
 			stale_pump()
 			helpers.assert_eq(Mailbox.status().pending, 1,
 				"a callback from the cancelled generation must be inert")
+			current_pump()
+			helpers.assert_eq(Mailbox.status().pending, 0)
+		end)
+	end)
+
+	helpers.it("(hid-mailbox-partial-arm-debt) retains a partially armed pump until exact cleanup", function()
+		with_fixture(function(fixture)
+			local Mailbox = fixture.Mailbox
+			Mailbox.report_preview_provider_failure(11, "SECRET")
+			fixture.controls.arm_mode = "activate_then_throw"
+			fixture.controls.cancel_mode = "false"
+
+			helpers.assert_eq(Mailbox.start(), false)
+			helpers.assert_eq(fixture.effects.arm_calls, 1)
+			helpers.assert_eq(fixture.effects.cancel_calls, 1,
+				"failed acquisition must immediately retry exact candidate cleanup")
+			local stale_pump = fixture.effects.pumps[1]
+			stale_pump()
+			helpers.assert_eq(Mailbox.status().pending, 1,
+				"a callback from an uncommitted partially armed timer must be inert")
+
+			helpers.assert_eq(Mailbox.start(), false,
+				"a successor must be refused while exact cleanup remains pending")
+			helpers.assert_eq(fixture.effects.arm_calls, 1,
+				"cleanup debt must prevent allocating a second native pump")
+			helpers.assert_eq(fixture.effects.cancel_calls, 2)
+			helpers.assert_eq(fixture.effects.cancelled_handles[1],
+				fixture.effects.cancelled_handles[2],
+				"cleanup retries must target the same native capability")
+			helpers.assert_eq(fixture.effects.cancelled_handles[1], fixture.effects.handles[1])
+
+			fixture.controls.cancel_mode = "ok"
+			fixture.controls.arm_mode = "ok"
+			helpers.assert_true(Mailbox.start())
+			helpers.assert_eq(fixture.effects.arm_calls, 2)
+			local current_pump = fixture.effects.pumps[2]
+			stale_pump()
+			helpers.assert_eq(Mailbox.status().pending, 1,
+				"the retired timer generation must remain inert after replacement")
 			current_pump()
 			helpers.assert_eq(Mailbox.status().pending, 0)
 		end)

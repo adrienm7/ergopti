@@ -64,6 +64,19 @@ local FOREIGN_PID = 8002
 local SOURCE_PID_PROPERTY = 1
 local USER_DATA_PROPERTY = 2
 
+local function lifecycle_watcher()
+	local watcher = { _running = false }
+	function watcher:start()
+		self._running = true
+		return self
+	end
+	function watcher:stop()
+		self._running = false
+		return self
+	end
+	return watcher
+end
+
 --- Loads a fresh, fully-wired modules.keylogger.init with every I/O sub-module
 --- stubbed in-memory (mirrors the stubbing already established for
 --- modules.keylogger.log_manager tests), then starts it and captures both the
@@ -83,11 +96,15 @@ local function start_real_keylogger()
 	local captured_handle_key = nil
 	local captured_core_state = nil
 	local appended_entries    = {}
+	local context_capture_count = 0
 
 	package.loaded["modules.keylogger.rotation"] = {
-		init             = function() end,
+		init             = function() return true end,
 		is_initialized   = function() return true end,
-		append_log       = function(e) table.insert(appended_entries, e) end,
+		append_log       = function(e)
+			table.insert(appended_entries, e)
+			return true
+		end,
 		read_new_entries = function() return {}, 0 end,
 		get_offset       = function() return 0 end,
 		get_date         = function() return os.date("%Y-%m-%d") end,
@@ -95,7 +112,7 @@ local function start_real_keylogger()
 		rollover         = function() end,
 	}
 	package.loaded["modules.keylogger.sqlite_writer"] = {
-		init                  = function() end,
+		init                  = function() return true end,
 		open_db               = function() return true end,
 		close_db              = function() end,
 		get_db                = function() return nil end,
@@ -132,25 +149,96 @@ local function start_real_keylogger()
 	-- CoreState never crosses a public accessor in init.lua; capture the exact
 	-- live reference at the one point it is handed to a stubbable sub-module.
 	package.loaded["modules.keylogger.context_tracker"] = {
-		init                   = function(core_state, _log_manager) captured_core_state = core_state end,
+		init                   = function(core_state, _log_manager)
+			captured_core_state = core_state
+			return true
+		end,
 		update_private_status  = function() end,
 		app_watcher_cb         = function() end,
 		update_ax_observer     = function() end,
+		capture_frontmost_app  = function()
+			context_capture_count = context_capture_count + 1
+			captured_core_state.is_secure_field = false
+			return true
+		end,
+	}
+	package.loaded["adapters.process_lifecycle"] = {
+		onAppActivate = function() end,
+		start = function() return true end,
+		stop = function() return true end,
+	}
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
 	}
 	-- The production engine owns the raw event tap through KeyboardHook. Capture
 	-- its onEvent callback at that boundary rather than relying on the retired
 	-- direct hs.eventtap.new() ownership in keylogger/init.lua.
 	package.loaded["adapters.keyboard_hook"] = {
-		start = function(opts) captured_handle_key = opts and opts.onEvent end,
-		stop = function() end,
+		start = function(opts) captured_handle_key = opts and opts.onEvent; return true end,
+		stop = function() return true end,
 		isRunning = function() return true end,
 	}
 
-	-- Force a fresh require of every sub-module that holds its own _state so a
-	-- prior scenario's M.init() cannot leak into this one (each is a singleton).
+	-- Force a fresh require of every stateful dependency captured by the real
+	-- LogManager. TimerScheduler owns native timer capabilities, so retaining it
+	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keylogger.log_manager"] = nil
-	package.loaded["modules.keylogger.kc_bridge"]   = nil
-	package.loaded["modules.keylogger.watchers"]    = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.event_provenance"] = nil
+
+	-- KC file draining and hardware sensor collection are independent of the
+	-- privacy pipeline under test. Their doubles still model committed lifecycle
+	-- ownership exactly, without touching a real metrics path on the test host.
+	local kc_running = false
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		init = function(core_state, _pathwatcher, _timer, _log_manager, may_persist)
+			return type(core_state) == "table" and type(may_persist) == "function"
+		end,
+		set_log_manager = function(log_manager) return type(log_manager) == "table" end,
+		start = function() kc_running = true; return true end,
+		stop = function() kc_running = false; return true end,
+		is_running = function() return kc_running end,
+		is_ke_managed_output_kc = function() return false end,
+	}
+	local hardware_running = false
+	package.loaded["modules.keylogger.watchers"] = {
+		init = function(core_state, is_paused)
+			return type(core_state) == "table" and type(is_paused) == "function"
+		end,
+		init_hardware_watchers = function()
+			hardware_running = true
+			return true
+		end,
+		stop_hardware_watchers = function()
+			hardware_running = false
+			return true
+		end,
+		check_idle = function() end,
+		perform_maintenance = function() end,
+		caffeinate_cb = function() end,
+		is_running = function() return hardware_running end,
+	}
+
+	local timers = {}
+	local function new_timer(delay, callback)
+		local timer = { delay = delay, callback = callback, _running = false }
+		function timer:start()
+			self._running = true
+			return self
+		end
+		function timer:stop()
+			self._running = false
+			return self
+		end
+		function timer:running() return self._running end
+		function timer:fire()
+			if self._running and self.callback then self.callback() end
+		end
+		timers[#timers + 1] = timer
+		return timer
+	end
 
 	local hs_overrides = {
 		processInfo = { processID = OWN_PID },
@@ -168,11 +256,11 @@ local function start_real_keylogger()
 				}
 			end,
 		},
-		caffeinate = { watcher = { new = function() return { start = function() end, stop = function() end } end } },
+		caffeinate = { watcher = { new = lifecycle_watcher } },
 		timer = {
-			doAfter      = function(_delay, fn) fn() end,
-			doEvery      = function() return { start = function() end, stop = function() end } end,
-			new          = function() return { start = function() end, stop = function() end } end,
+			doAfter = function(delay, fn) return new_timer(delay, fn):start() end,
+			doEvery = function(delay, fn) return new_timer(delay, fn):start() end,
+			new = new_timer,
 			delayed      = {
 				new = function(_delay, fn)
 					return {
@@ -216,7 +304,15 @@ local function start_real_keylogger()
 	local synthetic_input = require("adapters.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }
-	km.start(script_control)
+	helpers.assert_eq(km.start(script_control), true,
+		"the privacy fixture must own every required producer before driving events")
+	for _, timer in ipairs(timers) do
+		if timer.delay == 0 and timer:running() then
+			timer:fire()
+		end
+	end
+	helpers.assert_eq(context_capture_count, 1,
+		"exactly the foreground-context bootstrap must settle before privacy input")
 
 	return {
 		handle_key      = function(...) return captured_handle_key(...) end,

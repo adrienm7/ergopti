@@ -581,28 +581,37 @@ end
 --- @param core_state table The shared state object from init.lua.
 --- @param log_manager_mod table The log manager module reference.
 --- @param is_paused_fn function Predicate returning true while the script is paused.
+--- @return boolean initialized True only when the exact dependency set is active.
 function M.init(core_state, log_manager_mod, is_paused_fn)
 	Logger.start(LOG, "Initializing context tracker…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — context tracker non-functional.")
-		return
+		return false
 	end
 	if type(log_manager_mod) ~= "table" then
 		Logger.error(LOG, "M.init(): log_manager_mod must be a table — context tracker non-functional.")
-		return
+		return false
 	end
 	if type(is_paused_fn) ~= "function" then
 		Logger.error(LOG, "M.init(): is_paused_fn must be a function — context tracker non-functional.")
-		return
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state
+		and _log_manager == log_manager_mod
+		and _is_paused == is_paused_fn
+		then
+			Logger.warn(LOG, "M.init() called more than once — exact dependencies already active.")
+			return true
+		end
+		Logger.error(LOG, "M.init() dependency mismatch — refusing split context state.")
+		return false
 	end
 	_state       = core_state
 	_log_manager = log_manager_mod
 	_is_paused   = is_paused_fn
 	Logger.success(LOG, "Context tracker initialized.")
+	return true
 end
 
 return M

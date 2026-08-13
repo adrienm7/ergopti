@@ -31,6 +31,7 @@ local function run_scenario()
 		"logger.shim",
 		"modules.diagnostics.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
+		"modules.keylogger",
 	}
 	local previous = {}
 	for _, name in ipairs(dependency_names) do previous[name] = package.loaded[name] end
@@ -51,6 +52,10 @@ local function run_scenario()
 	end
 	package.loaded["infra.logger"] = Logger
 	package.loaded["logger.shim"] = Logger
+	-- The resolver test owns only the dynamic-rules consumer. Loading the full
+	-- keylogger now arms its independent KC bridge poller during init, which would
+	-- consume this fixture's sole repeating-timer counter before the mailbox does
+	package.loaded["modules.keylogger"] = { notify_synthetic = function() end }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function()
 			after_calls = after_calls + 1

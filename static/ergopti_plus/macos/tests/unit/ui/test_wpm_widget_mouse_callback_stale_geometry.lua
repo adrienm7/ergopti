@@ -88,11 +88,23 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 				windowLevels = { overlay = 0, floating = 0 },
 			},
 			timer = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 			eventtap = {
-				new = function(_types, _cb) return { start = function() end, stop = function() end } end,
+				new = function(_types, _cb)
+					local tap = { enabled = false }
+					tap.start = function(self) self.enabled = true; return self end
+					tap.stop = function(self) self.enabled = false; return self end
+					tap.isEnabled = function(self) return self.enabled end
+					return tap
+				end,
 				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
 			},
 		})

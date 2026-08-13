@@ -54,13 +54,13 @@ local function load_shortcuts_with_spies(started)
 		set_wrap_pairs_getter = function() end,
 		set_chatgpt_url      = function() end,
 		is_started           = function() return is_started end,
-		start                = function() spy.b_start  = spy.b_start  + 1; is_started = true  end,
-		stop                 = function() spy.b_stop   = spy.b_stop   + 1; is_started = false end,
-		rebind               = function() spy.b_rebind = spy.b_rebind + 1 end,
+		start                = function() spy.b_start  = spy.b_start  + 1; is_started = true; return true end,
+		stop                 = function() spy.b_stop   = spy.b_stop   + 1; is_started = false; return true end,
+		rebind               = function() spy.b_rebind = spy.b_rebind + 1; return true end,
 	}
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-		start           = function() spy.ks_start = spy.ks_start + 1 end,
-		stop            = function() spy.ks_stop  = spy.ks_stop  + 1 end,
+		start           = function() spy.ks_start = spy.ks_start + 1; return true end,
+		stop            = function() spy.ks_stop  = spy.ks_stop  + 1; return true end,
 		set_action      = function() end,
 		get_action      = function() return "none" end,
 		get_slot_label  = function(s) return s end,
@@ -69,7 +69,7 @@ local function load_shortcuts_with_spies(started)
 	-- script_control is proxied at require time but never exercised here.
 	package.loaded["modules.shortcuts.script_control"] = {
 		ACTIONS = {}, ACTION_LABELS = {},
-		start = function() end, stop = function() end,
+		start = function() return true end, stop = function() return true end,
 		is_paused = function() return false end,
 		set_shortcut_action = function() end, set_on_pause_change = function() end,
 		set_extras = function() end, toggle = function() end,

@@ -18,14 +18,14 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		local hs_stub = require("tests.stubs.hs")
 		hs_stub.__reset()
 		local selected = string.rep("a", 32)
-		local clipboard_reads = 0
 		hs_stub.pasteboard = {
-			getContents = function()
-				clipboard_reads = clipboard_reads + 1
-				return clipboard_reads == 1 and "USER_CLIPBOARD" or selected
-			end,
+			getContents = function() return selected end,
 			setContents = function() return true end,
 			clearContents = function() return true end,
+			readAllData = function()
+				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
+			end,
+			writeAllData = function() return true end,
 		}
 		_G.hs = hs_stub
 		package.loaded.hs = hs_stub

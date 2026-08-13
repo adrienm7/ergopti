@@ -17,8 +17,9 @@
 --- The fix splits task creation from start, checks the return value, and releases
 --- the lock immediately when start fails.
 ---
---- This test also verifies the inputSourceChanged overwrite fix (save/restore the
---- previous callback rather than passing nil on stop).
+--- This test also verifies the inputSourceChanged single-owner fix: Hammerspoon's
+--- setter unsets its predecessor and has no getter, so every consumer must use
+--- the process-wide broker.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -103,28 +104,24 @@ end)
 
 -- ======================================================================
 -- ======================================================================
--- ======= 2/ inputSourceChanged previous callback saved and restored ====
+-- ======= 2/ inputSourceChanged single native broker ====================
 -- ======================================================================
 -- ======================================================================
 
-helpers.describe("karabiner/watchers.lua: inputSourceChanged save/restore (karabiner-input-source-changed-overwrite)", function()
+helpers.describe("karabiner/watchers.lua: inputSourceChanged broker ownership", function()
 
-	helpers.it("previous inputSourceChanged callback is saved before overwriting", function()
+	helpers.it("watchers subscribe through the process-wide broker", function()
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
-		-- The fix reads the current callback before setting a new one
-		helpers.assert_true(
-			src:match("_previous_input_source_cb") ~= nil,
-			"watchers.lua must declare _previous_input_source_cb to save/restore the previous callback (karabiner-input-source-changed-overwrite)")
-		helpers.assert_true(
-			src:match("_previous_input_source_cb%s*=%s*hs%.keycodes%.inputSourceChanged%(%)") ~= nil,
-			"start_input_source_watcher must save the current callback via hs.keycodes.inputSourceChanged() before setting a new one (karabiner-input-source-changed-overwrite)")
+		helpers.assert_true(src:find("InputSourceBroker.subscribe", 1, true) ~= nil,
+			"the Karabiner watcher must not replace the setter-only global callback")
+		helpers.assert_true(src:find("hs.keycodes.inputSourceChanged", 1, true) == nil,
+			"only the adapter broker may call the native global setter")
 	end)
 
-	helpers.it("stop_input_source_watcher restores the previous callback instead of passing nil", function()
+	helpers.it("watcher teardown removes only its named broker subscriber", function()
 		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
-		helpers.assert_true(
-			src:match("hs%.keycodes%.inputSourceChanged%(_previous_input_source_cb%)") ~= nil,
-			"stop_input_source_watcher must call hs.keycodes.inputSourceChanged(_previous_input_source_cb) to restore (karabiner-input-source-changed-overwrite)")
+		helpers.assert_true(src:find("InputSourceBroker.unsubscribe", 1, true) ~= nil,
+			"Karabiner teardown must preserve every sibling subscriber")
 	end)
 
 end)

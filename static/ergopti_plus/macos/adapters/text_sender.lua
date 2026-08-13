@@ -30,6 +30,7 @@ local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "adapters.text_sender"
 
@@ -68,14 +69,34 @@ local PASTE_KEY_DELAY_US = 0
 -- capture them correctly (F-L8).
 local _paste_saved_original = nil
 local _paste_pending_timer = nil
+local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
 local _paste_recovery_only = false
 local _paste_generation = 0
 
+local function cancel_restore_timer(timer)
+	if type(timer) ~= "table" or timer.timer == nil then return true end
+	local ok_cancel, settled_or_error = pcall(TimerScheduler.cancel, timer)
+	if ok_cancel and settled_or_error == true then return true end
+	_paste_timer_cleanup = timer
+	Logger.error(LOG, "Clipboard restore timer cleanup remains pending: %s",
+		tostring(settled_or_error))
+	return false
+end
+
+local function retry_restore_timer_cleanup()
+	local cleanup = _paste_timer_cleanup
+	if cleanup == nil then return true end
+	if cancel_restore_timer(cleanup) ~= true then return false end
+	if _paste_timer_cleanup == cleanup then _paste_timer_cleanup = nil end
+	return true
+end
+
 local function stop_restore_timer()
 	local pending = _paste_pending_timer
 	_paste_pending_timer = nil
-	if pending and type(pending.stop) == "function" then pcall(pending.stop, pending) end
+	if pending and cancel_restore_timer(pending) ~= true then return false end
+	return retry_restore_timer_cleanup()
 end
 
 local function release_clipboard()
@@ -100,31 +121,39 @@ local queue_restore_retry
 
 local function schedule_restore()
 	if _paste_pending_timer then return true end
+	if retry_restore_timer_cleanup() ~= true then
+		return false, "prior restore timer cleanup remains unsettled"
+	end
 	local generation = _paste_generation
 	local callback_ran = false
-	-- Never run recovery before doAfter has committed its handle. A synchronous
+	-- Never run recovery before TimerScheduler has committed its handle. A synchronous
 	-- callback would otherwise recurse through queue_restore_retry() while
 	-- _paste_pending_timer is still nil.
 	local installing = true
-	local ok_timer, timer_or_error = pcall(function()
-		_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
+	local timer_handle = nil
+	local ok_timer, timer_or_error, timer_committed = pcall(
+		TimerScheduler.after, CLIPBOARD_RESTORE_DELAY_S, function()
 			callback_ran = true
 			if installing then return end
-			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+			if timer_handle and timer_handle.timer ~= nil then
+				_paste_timer_cleanup = timer_handle
+			end
 			_paste_pending_timer = nil
+			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
 			local restored, restore_error = restore_clipboard()
 			if restored then return end
 			_paste_recovery_only = true
 			Logger.error(LOG, "Clipboard restore refused; ownership retained — %s", tostring(restore_error))
 			queue_restore_retry()
 		end)
-		return _paste_pending_timer
-	end)
+	timer_handle = timer_or_error
 	installing = false
-	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
-		stop_restore_timer()
-		return false, ok_timer and "hs.timer.doAfter returned no stable handle" or timer_or_error
+	if not ok_timer or timer_committed ~= true
+		or type(timer_or_error) ~= "table" or timer_or_error.timer == nil or callback_ran then
+		if type(timer_or_error) == "table" then cancel_restore_timer(timer_or_error) end
+		return false, ok_timer and "TimerScheduler.after returned no committed handle" or timer_or_error
 	end
+	_paste_pending_timer = timer_or_error
 	return true
 end
 
@@ -196,7 +225,12 @@ function M.send(text, opts, callback)
 			-- but KEEP the first-captured original; only capture the user's clipboard
 			-- when no send is in flight (otherwise we'd save our own injected payload).
 			if _paste_owns_clipboard then
-				stop_restore_timer()
+				if stop_restore_timer() ~= true then
+					local restored, restore_error = restore_clipboard()
+					if not restored then queue_restore_retry() end
+					error("prior clipboard timer cleanup remains pending: "
+						.. tostring(restore_error), 0)
+				end
 			else
 				local snapshot, snapshot_ok = Clipboard.save()
 				assert(snapshot_ok == true, "clipboard snapshot failed")

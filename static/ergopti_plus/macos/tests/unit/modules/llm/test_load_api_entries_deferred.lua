@@ -31,9 +31,10 @@ helpers.describe("llm: persisted API-entry load is deferred off the require path
 
 	helpers.it("defers the require-path load via TimerScheduler.after(0)", function()
 		local src = read_src()
-		helpers.assert_true(
-			src:find("TimerScheduler.after(0, function() pcall(M.load_api_entries) end)", 1, true) ~= nil,
-			"the persisted-entry load (blocking Keychain decrypt) must be deferred via TimerScheduler.after(0)")
+		helpers.assert_true(src:find("schedule_api_entries_load()", 1, true) ~= nil,
+			"the persisted-entry load must enter its owned deferred-load transaction")
+		helpers.assert_true(src:find("handle, committed = TimerScheduler.after(0", 1, true) ~= nil,
+			"the deferred load must require explicit TimerScheduler commit")
 	end)
 
 	helpers.it("does NOT call load_api_entries synchronously at top level on require", function()

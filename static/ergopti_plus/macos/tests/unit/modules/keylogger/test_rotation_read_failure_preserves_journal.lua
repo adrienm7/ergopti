@@ -34,6 +34,7 @@ local STUBBED_MODULES = {
 
 local function fake_writer()
 	return {
+		setvbuf = function(_, mode) return mode == "no" end,
 		write = function(self) return self end,
 		flush = function() return true end,
 		close = function() return true end,

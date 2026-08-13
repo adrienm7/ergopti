@@ -27,6 +27,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("infra.logger")
+local InputSourceBroker = require("adapters.input_source_broker")
 local TaskLifecycle  = require("adapters.task_lifecycle")
 local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
@@ -41,6 +42,7 @@ local KeVariables   = require("platform.remap.ke_variables")
 
 
 local LOG = "karabiner"
+local INPUT_SOURCE_SUBSCRIBER_ID = "platform.remap.watchers"
 
 -- hs.hotkey accepts the macOS key name directly, derived here from the
 -- registry numeric keycode so the registry stays the canonical source.
@@ -75,6 +77,7 @@ local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 
 -- Holds the fallback poll timer so it can be cancelled on stop.
 local _layout_poll_timer = nil
+local _layout_poll_committed = false
 -- Guard so the async fallback poll never piles up concurrent `defaults` reads.
 local _layout_poll_pending = false
 -- Max time to wait for a layout read that reported a successful start but never
@@ -111,14 +114,7 @@ local _layout_poll_termination_pending = false
 -- handle itself.
 local _layout_read_generation = 0
 
--- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
--- installs its own, so stop_input_source_watcher can restore it instead of passing nil
--- (karabiner-input-source-changed-overwrite).
-local _previous_input_source_cb = nil
--- Ownership bit is separate because nil is itself a valid previous callback.
--- Without it teardown cannot distinguish "restore nil" from "already restored".
 local _input_source_callback_owned = false
-local _installed_input_source_cb = nil
 -- Every installed callback captures this generation. A native watcher/timer
 -- whose stop fails remains physically live but becomes logically inert at once.
 local _input_source_watcher_gen = 0
@@ -198,6 +194,24 @@ local function cancel_scheduled_timer(handle, label)
 	return false
 end
 
+--- Retries every exact timer capability retained after a refused cancellation.
+--- No same-family successor may be acquired while one native candidate remains
+--- unsettled, even though its generation fence already makes its callback inert.
+--- @param backlog table Dense handle array.
+--- @param label string Diagnostic owner.
+--- @return boolean settled
+local function drain_scheduled_backlog(backlog, label)
+	local settled = true
+	for index = #backlog, 1, -1 do
+		if cancel_scheduled_timer(backlog[index], label) then
+			table.remove(backlog, index)
+		else
+			settled = false
+		end
+	end
+	return settled
+end
+
 
 
 
@@ -227,6 +241,11 @@ local function complete_capsword_clear(watcher_gen, ok, reason, revision)
 		Logger.debug(LOG, "CapsWord LED clear superseded by newer local intent.")
 		return
 	end
+	if not drain_scheduled_backlog(_capsword_timer_cleanup_backlog,
+		"CapsWord timer backlog") then
+		Logger.error(LOG, "CapsWord LED correction blocked by prior timer cleanup debt.")
+		return
+	end
 
 	if _capsword_led_timer then
 		if not cancel_scheduled_timer(_capsword_led_timer, "Superseded CapsWord LED timer") then
@@ -238,7 +257,7 @@ local function complete_capsword_clear(watcher_gen, ok, reason, revision)
 
 	local led_timer = nil
 	local callback_fired_before_return = false
-	local timer_ok, timer_or_err = pcall(
+	local timer_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		0.15,
 		function()
@@ -256,7 +275,7 @@ local function complete_capsword_clear(watcher_gen, ok, reason, revision)
 		end
 	)
 	led_timer = timer_or_err
-	if not timer_ok or type(timer_or_err) ~= "table"
+	if not timer_ok or timer_committed ~= true or type(timer_or_err) ~= "table"
 		or timer_or_err.fired == true or callback_fired_before_return then
 		if type(timer_or_err) == "table"
 			and not cancel_scheduled_timer(timer_or_err, "Rejected CapsWord LED timer") then
@@ -275,10 +294,51 @@ end
 --- @param label string Diagnostic owner.
 --- @return boolean stopped
 local function stop_native_watcher(watcher, label)
-	local stopped, stop_err = pcall(function() watcher:stop() end)
-	if stopped then return true end
+	local stopped, stop_result = pcall(function() return watcher:stop() end)
+	if stopped and stop_result ~= false then return true end
 	Logger.error(LOG, "%s stop failed; retained for retry: %s.",
-		label, tostring(stop_err))
+		label, tostring(stop_result))
+	return false
+end
+
+--- Verifies the exact native running state of the recurring layout poll timer.
+--- Real Hammerspoon timers expose running(); the boolean branch is only for the
+--- pure-Lua lifecycle doubles used by the unit suite.
+--- @param timer_handle table|userdata Native timer candidate.
+--- @param expected boolean Required running state.
+--- @return boolean matches
+--- @return string|nil detail
+local function layout_poll_running_matches(timer_handle, expected)
+	local member_ok, member_or_err = pcall(function() return timer_handle.running end)
+	if not member_ok then return false, tostring(member_or_err) end
+	if type(member_or_err) == "boolean" and type(timer_handle) == "table" then
+		if member_or_err == expected then return true end
+		return false, string.format("running state was %s", tostring(member_or_err))
+	end
+	if type(member_or_err) ~= "function" then return false, "running() unavailable" end
+	local probe_ok, running_or_err = pcall(member_or_err, timer_handle)
+	if not probe_ok or type(running_or_err) ~= "boolean" then
+		return false, tostring(running_or_err)
+	end
+	if running_or_err ~= expected then
+		return false, string.format("running() returned %s", tostring(running_or_err))
+	end
+	return true
+end
+
+--- Stops the exact layout-poll capability and retains it unless native state
+--- proves that it is no longer running.
+--- @param timer_handle table|userdata Exact layout timer.
+--- @param label string Diagnostic owner.
+--- @return boolean stopped
+local function stop_layout_poll_timer(timer_handle, label)
+	local stopped, stop_result = pcall(function() return timer_handle:stop() end)
+	local state_stopped, state_detail = layout_poll_running_matches(timer_handle, false)
+	if stopped and stop_result ~= false and state_stopped then return true end
+	Logger.error(LOG, "%s stop failed; retained for retry: %s.", label,
+		tostring(not stopped and stop_result
+			or (stop_result == false and "stop returned false")
+			or state_detail))
 	return false
 end
 
@@ -287,6 +347,11 @@ end
 --- main loop — hs.execute is synchronous and would lag the mouse at ~10 calls/sec.
 local function deactivate_capsword(capsword_variable_name, watcher_gen)
 	if watcher_gen ~= _capsword_watcher_gen then return end
+	if not drain_scheduled_backlog(_capsword_timer_cleanup_backlog,
+		"CapsWord timer backlog") then
+		Logger.error(LOG, "CapsWord probe blocked by prior timer cleanup debt.")
+		return
+	end
 	-- Throttle: mouseMoved fires at display refresh rate — cap subprocess spawns
 	local now_s = hs.timer.secondsSinceEpoch()
 	if now_s - _capsword_last_check_s < CAPSWORD_CHECK_INTERVAL_S then return end
@@ -426,7 +491,7 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 		_capsword_probe_watchdog = nil
 	end
 	local watchdog
-	local ok_watchdog, watchdog_or_err = pcall(
+	local ok_watchdog, watchdog_or_err, watchdog_committed = pcall(
 		TimerScheduler.after,
 		CAPSWORD_PROBE_TIMEOUT_SEC,
 		function()
@@ -441,7 +506,7 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 		end
 	)
 	watchdog = ok_watchdog and watchdog_or_err or nil
-	if type(watchdog) ~= "table" or watchdog.fired then
+	if watchdog_committed ~= true or type(watchdog) ~= "table" or watchdog.fired then
 		abandon_probe(task, ok_watchdog
 			and "CapsWord probe watchdog could not be armed."
 			or "CapsWord probe watchdog raised: " .. tostring(watchdog_or_err))
@@ -749,6 +814,27 @@ local function has_input_source_cleanup_debt()
 		or #_layout_watchdog_cleanup_backlog > 0
 end
 
+--- Releases the named broker subscription after a partial watcher start.
+--- The generation is retired first so a native dispatcher retained by a failed
+--- unsubscribe cannot invoke the callback from the rejected lifecycle.
+--- @param reason string Acquisition failure reported to the file logger.
+--- @return boolean released True only when no broker cleanup debt remains.
+local function rollback_input_source_subscription(reason)
+	_input_source_watcher_gen = _input_source_watcher_gen + 1
+	local release_ok, released_or_err = pcall(
+		InputSourceBroker.unsubscribe,
+		INPUT_SOURCE_SUBSCRIBER_ID
+	)
+	if release_ok and released_or_err == true then
+		_input_source_callback_owned = false
+	else
+		Logger.error(LOG,
+			"%s; input-source broker cleanup remains pending: %s.",
+			reason, tostring(released_or_err))
+	end
+	return not _input_source_callback_owned
+end
+
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
 
@@ -768,11 +854,7 @@ function M.start_input_source_watcher(on_change)
 		or nil
 	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
 
-	-- Save the previous global callback so stop_input_source_watcher can restore it
-	-- rather than passing nil (which would clear callbacks registered by other modules).
-	_previous_input_source_cb = hs.keycodes.inputSourceChanged()
-
-	-- Primary: hs.keycodes notification (fires immediately on most macOS versions)
+	-- Primary: one named subscriber behind the process-wide broker
 	local installed_callback = function()
 		if watcher_gen ~= _input_source_watcher_gen then return end
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
@@ -783,14 +865,29 @@ function M.start_input_source_watcher(on_change)
 			or "<unknown>"
 		fire_layout_change(on_change, new_layout, watcher_gen)
 	end
-	hs.keycodes.inputSourceChanged(installed_callback)
-	_installed_input_source_cb = installed_callback
+	-- Publish the cleanup obligation before crossing the adapter boundary: a
+	-- subscriber installation may mutate the native slot and then throw.
 	_input_source_callback_owned = true
+	local subscribe_ok, subscribed_or_err = pcall(
+		InputSourceBroker.subscribe,
+		INPUT_SOURCE_SUBSCRIBER_ID,
+		installed_callback
+	)
+	if not subscribe_ok or subscribed_or_err ~= true then
+		rollback_input_source_subscription("Input source watcher registration failed")
+		Logger.error(LOG, "Input source watcher registration failed at the shared broker.")
+		return false
+	end
 
 	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
 	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
-	_layout_poll_timer = hs.timer.doEvery(LAYOUT_POLL_SEC, function()
+	local function run_layout_poll()
 		if watcher_gen ~= _input_source_watcher_gen then return end
+		if not drain_scheduled_backlog(_layout_watchdog_cleanup_backlog,
+			"Layout watchdog backlog") then
+			Logger.error(LOG, "Layout poll blocked by prior watchdog cleanup debt.")
+			return
+		end
 		if _layout_poll_termination_pending then
 			local abandoned = _layout_poll_handle
 			if abandoned then
@@ -822,7 +919,7 @@ function M.start_input_source_watcher(on_change)
 		end
 		local watchdog
 		local callback_fired_before_return = false
-		local watchdog_ok, watchdog_or_err = pcall(
+		local watchdog_ok, watchdog_or_err, watchdog_committed = pcall(
 			TimerScheduler.after,
 			LAYOUT_POLL_TIMEOUT_SEC,
 			function()
@@ -863,7 +960,7 @@ function M.start_input_source_watcher(on_change)
 			end
 		)
 		watchdog = watchdog_ok and watchdog_or_err or nil
-		if not watchdog_ok or type(watchdog) ~= "table"
+		if not watchdog_ok or watchdog_committed ~= true or type(watchdog) ~= "table"
 			or watchdog.fired == true or callback_fired_before_return then
 			_layout_poll_pending = false
 			if type(watchdog) == "table"
@@ -898,7 +995,54 @@ function M.start_input_source_watcher(on_change)
 				_layout_poll_watchdog = nil
 			end
 		end
+	end
+
+	-- Keep construction and start separate. The combined constructor starts the
+	-- timer before returning it, so a native start that mutates and then raises
+	-- makes the exact live handle impossible to recover for rollback.
+	local poll_candidate = nil
+	local poll_ok, poll_or_err = pcall(hs.timer.new, LAYOUT_POLL_SEC, function()
+		if _layout_poll_committed ~= true
+			or _layout_poll_timer ~= poll_candidate then return end
+		Logger.pcall(LOG, run_layout_poll)
 	end)
+	local poll_type = type(poll_or_err)
+	local methods_ok, start_method, stop_method = pcall(function()
+		return poll_or_err and poll_or_err.start, poll_or_err and poll_or_err.stop
+	end)
+	if not poll_ok
+		or (poll_type ~= "table" and poll_type ~= "userdata")
+		or not methods_ok
+		or type(start_method) ~= "function"
+		or type(stop_method) ~= "function" then
+		local failure = poll_ok and "timer unavailable" or tostring(poll_or_err)
+		rollback_input_source_subscription("Layout poll timer acquisition failed")
+		Logger.error(LOG, "Layout poll timer acquisition failed: %s.", failure)
+		return false
+	end
+	poll_candidate = poll_or_err
+	_layout_poll_timer = poll_candidate
+	_layout_poll_committed = false
+	local start_ok, started_or_err = pcall(start_method, poll_candidate)
+	local state_started, state_detail = layout_poll_running_matches(poll_candidate, true)
+	if not start_ok or started_or_err ~= poll_candidate or not state_started then
+		-- Retire the callback before cleanup. If stop refuses, the retained exact
+		-- timer may keep firing, but it cannot mutate state or start a layout read.
+		_input_source_watcher_gen = _input_source_watcher_gen + 1
+		_layout_poll_committed = false
+		if stop_layout_poll_timer(poll_candidate, "Rejected layout poll timer") then
+			if _layout_poll_timer == poll_candidate then _layout_poll_timer = nil end
+		end
+		-- Broker rollback is independent of timer rollback: one refusal must not
+		-- strand the sibling capability acquired earlier in this transaction.
+		rollback_input_source_subscription("Layout poll timer start failed")
+		Logger.error(LOG, "Layout poll timer start failed; cleanup may remain pending: %s.",
+			tostring(not start_ok and started_or_err
+				or (started_or_err ~= poll_candidate and "start returned a foreign value")
+				or state_detail))
+		return false
+	end
+	_layout_poll_committed = true
 
 	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
 	return true
@@ -909,35 +1053,14 @@ end
 function M.stop_input_source_watcher()
 	Logger.trace(LOG, "Stopping input source watcher…")
 	_input_source_watcher_gen = _input_source_watcher_gen + 1
+	_layout_poll_committed = false
 	local all_stopped = true
-	-- Restore the previous callback rather than passing nil, so that any
-	-- callback registered before this module started is not silently dropped.
 	if _input_source_callback_owned then
-		local current_ok, current_or_err = pcall(hs.keycodes.inputSourceChanged)
-		if not current_ok then
-			Logger.error(LOG, "Input-source callback ownership check failed; retained for retry: %s.",
-				tostring(current_or_err))
+		if InputSourceBroker.unsubscribe(INPUT_SOURCE_SUBSCRIBER_ID) ~= true then
+			Logger.error(LOG, "Input-source broker cleanup failed; retained for retry.")
 			all_stopped = false
-		elseif current_or_err ~= _installed_input_source_cb then
-			-- Another subsystem replaced our callback after start. It now owns the
-			-- global slot; restoring our predecessor would clobber that third party.
-			_input_source_callback_owned = false
-			_installed_input_source_cb = nil
-			_previous_input_source_cb = nil
-			Logger.debug(LOG, "Input-source callback already replaced by another owner; leaving it intact.")
 		else
-			local stopped, stop_err = pcall(function()
-				hs.keycodes.inputSourceChanged(_previous_input_source_cb)
-			end)
-			if not stopped then
-				Logger.error(LOG, "Input-source callback restoration failed; retained for retry: %s.",
-					tostring(stop_err))
-				all_stopped = false
-			else
-				_input_source_callback_owned = false
-				_installed_input_source_cb = nil
-				_previous_input_source_cb = nil
-			end
+			_input_source_callback_owned = false
 		end
 	end
 	if _input_source_timer then
@@ -956,7 +1079,7 @@ function M.stop_input_source_watcher()
 		end
 	end
 	if _layout_poll_timer then
-		if stop_native_watcher(_layout_poll_timer, "Layout poll timer") then
+		if stop_layout_poll_timer(_layout_poll_timer, "Layout poll timer") then
 			_layout_poll_timer = nil
 		else
 			all_stopped = false

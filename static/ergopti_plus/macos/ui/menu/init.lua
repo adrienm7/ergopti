@@ -150,15 +150,26 @@ end
 --- the hazard that loop's own comment cites. This module holds the handles, so
 --- it is the only place that can stop them.
 function M.stop_watchers()
-	if M._watcher then
-		pcall(function() M._watcher:stop() end)
-		M._watcher = nil
+	local function stop_owned(field, label)
+		local watcher = M[field]
+		if watcher == nil then return true end
+		local ok, result = pcall(function() return watcher:stop() end)
+		if not ok or result == false then
+			Logger.error(LOG, "%s stop failed; exact capability retained for retry: %s",
+				label, tostring(result))
+			return false
+		end
+		M[field] = nil
+		return true
 	end
-	if M._theme_watcher then
-		pcall(function() M._theme_watcher:stop() end)
-		M._theme_watcher = nil
+
+	local config_stopped = stop_owned("_watcher", "Menubar config watcher")
+	local theme_stopped = stop_owned("_theme_watcher", "Menubar theme watcher")
+	if config_stopped and theme_stopped then
+		Logger.debug(LOG, "Menubar watchers stopped.")
+		return true
 	end
-	Logger.debug(LOG, "Menubar watchers stopped.")
+	return false
 end
 
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
@@ -670,6 +681,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 
+	-- Preserve the known-live pre-load posture. A persisted preference can cross
+	-- several runtime owners (notably Bindings + KeyboardShortcuts); if one child
+	-- refuses, continuing with the merged table would let the menu advertise OFF
+	-- while a retained native hotkey remains ON.
+	local pre_load_state = PreferencesTransaction.clone(state)
 	Preferences.merge_saved_data(state, saved)
 	-- Sync the core LLM backend from the just-merged persisted state BEFORE
 	-- sync_state_to_modules pushes the model into the engine. sync_state_to_modules
@@ -689,7 +705,27 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- user click after boot, before any successful save has occurred.
 	local initial_sync_ok = sync_state_to_modules(saved, false)
 	if initial_sync_ok ~= true then
-		Logger.error(LOG, "Initial preference synchronization did not complete.")
+		Logger.error(LOG,
+			"Initial preference synchronization did not complete; restoring pre-load runtime state.")
+		local state_restored = PreferencesTransaction.restore_table(state, pre_load_state)
+		local rollback_ok = false
+		local rollback_result
+		if state_restored == true then
+			local rollback_call_ok
+			rollback_call_ok, rollback_result = xpcall(function()
+				return sync_state_to_modules(pre_load_state, false, true)
+			end, debug.traceback)
+			rollback_ok = rollback_call_ok and rollback_result == true
+		end
+		if not rollback_ok then
+			Logger.error(LOG,
+				"Initial preference rollback did not settle; menubar startup aborted: %s.",
+				tostring(rollback_result))
+			pcall(TrayMenu.destroy)
+			return nil, nil
+		end
+		Logger.warn(LOG,
+			"Persisted preferences were rejected; the pre-load runtime state was restored.")
 	end
 	local snapshot_ok, initial_preferences = pcall(Preferences.snapshot, state, hotfiles, core_mods)
 	if not snapshot_ok or type(initial_preferences) ~= "table" then
@@ -914,7 +950,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local scheduled, timer_or_err = pcall(function()
 				return hs.timer.doAfter(0.05, request_controlled_exit)
 			end)
-			if not scheduled or timer_or_err == nil then
+			if not scheduled or timer_or_err == nil or timer_or_err == false then
 				Logger.error(LOG, "Menubar controlled exit scheduling failed: %s",
 					tostring(timer_or_err))
 				-- The asynchronous coordinator remains the sole owner of the exact

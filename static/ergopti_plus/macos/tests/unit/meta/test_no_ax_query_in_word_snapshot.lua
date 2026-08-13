@@ -15,8 +15,8 @@
 --- A snapshot written as a query when every value it wants is already maintained
 --- elsewhere. The context tracker's app watcher sets active_app_name on every
 --- activation and its window handler has the focused title in hand on every window
---- change; the layout changes only when the OS says so. The assertion is that the
---- snapshot READS rather than ASKS.
+--- change; the input-source broker multiplexes the OS notification to every
+--- subscriber. The assertion is that the snapshot READS rather than ASKS.
 ---
 --- PROVENANCE: source invariant. The snapshot is a few lines inside the keyDown
 --- handler, reached only from a live eventtap with a populated CoreState, and what
@@ -25,8 +25,8 @@
 
 local helpers = require("tests.helpers")
 
--- The snapshot is anchored on the field it fills.
-local ANCHOR = "session_win_title"
+-- This declaration is unique to the keylogger translation unit.
+local KEYLOGGER_SELECTOR = "local function ensure_browser_window_filter"
 
 -- The queries it must not make.
 local FORBIDDEN = {
@@ -34,6 +34,14 @@ local FORBIDDEN = {
 	":mainWindow()",
 	"keycodes.currentLayout()",
 }
+
+--- Reads the one keylogger translation unit for meaningful position checks.
+--- @return string Production source without line comments.
+local function keylogger_source()
+	local source, err = helpers.read_driver_unit(KEYLOGGER_SELECTOR)
+	helpers.assert_not_nil(source, err)
+	return source:gsub("%-%-[^\n]*", "")
+end
 
 
 
@@ -47,11 +55,7 @@ local FORBIDDEN = {
 helpers.describe("keylogger: the per-word snapshot makes no OS query", function()
 
 	helpers.it("queries neither the frontmost app, its window, nor the layout", function()
-		local src = helpers.read_driver_source(ANCHOR)
-		helpers.assert_true(src ~= nil and src ~= "",
-			"the keylogger must be locatable by '" .. ANCHOR .. "'; an empty corpus would "
-			.. "make every assertion below vacuous")
-		local code = src:gsub("%-%-[^\n]*", "")
+		local code = keylogger_source()
 
 		local at = code:find("CoreState.session_app_name%s*=")
 		helpers.assert_true(at ~= nil, "the snapshot must still be findable")
@@ -73,7 +77,7 @@ helpers.describe("keylogger: the per-word snapshot makes no OS query", function(
 	end)
 
 	helpers.it("still fills all three fields", function()
-		local code = helpers.read_driver_source(ANCHOR):gsub("%-%-[^\n]*", "")
+		local code = keylogger_source()
 
 		-- Without this case the assertion above would pass against a snapshot that
 		-- simply stopped recording the context, which every log row depends on.
@@ -85,13 +89,21 @@ helpers.describe("keylogger: the per-word snapshot makes no OS query", function(
 	end)
 
 	helpers.it("the layout cache is refreshed, not frozen", function()
-		local code = helpers.read_driver_source(ANCHOR):gsub("%-%-[^\n]*", "")
+		local code = keylogger_source()
 
 		-- Caching without invalidation would be worse than the query: every row after
-		-- a layout switch would carry the wrong layout, silently and forever.
-		helpers.assert_true(code:find("inputSourceChanged", 1, true) ~= nil,
-			"the cached layout must be refreshed from the OS notification, or a layout "
-			.. "switch would mislabel every subsequent row for the rest of the session")
+		-- a layout switch would carry the wrong layout, silently and forever. The
+		-- broker is the process-wide native owner, so this consumer must subscribe
+		-- instead of replacing a sibling through the setter-only Hammerspoon API.
+		local subscribe_pos = code:find(
+			"InputSourceBroker.subscribe(INPUT_SOURCE_SUBSCRIBER_ID", 1, true)
+		helpers.assert_true(subscribe_pos ~= nil,
+			"the keylogger must subscribe its layout cache to the input-source broker")
+		local callback_block = code:sub(subscribe_pos, subscribe_pos + 700)
+		helpers.assert_contains(callback_block, "pcall(hs.keycodes.currentLayout)")
+		helpers.assert_contains(callback_block, "_cached_layout = new_layout")
+		helpers.assert_true(not callback_block:find("inputSourceChanged", 1, true),
+			"the keylogger consumer must not replace the broker's native callback")
 	end)
 
 end)

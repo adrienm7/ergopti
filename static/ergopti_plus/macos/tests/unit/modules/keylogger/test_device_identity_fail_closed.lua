@@ -100,10 +100,19 @@ local function run_unowned_case(failure)
 		end,
 	}
 
-	local timer_handle = {
-		start = function() end,
-		stop = function() end,
-	}
+	local timer_handle = { active = false }
+	function timer_handle:start()
+		self.active = true
+		return self
+	end
+	function timer_handle:stop()
+		self.active = false
+		return self
+	end
+	function timer_handle:running()
+		return self.active
+	end
+
 	local module = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -226,7 +235,10 @@ local function run_publication_case(failure)
 	package.loaded["modules.keylogger.rotation"] = {
 		init = function() calls.rotation_init = calls.rotation_init + 1 end,
 		is_initialized = function() return false end,
-		append_log = function() calls.rotation_appends = calls.rotation_appends + 1 end,
+		append_log = function()
+			calls.rotation_appends = calls.rotation_appends + 1
+			return true
+		end,
 		read_new_entries = function() return {}, 0, "eof" end,
 	}
 	package.loaded["modules.keylogger.export"] = {
@@ -248,6 +260,19 @@ local function run_publication_case(failure)
 		end,
 	}
 
+	local timer_handle = { active = false }
+	function timer_handle:start()
+		self.active = true
+		return self
+	end
+	function timer_handle:stop()
+		self.active = false
+		return self
+	end
+	function timer_handle:running()
+		return self.active
+	end
+
 	local module = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -268,7 +293,7 @@ local function run_publication_case(failure)
 			absoluteTime = function() return 1000000 end,
 			new = function()
 				calls.timer_new = calls.timer_new + 1
-				return { start = function() end, stop = function() end }
+				return timer_handle
 			end,
 		},
 	})
@@ -302,6 +327,10 @@ local function run_publication_case(failure)
 				"submodules may initialize after identity publication commits")
 			helpers.assert_eq(calls.rotation_appends, 1,
 				"public log actions must become reachable after the commit")
+			helpers.assert_eq(calls.timer_new, 1,
+				"the committed identity must own exactly one proven-running ingest timer")
+			helpers.assert_eq(timer_handle:running(), true,
+				"the successful fixture must model the native timer state required by init")
 		end
 	end, debug.traceback)
 

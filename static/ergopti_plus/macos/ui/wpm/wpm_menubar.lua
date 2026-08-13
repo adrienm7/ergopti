@@ -18,6 +18,7 @@ local hs        = hs
 local keylogger = require("modules.keylogger")
 local WPMShared = require("ui.wpm.shared")
 local Logger    = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "wpm_menubar"
 
@@ -25,6 +26,7 @@ local _menubar           = nil
 local _timer             = nil
 local _running           = false -- true between start() and stop(); guards redundant restarts
 local _use_source_colors = true
+local _generation        = 0
 
 -- Source-color hold duration in seconds, single-sourced from the SAME shared TOML
 -- the floating widget uses (wpm_color_hold_ms via wpm_widget._load_shared_const), so
@@ -103,6 +105,23 @@ update_menubar_body = function()
 	end
 end
 
+--- Releases the exact recurring timer while retaining refused cleanup debt.
+--- @return boolean settled True only when no native timer remains owned.
+local function release_timer()
+	if not _timer then return true end
+	local handle = _timer
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "WPM menubar timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
+	end
+	if _timer == handle then _timer = nil end
+	return true
+end
+
 
 
 
@@ -114,29 +133,57 @@ end
 -- =====================================
 
 --- Starts the menubar monitoring loop.
+--- @return boolean committed True only when the recurring timer is active.
 function M.start()
 	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
 	-- redundant timer restart and menubar re-render when already polling — the 0.5 s
 	-- timer already keeps the icon fresh.
-	if _running then return end
+	if _running then return true end
 	Logger.debug(LOG, "Starting WPM menubar widget…")
-	if not _timer then _timer = hs.timer.new(0.5, update_menubar) end
-	_timer:start()
+	if not release_timer() then
+		Logger.error(LOG, "WPM menubar start refused: prior timer cleanup remains pending.")
+		return false
+	end
+
+	_generation = _generation + 1
+	local generation = _generation
+	local ok, candidate, committed = xpcall(function()
+		return TimerScheduler.every(0.5, function()
+			if not _running or generation ~= _generation then return end
+			update_menubar()
+		end)
+	end, debug.traceback)
+	if type(candidate) == "table" then _timer = candidate end
+	if not ok or type(candidate) ~= "table" or committed ~= true then
+		_generation = _generation + 1
+		release_timer()
+		Logger.error(LOG, "WPM menubar timer acquisition failed: %s.",
+			tostring(ok and committed or candidate))
+		return false
+	end
 	_running = true
 	update_menubar()
 	Logger.info(LOG, "WPM menubar widget started successfully.")
+	return true
 end
 
 --- Halts the menubar updating and removes the icon.
+--- @return boolean settled True only when the recurring timer was released.
 function M.stop()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _menubar then return end
+	if not _running and not _timer and not _menubar then return true end
 	Logger.debug(LOG, "Stopping WPM menubar widget…")
 	_running = false
-	if _timer then _timer:stop(); _timer = nil end
+	_generation = _generation + 1
+	local timer_stopped = release_timer()
 	if _menubar then _menubar:delete(); _menubar = nil end
+	if not timer_stopped then
+		Logger.error(LOG, "WPM menubar stop incomplete: timer cleanup remains pending.")
+		return false
+	end
 	Logger.info(LOG, "WPM menubar widget stopped.")
+	return true
 end
 
 --- Enables or disables source-based menubar coloring.

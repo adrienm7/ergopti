@@ -206,7 +206,7 @@ local function load_remap(options)
 			calls.tracker_stops = calls.tracker_stops + 1
 			return true
 		end,
-		start_input_source_watcher = noop,
+		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
 	package.loaded["adapters.hotkey_registrar"] = {

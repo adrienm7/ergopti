@@ -28,6 +28,7 @@ local STUB_MODULES = {
 	"platform.remap.generator",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
+	"platform.remap.onboarding",
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
@@ -151,6 +152,8 @@ local function with_remap(options, body)
 		guardian_probe_statuses = {},
 		guardian_cached_status = options.guardian_cached_status or options.guardian_status,
 		guardian_settings_opens = 0,
+		onboarding_stop_attempts = 0,
+		onboarding_stop_failures_remaining = options.onboarding_stop_failures or 0,
 	}
 	for index, outcome in ipairs(options.guardian_probe_statuses or {}) do
 		calls.guardian_probe_statuses[index] = outcome
@@ -259,6 +262,16 @@ local function with_remap(options, body)
 				calls.notify_failures_remaining = calls.notify_failures_remaining - 1
 				error("synthetic-ready-notification-failure")
 			end
+		end,
+	}
+	package.loaded["platform.remap.onboarding"] = {
+		stop = function()
+			calls.onboarding_stop_attempts = calls.onboarding_stop_attempts + 1
+			if calls.onboarding_stop_failures_remaining > 0 then
+				calls.onboarding_stop_failures_remaining = calls.onboarding_stop_failures_remaining - 1
+				return false
+			end
+			return true
 		end,
 	}
 
@@ -515,13 +528,16 @@ local function with_remap(options, body)
 		end,
 	}
 
+	local remap_initialized = false
 	local timer_scheduler = {}
 	function timer_scheduler.after(delay, callback)
-		calls.recovery_timer_arm_attempts = calls.recovery_timer_arm_attempts + 1
-		if calls.recovery_timer_arm_failures_remaining > 0 then
+		if remap_initialized then
+			calls.recovery_timer_arm_attempts = calls.recovery_timer_arm_attempts + 1
+		end
+		if remap_initialized and calls.recovery_timer_arm_failures_remaining > 0 then
 			calls.recovery_timer_arm_failures_remaining =
 				calls.recovery_timer_arm_failures_remaining - 1
-			return { fired = true }
+			return { fired = true }, false
 		end
 		local timer = {
 			delay = delay,
@@ -536,9 +552,11 @@ local function with_remap(options, body)
 			self.callback()
 			return true
 		end
-		local timers = delay == 2.0 and calls.guardian_probe_timers or calls.recovery_timers
-		timers[#timers + 1] = timer
-		return timer
+		if remap_initialized then
+			local timers = delay == 2.0 and calls.guardian_probe_timers or calls.recovery_timers
+			timers[#timers + 1] = timer
+		end
+		return timer, true
 	end
 	function timer_scheduler.cancel(timer)
 		calls.cancel_attempts = calls.cancel_attempts + 1
@@ -607,6 +625,7 @@ local function with_remap(options, body)
 	package.loaded["platform.remap"] = nil
 	local remap = require("platform.remap")
 	remap.init({ expand_path = function(path) return path end })
+	remap_initialized = true
 
 	calls.publish_phase = publish
 	function calls.publish_failed(token)
@@ -1155,9 +1174,22 @@ helpers.describe("Karabiner recovery user-intent fencing", function()
 			helpers.assert_eq(calls.cancel_attempts, 1)
 			helpers.assert_true(remap.teardown_local() == false,
 				"teardown must not claim success while a native timer remains unproven")
-			helpers.assert_eq(calls.cancel_attempts, 2)
+			helpers.assert_eq(calls.cancel_attempts, 3,
+				"teardown retries recovery debt and also releases the committed wizard timer")
 			helpers.assert_true(remap.teardown_local())
-			helpers.assert_eq(calls.cancel_attempts, 3)
+			helpers.assert_eq(calls.cancel_attempts, 4)
+		end)
+	end)
+
+	helpers.it("retains onboarding poll cleanup debt in the composed local teardown", function()
+		with_remap({ guardian_status = "ready", onboarding_stop_failures = 1 }, function(remap, calls)
+			helpers.assert_true(remap.revoke("test-shutdown"))
+			helpers.assert_eq(remap.teardown_local(), false,
+				"local teardown must surface an exact onboarding timer stop refusal")
+			helpers.assert_eq(calls.onboarding_stop_attempts, 1)
+			helpers.assert_eq(remap.teardown_local(), true,
+				"the same module-owned onboarding cleanup debt must remain retryable")
+			helpers.assert_eq(calls.onboarding_stop_attempts, 2)
 		end)
 	end)
 

@@ -73,4 +73,20 @@ helpers.describe("init.lua shutdown uses exact Karabiner lease revocation", func
 		helpers.assert_true(region:find("reload = function", 1, true) ~= nil)
 		helpers.assert_true(region:find("exit = function", 1, true) ~= nil)
 	end)
+
+	helpers.it("uses the terminal keylogger shutdown boundary after the exact fence", function()
+		local code = init_source()
+		local keylogger_at = code:find('name = "keylogger"', 1, true)
+		local next_step_at = code:find('name = "vscode-bridge"', keylogger_at or 1, true)
+		helpers.assert_true(keylogger_at ~= nil and next_step_at ~= nil and keylogger_at < next_step_at,
+			"the controlled teardown must expose a bounded keylogger step")
+		local body = code:sub(keylogger_at, next_step_at - 1)
+		helpers.assert_true(body:find('package.loaded["modules.keylogger"]', 1, true) ~= nil)
+		helpers.assert_true(body:find('type(module.shutdown) ~= "function"', 1, true) ~= nil,
+			"terminal teardown must fail closed when the KC-aware shutdown boundary is absent")
+		helpers.assert_true(body:find("return module.shutdown()", 1, true) ~= nil,
+			"controlled reload/quit must stop the always-on KC drain producers")
+		helpers.assert_true(body:find("module.stop", 1, true) == nil,
+			"feature stop must not be reused for terminal shutdown because KC drains stay live while disabled")
+	end)
 end)
