@@ -94,13 +94,127 @@ local KEY_ECHO_CHARS = { ["return"] = "\r", ["tab"] = "\t" }
 -- ==========================================
 -- ==========================================
 
--- Clipboard serialisation state for the paste path.
--- When two paste expansions overlap within CLIPBOARD_RESTORE_SEC of each other,
--- naively reading readAllData() on the second paste yields the first expansion's
--- data rather than the user's real clipboard. This trio guarantees that only one
--- "original" value is ever saved and that the final doAfter always restores it.
-local _paste_saved_original = nil   -- user's full clipboard data (table from readAllData) at first paste
-local _paste_pending_timer  = nil   -- the active restore timer, if any
+-- Clipboard serialisation state for the paste path. Ownership is retained until
+-- the exact all-type snapshot has been restored; a native false/nil result never
+-- releases it. That matters after a failed restore: a later expansion must not
+-- snapshot Ergopti's payload as if it were the user's clipboard.
+local _paste_saved_original = nil
+local _paste_pending_timer = nil
+local _paste_owns_clipboard = false
+local _paste_recovery_only = false
+local _paste_generation = 0
+
+local function stop_paste_restore_timer()
+	local pending = _paste_pending_timer
+	_paste_pending_timer = nil
+	if pending and type(pending.stop) == "function" then
+		pcall(pending.stop, pending)
+	end
+end
+
+local function release_paste_ownership()
+	stop_paste_restore_timer()
+	_paste_saved_original = nil
+	_paste_owns_clipboard = false
+	_paste_recovery_only = false
+	_paste_generation = _paste_generation + 1
+end
+
+--- Restores the retained all-type snapshot without releasing it on refusal.
+--- `clearContents()` has no success return in Hammerspoon, so a non-throw is its
+--- complete contract; `writeAllData()` must return the literal boolean true.
+--- @return boolean restored
+--- @return any error_detail
+local function restore_owned_clipboard()
+	if not _paste_owns_clipboard then return true, nil end
+	local saved = _paste_saved_original
+	local ok_restore, restore_result
+	if type(saved) == "table" and next(saved) ~= nil then
+		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+		if not ok_restore or restore_result ~= true then
+			return false, ok_restore and "writeAllData returned " .. tostring(restore_result)
+				or restore_result
+		end
+	else
+		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+		if not ok_restore then return false, restore_result end
+	end
+	release_paste_ownership()
+	return true, nil
+end
+
+local queue_paste_restore_retry
+
+--- Arms one retained restore timer for the current ownership generation.
+--- @param delay number Seconds before the attempt.
+--- @return boolean scheduled
+--- @return any error_detail
+local function schedule_paste_restore(delay)
+	if _paste_pending_timer then return true, nil end
+	local generation = _paste_generation
+	local callback_ran = false
+	-- A scheduler test-double (or a broken native boundary) may invoke the
+	-- callback before returning its handle. Treat that as allocation refusal:
+	-- running recovery while this assignment is incomplete would recursively
+	-- observe a nil _paste_pending_timer and exhaust the Lua stack.
+	local installing = true
+	local ok_timer, timer_or_error = pcall(function()
+		_paste_pending_timer = hs.timer.doAfter(delay, function()
+			callback_ran = true
+			if installing then return end
+			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+			_paste_pending_timer = nil
+			local restored, restore_error = restore_owned_clipboard()
+			if restored then return end
+			_paste_recovery_only = true
+			Logger.error(LOG, "Clipboard restore failed; ownership retained for retry: %s.",
+				tostring(restore_error))
+			queue_paste_restore_retry("native restore refusal")
+		end)
+		return _paste_pending_timer
+	end)
+	installing = false
+	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+		stop_paste_restore_timer()
+		return false, ok_timer and (callback_ran and "timer fired before commit"
+			or "hs.timer.doAfter returned no handle") or timer_or_error
+	end
+	return true, nil
+end
+
+--- Retains autonomous recovery after a restore failure. If native timer
+--- allocation is unavailable, the synthetic-input lifecycle queue is an
+--- independent fallback. When both refuse, ownership still remains closed and
+--- the next paste fails closed until the original clipboard can be restored.
+--- @param reason string Diagnostic context.
+--- @return boolean scheduled
+queue_paste_restore_retry = function(reason)
+	if not _paste_owns_clipboard then return true end
+	local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+	if scheduled then return true end
+	if type(SyntheticInput.defer_after_callback) == "function" then
+		local generation = _paste_generation
+		local callback_ran = false
+		local installing = true
+		local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+			"clipboard restore recovery", function()
+				callback_ran = true
+				if installing then return end
+				if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+				local restored, restore_error = restore_owned_clipboard()
+				if restored then return end
+				_paste_recovery_only = true
+				Logger.error(LOG, "Deferred clipboard restore failed; ownership retained: %s.",
+					tostring(restore_error))
+				queue_paste_restore_retry("deferred restore refusal")
+			end)
+		installing = false
+		if ok_defer and deferred == true and not callback_ran then return true end
+	end
+	Logger.error(LOG, "Clipboard restore retry could not be armed after %s: %s.",
+		tostring(reason), tostring(timer_error))
+	return false
+end
 
 --- Returns true when the text is long enough or unicode-heavy enough that
 --- clipboard-paste should be preferred over simulated keystrokes.
@@ -123,53 +237,77 @@ end
 --- emit_tokens (which may need to defer this call — see the serialisation
 --- comment in emit_tokens) share the exact same paste + restore contract.
 --- @param value string The text to paste.
+--- @return boolean True only after the payload and Cmd+V were both accepted.
 local function perform_paste(value)
+	-- A previous failed restore owns the clipboard but has no valid user output
+	-- to extend. Recover it first; if the native pasteboard still refuses, fail
+	-- closed and preserve the original snapshot for the autonomous retry.
+	if _paste_recovery_only then
+		local recovered, recovery_error = restore_owned_clipboard()
+		if not recovered then
+			queue_paste_restore_retry("new paste while recovery is pending")
+			Logger.error(LOG, "Clipboard paste refused while recovery is pending: %s.",
+				tostring(recovery_error))
+			return false
+		end
+	end
+
 	-- Serialise clipboard ownership: if a restore is already pending,
 	-- cancel it but keep _paste_saved_original (the user's real
 	-- clipboard) — reading readAllData() now would return the first
 	-- expansion's data rather than what the user had copied.
-	if _paste_pending_timer then
-		pcall(function() _paste_pending_timer:stop() end)
-		_paste_pending_timer = nil
+	if _paste_owns_clipboard then
+		stop_paste_restore_timer()
 	else
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-		_paste_saved_original = hs.pasteboard.readAllData()
-	end
-	-- From here the user's clipboard holds OUR payload, and the restore timer is
-	-- not armed yet. A throw in between — setContents failing, the keystroke
-	-- raising — used to leave it there permanently, with _paste_saved_original
-	-- still set so the NEXT paste would not even re-capture the real value. The
-	-- enclosing pcall caught the error and logged it, which is precisely why the
-	-- eaten clipboard was never traced back here. The sibling path in
-	-- adapters/text_sender was fixed for this; this one, which every real
-	-- hotstring paste goes through, was missed.
-	local ok_write = pcall(function()
-		hs.pasteboard.setContents(value)
-		assert(SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0),
-			"synthetic paste keystroke could not be dispatched")
-	end)
-	if not ok_write then
-		local original = _paste_saved_original
-		_paste_saved_original = nil
-		pcall(function()
-			if type(original) == "table" and next(original) ~= nil then
-				hs.pasteboard.writeAllData(original)
-			end
+		local ok_snapshot, snapshot_or_error = pcall(function()
+			return hs.pasteboard.readAllData()
 		end)
-		Logger.error(LOG, "Clipboard paste failed before the restore could be armed — original restored.")
-		return
-	end
-	-- Restore clipboard asynchronously after the target app has received the paste.
-	local saved = _paste_saved_original
-	_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
-		_paste_pending_timer  = nil
-		_paste_saved_original = nil
-		if type(saved) == "table" and next(saved) ~= nil then
-			pcall(hs.pasteboard.writeAllData, saved)
-		else
-			pcall(hs.pasteboard.setContents, "")
+		if not ok_snapshot or (snapshot_or_error ~= nil and type(snapshot_or_error) ~= "table") then
+			Logger.error(LOG, "Clipboard paste snapshot failed: %s.", tostring(snapshot_or_error))
+			return false
 		end
+		_paste_saved_original = snapshot_or_error
+	end
+
+	_paste_generation = _paste_generation + 1
+	-- Conservative ordering: a native method may mutate the pasteboard and only
+	-- then return false or throw. Ownership must exist before entering it.
+	_paste_owns_clipboard = true
+	_paste_recovery_only = true
+	local ok_write, write_result = pcall(hs.pasteboard.setContents, value)
+	if not ok_write or write_result ~= true then
+		local restored, restore_error = restore_owned_clipboard()
+		if not restored then queue_paste_restore_retry("payload write refusal") end
+		Logger.error(LOG, "Clipboard paste payload was rejected — %s (restore=%s).",
+			tostring(write_result), tostring(restore_error))
+		return false
+	end
+
+	-- Arm restoration BEFORE Cmd+V. If allocation is refused there is still no
+	-- target output to preserve, so rollback can be exact and the trigger passes.
+	local restore_armed, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+	if not restore_armed then
+		local restored, restore_error = restore_owned_clipboard()
+		if not restored then queue_paste_restore_retry("restore timer refusal") end
+		Logger.error(LOG, "Clipboard paste restore timer was refused — %s (restore=%s).",
+			tostring(timer_error), tostring(restore_error))
+		return false
+	end
+
+	local ok_emit, emitted_or_error = pcall(function()
+		return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0)
 	end)
+	if not ok_emit or emitted_or_error ~= true then
+		stop_paste_restore_timer()
+		local restored, restore_error = restore_owned_clipboard()
+		if not restored then queue_paste_restore_retry("paste dispatch refusal") end
+		Logger.error(LOG, "Clipboard paste shortcut was refused — %s (restore=%s).",
+			tostring(emitted_or_error), tostring(restore_error))
+		return false
+	end
+	_paste_recovery_only = false
+	return true
 end
 
 --- Emits a sequence of tokens by simulating keystrokes or pasting via the clipboard.
@@ -297,11 +435,15 @@ function M.emit_tokens(tokens)
 				local paste_at    = next_paste_delay
 				local paste_value = tok.value  -- Bound per iteration for the deferred closure
 				if paste_at <= 0 then
-					perform_paste(paste_value)
+					assert(perform_paste(paste_value) == true,
+						"clipboard token paste could not be dispatched")
 				else
 					Logger.debug(LOG, "Deferring paste of %d char(s) by %.2fs to avoid clipboard race.",
 						ok_l and tok_len or 1, paste_at)
-					defer_in_transaction(paste_at, function() perform_paste(paste_value) end)
+					defer_in_transaction(paste_at, function()
+						assert(perform_paste(paste_value) == true,
+							"deferred clipboard token paste could not be dispatched")
+					end)
 				end
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
@@ -358,7 +500,8 @@ function M.emit_text(text)
 	Logger.trace(LOG, "Emitting text (%d byte(s))…", #text)
 
 	if M.should_paste(text) then
-		perform_paste(text)
+		assert(perform_paste(text) == true,
+			"clipboard text paste could not be dispatched")
 		Logger.done(LOG, "Text pasted via clipboard.")
 		-- physical_echo stays empty: Cmd+V emits one tagged key pair, not one
 		-- keydown per pasted character. Immutable transaction provenance owns its

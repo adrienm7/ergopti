@@ -21,6 +21,7 @@ local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local ShellRunner   = require("adapters.shell_runner")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "shortcuts.actions.system"
 
@@ -129,7 +130,12 @@ function M.copy_pixel_color()
 			return
 		end
 
-		pcall(pasteboard.setContents, hex)
+		local ok_write, write_result = pcall(pasteboard.setContents, hex)
+		if not ok_write or write_result ~= true then
+			Logger.error(LOG, "Pixel color clipboard write failed — %s.", tostring(write_result))
+			notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
+			return
+		end
 		notifications.notify(string.format(i18n.get("shortcuts.color_copied"), hex), nil, "success")
 	end)
 end
@@ -138,8 +144,7 @@ end
 function M.interactive_screenshot()
 	Logger.trace(LOG, "Interactive screenshot started…")
 	local task
-	local ok
-	ok, task = pcall(hs.task.new,
+	task = TaskLifecycle.native("Interactive screenshot",
 		"/usr/sbin/screencapture",
 		function(exit_code, _, _)
 			if task then _active_tasks[task] = nil end
@@ -152,12 +157,12 @@ function M.interactive_screenshot()
 		end,
 		{"-i", "-c"}
 	)
-	if ok and task then
+	if task then
 		-- Interactive screencapture waits for the user to drag a selection, so this
 		-- is the longest-lived subprocess in the driver — precisely the one the GC
 		-- is most likely to collect before its callback fires.
 		_active_tasks[task] = true
-		if not task:start() then
+		if not TaskLifecycle.start(task, "Interactive screenshot") then
 			_active_tasks[task] = nil
 			Logger.error(LOG, "Screenshot task failed to start.")
 		end

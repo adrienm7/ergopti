@@ -394,6 +394,27 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 	end)
 
+	helpers.it("resume starts from fresh text after unobserved paused typing", function()
+		local fixture = load_fixture()
+		fixture.state.buffer = "ae"
+		fixture.state.start_is_word_boundary = true
+
+		fixture.keymap.pause_processing()
+		local paused_consumed = fixture.physical_letter("x")
+		helpers.assert_true(not paused_consumed,
+			"typing while paused must continue to reach the frontmost application")
+		fixture.keymap.resume_processing()
+
+		helpers.assert_eq(fixture.state.buffer, "",
+			"resume must discard text that predates unobserved paused edits")
+		helpers.assert_true(not fixture.state.start_is_word_boundary,
+			"an unknown cursor context must not be advertised as a proven word boundary")
+		fixture.physical_letter("u")
+		helpers.assert_true(not fixture.state.buffer:find("ae", 1, true),
+			"the post-resume key must not join text from before the pause boundary")
+		fixture.keymap.stop()
+	end)
+
 	helpers.it("start and stop register the stable listener exactly once", function()
 		local fixture = load_fixture()
 		fixture.keymap.start()

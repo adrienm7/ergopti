@@ -6,7 +6,7 @@
 --- Static source guard for the "hs.task silent death by GC" bug. Hammerspoon's
 --- GC kills any hs.task whose Lua object is held only in a local variable the
 --- moment the enclosing function returns, sending a SIGTERM to the subprocess
---- mid-run. This test ensures every hs.task.new() call site keeps a GC-root
+--- mid-run. This test ensures every guarded native-task launch keeps a GC-root
 --- reference (_active_tasks) so the task survives until its callback fires.
 ---
 --- WHY PER-SITE AND NOT PER-FILE (gc-guard-file-granular): this guard used to
@@ -75,7 +75,7 @@ local function window_has_pin(window)
 		or window:find("waitUntilExit", 1, true) ~= nil
 end
 
---- Reports every hs.task.new call site in a source that has no pin near it.
+--- Reports every raw or TaskLifecycle.native task site with no pin near it.
 ---
 --- Comments are stripped first, and this is load-bearing rather than cosmetic:
 --- two modules DISCUSS `hs.task.new(...)` in prose while spawning nothing there
@@ -92,7 +92,9 @@ local function scan_unpinned_sites(src)
 
 	local out = {}
 	for i, line in ipairs(lines) do
-		if line:find("hs%.task%.new") then
+		if line:find("hs%.task%.new%s*%(")
+				or line:find("pcall%s*%(%s*hs%.task%.new")
+				or line:find("TaskLifecycle%.native") then
 			local window = table.concat(lines, "\n",
 				math.max(1, i - PIN_LOOKBACK), math.min(#lines, i + PIN_LOOKAHEAD))
 			if not window_has_pin(window) then
@@ -247,7 +249,7 @@ local function all_driver_sources()
 	return out
 end
 
-helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned", function()
+helpers.describe("GC retention: EVERY native task site in the driver is pinned", function()
 	helpers.it("no call site spawns without a GC-root pin near it", function()
 		local files = all_driver_sources()
 		helpers.assert_true(#files > 0,
@@ -257,8 +259,16 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 		for _, rel in ipairs(files) do
 			local src = read_source(rel)
 			if src then
-				local sites = scan_unpinned_sites(src)
-				if src:gsub("%-%-[^\n]*", ""):find("hs%.task%.new") then scanned = scanned + 1 end
+				local code = src:gsub("%-%-[^\n]*", "")
+				-- TaskLifecycle owns construction only; its callers own the handle and
+				-- pin before start. Judge each caller launch, not the adapter's return.
+				local sites = rel == "adapters/task_lifecycle.lua" and {}
+					or scan_unpinned_sites(src)
+				if code:find("hs%.task%.new%s*%(")
+						or code:find("pcall%s*%(%s*hs%.task%.new")
+						or code:find("TaskLifecycle%.native") then
+					scanned = scanned + 1
+				end
 				for _, o in ipairs(sites) do
 					offenders[#offenders + 1] = rel .. ":" .. o.line .. "  " .. o.text
 				end
@@ -266,7 +276,7 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 		end
 
 		helpers.assert_true(scanned >= 10,
-			"the walk must actually reach the spawning modules (found " .. scanned
+			"the walk must actually reach the native-task launchers (found " .. scanned
 				.. ") — a scan that matches nothing cannot fail")
 
 		-- The walk has two implementations — an lfs recursion and a shell fallback
@@ -285,7 +295,7 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 				.. "installed, and the suite reports coverage it does not have")
 
 		helpers.assert_true(#offenders == 0, string.format(
-			"%d hs.task.new call site(s) have no GC-root pin. An unreferenced hs.task is "
+				"%d native task launch site(s) have no GC-root pin. An unreferenced hs.task is "
 			.. "collected mid-run: the subprocess is killed and its completion callback never "
 			.. "fires, so whatever it was supposed to finish silently never happens. Pin before "
 			.. ":start(), release in the callback:\n  %s",

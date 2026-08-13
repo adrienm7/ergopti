@@ -373,6 +373,28 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		helpers.assert_true(found_error,
 			"a throwing axis action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
 	end)
+
+	helpers.it("logs a native false from the shared keystroke helper", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+		local SyntheticInput = require("adapters.synthetic_input")
+		local original_emit = SyntheticInput.emit_key_stroke
+		SyntheticInput.emit_key_stroke = function() return false end
+
+		local dispatched = Actions2.execute_single("mission_control")
+		SyntheticInput.emit_key_stroke = original_emit
+
+		helpers.assert_eq(true, dispatched,
+			"the registered action remains owned by the gesture dispatcher")
+		local found_refusal = false
+		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("synthetic key stroke was refused", 1, true) then
+				found_refusal = true
+			end
+		end
+		helpers.assert_true(found_refusal,
+			"a false native dispatch must reach the file logger through a real registered action")
+	end)
 end)
 
 

@@ -189,6 +189,8 @@ end
 -- already used by infra/ui_restore and api_mlx, including their hard timeout: a
 -- flag that could stick would block every later transform for the session.
 local _transform_in_flight = false
+local _plain_paste_in_flight = false
+local _plain_paste_generation = 0
 -- Same guard for the wrap path, declared beside its sibling so the pair stays visible.
 local _wrap_in_flight      = false
 -- The restore timer is retained explicitly. A one-shot native timer that is only
@@ -237,81 +239,240 @@ end
 local function do_transform(transform_func)
 	if _transform_in_flight then
 		Logger.debug(LOG, "Text transform ignored — a previous one still owns the clipboard.")
-		return
+		return false
 	end
 	_transform_in_flight = true
 	_transform_generation = _transform_generation + 1
 	local my_generation = _transform_generation
+	local active = true
+	local owns_clipboard = false
+	local timers = {}
+	local next_timer_id = 0
+	local restore_retry_armed = false
+	local deferred_retry_armed = false
 
-	--- Releases the lock, but only if this transform still owns it.
-	--- Called at every terminal point rather than left to the failsafe: released
-	--- only by the 2 s timer, a transform that finished in half a second still
-	--- blocked the next one for the remaining second and a half, so deliberate
-	--- repeat transforms were simply dropped.
-	local function release()
-		if my_generation ~= _transform_generation then return end
-		_transform_in_flight = false
+	local function stop_all_timers()
+		for id, handle in pairs(timers) do
+			if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+			timers[id] = nil
+		end
 	end
 
-	-- Failsafe release: a callback that never fires must not strand the flag for
-	-- the session. Generation-checked because a long selection legitimately
-	-- outlives this delay — the re-select walks the text one keystroke at a time
-	-- — and an unguarded failsafe then unlocked the clipboard mid-transform,
-	-- re-opening the very race the flag exists to close.
-	timer.doAfter(TRANSFORM_LOCK_TIMEOUT_SEC, release)
+	local function release()
+		if not active or my_generation ~= _transform_generation then return end
+		active = false
+		stop_all_timers()
+		_transform_in_flight = false
+		_transform_generation = _transform_generation + 1
+	end
 
 	Logger.trace(LOG, "Text transformation started…")
-	local prior = pasteboard.getContents()
-	pasteboard.clearContents()
-	SyntheticInput.emit_key_stroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
+	local ok_snapshot, prior = pcall(pasteboard.readAllData)
+	if not ok_snapshot or type(prior) ~= "table" then
+		release()
+		Logger.error(LOG, "Text transform clipboard snapshot failed: %s.", tostring(prior))
+		return false
+	end
+	owns_clipboard = true
 
-	timer.doAfter(COPY_SETTLE_SEC, function()
-		local sel = pasteboard.getContents()
+	local restore_prior
+	local queue_restore_retry
+	local abort_transform
 
-		if not sel or sel == "" then
-			if prior then pcall(pasteboard.setContents, prior) end
-			release()
-			Logger.warn(LOG, "Text transform aborted — no text was selected.")
+	restore_prior = function()
+		if not owns_clipboard then return true end
+		local ok_restore, restore_result
+		if next(prior) ~= nil then
+			ok_restore, restore_result = pcall(pasteboard.writeAllData, prior)
+			ok_restore = ok_restore and restore_result == true
+		else
+			ok_restore, restore_result = pcall(pasteboard.clearContents)
+		end
+		if ok_restore then
+			owns_clipboard = false
+			return true, nil
+		end
+		return false, restore_result
+	end
+
+	local function schedule_transform_timer(delay, label, callback)
+		next_timer_id = next_timer_id + 1
+		local id = next_timer_id
+		local handle = nil
+		local installing = true
+		local callback_ran = false
+		local ok_timer, timer_or_error = pcall(timer.doAfter, delay, function()
+			callback_ran = true
+			if installing then return end
+			timers[id] = nil
+			if not active or my_generation ~= _transform_generation then return end
+			local ok_callback, callback_error = xpcall(callback, debug.traceback)
+			if not ok_callback then
+				Logger.error(LOG, "Text transform %s callback failed: %s.",
+					label, tostring(callback_error))
+				if abort_transform then abort_transform(label .. " callback", callback_error) end
+			end
+		end)
+		installing = false
+		if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+			if timer_or_error and type(timer_or_error.stop) == "function" then
+				pcall(timer_or_error.stop, timer_or_error)
+			end
+			return false, ok_timer and (callback_ran and "timer fired during installation"
+				or "hs.timer.doAfter returned no handle") or timer_or_error
+		end
+		handle = timer_or_error
+		timers[id] = handle
+		return true, nil
+	end
+
+	queue_restore_retry = function()
+		if restore_retry_armed or deferred_retry_armed or not owns_clipboard then return true end
+		local function attempt_restore()
+			restore_retry_armed = false
+			deferred_retry_armed = false
+			local restored, restore_error = restore_prior()
+			if restored then
+				release()
+				Logger.done(LOG, "Text transformation completed after clipboard retry.")
+				return
+			end
+			Logger.error(LOG, "Text transform clipboard restore retry refused: %s.",
+				tostring(restore_error))
+			queue_restore_retry()
+		end
+		local armed, timer_error = schedule_transform_timer(
+			RESTORE_DELAY_SEC, "clipboard restore retry", attempt_restore)
+		if armed then
+			restore_retry_armed = true
+			return true
+		end
+		if type(SyntheticInput.defer_after_callback) == "function" then
+			local installing = true
+			local callback_ran = false
+			local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+				"text transform clipboard restore recovery", function()
+					callback_ran = true
+					if installing then return end
+					local ok_callback, callback_error = xpcall(attempt_restore, debug.traceback)
+					if not ok_callback then
+						Logger.error(LOG, "Text transform deferred restore callback failed: %s.",
+							tostring(callback_error))
+					end
+				end)
+			installing = false
+			if ok_defer and deferred == true and not callback_ran then
+				deferred_retry_armed = true
+				return true
+			end
+		end
+		Logger.error(LOG, "Text transform clipboard restore retry could not be armed: %s.",
+			tostring(timer_error))
+		return false
+	end
+
+	abort_transform = function(reason, detail)
+		if not active or my_generation ~= _transform_generation then return false end
+		local restored, restore_error = restore_prior()
+		if restored then release() else queue_restore_retry() end
+		Logger.error(LOG, "Text transform aborted at %s: %s (restore=%s).",
+			reason, tostring(detail), tostring(restore_error))
+		return false
+	end
+
+	local copy_stage
+	copy_stage = function()
+		local ok_selection, selection = pcall(pasteboard.getContents)
+		if not ok_selection or type(selection) ~= "string" or selection == "" then
+			abort_transform("selection copy", selection)
+			return
+		end
+		local ok_transform, transformed = pcall(transform_func, selection)
+		if not ok_transform or type(transformed) ~= "string" then
+			abort_transform("transform callback", transformed)
 			return
 		end
 
-		local ok, transformed = pcall(transform_func, sel)
-		if not ok or not transformed then
-			if prior then pcall(pasteboard.setContents, prior) end
-			release()
-			Logger.error(LOG, "Text transform callback failed.")
-			return
-		end
-
-		pcall(pasteboard.setContents, transformed)
-
-		timer.doAfter(PASTE_SETTLE_SEC, function()
-			SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
-
-			timer.doAfter(RESELECT_DELAY_SEC, function()
-				-- Use utf8.len for accuracy; fall back to byte length
-				local len_ok, ulen = pcall(utf8.len, transformed)
-				local n = (len_ok and ulen and ulen > 0) and ulen or #transformed
-				if n > MAX_RESELECT_CHARS then n = MAX_RESELECT_CHARS end
-
-				if n > 0 then
-					reselect_previous_text(n)
-				end
-
-				timer.doAfter(RESTORE_DELAY_SEC, function()
-					pcall(function()
-						if prior and prior ~= "" then
-							pasteboard.setContents(prior)
+		local paste_stage
+		paste_stage = function()
+			local reselect_stage
+			reselect_stage = function()
+				local restore_armed, restore_timer_error = schedule_transform_timer(
+					RESTORE_DELAY_SEC, "clipboard restore", function()
+						local restored, restore_error = restore_prior()
+						if restored then
+							release()
+							Logger.done(LOG, "Text transformation completed.")
 						else
-							pasteboard.clearContents()
+							Logger.error(LOG, "Text transform clipboard restore refused: %s.",
+								tostring(restore_error))
+							queue_restore_retry()
 						end
 					end)
-					release()
-					Logger.done(LOG, "Text transformation completed.")
-				end)
-			end)
+				if not restore_armed then
+					abort_transform("restore timer", restore_timer_error)
+					return
+				end
+				local len_ok, ulen = pcall(utf8.len, transformed)
+				local count = (len_ok and ulen and ulen > 0) and ulen or #transformed
+				if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
+				if count > 0 and not reselect_previous_text(count) then
+					abort_transform("text reselection", "synthetic dispatch refused")
+				end
+			end
+			local reselect_armed, reselect_timer_error = schedule_transform_timer(
+				RESELECT_DELAY_SEC, "reselection", reselect_stage)
+			if not reselect_armed then
+				abort_transform("reselection timer", reselect_timer_error)
+				return
+			end
+			local ok_paste, pasted = pcall(
+				SyntheticInput.emit_key_stroke, { "cmd" }, "v", 0.02)
+			if not ok_paste or pasted ~= true then
+				abort_transform("paste shortcut", pasted)
+			end
+		end
+
+		local paste_armed, paste_timer_error = schedule_transform_timer(
+			PASTE_SETTLE_SEC, "paste", paste_stage)
+		if not paste_armed then
+			abort_transform("paste timer", paste_timer_error)
+			return
+		end
+		local ok_write, write_result = pcall(pasteboard.setContents, transformed)
+		if not ok_write or write_result ~= true then
+			abort_transform("clipboard write", write_result)
+		end
+	end
+
+	local failsafe_armed, failsafe_error = schedule_transform_timer(
+		TRANSFORM_LOCK_TIMEOUT_SEC, "ownership failsafe", function()
+			abort_transform("ownership timeout", "pipeline did not complete")
 		end)
-	end)
+	if not failsafe_armed then
+		release()
+		Logger.error(LOG, "Text transform failsafe timer was refused: %s.", tostring(failsafe_error))
+		return false
+	end
+	local copy_armed, copy_timer_error = schedule_transform_timer(
+		COPY_SETTLE_SEC, "selection copy", copy_stage)
+	if not copy_armed then
+		abort_transform("copy timer", copy_timer_error)
+		return false
+	end
+
+	local ok_clear, clear_error = pcall(pasteboard.clearContents)
+	if not ok_clear then
+		abort_transform("clipboard clear", clear_error)
+		return false
+	end
+	local ok_copy, copied = pcall(
+		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
+	if not ok_copy or copied ~= true then
+		abort_transform("copy shortcut", copied)
+		return false
+	end
+	return true
 end
 
 
@@ -326,26 +487,170 @@ end
 
 --- Pastes the current clipboard content stripped of any rich-text formatting.
 function M.paste_as_plain_text()
-	local prior = pasteboard.getContents()
-	local plain = prior or ""
+	if _plain_paste_in_flight then
+		Logger.debug(LOG, "Plain-text paste ignored — a previous action still owns the clipboard.")
+		return false
+	end
+	local ok_snapshot, prior = pcall(pasteboard.readAllData)
+	local ok_plain, plain = pcall(pasteboard.getContents)
+	if not ok_snapshot or type(prior) ~= "table" or not ok_plain then
+		Logger.error(LOG, "Plain-text paste clipboard snapshot failed.")
+		return false
+	end
+	_plain_paste_in_flight = true
+	_plain_paste_generation = _plain_paste_generation + 1
+	local generation = _plain_paste_generation
+	local owns_clipboard = true
+	local active = true
+	local timers = {}
+	local next_timer_id = 0
+	local retry_armed = false
+	local deferred_retry_armed = false
+	local restore_prior
+	local queue_restore_retry
+	local abort_plain_paste
 
-	pcall(function()
-		pasteboard.clearContents()
-		pasteboard.setContents(plain)
-	end)
+	local function stop_all_timers()
+		for id, handle in pairs(timers) do
+			if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+			timers[id] = nil
+		end
+	end
 
-	timer.doAfter(PASTE_SETTLE_SEC, function()
-		SyntheticInput.emit_key_stroke({"cmd"}, "v", 0.02)
-		timer.doAfter(0.25, function()
-			pcall(function()
-				if prior and prior ~= "" then
-					pasteboard.setContents(prior)
-				else
-					pasteboard.clearContents()
-				end
-			end)
+	local function release()
+		if not active or generation ~= _plain_paste_generation then return end
+		active = false
+		stop_all_timers()
+		_plain_paste_in_flight = false
+		owns_clipboard = false
+		_plain_paste_generation = _plain_paste_generation + 1
+	end
+
+	restore_prior = function()
+		if not owns_clipboard then return true end
+		local ok_restore, restore_result
+		if next(prior) ~= nil then
+			ok_restore, restore_result = pcall(pasteboard.writeAllData, prior)
+			ok_restore = ok_restore and restore_result == true
+		else
+			ok_restore, restore_result = pcall(pasteboard.clearContents)
+		end
+		if ok_restore then owns_clipboard = false; return true, nil end
+		return false, restore_result
+	end
+
+	local function schedule_plain_timer(delay, label, callback)
+		next_timer_id = next_timer_id + 1
+		local id = next_timer_id
+		local handle = nil
+		local installing = true
+		local callback_ran = false
+		local ok_timer, timer_or_error = pcall(timer.doAfter, delay, function()
+			callback_ran = true
+			if installing then return end
+			timers[id] = nil
+			if not active or generation ~= _plain_paste_generation then return end
+			local ok_callback, callback_error = xpcall(callback, debug.traceback)
+			if not ok_callback then
+				Logger.error(LOG, "Plain-text paste %s callback failed: %s.",
+					label, tostring(callback_error))
+				if abort_plain_paste then abort_plain_paste(label .. " callback", callback_error) end
+			end
 		end)
-	end)
+		installing = false
+		if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+			if timer_or_error and type(timer_or_error.stop) == "function" then
+				pcall(timer_or_error.stop, timer_or_error)
+			end
+			return false, ok_timer and (callback_ran and "timer fired during installation"
+				or "hs.timer.doAfter returned no handle") or timer_or_error
+		end
+		handle = timer_or_error
+		timers[id] = handle
+		return true, nil
+	end
+
+	queue_restore_retry = function()
+		if retry_armed or deferred_retry_armed or not owns_clipboard then return true end
+		local function attempt_restore()
+			retry_armed = false
+			deferred_retry_armed = false
+			local restored, restore_error = restore_prior()
+			if restored then release(); return end
+			Logger.error(LOG, "Plain-text paste clipboard restore retry refused: %s.",
+				tostring(restore_error))
+			queue_restore_retry()
+		end
+		local armed, timer_error = schedule_plain_timer(
+			RESTORE_DELAY_SEC, "clipboard restore retry", attempt_restore)
+		if armed then retry_armed = true; return true end
+		if type(SyntheticInput.defer_after_callback) == "function" then
+			local installing = true
+			local callback_ran = false
+			local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+				"plain-text paste clipboard restore recovery", function()
+					callback_ran = true
+					if installing then return end
+					local ok_callback, callback_error = xpcall(attempt_restore, debug.traceback)
+					if not ok_callback then
+						Logger.error(LOG, "Plain-text paste deferred restore callback failed: %s.",
+							tostring(callback_error))
+					end
+				end)
+			installing = false
+			if ok_defer and deferred == true and not callback_ran then
+				deferred_retry_armed = true
+				return true
+			end
+		end
+		Logger.error(LOG, "Plain-text paste clipboard restore retry could not be armed: %s.",
+			tostring(timer_error))
+		return false
+	end
+
+	abort_plain_paste = function(reason, detail)
+		if not active or generation ~= _plain_paste_generation then return false end
+		local restored, restore_error = restore_prior()
+		if restored then release() else queue_restore_retry() end
+		Logger.error(LOG, "Plain-text paste aborted at %s: %s (restore=%s).",
+			reason, tostring(detail), tostring(restore_error))
+		return false
+	end
+
+	local paste_armed, paste_timer_error = schedule_plain_timer(
+		PASTE_SETTLE_SEC, "paste", function()
+			local restore_armed, restore_timer_error = schedule_plain_timer(
+				RESTORE_DELAY_SEC, "clipboard restore", function()
+					local restored, restore_error = restore_prior()
+					if restored then release()
+					else
+						Logger.error(LOG, "Plain-text paste clipboard restore refused: %s.",
+							tostring(restore_error))
+						queue_restore_retry()
+					end
+				end)
+			if not restore_armed then
+				abort_plain_paste("restore timer", restore_timer_error)
+				return
+			end
+			local ok_emit, emitted = pcall(
+				SyntheticInput.emit_key_stroke, { "cmd" }, "v", 0.02)
+			if not ok_emit or emitted ~= true then
+				abort_plain_paste("paste shortcut", emitted)
+			end
+		end)
+	if not paste_armed then
+		release()
+		Logger.error(LOG, "Plain-text paste timer was refused: %s.", tostring(paste_timer_error))
+		return false
+	end
+
+	local ok_write, write_result = pcall(pasteboard.setContents, plain or "")
+	if not ok_write or write_result ~= true then
+		abort_plain_paste("clipboard write", write_result)
+		return false
+	end
+	return true
 end
 
 --- Selects the entire current line (Cmd+Left, then Cmd+Shift+Right).
@@ -504,10 +809,11 @@ function M.wrap_selection(sel, left, right)
 		local ok, result
 		if transaction.prior_empty then
 			ok, result = pcall(pasteboard.clearContents)
+			if not ok then return false, tostring(result) end
 		else
 			ok, result = pcall(pasteboard.writeAllData, transaction.prior)
+			if not ok or result ~= true then return false, tostring(result) end
 		end
-		if not ok or result == false then return false, tostring(result) end
 		return true
 	end
 
@@ -631,7 +937,7 @@ function M.wrap_selection(sel, left, right)
 	-- implementation may have changed its contents before reporting the error.
 	transaction.mutated = true
 	local write_ok, write_result = pcall(pasteboard.setContents, left .. sel .. right)
-	if not write_ok or write_result == false then
+	if not write_ok or write_result ~= true then
 		return rollback("clipboard write", write_result)
 	end
 

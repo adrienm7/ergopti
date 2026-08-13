@@ -567,7 +567,15 @@ function M.show_window()
 						wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
 							if result == true then
 								Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
-								hs.pasteboard.setContents(plain)
+								local ok_write, write_result = pcall(hs.pasteboard.setContents, plain)
+								if not ok_write or write_result ~= true then
+									Logger.error(LOG, "Healthcheck clipboard write was refused: %s.",
+										tostring(write_result))
+									pcall(function()
+										wv:evaluateJavaScript("window.__hs_copy_requested=false")
+									end)
+									return
+								end
 								_stop_poll()
 								if _window then
 									pcall(function() _window:delete() end)
