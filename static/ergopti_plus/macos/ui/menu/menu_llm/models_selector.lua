@@ -50,12 +50,16 @@ function M.build(ctx)
 	local state         = ctx.state
 	local models_mgr    = ctx.models_mgr
 	local switch_model  = ctx.switch_model
+	local disable_model = ctx.disable_model
 	local save_prefs    = ctx.save_prefs
 	local update_menu   = ctx.update_menu
 	local DEFAULT_STATE = ctx.DEFAULT_STATE
 	-- Disable all model-switch rows while the driver is paused so a model
 	-- click cannot trigger backend loading mid-pause (M-16).
 	local paused        = ctx.paused or false
+	if type(disable_model) ~= "function" then
+		error("ModelsSelector.build requires ctx.disable_model")
+	end
 
 	Logger.debug(LOG, "Building models selection menu…")
 	local menu = {}
@@ -139,7 +143,7 @@ function M.build(ctx)
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
 				table.remove(state.llm_user_models, i)
 				Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
-				return
+				return i, entry
 			end
 		end
 	end
@@ -277,9 +281,7 @@ function M.build(ctx)
 		disabled = paused or nil,
 		action       = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
-			state.llm_model = ""
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return disable_model()
 		end
 	})
 
@@ -355,8 +357,14 @@ function M.build(ctx)
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
 						i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
 					if ok and choice == i18n.get("button.remove") then
-						remove_user_model(active_backend, m_name)
-						if state.llm_model == m_name then state.llm_model = "" end
+						local removed_index, removed_entry = remove_user_model(active_backend, m_name)
+						if state.llm_model == m_name then
+							if disable_model() ~= true then
+								table.insert(state.llm_user_models, removed_index, removed_entry)
+								return false
+							end
+							return true
+						end
 						if save_prefs() ~= true then return false end
 						update_menu()
 					end

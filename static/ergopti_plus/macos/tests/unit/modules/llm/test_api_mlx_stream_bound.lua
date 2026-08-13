@@ -245,4 +245,52 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 		scheduler.cancel = original_cancel
 		if not ok then error(err) end
 	end)
+
+	helpers.it("(stream-nonzero-exit) rejects parseable partial output when curl exits nonzero", function()
+		local original_spawn = shell_runner.spawn
+		local original_after = scheduler.after
+		local original_cancel = scheduler.cancel
+		local json_codec = get_upvalue(Inference.post_and_parse_streaming, "JsonCodec")
+		local parser = get_upvalue(Inference.post_and_parse_streaming, "Parser")
+		local original_decode = json_codec.decode
+		local original_process = parser.process_prediction
+		local ctx = new_ctx()
+		local successes, failures = 0, 0
+
+		json_codec.decode = function()
+			return { choices = { { delta = { content = "would-have-been-published" } } } }
+		end
+		parser.process_prediction = function(_, _, raw) return raw end
+		scheduler.after = function(_, callback)
+			return { callback = callback }, true
+		end
+		scheduler.cancel = function() return true end
+		shell_runner.spawn = function(_, _, on_done)
+			return {
+				start = function()
+					on_done(28, "data: {}\n", "Operation timed out")
+					return true
+				end,
+				terminate = function() return true end,
+			}
+		end
+		Inference.init(ctx)
+
+		local ok, err = pcall(function()
+			Inference.post_and_parse_streaming(
+				"fixture-model", "", "typed context", "", 0.2, 8, 1, false,
+				function() successes = successes + 1 end,
+				function() failures = failures + 1 end, {}, function() end)
+			helpers.assert_eq(successes, 0,
+				"curl timeout output is partial transport data, never a prediction")
+			helpers.assert_eq(failures, 1)
+			helpers.assert_eq(ctx.stream.task, nil)
+		end)
+		shell_runner.spawn = original_spawn
+		scheduler.after = original_after
+		scheduler.cancel = original_cancel
+		json_codec.decode = original_decode
+		parser.process_prediction = original_process
+		if not ok then error(err) end
+	end)
 end)

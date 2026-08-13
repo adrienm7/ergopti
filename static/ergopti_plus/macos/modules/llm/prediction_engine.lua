@@ -284,6 +284,13 @@ end
 function M.get_llm_enabled() return is_llm_enabled end
 
 function M.set_llm_model(model_name)
+	local changed = active_model ~= model_name
+	if changed then
+		-- Model identity owns every pending debounce, watchdog and backend request.
+		-- Tear those down before publishing the new identity so a completion from
+		-- the old model cannot appear under the new menu selection.
+		M.reset()
+	end
 	local backend = core_llm.get_backend()
 	if backend == "mlx" then core_llm.set_llm_model_mlx(model_name)
 	else core_llm.set_llm_model_ollama(model_name) end
@@ -291,7 +298,7 @@ function M.set_llm_model(model_name)
 	Logger.info(LOG, "Model set: '%s' (backend: %s).", tostring(model_name), tostring(backend))
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
-	if is_llm_enabled then
+	if is_llm_enabled and type(model_name) == "string" and model_name ~= "" then
 		WarmupController.schedule_warmup_with_retry("set_llm_model")
 	end
 end
@@ -758,6 +765,17 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "AI preview disabled — request skipped.")
 		return
 	end
+	local model_ok, model_to_use = xpcall(function()
+		return core_llm.get_current_model()
+	end, debug.traceback)
+	if not model_ok then
+		Logger.error(LOG, "Current model lookup raised — request aborted: %s", tostring(model_to_use))
+		return
+	end
+	if type(model_to_use) ~= "string" or model_to_use == "" then
+		Logger.debug(LOG, "No active model — request skipped.")
+		return
+	end
 	-- Backend readiness gate: until the warmup has confirmed the model is loaded
 	-- and serving inference, dispatching a request would show the loading tooltip
 	-- against a server that simply cannot answer in time. Skip silently so the
@@ -840,7 +858,6 @@ function M.perform_check(force_trigger, profile_name)
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
 
-	local model_to_use    = core_llm.get_current_model()
 	local num_preds       = params.num_preds
 
 	llm_request_counter   = llm_request_counter + 1

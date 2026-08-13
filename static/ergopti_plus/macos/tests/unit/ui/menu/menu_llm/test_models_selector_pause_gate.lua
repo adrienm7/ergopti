@@ -24,6 +24,7 @@ local helpers = require("tests.helpers")
 -- Build a minimal fake context that satisfies ModelsSelector.build() I/O contract
 local function make_ctx(paused)
 	local switch_calls = {}
+	local disable_calls = 0
 	return {
 		state = {
 			llm_model   = "",
@@ -37,11 +38,13 @@ local function make_ctx(paused)
 			is_model_installed   = function() return false end,
 		},
 		switch_model  = function(m) switch_calls[#switch_calls + 1] = m end,
+		disable_model = function() disable_calls = disable_calls + 1; return true end,
 		save_prefs    = function() end,
 		update_menu   = function() end,
 		DEFAULT_STATE = { llm_model_mlx = "", llm_model_ollama = "" },
 		paused        = paused,
 		get_switch_calls = function() return switch_calls end,
+		get_disable_calls = function() return disable_calls end,
 	}
 end
 
@@ -100,5 +103,23 @@ helpers.describe("M-16: models_selector rows disabled when paused", function()
 		end
 		helpers.assert_true(found_enabled,
 			"at least one model row must be enabled when paused=false")
+	end)
+
+	helpers.it("(no-model-runtime) the No Model row delegates the runtime transaction to the model switcher", function()
+		package.loaded["ui.menu.menu_llm.models_selector"] = nil
+		local MS = helpers.load_with_stubs("ui.menu.menu_llm.models_selector")
+		local ctx = make_ctx(false)
+		local menu = MS.build(ctx)
+		local no_model
+		for _, item in ipairs(menu) do
+			if item.checked == true and type(item.action) == "function" then
+				no_model = item
+				break
+			end
+		end
+		helpers.assert_not_nil(no_model, "the checked No Model action must be reachable")
+		helpers.assert_eq(no_model.action(), true)
+		helpers.assert_eq(ctx.get_disable_calls(), 1,
+			"the selector must not mutate preferences without clearing runtime model state")
 	end)
 end)

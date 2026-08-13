@@ -450,13 +450,23 @@ function M.set_active_profile(id)
 		local my_backend_generation = CoreState.backend_generation
 		local my_profile_generation = CoreState.profile_generation
 		hs.timer.doAfter(0, function()
-			if CoreState.backend_generation ~= my_backend_generation
-				or CoreState.profile_generation ~= my_profile_generation then
-				Logger.debug(LOG, "set_active_profile: backend/profile changed before deferred warmup fired — discarding stale dispatch for '%s'.",
-					tostring(model))
-				return
+			local ok, err = xpcall(function()
+				if CoreState.backend_generation ~= my_backend_generation
+					or CoreState.profile_generation ~= my_profile_generation then
+					Logger.debug(LOG, "set_active_profile: backend/profile changed before deferred warmup fired — discarding stale dispatch for '%s'.",
+						tostring(model))
+					return
+				end
+				if not CoreState.runtime_llm_enabled then
+					Logger.debug(LOG, "set_active_profile: runtime LLM disabled before deferred warmup — discarding dispatch for '%s'.",
+						tostring(model))
+					return
+				end
+				M.warmup_model(model, new_profile)
+			end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "Deferred profile warmup callback raised: %s", tostring(err))
 			end
-			pcall(M.warmup_model, model, new_profile)
 		end)
 	end
 end

@@ -42,12 +42,12 @@ helpers.describe("models_manager_ollama: installed-models refresh task is forwar
 		-- Extract the source window before the guard and confirm a forward declaration exists
 		local window = src:sub(1, guard_pos)
 		local decl_pos = window:find("local task\n", 1, true)
-		local new_pos  = window:find("task = hs.task.new(", 1, true)
+		local new_pos  = window:find("task = TaskLifecycle.native", 1, true)
 
 		helpers.assert_true(decl_pos ~= nil,
 			"the installed-models task must be forward-declared as `local task` (own line)")
 		helpers.assert_true(new_pos ~= nil,
-			"the installed-models task must be assigned via `task = hs.task.new(`")
+			"the installed-models task must be assigned via `task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
 			"forward declaration must precede the hs.task.new closure so the callback captures the upvalue")
 	end)

@@ -29,6 +29,7 @@ local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "ollama_deps"
 
@@ -266,7 +267,7 @@ function M.check_and_install_deps()
 	end
 
 	local task
-	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
+	task = TaskLifecycle.native("Ollama bootstrap", "/bin/bash", function(exit_code, stdout, stderr)
 		if task then _active_tasks[task] = nil end
 		_task_running = false
 		local combined = (stdout or "") .. (stderr or "")
@@ -318,23 +319,19 @@ function M.check_and_install_deps()
 			end
 			pcall(llm_progress.set_error, tail)
 		end
-	end, { script_path, server_cmd, resolved_bin or "" })
+	end, make_streaming_handler(), { script_path, server_cmd, resolved_bin or "" })
 
 	if not task then
-		Logger.error(LOG, "Failed to create hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("ollama.deps_task_create_failed")
 		return
 	end
 
-	pcall(function() task:setStreamingCallback(make_streaming_handler()) end)
-
 	_task_running = true
 	if task then _active_tasks[task] = true end
-	if not pcall(function() task:start() end) then
+	if not TaskLifecycle.start(task, "Ollama bootstrap") then
 		if task then _active_tasks[task] = nil end
 		_task_running = false
-		Logger.error(LOG, "Failed to start hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("ollama.deps_task_start_failed")
 	end

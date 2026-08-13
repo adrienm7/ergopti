@@ -93,6 +93,48 @@ end)
 
 
 
+-- ===========================================================
+-- ===========================================================
+-- ======= 4/ Native Task Start Contract =====================
+-- ===========================================================
+-- ===========================================================
+
+helpers.describe("mlx_deps_checker: refused native launch settles immediately", function()
+	helpers.it("treats task:start() false as terminal failure (mlx-deps-false-start)", function()
+		package.loaded["infra.paths"] = {
+			find_from_configdir = function() return nil end,
+		}
+		package.loaded["ui.download_window"] = {
+			show = function() end, hide = function() end, set_step = function() end,
+			set_progress = function() end, set_error = function() end,
+			set_detail = function() end, append_log = function() end,
+			is_active = function() return false end,
+		}
+
+		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
+			task = {
+				new = function()
+					return {
+						start = function() return false end,
+					}
+				end,
+			},
+		})
+		local settled = "not called"
+		checker.check_and_install_deps(function(ok) settled = ok end)
+
+		helpers.assert_eq(false, settled,
+			"a refused launch has no completion callback, so pending callers must be "
+				.. "settled synchronously instead of waiting forever")
+		helpers.assert_eq("failed", checker.get_state(),
+			"the public state must describe the refused launch")
+	end)
+end)
+
+
+
+
+
 --- ======================================
 --- ======================================
 --- ======= 2/ Public API contract =======
@@ -222,6 +264,11 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 			append_log = function() end, is_active = function() return false end,
 		}
 
+		-- task_lifecycle captures the current global hs table at require time.
+		-- The refused-start test above intentionally loaded it against a task
+		-- stub that always returns false, so a cached adapter would make every
+		-- later "fresh" checker inherit that unrelated native result.
+		package.loaded["adapters.task_lifecycle"] = nil
 		package.loaded["modules.llm.mlx_deps_checker"] = nil
 		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", hs_overrides)
 

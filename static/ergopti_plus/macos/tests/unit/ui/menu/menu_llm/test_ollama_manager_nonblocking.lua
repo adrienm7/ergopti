@@ -11,8 +11,8 @@
 ---
 --- Fixes:
 --- 1. Both curl invocations now pass --max-time 5 to cap the blocking window.
---- 2. check_requirements uses hs.task.new (non-blocking) for ollama list.
---- 3. delete_model uses hs.task.new (non-blocking) for ollama rm.
+--- 2. check_requirements uses TaskLifecycle.native (non-blocking) for ollama list.
+--- 3. delete_model uses TaskLifecycle.native (non-blocking) for ollama rm.
 
 local helpers = require("tests.helpers")
 
@@ -34,25 +34,22 @@ helpers.assert_true(
 -- blocking pattern `hs.execute, bin .. " list"`).
 helpers.assert_true(
 	src:find('hs%.execute.*" list', 1, false) == nil,
-	"check_requirements must not call hs.execute for 'ollama list' — use hs.task.new instead"
+	"check_requirements must not call hs.execute for 'ollama list' — use TaskLifecycle.native instead"
 )
 
 -- Test 3: delete_model must NOT use hs.execute for ollama rm.
 helpers.assert_true(
 	src:find('hs%.execute.*" rm ', 1, false) == nil,
-	"delete_model must not call hs.execute for 'ollama rm' — use hs.task.new instead"
+	"delete_model must not call hs.execute for 'ollama rm' — use TaskLifecycle.native instead"
 )
 
--- Test 4: both check_requirements and delete_model must use hs.task.new.
--- The file already had one hs.task for refresh_installed_async; after the
--- fix there must be at least three hs.task.new calls (list-refresh, list-check,
--- and rm).
+-- Test 4: all model operations must use the guarded native-task adapter.
 local count = 0
-for _ in src:gmatch("hs%.task%.new") do count = count + 1 end
+for _ in src:gmatch("TaskLifecycle%.native") do count = count + 1 end
 helpers.assert_true(
-	count >= 3,
+	count >= 4,
 	string.format(
-		"models_manager_ollama.lua must have at least 3 hs.task.new calls after the fix; found %d",
+		"models_manager_ollama.lua must have at least 4 guarded native task launches; found %d",
 		count
 	)
 )

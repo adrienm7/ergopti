@@ -52,12 +52,13 @@ local _state = {
 	bg_color           = nil,
 	loading_text       = nil,
 	enter_validates    = false,
+	session_id         = nil,
 	reserved_count     = 0,
 	-- Set to true the first time the user navigates within an open tooltip
 	-- (arrow keys, shift+Tab). Used by the Enter handler to choose between
 	-- "accept current prediction" (post-navigation) and "let Enter through"
 	-- (no navigation happened — Enter is just a normal newline). Reset to
-	-- false on every show_predictions() and hide().
+	-- false on a new request or hide(), but preserved across one stream's repaints.
 	navigation_started = false,
 }
 
@@ -67,6 +68,7 @@ local _shift_side = nil  -- "left", "right", or nil when no shift is held
 local _watcher_session_active = false
 local _watcher_epoch = 0
 local _ui_generation = 0
+local _navigation_revision = 0
 local REQUIRED_WATCHER_COUNT = 3
 
 -- ── Chain timing instrumentation ─────────────────────────────────────────────
@@ -100,6 +102,7 @@ local _chain_ttlt_ms         = nil
 -- in that case so a length check would incorrectly return false.
 local _is_visible            = false
 local _runtime_guard = function() return true end
+local render_navigation
 
 
 local function runtime_available()
@@ -439,6 +442,39 @@ local function defer_runtime_action(label, fn, ...)
 	end)
 end
 
+--- Commits the O(1) navigation state before Quartz can deliver a following key.
+--- Canvas rendering remains deferred, but Enter must observe the row selected by
+--- an immediately preceding arrow or Shift-Tab in the same physical event order.
+--- @param label string Diagnostic label.
+--- @param delta number Relative row movement.
+--- @return boolean scheduled
+local function defer_navigation(label, delta)
+	local active_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+	if active_count < 2 then return false end
+	local previous_index = _state.current_index
+	local previous_navigation = _state.navigation_started
+	local previous_revision = _navigation_revision
+	_state.current_index = ((_state.current_index - 1 + delta) % active_count) + 1
+	_state.navigation_started = true
+	_navigation_revision = _navigation_revision + 1
+	local my_revision = _navigation_revision
+	local scheduled = defer_runtime_action(label, function()
+		-- Rapid arrows commit synchronously, then coalesce their expensive AX/canvas
+		-- work. Only the newest queued revision renders and notifies semantics.
+		if my_revision ~= _navigation_revision then return true end
+		return render_navigation()
+	end)
+	if scheduled then return true end
+	-- Restore logical state because the physical navigation key will pass through.
+	-- Navigation intentionally does not advance the global UI generation: an
+	-- earlier consumed Tab/Enter owns its FIFO callback, and a later arrow must
+	-- never invalidate that earlier physical action before the queue drains.
+	_state.current_index = previous_index
+	_state.navigation_started = previous_navigation
+	_navigation_revision = previous_revision
+	return false
+end
+
 --- Defers the full cancel contract; stale runtime state is hidden silently.
 --- @param reason string Dismissal reason.
 --- @return boolean scheduled
@@ -603,11 +639,8 @@ local function start_watchers()
 				if preds_count > 1 then
 					-- Left shift → back (-1), right shift → forward (+1)
 					local direction = (_shift_side == "right") and 1 or -1
-					local scheduled = defer_runtime_action("LLM tooltip Shift-Tab navigation",
-						function()
-							_state.navigation_started = true
-							M.navigate(direction)
-						end)
+					local scheduled = defer_navigation(
+						"LLM tooltip Shift-Tab navigation", direction)
 					return finish(scheduled)
 				end
 			else
@@ -661,11 +694,8 @@ local function start_watchers()
 				-- Any arrow consumed for navigation marks the session as "user is engaged"
 				-- and resets the auto-dismiss timer so the user never loses the tooltip
 				-- mid-decision (timer reset is also done inside M.navigate()).
-				local scheduled = defer_runtime_action("LLM tooltip arrow navigation",
-					function()
-						_state.navigation_started = true
-						M.navigate(nav_direction)
-					end)
+				local scheduled = defer_navigation(
+					"LLM tooltip arrow navigation", nav_direction)
 				return finish(scheduled)
 			end
 		end
@@ -1166,6 +1196,7 @@ local function hide_impl(log_callsite)
 		_state.loading_text       = nil
 		_state.enter_validates    = false
 		_state.navigation_started = false
+		_state.session_id         = nil
 		-- IMPORTANT: do NOT reset chain timing here. The keymap layer can
 		-- call hide() at any moment between set_chain_start (in
 		-- perform_check) and the actual streaming show_predictions — for
@@ -1186,7 +1217,7 @@ function M.hide() return hide_impl(true) end
 --- but no logger sink may run inside the eventtap callback.
 function M.hide_silent() return hide_impl(false) end
 
-function M.navigate(delta)
+render_navigation = function()
 	if not runtime_available() then return false end
 	local completed = false
 	local ok, err = pcall(function()
@@ -1196,8 +1227,6 @@ function M.navigate(delta)
 			return
 		end
 		
-		advance_ui_generation()
-		_state.current_index = ((_state.current_index - 1 + delta) % active_count) + 1
 		local watcher_callback_ran = false
 		local watcher_activation_ok = false
 		local watcher_activation_crashed = false
@@ -1235,7 +1264,18 @@ function M.navigate(delta)
 	return ok and completed
 end
 
-function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
+function M.navigate(delta)
+	if not runtime_available() then return false end
+	local active_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+	if active_count < 2 then return true end
+	advance_ui_generation()
+	_navigation_revision = _navigation_revision + 1
+	_state.current_index = ((_state.current_index - 1 + delta) % active_count) + 1
+	_state.navigation_started = true
+	return render_navigation()
+end
+
+function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id)
 	if not runtime_available() then return false end
 	-- Latency tripwire: this runs on the streaming hot path (re-fired per token),
 	-- so a slow assemble/width-calc/render surfaces as one WARNING instead of an
@@ -1253,15 +1293,31 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			return
 		end
 
-		advance_ui_generation()
+		local same_session = session_id ~= nil and _is_visible and _state.session_id == session_id
+		-- A same-request token repaint is not a new interaction epoch. Advancing
+		-- here would discard a Tab/Enter already consumed by the eventtap but still
+		-- queued for post-callback execution.
+		if not same_session then advance_ui_generation() end
 		_state.raw_predictions = type(predictions) == "table" and predictions or {}
-		_state.current_index   = current_index or 1
+		if same_session then
+			-- The tooltip owns the interaction cursor once the request is visible.
+			-- A streaming frame can arrive after an arrow was consumed but before its
+			-- deferred render/callback; accepting the producer's older index here
+			-- would silently undo that physical key action.
+			local latest_count = #_state.raw_predictions
+			_state.current_index = latest_count > 0
+				and math.max(1, math.min(_state.current_index or 1, latest_count))
+				or 1
+		else
+			_state.current_index = current_index or 1
+		end
 		_state.info_bar        = info_bar
 		_state.shortcut_mod    = shortcut_modifier or "alt"
 		_state.nav_mods        = type(navigation_modifiers) == "table" and navigation_modifiers or {}
 		_state.indent          = indent or 0
 		_state.bg_color        = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
 		_state.loading_text    = loading_text
+		_state.session_id      = session_id
 		
 		local flattened_nav_modifiers = {}
 		for _, mod in ipairs(_state.nav_mods) do
@@ -1340,10 +1396,12 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 		_state.fixed_width        = calculated_max_width
 		_state.reserved_count     = render_count
-		_state.enter_validates    = false
-		-- Fresh tooltip session: user has not navigated yet, so an Enter press
-		-- right now is a "real" newline and should pass through.
-		_state.navigation_started = false
+		if not same_session then
+			_state.enter_validates = false
+			-- Only a new request starts a fresh interaction session. Streaming
+			-- repaints for the same request preserve the user's engagement.
+			_state.navigation_started = false
+		end
 
 		local watcher_callback_ran = false
 		local watcher_activation_ok = false

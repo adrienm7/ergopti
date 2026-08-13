@@ -68,15 +68,15 @@ helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", functio
 		local src = fh:read("*a")
 		fh:close()
 
-		-- _task_running = true must appear before the pcall(task:start) code line
+		-- _task_running = true must appear before the strict native-start call
 		local set_true_pos   = src:find("_task_running = true", 1, true)
-		-- Match the actual call site, not the comment referencing it
-		local task_start_pos = src:find("pcall(function() task:start()", 1, true)
+		local task_start_pos = src:find("TaskLifecycle.start(task, \"MLX dependency bootstrap\")", 1, true)
 		helpers.assert_true(set_true_pos ~= nil, "_task_running = true must be set before task:start()")
-		helpers.assert_true(task_start_pos ~= nil, "pcall(function() task:start()) must exist in source")
+		helpers.assert_true(task_start_pos ~= nil,
+			"the strict TaskLifecycle start contract must exist in source")
 		helpers.assert_true(
 			set_true_pos < task_start_pos,
-			"_task_running = true must appear before pcall(function() task:start())"
+			"_task_running = true must appear before the strict native-start call"
 		)
 
 		-- _task_running = false must appear inside fire_pending_callbacks body

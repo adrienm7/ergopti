@@ -258,6 +258,30 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 		PE.reset()
 	end)
 
+	helpers.it("(no-model-runtime) clearing the model cancels old identity without scheduling an empty warmup", function()
+		local core = package.loaded["modules.llm"]
+		local warmup = package.loaded["modules.llm.warmup_controller"]
+		local previous_cancel = core.cancel_streaming
+		local previous_schedule = warmup.schedule_warmup_with_retry
+		local cancellations, warmups = 0, 0
+		core.cancel_streaming = function() cancellations = cancellations + 1; return true end
+		warmup.schedule_warmup_with_retry = function() warmups = warmups + 1 end
+
+		local ok, err = pcall(function()
+			PE.init(core_state)
+			PE.set_llm_enabled(true)
+			cancellations, warmups = 0, 0
+			PE.set_llm_model("")
+			helpers.assert_true(cancellations > 0,
+				"No Model must revoke the prior backend request generation")
+			helpers.assert_eq(warmups, 0,
+				"an empty model is a disabled identity, not a model to warm")
+		end)
+		core.cancel_streaming = previous_cancel
+		warmup.schedule_warmup_with_retry = previous_schedule
+		if not ok then error(err) end
+	end)
+
 	for _, case in ipairs({
 		{ name = "throw", build = function() error("FALLBACK_CREATE_THROW") end },
 		{ name = "nil", build = function() return nil end },

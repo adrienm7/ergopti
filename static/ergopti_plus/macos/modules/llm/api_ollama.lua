@@ -779,7 +779,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	-- Completion callback: fired when curl exits
-	local function on_done(_, remaining, _)
+	local function on_done(exit_code, remaining, stderr_out)
 		task_completed = true
 		-- Relinquish the exact native capability before any parser/file/logger call
 		-- can raise. A callback throw must never leave a completed task published.
@@ -793,6 +793,13 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		-- shared state (otherwise we untrack the active stream and leak its task)
 		if my_generation ~= _stream_generation then
 			Logger.debug(LOG, "[%s] #%d STREAM: superseded — discarding on_done.", model_name, req_id)
+			return
+		end
+		if exit_code ~= 0 then
+			Logger.error(LOG, "[%s] #%d STREAM transport failed (exit=%s, stderr=%s) — discarding partial output.",
+				tostring(model_name), req_id, tostring(exit_code),
+				tostring((stderr_out or ""):sub(1, 200)))
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 		if remaining and remaining ~= "" then

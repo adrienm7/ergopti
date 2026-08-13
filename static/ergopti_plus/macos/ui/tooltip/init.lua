@@ -187,14 +187,15 @@ end
 --- @param background_color table Optional tint.
 --- @param loading_text string Text to show if loading.
 --- @param max_reserved_count number Skeleton slots to render.
-function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
+--- @param session_id any|nil Stable request identity for same-stream repaints.
+function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id)
 	if not runtime_available() then return false end
 	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
 	-- the loading indicator in-place — no blank frame between the two tooltips.
 	if TooltipHotstring.dismiss_silent() ~= true then return false end
 	local shown = TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar,
 		shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
-		max_reserved_count) == true
+		max_reserved_count, session_id) == true
 	if not shown then TooltipHotstring.hide_forced() end
 	return publish_show(shown)
 end

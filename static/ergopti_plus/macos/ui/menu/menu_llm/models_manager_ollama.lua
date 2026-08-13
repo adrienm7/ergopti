@@ -19,6 +19,7 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}
@@ -239,7 +240,7 @@ function M.new(deps, presets, ram_getter)
 		-- Pinned to _active_tasks so the GC cannot SIGTERM it before the callback
 		-- fires and resets _installed_loading — a GC kill would deadlock the lock.
 		local task
-		task = hs.task.new(bin, function(code, stdout)
+		task = TaskLifecycle.native("Ollama installed-model refresh", bin, function(code, stdout)
 			if task then _active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 			_installed_loading = false
 			local installed = {}
@@ -254,7 +255,12 @@ function M.new(deps, presets, ram_getter)
 		end, {"list"})
 		if task then
 			_active_tasks[task] = true
-			pcall(function() task:start() end)
+			if not TaskLifecycle.start(task, "Ollama installed-model refresh") then
+				_active_tasks[task] = nil
+				_installed_loading = false
+			end
+		else
+			_installed_loading = false
 		end
 	end
 
@@ -328,7 +334,7 @@ function M.new(deps, presets, ram_getter)
 		
 		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_pull_and_upgrade, do_retry)
 		
-		local task = hs.task.new(bin, function(code)
+		local task = TaskLifecycle.native("Ollama model pull", bin, function(code)
 			if deps.active_tasks then deps.active_tasks["ollama_pull"] = nil end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
@@ -404,7 +410,12 @@ function M.new(deps, presets, ram_getter)
 		if task then
 			deps.active_tasks = deps.active_tasks or {}
 			deps.active_tasks["ollama_pull"] = task
-			pcall(function() task:start() end)
+			if not TaskLifecycle.start(task, "Ollama model pull") then
+				deps.active_tasks["ollama_pull"] = nil
+				complete_progress_ui(false, target_model)
+			end
+		else
+			complete_progress_ui(false, target_model)
 		end
 	end
 
@@ -430,7 +441,7 @@ function M.new(deps, presets, ram_getter)
 				return
 			end
 			local task
-			task = hs.task.new(bin, function(code, stdout)
+				task = TaskLifecycle.native("Ollama model requirement check", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
 				local installed = {}
 				if code == 0 and type(stdout) == "string" then
@@ -468,11 +479,16 @@ function M.new(deps, presets, ram_getter)
 						else obj.install_ollama_then_pull(target_model, repo, on_success) end
 					end
 				end
-			end, {"list"})
-			if task then
-				_active_tasks[task] = true
-				pcall(function() task:start() end)
-			end
+				end, {"list"})
+				if task then
+					_active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Ollama model requirement check") then
+						_active_tasks[task] = nil
+						if type(on_cancel) == "function" then on_cancel() end
+					end
+				elseif type(on_cancel) == "function" then
+					on_cancel()
+				end
 		end, on_cancel)
 	end
 
@@ -489,7 +505,7 @@ function M.new(deps, presets, ram_getter)
 				return
 			end
 			local task
-			task = hs.task.new(bin, function(code, stdout)
+				task = TaskLifecycle.native("Ollama model delete", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
 				if code == 0 then
 					pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
@@ -498,11 +514,20 @@ function M.new(deps, presets, ram_getter)
 				else
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")
 				end
-			end, {"rm", model_name})
-			if task then
-				_active_tasks[task] = true
-				pcall(function() task:start() end)
-			end
+				end, {"rm", model_name})
+				if task then
+					_active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Ollama model delete") then
+						_active_tasks[task] = nil
+						pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+							string.format(i18n.get("ollama.delete_error"), model_name,
+								"task start failed"), "error")
+					end
+				else
+					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+						string.format(i18n.get("ollama.delete_error"), model_name,
+							"task creation failed"), "error")
+				end
 		end)
 	end
 

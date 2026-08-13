@@ -181,12 +181,31 @@ local RETRY_FAILED_MAX_MULT      = _R_MAX_MULT
 local _entries = {}
 local _active_id = ""
 local _is_ready = false
+local _identity_generation = 0
+
+--- Invalidates every asynchronous operation owned by the prior remote entry.
+--- Entry identity is a request-generation boundary: a healthy response from A
+--- must never make B ready, and A's completion must never publish after B was
+--- selected. The adapter generation is the first fence; this module generation
+--- remains authoritative even when a native completion was already queued.
+local function invalidate_identity()
+	_identity_generation = _identity_generation + 1
+	_is_ready = false
+	for label, client in pairs({ health = _check_client, inference = _infer_client }) do
+		local ok, err = xpcall(function() return client.cancel() end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Remote %s cancellation raised during identity change: %s",
+				tostring(label), tostring(err))
+		end
+	end
+end
 
 --- Replace the full list of configured API entries. Used at load time from
 --- the persisted JSON sidecar and whenever the tray menu adds / removes one.
 --- @param entries table Array of entry tables. Pass {} to clear.
 function M.set_entries(entries)
 	if type(entries) ~= "table" then return end
+	invalidate_identity()
 	_entries = {}
 	for _, e in ipairs(entries) do
 		if type(e) == "table" then table.insert(_entries, e) end
@@ -198,14 +217,15 @@ function M.get_entries()
 	return _entries
 end
 
---- Pick the active API entry by id. When the id is empty or unknown, the
---- first entry wins — same fallback as the AHK twin, so the engine never
---- silently produces no predictions when the user has at least one entry
---- configured but no explicit selection yet.
+--- Pick the active API entry by id. Empty and unknown ids deliberately select
+--- no entry: the menu's "No Model" choice must disable runtime inference rather
+--- than silently falling back to the first configured account.
 --- @param id string Active entry identifier (matches entry.id field).
 function M.set_active_entry_id(id)
 	if type(id) ~= "string" then return end
+	if id == _active_id then return end
 	_active_id = id
+	invalidate_identity()
 	Logger.debug(LOG, "Active API entry id: '%s'.", id)
 end
 
@@ -213,24 +233,21 @@ function M.get_active_entry_id()
 	return _active_id
 end
 
---- Finds the currently active entry object (by id, falling back to the
---- first configured entry) WITHOUT resolving its token. Shared by
+--- Finds the currently active entry object by exact id WITHOUT resolving its
+--- token. An empty or unknown id intentionally means "No Model". Shared by
 --- get_active_entry() and prewarm_active_entry_decrypt() so both agree on
 --- exactly which entry is "active".
 --- @return table|nil entry
 local function find_active_entry()
-	if #_entries == 0 then return nil end
-	local entry
-	if _active_id ~= "" then
-		for _, e in ipairs(_entries) do
-			if e.id == _active_id then entry = e; break end
-		end
+	if #_entries == 0 or _active_id == "" then return nil end
+	for _, entry in ipairs(_entries) do
+		if entry.id == _active_id then return entry end
 	end
-	return entry or _entries[1]
+	return nil
 end
 
---- Resolve the currently active entry, falling back to the first configured
---- one when no id matches. Returns nil when no entry exists at all.
+--- Resolve the explicitly active entry. Returns nil when "No Model" is selected
+--- or when the persisted id no longer exists in the configured list.
 --- Tokens stored as ``keychain:<id>`` references are decrypted on first call
 --- and the cleartext is cached back into the entry so the Keychain subprocess
 --- fires at most once per entry across the session lifetime.
@@ -281,6 +298,7 @@ function M.prewarm_active_entry_decrypt()
 	local entry = find_active_entry()
 	if not entry then return end
 	if type(entry.token) ~= "string" or not TokenCrypto.is_encrypted(entry.token) then return end
+	local my_identity = _identity_generation
 	TokenCrypto.decrypt_async(entry.token, function(cleartext)
 		-- The entry list or active id may have changed while the async
 		-- Keychain read was in flight; only cache back if this entry is
@@ -289,7 +307,7 @@ function M.prewarm_active_entry_decrypt()
 		local still_active = find_active_entry()
 		-- Same non-empty guard as the lazy path above: the async decrypt reports
 		-- failure the same way, and caching "" here is equally destructive.
-		if still_active == entry and TokenCrypto.is_encrypted(entry.token)
+		if my_identity == _identity_generation and still_active == entry and TokenCrypto.is_encrypted(entry.token)
 			and type(cleartext) == "string" and cleartext ~= "" then
 			entry.token = cleartext
 			Logger.debug(LOG, "Pre-warmed Keychain decrypt for active API entry '%s'.", tostring(entry.id))
@@ -538,6 +556,7 @@ function M.warmup(_model_name, _profile)
 	-- Gemini the same shape works (with ?key= in the URL). A 200 confirms
 	-- both reachability and auth.
 	local format = provider.format
+	local my_identity = _identity_generation
 	local ping_url
 	if format == "gemini" then
 		local enc = _http_adapter.encodeForQuery(token)
@@ -547,6 +566,7 @@ function M.warmup(_model_name, _profile)
 	end
 
 	_check_client.get(ping_url, build_headers(format, token), function(r)
+		if my_identity ~= _identity_generation or find_active_entry() ~= entry then return end
 		local was_ready = _is_ready
 		_is_ready = r.ok
 		if _is_ready and not was_ready then
@@ -559,10 +579,13 @@ function M.warmup(_model_name, _profile)
 	end)
 end
 
---- No active stream to terminate — the remote path is request/response.
---- Kept as a no-op so the engine's dispatch surface stays identical across
---- backends and there is no need for a "supports streaming?" capability flag.
+--- Cancels the active request/response inference, if any.
 function M.cancel_streaming()
+	local ok, err = xpcall(function() return _infer_client.cancel() end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Remote inference cancellation raised: %s", tostring(err))
+		return false
+	end
 	return true
 end
 
@@ -589,6 +612,7 @@ function M.check_availability(_model_name, on_available, on_missing)
 	end
 
 	local format = provider.format
+	local my_identity = _identity_generation
 	local url
 	if format == "gemini" then
 		local enc = _http_adapter.encodeForQuery(entry.token)
@@ -598,6 +622,7 @@ function M.check_availability(_model_name, on_available, on_missing)
 	end
 
 	_check_client.get(url, build_headers(format, entry.token), function(r)
+		if my_identity ~= _identity_generation or find_active_entry() ~= entry then return end
 		if r.ok then
 			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 		else
@@ -631,6 +656,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		return
 	end
 	local provider = M.PROVIDERS[entry.provider]
+	local my_identity = _identity_generation
 	if not provider then
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
@@ -686,6 +712,11 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
 
 	_infer_client.post(url, headers, encoded, function(r)
+		if my_identity ~= _identity_generation or find_active_entry() ~= entry then
+			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
+				tostring(model), req_id)
+			return
+		end
 		local status, body = r.status, r.body
 		-- Logger.pcall, not a bare pcall. This closure IS the entire response
 		-- handler: parsing, dedup, telemetry and the on_success dispatch all live
@@ -813,10 +844,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	-- Snapshot the request id so the callback can detect if the user typed more text
 	-- while the single HTTP round-trip was in flight and discard the stale response
 	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
+	local initial_identity = _identity_generation
 
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
+			if initial_identity ~= _identity_generation then return end
 			-- Discard if the user typed new text between dispatch and callback
 			if initial_request_id
 				and type(request_id_provider) == "function"
@@ -833,6 +866,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			-- the equivalent condition here is simply "more than one result".
 			if #results > 1 then
 				local function reveal_next(idx)
+					if initial_identity ~= _identity_generation then return end
 					if idx > #results then return end
 					local subset = {}
 					for j = 1, idx do subset[j] = results[j] end
@@ -865,8 +899,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local attempt_index          = 1
 	local dedup_stats            = ApiCommon.new_dedup_stats()
 	local initial_request_id     = type(request_id_provider) == "function" and request_id_provider() or nil
+	local initial_identity       = _identity_generation
 
 	local function do_next()
+		if initial_identity ~= _identity_generation then return end
 		if type(request_id_provider) == "function" then
 			local cur = request_id_provider()
 			if initial_request_id ~= nil and cur ~= initial_request_id then

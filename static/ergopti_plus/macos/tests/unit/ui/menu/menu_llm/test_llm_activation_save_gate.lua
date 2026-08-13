@@ -19,11 +19,13 @@ local function build_fixture(backend, save_results, options)
 		updates = 0,
 		saves = 0,
 		keymap_states = {},
+		runtime_models = {},
+		display_models = {},
 	}
 	local state = {
 		llm_enabled = false,
 		llm_backend = backend,
-		llm_model = "candidate-model",
+		llm_model = options.model ~= nil and options.model or "candidate-model",
 		llm_num_predictions = 1,
 		llm_min_words = 1,
 		llm_max_words = 16,
@@ -103,6 +105,7 @@ local function build_fixture(backend, save_results, options)
 		new = function()
 			return {
 				switch_model = noop,
+				disable_model = noop,
 				set_llm_profile = noop,
 				apply_recommended_prompt_profile = noop,
 				get_display_model_name = function(name) return name end,
@@ -164,6 +167,12 @@ local function build_fixture(backend, save_results, options)
 				calls.keymap_states[#calls.keymap_states + 1] = value
 				if options.keymap_throw_on == value then error("keymap setter exploded") end
 			end,
+			set_llm_model = function(value)
+				calls.runtime_models[#calls.runtime_models + 1] = value
+			end,
+			set_llm_display_model_name = function(value)
+				calls.display_models[#calls.display_models + 1] = value
+			end,
 		},
 		save_prefs = function()
 			calls.saves = calls.saves + 1
@@ -201,6 +210,14 @@ local function assert_rejected_activation(backend)
 end
 
 helpers.describe("LLM activation: external work waits for preference commit", function()
+	helpers.it("(no-model-runtime) reapplies a persisted No Model identity after reload", function()
+		local _, state, calls = build_fixture("ollama", {}, { model = "" })
+		helpers.assert_eq(state.llm_model, "")
+		helpers.assert_eq(calls.runtime_models, { "" },
+			"startup must override the prediction engine's backend default")
+		helpers.assert_eq(calls.display_models, { "" })
+	end)
+
 	helpers.it("keeps Ollama inert when the writer returns false", function()
 		assert_rejected_activation("ollama")
 	end)

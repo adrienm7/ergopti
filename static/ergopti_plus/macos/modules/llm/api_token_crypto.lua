@@ -28,6 +28,7 @@
 local M = {}
 local hs = hs
 local Logger = require("infra.logger")
+local TaskLifecycle = require("adapters.task_lifecycle")
 -- Async Keychain read (F-MED-9): M.decrypt() below is a synchronous
 -- hs.execute shell-out that can raise a modal Keychain-unlock prompt,
 -- freezing the ENTIRE Hammerspoon run loop (all keystroke processing, every
@@ -97,7 +98,7 @@ function M.encrypt(entry_id, cleartext)
 	-- security(1) man page documents that `-w` with no value reads the
 	-- password from stdin. hs.task with setInput is the cleanest way to
 	-- do that synchronously from Hammerspoon.
-	local task = hs.task.new("/usr/bin/security", nil, {
+	local task = TaskLifecycle.native("Keychain token write", "/usr/bin/security", nil, {
 		"add-generic-password", "-U",
 		"-a", entry_id,
 		"-s", KEYCHAIN_SERVICE,
@@ -107,13 +108,31 @@ function M.encrypt(entry_id, cleartext)
 		Logger.warn(LOG, "hs.task.new failed — token kept in plaintext on disk.")
 		return cleartext
 	end
-	task:setInput(cleartext)
-	if not task:start() then
+	local input_ok, input_err = xpcall(function() return task:setInput(cleartext) end,
+		debug.traceback)
+	if not input_ok then
+		Logger.warn(LOG, "Keychain task input failed — token kept in plaintext on disk: %s.",
+			tostring(input_err))
+		return cleartext
+	end
+	if not TaskLifecycle.start(task, "Keychain token write") then
 		Logger.warn(LOG, "Keychain task start failed — token kept in plaintext on disk.")
 		return cleartext
 	end
-	task:waitUntilExit()
-	local rc = task:terminationStatus() or -1
+	local wait_ok, wait_err = xpcall(function() task:waitUntilExit() end, debug.traceback)
+	if not wait_ok then
+		Logger.warn(LOG, "Keychain task wait failed — token kept in plaintext on disk: %s.",
+			tostring(wait_err))
+		return cleartext
+	end
+	local status_ok, status_or_err = xpcall(function() return task:terminationStatus() end,
+		debug.traceback)
+	local rc = status_ok and (status_or_err or -1) or -1
+	if not status_ok then
+		Logger.warn(LOG, "Keychain task status failed — token kept in plaintext on disk: %s.",
+			tostring(status_or_err))
+		return cleartext
+	end
 	if rc ~= 0 then
 		Logger.warn(LOG, "Keychain write failed (rc=%d) — token kept in plaintext on disk.", rc)
 		return cleartext

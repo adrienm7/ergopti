@@ -350,7 +350,7 @@ function M.build_callbacks(ctx)
 			return _tooltip.show_predictions(
 				new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
 				nil, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), "…", num_predictions
+				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id
 			)
 		end) then return end
 
@@ -475,7 +475,7 @@ function M.build_callbacks(ctx)
 			return _tooltip.show_predictions(
 				valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
 				val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
-				loading_text, slot_count
+				loading_text, slot_count, my_fetch_id
 			)
 		end) then return end
 
@@ -543,7 +543,7 @@ function M.build_callbacks(ctx)
 				return _tooltip.show_predictions(
 					pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
 					val_shortcut, prediction_indent, navigation_mods,
-					_tooltip.tint("ai_prediction"), nil, #pending_ref.value
+					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
 				)
 			end) then return end
 			commit_final_ui()
@@ -622,7 +622,7 @@ function M.arm_watchdog(ctx)
 			local render_result = _tooltip.show_predictions(
 				pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
 				val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value
+				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
 			)
 			if render_result ~= true then reject_watchdog_ui(render_result) end
 		end, debug.traceback)

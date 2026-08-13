@@ -44,6 +44,8 @@ local Logger       = require("infra.logger")
 local i18n         = require("infra.i18n")
 local Paths        = require("infra.paths")
 local llm_progress = require("ui.download_window")
+local ApiCommon    = require("modules.llm.api_common")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "mlx_deps"
 
@@ -402,18 +404,18 @@ local function fire_pending_callbacks(ok)
 	local cbs = _pending_callbacks
 	_pending_callbacks = {}
 	for _, cb in ipairs(cbs) do
-		pcall(cb, ok)
+		ApiCommon.protected_call(cb, "MLX dependency on_complete", ok)
 	end
 end
 
 function M.check_and_install_deps(on_complete)
 	-- If already done, fire the callback immediately — no need to re-run.
 	if _bootstrap_state == "ready" then
-		if type(on_complete) == "function" then on_complete(true) end
+		ApiCommon.protected_call(on_complete, "MLX dependency on_complete", true)
 		return
 	end
 	if _bootstrap_state == "failed" then
-		if type(on_complete) == "function" then on_complete(false) end
+		ApiCommon.protected_call(on_complete, "MLX dependency on_complete", false)
 		return
 	end
 
@@ -524,7 +526,7 @@ function M.check_and_install_deps(on_complete)
 	-- Construct the full Python invocation: python3 executes the PTY wrapper,
 	-- passing bash_cmd as the first argument so pty.spawn(sys.argv[1:]) receives ["/bin/bash", "-c", bash_cmd].
 	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
-	task = hs.task.new("/usr/bin/python3", function(exit_code, stdout, stderr)
+	task = TaskLifecycle.native("MLX dependency bootstrap", "/usr/bin/python3", function(exit_code, stdout, stderr)
 		if task then _active_tasks[task] = nil end
 		-- Completion callback: fires when the process exits
 		local combined = (stdout or "") .. (stderr or "")
@@ -600,7 +602,6 @@ function M.check_and_install_deps(on_complete)
 	end, make_streaming_handler(), { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
 
 	if not task then
-		Logger.error(LOG, "Failed to create hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("mlx.deps_task_create_failed")
 		os.execute("rm -f " .. pty_wrapper_path)
@@ -614,9 +615,8 @@ function M.check_and_install_deps(on_complete)
 	-- synchronously (unlikely but possible) sees _task_running = true.
 	_task_running = true
 	if task then _active_tasks[task] = true end
-	if not pcall(function() task:start() end) then
+	if not TaskLifecycle.start(task, "MLX dependency bootstrap") then
 		if task then _active_tasks[task] = nil end
-		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("mlx.deps_task_start_failed")
 		os.execute("rm -f " .. pty_wrapper_path)
