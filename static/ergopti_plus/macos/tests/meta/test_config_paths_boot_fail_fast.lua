@@ -31,4 +31,3 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 			"boot must stop before logger, preferences, watchers, eventtaps, or Karabiner use defaults")
 	end)
 end)
-
