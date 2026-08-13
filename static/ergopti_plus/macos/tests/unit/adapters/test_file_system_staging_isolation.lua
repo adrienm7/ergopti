@@ -136,6 +136,8 @@ local function make_adapter(scenario)
 				return true
 			end,
 			pathToAbsolute = function(path) return path end,
+			lock = function() return true end,
+			unlock = function() return true end,
 		},
 	})
 	return adapter, state

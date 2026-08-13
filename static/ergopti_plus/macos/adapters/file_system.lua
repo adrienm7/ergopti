@@ -41,6 +41,8 @@ local MAX_STAGING_RESERVATION_ATTEMPTS = 64
 -- is retained until explicit release; macOS releases the kernel lock if the
 -- process dies, while the stable empty lock file intentionally remains.
 local _held_write_locks = {}
+local acquire_cooperative_write_lock
+local release_cooperative_write_lock
 
 
 
@@ -586,7 +588,9 @@ end
 
 --- Creates a regular file only when its final directory entry is proven absent.
 --- Publication uses hard-link create semantics, so a concurrent winner can
---- never be overwritten between the absence probe and publication.
+--- never be overwritten between the absence probe and publication. The whole
+--- compare/link transaction shares the adjacent advisory mutex used by
+--- replacement writers, closing the cooperating create-vs-replace gap.
 --- @param path string Absolute destination path.
 --- @param content string UTF-8 content.
 --- @return boolean created True only when this call published the file.
@@ -600,83 +604,133 @@ function M.create_if_absent(path, content)
 	-- Keep `.`/`..` components intact until classify_read_path() has resolved
 	-- every preceding symlink, matching resolve_write_path() and kernel ordering.
 	local requested_path = path
+	local resolved_path = nil
+	local route_chain = nil
+	local staging_area = nil
+	local write_lock = nil
 
-	local existing, read_status, read_detail = M.read_with_status(requested_path)
-	if read_status == "ok" then return false, "exists" end
-	if read_status ~= "absent" then return false, "error", read_detail end
-
-	local resolved_path, classification, detail, chain = classify_read_path(requested_path)
-	if classification ~= "absent" then
-		if classification == "present" then return false, "exists" end
-		return false, "error", detail
-	end
-	local staging_area, reserve_err = reserve_staging_area(resolved_path)
-	if not staging_area then return false, "error", reserve_err end
-
-	local function cleanup()
-		local released, release_err = release_staging_area(staging_area, false)
+	local function cleanup_staging()
+		if staging_area == nil then return true end
+		local area = staging_area
+		staging_area = nil
+		local released, release_err = release_staging_area(area, false)
 		if not released then
 			Logger.warn(LOG, "create_if_absent(): staging cleanup failed for '%s' — %s",
 				path, tostring(release_err))
 		end
+		return released, release_err
 	end
 
-	local open_ok, fh, open_err = pcall(io.open, staging_area.payload_path, "w")
-	if not open_ok or not fh then
-		cleanup()
-		return false, "error", tostring((open_ok and open_err) or fh or "open failed")
+	local call_ok, created, status, result_detail
+	call_ok, created, status, result_detail = pcall(function()
+		local _, read_status, read_detail = M.read_with_status(requested_path)
+		if read_status == "ok" then return false, "exists" end
+		if read_status ~= "absent" then return false, "error", read_detail end
+
+		local classification, classification_detail
+		resolved_path, classification, classification_detail, route_chain = classify_read_path(requested_path)
+		if classification ~= "absent" then
+			if classification == "present" then return false, "exists" end
+			return false, "error", classification_detail
+		end
+
+		local lock_err = nil
+		write_lock, lock_err = acquire_cooperative_write_lock(resolved_path)
+		if not write_lock then
+			return false, "error", tostring(lock_err or "cooperative write lock failed")
+		end
+
+		local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, route_chain)
+		if not unchanged then return false, "error", revalidate_err end
+
+		-- The first absence proof happened before lock acquisition. Repeat it while
+		-- owning the shared writer mutex so every cooperating mutation is ordered.
+		local locked_path, locked_classification, locked_detail, locked_chain =
+			classify_read_path(requested_path)
+		if locked_classification ~= "absent" then
+			if locked_classification == "present" then return false, "exists" end
+			return false, "error", locked_detail
+		end
+		if locked_path ~= resolved_path then
+			return false, "error", locked_detail or "destination changed while acquiring write lock"
+		end
+		unchanged, revalidate_err = revalidate_write_path(requested_path, locked_path, locked_chain)
+		if not unchanged then return false, "error", revalidate_err end
+		route_chain = locked_chain
+
+		local reserve_err = nil
+		staging_area, reserve_err = reserve_staging_area(resolved_path)
+		if not staging_area then return false, "error", reserve_err end
+
+		local open_ok, fh, open_err = pcall(io.open, staging_area.payload_path, "w")
+		if not open_ok or not fh then
+			return false, "error", tostring((open_ok and open_err) or fh or "open failed")
+		end
+		local write_ok, written, write_err = pcall(fh.write, fh, content)
+		local close_ok, closed, close_err = pcall(fh.close, fh)
+		if not write_ok or written == nil or written == false then
+			return false, "error", tostring((write_ok and write_err) or written or "write failed")
+		end
+		if not close_ok or closed ~= true then
+			return false, "error", tostring((close_ok and close_err) or closed or "close failed")
+		end
+
+		local current_path, current_classification, current_detail, current_chain =
+			classify_read_path(requested_path)
+		if current_classification ~= "absent" or current_path ~= resolved_path then
+			if current_classification == "present" then return false, "exists" end
+			return false, "error", current_detail or "destination changed before publication"
+		end
+		unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, route_chain)
+		if not unchanged then return false, "error", revalidate_err end
+		-- Keep both observations explicit: a symlink introduced after the second
+		-- classification must not inherit an earlier empty chain.
+		unchanged, revalidate_err = revalidate_write_path(requested_path, current_path, current_chain)
+		if not unchanged then return false, "error", revalidate_err end
+
+		if not hs or not hs.fs or type(hs.fs.link) ~= "function" then
+			return false, "error", "hs.fs.link is unavailable; create-only publication is unsupported"
+		end
+		local link_ok, linked, link_err = pcall(
+			hs.fs.link,
+			staging_area.payload_path,
+			resolved_path,
+			false
+		)
+		if not link_ok or linked ~= true then
+			local _, winner_status, winner_detail = M.read_with_status(requested_path)
+			if winner_status == "ok" then return false, "exists" end
+			return false, "error", winner_detail or tostring(link_ok and link_err or linked)
+		end
+		return true, "created"
+	end)
+
+	local cleanup_ok, cleanup_err = pcall(cleanup_staging)
+	if not cleanup_ok then
+		Logger.warn(LOG, "create_if_absent(): unexpected staging cleanup error for '%s' — %s",
+			path, tostring(cleanup_err))
 	end
-	local write_ok, written, write_err = pcall(fh.write, fh, content)
-	local close_ok, closed, close_err = pcall(fh.close, fh)
-	if not write_ok or written == nil or written == false then
-		cleanup()
-		return false, "error", tostring((write_ok and write_err) or written or "write failed")
-	end
-	if not close_ok or closed ~= true then
-		cleanup()
-		return false, "error", tostring((close_ok and close_err) or closed or "close failed")
+	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
+	write_lock = nil
+	if not lock_released then
+		Logger.error(LOG, "create_if_absent(): cooperative publication lock for '%s' was not released — %s",
+			tostring(resolved_path or path), tostring(lock_release_err))
+	elseif lock_release_err ~= nil then
+		Logger.warn(LOG, "create_if_absent(): cooperative publication lock cleanup for '%s' was partial — %s",
+			tostring(resolved_path or path), tostring(lock_release_err))
 	end
 
-	local current_path, current_classification, current_detail, current_chain = classify_read_path(requested_path)
-	if current_classification ~= "absent" or current_path ~= resolved_path then
-		cleanup()
-		if current_classification == "present" then return false, "exists" end
-		return false, "error", current_detail or "destination changed before publication"
+	if not call_ok then
+		Logger.error(LOG, "create_if_absent(): unexpected error on '%s' — %s", path, tostring(created))
+		return false, "error", tostring(created)
 	end
-	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
-	if not unchanged then
-		cleanup()
-		return false, "error", revalidate_err
+	if not lock_released then
+		return false, "error", tostring(lock_release_err or "cooperative write lock release failed")
 	end
-	-- Keep both observations explicit: a symlink introduced after the second
-	-- classification must not inherit an earlier empty chain.
-	unchanged, revalidate_err = revalidate_write_path(requested_path, current_path, current_chain)
-	if not unchanged then
-		cleanup()
-		return false, "error", revalidate_err
-	end
-
-	if not hs or not hs.fs or type(hs.fs.link) ~= "function" then
-		cleanup()
-		return false, "error", "hs.fs.link is unavailable; create-only publication is unsupported"
-	end
-	local link_ok, linked, link_err = pcall(
-		hs.fs.link,
-		staging_area.payload_path,
-		resolved_path,
-		false
-	)
-	if not link_ok or linked ~= true then
-		cleanup()
-		local _, winner_status, winner_detail = M.read_with_status(requested_path)
-		if winner_status == "ok" then return false, "exists" end
-		return false, "error", winner_detail or tostring(link_ok and link_err or linked)
-	end
-	cleanup()
-	return true, "created"
+	return created, status, result_detail
 end
 
---- Acquires the stable, adjacent fcntl mutex used by Ergopti replacement writers.
+--- Acquires the stable, adjacent fcntl mutex used by all cooperating Ergopti writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
 --- across different inodes. hs.fs.lock uses non-blocking F_SETLK, and the kernel
 --- releases it automatically when a Hammerspoon process exits or is killed.
@@ -685,7 +739,7 @@ end
 --- @param resolved_path string Symlink-resolved destination path.
 --- @return table|nil owner Retained `{ path, handle }` lock owner.
 --- @return string|nil error_message
-local function acquire_cooperative_write_lock(resolved_path)
+acquire_cooperative_write_lock = function(resolved_path)
 	if not hs or not hs.fs or type(hs.fs.lock) ~= "function"
 		or type(hs.fs.unlock) ~= "function" then
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
@@ -733,7 +787,7 @@ end
 --- @param owner table|nil Owner returned by acquire_cooperative_write_lock().
 --- @return boolean released
 --- @return string|nil error_message
-local function release_cooperative_write_lock(owner)
+release_cooperative_write_lock = function(owner)
 	if owner == nil then return true end
 	if type(owner) ~= "table" or type(owner.path) ~= "string" or owner.handle == nil then
 		return false, "invalid cooperative write-lock owner"

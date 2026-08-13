@@ -423,6 +423,8 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 			mkdir = host_fs.mkdir,
 			rmdir = host_fs.rmdir,
 			link = host_fs.link,
+			lock = host_fs.lock,
+			unlock = host_fs.unlock,
 			pathToAbsolute = function(p) return p end,
 		},
 	})
