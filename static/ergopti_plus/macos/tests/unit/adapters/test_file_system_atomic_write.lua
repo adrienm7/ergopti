@@ -1024,11 +1024,11 @@ end)
 
 -- =====================================================
 -- =====================================================
--- ======= 2/ Cooperative replacement serialization ===
+-- ======= 2/ Cooperative writer serialization ========
 -- =====================================================
 -- =====================================================
 
-helpers.describe("adapters.file_system: cooperative replacement writer lock", function()
+helpers.describe("adapters.file_system: cooperative writer lock", function()
 	local function seed(path, content)
 		local handle = assert(io.open(path, "w"))
 		assert(handle:write(content))
@@ -1136,6 +1136,73 @@ helpers.describe("adapters.file_system: cooperative replacement writer lock", fu
 
 	helpers.it("serializes unconditional reset against a conditional Ergopti writer", function()
 		run_nested_competitor(true)
+	end)
+
+	helpers.it("serializes create-only publication against an absent-source conditional writer", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+
+		local owner = nil
+		local lock_calls = { creator = 0, replacer = 0 }
+		local unlock_calls = { creator = 0, replacer = 0 }
+		local function lock_api(name)
+			return function()
+				lock_calls[name] = lock_calls[name] + 1
+				if owner ~= nil then return nil, "injected busy lock" end
+				owner = name
+				return true
+			end, function()
+				unlock_calls[name] = unlock_calls[name] + 1
+				if owner ~= name then return nil, "wrong injected owner" end
+				owner = nil
+				return true
+			end
+		end
+
+		local creator_lock, creator_unlock = lock_api("creator")
+		local replacer_lock, replacer_unlock = lock_api("replacer")
+		local replacer = nil
+		local replacer_written, replacer_err = nil, nil
+		local creator = make_adapter(nil, nil, nil, function(source, destination)
+			replacer_written, replacer_err = replacer.write_if_unchanged(destination, "replacer", {
+				status = "absent",
+			})
+			local existing_handle = io.open(destination, "r")
+			if existing_handle ~= nil then
+				existing_handle:close()
+				return nil, "destination already exists"
+			end
+			local source_handle = assert(io.open(source, "r"))
+			local content = source_handle:read("*a")
+			source_handle:close()
+			local destination_handle = assert(io.open(destination, "w"))
+			assert(destination_handle:write(content))
+			assert(destination_handle:close())
+			return true
+		end, creator_lock, creator_unlock)
+		replacer = make_adapter(nil, nil, nil, nil, replacer_lock, replacer_unlock)
+
+		local created, status, detail = creator.create_if_absent(path, "creator")
+		local final_content = read_all(path)
+		os.remove(path)
+		os.remove(lock_path)
+
+		helpers.assert_eq(created, true, tostring(detail))
+		helpers.assert_eq(status, "created")
+		helpers.assert_eq(replacer_written, false,
+			"the conditional replacer must not enter create-only publication's compare/link gap")
+		helpers.assert_true(type(replacer_err) == "string" and replacer_err ~= "",
+			"lock contention must surface a concrete refusal")
+		helpers.assert_eq(lock_calls.creator, 1,
+			"create_if_absent() must own the same cooperative mutex as replacement writers")
+		helpers.assert_eq(lock_calls.replacer, 1)
+		helpers.assert_eq(unlock_calls.creator, 1)
+		helpers.assert_eq(unlock_calls.replacer, 0)
+		helpers.assert_nil(owner)
+		helpers.assert_eq(final_content, "creator",
+			"exactly the create-only lock owner may determine the committed bytes")
 	end)
 
 	helpers.it("checks the expected source only after lock acquisition and releases after rename", function()

@@ -42,13 +42,15 @@ local function load_managed()
 			attributes = function(path)
 				local file = io.open(path, "r")
 				if file then file:close(); return { mode = "file" } end
-				if path:match("paths%.toml$") or path:find("stage%-lock") then return nil end
+				if path:match("paths%.toml$") or path:find("stage%-lock")
+					or path:find("write%-lock%-v1") then return nil end
 				return { mode = "directory" }
 			end,
 			symlinkAttributes = function(path)
 				local file = io.open(path, "r")
 				if file then file:close(); return { mode = "file" } end
-				if path:match("paths%.toml$") or path:find("stage%-lock") then return nil, "missing" end
+				if path:match("paths%.toml$") or path:find("stage%-lock")
+					or path:find("write%-lock%-v1") then return nil, "missing" end
 				return { mode = "directory" }
 			end,
 			mkdir = function() return true end,
@@ -70,6 +72,8 @@ local function load_managed()
 				local index = 0
 				return function() index = index + 1; return entries[index] end
 			end,
+			lock = function() return true end,
+			unlock = function() return true end,
 		},
 	})
 	os.getenv = real_getenv
@@ -110,6 +114,10 @@ local function with_memory_files(initial, fn)
 					return true
 				end,
 			}
+		end
+		if mode == "a+" then
+			files[path] = files[path] or ""
+			return { close = function() return true end }
 		end
 		return real_open(path, mode)
 	end
