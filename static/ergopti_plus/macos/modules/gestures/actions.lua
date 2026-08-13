@@ -31,6 +31,7 @@ local LOG           = "gestures.actions"
 -- tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout). Declared
 -- here, above every closure that captures it, so it is never bound as a nil global.
 local KEYSTROKE_NO_DELAY_US = 0
+local CLIPBOARD_COPY_SETTLE_SEC = Timings.sec("debounce", "clipboard_copy_settle_ms")
 
 local _state = nil
 
@@ -76,7 +77,14 @@ end
 --- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
 --- @param key string The key code or character.
 local function postKeyStroke(mods, key)
-	pcall(function() SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
+	local ok, result = xpcall(function()
+		return SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US)
+	end, debug.traceback)
+	if not ok or result ~= true then
+		error(string.format("synthetic key stroke was refused for %s: %s",
+			tostring(key), tostring(result)), 0)
+	end
+	return true
 end
 
 local function url_encode_query(value)
@@ -706,28 +714,180 @@ end)
 -- it: a local declared below one binds a nil global instead, and the failure
 -- surfaces only inside a timer callback where the file logger never sees it.
 local _search_capture_in_flight = false
-local _search_saved_clipboard   = nil
+local _search_saved_clipboard = nil
+local _search_capture_generation = 0
+local _search_recovery_only = false
+local _search_capture_timer = nil
+local _search_restore_retry_timer = nil
+local _search_deferred_retry_armed = false
+
+local function stop_search_timer(handle)
+	if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+end
+
+local function release_search_clipboard(generation)
+	if generation ~= _search_capture_generation then return end
+	stop_search_timer(_search_capture_timer)
+	stop_search_timer(_search_restore_retry_timer)
+	_search_capture_timer = nil
+	_search_restore_retry_timer = nil
+	_search_capture_in_flight = false
+	_search_saved_clipboard = nil
+	_search_recovery_only = false
+	_search_deferred_retry_armed = false
+	_search_capture_generation = _search_capture_generation + 1
+end
+
+local function restore_search_clipboard(generation)
+	if generation ~= _search_capture_generation or not _search_capture_in_flight then
+		return false, "stale search generation"
+	end
+	local saved = _search_saved_clipboard
+	local ok_restore, restore_result
+	if type(saved) == "table" and next(saved) ~= nil then
+		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+		if not ok_restore or restore_result ~= true then
+			return false, ok_restore and "writeAllData returned " .. tostring(restore_result)
+				or restore_result
+		end
+	else
+		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+		if not ok_restore then return false, restore_result end
+	end
+	release_search_clipboard(generation)
+	return true
+end
+
+local function arm_search_timer(slot, delay, label, generation, callback)
+	local handle = nil
+	local installing = true
+	local callback_ran = false
+	local ok_timer, timer_or_error = pcall(hs.timer.doAfter, delay, function()
+		callback_ran = true
+		if installing then return end
+		if slot == "capture" and _search_capture_timer == handle then
+			_search_capture_timer = nil
+		elseif slot == "restore" and _search_restore_retry_timer == handle then
+			_search_restore_retry_timer = nil
+		end
+		if generation ~= _search_capture_generation then return end
+		local ok_callback, callback_error = xpcall(callback, debug.traceback)
+		if not ok_callback then
+			Logger.error(LOG, "search_web %s callback failed: %s.", label, tostring(callback_error))
+			_search_recovery_only = true
+		end
+	end)
+	installing = false
+	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+		stop_search_timer(timer_or_error)
+		return false, ok_timer and (callback_ran and "timer fired during installation"
+			or "hs.timer.doAfter returned no handle") or timer_or_error
+	end
+	handle = timer_or_error
+	if slot == "capture" then
+		_search_capture_timer = handle
+	else
+		_search_restore_retry_timer = handle
+	end
+	return true
+end
+
+local queue_search_restore_retry
+queue_search_restore_retry = function(generation)
+	if _search_restore_retry_timer or _search_deferred_retry_armed then return true end
+	local function attempt_restore()
+			local restored, restore_error = restore_search_clipboard(generation)
+			if restored or generation ~= _search_capture_generation then return end
+			_search_recovery_only = true
+			Logger.error(LOG, "search_web clipboard restore retry refused: %s.",
+				tostring(restore_error))
+			queue_search_restore_retry(generation)
+	end
+	local timer_armed, timer_error = arm_search_timer(
+		"restore", CLIPBOARD_COPY_SETTLE_SEC, "restore retry", generation, attempt_restore)
+	if timer_armed then
+		return true
+	end
+	if type(SyntheticInput.defer_after_callback) == "function" then
+		local installing = true
+		local callback_ran = false
+		local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+			"search_web clipboard restore recovery", function()
+				callback_ran = true
+				if installing then return end
+				_search_deferred_retry_armed = false
+				local ok_callback, callback_error = xpcall(attempt_restore, debug.traceback)
+				if not ok_callback then
+					Logger.error(LOG, "search_web deferred restore callback failed: %s.",
+						tostring(callback_error))
+				end
+			end)
+		installing = false
+		if ok_defer and deferred == true and not callback_ran then
+			_search_deferred_retry_armed = true
+			return true
+		end
+	end
+	Logger.error(LOG, "search_web clipboard restore retry could not be armed: %s.",
+		tostring(timer_error))
+	return false
+end
 
 sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
+	if _search_capture_in_flight then
+		if _search_recovery_only then
+			local recovered, recovery_error = restore_search_clipboard(_search_capture_generation)
+			if not recovered then
+				queue_search_restore_retry(_search_capture_generation)
+				Logger.error(LOG, "search_web refused while clipboard recovery is pending: %s.",
+					tostring(recovery_error))
+				return
+			end
+		else
+			Logger.debug(LOG, "search_web ignored while another capture owns the clipboard.")
+			return
+		end
+	end
 	-- Capture the user's clipboard ONLY when no capture is already in flight.
 	-- Two search_web gestures in quick succession made the second snapshot what
 	-- the FIRST had just copied — the selection, not the user's clipboard — and
 	-- then dutifully "restored" it, so the real clipboard was gone for good. The
 	-- same stale-snapshot class the text-transform path was hardened against.
-	if not _search_capture_in_flight then
-		_search_saved_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	local ok_snapshot, snapshot_or_error = pcall(hs.pasteboard.readAllData)
+	if not ok_snapshot or type(snapshot_or_error) ~= "table" then
+		Logger.error(LOG, "search_web clipboard snapshot failed: %s.", tostring(snapshot_or_error))
+		return
 	end
+	_search_saved_clipboard = snapshot_or_error
 	_search_capture_in_flight = true
-	local old_clipboard = _search_saved_clipboard
-	postKeyStroke({"cmd"}, "c")
-	hs.timer.doAfter(0.08, function()
-		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
-		_search_capture_in_flight = false
-		_search_saved_clipboard   = nil
-		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
-			pcall(hs.pasteboard.setContents, old_clipboard)
+	_search_capture_generation = _search_capture_generation + 1
+	local my_generation = _search_capture_generation
+	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
+	if not ok_clear then
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web clipboard clear failed: %s.", tostring(clear_error))
+		return
+	end
+	local timer_armed, timer_error = arm_search_timer(
+		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, function()
+		if my_generation ~= _search_capture_generation then return end
+		local ok_selected, selected = pcall(hs.pasteboard.getContents)
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			Logger.error(LOG, "search_web clipboard restore refused; ownership retained: %s.",
+				tostring(restore_error))
+			queue_search_restore_retry(my_generation)
+		end
+		if not ok_selected or type(selected) ~= "string" or selected == "" then
+			Logger.error(LOG, "search_web selection copy produced no text: %s.", tostring(selected))
+			return
 		end
 		-- url_encode_query returns percent-escapes, and this value lands on the
 		-- REPLACEMENT side of gsub where "%2" reads as capture reference #2. Any
@@ -736,6 +896,29 @@ sg("search_web", function(binding)
 		-- Console and never to the file logger, and the search silently never opened.
 		open_url((template:gsub("%%s", text_utils.escape_gsub_replacement(url_encode_query(selected)))))
 	end)
+	if not timer_armed then
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web capture timer was refused: %s (restore=%s).",
+			tostring(timer_error), tostring(restore_error))
+		return
+	end
+	local ok_copy, copied = pcall(
+		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
+	if not ok_copy or copied ~= true then
+		stop_search_timer(_search_capture_timer)
+		_search_capture_timer = nil
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web copy shortcut was refused: %s (restore=%s).",
+			tostring(copied), tostring(restore_error))
+	end
 end)
 
 -- Script management

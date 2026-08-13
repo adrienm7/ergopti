@@ -67,7 +67,93 @@ local PASTE_KEY_DELAY_US = 0
 -- keymap/utils.lua paste discipline). Declared ABOVE M.send so the restore closures
 -- capture them correctly (F-L8).
 local _paste_saved_original = nil
-local _paste_pending_timer  = nil
+local _paste_pending_timer = nil
+local _paste_owns_clipboard = false
+local _paste_recovery_only = false
+local _paste_generation = 0
+
+local function stop_restore_timer()
+	local pending = _paste_pending_timer
+	_paste_pending_timer = nil
+	if pending and type(pending.stop) == "function" then pcall(pending.stop, pending) end
+end
+
+local function release_clipboard()
+	stop_restore_timer()
+	_paste_saved_original = nil
+	_paste_owns_clipboard = false
+	_paste_recovery_only = false
+	_paste_generation = _paste_generation + 1
+end
+
+local function restore_clipboard()
+	if not _paste_owns_clipboard then return true end
+	local ok_restore, restored = pcall(Clipboard.restore, _paste_saved_original)
+	if not ok_restore or restored ~= true then
+		return false, ok_restore and "Clipboard.restore returned " .. tostring(restored) or restored
+	end
+	release_clipboard()
+	return true
+end
+
+local queue_restore_retry
+
+local function schedule_restore()
+	if _paste_pending_timer then return true end
+	local generation = _paste_generation
+	local callback_ran = false
+	-- Never run recovery before doAfter has committed its handle. A synchronous
+	-- callback would otherwise recurse through queue_restore_retry() while
+	-- _paste_pending_timer is still nil.
+	local installing = true
+	local ok_timer, timer_or_error = pcall(function()
+		_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
+			callback_ran = true
+			if installing then return end
+			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+			_paste_pending_timer = nil
+			local restored, restore_error = restore_clipboard()
+			if restored then return end
+			_paste_recovery_only = true
+			Logger.error(LOG, "Clipboard restore refused; ownership retained — %s", tostring(restore_error))
+			queue_restore_retry()
+		end)
+		return _paste_pending_timer
+	end)
+	installing = false
+	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+		stop_restore_timer()
+		return false, ok_timer and "hs.timer.doAfter returned no stable handle" or timer_or_error
+	end
+	return true
+end
+
+queue_restore_retry = function()
+	if not _paste_owns_clipboard then return true end
+	local scheduled, timer_error = schedule_restore()
+	if scheduled then return true end
+	if type(SyntheticInput.defer_after_callback) == "function" then
+		local generation = _paste_generation
+		local callback_ran = false
+		local installing = true
+		local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+			"text sender clipboard restore recovery", function()
+				callback_ran = true
+				if installing then return end
+				if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+				local restored, restore_error = restore_clipboard()
+				if restored then return end
+				_paste_recovery_only = true
+				Logger.error(LOG, "Deferred clipboard restore refused; ownership retained — %s",
+					tostring(restore_error))
+				queue_restore_retry()
+			end)
+		installing = false
+		if ok_defer and deferred == true and not callback_ran then return true end
+	end
+	Logger.error(LOG, "Clipboard restore retry could not be armed — %s", tostring(timer_error))
+	return false
+end
 
 
 -- =========================================
@@ -99,39 +185,52 @@ function M.send(text, opts, callback)
 	local ok, err
 	if mode == "clipboard" then
 		ok, err = pcall(function()
+			if _paste_recovery_only then
+				local restored, restore_error = restore_clipboard()
+				if not restored then
+					queue_restore_retry()
+					error("previous clipboard recovery remains pending: " .. tostring(restore_error), 0)
+				end
+			end
 			-- If a restore is still pending from a previous clipboard send, cancel it
 			-- but KEEP the first-captured original; only capture the user's clipboard
 			-- when no send is in flight (otherwise we'd save our own injected payload).
-			if _paste_pending_timer then
-				pcall(function() _paste_pending_timer:stop() end)
-				_paste_pending_timer = nil
+			if _paste_owns_clipboard then
+				stop_restore_timer()
 			else
-				_paste_saved_original = Clipboard.save()
+				local snapshot, snapshot_ok = Clipboard.save()
+				assert(snapshot_ok == true, "clipboard snapshot failed")
+				_paste_saved_original = snapshot
 			end
-			local saved = _paste_saved_original  -- bind the correct value into the closure
-			-- From here the user's clipboard holds OUR payload. A throw before the
-			-- restore timer is armed — Clipboard.write failing, the keystroke
-			-- raising — left it there permanently, with _paste_saved_original still
-			-- set so the next send would not even re-capture. The pcall around this
-			-- block caught the error and logged it, which is precisely why nobody
-			-- noticed the clipboard had been eaten.
-			local ok_write = pcall(function()
-				Clipboard.write(text)
-				assert(SyntheticInput.emit_key_stroke(
-					PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US),
-					"synthetic paste keystroke could not be dispatched")
-			end)
-			if not ok_write then
-				Clipboard.restore(saved)
-				_paste_saved_original = nil
-				error("clipboard send failed before the restore could be armed", 0)
+
+			_paste_generation = _paste_generation + 1
+			_paste_owns_clipboard = true
+			_paste_recovery_only = true
+			local ok_write, written = pcall(function() return Clipboard.write(text) end)
+			if not ok_write or written ~= true then
+				local restored, restore_error = restore_clipboard()
+				if not restored then queue_restore_retry() end
+				error("clipboard payload refused (restore=" .. tostring(restore_error) .. ")", 0)
 			end
-			-- Restore after a short delay so the paste completes before we overwrite.
-			_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
-				_paste_pending_timer  = nil
-				Clipboard.restore(saved)
-				_paste_saved_original = nil
-			end)
+
+			local restore_armed, timer_error = schedule_restore()
+			if not restore_armed then
+				local restored, restore_error = restore_clipboard()
+				if not restored then queue_restore_retry() end
+				error("clipboard restore timer refused: " .. tostring(timer_error)
+					.. " (restore=" .. tostring(restore_error) .. ")", 0)
+			end
+
+			local ok_emit, emitted = pcall(
+				SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
+			if not ok_emit or emitted ~= true then
+				stop_restore_timer()
+				local restored, restore_error = restore_clipboard()
+				if not restored then queue_restore_retry() end
+				error("synthetic paste keystroke refused (restore="
+					.. tostring(restore_error) .. ")", 0)
+			end
+			_paste_recovery_only = false
 		end)
 	else
 		ok, err = pcall(function()

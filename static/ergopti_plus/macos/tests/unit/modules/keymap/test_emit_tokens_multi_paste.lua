@@ -155,4 +155,147 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(events[1].key, "v")
 		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
 	end)
+
+	helpers.it("restores the first snapshot when a later clipboard write is rejected", function()
+		local fixture = load_fixture()
+		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
+		local current = original
+		local payload_writes = 0
+		fixture.hs.pasteboard.readAllData = function() return original end
+		fixture.hs.pasteboard.writeAllData = function(saved)
+			current = saved
+			return true
+		end
+		fixture.hs.pasteboard.setContents = function(value)
+			payload_writes = payload_writes + 1
+			if payload_writes == 2 then return false end
+			current = value
+			return true
+		end
+
+		local results = emit_in_callback(fixture, two_segment_tokens())
+		local gap = results[4] / 2
+		fire_existing_delay(fixture.hs, gap)
+
+		helpers.assert_true(current == original,
+			"rejecting an overlapping payload must not cancel the first owner's restore")
+	end)
+
+	helpers.it("retains ownership and retries when the native restore is refused", function()
+		local fixture = load_fixture()
+		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
+		local current = original
+		local restore_attempts = 0
+		fixture.hs.pasteboard.readAllData = function() return original end
+		fixture.hs.pasteboard.setContents = function(value)
+			current = value
+			return true
+		end
+		fixture.hs.pasteboard.writeAllData = function(saved)
+			restore_attempts = restore_attempts + 1
+			if restore_attempts == 1 then return false end
+			current = saved
+			return true
+		end
+
+		emit_in_callback(fixture, {
+			{ kind = "text", value = ("R"):rep(60) },
+		})
+		helpers.assert_eq(fire_existing_delay(fixture.hs, 0.15), 1)
+		helpers.assert_eq(restore_attempts, 1)
+		helpers.assert_eq(current, ("R"):rep(60),
+			"a refused restore must keep ownership instead of pretending recovery succeeded")
+
+		helpers.assert_eq(fire_existing_delay(fixture.hs, 0.15), 1,
+			"a refused native restore must autonomously arm another retained attempt")
+		helpers.assert_eq(restore_attempts, 2)
+		helpers.assert_true(current == original,
+			"the retained retry must restore the original all-type snapshot")
+	end)
+
+	helpers.it("rolls back without Cmd+V when the restore timer is refused", function()
+		local fixture = load_fixture()
+		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
+		local current = original
+		fixture.hs.pasteboard.readAllData = function() return original end
+		fixture.hs.pasteboard.setContents = function(value)
+			current = value
+			return true
+		end
+		fixture.hs.pasteboard.writeAllData = function(saved)
+			current = saved
+			return true
+		end
+		fixture.hs.timer.doAfter = function() return nil end
+
+		fixture.synthetic.enter_callback()
+		local transaction = fixture.synthetic.begin("test.timer_refusal", "replacement")
+		local ok = pcall(function()
+			fixture.synthetic.with_transaction(transaction, function()
+				fixture.utils.emit_text(("T"):rep(60))
+			end)
+		end)
+		if ok then fixture.synthetic.seal(transaction) else fixture.synthetic.cancel(transaction) end
+		local consume, events = fixture.synthetic.leave_callback(ok)
+
+		helpers.assert_true(not ok,
+			"timer allocation refusal must fail the logical replacement")
+		helpers.assert_true(not consume)
+		helpers.assert_nil(events,
+			"Cmd+V must not be published unless exact clipboard restoration is armed")
+		helpers.assert_true(current == original,
+			"timer refusal must synchronously roll the clipboard back")
+	end)
+
+	helpers.it("rejects synchronous recovery dispatchers without recursive re-entry", function()
+		local fixture = load_fixture()
+		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
+		local current = original
+		local restore_attempts = 0
+		local timer_calls = 0
+		local defer_calls = 0
+		fixture.hs.pasteboard.readAllData = function() return original end
+		fixture.hs.pasteboard.setContents = function(value)
+			current = value
+			return true
+		end
+		fixture.hs.pasteboard.writeAllData = function()
+			restore_attempts = restore_attempts + 1
+			return false
+		end
+		fixture.hs.timer.doAfter = function(_delay, callback)
+			timer_calls = timer_calls + 1
+			local handle = { stop = function() end }
+			callback()
+			return handle
+		end
+		fixture.synthetic.defer_after_callback = function(_label, callback)
+			defer_calls = defer_calls + 1
+			callback()
+			return true
+		end
+
+		fixture.synthetic.enter_callback()
+		local transaction = fixture.synthetic.begin("test.sync_restore", "replacement")
+		local ok = pcall(function()
+			fixture.synthetic.with_transaction(transaction, function()
+				fixture.utils.emit_text(("S"):rep(60))
+			end)
+		end)
+		if ok then fixture.synthetic.seal(transaction) else fixture.synthetic.cancel(transaction) end
+		local consume, events = fixture.synthetic.leave_callback(ok)
+
+		helpers.assert_true(not ok,
+			"a synchronous timer callback is allocation refusal, not a committed restore")
+		helpers.assert_true(not consume)
+		helpers.assert_nil(events, "Cmd+V must not escape a refused restore transaction")
+		helpers.assert_eq(timer_calls, 2,
+			"one initial arm and one bounded retry are allowed; recursion is not")
+		helpers.assert_eq(defer_calls, 1,
+			"the synchronous fallback must be rejected after one bounded attempt")
+		helpers.assert_eq(restore_attempts, 1,
+			"installer callbacks must not race the caller's single rollback attempt")
+		helpers.assert_eq(current, ("S"):rep(60),
+			"failed recovery retains ownership of the injected payload for a later retry")
+	end)
 end)

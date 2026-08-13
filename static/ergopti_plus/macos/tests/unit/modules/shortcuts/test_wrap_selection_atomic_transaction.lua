@@ -118,6 +118,7 @@ local function load_fixture(options)
 			clipboard_data = { ["public.utf8-plain-text"] = text }
 			if outcome == "throw" then error("injected clipboard write failure") end
 			if outcome == "false" then return false end
+			if outcome == "nil" then return nil end
 			return true
 		end,
 		writeAllData = function(snapshot)
@@ -125,6 +126,7 @@ local function load_fixture(options)
 			local outcome = next_outcome(restore_outcomes, calls.restore)
 			if outcome == "throw" then error("injected clipboard restore failure") end
 			if outcome == "false" then return false end
+			if outcome == "nil" then return nil end
 			clipboard_data = clone(snapshot)
 			return true
 		end,
@@ -233,7 +235,7 @@ helpers.describe("wrap_selection: atomic pre-commit contract", function()
 		end)
 	end)
 
-	for _, outcome in ipairs({ "false", "throw" }) do
+	for _, outcome in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("clipboard write " .. outcome .. " rolls back exact data and emits no paste", function()
 			with_fixture({ write_outcomes = { outcome, "success" } }, function(f)
 				helpers.assert_eq(f.wrap(), false)
@@ -297,7 +299,7 @@ helpers.describe("wrap_selection: atomic pre-commit contract", function()
 end)
 
 helpers.describe("wrap_selection: restore recovery and generation ownership", function()
-	for _, outcome in ipairs({ "false", "throw" }) do
+	for _, outcome in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("restore callback " .. outcome .. " stays owned and retries to exact data", function()
 			with_fixture({ restore_outcomes = { outcome, "success" } }, function(f)
 				helpers.assert_eq(f.wrap(), true)

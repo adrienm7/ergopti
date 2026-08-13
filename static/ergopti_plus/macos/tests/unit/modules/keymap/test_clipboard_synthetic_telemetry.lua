@@ -163,4 +163,63 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(received.source, "llm")
 		helpers.assert_eq(received.variant, "test")
 	end)
+
+	helpers.it("cancels the whole replacement when the pasteboard rejects its payload", function()
+		local received = nil
+		local fixture = load_fixture({
+			notify_synthetic = function(...)
+				received = table.pack(...)
+			end,
+			set_buffer = function() end,
+		})
+		local write_attempts = 0
+		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
+		local current = original
+		fixture.hs.pasteboard.readAllData = function() return original end
+		fixture.hs.pasteboard.writeAllData = function(saved)
+			current = saved
+			return true
+		end
+		fixture.hs.pasteboard.setContents = function(value)
+			write_attempts = write_attempts + 1
+			current = value -- native APIs may mutate before reporting refusal
+			return false
+		end
+
+		local expander = require("modules.keymap.expander")
+		local state = {
+			buffer = "abc",
+			magic_key = "*",
+			start_is_word_boundary = true,
+			is_repeat_feature_enabled = function() return false end,
+			suppress_rescan = function() end,
+		}
+		expander.init(state, { is_terminator = function() return false end }, {
+			get_llm_enabled = function() return false end,
+			update_preview = function() end,
+		})
+		local payload = ("z"):rep(60)
+
+		local results, consume, events = collect(fixture, function()
+			return expander.perform_text_replacement(3,
+				function() return fixture.utils.emit_text(payload) end,
+				function() state.buffer = payload end,
+				false, false, "llm", "pasteboard-rejection")
+		end)
+
+		helpers.assert_eq(write_attempts, 1,
+			"one rejected native write must not be retried as if it had committed")
+		helpers.assert_eq(results[1], false,
+			"pcall success around setContents(false) is not a successful paste")
+		helpers.assert_true(not consume,
+			"the physical trigger must pass through when no replacement batch committed")
+		helpers.assert_nil(events,
+			"the rejected payload must cancel both the Delete prefix and Cmd+V")
+		helpers.assert_eq(state.buffer, "abc",
+			"logical text must remain unchanged when the target received no replacement")
+		helpers.assert_nil(received,
+			"a rejected paste must not be persisted as successful synthetic output")
+		helpers.assert_true(current == original,
+			"a mutate-then-false native write must restore the exact all-type snapshot")
+	end)
 end)

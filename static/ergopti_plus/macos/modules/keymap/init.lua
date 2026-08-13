@@ -340,6 +340,15 @@ local function invalidate_observed_context()
 	arm_observed_context_reconcile(false)
 end
 
+--- Discards text observed before a pause boundary.
+--- Physical keys pass through while paused, so neither side of that boundary
+--- may reuse a buffer or word-start claim assembled in the other context.
+local function discard_paused_text_context()
+	CoreState.buffer = ""
+	CoreState.start_is_word_boundary = false
+	cancel_action_preview_recovery()
+end
+
 
 --- Severs text ownership at a focus/title boundary without replaying an old-app
 --- terminator into the new app. Reconciliation stays closed until AX says the
@@ -398,12 +407,13 @@ end
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 function M.pause_processing()
 	CoreState.processing_paused = true
-	cancel_action_preview_recovery()
+	discard_paused_text_context()
 	Logger.debug(LOG, "Processing paused.")
 end
 
 --- Resumes eventtap processing after a pause.
 function M.resume_processing()
+	discard_paused_text_context()
 	CoreState.processing_paused = false
 	Logger.debug(LOG, "Processing resumed.")
 end

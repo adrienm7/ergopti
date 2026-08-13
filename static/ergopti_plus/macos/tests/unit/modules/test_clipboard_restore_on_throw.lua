@@ -27,23 +27,40 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 			"the keymap utils source must be readable or this asserts nothing")
 		local at = src:find("local function perform_paste", 1, true)
 		helpers.assert_not_nil(at, "perform_paste must exist")
-		local body = src:sub(at, at + 1600)
+		local next_function = src:find("function M.emit_tokens", at, true)
+		helpers.assert_not_nil(next_function, "perform_paste must remain a bounded unit")
+		local body = src:sub(at, next_function - 1)
+		local ownership_at = body:find("_paste_owns_clipboard = true", 1, true)
+		local write_at = body:find("pcall(hs.pasteboard.setContents", 1, true)
+		local rejected_at = body:find("not ok_write or write_result ~= true", 1, true)
+		local restore_at = rejected_at and body:find("restore_owned_clipboard()", rejected_at, true)
+		local timer_at = body:find("local restore_armed", 1, true)
 
-		helpers.assert_true(body:find("setContents", 1, true) ~= nil,
-			"sanity: this really is the function that writes the clipboard")
-		helpers.assert_true(body:find("ok_write", 1, true) ~= nil,
-			"between writing our payload and arming the restore timer there is a window in "
-			.. "which a throw leaves the user's clipboard holding our text permanently — the "
-			.. "sibling path in adapters/text_sender was fixed for exactly this and this one, "
-			.. "which every real hotstring paste goes through, was not")
+		helpers.assert_true(ownership_at ~= nil and write_at ~= nil and rejected_at ~= nil
+			and restore_at ~= nil and timer_at ~= nil,
+			"the keymap paste must retain ownership, inspect throw/false, restore, then arm output")
+		helpers.assert_true(ownership_at < write_at and write_at < rejected_at
+			and rejected_at < restore_at and restore_at < timer_at,
+			"ownership must precede the possibly mutating native write, whose throw/false path "
+			.. "must restore before any Cmd+V restore timer can be committed")
 	end)
 
 	helpers.it("the sibling that was already fixed still restores", function()
-		local src = helpers.read_driver_source("clipboard send failed before the restore")
+		local src = helpers.read_driver_source("local function schedule_restore()")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the text sender source must be readable or this asserts nothing")
-		helpers.assert_true(src:find("Clipboard.restore(saved)", 1, true) ~= nil,
-			"without this the assertion above could be satisfied by deleting both guards")
+		local send_at = src:find("function M.send", 1, true)
+		local ownership_at = send_at and src:find("_paste_owns_clipboard = true", send_at, true)
+		local write_at = send_at and src:find("pcall(function() return Clipboard.write(text) end)", send_at, true)
+		local rejected_at = write_at and src:find("not ok_write or written ~= true", write_at, true)
+		local restore_at = rejected_at and src:find("restore_clipboard()", rejected_at, true)
+		local timer_at = restore_at and src:find("local restore_armed", restore_at, true)
+		helpers.assert_true(ownership_at ~= nil and write_at ~= nil and rejected_at ~= nil
+			and restore_at ~= nil and timer_at ~= nil,
+			"the text sender sibling must retain and restore around its native write")
+		helpers.assert_true(ownership_at < write_at and write_at < rejected_at
+			and rejected_at < restore_at and restore_at < timer_at,
+			"the text sender must restore a possibly mutated clipboard before publishing Cmd+V")
 	end)
 
 end)

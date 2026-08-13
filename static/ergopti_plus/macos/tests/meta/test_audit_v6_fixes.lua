@@ -234,7 +234,13 @@ helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (a
 		local timer_pos = src:find("_paste_pending_timer = hs.timer.doAfter", 1, true)
 		helpers.assert_not_nil(timer_pos, "the clipboard restore timer must remain present")
 		local restore = src:sub(timer_pos, timer_pos + 700)
-		helpers.assert_true(restore:find("writeAllData", 1, true) ~= nil,
-			"the timer must restore the full clipboard payload")
+		helpers.assert_true(restore:find("restore_owned_clipboard", 1, true) ~= nil,
+			"the timer must delegate to the retained exact-restore helper")
+		local helper_pos = src:find("local function restore_owned_clipboard", 1, true)
+		local helper = helper_pos and src:sub(helper_pos, helper_pos + 900) or ""
+		helpers.assert_true(helper:find("writeAllData", 1, true) ~= nil,
+			"the shared restore helper must preserve every clipboard UTI")
+		helpers.assert_true(helper:find("restore_result ~= true", 1, true) ~= nil,
+			"a false/nil native restore must retain ownership for retry")
 	end)
 end)
