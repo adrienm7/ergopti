@@ -42,6 +42,9 @@ local function load_remap(options)
 		rebind = 0,
 		watcher_start = 0,
 		watcher_stop = 0,
+		wizard_runs = 0,
+		onboarding_stops = 0,
+		timer_cancel_attempts = 0,
 		timers = {},
 		lease_phase = options.initial_phase or "prepared",
 		lease_start_callbacks = {},
@@ -254,7 +257,7 @@ local function load_remap(options)
 		start_alt_tab_windows_hotkey = function() return "windows" end,
 		start_alt_tab_apps_hotkey = function() return "apps" end,
 		start_alt_tab_monitor_hotkey = function() return "monitor" end,
-		start_input_source_watcher = function() end,
+		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
@@ -286,6 +289,15 @@ local function load_remap(options)
 			return options.rebind_result ~= false
 		end,
 	}
+	package.loaded["platform.remap.onboarding"] = {
+		run_first_run_wizard = function()
+			calls.wizard_runs = calls.wizard_runs + 1
+		end,
+		stop = function()
+			calls.onboarding_stops = calls.onboarding_stops + 1
+			return true
+		end,
+	}
 
 	local retained_callback = nil
 	local wake_watcher = {
@@ -311,6 +323,51 @@ local function load_remap(options)
 		end,
 	}
 
+	local function new_timer(delay, callback)
+		local timer = {
+			delay = delay,
+			callback = callback,
+			running = true,
+			fired = false,
+			committed = true,
+		}
+		timer.timer = timer
+		function timer:stop()
+			self.running = false
+			return self
+		end
+		function timer:fire(force)
+			if not self.running and force ~= true then return end
+			self.running = false
+			self.fired = true
+			self.committed = false
+			self.timer = nil
+			self.callback()
+		end
+		calls.timers[#calls.timers + 1] = timer
+		if options.settle_timer_synchronous and delay ~= 2.0 then timer:fire() end
+		return timer
+	end
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			return new_timer(delay, callback), true
+		end,
+		cancel = function(timer)
+			if type(timer) ~= "table" or timer.timer == nil then return true end
+			calls.timer_cancel_attempts = calls.timer_cancel_attempts + 1
+			if calls.timer_cancel_attempts <= (options.timer_cancel_refusals or 0) then
+				timer.committed = false
+				return false
+			end
+			local stopped = timer:stop()
+			if stopped == false then return false end
+			timer.committed = false
+			timer.fired = true
+			timer.timer = nil
+			return true
+		end,
+	}
+
 	local remap = helpers.load_with_stubs("platform.remap", {
 		execute = function() return "", true end,
 		keycodes = {
@@ -320,19 +377,7 @@ local function load_remap(options)
 		},
 		timer = {
 			doAfter = function(delay, callback)
-				local timer = { delay = delay, callback = callback, running = true }
-				function timer:stop()
-					self.running = false
-					return self
-				end
-				function timer:fire(force)
-					if not self.running and force ~= true then return end
-					self.running = false
-					self.callback()
-				end
-				calls.timers[#calls.timers + 1] = timer
-				if options.settle_timer_synchronous and delay ~= 2.0 then timer:fire() end
-				return timer
+				return new_timer(delay, callback)
 			end,
 			doEvery = function()
 				return { stop = function() end }
@@ -447,6 +492,43 @@ local function reset_layout_observations(calls)
 end
 
 helpers.describe("karabiner wake callback lifecycle", function()
+	helpers.it("cancels and fences the deferred wizard before local teardown commits", function()
+		local remap, calls = load_remap()
+		local wizard_timer = calls.timers[1]
+		helpers.assert_type(wizard_timer, "table",
+			"enabled initialization must retain the deferred wizard timer")
+		helpers.assert_eq(wizard_timer.delay, 2.0)
+
+		helpers.assert_true(remap.stop())
+		calls.deliver_stopped()
+		helpers.assert_true(wizard_timer.running == false,
+			"local teardown must cancel the exact deferred wizard timer")
+		wizard_timer:fire(true)
+		helpers.assert_eq(calls.wizard_runs, 0,
+			"an already-queued wizard callback must reject the stopped lifecycle")
+		helpers.assert_eq(calls.onboarding_stops, 1,
+			"teardown must still stop onboarding resources exactly once")
+	end)
+
+	helpers.it("retries the exact deferred wizard after native cancellation refuses", function()
+		local remap, calls = load_remap({ timer_cancel_refusals = 1 })
+		local wizard_timer = calls.timers[1]
+
+		helpers.assert_true(remap.stop())
+		calls.deliver_stopped()
+		helpers.assert_eq(calls.timer_cancel_attempts, 1)
+		helpers.assert_true(wizard_timer.running,
+			"a refused cancellation must retain the exact live native capability")
+		helpers.assert_true(remap.teardown_local(),
+			"a later local teardown must retry retained wizard cleanup debt")
+		helpers.assert_eq(calls.timer_cancel_attempts, 2,
+			"retry must target the same wizard timer exactly once more")
+		helpers.assert_true(wizard_timer.running == false)
+		wizard_timer:fire(true)
+		helpers.assert_eq(calls.wizard_runs, 0,
+			"cleanup debt must remain callback-inert across every retry")
+	end)
+
 	helpers.it("renews the exact lease before redeploying the already-active generation", function()
 		local _, calls = load_remap()
 		helpers.assert_true(calls.init_ok, tostring(calls.init_err))

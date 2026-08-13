@@ -184,6 +184,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 		}
 
 		local original_focused_window = hs_stub.window.focusedWindow
+		local original_timer_new = hs_stub.timer.new
 		local original_do_after = hs_stub.timer.doAfter
 		local original_subscribe = hs_stub.window.filter.default.subscribe
 		local scheduled = 0
@@ -192,6 +193,10 @@ helpers.describe("ignored-window eventtap boundary", function()
 		hs_stub.window.focusedWindow = function()
 			focused_reads = focused_reads + 1
 			return watcher_capable_window("Password Manager", function() return "Sensitive Entry" end)
+		end
+		hs_stub.timer.new = function(...)
+			scheduled = scheduled + 1
+			return original_timer_new(...)
 		end
 		hs_stub.timer.doAfter = function(...)
 			scheduled = scheduled + 1
@@ -216,6 +221,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 			second_consumed = tap.fn(event)
 		end, debug.traceback)
 		hs_stub.window.focusedWindow = original_focused_window
+		hs_stub.timer.new = original_timer_new
 		hs_stub.timer.doAfter = original_do_after
 		hs_stub.window.filter.default.subscribe = original_subscribe
 		if not ok then error(err, 0) end

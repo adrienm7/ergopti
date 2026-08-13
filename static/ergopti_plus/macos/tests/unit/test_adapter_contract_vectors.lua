@@ -142,8 +142,15 @@ end)
 --- =====================================
 -- =====================================
 
+--- Loads HttpClient with the TimerScheduler bound to the same fresh hs stub.
+--- @return table HttpClient adapter.
+local function load_http_client()
+	package.loaded["adapters.timer_scheduler"] = nil
+	return helpers.load_with_stubs("adapters.http_client")
+end
+
 helpers.describe("Adapter contract vectors: HttpClient", function()
-	local adapter = helpers.load_with_stubs("adapters.http_client")
+	local adapter = load_http_client()
 
 	helpers.it("post_success_200 — callback receives ok=true, status=200", function()
 		hs.http.__set_response(
@@ -187,12 +194,12 @@ helpers.describe("Adapter contract vectors: HttpClient", function()
 
 	helpers.it("isActive returns false when no request is in flight", function()
 		-- Load a fresh adapter with no pending request
-		local fresh = helpers.load_with_stubs("adapters.http_client")
+		local fresh = load_http_client()
 		helpers.assert_eq(fresh.isActive(), false, "isActive() must be false when idle")
 	end)
 
 	helpers.it("cancel on an idle adapter leaves it idle and usable", function()
-		local fresh = helpers.load_with_stubs("adapters.http_client")
+		local fresh = load_http_client()
 		fresh.cancel()
 		helpers.assert_eq(fresh.isActive(), false,
 			"cancelling nothing must not flip the in-flight flag — a stuck true makes "

@@ -33,7 +33,7 @@ local helpers = require("tests.helpers")
 ---     on_done (the nil/unstartable-task shape),
 ---   * a TimerScheduler stub capturing every armed watchdog so the test can fire
 ---     it on demand,
----   * an hs.timer.doEvery stub capturing the poll callback so the test can tick
+---   * an hs.timer.new stub capturing the poll callback so the test can tick
 ---     the poll manually.
 --- @return table watchers The loaded module.
 --- @return table ctx {spawns=int, watchdogs=array, poll_cb=function|nil}.
@@ -62,7 +62,7 @@ local function load_watchers_with_dead_spawn()
 		after = function(_delay, fn)
 			local handle = { fn = fn, cancelled = false }
 			table.insert(ctx.watchdogs, handle)
-			return handle
+			return handle, true
 		end,
 		cancel = function(handle)
 			if type(handle) == "table" then handle.cancelled = true end
@@ -72,9 +72,13 @@ local function load_watchers_with_dead_spawn()
 
 	local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		timer = {
-			doEvery = function(_interval, fn)
+			new = function(_interval, fn)
 				ctx.poll_cb = fn
-				return { stop = function() end }
+				local handle = { live = false }
+				function handle:start() self.live = true; return self end
+				function handle:stop() self.live = false; return self end
+				function handle:running() return self.live end
+				return handle
 			end,
 			doAfter           = function(_d, _fn) return { stop = function() end } end,
 			secondsSinceEpoch = function() return 1000 end,
@@ -216,7 +220,7 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 			after = function(_delay, fn)
 				local handle = { fn = fn, cancelled = false }
 				table.insert(ctx.watchdogs, handle)
-				return handle
+				return handle, true
 			end,
 			cancel = function(handle)
 				if type(handle) == "table" then handle.cancelled = true end
@@ -226,7 +230,14 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 			timer = {
-				doEvery = function(_i, fn) ctx.poll_cb = fn; return { stop = function() end } end,
+				new = function(_i, fn)
+					ctx.poll_cb = fn
+					local handle = { live = false }
+					function handle:start() self.live = true; return self end
+					function handle:stop() self.live = false; return self end
+					function handle:running() return self.live end
+					return handle
+				end,
 				doAfter = function(_d, _fn) return { stop = function() end } end,
 				secondsSinceEpoch = function() return 1000 end,
 			},

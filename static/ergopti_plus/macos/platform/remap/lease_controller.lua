@@ -411,6 +411,20 @@ local function release_generation_timer(generation, slot, label)
 	end
 end
 
+--- Rolls back one scheduler candidate that never committed, retaining cleanup
+--- debt outside the active generation slot when native stop is not yet proven.
+--- @param timer table|nil Exact TimerScheduler handle.
+--- @param label string Diagnostic owner.
+local function rollback_uncommitted_timer(timer, label)
+	if type(timer) ~= "table" then return end
+	if not cancel_timer_handle(timer, label) then
+		_state.timer_cleanup_backlog[#_state.timer_cleanup_backlog + 1] = {
+			timer = timer,
+			label = label,
+		}
+	end
+end
+
 --- Resolves the bundle-owned executable at the final task-construction boundary.
 --- The launcher path is mutable across an app update, so a value cached by
 --- M.init() cannot authorize a later worker or fallback process.
@@ -567,7 +581,8 @@ local function schedule_fallback_retry(generation, reason)
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(TimerScheduler.after, FALLBACK_RETRY_SEC, function()
+	local schedule_ok, timer_or_err, committed = pcall(
+		TimerScheduler.after, FALLBACK_RETRY_SEC, function()
 		if not armed then
 			fired_before_arm = true
 			return
@@ -579,8 +594,9 @@ local function schedule_fallback_retry(generation, reason)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.fallback_retry_timer = timer
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
 		generation.fallback_retry_timer = nil
+		rollback_uncommitted_timer(timer, "Lease fallback retry timer")
 		generation.fallback_started = false
 		Logger.error(LOG, "Could not schedule fallback helper retry for lease %s: %s.",
 			generation.token, tostring(schedule_ok and "invalid handle" or timer_or_err))
@@ -715,7 +731,7 @@ local function arm_ack_timer(generation, expected)
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(TimerScheduler.after, timeout, function()
+	local schedule_ok, timer_or_err, committed = pcall(TimerScheduler.after, timeout, function()
 		if not armed then
 			fired_before_arm = true
 			return
@@ -730,8 +746,9 @@ local function arm_ack_timer(generation, expected)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.ack_timer = timer
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
 		generation.ack_timer = nil
+		rollback_uncommitted_timer(timer, "Lease ACK timer")
 		fail_generation(generation, "could not arm timeout for " .. expected .. ": "
 			.. tostring(schedule_ok and "invalid handle" or timer_or_err))
 		return
@@ -844,7 +861,8 @@ end
 local function arm_heartbeat_timer(generation)
 	if generation.heartbeat_timer then return true end
 	local timer
-	local schedule_ok, timer_or_err = pcall(TimerScheduler.every, HEARTBEAT_INTERVAL_SEC, function()
+	local schedule_ok, timer_or_err, committed = pcall(
+		TimerScheduler.every, HEARTBEAT_INTERVAL_SEC, function()
 		if not _state or _state.current ~= generation
 			or generation.heartbeat_timer ~= timer
 			or generation.failed or generation.stop_requested then
@@ -854,8 +872,9 @@ local function arm_heartbeat_timer(generation)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.heartbeat_timer = timer
-	if type(timer) ~= "table" or timer.fired == true then
+	if committed ~= true or type(timer) ~= "table" or timer.fired == true then
 		generation.heartbeat_timer = nil
+		rollback_uncommitted_timer(timer, "Lease heartbeat timer")
 		fail_generation(generation, "could not arm sequenced heartbeat timer: "
 			.. tostring(schedule_ok and "invalid handle" or timer_or_err))
 		return false
@@ -873,7 +892,8 @@ local function schedule_heartbeat_retry(generation)
 	local timer
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(TimerScheduler.after, HEARTBEAT_RETRY_SEC, function()
+	local schedule_ok, timer_or_err, committed = pcall(
+		TimerScheduler.after, HEARTBEAT_RETRY_SEC, function()
 		if not armed then
 			fired_before_arm = true
 			return
@@ -890,8 +910,9 @@ local function schedule_heartbeat_retry(generation)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.heartbeat_retry_timer = timer
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
 		generation.heartbeat_retry_timer = nil
+		rollback_uncommitted_timer(timer, "Lease heartbeat retry timer")
 		fail_generation(generation, "could not arm bounded heartbeat retry: "
 			.. tostring(schedule_ok and "invalid handle" or timer_or_err))
 		return false

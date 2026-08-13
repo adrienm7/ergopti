@@ -43,6 +43,7 @@ local function load_fixture()
 		tap_failure_ordinal = nil,
 		tap_failure_mode = nil,
 		watchdog_failure_mode = nil,
+		watchdog_stop_mode = nil,
 		listener_raises = false,
 		listener_result = true,
 		mailbox_start_mode = "ok",
@@ -86,7 +87,15 @@ local function load_fixture()
 			if controls.watchdog_failure_mode ~= "disabled" then self.live = true end
 			return self
 		end
-		function timer:stop() self.stops = self.stops + 1; self.live = false; return self end
+		function timer:stop()
+			self.stops = self.stops + 1
+			if controls.watchdog_stop_mode == "truthy_running_once" then
+				controls.watchdog_stop_mode = nil
+				return self
+			end
+			self.live = false
+			return self
+		end
 		function timer:running() return self.live end
 		watchdogs[#watchdogs + 1] = timer
 		return timer
@@ -180,6 +189,7 @@ local function load_fixture()
 	package.loaded["infra.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
+		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 	})
 	package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
@@ -264,6 +274,33 @@ helpers.describe("keymap start: exact native commitment", function()
 			helpers.assert_true(fixture.keymap.stop(true))
 		end)
 	end
+
+	helpers.it("fences a watchdog whose chainable stop leaves it running", function()
+		local fixture = load_fixture()
+		helpers.assert_true(fixture.keymap.start())
+		local watchdog = fixture.watchdogs[1]
+		fixture.taps[1].enabled = false
+		watchdog.callback()
+		helpers.assert_true(fixture.taps[1].enabled,
+			"the committed watchdog callback must be live in the behavioral fixture")
+
+		fixture.controls.watchdog_stop_mode = "truthy_running_once"
+		helpers.assert_eq(fixture.keymap.stop(true), false,
+			"a truthy stop result cannot commit while running() remains true")
+		helpers.assert_true(watchdog.live,
+			"the exact native watchdog must remain retained for cleanup retry")
+		assert_all_taps_disabled(fixture)
+		watchdog.callback()
+		assert_all_taps_disabled(fixture,
+			"a queued callback from retained cleanup debt")
+
+		helpers.assert_true(fixture.keymap.stop(true),
+			"a later teardown must retry the exact retained watchdog")
+		helpers.assert_eq(watchdog.stops, 2)
+		helpers.assert_eq(#fixture.watchdogs, 1,
+			"cleanup retry must not allocate a sibling watchdog")
+		helpers.assert_eq(watchdog.live, false)
+	end)
 
 	helpers.it("rolls back a listener registration throw before starting taps", function()
 		local fixture = load_fixture()

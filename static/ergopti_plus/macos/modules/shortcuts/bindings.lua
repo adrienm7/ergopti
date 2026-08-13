@@ -273,23 +273,38 @@ end
 -- =============================
 -- =============================
 
---- Releases every live hotkey/eventtap object and empties the registry.
+--- Releases every live hotkey/eventtap object without forgetting cleanup debt.
 --- Extracted so the two callers cannot drift apart on how an object is torn
 --- down: M.stop() (a genuine subsystem shutdown) and M.rebind() (a layout
 --- re-arm). Only the former owns the subsystem-level state — see M.stop().
+--- @return boolean settled True only when every native owner was released.
 local function release_hotkeys()
-	for name, v in pairs(hotkeys) do
+	local settled = true
+	local names = {}
+	for name in pairs(hotkeys) do names[#names + 1] = name end
+	for _, name in ipairs(names) do
+		local v = hotkeys[name]
+		local released = false
 		if v and type(v.delete) == "function" then
-			pcall(function() v:delete() end)
+			local ok, result = pcall(function() return v:delete() end)
+			released = ok and result ~= false
 		elseif v and type(v.disable) == "function" then
-			pcall(function() v:disable() end)
+			local ok, result = pcall(function() return v:disable() end)
+			released = ok and result ~= false
 		end
-		Logger.debug(LOG, "Hotkey '%s' unbound.", name)
+		if released then
+			hotkeys[name] = nil
+			Logger.debug(LOG, "Hotkey '%s' unbound.", name)
+		else
+			settled = false
+			Logger.error(LOG, "Hotkey '%s' teardown did not settle — native handle retained for retry.", name)
+		end
 	end
-	hotkeys = {}
+	return settled
 end
 
---- Binds all configured hotkeys and starts background tasks.
+--- Binds all configured hotkeys and starts background tasks transactionally.
+--- @return boolean committed True only when every enabled binding is owned.
 function M.start()
 	if started then
 		-- A second start() per boot is the intended reconciliation, not a bug:
@@ -298,10 +313,13 @@ function M.start()
 		-- keymap.start's silently-idempotent restart and log at DEBUG so a normal
 		-- boot stays warning-free (a WARNING every boot trains users to ignore them)
 		Logger.debug(LOG, "M.start() already active — ignoring duplicate start (boot reconciliation).")
-		return
+		return true
+	end
+	if next(hotkeys) ~= nil and release_hotkeys() ~= true then
+		Logger.error(LOG, "Shortcuts bindings cannot start while native cleanup is pending.")
+		return false
 	end
 	Logger.start(LOG, "Starting shortcuts bindings…")
-	started = true
 
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
@@ -309,12 +327,18 @@ function M.start()
 		-- so that resume after focus loss cannot silently re-enable them
 		-- (shortcuts-bindings-reenable-on-resume).
 		if not hotkeys[name] and not _disabled_set[name] then
-			local ok, obj = pcall(def)
-			if ok and type(obj) == "table" then
+			local ok, obj = xpcall(def, debug.traceback)
+			local object_type = type(obj)
+			if ok and obj ~= nil and (object_type == "table" or object_type == "userdata") then
 				hotkeys[name] = obj
 				Logger.debug(LOG, "Hotkey '%s' bound.", name)
 			else
-				Logger.error(LOG, "Failed to bind hotkey '%s'.", name)
+				Logger.error(LOG, "Failed to bind hotkey '%s': %s.", name, tostring(obj))
+				local rollback_settled = release_hotkeys()
+				if not rollback_settled then
+					Logger.error(LOG, "Shortcuts bindings startup rollback is incomplete.")
+				end
+				return false
 			end
 		end
 	end
@@ -324,14 +348,17 @@ function M.start()
 
 	local count = 0
 	for _ in pairs(hotkeys) do count = count + 1 end
+	started = true
 	Logger.success(LOG, "Shortcuts bindings started (%d hotkey(s)).", count)
+	return true
 end
 
 --- Unbinds all hotkeys and stops background tasks.
+--- @return boolean settled True only when every owned resource was released.
 function M.stop()
-	if not started then
+	if not started and next(hotkeys) == nil then
 		Logger.debug(LOG, "M.stop() called when not started — nothing to do.")
-		return
+		return true
 	end
 	Logger.start(LOG, "Stopping shortcuts bindings…")
 
@@ -341,11 +368,23 @@ function M.stop()
 	-- cancelling it. M.rebind() must NEVER reach this line — routing the layout
 	-- rebind through stop() is what silently killed keep-awake, and the laptop
 	-- slept, on every input-source change (shortcuts-rebind-kills-keep-awake).
-	sys_acts.stop_awake()
+	local awake_settled = true
+	if started then
+		local ok, result = xpcall(sys_acts.stop_awake, debug.traceback)
+		awake_settled = ok and result ~= false
+		if not awake_settled then
+			Logger.error(LOG, "Keep-awake teardown did not settle: %s.", tostring(result))
+		end
+	end
 
-	release_hotkeys()
+	local hotkeys_settled = release_hotkeys()
 	started = false
+	if not awake_settled or not hotkeys_settled then
+		Logger.error(LOG, "Shortcuts bindings stop is incomplete and remains retryable.")
+		return false
+	end
 	Logger.success(LOG, "Shortcuts bindings stopped.")
+	return true
 end
 
 --- Re-creates every hotkey object in place, WITHOUT touching subsystem-level
@@ -361,15 +400,20 @@ function M.rebind()
 		-- would resurrect hotkeys the user deliberately turned off
 		-- (shortcuts-layout-rebind-reenables).
 		Logger.debug(LOG, "M.rebind() called when not started — nothing to re-arm.")
-		return
+		return false
 	end
 	Logger.trace(LOG, "Rebinding shortcuts hotkeys…")
-	release_hotkeys()
-	-- Clear the flag so M.start() runs its bind loop instead of early-returning
-	-- on the duplicate-start guard.
 	started = false
-	M.start()
+	if release_hotkeys() ~= true then
+		Logger.error(LOG, "Shortcuts hotkey rebind could not release every prior owner.")
+		return false
+	end
+	if M.start() ~= true then
+		Logger.error(LOG, "Shortcuts hotkey rebind could not commit replacement owners.")
+		return false
+	end
 	Logger.done(LOG, "Shortcuts hotkeys rebound.")
+	return true
 end
 
 --- Returns true when bindings have been started and not yet stopped.

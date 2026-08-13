@@ -100,16 +100,42 @@ local KEY_ECHO_CHARS = { ["return"] = "\r", ["tab"] = "\t" }
 -- snapshot Ergopti's payload as if it were the user's clipboard.
 local _paste_saved_original = nil
 local _paste_pending_timer = nil
+local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
 local _paste_recovery_only = false
 local _paste_generation = 0
 
+--- Cancels one exact scheduler handle without discarding stop-failure debt.
+--- @param timer table TimerScheduler handle.
+--- @return boolean settled
+local function cancel_paste_timer(timer)
+	local ok_cancel, settled_or_error = pcall(TimerScheduler.cancel, timer)
+	if ok_cancel and settled_or_error == true then return true end
+	if _paste_timer_cleanup == nil or _paste_timer_cleanup == timer then
+		_paste_timer_cleanup = timer
+	end
+	Logger.error(LOG, "Clipboard timer cleanup remains pending: %s.",
+		tostring(ok_cancel and settled_or_error or settled_or_error))
+	return false
+end
+
+--- Retries the exact native timer retained after a stop refusal.
+--- @return boolean settled
+local function retry_paste_timer_cleanup()
+	local cleanup = _paste_timer_cleanup
+	if cleanup == nil then return true end
+	if cancel_paste_timer(cleanup) ~= true then return false end
+	if _paste_timer_cleanup == cleanup then _paste_timer_cleanup = nil end
+	return true
+end
+
+--- Stops the active clipboard timer and retains any exact cleanup debt.
+--- @return boolean settled
 local function stop_paste_restore_timer()
 	local pending = _paste_pending_timer
 	_paste_pending_timer = nil
-	if pending and type(pending.stop) == "function" then
-		pcall(pending.stop, pending)
-	end
+	if pending and cancel_paste_timer(pending) ~= true then return false end
+	return retry_paste_timer_cleanup()
 end
 
 local function release_paste_ownership()
@@ -151,34 +177,39 @@ local queue_paste_restore_retry
 --- @return any error_detail
 local function schedule_paste_restore(delay)
 	if _paste_pending_timer then return true, nil end
+	if retry_paste_timer_cleanup() ~= true then
+		return false, "prior clipboard timer cleanup remains unsettled"
+	end
 	local generation = _paste_generation
 	local callback_ran = false
-	-- A scheduler test-double (or a broken native boundary) may invoke the
-	-- callback before returning its handle. Treat that as allocation refusal:
-	-- running recovery while this assignment is incomplete would recursively
-	-- observe a nil _paste_pending_timer and exhaust the Lua stack.
+	local timer_handle = nil
 	local installing = true
-	local ok_timer, timer_or_error = pcall(function()
-		_paste_pending_timer = hs.timer.doAfter(delay, function()
+	local ok_timer, timer_or_error, timer_committed = pcall(TimerScheduler.after, delay, function()
 			callback_ran = true
 			if installing then return end
-			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
+			if timer_handle and timer_handle.timer ~= nil then
+				-- TimerScheduler already fenced repeat delivery before invoking us.
+				-- Retain its exact native stop debt so no successor can be armed.
+				_paste_timer_cleanup = timer_handle
+			end
 			_paste_pending_timer = nil
+			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
 			local restored, restore_error = restore_owned_clipboard()
 			if restored then return end
 			_paste_recovery_only = true
 			Logger.error(LOG, "Clipboard restore failed; ownership retained for retry: %s.",
 				tostring(restore_error))
 			queue_paste_restore_retry("native restore refusal")
-		end)
-		return _paste_pending_timer
 	end)
+	timer_handle = timer_or_error
 	installing = false
-	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
-		stop_paste_restore_timer()
+	if not ok_timer or timer_committed ~= true
+		or type(timer_or_error) ~= "table" or timer_or_error.timer == nil or callback_ran then
+		if type(timer_or_error) == "table" then cancel_paste_timer(timer_or_error) end
 		return false, ok_timer and (callback_ran and "timer fired before commit"
-			or "hs.timer.doAfter returned no handle") or timer_or_error
+			or "TimerScheduler.after returned no committed handle") or timer_or_error
 	end
+	_paste_pending_timer = timer_or_error
 	return true, nil
 end
 
@@ -257,7 +288,13 @@ local function perform_paste(value)
 	-- clipboard) — reading readAllData() now would return the first
 	-- expansion's data rather than what the user had copied.
 	if _paste_owns_clipboard then
-		stop_paste_restore_timer()
+		if stop_paste_restore_timer() ~= true then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("prior paste timer cleanup refusal") end
+			Logger.error(LOG, "Clipboard paste refused while prior timer cleanup remains pending: %s.",
+				tostring(restore_error))
+			return false
+		end
 	else
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
 		local ok_snapshot, snapshot_or_error = pcall(function()
@@ -318,7 +355,7 @@ end
 --- clipboard again before the OS has delivered the previous Cmd+V would
 --- overwrite it mid-flight and corrupt the earlier segment
 --- (multi-segment-paste-race). Only the FIRST paste in the loop fires
---- synchronously; every subsequent one is chained onto hs.timer.doAfter so
+--- synchronously; every subsequent one is chained onto TimerScheduler.after so
 --- each paste's Cmd+V has CLIPBOARD_PASTE_GAP_SEC to be consumed before the
 --- next setContents() call runs.
 --- @param tokens table The token list produced by tokens_from_repl().
@@ -339,14 +376,11 @@ function M.emit_tokens(tokens)
 	-- allowed to mutate the clipboard. 0 means "fire immediately" (no prior
 	-- paste queued yet in this emit_tokens call).
 	local next_paste_delay = 0
+	local planned_emissions = {}
 
-	-- When the next token of ANY kind may be emitted. Stays 0 — i.e. everything
-	-- keeps firing inline — until a paste is actually DEFERRED. Only a deferred
-	-- paste creates an ordering hazard: an inline paste has already posted its
-	-- Cmd+V by the time the next token runs, and CGEvent delivery preserves post
-	-- order, so a following inline keystroke still lands after it. Chaining after
-	-- an inline paste too would add a settle gap to the common single-segment
-	-- expansion for no benefit.
+	-- When the next token of ANY kind may be emitted. Every clipboard paste moves
+	-- this cursor: Cmd+V is only our last posted event; the target produces the
+	-- pasted text later, so a following key must wait for that settle boundary.
 	local order_delay = 0
 
 	--- Schedules an emission while retaining the ambient synthetic-input
@@ -361,8 +395,26 @@ function M.emit_tokens(tokens)
 	local function defer_in_transaction(delay, fn)
 		local tx = SyntheticInput.current_transaction()
 		local retain_token = tx and SyntheticInput.retain(tx) or nil
+		local deferred = {
+			tx = tx,
+			retain_token = retain_token,
+			released = false,
+		}
 
-		local ok_timer, timer_or_err = pcall(TimerScheduler.after, delay, function()
+		local function release_retain()
+			if deferred.released then return true end
+			deferred.released = true
+			if not tx then return true end
+			local ok_release, release_err = pcall(SyntheticInput.release, tx, retain_token)
+			if not ok_release then
+				Logger.error(LOG, "Deferred synthetic transaction release failed: %s.",
+					tostring(release_err))
+				return false
+			end
+			return true
+		end
+
+		local ok_timer, timer_or_err, timer_committed = pcall(TimerScheduler.after, delay, function()
 			local ok_run, run_err = pcall(function()
 				if tx then
 					SyntheticInput.with_transaction(tx, fn)
@@ -371,27 +423,25 @@ function M.emit_tokens(tokens)
 				end
 			end)
 
-			local ok_release, release_err = true, nil
-			if tx then
-				ok_release, release_err = pcall(SyntheticInput.release, tx, retain_token)
-			end
+			release_retain()
 
 			if not ok_run then
 				Logger.error(LOG, "Deferred synthetic emission failed: %s.", tostring(run_err))
 			end
-			if not ok_release then
-				Logger.error(LOG, "Deferred synthetic transaction release failed: %s.", tostring(release_err))
-			end
 		end)
 
-		if not ok_timer or type(timer_or_err) ~= "table" or timer_or_err.timer == nil then
-			if tx then
-				pcall(SyntheticInput.release, tx, retain_token)
+		if not ok_timer or timer_committed ~= true
+			or type(timer_or_err) ~= "table" or timer_or_err.timer == nil then
+			if type(timer_or_err) == "table" then
+				pcall(TimerScheduler.cancel, timer_or_err)
 			end
+			release_retain()
 			error(ok_timer and "timer scheduler returned no live deferred synthetic timer"
 				or timer_or_err, 0)
 		end
-		return timer_or_err
+		deferred.handle = timer_or_err
+		deferred.release = release_retain
+		return deferred
 	end
 
 	--- Emits inline when nothing is queued ahead, otherwise chains behind it.
@@ -402,7 +452,7 @@ function M.emit_tokens(tokens)
 	--- @param delay number Seconds to wait, or <= 0 to fire inline.
 	--- @param fn function The emission to perform.
 	local function emit_in_order(delay, fn)
-		if delay <= 0 then fn() else defer_in_transaction(delay, fn) end
+		planned_emissions[#planned_emissions + 1] = { delay = delay, run = fn }
 	end
 
 	for _, tok in ipairs(tokens) do
@@ -434,17 +484,15 @@ function M.emit_tokens(tokens)
 
 				local paste_at    = next_paste_delay
 				local paste_value = tok.value  -- Bound per iteration for the deferred closure
-				if paste_at <= 0 then
-					assert(perform_paste(paste_value) == true,
-						"clipboard token paste could not be dispatched")
-				else
+				if paste_at > 0 then
 					Logger.debug(LOG, "Deferring paste of %d char(s) by %.2fs to avoid clipboard race.",
 						ok_l and tok_len or 1, paste_at)
-					defer_in_transaction(paste_at, function()
-						assert(perform_paste(paste_value) == true,
-							"deferred clipboard token paste could not be dispatched")
-					end)
 				end
+				emit_in_order(paste_at, function()
+					assert(perform_paste(paste_value) == true,
+						paste_at > 0 and "deferred clipboard token paste could not be dispatched"
+							or "clipboard token paste could not be dispatched")
+				end)
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
 				next_paste_delay = paste_at + CLIPBOARD_PASTE_GAP_SEC
@@ -471,6 +519,41 @@ function M.emit_tokens(tokens)
 		end
 
 		::continue::
+	end
+
+	-- Acquire every delayed capability before the first visible mutation. If one
+	-- timer is refused, previously acquired timers are fenced and every synthetic
+	-- retain is released while the user's screen is still untouched. The earlier
+	-- inline-first implementation could paste the first segment and only then
+	-- discover that the timer for the trailing Return did not exist, leaving a
+	-- silently truncated expansion.
+	local deferred_emissions = {}
+	local function rollback_deferred()
+		for _, deferred in ipairs(deferred_emissions) do
+			if deferred.handle then pcall(TimerScheduler.cancel, deferred.handle) end
+			if deferred.release then deferred.release() end
+		end
+	end
+	for _, emission in ipairs(planned_emissions) do
+		if emission.delay > 0 then
+			local ok_defer, deferred_or_error = pcall(defer_in_transaction,
+				emission.delay, emission.run)
+			if not ok_defer then
+				rollback_deferred()
+				error(deferred_or_error, 0)
+			end
+			deferred_emissions[#deferred_emissions + 1] = deferred_or_error
+		end
+	end
+
+	local ok_inline, inline_error = xpcall(function()
+		for _, emission in ipairs(planned_emissions) do
+			if emission.delay <= 0 then emission.run() end
+		end
+	end, debug.traceback)
+	if not ok_inline then
+		rollback_deferred()
+		error(inline_error, 0)
 	end
 
 	Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)

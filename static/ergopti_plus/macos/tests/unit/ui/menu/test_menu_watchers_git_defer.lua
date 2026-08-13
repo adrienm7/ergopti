@@ -82,4 +82,57 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 
 		hs.pathwatcher, hs.timer = prev_pw, prev_timer
 	end)
+
+	helpers.it("revokes a pending reload and retains failed timer cleanup for an exact retry", function()
+		for _, failure in ipairs({ "false", "throw" }) do
+			local prev_pw, prev_timer = hs.pathwatcher, hs.timer
+			local captured_cb, pending_callback
+			local reloads = 0
+			local timer_stops = 0
+
+			hs.pathwatcher = { new = function(_path, callback)
+				captured_cb = callback
+				local watcher = {}
+				function watcher:start() return watcher end
+				function watcher:stop() return watcher end
+				return watcher
+			end }
+			hs.timer = {
+				doAfter = function(_delay, callback)
+					pending_callback = callback
+					local timer = {}
+					function timer:stop()
+						timer_stops = timer_stops + 1
+						if timer_stops == 1 then
+							if failure == "throw" then error("timer stop failed") end
+							return false
+						end
+						return timer
+					end
+					return timer
+				end,
+				secondsSinceEpoch = function() return 10 end,
+			}
+
+			local owner = MenuWatchers.start_config_watcher(
+				"/fake/base/",
+				function() reloads = reloads + 1 end,
+				function() return 0 end,
+				{ defer_reload = function(callback) callback() end }
+			)
+			captured_cb({ "/fake/base/modules/change.lua" })
+			helpers.assert_true(type(pending_callback) == "function", "a relevant change must arm the debounce")
+			helpers.assert_eq(false, owner:stop(),
+				"a failed timer cancellation must preserve the owner for retry (" .. failure .. ")")
+			pending_callback()
+			helpers.assert_eq(0, reloads,
+				"a stale queued callback must not reload after logical teardown (" .. failure .. ")")
+			helpers.assert_eq(true, owner:stop(),
+				"the same owner must settle retained cleanup on retry (" .. failure .. ")")
+			helpers.assert_eq(2, timer_stops,
+				"cleanup must retry the exact timer once (" .. failure .. ")")
+
+			hs.pathwatcher, hs.timer = prev_pw, prev_timer
+		end
+	end)
 end)

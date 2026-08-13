@@ -80,7 +80,7 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 		}
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(_delay, callback)
-				return { callback = callback, fired = false }
+			return { callback = callback, fired = false }, true
 			end,
 			cancel = function() return true end,
 		}
@@ -88,9 +88,13 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 		package.loaded["platform.remap.watchers"] = nil
 
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
-			timer    = { doEvery = function(_delay, callback)
+			timer    = { new = function(_delay, callback)
 					poll_callback = callback
-					return { stop = function() end }
+					local handle = { live = false }
+					function handle:start() self.live = true; return self end
+					function handle:stop() self.live = false; return self end
+					function handle:running() return self.live end
+					return handle
 				end,
 			          doAfter  = function() return { stop = function() end } end },
 			-- load_with_stubs replaces hs.keycodes wholesale (shallow key

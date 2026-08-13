@@ -213,6 +213,34 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			"the retained retry must restore the original all-type snapshot")
 	end)
 
+	helpers.it("acquires trailing ordering timers before the first visible paste", function()
+		local fixture = load_fixture()
+		fixture.hs.timer.new = function() return nil end
+
+		fixture.synthetic.enter_callback()
+		local transaction = fixture.synthetic.begin("test.preflight", "replacement")
+		local ok = pcall(function()
+			fixture.synthetic.with_transaction(transaction, function()
+				fixture.utils.emit_tokens({
+					{ kind = "text", value = ("P"):rep(60) },
+					{ kind = "key", value = "return" },
+				})
+			end)
+		end)
+		if ok then fixture.synthetic.seal(transaction) else fixture.synthetic.cancel(transaction) end
+		local consume, events = fixture.synthetic.leave_callback(ok)
+
+		helpers.assert_true(not ok,
+			"a refused trailing-order timer must reject the logical replacement")
+		helpers.assert_eq(#fixture.pasted_values, 0,
+			"all delayed capabilities must commit before the first clipboard mutation")
+		helpers.assert_true(not consume)
+		helpers.assert_nil(events,
+			"preflight refusal must leave no partial synthetic batch to consume")
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+			"the failed preflight must release every retained transaction token")
+	end)
+
 	helpers.it("rolls back without Cmd+V when the restore timer is refused", function()
 		local fixture = load_fixture()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
@@ -226,7 +254,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			current = saved
 			return true
 		end
-		fixture.hs.timer.doAfter = function() return nil end
+		fixture.hs.timer.new = function() return nil end
 
 		fixture.synthetic.enter_callback()
 		local transaction = fixture.synthetic.begin("test.timer_refusal", "replacement")
@@ -263,11 +291,15 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			restore_attempts = restore_attempts + 1
 			return false
 		end
-		fixture.hs.timer.doAfter = function(_delay, callback)
+		fixture.hs.timer.new = function(_delay, callback)
 			timer_calls = timer_calls + 1
-			local handle = { stop = function() end }
-			callback()
-			return handle
+			return {
+				start = function(self)
+					callback()
+					return self
+				end,
+				stop = function(self) return self end,
+			}
 		end
 		fixture.synthetic.defer_after_callback = function(_label, callback)
 			defer_calls = defer_calls + 1

@@ -3,22 +3,20 @@
 --- ==============================================================================
 --- MODULE: Regression — the KE bridge must not replay its off-window backlog
 --- DESCRIPTION:
---- Toggling Metrics off, working for a while, then toggling it back on injected
---- the entire intervening period of physical keystrokes into the metrics store —
---- stamped with the CURRENT time and attributed to the CURRENTLY focused app.
+--- A bridge restart must never replay bytes written while no trusted drain
+--- cursor existed, stamped with the current time and focused application.
 ---
 --- ROOT CAUSE ENCODED:
---- M.stop() tears down both drain triggers (the path watcher and the poll timer),
---- so _file_offset cannot advance while the bridge is off. Karabiner keeps
---- appending to the kc log regardless — it is a separate process that knows
---- nothing about the toggle. M.start() re-armed the watchers without moving the
---- cursor, so the very next drain read everything appended during the off window
---- and replayed it as if it had just happened.
+--- The normal Metrics OFF path now deliberately leaves the KC watcher and poll
+--- timer alive, so the cursor advances while persistence is denied; the
+--- behavioural proof lives in test_kc_bridge_offset_advances_while_disabled.lua.
+--- This test pins the independent recovery backstop: if producer ownership or
+--- cursor trust was lost, M.start() must call the single EOF-resync helper before
+--- it can re-arm or reuse the drain producers.
 ---
---- M.init() already does the right thing for the same reason, and says so: "Set
---- _file_offset to current end so we ignore stale lines from a prior session".
---- The restart path simply did not carry that step — the repo's usual shape, an
---- invariant applied at one of two entry points.
+--- The helper owns the open/seek/close proof and publishes both the EOF offset
+--- and the cursor-trusted bit. Keeping those mutations in one function prevents
+--- init() and recovery start() from drifting apart.
 ---
 --- Discarding is the only correct choice. The user deliberately switched recording
 --- off, and the real timestamps and focused-app context of those keys are gone, so
@@ -49,17 +47,26 @@ helpers.describe("kc_bridge discards keystrokes appended while it was stopped", 
 		local start_at = src:find("function M%.start%(%)")
 		helpers.assert_true(start_at ~= nil, "M.start must be locatable")
 
-		-- Bound the slice to M.start's body so init()'s own seek cannot satisfy this.
+		-- Bound the slice to M.start's body so init()'s call cannot satisfy this.
 		local body_end = src:find("\n%-%-%-", start_at + 10) or #src
 		local body = src:sub(start_at, body_end)
 
-		helpers.assert_true(body:find('seek%("end"%)') ~= nil,
-			"M.start() must re-sync _file_offset to EOF. stop() removes both drain "
-			.. "triggers so the cursor cannot advance while the bridge is off, and "
-			.. "Karabiner keeps appending — without the re-sync the next drain replays "
-			.. "the whole off-window backlog with fabricated timestamps")
-		helpers.assert_true(body:find("_file_offset = eof") ~= nil,
-			"the re-synced end position must actually be assigned to _file_offset")
+		helpers.assert_true(
+			body:find("if not _watchers_active or not _cursor_trusted then", 1, true) ~= nil,
+			"M.start() must refuse the fast path whenever producer ownership or cursor trust was lost")
+		helpers.assert_true(body:find("resync_cursor_to_eof()", 1, true) ~= nil,
+			"M.start() must prove a fresh EOF before recovering an inactive or untrusted bridge")
+
+		local helper_at = src:find("local function resync_cursor_to_eof()", 1, true)
+		helpers.assert_true(helper_at ~= nil, "the EOF resync helper must be locatable")
+		local helper_end = src:find("\nend\n", helper_at) or #src
+		local helper = src:sub(helper_at, helper_end)
+		helpers.assert_true(helper:find('handle:seek("end")', 1, true) ~= nil,
+			"the shared recovery helper must seek the physical ledger to EOF")
+		helpers.assert_true(helper:find("_file_offset = eof_or_err", 1, true) ~= nil,
+			"the proven EOF must be published as the next drain offset")
+		helpers.assert_true(helper:find("_cursor_trusted = true", 1, true) ~= nil,
+			"cursor trust may open only after the EOF proof commits")
 	end)
 
 	helpers.it("still reports how much was skipped", function()

@@ -11,8 +11,9 @@
 ---   (c) when the orphan fired it clobbered _warmup_timeout and flipped
 ---       _warmup_in_flight=false, corrupting a later warmup cycle.
 ---
---- Fix: both sites now use TimerScheduler.cancel(_warmup_timeout) — the only
---- correct cancellation API for a TimerScheduler handle.
+--- Fix: every timeout teardown selects the exact retained handle through
+--- cancel_warmup_timer(), which calls TimerScheduler.cancel(handle) and clears
+--- the slot only after that adapter reports literal true.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -35,12 +36,23 @@ helpers.describe("api_mlx: warmup timeout uses TimerScheduler.cancel not :stop()
 		)
 	end)
 
-	helpers.it("api_mlx.lua uses TimerScheduler.cancel for warmup timeout teardown", function()
+	helpers.it("api_mlx.lua delegates exact warmup timeout teardown to TimerScheduler.cancel", function()
 		local src = read_src()
-		-- There must be at least one TimerScheduler.cancel(_warmup_timeout) call
+		local helper_at = src:find("local function cancel_warmup_timer", 1, true)
+		local helper_end = helper_at and src:find("\n--- Schedules one generation%-fenced warmup retry", helper_at)
+		helpers.assert_true(helper_at ~= nil and helper_end ~= nil,
+			"the exact warmup timer cleanup helper must remain independently locatable")
+		local helper = src:sub(helper_at, helper_end - 1)
 		helpers.assert_true(
-			src:find("TimerScheduler%.cancel%(_warmup_timeout%)") ~= nil,
-			"api_mlx.lua must cancel _warmup_timeout via TimerScheduler.cancel(_warmup_timeout)"
-		)
+			helper:find("slot_name == \"timeout\" and _warmup_timeout", 1, true) ~= nil,
+			"the helper must select the exact retained warmup timeout capability")
+		helpers.assert_true(helper:find("TimerScheduler.cancel(handle)", 1, true) ~= nil,
+			"the retained scheduler handle must be cancelled through its owning adapter")
+		helpers.assert_true(
+			helper:find("slot_name == \"timeout\" and _warmup_timeout == handle", 1, true) ~= nil,
+			"successful cancellation may clear only the exact timeout generation it settled")
+		local _, timeout_call_count = src:gsub("cancel_warmup_timer%(\"timeout\"%)", "")
+		helpers.assert_true(timeout_call_count >= 3,
+			"warmup completion, reset, and stop paths must all use the exact cleanup helper")
 	end)
 end)

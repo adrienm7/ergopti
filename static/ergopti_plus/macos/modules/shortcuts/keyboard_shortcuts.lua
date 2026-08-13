@@ -192,33 +192,43 @@ end
 --- Creates and starts a hotkey binding for a single slot.
 --- @param slot_id string
 --- @param action_id string
+--- @return boolean committed True when no binding is needed or one is owned.
 local function bind_slot(slot_id, action_id)
-	if action_id == "none" then return end
+	if action_id == "none" then return true end
 	local chord = slot_to_chord(slot_id)
 	if not chord then
-		Logger.debug(LOG, "Slot '%s' has no valid chord mapping — skipped.", slot_id)
-		return
+		Logger.error(LOG, "Slot '%s' has no valid chord mapping — startup refused.", slot_id)
+		return false
 	end
-	local handle = Registrar.bind(chord, function()
+	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
 		pcall(GestActions.execute_single, action_id, "keyboard__" .. slot_id)
 	end)
-	if handle then
+	if ok_bind and handle then
 		_hotkeys[slot_id] = handle
 		Logger.done(LOG, "Bound %s → %s.", slot_label(slot_id), action_id)
+		return true
 	else
-		Logger.warn(LOG, "Failed to bind slot '%s' (chord: %s).", slot_id, chord)
+		Logger.error(LOG, "Failed to bind slot '%s' (chord: %s): %s.",
+			slot_id, chord, tostring(handle))
+		return false
 	end
 end
 
 --- Releases the hotkey for a slot if active.
 --- @param slot_id string
+--- @return boolean settled True only when the native owner was released.
 local function unbind_slot(slot_id)
 	local handle = _hotkeys[slot_id]
-	if handle then
-		Registrar.unbind(handle)
+	if not handle then return true end
+	local ok, result = xpcall(Registrar.unbind, debug.traceback, handle)
+	if ok and result == true then
 		_hotkeys[slot_id] = nil
+		return true
 	end
+	Logger.error(LOG, "Failed to release slot '%s': %s — handle retained for retry.",
+		slot_id, tostring(result))
+	return false
 end
 
 
@@ -298,17 +308,18 @@ end
 function M.set_action(slot_id, action_id)
 	if type(slot_id) ~= "string" or type(action_id) ~= "string" then
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
-		return
+		return false
 	end
 	_actions[slot_id] = action_id
 	hs.settings.set(_settings_prefix .. slot_id, action_id)
 	Logger.debug(LOG, "Slot '%s' → '%s' persisted.", slot_id, action_id)
 
 	-- Hot-rebind: release old hotkey, create new one if not "none"
-	unbind_slot(slot_id)
+	if unbind_slot(slot_id) ~= true then return false end
 	if _started and action_id ~= "none" then
-		bind_slot(slot_id, action_id)
+		if bind_slot(slot_id, action_id) ~= true then return false end
 	end
+	return true
 end
 
 --- Loads persisted assignments from hs.settings, seeding defaults first.
@@ -335,37 +346,59 @@ local function load_assignments()
 	end
 end
 
---- Starts the keyboard shortcuts module: loads assignments and binds all active slots.
+--- Starts the keyboard shortcuts module and owns every configured binding.
+--- @return boolean committed True only when every required slot was bound.
 function M.start()
 	if _started then
 		Logger.debug(LOG, "M.start() called again after menu-state synchronization; bindings already active.")
-		return
+		return true
+	end
+	if next(_hotkeys) ~= nil and M.stop() ~= true then
+		Logger.error(LOG, "Keyboard shortcuts cannot start while native cleanup is pending.")
+		return false
 	end
 	Logger.start(LOG, "Starting keyboard shortcuts…")
-	load_assignments()
+	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback)
+	if not assignments_ok then
+		Logger.error(LOG, "Keyboard shortcut assignments could not be loaded: %s.",
+			tostring(assignments_err))
+		return false
+	end
 	for slot, action in pairs(_actions) do
-		if action ~= "none" then
-			bind_slot(slot, action)
+		if action ~= "none" and bind_slot(slot, action) ~= true then
+			Logger.error(LOG, "Keyboard shortcuts startup rolled back after slot '%s'.", slot)
+			M.stop()
+			return false
 		end
 	end
 	_started = true
 	local count = 0
 	for _ in pairs(_hotkeys) do count = count + 1 end
 	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s)).", count)
+	return true
 end
 
 --- Stops the keyboard shortcuts module and releases all hotkeys.
+--- @return boolean settled True only when every native owner was released.
 function M.stop()
-	if not _started then
-		Logger.warn(LOG, "stop() called before start() — nothing to stop.")
-		return
+	if not _started and next(_hotkeys) == nil then
+		Logger.debug(LOG, "stop() called before start() — nothing to stop.")
+		return true
 	end
 	Logger.start(LOG, "Stopping keyboard shortcuts…")
-	for slot in pairs(_hotkeys) do
-		unbind_slot(slot)
-	end
 	_started = false
+	local slots = {}
+	for slot in pairs(_hotkeys) do slots[#slots + 1] = slot end
+	local settled = true
+	for _, slot in ipairs(slots) do
+		if unbind_slot(slot) ~= true then settled = false end
+	end
+	if not settled then
+		Logger.error(LOG, "Keyboard shortcuts stop is incomplete and remains retryable.")
+		return false
+	end
 	Logger.success(LOG, "Keyboard shortcuts stopped.")
+	return true
 end
 
 return M

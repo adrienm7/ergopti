@@ -16,8 +16,9 @@
  *   - debounce = 0.5 s     (rapid-save collapse window before triggering reload)
  *
  * This gate fails if either constant diverges between the two drivers.
- * It also ratchet-checks the macOS debounce (hardcoded literal 0.5 in
- * hs.timer.doAfter) against the Linux `_debounce_sec = 0.5` declaration.
+ * It also ratchet-checks the macOS debounce (hardcoded literal 0.5 in the
+ * protected `pcall(hs.timer.doAfter, ...)` acquisition) against the Linux
+ * `_debounce_sec = 0.5` declaration.
  * ==============================================================================
  */
 
@@ -74,14 +75,14 @@ if (!linuxDebounceM) {
 	}
 }
 
-// macOS: `hs.timer.doAfter(0.5, ...)` — the literal 0.5 in the timer call
-const macosDebounceM = macosSrc.match(/doAfter\(\s*([\d.]+)\s*,/);
+// macOS: the protected native acquisition keeps the literal as pcall's second argument
+const macosDebounceM = macosSrc.match(/pcall\(\s*hs\.timer\.doAfter\s*,\s*([\d.]+)\s*,/);
 if (!macosDebounceM) {
-	errors.push('macos/infra/file_watchers.lua: hs.timer.doAfter(0.5, ...) not found');
+	errors.push('macos/infra/file_watchers.lua: protected hs.timer.doAfter debounce acquisition not found');
 } else {
 	const macosDebounce = parseFloat(macosDebounceM[1]);
 	if (macosDebounce !== 0.5) {
-		errors.push(`macos/infra/file_watchers.lua: doAfter delay = ${macosDebounce} — expected 0.5`);
+		errors.push(`macos/infra/file_watchers.lua: protected doAfter delay = ${macosDebounce} — expected 0.5`);
 	}
 }
 

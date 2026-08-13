@@ -35,10 +35,11 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
+const DRIVER_PREFIX = 'static/ergopti_plus/';
+const REQUIRED_DRIVERS = ['linux', 'macos', 'windows'];
 
 // The top-level trees that hold a driver's own source. `data`, `_generated`,
 // `tests`, `vendor`, `build` and `docs` are deliberately NOT here: they are not
@@ -67,9 +68,16 @@ function treesIn(literal) {
 	return CANONICAL_TREES.filter((t) => new RegExp(`["']${t}/?["']`).test(literal));
 }
 
-const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
-	.split('\n')
+const trackedPaths = execFileSync(
+	'git',
+	['ls-files', '--cached', '-z'],
+	{ cwd: ROOT, encoding: 'utf8' }
+)
+	.split('\0')
 	.filter(Boolean)
+	.map((rel) => rel.split(path.sep).join('/'));
+
+const tracked = trackedPaths
 	.filter((f) => /\.(ahk|lua|cjs|js|mjs)$/.test(f))
 	.filter((f) => fs.existsSync(path.join(ROOT, f)))
 	// This gate names every tree in its own canonical list, which is exactly the
@@ -105,18 +113,27 @@ for (const rel of tracked) {
 }
 
 // Every driver's real top-level folders must be known.
-const DRIVERS = fs
-	.readdirSync(DRIVERS_DIR, { withFileTypes: true })
-	.filter((e) => e.isDirectory() && fs.existsSync(path.join(DRIVERS_DIR, e.name, 'adapters')))
-	.map((e) => e.name)
-	.sort();
+const DRIVERS = [...new Set(
+	trackedPaths
+		.filter((rel) => rel.startsWith(DRIVER_PREFIX))
+		.map((rel) => rel.slice(DRIVER_PREFIX.length).split('/'))
+		.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
+		.map((parts) => parts[0])
+)].sort();
+
+const driverTrees = new Map(DRIVERS.map((driver) => [driver, new Set()]));
+for (const rel of trackedPaths) {
+	if (!rel.startsWith(DRIVER_PREFIX)) continue;
+	const parts = rel.slice(DRIVER_PREFIX.length).split('/');
+	if (parts.length < 3 || !driverTrees.has(parts[0])) continue;
+	driverTrees.get(parts[0]).add(parts[1]);
+}
 
 const unknown = [];
 for (const driver of DRIVERS) {
-	for (const e of fs.readdirSync(path.join(DRIVERS_DIR, driver), { withFileTypes: true })) {
-		if (!e.isDirectory()) continue;
-		if (CANONICAL_TREES.includes(e.name) || NON_SOURCE.has(e.name)) continue;
-		unknown.push(`${driver}/${e.name}`);
+	for (const tree of driverTrees.get(driver)) {
+		if (CANONICAL_TREES.includes(tree) || NON_SOURCE.has(tree)) continue;
+		unknown.push(`${driver}/${tree}`);
 	}
 }
 
@@ -131,6 +148,13 @@ if (process.argv.includes('--measure')) {
 }
 
 let failed = false;
+const missingDrivers = REQUIRED_DRIVERS.filter((driver) => !DRIVERS.includes(driver));
+if (missingDrivers.length > 0) {
+	failed = true;
+	console.error(
+		`\x1b[31m[ERROR] tracked-tree discovery missed required driver(s): ${missingDrivers.join(', ')}.\x1b[0m`
+	);
+}
 if (incomplete.length > 0) {
 	failed = true;
 	console.error(

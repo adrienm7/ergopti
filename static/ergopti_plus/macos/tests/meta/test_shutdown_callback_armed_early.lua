@@ -159,9 +159,13 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 				"the shared local teardown must still perform '" .. step .. "'")
 		end
 		helpers.assert_true(
-			teardown_body:find("TeardownTransaction.run(_local_teardown_state, steps)", 1, true) ~= nil,
-			"throws and explicit false results must remain visible and retryable per teardown step"
+			teardown_body:match(
+				"TeardownTransaction%.run_with_finalizer%s*%(%s*_local_teardown_state%s*,%s*steps%s*,%s*timer_finalizer") ~= nil,
+			"throws and explicit false results must remain visible and retryable per teardown step, "
+				.. "and the process-wide timer drain must remain dependent on their success"
 		)
+		helpers.assert_true(teardown_body:find("TimerScheduler.cancelAll", 1, true) ~= nil,
+			"the dependent finalizer must still drain the scheduler after every owner settles")
 		helpers.assert_true(teardown_body:find("_local_teardown_complete", 1, true) == nil,
 			"teardown must never certify itself before resource release has run")
 		helpers.assert_true(shutdown_body:find("request_exact_lease_revoke", 1, true) ~= nil,

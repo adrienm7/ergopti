@@ -14,6 +14,8 @@
 ---    run again on the next controlled quit/reload attempt.
 --- 4. Extensible completion: a later exit may add quit-only steps even after a
 ---    completed reload teardown attempt.
+--- 5. Dependent finalization: scheduler-wide or process-wide drains run only
+---    after every resource owner has released its exact capabilities.
 --- ==============================================================================
 
 local M = {}
@@ -96,6 +98,33 @@ function M.run(state, steps)
 		end
 	end
 	return all_complete
+end
+
+--- Runs independent owner cleanup before one dependent global finalizer.
+--- The finalizer is validated before any mutation, deferred while an owner is
+--- incomplete, and retained in the same transaction state for exact retries.
+--- @param state table State returned by `M.new_state()`.
+--- @param steps table[] Ordered independent owner cleanup descriptors.
+--- @param finalizer table Dependent `{ name=string, run=function }` descriptor.
+--- @return boolean complete True only when owners and finalizer are complete.
+function M.run_with_finalizer(state, steps, finalizer)
+	if type(steps) ~= "table" then
+		Logger.error(LOG, "Teardown steps must be a table.")
+		return false
+	end
+	if type(finalizer) ~= "table" then
+		Logger.error(LOG, "Teardown finalizer must be a descriptor table.")
+		return false
+	end
+	local complete_transaction = {}
+	for index, step in ipairs(steps) do
+		complete_transaction[index] = step
+	end
+	complete_transaction[#complete_transaction + 1] = finalizer
+	if not validate_steps(complete_transaction) then return false end
+
+	if M.run(state, steps) ~= true then return false end
+	return M.run(state, { finalizer })
 end
 
 return M

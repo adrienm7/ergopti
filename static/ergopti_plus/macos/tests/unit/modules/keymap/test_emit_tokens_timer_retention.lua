@@ -25,11 +25,19 @@ local function load_fixture()
 	package.loaded["hs"] = hs_stub
 
 	local pending = {}
-	hs_stub.timer.doAfter = function(delay, callback)
-		local entry = { delay = delay, callback = callback, stopped = false, fired = false }
+	hs_stub.timer.new = function(delay, callback)
+		local entry = {
+			delay = delay,
+			callback = callback,
+			stopped = false,
+			fired = false,
+			active = false,
+		}
 		pending[#pending + 1] = entry
 		local handle = {}
-		function handle:stop() entry.stopped = true end
+		function handle:start() entry.active = true; return self end
+		function handle:stop() entry.active = false; entry.stopped = true; return self end
+		function handle:running() return entry.active end
 		setmetatable(handle, { __gc = function(self) self:stop() end })
 		return handle
 	end
@@ -60,7 +68,8 @@ local function load_fixture()
 	}
 
 	local pasted = {}
-	hs_stub.pasteboard.readAllData = function() return {} end
+	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
+	hs_stub.pasteboard.writeAllData = function() return true end
 	hs_stub.pasteboard.setContents = function(value)
 		if value ~= "" then pasted[#pasted + 1] = value end
 		return true
@@ -70,7 +79,7 @@ local function load_fixture()
 		for _ = 1, 20 do
 			local next_entry = nil
 			for _, entry in ipairs(pending) do
-				if not entry.stopped and not entry.fired
+				if entry.active and not entry.stopped and not entry.fired
 					and (next_entry == nil or entry.delay < next_entry.delay) then
 					next_entry = entry
 				end

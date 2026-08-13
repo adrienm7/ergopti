@@ -117,9 +117,9 @@ check(
 );
 
 check(
-    'Controlled teardown: runs through the retryable transaction',
+    'Controlled teardown: drains owners before the dependent timer finalizer',
     'static/ergopti_plus/macos/init.lua',
-    /TeardownTransaction\.run\(_local_teardown_state, steps\)/
+    /name\s*=\s*["']timer-scheduler["'][\s\S]*TeardownTransaction\.run_with_finalizer\([\s\S]*_local_teardown_state,[\s\S]*steps,[\s\S]*timer_finalizer/
 );
 
 check(

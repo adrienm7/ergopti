@@ -27,17 +27,50 @@ local function load_core_with_timer_spy()
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	local timer_spy_calls = {}
-	local timer_stub = {}
-	for k, v in pairs(hs_stub.timer or {}) do
-		timer_stub[k] = v
+	local controller = { fail_next = nil, cancel_failures = 0 }
+	local scheduler_stub = {}
+	function scheduler_stub.after(delay, fn)
+		local handle = { timer = {}, committed = false, fired = false }
+		local call = { delay = delay, fn = fn, handle = handle }
+		timer_spy_calls[#timer_spy_calls + 1] = call
+		function call.fire()
+			if handle.committed ~= true or handle.fired then return false end
+			handle.committed = false
+			handle.fired = true
+			handle.timer = nil
+			fn()
+			return true
+		end
+		local failure = controller.fail_next
+		controller.fail_next = nil
+		if failure == "settled" then
+			handle.timer = nil
+			handle.fired = true
+			return handle, false
+		elseif failure == "debt" then
+			return handle, false
+		end
+		handle.committed = true
+		return handle, true
 	end
-	timer_stub.doAfter = function(delay, fn)
-		timer_spy_calls[#timer_spy_calls + 1] = { delay = delay, fn = fn }
-		return { stop = function() end }
+	function scheduler_stub.cancel(handle)
+		if controller.cancel_failures > 0 then
+			controller.cancel_failures = controller.cancel_failures - 1
+			return false
+		end
+		handle.committed = false
+		handle.fired = true
+		handle.timer = nil
+		return true
 	end
-	local fresh_core = helpers.load_with_stubs("modules.llm", { timer = timer_stub })
+	package.loaded["adapters.timer_scheduler"] = scheduler_stub
+	local fresh_core = helpers.load_with_stubs("modules.llm")
+	local loaded_hs = package.loaded["hs"]
+	local load_time_calls = {}
+	for index, call in ipairs(timer_spy_calls) do load_time_calls[index] = call end
+	for index = #timer_spy_calls, 1, -1 do timer_spy_calls[index] = nil end
 	_G.hs = INITIAL_HS
-	return fresh_core, timer_spy_calls, _G.hs
+	return fresh_core, timer_spy_calls, loaded_hs, controller, load_time_calls
 end
 
 
@@ -52,9 +85,13 @@ end
 
 helpers.describe("Core.DEFAULT_STATE", function()
 	helpers.it("does not schedule a network bootstrap timer at require-time", function()
-		local _, timer_spy_calls = load_core_with_timer_spy()
+		local _, timer_spy_calls, hs_stub, _, load_time_calls = load_core_with_timer_spy()
 		helpers.assert_eq(#timer_spy_calls, 0,
 			"modules.llm must stay side-effect free until boot explicitly enables network bootstrap")
+		hs_stub.http.__reset()
+		for _, call in ipairs(load_time_calls) do call.fire() end
+		helpers.assert_eq(#hs_stub.http.__calls, 0,
+			"the intentional local API-entry load must not perform backend probes")
 	end)
 
 	local required_keys = {
@@ -113,7 +150,7 @@ helpers.describe("Core.start_background_network_bootstrap", function()
 		fresh_core.start_background_network_bootstrap()
 		helpers.assert_eq(#timer_spy_calls, 1,
 			"explicit bootstrap must schedule exactly one deferred timer")
-		timer_spy_calls[1].fn()
+		helpers.assert_true(timer_spy_calls[1].fire())
 		helpers.assert_eq(#hs_stub.http.__calls, 4,
 			"bootstrap must issue two detection probes and two connection warmups")
 	end)
@@ -124,6 +161,31 @@ helpers.describe("Core.start_background_network_bootstrap", function()
 		fresh_core.start_background_network_bootstrap()
 		helpers.assert_eq(#timer_spy_calls, 1,
 			"duplicate bootstrap calls must not schedule extra timers")
+	end)
+
+	helpers.it("a refused timer does not latch bootstrap as permanently started", function()
+		local fresh_core, timer_spy_calls, hs_stub, controller = load_core_with_timer_spy()
+		hs_stub.http.__reset()
+		controller.fail_next = "settled"
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+		helpers.assert_true(fresh_core.start_background_network_bootstrap(),
+			"a settled refusal must leave the explicit bootstrap retryable")
+		helpers.assert_eq(#timer_spy_calls, 2)
+		helpers.assert_true(timer_spy_calls[2].fire())
+		helpers.assert_eq(#hs_stub.http.__calls, 4)
+	end)
+
+	helpers.it("cleanup debt blocks a sibling bootstrap timer until exact retry", function()
+		local fresh_core, timer_spy_calls, _, controller = load_core_with_timer_spy()
+		controller.fail_next = "debt"
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+
+		controller.cancel_failures = 1
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+		helpers.assert_eq(#timer_spy_calls, 1,
+			"an activated failed candidate must remain the sole native owner")
+		helpers.assert_true(fresh_core.start_background_network_bootstrap())
+		helpers.assert_eq(#timer_spy_calls, 2)
 	end)
 end)
 

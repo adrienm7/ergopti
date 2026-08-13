@@ -64,7 +64,7 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 					end,
 				},
 				shortcuts_mod = {
-					pause_bindings = noop,
+					pause_bindings = function() return true end,
 					set_chatgpt_url = function(value)
 						observed.chatgpt_urls[#observed.chatgpt_urls + 1] = value
 					end,

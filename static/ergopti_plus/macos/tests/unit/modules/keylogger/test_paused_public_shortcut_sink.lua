@@ -36,7 +36,7 @@ helpers.describe("audit pause fence: keylogger public shortcut sink", function()
 		}
 
 		local paused = true
-		fixture.keylogger.start({ is_paused = function() return paused end })
+		fixture.start({ is_paused = function() return paused end })
 		fixture.keylogger.notify_synthetic("synthetic", "hotstring", 1, nil, "synthetic", false)
 		fixture.keylogger.log_hotstring("btw", "by the way", "star")
 		fixture.keylogger.log_llm("context", { { to_type = "prediction" } }, "TextEdit", {})

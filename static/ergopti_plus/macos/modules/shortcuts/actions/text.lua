@@ -23,6 +23,7 @@ local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local Timings    = require("infra.timings")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "shortcuts.actions.text"
 
@@ -31,6 +32,13 @@ local LOG = "shortcuts.actions.text"
 -- the main run loop, so an omitted delay stalls the loop that services the typing
 -- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
 local KEYSTROKE_NO_DELAY_US = 0
+
+-- Exact owner for the delayed second half of surround_with_parens(). A failed
+-- activation can retain a native timer even when the adapter reports no commit;
+-- keep that capability until cancellation settles and fence its callback by a
+-- generation before allowing a successor action.
+local _surround_timer = nil
+local _surround_generation = 0
 
 
 
@@ -661,12 +669,57 @@ end
 
 --- Wraps the current line in parentheses.
 function M.surround_with_parens()
-	SyntheticInput.emit_key_stroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
-	SyntheticInput.emit_key_strokes("(")
-	timer.doAfter(0.04, function()
-		SyntheticInput.emit_key_stroke({"cmd"}, "right", KEYSTROKE_NO_DELAY_US)
-		SyntheticInput.emit_key_strokes(")")
+	local prior = _surround_timer
+	if prior then
+		if prior.committed == true then return false end
+		if TimerScheduler.cancel(prior) ~= true then
+			Logger.error(LOG, "Parenthesis surround timer cleanup remains pending.")
+			return false
+		end
+		if _surround_timer == prior then _surround_timer = nil end
+	end
+
+	_surround_generation = _surround_generation + 1
+	local generation = _surround_generation
+	local closing_timer
+	local committed
+	closing_timer, committed = TimerScheduler.after(0.04, function()
+		if generation ~= _surround_generation or _surround_timer ~= closing_timer then return end
+		if closing_timer.timer == nil then _surround_timer = nil end
+		local ok, emitted_or_err = xpcall(function()
+			assert(SyntheticInput.emit_key_stroke(
+				{"cmd"}, "right", KEYSTROKE_NO_DELAY_US) == true,
+				"closing cursor movement was refused")
+			assert(SyntheticInput.emit_key_strokes(")") == true,
+				"closing parenthesis was refused")
+		end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Parenthesis surround completion failed: %s.",
+				tostring(emitted_or_err))
+		end
 	end)
+	if closing_timer and closing_timer.timer ~= nil then _surround_timer = closing_timer end
+	if committed ~= true then
+		if not closing_timer or closing_timer.timer == nil then _surround_timer = nil end
+		Logger.error(LOG, "Parenthesis surround timer was refused before text mutation.")
+		return false
+	end
+	_surround_timer = closing_timer
+
+	local ok, emitted_or_err = xpcall(function()
+		assert(SyntheticInput.emit_key_stroke(
+			{"cmd"}, "left", KEYSTROKE_NO_DELAY_US) == true,
+			"opening cursor movement was refused")
+		assert(SyntheticInput.emit_key_strokes("(") == true,
+			"opening parenthesis was refused")
+	end, debug.traceback)
+	if not ok then
+		_surround_generation = _surround_generation + 1
+		TimerScheduler.cancel(closing_timer)
+		Logger.error(LOG, "Parenthesis surround opening failed: %s.", tostring(emitted_or_err))
+		return false
+	end
+	return true
 end
 
 --- Toggles the current selection between Title Case and lowercase.

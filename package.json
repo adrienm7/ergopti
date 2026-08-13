@@ -198,6 +198,7 @@
 		"test:menu-labels-resolve": "node ./tools/test/test-menu-labels-resolve.cjs",
 		"test:convention-p-platform-only": "node ./tools/test/test-convention-p-platform-only.cjs",
 		"test:source-trees-are-scanned": "node ./tools/test/test-source-trees-are-scanned.cjs",
+		"test:untracked-driver-artifacts-do-not-affect-gates": "node ./tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs",
 		"test:driver-config-surface-is-declared": "node ./tools/test/test-driver-config-surface-is-declared.cjs",
 		"test:metrics-heatmap-translation": "node ./tools/test/test-metrics-heatmap-translation.cjs",
 		"test:mutation-targets": "node ./tools/test/test-mutation-targets.cjs",

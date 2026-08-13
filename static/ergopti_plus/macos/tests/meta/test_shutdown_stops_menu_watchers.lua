@@ -41,4 +41,34 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 			.. "teardown, which is the exact hazard that loop's comment cites")
 	end)
 
+	helpers.it("retains a menu watcher whose exact stop throws or returns false", function()
+		for _, failure in ipairs({ "false", "throw" }) do
+			package.loaded["ui.menu"] = nil
+			local menu = helpers.load_with_stubs("ui.menu")
+			local attempts = 0
+			local watcher = {}
+			function watcher:stop()
+				attempts = attempts + 1
+				if attempts == 1 then
+					if failure == "throw" then error("native stop failed") end
+					return false
+				end
+				return watcher
+			end
+			menu._watcher = watcher
+			menu._theme_watcher = nil
+
+			helpers.assert_eq(false, menu.stop_watchers(),
+				"uncertain native cleanup must remain visible (" .. failure .. ")")
+			helpers.assert_eq(watcher, menu._watcher,
+				"the exact capability must remain owned after failure (" .. failure .. ")")
+			helpers.assert_eq(true, menu.stop_watchers(),
+				"a later teardown pass must settle the retained capability (" .. failure .. ")")
+			helpers.assert_eq(2, attempts,
+				"the second pass must retry the same capability exactly once (" .. failure .. ")")
+			helpers.assert_eq(nil, menu._watcher, "ownership clears only after confirmed cleanup")
+			package.loaded["ui.menu"] = nil
+		end
+	end)
+
 end)

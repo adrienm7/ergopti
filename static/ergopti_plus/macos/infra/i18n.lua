@@ -24,6 +24,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG    = "i18n"
 
 local locale_mod = require("infra.locale")
@@ -57,6 +58,7 @@ local _locale = "fr"
 --- Pending reload timer — cancelled and replaced on every rapid locale switch
 --- so only the last selection triggers a reload.
 local _reload_timer = nil
+local _reload_generation = 0
 
 --- Delay before reloading after a locale change (seconds).
 local RELOAD_DEBOUNCE_SEC = 0.15
@@ -189,22 +191,47 @@ end
 function M.set_locale(code)
 	if not is_known(code) then
 		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
-		return
+		return false
 	end
-	if code == _locale then return end
+	if code == _locale then return true end
 	Logger.start(LOG, "Switching locale to '%s'…", code)
-	_locale = code
-	hs.settings.set(SETTINGS_KEY, code)
 	-- Cancel any pending reload from a previous rapid switch
 	if _reload_timer then
-		_reload_timer:stop()
+		if TimerScheduler.cancel(_reload_timer) ~= true then
+			Logger.error(LOG, "Locale switch blocked by pending reload cleanup debt.")
+			return false
+		end
 		_reload_timer = nil
 	end
-	_reload_timer = hs.timer.doAfter(RELOAD_DEBOUNCE_SEC, function()
-		_reload_timer = nil
+
+	_reload_generation = _reload_generation + 1
+	local generation = _reload_generation
+	local reload_timer
+	local committed
+	reload_timer, committed = TimerScheduler.after(RELOAD_DEBOUNCE_SEC, function()
+		if generation ~= _reload_generation or _reload_timer ~= reload_timer then return end
+		if reload_timer.timer == nil then _reload_timer = nil end
 		Logger.success(LOG, "Locale set to '%s' — reloading.", code)
-		hs.reload()
+		Logger.pcall(LOG, hs.reload)
 	end)
+	if reload_timer and reload_timer.timer ~= nil then _reload_timer = reload_timer end
+	if committed ~= true then
+		if not reload_timer or reload_timer.timer == nil then _reload_timer = nil end
+		Logger.error(LOG, "Locale switch reload timer was refused; locale remains unchanged.")
+		return false
+	end
+	_reload_timer = reload_timer
+
+	local persisted, persist_err = pcall(hs.settings.set, SETTINGS_KEY, code)
+	if not persisted then
+		_reload_generation = _reload_generation + 1
+		TimerScheduler.cancel(reload_timer)
+		Logger.error(LOG, "Locale persistence failed; locale remains unchanged: %s.",
+			tostring(persist_err))
+		return false
+	end
+	_locale = code
+	return true
 end
 
 --- Persists the locale to the settings store WITHOUT changing the in-memory

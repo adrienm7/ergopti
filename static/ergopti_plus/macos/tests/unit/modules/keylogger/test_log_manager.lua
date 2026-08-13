@@ -52,7 +52,10 @@ package.loaded["modules.keylogger.rotation"] = {
 	init           = function() end,
 	-- Mirrors the real module: log_manager asks the flag, never an accessor's existence
 	is_initialized = function() return true end,
-	append_log     = function(entry) table.insert(_appended_entries, entry) end,
+	append_log     = function(entry)
+		table.insert(_appended_entries, entry)
+		return true
+	end,
 	read_new_entries = function() return {}, 0 end,
 	get_offset     = function() return 0 end,
 	get_date       = function() return os.date("%Y-%m-%d") end,
@@ -601,10 +604,11 @@ local hs_tracking_overrides = {
 	execute = function() return "" end,
 	timer = {
 		new = function(_interval, _cb)
-			return {
-				start = function() lm_timer_running = true end,
-				stop  = function() lm_timer_running = false end,
-			}
+			local handle = {}
+			function handle:start() lm_timer_running = true; return self end
+			function handle:stop() lm_timer_running = false; return self end
+			function handle:running() return lm_timer_running end
+			return handle
 		end,
 		doAfter      = function() end,
 		absoluteTime = function() return 0 end,
@@ -663,7 +667,8 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 	helpers.it("ensure_ingest_running() is a no-op before init", function()
 		lm_timer_running = false
 		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
-		lm.ensure_ingest_running()
+		helpers.assert_eq(false, lm.ensure_ingest_running(),
+			"the exact acquisition contract must fail closed before initialization")
 		helpers.assert_eq(lm_timer_running, false,
 			"ensure_ingest_running() before init must not start a timer")
 	end)
@@ -678,10 +683,11 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 			timer = {
 				new = function(_i, _cb)
 					created_count = created_count + 1
-					return {
-						start = function() lm_timer_running = true end,
-						stop  = function() lm_timer_running = false end,
-					}
+					local handle = {}
+					function handle:start() lm_timer_running = true; return self end
+					function handle:stop() lm_timer_running = false; return self end
+					function handle:running() return lm_timer_running end
+					return handle
 				end,
 				doAfter      = function() end,
 				absoluteTime = function() return 0 end,

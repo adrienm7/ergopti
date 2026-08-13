@@ -177,7 +177,8 @@ helpers.describe("keylogger/log_manager: a db.sqlite open failure must not silen
 	end)
 
 	helpers.it("writes the appended event to today.log as exactly one JSONL line", function()
-		LM.append_log({ type = "typing", text = "x" })
+		helpers.assert_true(LM.append_log({ type = "typing", text = "x" }),
+			"the JSONL-only append must cross the exact write+flush commit boundary")
 
 		local lines = read_lines(TODAY_LOG)
 		helpers.assert_eq(#lines, 1,

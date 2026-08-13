@@ -63,6 +63,10 @@ local function load_fixture(failure_mode)
 	package.loaded["modules.dynamic_hotstrings.rules_engine"] = rules
 	local DynamicHotstrings = helpers.load_with_stubs("modules.dynamic_hotstrings")
 	local config_path = os.tmpname()
+	local config_file, config_err = io.open(config_path, "w")
+	helpers.assert_not_nil(config_file,
+		"the startup fixture must materialize its empty PersonalInfo TOML: " .. tostring(config_err))
+	config_file:close()
 
 	return {
 		controls = controls,

@@ -5,10 +5,10 @@
 --- gestures-actions-snap: snap_right called win:maximize() instead of
 --- win:moveToUnit(hs.layout.right50), so it maximised instead of snapping.
 ---
---- gestures-actions-rclick: the right-click mouseUp deferred toggle had no
---- guard: `hs.timer.doAfter(0, M.toggle_right_click)`. If rightClickHeld was
---- cleared by a concurrent key-down before the callback fired, the re-toggle
---- created a phantom hold. The left-click path already had the guard.
+--- gestures-actions-rclick: the right-click mouseUp used a deferred re-toggle.
+--- It could re-engage a stale hold, and even a guarded deferral left the sole
+--- physical mouseUp consumed until in-process work ran. The safe implementation
+--- has no deferred toggle: it fences state and lets the physical event through.
 
 local helpers = require("tests.helpers")
 
@@ -47,19 +47,16 @@ helpers.assert_true(
 	"snap_right and maximize should be separate blocks (gestures-actions-snap)"
 )
 
--- Test 3 (gestures-actions-rclick): the deferred right-click toggle is guarded.
--- Pre-fix: `doAfter(0, M.toggle_right_click)` — no state check.
--- Post-fix: `doAfter(0, function() if rightClickHeld then M.toggle_right_click() end end)`.
+-- Test 3 (gestures-actions-rclick): no deferred right-click toggle remains.
 local bare_defer = all_src:find("doAfter(0, M.toggle_right_click)", 1, true) ~= nil
 helpers.assert_true(
 	not bare_defer,
 	"doAfter(0, M.toggle_right_click) must not appear bare — must be guarded with 'if rightClickHeld then' (gestures-actions-rclick)"
 )
 
-local guarded_defer = all_src:find("if rightClickHeld then M.toggle_right_click()", 1, true) ~= nil
 helpers.assert_true(
-	guarded_defer,
-	"right-click deferred toggle must be guarded with 'if rightClickHeld then' (gestures-actions-rclick)"
+	all_src:find("if rightClickHeld then M.toggle_right_click()", 1, true) == nil,
+	"right-click mouseUp must not rely on any deferred re-toggle (gestures-actions-rclick)"
 )
 
 print("[PASS] test_actions_snap_rclick")

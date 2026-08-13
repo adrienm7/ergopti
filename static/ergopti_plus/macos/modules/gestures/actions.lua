@@ -952,7 +952,7 @@ sg("script_quit",                         function()
 	local scheduled, schedule_result = pcall(function()
 		return hs.timer.doAfter(0, request_controlled_exit)
 	end)
-	if not scheduled or schedule_result == nil then
+	if not scheduled or schedule_result == nil or schedule_result == false then
 		Logger.error(LOG, "script_quit could not schedule controlled exit: %s", tostring(schedule_result))
 		-- request_exit starts the asynchronous root transaction; invoking it here
 		-- never bypasses the exact lease fence or performs a direct process exit.

@@ -198,9 +198,10 @@ local function fresh_bridge(options)
 				fn = fn,
 				cancelled = false,
 				fired = configured == "fired",
+				committed = configured ~= "uncommitted",
 			}
 			ctx.timers[#ctx.timers + 1] = timer
-			return timer
+			return timer, timer.committed
 		end,
 		cancel = function(timer)
 			ctx.cancel_calls = ctx.cancel_calls + 1
@@ -443,6 +444,31 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"the never-started ShellRunner task must release its construction-time GC pin")
 		helpers.assert_nil(ctx.engine[scoped_name("capsword")],
 			"watchdog failure must not leave a side effect behind a false return")
+	end)
+
+	helpers.it("rejects an uncommitted watchdog and retains exact rollback debt", function()
+		local bridge, ctx = fresh_bridge({
+			timer_results = { "uncommitted" },
+			cancel_results = { false, true },
+			apply_on_start = { true, true },
+		})
+
+		helpers.assert_true(not bridge.set("capsword", 1),
+			"a native timer candidate without an explicit commit cannot guard a writer")
+		helpers.assert_true(not ctx.tasks[1].started,
+			"the CLI child must remain side-effect free until its watchdog commits")
+		helpers.assert_eq(ctx.cancel_calls, 1)
+		helpers.assert_true(ctx.cancel_handles[1] == ctx.timers[1],
+			"rollback must target the exact uncommitted timer candidate")
+		helpers.assert_true(not ctx.timers[1].cancelled,
+			"a refused native stop is cleanup debt, not successful release")
+
+		helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_OFF),
+			"a later acquisition must retry exact debt and then remain usable")
+		helpers.assert_eq(ctx.cancel_calls, 2)
+		helpers.assert_true(ctx.cancel_handles[2] == ctx.timers[1])
+		helpers.assert_true(ctx.timers[1].cancelled)
+		helpers.assert_true(ctx.tasks[2].started)
 	end)
 
 	helpers.it("still terminates and fences when watchdog cancellation throws", function()
@@ -749,14 +775,12 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"an adapter false result must not be fabricated into successful cancellation")
 
 		helpers.assert_true(bridge.set("capsword", 1))
-		helpers.assert_eq(ctx.cancel_calls, 1,
-			"starting unrelated work must not duplicate cleanup before a cancellation boundary")
+		helpers.assert_eq(ctx.cancel_calls, 2,
+			"successor acquisition is itself a cleanup boundary and must settle old timer debt first")
+		helpers.assert_true(ctx.cancel_handles[2] == refused_timer)
+		helpers.assert_true(refused_timer.cancelled)
 		ctx.complete(2)
 
-		helpers.assert_true(ctx.cancel_handles[2] == refused_timer,
-			"the next cleanup boundary must retry the retained timer object by identity")
-		helpers.assert_true(refused_timer.cancelled,
-			"the retained native timer must become settled after the retry succeeds")
 		helpers.assert_true(ctx.cancel_handles[3] == ctx.timers[2],
 			"after draining the backlog, cleanup must still cancel the current exact watchdog")
 	end)

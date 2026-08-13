@@ -27,6 +27,7 @@ local M = {}
 local hs      = hs
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
@@ -55,6 +56,9 @@ local POLL_FALLBACK_SEC = Timings.sec("keylogger", "kc_bridge_poll_ms")
 
 local _state      = nil   -- injected by M.init()
 local _log_manager = nil  -- injected by M.init()
+local _init_tap_hold_config = nil
+local _init_available_actions = nil
+local _may_persist = nil
 
 -- Set of numeric HS keycodes that are KE remap outputs (not physical inputs).
 -- Populated by _build_managed_output_set() at init time; read by
@@ -66,9 +70,12 @@ local _watcher = nil
 
 -- Backup poll timer that drains the log on a fixed cadence.
 local _poll_timer = nil
+local _watchers_active = false
+local _watcher_generation = 0
 
 -- Byte offset into KC_LOG_PATH: we only read lines written since the last drain.
 local _file_offset = 0
+local _cursor_trusted = false
 
 -- Cumulative count of physical kc events drained — surfaced via M.get_stats()
 -- so the user can verify in the console that the bridge is actually receiving
@@ -201,10 +208,6 @@ end
 --- and the very first drain_log() after the feature is enabled replays the
 --- entire backlog in one burst with fabricated (current-time) timestamps
 --- instead of the real press times.
--- Injected pause predicate. Declared above may_persist: a local declared below
--- a closure that reads it binds the nil global instead.
-local _is_paused = nil
-
 --- Reports whether this bridge may persist an event right now.
 ---
 --- kc_bridge is a FOURTH keylogger writer, and it carried neither guard: no
@@ -218,12 +221,17 @@ local _is_paused = nil
 --- path does, so nothing is replayed as a backlog when logging resumes.
 --- @return boolean
 local function may_persist()
-	if _is_paused and _is_paused() then return false end
-	local ok_kl, kl = pcall(require, "modules.keylogger")
-	if ok_kl and type(kl) == "table" and type(kl.context_allows_logging) == "function" then
-		return kl.context_allows_logging() == true
+	if type(_may_persist) ~= "function" then
+		Logger.error(LOG, "Persistence gate is unavailable — physical event discarded.")
+		return false
 	end
-	return true
+	local ok, allowed_or_err = xpcall(_may_persist, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Persistence gate raised — physical event discarded: %s.",
+			tostring(allowed_or_err))
+		return false
+	end
+	return allowed_or_err == true
 end
 
 local function drain_log()
@@ -371,8 +379,91 @@ end
 --- Arms the path watcher and backup poll timer. Idempotent: skips creation when
 --- the handles already exist so stop/start cycles can call this repeatedly.
 --- Must only be called after _state is set.
+local function stop_path_watcher()
+	if not _watcher then return true end
+	local watcher = _watcher
+	local ok, stopped = xpcall(function()
+		if type(watcher.stop) ~= "function" then error("path watcher has no stop method") end
+		return watcher:stop()
+	end, debug.traceback)
+	-- hs.pathwatcher:stop() is a void API; non-throw is its exact commitment.
+	if not ok then
+		Logger.error(LOG, "Path watcher cleanup failed; exact handle retained: %s.",
+			tostring(stopped))
+		return false
+	end
+	if _watcher == watcher then _watcher = nil end
+	return true
+end
+
+--- Releases the exact backup poller while retaining refused cleanup debt.
+--- @return boolean settled True only when no native timer remains owned.
+local function stop_poll_timer()
+	if not _poll_timer then return true end
+	local handle = _poll_timer
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Poll timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
+	end
+	if _poll_timer == handle then _poll_timer = nil end
+	return true
+end
+
+--- Releases both drain producers without hiding a sibling cleanup failure.
+--- @return boolean settled True only when both exact capabilities were released.
+local function stop_watchers()
+	local watcher_stopped = stop_path_watcher()
+	local poll_stopped = stop_poll_timer()
+	return watcher_stopped and poll_stopped
+end
+
+--- Moves the ledger cursor to a proven EOF and releases the exact read handle.
+--- A transient cold-start read refusal leaves active drain producers at offset
+--- zero. This proof is therefore separate from watcher ownership and must be
+--- retried before persistence can become eligible.
+--- @return boolean committed True only after open, seek and close all commit.
+--- @return number|string eof_or_error Proven EOF or failure detail.
+local function resync_cursor_to_eof()
+	_cursor_trusted = false
+	local open_ok, handle_or_err, open_err = xpcall(function()
+		return io.open(KC_LOG_PATH, "r")
+	end, debug.traceback)
+	if not open_ok or not handle_or_err then
+		return false, "open failed: " .. tostring(open_ok and open_err or handle_or_err)
+	end
+
+	local handle = handle_or_err
+	local seek_ok, eof_or_err = xpcall(function()
+		return handle:seek("end")
+	end, debug.traceback)
+	local close_ok, closed_or_err = xpcall(function()
+		return handle:close()
+	end, debug.traceback)
+	if not seek_ok or type(eof_or_err) ~= "number" then
+		return false, "seek failed: " .. tostring(eof_or_err)
+	end
+	if not close_ok or closed_or_err ~= true then
+		return false, "close failed: " .. tostring(closed_or_err)
+	end
+
+	_file_offset = eof_or_err
+	_cursor_trusted = true
+	return true, eof_or_err
+end
+
 local function _arm_watchers()
-	if not require_state("_arm_watchers") then return end
+	if not require_state("_arm_watchers") then return false end
+	if _watchers_active then return true end
+	if not stop_watchers() then
+		Logger.error(LOG, "Watcher start refused: prior cleanup remains pending.")
+		return false
+	end
+	_watcher_generation = _watcher_generation + 1
+	local generation = _watcher_generation
 
 	-- Touch: hs.pathwatcher binds to an inode; the file must exist before
 	-- watcher:start() or creation events may be missed on some macOS versions.
@@ -381,23 +472,49 @@ local function _arm_watchers()
 	else Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
 	end
 
-	if not _watcher then
-		_watcher = hs.pathwatcher.new(KC_LOG_PATH, function()
+	local watcher_ok, watcher_candidate = xpcall(function()
+		return hs.pathwatcher.new(KC_LOG_PATH, function()
+			if not _watchers_active or generation ~= _watcher_generation then return end
 			local ok, err = pcall(drain_log)
 			if not ok then Logger.error(LOG, "drain_log() raised (watcher): %s.", tostring(err)) end
 		end)
-		_watcher:start()
-		Logger.trace(LOG, "Path watcher armed.")
+	end, debug.traceback)
+	if not watcher_ok or watcher_candidate == nil or watcher_candidate == false then
+		Logger.error(LOG, "Path watcher construction failed: %s.", tostring(watcher_candidate))
+		return false
+	end
+	_watcher = watcher_candidate
+	local watcher_start_ok, watcher_started = xpcall(function()
+		if type(watcher_candidate.start) ~= "function" then error("path watcher has no start method") end
+		return watcher_candidate:start()
+	end, debug.traceback)
+	if not watcher_start_ok or (watcher_started ~= true and watcher_started ~= watcher_candidate) then
+		_watcher_generation = _watcher_generation + 1
+		stop_path_watcher()
+		Logger.error(LOG, "Path watcher start failed: %s.",
+			tostring(watcher_start_ok and watcher_started or watcher_started))
+		return false
 	end
 
-	if not _poll_timer then
-		_poll_timer = hs.timer.new(POLL_FALLBACK_SEC, function()
+	local timer_ok, timer_candidate, timer_committed = xpcall(function()
+		return TimerScheduler.every(POLL_FALLBACK_SEC, function()
+			if not _watchers_active or generation ~= _watcher_generation then return end
 			local ok, err = pcall(drain_log)
 			if not ok then Logger.error(LOG, "drain_log() raised (poll): %s.", tostring(err)) end
 		end)
-		_poll_timer:start()
-		Logger.trace(LOG, "Poll timer armed.")
+	end, debug.traceback)
+	if type(timer_candidate) == "table" then _poll_timer = timer_candidate end
+	if not timer_ok or type(timer_candidate) ~= "table" or timer_committed ~= true then
+		_watcher_generation = _watcher_generation + 1
+		stop_watchers()
+		Logger.error(LOG, "Poll timer acquisition failed: %s.",
+			tostring(timer_ok and timer_committed or timer_candidate))
+		return false
 	end
+
+	_watchers_active = true
+	Logger.trace(LOG, "Path watcher and poll timer armed.")
+	return true
 end
 
 --- Initializes the bridge: wires dependencies, builds the suppression set, and
@@ -406,22 +523,37 @@ end
 --- @param log_manager table The LogManager module reference.
 --- @param tap_hold_config table Map of key_id → {tap, hold} action ids.
 --- @param available_actions table List of action definitions from actions.json.
-function M.init(core_state, log_manager, tap_hold_config, available_actions, is_paused_fn)
+--- @param may_persist_fn function Canonical root enable/pause/privacy predicate.
+function M.init(core_state, log_manager, tap_hold_config, available_actions, may_persist_fn)
 	Logger.start(LOG, "Initializing KE physical-kc bridge…")
 
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — bridge non-functional.")
-		return
+		return false
+	end
+	if type(may_persist_fn) ~= "function" then
+		Logger.error(LOG, "M.init(): may_persist_fn must be a function — bridge non-functional.")
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		local same_dependencies = _state == core_state
+			and _log_manager == log_manager
+			and _init_tap_hold_config == tap_hold_config
+			and _init_available_actions == available_actions
+			and _may_persist == may_persist_fn
+		if same_dependencies and _watchers_active then
+			Logger.warn(LOG, "M.init() called more than once with the same dependencies — reusing the committed bridge.")
+			return true
+		end
+		Logger.error(LOG, "M.init() called again with different dependencies or an uncommitted lifecycle.")
+		return false
 	end
 
 	_state        = core_state
 	_log_manager  = log_manager
-	-- Injected like the watcher and context-tracker layers already receive it.
-	if type(is_paused_fn) == "function" then _is_paused = is_paused_fn end
+	_init_tap_hold_config = tap_hold_config
+	_init_available_actions = available_actions
+	_may_persist = may_persist_fn
 
 	if type(tap_hold_config) == "table" and type(available_actions) == "table" then
 		build_managed_output_set(tap_hold_config, available_actions)
@@ -431,16 +563,22 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions, is_
 
 	-- Set _file_offset to current end so we ignore stale lines from a prior session
 	-- (those have already been counted in the persisted kc dict on disk).
-	local fh_init = io.open(KC_LOG_PATH, "r")
-	if fh_init then
-		_file_offset = fh_init:seek("end") or 0
-		fh_init:close()
-		Logger.debug(LOG, "KC log opened (%d bytes) — draining only future writes.", _file_offset)
+	local cursor_ready, eof_or_err = resync_cursor_to_eof()
+	if cursor_ready then
+		Logger.debug(LOG, "KC log opened (%d bytes) — draining only future writes.", eof_or_err)
+	else
+		Logger.warn(LOG,
+			"KC log EOF is untrusted at cold start — persistence stays denied until retry: %s.",
+			tostring(eof_or_err))
 	end
 
-	_arm_watchers()
+	if not _arm_watchers() then
+		Logger.error(LOG, "M.init(): watcher transaction failed — bridge non-functional.")
+		return false
+	end
 
 	Logger.success(LOG, "KE physical-kc bridge initialized (watching '%s').", KC_LOG_PATH)
+	return true
 end
 
 --- Re-arms the path watcher and poll timer after a stop/start cycle.
@@ -449,30 +587,29 @@ end
 --- M.init() is also a no-op (no _state yet). Called unconditionally from
 --- keylogger M.start() so the bridge survives toggle OFF/ON.
 function M.start()
-	if not require_state("start") then return end
-
-	-- Re-sync the cursor to EOF, exactly as M.init() does above. M.stop() tears
-	-- down both drain triggers, so the offset cannot advance on its own while the
-	-- bridge is off — every physical key Karabiner appended during that window was
-	-- still pending, and the next drain replayed the whole backlog. Those events
-	-- were then stamped with the CURRENT time and attributed to the CURRENTLY
-	-- focused app, so switching Metrics off, working for an hour, and switching it
-	-- back on injected an hour of keystrokes into the wrong app at the wrong time.
-	-- Discarding is the only correct choice: the events were deliberately not
-	-- recorded, and their real timestamps and context are gone.
-	local fh_resync = io.open(KC_LOG_PATH, "r")
-	if fh_resync then
-		local eof = fh_resync:seek("end") or _file_offset
-		fh_resync:close()
-		if eof > _file_offset then
-			Logger.info(LOG, "Skipping %d byte(s) appended while the bridge was stopped.",
-				eof - _file_offset)
+	if not require_state("start") then return false end
+	if not _watchers_active or not _cursor_trusted then
+		local previous_offset = _file_offset
+		local resynced, eof_or_err = resync_cursor_to_eof()
+		if not resynced then
+			Logger.error(LOG, "KE bridge start refused: cannot prove EOF resync: %s.",
+				tostring(eof_or_err))
+			return false
 		end
-		_file_offset = eof
+		if eof_or_err > previous_offset then
+			Logger.info(LOG, "Skipping %d byte(s) written outside a trusted session.",
+				eof_or_err - previous_offset)
+		end
+	end
+	if _watchers_active then return true end
+	if not stop_watchers() then
+		Logger.error(LOG, "KE bridge start refused: prior producer cleanup remains pending.")
+		return false
 	end
 
-	_arm_watchers()
+	if not _arm_watchers() then return false end
 	Logger.done(LOG, "KE bridge watchers ensured.")
+	return true
 end
 
 --- Injects the LogManager reference after deferred initialization.
@@ -501,18 +638,18 @@ end
 
 --- Stops the path watcher. Called from keylogger M.stop().
 function M.stop()
-	if _watcher then
-		_watcher:stop()
-		_watcher = nil
-	end
-	if _poll_timer then
-		_poll_timer:stop()
-		_poll_timer = nil
-	end
+	_watchers_active = false
+	_watcher_generation = _watcher_generation + 1
+	local stopped = stop_watchers()
 	-- Clear any keys held at stop time. Without this, a key pressed before stop()
 	-- and released after start() computes (now - old_down_at) as an aberrant hold_ms.
 	_pending_down = {}
+	if not stopped then
+		Logger.error(LOG, "KE physical-kc bridge stop incomplete: cleanup remains pending.")
+		return false
+	end
 	Logger.done(LOG, "KE physical-kc bridge stopped.")
+	return true
 end
 
 return M

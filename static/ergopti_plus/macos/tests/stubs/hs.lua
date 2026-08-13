@@ -59,7 +59,7 @@ local function make_timer(delay, fn, recurring)
 		recurring = recurring or false,
 		fired = 0,
 	}
-	function t:stop() self.running = false end
+	function t:stop() self.running = false ; return self end
 	function t:start() self.running = true ; return self end
 	function t:fire()
 		if self.running and self.fn then self.fired = self.fired + 1 ; self.fn() end
@@ -72,7 +72,11 @@ end
 M.timer = {
 	doAfter = function(delay, fn) return make_timer(delay, fn, false) end,
 	doEvery = function(delay, fn) return make_timer(delay, fn, true) end,
-	new = function(delay, fn) return make_timer(delay, fn, true) end,
+	new = function(delay, fn)
+		local timer = make_timer(delay, fn, true)
+		timer.running = false
+		return timer
+	end,
 	secondsSinceEpoch = function() return os.time() end,
 	-- absoluteTime returns nanoseconds since an arbitrary epoch, matching macOS semantics
 	absoluteTime = function() return math.floor(os.clock() * 1e9) end,
@@ -687,6 +691,7 @@ local DEFAULT_KEYCODES_MAP = {
 }
 
 M.keycodes = {}
+local INPUT_SOURCE_CALLBACK = nil
 
 --- Rebuilds the metatabled keycodes.map. Called once at module load and again
 --- from __reset() so that tests which assign `hs.keycodes.map = { ... }` to
@@ -703,6 +708,17 @@ M.keycodes.__rebuild_map = function()
 end
 
 M.keycodes.__rebuild_map()
+
+--- Models Hammerspoon's setter-only, single-owner input-source callback.
+--- @param callback function|nil Replacement callback; nil unsets the prior one.
+M.keycodes.inputSourceChanged = function(callback)
+	INPUT_SOURCE_CALLBACK = callback
+end
+
+--- Fires the current input-source callback for behavioral tests.
+M.keycodes.__fire_input_source_changed = function()
+	if INPUT_SOURCE_CALLBACK then INPUT_SOURCE_CALLBACK() end
+end
 
 
 
@@ -739,10 +755,108 @@ M.drawing = {
 	windowLevels = setmetatable({}, { __index = function() return 0 end }),
 }
 
+local CANVASES = {}
+
+--- Builds a stateful canvas double that preserves the native commit surface.
+--- Returning one generic function for every lookup made numeric element reads
+--- such as `canvas[7]` callable instead of mutable, while `isShowing()` returned
+--- the canvas table instead of a boolean. Render failures were therefore logged
+--- inside the E2E harness even though the gate itself stayed green.
+--- @param initial_frame table|nil Initial canvas frame.
+--- @return table canvas Stateful canvas double.
+local function make_canvas(initial_frame)
+	local canvas = {
+		_frame = initial_frame or { x = 0, y = 0, w = 0, h = 0 },
+		_showing = false,
+		_deleted = false,
+	}
+
+	function canvas:level(value)
+		if value == nil then return self._level end
+		self._level = value
+		return self
+	end
+
+	function canvas:behavior(value)
+		if value == nil then return self._behavior end
+		self._behavior = value
+		return self
+	end
+
+	function canvas:ignoresMouseEvents(value)
+		if value == nil then return self._ignores_mouse_events end
+		self._ignores_mouse_events = value == true
+		return self
+	end
+
+	function canvas:frame(value)
+		if value == nil then return self._frame end
+		self._frame = value
+		return self
+	end
+
+	function canvas:appendElements(...)
+		local args = { ... }
+		if #args == 1 and type(args[1]) == "table"
+				and args[1].type == nil and #args[1] > 0 then
+			args = args[1]
+		end
+		for _, element in ipairs(args) do self[#self + 1] = element end
+		return self
+	end
+
+	function canvas:replaceElements(elements)
+		for index = #self, 1, -1 do self[index] = nil end
+		if type(elements) == "table" then
+			for _, element in ipairs(elements) do self[#self + 1] = element end
+		end
+		return self
+	end
+
+	function canvas:minimumTextSize(_, styled_text)
+		local value = tostring(styled_text or "")
+		return { w = math.max(1, #value * 7), h = 20 }
+	end
+
+	function canvas:mouseCallback(callback)
+		if callback == nil then return self._mouse_callback end
+		self._mouse_callback = callback
+		return self
+	end
+
+	function canvas:show()
+		if self._deleted then return nil end
+		self._showing = true
+		return self
+	end
+
+	function canvas:hide()
+		self._showing = false
+		return self
+	end
+
+	function canvas:isShowing() return self._showing end
+
+	function canvas:imageFromCanvas()
+		local image = { _size = { w = self._frame.w or 0, h = self._frame.h or 0 } }
+		function image:size() return self._size end
+		function image:setSize(value) self._size = value; return self end
+		return image
+	end
+
+	function canvas:delete()
+		self._showing = false
+		self._deleted = true
+		return nil
+	end
+
+	CANVASES[#CANVASES + 1] = canvas
+	return canvas
+end
+
 M.canvas = {
-	new = function(_) return setmetatable({}, {
-		__index = function() return function(self) return self end end,
-	}) end,
+	new = make_canvas,
+	__instances = CANVASES,
 	-- Level and behavior constants used by renderer.lua at load time; the stub
 	-- must expose them as plain numbers so the canvas:level() / :behavior() calls
 	-- on the mock canvas object do not crash on nil indexing.
@@ -937,7 +1051,14 @@ M.menubar = { new = function() return {
 	delete = function() end, setIcon = function() end,
 } end }
 M.image = { imageFromPath = function(_) return nil end, imageFromName = function(_) return nil end }
-M.task = { new = function(_, _) return { start = function() end, terminate = function() end } end }
+M.task = { new = function(_, _)
+	local task
+	task = {
+		start = function() return task end,
+		terminate = function() end,
+	}
+	return task
+end }
 -- usercontent is the JavaScript bridge every webview UI builds at module load
 -- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
 -- unloadable under the harness, so their logic could only ever be source-guarded.
@@ -1013,7 +1134,9 @@ function M.__reset()
 	for i = #APPLICATION_QUERIES, 1, -1 do APPLICATION_QUERIES[i] = nil end
 	for i = #APPLICATION_QUERY_WATCHER_COUNTS, 1, -1 do APPLICATION_QUERY_WATCHER_COUNTS[i] = nil end
 	for id in pairs(APPLICATION_WATCHERS) do APPLICATION_WATCHERS[id] = nil end
+	for i = #CANVASES, 1, -1 do CANVASES[i] = nil end
 	APPLICATION_WATCHER_COUNT = 0
+	INPUT_SOURCE_CALLBACK = nil
 	M.http.__reset()
 	if M.fs and M.fs.__reset_entries then M.fs.__reset_entries() end
 	-- Rebuild the canonical keycodes.map: tests like test_keycodes deliberately

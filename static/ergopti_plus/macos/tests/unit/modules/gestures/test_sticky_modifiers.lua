@@ -57,7 +57,10 @@ local function fresh_sticky()
 		disarm_calls = 0,
 		next_arm_fails = false,
 	}
-	local timers = { scheduled = {}, cancelled = 0 }
+	local timers = {
+		scheduled = {}, cancelled = 0, cancel_handles = {},
+		next_committed = true, next_after_throws = false, cancel_results = {},
+	}
 
 	package.loaded["adapters.modifier_injector"] = {
 		arm = function(flags, on_applied)
@@ -78,11 +81,28 @@ local function fresh_sticky()
 	}
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(delay, fn)
-			local handle = { delay = delay, fn = fn }
+			if timers.next_after_throws then
+				timers.next_after_throws = false
+				error("timer acquisition exploded")
+			end
+			local committed = timers.next_committed
+			timers.next_committed = true
+			local handle = { delay = delay, fn = fn, timer = {}, committed = committed, fired = false }
 			timers.scheduled[#timers.scheduled + 1] = handle
-			return handle
+			return handle, committed
 		end,
-		cancel = function(_handle) timers.cancelled = timers.cancelled + 1 end,
+		cancel = function(handle)
+			timers.cancelled = timers.cancelled + 1
+			timers.cancel_handles[timers.cancelled] = handle
+			local result = timers.cancel_results[timers.cancelled]
+			if result == false then return false end
+			if handle then
+				handle.timer = nil
+				handle.committed = false
+				handle.fired = true
+			end
+			return true
+		end,
 	}
 
 	package.loaded["modules.gestures.sticky_modifiers"] = nil
@@ -216,6 +236,55 @@ helpers.describe("gestures.sticky_modifiers", function()
 		snapshot.cmd = true
 		helpers.assert_eq(describe(Sticky.armed()), "shift",
 			"a caller mutating the returned table must not arm a modifier")
+	end)
+
+	helpers.it("rejects an uncommitted auto-cancel timer and disarms immediately", function()
+		local Sticky, injector, timers = fresh_sticky()
+		timers.next_committed = false
+		helpers.assert_eq(Sticky.toggle({ "shift" }, TIMEOUT_SEC), false,
+			"modifier publication requires an exactly committed auto-cancel timer")
+		helpers.assert_eq(describe(Sticky.armed()), "(none)")
+		helpers.assert_eq(describe(injector.armed_with), "(none)",
+			"a timer refusal must not leave an arbitrarily long-lived modifier arm")
+		helpers.assert_eq(timers.cancel_handles[1], timers.scheduled[1],
+			"rollback must target the exact uncommitted timer candidate")
+	end)
+
+	helpers.it("contains a throwing timer acquisition without leaving the injector armed", function()
+		local Sticky, injector, timers = fresh_sticky()
+		timers.next_after_throws = true
+		helpers.assert_eq(Sticky.toggle({ "alt" }, TIMEOUT_SEC), false)
+		helpers.assert_eq(describe(Sticky.armed()), "(none)")
+		helpers.assert_eq(describe(injector.armed_with), "(none)")
+	end)
+
+	helpers.it("fences a stale auto-cancel callback after a newer arm commits", function()
+		local Sticky, injector, timers = fresh_sticky()
+		helpers.assert_eq(Sticky.toggle({ "shift" }, TIMEOUT_SEC), true)
+		local stale = timers.scheduled[1]
+		helpers.assert_eq(Sticky.toggle({ "cmd" }, TIMEOUT_SEC), true)
+		helpers.assert_eq(describe(Sticky.armed()), "cmd,shift")
+
+		stale.fn()
+		helpers.assert_eq(describe(Sticky.armed()), "cmd,shift",
+			"a queued callback from the cancelled timer must not release its successor")
+		helpers.assert_eq(describe(injector.armed_with), "cmd,shift")
+	end)
+
+	helpers.it("retains refused timer cleanup and settles it before a later retry", function()
+		local Sticky, injector, timers = fresh_sticky()
+		helpers.assert_eq(Sticky.toggle({ "ctrl" }, TIMEOUT_SEC), true)
+		local first = timers.scheduled[1]
+		timers.cancel_results[1] = false
+		helpers.assert_eq(Sticky.toggle({ "shift" }, TIMEOUT_SEC), false,
+			"a successor must not publish over exact timer cleanup debt")
+		helpers.assert_eq(describe(Sticky.armed()), "(none)")
+		helpers.assert_eq(describe(injector.armed_with), "(none)")
+
+		helpers.assert_eq(Sticky.toggle({ "shift" }, TIMEOUT_SEC), true,
+			"the next action must retry and settle prior cleanup before re-arming")
+		helpers.assert_eq(timers.cancel_handles[2], first)
+		helpers.assert_eq(describe(Sticky.armed()), "shift")
 	end)
 
 end)

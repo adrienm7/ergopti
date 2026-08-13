@@ -63,6 +63,7 @@ local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
+local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient
 -- failures inside that barrier therefore get their own bounded retry budget;
@@ -138,6 +139,8 @@ M.MOD_COMBOS = {}
 -- to false each time — but within a single boot a second M.init() call (e.g.
 -- from a menu "Reload") must not re-prompt the user.
 local _wizard_ran_this_session  = false
+local _wizard_timer             = nil  -- Exact deferred first-run capability or cleanup debt
+local _wizard_timer_committed   = false -- Fences queued callbacks before native cancellation
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
 local _pending_layout_refresh   = nil  -- Latest settled-layout pipeline deferred by a lease transition
 local _layout_event_serial      = 0    -- Monotonic identity of physical TIS/wake notifications
@@ -1338,6 +1341,19 @@ local function retry_lease_recovery_timer_cleanup()
 	return #_lease_recovery_timer_cleanup_backlog == 0
 end
 
+--- Rejects an uncommitted TimerScheduler candidate without losing exact native
+--- cleanup ownership when stop() itself refuses.
+--- @param timer table|nil Candidate returned by TimerScheduler.after().
+--- @param label string Diagnostic context.
+local function reject_lease_recovery_timer(timer, label)
+	if type(timer) ~= "table" or timer.timer == nil then return end
+	local ok, cancelled_or_err = pcall(TimerScheduler.cancel, timer)
+	if ok and cancelled_or_err == true then return end
+	_lease_recovery_timer_cleanup_backlog[#_lease_recovery_timer_cleanup_backlog + 1] = timer
+	Logger.error(LOG, "%s timer rollback failed; exact handle retained: %s.",
+		tostring(label), tostring(cancelled_or_err))
+end
+
 --- Retries exact guardian-status task termination without process discovery.
 --- ShellRunner deliberately retains the native task after a failed terminate;
 --- retaining this opaque handle is therefore the only safe cleanup capability.
@@ -1671,7 +1687,7 @@ schedule_guardian_regeneration_poll = function(wait, reason)
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(
+	local schedule_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		LEASE_GUARDIAN_STATUS_POLL_SEC,
 		function()
@@ -1688,8 +1704,9 @@ schedule_guardian_regeneration_poll = function(wait, reason)
 		end
 	)
 	if schedule_ok then timer = timer_or_err end
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
-		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+	if timer_committed ~= true or type(timer) ~= "table"
+		or timer.fired == true or fired_before_arm then
+		reject_lease_recovery_timer(timer, "Guardian readiness poll")
 		wait.timer_arm_attempts = wait.timer_arm_attempts + 1
 		if wait.timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
 			Logger.warn(LOG,
@@ -1772,7 +1789,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 	local timeout = nil
 	local armed = false
 	local fired_before_arm = false
-	local timer_ok, timeout_or_err = pcall(
+	local timer_ok, timeout_or_err, timeout_committed = pcall(
 		TimerScheduler.after,
 		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
 		function()
@@ -1791,8 +1808,9 @@ start_guardian_regeneration_probe = function(wait, reason)
 		end
 	)
 	if timer_ok then timeout = timeout_or_err end
-	if type(timeout) ~= "table" or timeout.fired == true or fired_before_arm then
-		if type(timeout) == "table" then pcall(TimerScheduler.cancel, timeout) end
+	if timeout_committed ~= true or type(timeout) ~= "table"
+		or timeout.fired == true or fired_before_arm then
+		reject_lease_recovery_timer(timeout, "Regeneration guardian probe timeout")
 		terminate_guardian_regeneration_probe(
 			probe,
 			"Karabiner regeneration guardian timeout could not arm"
@@ -1965,7 +1983,7 @@ probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, r
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local timer_ok, timer_or_err = pcall(
+	local timer_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
 		function()
@@ -1981,8 +1999,9 @@ probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, r
 		end
 	)
 	if timer_ok then timer = timer_or_err end
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
-		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+	if timer_committed ~= true or type(timer) ~= "table"
+		or timer.fired == true or fired_before_arm then
+		reject_lease_recovery_timer(timer, "Guardian status probe timeout")
 		terminate_probe_handle("Karabiner guardian-status timeout could not arm")
 		settle_probe(nil, timer_ok and "guardian-status-timeout-invalid-handle"
 			or "guardian-status-timeout-arm-raised: " .. tostring(timer_or_err))
@@ -2128,7 +2147,7 @@ schedule_lease_recovery = function(recovery, reason, guardian_proven_ready)
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(TimerScheduler.after, delay, function()
+	local schedule_ok, timer_or_err, timer_committed = pcall(TimerScheduler.after, delay, function()
 		if not armed then
 			fired_before_arm = true
 			return
@@ -2139,8 +2158,9 @@ schedule_lease_recovery = function(recovery, reason, guardian_proven_ready)
 		end)
 	end)
 	if schedule_ok then timer = timer_or_err end
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
-		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+	if timer_committed ~= true or type(timer) ~= "table"
+		or timer.fired == true or fired_before_arm then
+		reject_lease_recovery_timer(timer, "Lease recovery")
 		recovery.timer_arm_attempts = (recovery.timer_arm_attempts or 0) + 1
 		if recovery.timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
 			Logger.warn(LOG,
@@ -2184,7 +2204,7 @@ schedule_guardian_status_poll = function(recovery, reason)
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
-	local schedule_ok, timer_or_err = pcall(
+	local schedule_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
 		LEASE_GUARDIAN_STATUS_POLL_SEC,
 		function()
@@ -2210,8 +2230,9 @@ schedule_guardian_status_poll = function(recovery, reason)
 		end
 	)
 	if schedule_ok then timer = timer_or_err end
-	if type(timer) ~= "table" or timer.fired == true or fired_before_arm then
-		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+	if timer_committed ~= true or type(timer) ~= "table"
+		or timer.fired == true or fired_before_arm then
+		reject_lease_recovery_timer(timer, "Guardian status poll")
 		recovery.guardian_timer_arm_attempts =
 			(recovery.guardian_timer_arm_attempts or 0) + 1
 		if recovery.guardian_timer_arm_attempts < LEASE_RECOVERY_TIMER_ARM_ATTEMPTS then
@@ -4211,8 +4232,8 @@ function M.init(file_system)
 	-- here would intercept or mutate a personal Karabiner setup while Ergopti is
 	-- disabled/starting; READY starts them through start_lease_bound_inputs().
 
-	timed("start_input_source_watcher", function()
-		Watchers.start_input_source_watcher(function(layout_name)
+	local input_source_watcher_started = timed("start_input_source_watcher", function()
+		return Watchers.start_input_source_watcher(function(layout_name)
 			run_async_step("Input-source callback", function()
 				local epoch = _lifecycle_epoch
 				if not is_current_lifecycle(epoch) then return end
@@ -4223,6 +4244,15 @@ function M.init(file_system)
 			end)
 		end)
 	end)
+	if input_source_watcher_started ~= true then
+		_running = false
+		_shutdown_requested = true
+		_lifecycle_epoch = _lifecycle_epoch + 1
+		_state.enabled = false
+		Logger.error(LOG,
+			"Karabiner bridge initialization refused because layout observation is unavailable.")
+		return false
+	end
 
 	-- Wake-from-sleep refresh of the layout-dependent key codes.
 	--
@@ -4307,18 +4337,41 @@ function M.init(file_system)
 
 	-- Defer the first-run health check so it never blocks boot. The wizard
 	-- only surfaces a dialog when a KE dependency is missing; otherwise it
-	-- exits silently. Pcall-wrapped so any onboarding failure cannot prevent
-	-- the bridge itself from finishing initialization.
+	-- exits silently. A logged callback boundary keeps onboarding failure from
+	-- aborting the timer while still making it visible in the file logger.
 	-- The session guard prevents the dialog from re-appearing on every
 	-- hs.reload() within the same Hammerspoon session.
 	if _state.enabled and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
-		hs.timer.doAfter(2.0, function()
-			pcall(function()
-				local Onboarding = require("platform.remap.onboarding")
-				Onboarding.run_first_run_wizard()
+		local wizard_epoch = _lifecycle_epoch
+		local candidate = nil
+		local schedule_ok, handle_or_err, committed = xpcall(function()
+			return TimerScheduler.after(FIRST_RUN_WIZARD_DELAY_SEC, function()
+				if _wizard_timer ~= candidate or _wizard_timer_committed ~= true then return end
+				_wizard_timer_committed = false
+				if candidate.timer == nil then _wizard_timer = nil end
+				if not is_current_lifecycle(wizard_epoch)
+					or not _state or _state.enabled ~= true then return end
+				local callback_ok, callback_err = xpcall(function()
+					local Onboarding = require("platform.remap.onboarding")
+					Onboarding.run_first_run_wizard()
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "First-run wizard callback failed: %s.", tostring(callback_err))
+				end
 			end)
-		end)
+		end, debug.traceback)
+		candidate = handle_or_err
+		if type(candidate) == "table" and candidate.timer ~= nil then
+			_wizard_timer = candidate
+		end
+		if schedule_ok and committed == true and type(candidate) == "table" then
+			_wizard_timer = candidate
+			_wizard_timer_committed = true
+		else
+			Logger.error(LOG, "First-run wizard timer could not be scheduled: %s.",
+				tostring(handle_or_err))
+		end
 	end
 
 	Logger.success(LOG,
@@ -4337,6 +4390,31 @@ local function stop_local_resources()
 	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
+	_wizard_timer_committed = false
+	if _wizard_timer then
+		local timer_ok, timer_result = xpcall(function()
+			return TimerScheduler.cancel(_wizard_timer)
+		end, debug.traceback)
+		if not timer_ok or timer_result ~= true then
+			Logger.error(LOG, "First-run wizard timer teardown failed: %s.",
+				tostring(timer_result))
+			all_stopped = false
+		else
+			_wizard_timer = nil
+		end
+	end
+	-- The onboarding poll is owned by its module rather than the shared
+	-- scheduler registry.  Consult package.loaded so teardown never starts the
+	-- onboarding subsystem merely to stop it, while still retrying an exact
+	-- timer handle retained after a failed native cancellation.
+	local onboarding = package.loaded["platform.remap.onboarding"]
+	if onboarding and type(onboarding.stop) == "function" then
+		local onboarding_ok, onboarding_result = xpcall(onboarding.stop, debug.traceback)
+		if not onboarding_ok or onboarding_result ~= true then
+			Logger.error(LOG, "Onboarding poll teardown failed: %s.", tostring(onboarding_result))
+			all_stopped = false
+		end
+	end
 	if _wake_watcher then
 		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
 		if not stopped or stop_result == false then

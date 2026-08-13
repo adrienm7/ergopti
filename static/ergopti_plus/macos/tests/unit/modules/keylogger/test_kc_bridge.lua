@@ -63,19 +63,34 @@ local hs_overrides = {
 	-- pathwatcher stub: new() returns a table with start/stop no-ops
 	pathwatcher = {
 		new = function(_path, _cb)
-			return { start = function() end, stop = function() end }
+			local watcher = {}
+			watcher.start = function() return watcher end
+			watcher.stop = function() end
+			return watcher
 		end,
 	},
 	-- timer stub for the fallback poll
 	timer = {
 		new = function(_interval, _cb)
-			return { start = function() end, stop = function() end }
+			local timer = { active = false }
+			timer.start = function() timer.active = true; return timer end
+			timer.stop = function() timer.active = false; return timer end
+			timer.running = function() return timer.active end
+			return timer
 		end,
 		absoluteTime = function() return 0 end,
 	},
 }
 
-local KC = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
+--- Reloads both the bridge and its stateful scheduler under one fresh hs stub.
+--- @param overrides table Hammerspoon API overrides.
+--- @return table module Fresh bridge module.
+local function load_kc_bridge(overrides)
+	package.loaded["adapters.timer_scheduler"] = nil
+	return helpers.load_with_stubs("modules.keylogger.kc_bridge", overrides)
+end
+
+local KC = load_kc_bridge(hs_overrides)
 
 
 
@@ -270,7 +285,7 @@ end)
 helpers.describe("kc_bridge — M.init()", function()
 	helpers.it("a non-table core_state leaves the module uninitialised", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
-		kc.init(nil, nil, {}, {})
+		kc.init(nil, nil, {}, {}, function() return false end)
 		-- Refusal has to be observable, not merely survivable: a module that
 		-- swallowed the bad state and initialised anyway passes "does not crash"
 		-- and then fails at every later call, far from the argument that caused it.
@@ -285,7 +300,8 @@ helpers.describe("kc_bridge — M.init()", function()
 			{ some_state = true },
 			nil,  -- no log_manager needed for this surface test
 			{ k = { tap = "none", hold = "none" } },
-			{}
+			{},
+			function() return false end
 		)
 		helpers.assert_eq(type(kc.get_stats()), "table",
 			"a successful init must leave the public surface answering — the positive control "
@@ -295,9 +311,10 @@ helpers.describe("kc_bridge — M.init()", function()
 	helpers.it("ignores duplicate init calls", function()
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
 		local state = { ok = true }
-		kc.init(state, nil, {}, {})
+		local may_persist = function() return false end
+		kc.init(state, nil, {}, {}, may_persist)
 		local before = kc.get_stats()
-		kc.init(state, nil, {}, {})
+		kc.init(state, nil, {}, {}, may_persist)
 		helpers.assert_eq(type(kc.get_stats()), type(before),
 			"a second init must be ignored, not re-run — re-running rebuilds the managed set "
 				.. "while the first init's watchers are still armed against the old one")
@@ -323,22 +340,27 @@ local hs_lifecycle_overrides = {
 	keycodes = { map = { cmd = 55, shift = 56 } },
 	pathwatcher = {
 		new = function(_path, _cb)
-			return {
-				start = function() lc_watcher_running = true  end,
-				stop  = function() lc_watcher_running = false end,
-			}
+			local watcher = {}
+			watcher.start = function() lc_watcher_running = true; return watcher end
+			watcher.stop  = function() lc_watcher_running = false end
+			return watcher
 		end,
 	},
 	timer = {
 		new = function(_interval, _cb)
-			return {
-				start = function() lc_timer_running = true  end,
-				stop  = function() lc_timer_running = false end,
-			}
+			local timer = {}
+			timer.start = function() lc_timer_running = true; return timer end
+			timer.stop  = function() lc_timer_running = false; return timer end
+			timer.running = function() return lc_timer_running end
+			return timer
 		end,
 		absoluteTime = function() return 0 end,
 	},
 }
+
+-- The adapter captures its native timer table at require time; rebind it with
+-- the lifecycle hs override before this behavior group starts.
+package.loaded["adapters.timer_scheduler"] = nil
 
 helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", function()
 
@@ -346,7 +368,7 @@ helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", f
 		lc_watcher_running = false
 		lc_timer_running   = false
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return false end)
 		helpers.assert_true(lc_watcher_running,
 			"path watcher must be running after init")
 		helpers.assert_true(lc_timer_running,
@@ -357,7 +379,7 @@ helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", f
 		lc_watcher_running = false
 		lc_timer_running   = false
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return false end)
 		kc.stop()
 		helpers.assert_eq(lc_watcher_running, false,
 			"path watcher must be stopped after stop()")
@@ -371,9 +393,24 @@ helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", f
 		lc_watcher_running = false
 		lc_timer_running   = false
 		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return false end)
 		kc.stop()
-		kc.start()
+		local saved_open = io.open
+		io.open = function(path, mode)
+			if mode == "r" then
+				return {
+					seek = function() return 0 end,
+					close = function() return true end,
+				}
+			end
+			return saved_open(path, mode)
+		end
+		local call_ok, started = pcall(kc.start)
+		io.open = saved_open
+		helpers.assert_true(call_ok,
+			"the restart fixture must release its temporary file override: " .. tostring(started))
+		helpers.assert_eq(started, true,
+			"restart must commit after the disabled-period EOF is proven")
 		helpers.assert_true(lc_watcher_running,
 			"path watcher must be re-armed by start() after stop()")
 		helpers.assert_true(lc_timer_running,
@@ -408,6 +445,7 @@ end)
 -- This section pins the behavioral contract: a public function called before
 -- M.init() must both (a) not crash and (b) log via Logger.error, exactly like
 -- every other keylogger sibling module's require_state helper.
+package.loaded["adapters.timer_scheduler"] = nil
 helpers.describe("kc_bridge — require_state guard fires Logger.error before init (F-LOW-14)", function()
 
 	--- Loads a fresh kc_bridge with a Logger.error spy installed, so tests can
@@ -434,7 +472,7 @@ helpers.describe("kc_bridge — require_state guard fires Logger.error before in
 
 	helpers.it("start() after init does NOT log an error", function()
 		local kc, error_calls = load_kc_bridge_with_error_spy()
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return false end)
 		error_calls = {} -- clear any init-time noise before the call under test
 		kc.start()
 		helpers.assert_eq(#error_calls, 0,

@@ -23,6 +23,14 @@
 local helpers = require("tests.helpers")
 local NBSP = string.char(0xC2, 0xA0)
 
+local function empty_temp_file()
+	local path = os.tmpname()
+	local fh, err = io.open(path, "w")
+	helpers.assert_not_nil(fh, "the RulesEngine fixture must materialize its empty TOML: " .. tostring(err))
+	fh:close()
+	return path
+end
+
 -- A fake keymap module exposing exactly what PersonalInfo.start / RulesEngine.start
 -- consume, mirroring the shape used by test_date_rule_respects_group_disable.lua.
 -- get_trigger_char() is the load-bearing addition: it returns a magic key distinct
@@ -91,7 +99,7 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 		-- A scratch path with no [trigger_char] override, so PersonalInfo's own
 		-- config load falls back to its DEFAULT_CONFIG.trigger_char = "★" — this
 		-- is the wrong value the bug used to leak into RulesEngine.
-		local scratch_toml = os.tmpname()
+		local scratch_toml = empty_temp_file()
 
 		local CUSTOM_TRIGGER = "%"
 		local fake_km = make_fake_keymap(CUSTOM_TRIGGER)
@@ -129,9 +137,11 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 		local DynHot = helpers.load_with_stubs("modules.dynamic_hotstrings")
 		local fake_km = make_fake_keymap(":")
-		local scratch_toml = os.tmpname()
-		DynHot.start("/tmp/", fake_km, scratch_toml)
+		local scratch_toml = empty_temp_file()
+		local started = DynHot.start("/tmp/", fake_km, scratch_toml)
 		os.remove(scratch_toml)
+		helpers.assert_eq(started, true,
+			"the composite fixture must commit both engines before invoking the interceptor")
 
 		local result = fake_km.get_interceptor()(make_key_event(NBSP .. ":"), "td")
 		helpers.assert_eq(result, "consume",

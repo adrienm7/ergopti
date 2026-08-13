@@ -145,6 +145,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/fixture/ollama", nil, true end,
 		}
+		package.loaded["adapters.task_lifecycle"] = nil
 
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama", {
 			fs = { attributes = function(path)
@@ -196,18 +197,20 @@ helpers.describe("Ollama daemon log rollover", function()
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return nil, "not installed", false end,
 		}
+		package.loaded["adapters.task_lifecycle"] = nil
 		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
 
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 			fs = { attributes = function() return "file" end },
 			task = {
-				new = function(_, callback, args)
+				new = function(_, callback, _stream, args)
 					task_args = args
 					task_done = callback
-					return {
+					local task = {
 						setStreamingCallback = function() return true end,
-						start = function() return true end,
 					}
+					function task:start() return self end
+					return task
 				end,
 			},
 		})

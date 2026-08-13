@@ -45,6 +45,7 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.log_manager"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
@@ -97,6 +98,11 @@ local _paths = {}
 
 --- Background ingest timer.
 local _ingest_timer = nil
+local _ingest_timer_committed = false
+
+--- A failed initialization retains this flag until every partially acquired
+--- timer/database has been released. No later init may publish over that debt.
+local _init_cleanup_pending = false
 
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); errors are swallowed so one broken listener cannot
@@ -354,20 +360,29 @@ end
 
 
 --- Schedules the outbox drain on the next run-loop turn.
---- The handle is retained until the callback fires; losing a doAfter handle can
---- let Hammerspoon's GC cancel the timer before it runs.
+--- The shared scheduler publishes the exact unstarted native candidate before
+--- activation. If start raises after activation and rollback refuses, that
+--- candidate remains the only owner and blocks every sibling drain timer until
+--- teardown can retry its cleanup.
 --- @param delay number|nil Delay in seconds (zero for the initial drain).
 --- @return boolean scheduled
 local function _schedule_deferred_log_drain(delay)
 	if not _has_deferred_logs() then return true end
-	if _deferred_log_timer ~= nil then return true end
+	if _deferred_log_timer ~= nil then
+		return _deferred_log_timer.committed == true
+	end
 
-	local callback_ran = false
-	local marker = {}
-	_deferred_log_timer = marker
-	local ok, timer_or_err = pcall(timer.doAfter, delay or 0, function()
-		callback_ran = true
-		_deferred_log_timer = nil
+	-- Forward-declare before the closure: declaring this local below the closure
+	-- would bind the callback to a nil global instead of the scheduler handle.
+	local scheduled_handle
+	local committed
+	scheduled_handle, committed = TimerScheduler.after(delay or 0, function()
+		-- TimerScheduler fences repeat delivery before invoking us. Clear the
+		-- scheduling gate only when its exact native cleanup actually settled.
+		if _deferred_log_timer == scheduled_handle
+			and scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
 		local drained_ok, drain_err = xpcall(_drain_deferred_logs, debug.traceback)
 		if not drained_ok then
 			Logger.error(LOG, "Deferred keylogger drain failed: %s.", tostring(drain_err))
@@ -376,15 +391,21 @@ local function _schedule_deferred_log_drain(delay)
 			_schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC)
 		end
 	end)
-	if not ok or timer_or_err == nil then
-		if _deferred_log_timer == marker then _deferred_log_timer = nil end
-		Logger.error(LOG, "Cannot schedule deferred keylogger drain: %s.",
-			tostring(timer_or_err or "hs.timer.doAfter returned nil"))
+
+	-- A failed acquisition can still own a live candidate when native start
+	-- activated and then raised while rollback refused. Retain that exact debt;
+	-- otherwise discard the settled wrapper so a later ingest/action may retry.
+	if scheduled_handle and scheduled_handle.timer ~= nil then
+		_deferred_log_timer = scheduled_handle
+	end
+	if committed ~= true then
+		if not scheduled_handle or scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
+		Logger.error(LOG, "Cannot schedule deferred keylogger drain transactionally.")
 		return false
 	end
-	-- Some unit-test clocks execute doAfter callbacks synchronously. Do not leave
-	-- their already-fired handle looking like a live scheduling gate.
-	if not callback_ran then _deferred_log_timer = timer_or_err end
+	_deferred_log_timer = scheduled_handle
 	return true
 end
 
@@ -496,8 +517,8 @@ end
 
 
 --- Drains queued operations in strict insertion order.
---- The head advances only after Rotation accepted the operation, so a throwing
---- sink leaves the exact item available for the next timer/ingest retry.
+--- The head advances only after Rotation returns exact true, so either a thrown
+--- or non-throwing filesystem refusal leaves the exact item available for retry.
 --- @return boolean drained Whether the queue is now empty.
 _drain_deferred_logs = function()
 	while _has_deferred_logs() do
@@ -506,9 +527,12 @@ _drain_deferred_logs = function()
 		local entry = operation.kind == "typing_snapshot"
 			and _typing_entry_from_snapshot(operation.value)
 			or operation.value
-		local ok, err = xpcall(function() Rotation.append_log(entry) end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "Cannot append deferred keylogger entry: %s.", tostring(err))
+		local ok, accepted_or_err = xpcall(function()
+			return Rotation.append_log(entry)
+		end, debug.traceback)
+		if not ok or accepted_or_err ~= true then
+			Logger.error(LOG, "Cannot append deferred keylogger entry: %s.",
+				tostring(accepted_or_err))
 			return false
 		end
 		_deferred_log_queue[_deferred_log_head] = nil
@@ -521,18 +545,24 @@ end
 
 
 --- Append a single event entry to today.log as a JSONL line.
---- Delegates to Rotation.append_log (hot path — no SQLite).
+--- The FIFO owns the entry before the sink is called, so a non-throwing storage
+--- refusal cannot destroy the caller's only copy.
 --- @param entry table The event entry. Must contain a `type` field.
---- @return boolean|nil accepted True when queued behind deferred work.
+--- @return boolean persisted True when this call drained through exact commit;
+--- false when its owned FIFO item remains pending for a scheduled retry.
 function M.append_log(entry)
-	if _has_deferred_logs() then
-		_queue_deferred_log({ kind = "entry", value = entry })
+	local had_deferred_work = _has_deferred_logs()
+	_queue_deferred_log({ kind = "entry", value = entry })
+	if had_deferred_work then
 		-- Queue insertion is the acceptance boundary; timer allocation only controls
 		-- when accepted work drains; the ingest tick and stop path independently retry it
 		_schedule_deferred_log_drain(0)
 		return true
 	end
-	return Rotation.append_log(entry)
+
+	local drained = _drain_deferred_logs()
+	if not drained then _schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC) end
+	return drained
 end
 
 --- Serialize the keystroke buffer accumulated in CoreState into a
@@ -666,8 +696,11 @@ end
 --- The callback receives no arguments; use M.get_db_rev() to read the new rev.
 --- Errors inside the callback are swallowed.
 ---@param fn function The listener to register.
+---@return boolean registered True only after the listener is owned.
 function M.on_ingest_done(fn)
+	assert(type(fn) == "function", "on_ingest_done requires a callback")
 	table.insert(_ingest_listeners, fn)
+	return true
 end
 
 local function _notify_ingest_listeners()
@@ -1225,6 +1258,101 @@ function M.ingest_once()
 	_notify_ingest_listeners()
 end
 
+
+--- Verifies one native ingest timer's observable running state. Real
+--- Hammerspoon timers expose running(); the boolean branch keeps the narrow
+--- pure-Lua timer doubles faithful without accepting an unreadable userdata.
+--- @param timer_handle table|userdata Native timer candidate.
+--- @param expected boolean Required running state.
+--- @return boolean matches True only when the observable state matches.
+--- @return string|nil detail Probe failure detail.
+local function _ingest_timer_running_matches(timer_handle, expected)
+	local member_ok, member_or_err = pcall(function() return timer_handle.running end)
+	if not member_ok then return false, tostring(member_or_err) end
+	if type(member_or_err) == "boolean" and type(timer_handle) == "table" then
+		if member_or_err == expected then return true end
+		return false, string.format("running state was %s", tostring(member_or_err))
+	end
+	if type(member_or_err) ~= "function" then return false, "running() unavailable" end
+	local probe_ok, running_or_err = xpcall(function()
+		return member_or_err(timer_handle)
+	end, debug.traceback)
+	if not probe_ok or type(running_or_err) ~= "boolean" then
+		return false, tostring(running_or_err)
+	end
+	if running_or_err ~= expected then
+		return false, string.format("running() returned %s", tostring(running_or_err))
+	end
+	return true
+end
+
+--- Fences and releases the exact recurring ingest timer. A truthy chainable
+--- stop result is not a native-state verdict; retain the handle until
+--- running() proves that it is stopped.
+--- @param timer_handle table|userdata Exact timer owned by this module.
+--- @param label string Cleanup context for the file logger.
+--- @return boolean stopped True only when native state is observably stopped.
+local function _stop_ingest_timer(timer_handle, label)
+	if not timer_handle then return true end
+	if _ingest_timer == timer_handle then _ingest_timer_committed = false end
+	local stop_ok, stopped_or_err = xpcall(function()
+		return timer_handle:stop()
+	end, debug.traceback)
+	local state_stopped, state_detail = _ingest_timer_running_matches(timer_handle, false)
+	if not stop_ok or stopped_or_err == false or not state_stopped then
+		pcall(Logger.error, LOG, "%s cleanup remains pending: %s.", label,
+			tostring(not stop_ok and stopped_or_err
+				or (stopped_or_err == false and "stop returned false")
+				or state_detail))
+		return false
+	end
+	if _ingest_timer == timer_handle then _ingest_timer = nil end
+	return true
+end
+
+--- Acquires and starts the one recurring ingest timer. Construction and start
+--- are one transaction: a handle whose start raises or explicitly refuses stays
+--- retained so M.stop() can retry its exact cleanup.
+--- @return boolean started True when one owned timer is committed.
+local function _start_ingest_timer()
+	if _ingest_timer then return _ingest_timer_committed end
+
+	local timer_candidate = nil
+	local create_ok, timer_or_err = xpcall(function()
+		timer_candidate = timer.new(INGEST_TICK_SEC, function()
+			-- Native timers can invoke a queued callback after stop() refused or
+			-- after start() raised despite activating the candidate. Publication is
+			-- therefore both identity- and commit-scoped, never handle-presence-only.
+			if _ingest_timer ~= timer_candidate or _ingest_timer_committed ~= true then
+				return
+			end
+			Logger.pcall(LOG, M.ingest_once)
+		end)
+		return timer_candidate
+	end, debug.traceback)
+	if not create_ok or timer_or_err == nil then
+		pcall(Logger.error, LOG, "Cannot create ingest timer: %s.",
+			tostring(timer_or_err or "hs.timer.new returned nil"))
+		return false
+	end
+
+	_ingest_timer = timer_or_err
+	local start_ok, started_or_err = xpcall(function()
+		return timer_or_err:start()
+	end, debug.traceback)
+	local state_started, state_detail = _ingest_timer_running_matches(timer_or_err, true)
+	if not start_ok or started_or_err == false or not state_started then
+		pcall(Logger.error, LOG,
+			"Cannot start ingest timer; exact cleanup remains owned: %s.",
+			tostring(not start_ok and started_or_err
+				or (started_or_err == false and "start returned false")
+				or state_detail))
+		return false
+	end
+	_ingest_timer_committed = true
+	return true
+end
+
 --- Day rollover handler. Drains remaining today.log then delegates to
 --- Rotation.rollover to reset the file and offset.
 --- @return boolean True when the drain fully completed and rollover ran; false
@@ -1310,10 +1438,65 @@ end
 -- ============================
 -- ============================
 
+--- Releases resources acquired by an initialization attempt. Timer handles are
+--- cleared only after their exact stop call completes, so a failed teardown can
+--- be retried without constructing a sibling owner.
+--- @return boolean complete True only when no initialization cleanup debt remains.
+local function _release_failed_init_resources()
+	local complete = true
+
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Failed-init ingest timer") then
+			complete = false
+		end
+	end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Failed-init deferred timer cleanup remains pending: %s.",
+				tostring(result_or_err))
+		end
+	end
+
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Failed-init database cleanup remains pending: %s.",
+			tostring(db_result_or_err))
+	end
+	return complete
+end
+
+--- Revokes all log-manager publication from a failed initialization and starts
+--- cleanup of any native resources that attempt acquired.
+--- @return boolean complete True only when every cleanup completed.
+local function _rollback_failed_init()
+	_state = nil
+	_device_obj = nil
+	_device_id = nil
+	_paths = {}
+	_init_cleanup_pending = true
+	local complete = _release_failed_init_resources()
+	_init_cleanup_pending = not complete
+	return complete
+end
+
 --- Initialize the log manager. Resolves the device, opens the SQLite cache,
 --- creates the filesystem layout. Idempotent; calling twice is a warning.
 --- @param core_state table The shared CoreState from modules/keylogger/init.lua.
-function M.init(core_state)
+local function _init(core_state)
 	if _state then
 		Logger.warn(LOG, "M.init() called twice — ignoring duplicate.")
 		return true
@@ -1439,11 +1622,8 @@ function M.init(core_state)
 	_state.manifest  = _state.manifest  or {}
 
 	if not _ingest_timer then
-		pcall(M.ingest_once)
-		_ingest_timer = timer.new(INGEST_TICK_SEC, function()
-			pcall(M.ingest_once)
-		end)
-		_ingest_timer:start()
+		Logger.pcall(LOG, M.ingest_once)
+		if not _start_ingest_timer() then error("ingest timer acquisition failed") end
 	end
 
 	Logger.success(LOG, "Log manager initialized (device %s, name %s).",
@@ -1451,13 +1631,45 @@ function M.init(core_state)
 	return true
 end
 
+--- Runs initialization as a transaction. A dependency may raise after a native
+--- timer or database has already become live; contain that exception, revoke the
+--- prematurely published state, and retain any failed cleanup for exact retry.
+--- @param core_state table The shared CoreState from modules/keylogger/init.lua.
+--- @return boolean initialized True only when the complete initialization commits.
+function M.init(core_state)
+	if not _state and _init_cleanup_pending then
+		local cleanup_complete = _release_failed_init_resources()
+		_init_cleanup_pending = not cleanup_complete
+		if not cleanup_complete then
+			pcall(Logger.error, LOG,
+				"M.init() refused while prior initialization cleanup remains pending.")
+			return false
+		end
+	end
+
+	local state_was_committed = _state ~= nil
+	local ok, initialized_or_err = xpcall(_init, debug.traceback, core_state)
+	if ok then return initialized_or_err end
+
+	local cleanup_complete = true
+	if not state_was_committed then cleanup_complete = _rollback_failed_init() end
+	pcall(Logger.error, LOG,
+		"M.init() raised; initialization was rejected%s: %s.",
+		cleanup_complete and "" or " with cleanup still pending",
+		tostring(initialized_or_err))
+	return false
+end
+
 --- Re-creates the ingest timer if it was stopped by M.stop() without a
---- full re-init. Safe to call when already running (_ingest_timer exists)
---- or before init (_state is nil): both cases are no-ops. Called
---- unconditionally from keylogger M.start() so the ingest loop survives
---- toggle OFF/ON without requiring a full re-initialization.
+--- full re-init. Idempotent when already running; before init it reports false
+--- and acquires nothing. Called unconditionally from keylogger M.start() so the
+--- ingest loop survives toggle OFF/ON without a full re-initialization.
+--- @return boolean running True only when one timer owner is committed.
 function M.ensure_ingest_running()
-	if not _state then return end
+	if not _state then return false end
+	-- A candidate may have become native-live before start() raised/refused. It is
+	-- cleanup debt, not an ingest owner; never reopen the database underneath it.
+	if _ingest_timer and not _ingest_timer_committed then return false end
 
 	-- Re-arm must be symmetric with M.stop(), which tears down BOTH the timer and
 	-- the SQLite cache. Restoring only the timer left the ingest tick running
@@ -1474,25 +1686,60 @@ function M.ensure_ingest_running()
 		end
 	end
 
-	if _ingest_timer then return end
-	_ingest_timer = timer.new(INGEST_TICK_SEC, function()
-		pcall(M.ingest_once)
-	end)
-	_ingest_timer:start()
+	if _ingest_timer then return true end
+	if not _start_ingest_timer() then return false end
 	Logger.done(LOG, "Ingest timer re-armed after stop/start cycle.")
+	return true
 end
 
---- Stop the ingest timer and close the SQLite cache cleanly.
+--- Stop every retained timer and close the SQLite cache cleanly.
+--- Native stop/close methods may explicitly refuse or raise after leaving their
+--- resource live. Retain the exact handle in that case so the lifecycle owner can
+--- retry instead of publishing a successor beside an orphan.
+--- @return boolean complete True only when every owned resource was released.
 function M.stop()
-	if _ingest_timer then _ingest_timer:stop(); _ingest_timer = nil end
-	if _deferred_log_timer then
-		pcall(_deferred_log_timer.stop, _deferred_log_timer)
-		_deferred_log_timer = nil
+	local complete = true
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Ingest timer") then
+			complete = false
+		end
 	end
-	if _has_deferred_logs() then _drain_deferred_logs() end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred timer cleanup remains pending: %s.", tostring(result_or_err))
+		end
+	end
+
+	if _has_deferred_logs() then
+		local drain_ok, drained_or_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drain_ok or drained_or_err == false then
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
+		end
+	end
 	pcall(M.ingest_once)
-	SqliteWriter.close_db()
-	Logger.debug(LOG, "Log manager stopped")
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Database cleanup remains pending: %s.", tostring(db_result_or_err))
+	end
+	pcall(Logger.debug, LOG, complete and "Log manager stopped"
+		or "Log manager cleanup remains pending")
+	return complete
 end
 
 

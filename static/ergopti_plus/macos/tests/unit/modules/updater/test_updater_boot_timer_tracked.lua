@@ -6,8 +6,8 @@
 --- stop_background_checks() the timer continued to fire, triggering a
 --- background_tick on a channel that was supposed to be stopped.
 ---
---- Fix: the boot-check timer is stored in module-level _boot_timer; both
---- start_background_checks() and stop_background_checks() manage it.
+--- Fix: the exact boot-check handle is published before commit and cancelled
+--- through TimerScheduler; the behavioral lifecycle test drives that contract.
 
 local helpers = require("tests.helpers")
 
@@ -24,18 +24,19 @@ helpers.assert_true(
 	"modules/updater/init.lua must declare _boot_timer at module level (lib-update-01)"
 )
 
--- Test 2: doAfter result must be assigned to _boot_timer (not discarded).
-local assign_pos = src:find("_boot_timer = hs.timer.doAfter(", 1, true)
+-- Test 2: the scheduler result must be assigned to _boot_timer (not discarded).
+local schedule_pos = src:find("TimerScheduler.after, first_delay, function()", 1, true)
+local assign_pos = src:find("_boot_timer = boot_handle", 1, true)
 helpers.assert_true(
-	assign_pos ~= nil,
-	"modules/updater/init.lua must assign the doAfter() result to _boot_timer (lib-update-01)"
+	schedule_pos ~= nil and assign_pos ~= nil and schedule_pos < assign_pos,
+	"modules/updater/init.lua must retain the exact TimerScheduler.after() handle (lib-update-01)"
 )
 
--- Test 3: stop_background_checks must stop and nil _boot_timer.
-local stop_pos = src:find("_boot_timer:stop()", 1, true)
+-- Test 3: stop_background_checks must cancel the exact retained handle.
+local stop_pos = src:find("TimerScheduler.cancel, _boot_timer", 1, true)
 helpers.assert_true(
 	stop_pos ~= nil,
-	"modules/updater/init.lua stop_background_checks() must stop _boot_timer (lib-update-01)"
+	"modules/updater/init.lua stop_background_checks() must cancel _boot_timer (lib-update-01)"
 )
 
 print("[PASS] test_updater_boot_timer_tracked")

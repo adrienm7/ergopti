@@ -86,7 +86,8 @@ helpers.describe("rotation — pre-init guard", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
 		-- Called directly. An append before init must write NOTHING: the offset is
 		-- still zero, and a line written past it is a line the next flush replays.
-		r.append_log({ type = "typing", text = "hello" })
+		helpers.assert_eq(r.append_log({ type = "typing", text = "hello" }), false,
+			"an append rejected by the pre-init guard must report exact false")
 		helpers.assert_eq(r.get_offset(), 0,
 			"an append before init must not advance the offset")
 	end)

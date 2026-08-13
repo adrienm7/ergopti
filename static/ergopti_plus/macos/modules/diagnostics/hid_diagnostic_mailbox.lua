@@ -56,7 +56,7 @@ local _overflow_resolver = 0
 local _delivery_failures = 0
 local _pump_handle = nil
 local _pump_generation = 0
-local _running = false
+local _pump_committed = false
 local _draining = false
 
 
@@ -189,6 +189,28 @@ local function drain_pending()
 end
 
 
+--- Cancels the exact retained pump capability without discarding stop debt.
+--- Callers must fence the generation and clear `_pump_committed` first so a
+--- native callback already queued before cancellation remains inert.
+--- @param reason string Lifecycle operation attempting cancellation.
+--- @return boolean settled True only when no native timer remains owned.
+local function cancel_retained_pump(reason)
+	local handle = _pump_handle
+	if not handle then return true end
+
+	local cancel_ok, settled = pcall(TimerScheduler.cancel, handle)
+	if cancel_ok and settled == true then
+		if _pump_handle == handle then _pump_handle = nil end
+		return true
+	end
+
+	Logger.error(LOG,
+		"HID diagnostic pump %s did not commit; exact handle retained for retry — %s.",
+		reason, tostring(cancel_ok and settled or settled))
+	return false
+end
+
+
 
 
 
@@ -228,9 +250,18 @@ end
 --- logged synchronously only from lifecycle code, never from a key callback.
 --- @return boolean committed True only when the native repeating timer is owned.
 function M.start()
-	if _running then
+	if _pump_handle and _pump_committed then
 		Logger.warn(LOG, "start() called while the HID diagnostic pump is already running — retaining it.")
 		return true
+	end
+	if _pump_handle then
+		_pump_generation = _pump_generation + 1
+		_pump_committed = false
+		if not cancel_retained_pump("pre-start cleanup") then
+			Logger.error(LOG,
+				"HID diagnostic pump cannot start while prior timer cleanup is pending.")
+			return false
+		end
 	end
 
 	Logger.start(LOG, "Starting HID diagnostic pump…")
@@ -239,26 +270,29 @@ function M.start()
 	local candidate
 	local schedule_ok, handle, committed = pcall(TimerScheduler.every,
 		M.DEFAULT_STATE.pump_interval_sec, function()
-			if not _running or generation ~= _pump_generation
+			if not _pump_committed or generation ~= _pump_generation
 				or _pump_handle ~= candidate then
 				return
 			end
 			drain_pending()
 		end)
 	candidate = handle
+	if schedule_ok and type(handle) == "table" then
+		-- TimerScheduler may return an uncommitted candidate whose native start
+		-- partially activated before raising; publish it before cleanup can fail
+		_pump_handle = handle
+		_pump_committed = committed == true
+	end
 
 	if not schedule_ok or committed ~= true or type(handle) ~= "table" then
 		_pump_generation = _pump_generation + 1
-		if schedule_ok and type(handle) == "table" then
-			pcall(TimerScheduler.cancel, handle)
-		end
+		_pump_committed = false
+		cancel_retained_pump("startup rollback")
 		Logger.error(LOG,
 			"HID diagnostic pump could not be armed; key capture must remain stopped.")
 		return false
 	end
 
-	_pump_handle = handle
-	_running = true
 	Logger.success(LOG, "HID diagnostic pump started.")
 	return true
 end
@@ -270,24 +304,15 @@ end
 --- @return boolean settled
 function M.stop()
 	Logger.start(LOG, "Stopping HID diagnostic pump…")
-	if not drain_pending() then
+	_pump_generation = _pump_generation + 1
+	_pump_committed = false
+	local delivered = drain_pending()
+	local timer_settled = cancel_retained_pump("cancellation")
+	if not delivered then
 		Logger.error(LOG,
 			"HID diagnostic pump stop retained pending records after a sink failure.")
-		return false
 	end
-
-	if _running then
-		local cancel_ok, settled = pcall(TimerScheduler.cancel, _pump_handle)
-		if not cancel_ok or settled ~= true then
-			Logger.error(LOG,
-				"HID diagnostic pump cancellation did not commit; handle retained for retry.")
-			return false
-		end
-	end
-
-	_pump_generation = _pump_generation + 1
-	_pump_handle = nil
-	_running = false
+	if not delivered or not timer_settled then return false end
 	Logger.success(LOG, "HID diagnostic pump stopped.")
 	return true
 end
@@ -296,7 +321,7 @@ end
 --- Reports whether the exact repeating pump is currently owned.
 --- @return boolean running
 function M.is_running()
-	return _running
+	return _pump_handle ~= nil
 end
 
 
@@ -304,7 +329,7 @@ end
 --- @return table status
 function M.status()
 	return {
-		running = _running,
+		running = _pump_handle ~= nil,
 		pending = pending_count(),
 		overflow_preview = _overflow_preview,
 		overflow_resolver = _overflow_resolver,

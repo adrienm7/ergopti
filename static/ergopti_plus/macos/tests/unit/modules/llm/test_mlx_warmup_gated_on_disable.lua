@@ -161,10 +161,13 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn, cancelled = false }
 				timer_queue[#timer_queue + 1] = handle
-				return handle
+				return handle, true
 			end,
-			every     = function(_, _) return { cancelled = false } end,
-			cancel    = function(handle) if type(handle) == "table" then handle.cancelled = true end end,
+			every     = function(_, _) return { cancelled = false }, true end,
+			cancel    = function(handle)
+				if type(handle) == "table" then handle.cancelled = true; handle.timer = nil end
+				return true
+			end,
 			cancelAll = function() end,
 			now       = function() return 0 end,
 		}

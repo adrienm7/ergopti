@@ -47,6 +47,7 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 		package.loaded["infra.logger"] = spy
 
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local HC = helpers.load_with_stubs("adapters.http_client", {
 			http = {
 				-- Deliver a response synchronously so the completion path runs
@@ -61,7 +62,12 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 				end,
 			},
 			timer = {
-				doAfter = function(_d, _fn) return { stop = function() end } end,
+				new = function(_delay, _fn)
+					local timer = {}
+					function timer:start() return self end
+					function timer:stop() return self end
+					return timer
+				end,
 			},
 		})
 
@@ -88,6 +94,7 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 
 		package.loaded["infra.logger"] = nil
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 	end)
 end)
 

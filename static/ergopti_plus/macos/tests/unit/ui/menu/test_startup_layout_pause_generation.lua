@@ -74,7 +74,9 @@ package.loaded["ui.menu.menu_paths"] = {
 	get_config_dir = function() return "/tmp/ergopti-test" end,
 	open_editor = function() end,
 }
-package.loaded["ui.menu.menu_state"] = { sync_state_to_modules = function() end }
+package.loaded["ui.menu.menu_state"] = {
+	sync_state_to_modules = function() return true end,
+}
 package.loaded["ui.menu.menu_watchers"] = {
 	start_config_watcher = function()
 		return { stop = function() end }

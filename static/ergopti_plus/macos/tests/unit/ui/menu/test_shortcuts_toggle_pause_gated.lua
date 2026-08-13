@@ -34,10 +34,6 @@
 
 local helpers = require("tests.helpers")
 
--- Characters after the toggle's title far enough to cover its item table but not
--- to reach the next item, so a gate belonging to a sibling cannot be miscredited.
-local ITEM_WINDOW_CHARS = 400
-
 
 
 
@@ -58,19 +54,21 @@ local function toggle_item_source()
 	helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
 	if not src then return "" end
 
-	-- The master toggle is the item whose fn flips state.shortcuts; anchor on the
-	-- item table that contains it rather than on any title lookup, since the same
-	-- i18n key is read in more than one place.
-	local flip_at = src:find("state%.shortcuts%s*=%s*not%s+state%.shortcuts")
-	helpers.assert_true(flip_at ~= nil, "the Shortcuts master toggle must be locatable")
-	if not flip_at then return "" end
+	-- The runtime transaction helper is unique to the master item and survives
+	-- changing how the desired boolean is computed. Anchoring on the old assignment
+	-- made this pause guard red when the toggle became transactional.
+	local owner_at = src:find("local function commit_shortcuts_runtime", 1, true)
+	helpers.assert_true(owner_at ~= nil, "the Shortcuts master toggle owner must be locatable")
+	if not owner_at then return "" end
 
-	-- Walk back to the opening of the item table so the fields above fn are in view.
-	local item_at = src:sub(1, flip_at):find("local item = {[^\0]*$")
+	local item_at = src:find("local item = {", owner_at, true)
 	helpers.assert_true(item_at ~= nil, "the toggle's item table must be locatable")
 	if not item_at then return "" end
+	local end_at = src:find("-- ===== 2.1) Shortcut Item Factory Helpers =====", item_at, true)
+	helpers.assert_true(end_at ~= nil, "the master item must end before subsection 2.1")
+	if not end_at then return "" end
 
-	return src:sub(item_at, flip_at + ITEM_WINDOW_CHARS)
+	return src:sub(item_at, end_at - 1)
 end
 
 helpers.describe("the Shortcuts master toggle is pause-gated like its siblings", function()

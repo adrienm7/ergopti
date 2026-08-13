@@ -80,6 +80,57 @@ local _state = nil
 ---          min_delay = number, watchdog = handle|nil }
 local _pending = nil
 
+--- Exact TimerScheduler handles whose native stop refused. Identity fences make
+--- their queued callbacks inert, but ownership remains here until a later
+--- lifecycle boundary successfully retries the same capability.
+local _timer_cleanup = {}
+
+
+local function retain_timer_cleanup(handle)
+	if type(handle) ~= "table" or handle.timer == nil then return end
+	for _, existing in ipairs(_timer_cleanup) do
+		if existing == handle then return end
+	end
+	_timer_cleanup[#_timer_cleanup + 1] = handle
+end
+
+
+local function cancel_owned_timer(handle)
+	if type(handle) ~= "table" or handle.timer == nil then return true end
+	local ok_cancel, settled_or_error = pcall(TimerScheduler.cancel, handle)
+	if ok_cancel and settled_or_error == true then return true end
+	retain_timer_cleanup(handle)
+	Logger.error(LOG, "Terminator timer cleanup remains pending: %s.",
+		tostring(settled_or_error))
+	return false
+end
+
+
+local function retry_timer_cleanup()
+	if #_timer_cleanup == 0 then return true end
+	local remaining = {}
+	for _, handle in ipairs(_timer_cleanup) do
+		local ok_cancel, settled = pcall(TimerScheduler.cancel, handle)
+		if not ok_cancel or settled ~= true then remaining[#remaining + 1] = handle end
+	end
+	_timer_cleanup = remaining
+	return #remaining == 0
+end
+
+
+local function acquire_timer(delay, callback, label)
+	retry_timer_cleanup()
+	local ok_schedule, handle_or_error, committed = pcall(TimerScheduler.after, delay, callback)
+	if ok_schedule and committed == true
+		and type(handle_or_error) == "table" and handle_or_error.timer ~= nil then
+		return handle_or_error, true
+	end
+	if type(handle_or_error) == "table" then cancel_owned_timer(handle_or_error) end
+	Logger.error(LOG, "Cannot arm %s timer: %s.", label,
+		tostring(ok_schedule and "scheduler returned no committed handle" or handle_or_error))
+	return nil, false
+end
+
 
 --- Guard: verifies M.init() ran before any public function that needs state.
 --- @param func_name string Name of the calling function (for error messages).
@@ -127,19 +178,18 @@ local function schedule_retry(pending, reason, quiet)
 	pending.retry_attempt = (pending.retry_attempt or 0) + 1
 	local delay = math.min(REPLAY_RETRY_BASE_SEC * (2 ^ (pending.retry_attempt - 1)),
 		REPLAY_RETRY_MAX_SEC)
-	local ok, handle_or_err = pcall(TimerScheduler.after, delay, function()
+	local handle, committed = acquire_timer(delay, function()
 		if _pending ~= pending then return end
 		pending.retry = nil
 		emit_pending("retry after " .. reason, false)
-	end)
-	if ok and type(handle_or_err) == "table" and handle_or_err.timer ~= nil then
-		pending.retry = handle_or_err
+	end, "terminator replay retry")
+	if committed then
+		pending.retry = handle
 		return
 	end
 	pending.retry = nil
 	if not quiet then
-		Logger.error(LOG, "Cannot schedule terminator replay retry: %s.",
-			tostring(ok and "timer unavailable" or handle_or_err))
+		Logger.error(LOG, "Cannot schedule terminator replay retry after %s.", tostring(reason))
 	end
 end
 
@@ -184,15 +234,15 @@ emit_pending = function(reason, quiet)
 
 	_pending = nil
 	if pending.watchdog then
-		TimerScheduler.cancel(pending.watchdog)
+		cancel_owned_timer(pending.watchdog)
 		pending.watchdog = nil
 	end
 	if pending.fence then
-		TimerScheduler.cancel(pending.fence)
+		cancel_owned_timer(pending.fence)
 		pending.fence = nil
 	end
 	if pending.retry then
-		TimerScheduler.cancel(pending.retry)
+		cancel_owned_timer(pending.retry)
 		pending.retry = nil
 	end
 	if not quiet then Logger.done(LOG, "Terminator replayed (%s).", reason) end
@@ -263,7 +313,7 @@ function M.arm(spec)
 		return false
 	end
 
-	_pending = {
+	local pending = {
 		kind       = spec.kind,
 		key        = spec.key,
 		chars      = spec.chars,
@@ -276,29 +326,56 @@ function M.arm(spec)
 		fence_open = false,
 		fence      = nil,
 	}
-	Logger.trace(LOG, "Terminator held pending delivery of the replacement…")
 
-	-- Armed FIRST so a synchronous flush below still finds the handle and
-	-- cancels it; arming it afterwards would leave an orphan timer that fires
-	-- into an empty slot.
-	local pending = _pending
-	pending.watchdog = TimerScheduler.after(REPLAY_WATCHDOG_SEC, function()
+	-- Acquire every timer before publishing the pending record or consuming the
+	-- physical terminator. A refused watchdog/fence is therefore a complete
+	-- rollback: the caller can pass the original key through with no hidden owner.
+	local watchdog, watchdog_committed = acquire_timer(REPLAY_WATCHDOG_SEC, function()
 		if _pending ~= pending then return end
 		Logger.warn(LOG,
 			"Replacement transaction did not complete within %.2fs — replaying the terminator anyway.",
 			REPLAY_WATCHDOG_SEC)
 		pending.watchdog = nil
 		emit_pending("watchdog")
-	end)
+	end, "terminator replay watchdog")
+	if not watchdog_committed then return false end
+	pending.watchdog = watchdog
+
+	if pending.min_delay > 0 then
+		local fence, fence_committed = acquire_timer(pending.min_delay, function()
+			if _pending ~= pending then return end
+			pending.fence_open = true
+			pending.fence      = nil
+			M.flush_if_delivered()
+		end, "terminator replay settle fence")
+		if not fence_committed then
+			cancel_owned_timer(pending.watchdog)
+			pending.watchdog = nil
+			return false
+		end
+		pending.fence = fence
+	end
+
+	_pending = pending
+	Logger.trace(LOG, "Terminator held pending delivery of the replacement…")
 
 	-- Completion is generation-bound. A delayed callback from an older
 	-- replacement can only update its own pending object and is ignored after a
 	-- superseding arm/forced flush.
-	SyntheticInput.on_complete(pending.transaction, function()
+	local registered, registration_error = pcall(SyntheticInput.on_complete,
+		pending.transaction, function()
 		if _pending ~= pending then return end
 		pending.transaction_complete = true
 		M.flush_if_delivered()
 	end)
+	if not registered then
+		if _pending == pending then _pending = nil end
+		cancel_owned_timer(pending.watchdog)
+		if pending.fence then cancel_owned_timer(pending.fence) end
+		Logger.error(LOG, "arm(): replacement completion registration failed: %s.",
+			tostring(registration_error))
+		return false
+	end
 
 	-- A paste-backed expansion has no target-delivery callback: the target
 	-- reads the clipboard on its own schedule, so the settle delay the emitter
@@ -307,15 +384,6 @@ function M.arm(spec)
 	-- replacement has landed: whichever arrives second releases the terminator,
 	-- instead of the echo racing past a fence it could not see.
 	if pending.min_delay > 0 then
-		pending.fence_open = false
-		pending.fence = TimerScheduler.after(pending.min_delay, function()
-			if _pending ~= pending then return end
-			pending.fence_open = true
-			pending.fence      = nil
-			-- Dispatch may already be complete, in which case this is the
-			-- second of the two conditions and the terminator goes now.
-			M.flush_if_delivered()
-		end)
 		return true
 	end
 
@@ -364,10 +432,14 @@ function M.discard_pending(reason, quiet)
 	if not pending then return false end
 	_pending = nil
 	if quiet ~= true then
-		if pending.watchdog then TimerScheduler.cancel(pending.watchdog) end
-		if pending.fence then TimerScheduler.cancel(pending.fence) end
-		if pending.retry then TimerScheduler.cancel(pending.retry) end
+		if pending.watchdog then cancel_owned_timer(pending.watchdog) end
+		if pending.fence then cancel_owned_timer(pending.fence) end
+		if pending.retry then cancel_owned_timer(pending.retry) end
 		Logger.debug(LOG, "Pending terminator discarded (%s).", reason or "ownership changed")
+	else
+		retain_timer_cleanup(pending.watchdog)
+		retain_timer_cleanup(pending.fence)
+		retain_timer_cleanup(pending.retry)
 	end
 	return true
 end

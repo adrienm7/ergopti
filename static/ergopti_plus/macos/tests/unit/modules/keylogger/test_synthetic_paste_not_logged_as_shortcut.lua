@@ -19,43 +19,55 @@ local KEYCODE_V = 9
 local function load_fixture()
 	local captured_handle = nil
 	local shortcuts = {}
+	local context_state = nil
 	local log_manager = {
-		init = function() end,
-		ensure_ingest_running = function() end,
+		init = function() return true end,
+		ensure_ingest_running = function() return true end,
 		defer_flush_buffer = function() return true end,
 		flush_buffer = function() end,
+		stop = function() return true end,
 		log_shortcut = function(value) shortcuts[#shortcuts + 1] = value end,
 	}
 	package.loaded["modules.keylogger.log_manager"] = log_manager
 	package.loaded["modules.keylogger.context_tracker"] = {
-		init = function() end,
+		init = function(state) context_state = state; return true end,
 		update_private_status = function() end,
 		app_watcher_cb = function() end,
-		capture_frontmost_app = function() end,
+		capture_frontmost_app = function()
+			context_state.is_secure_field = false
+			return true
+		end,
 	}
 	package.loaded["modules.keylogger.kc_bridge"] = {
-		init = function() end,
+		init = function() return true end,
 		set_log_manager = function() end,
-		start = function() end,
+		start = function() return true end,
+		stop = function() return true end,
 	}
 	package.loaded["modules.keylogger.watchers"] = {
-		init = function() end,
+		init = function() return true end,
 		caffeinate_cb = function() end,
-		init_hardware_watchers = function() end,
+		init_hardware_watchers = function() return true end,
+		stop_hardware_watchers = function() return true end,
 		check_idle = function() end,
 		perform_maintenance = function() end,
 	}
 	package.loaded["adapters.process_lifecycle"] = {
 		onAppActivate = function() end,
-		start = function() end,
+		start = function() return true end,
+		stop = function() return true end,
 	}
 	package.loaded["adapters.keyboard_hook"] = {
 		start = function(options)
 			if options then captured_handle = options.onEvent end
 			return true
 		end,
-		stop = function() end,
+		stop = function() return true end,
 		isRunning = function() return true end,
+	}
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return nil end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
@@ -96,9 +108,24 @@ local function load_fixture()
 		application = application,
 		caffeinate = caffeinate,
 	})
-	keylogger.start({ is_paused = function() return false end })
+	local live_hs = require("hs")
+	local prior_timer_count = #live_hs.timer.__timers
+	helpers.assert_eq(keylogger.start({ is_paused = function() return false end }), true,
+		"the provenance fixture must start before it drives the real callback")
+	local settled = 0
+	for index = prior_timer_count + 1, #live_hs.timer.__timers do
+		local timer = live_hs.timer.__timers[index]
+		if timer.delay == 0 and timer.running then
+			timer:fire()
+			settled = settled + 1
+		end
+	end
+	helpers.assert_eq(settled, 1,
+		"exactly the deferred foreground-context capture must settle before input")
 	helpers.assert_not_nil(captured_handle, "KeyboardHook must receive the real handle_key callback")
 	return {
+		keylogger = keylogger,
+		context_state = context_state,
 		handle = captured_handle,
 		shortcuts = shortcuts,
 		synthetic = require("adapters.synthetic_input"),
@@ -173,6 +200,10 @@ end
 helpers.describe("keylogger: tagged paste is never persisted as a shortcut", function()
 	helpers.it("keeps the physical Cmd+V shortcut path live", function()
 		local fixture = load_fixture()
+		helpers.assert_eq(fixture.context_state.is_secure_field, false,
+			"the negative control requires a committed non-secure foreground context")
+		helpers.assert_eq(fixture.keylogger.may_persist(), true,
+			"the negative control must reach an enabled, unpaused persistence sink")
 		fixture.handle(physical_paste_event(fixture))
 		helpers.assert_eq(#fixture.shortcuts, 1,
 			"the negative control must reach real shortcut persistence")

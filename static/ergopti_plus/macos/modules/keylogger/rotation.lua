@@ -9,7 +9,8 @@
 ---
 --- HOT PATH NOTE:
 --- M.append_log() is called on every keystroke. It must never block on SQLite.
---- All it does is open today.log in append mode, write one JSON line, and close.
+--- It reuses one unbuffered append handle and accepts a line only after write
+--- reports its documented success value.
 ---
 --- DAY ROLLOVER:
 --- M.day_rollover() is called at midnight by the keylogger init watchdog. It
@@ -70,6 +71,11 @@ local _initialized = false
 --- Persistent append handle for today.log — opened once in M.init() and reused
 --- across every M.append_log() call so the hot path never pays open()/close().
 local _log_handle = nil
+
+--- A failed unbuffered write may have left a partial unterminated record. The
+--- next retry starts on a fresh line so that its complete JSON object remains
+--- independently ingestible after storage recovers.
+local _append_boundary_required = false
 
 
 
@@ -150,14 +156,63 @@ end
 -- ==================================================================
 -- ==================================================================
 
+--- Invalidates an append handle after an ambiguous unbuffered write result.
+--- The exact handle is closed best-effort and never reused: stdio buffer state
+--- after ENOSPC is undefined, so a retry must acquire a fresh stream.
+--- @param stage string Failed operation name for diagnostics.
+--- @param detail any Non-sensitive failure detail returned by the file API.
+--- @return boolean Always false so callers propagate the refused transaction.
+local function _reject_append_handle(stage, detail)
+	local failed_handle = _log_handle
+	_log_handle = nil
+	if failed_handle then
+		local close_ok, close_result = pcall(failed_handle.close, failed_handle)
+		if not close_ok or close_result ~= true then
+			Logger.warn(LOG, "today.log handle close after %s failure was not confirmed.", stage)
+		end
+	end
+	Logger.error(LOG, "Cannot append to today.log: %s failed (%s).",
+		stage, tostring(detail))
+	return false
+end
+
+--- Opens today.log in unbuffered append mode. With stdio buffering disabled,
+--- file:write() is the only ambiguous persistence boundary: a successful return
+--- means the complete line reached the OS, while nil/throw means a possibly
+--- partial line must be isolated before retry. A later flush cannot add a second
+--- uncertainty window because there is no userspace buffer left to flush.
+--- @return boolean opened True only when a configured handle is published.
+local function _open_append_handle()
+	local open_ok, handle_or_err, open_detail = pcall(io.open,
+		_paths.today_log_path, "a")
+	if not open_ok or handle_or_err == nil then
+		Logger.error(LOG, "Cannot open today.log for append (%s).",
+			tostring(open_detail or handle_or_err))
+		return false
+	end
+
+	local setvbuf_ok, configured_or_err, config_detail = pcall(
+		handle_or_err.setvbuf, handle_or_err, "no")
+	if not setvbuf_ok or configured_or_err ~= true then
+		pcall(handle_or_err.close, handle_or_err)
+		Logger.error(LOG, "Cannot configure unbuffered today.log append (%s).",
+			tostring(config_detail or configured_or_err))
+		return false
+	end
+
+	_log_handle = handle_or_err
+	return true
+end
+
 --- Append a single event entry to today.log as a JSONL line.
 --- Hot path: every keystroke ends up here. Never touches SQLite.
 --- @param entry table The event entry. Must contain a `type` field.
+--- @return boolean True only after one unbuffered write accepted the complete line.
 function M.append_log(entry)
-	if not _require_init("append_log") then return end
+	if not _require_init("append_log") then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
-		return
+		return false
 	end
 	entry.timestamp = entry.timestamp or _now_ts()
 
@@ -165,22 +220,24 @@ function M.append_log(entry)
 	if not ok then
 		Logger.error(LOG, "JSON encode failed for type '%s': %s.",
 			tostring(entry.type), tostring(str))
-		return
+		return false
 	end
 	-- Collapse any embedded newlines so the file stays valid JSONL
 	str = str:gsub("\n", "")
 
 	-- Reopen if the handle was lost (e.g. external rotation deleted the file).
-	if not _log_handle then
-		_log_handle = io.open(_paths.today_log_path, "a")
+	if not _log_handle and not _open_append_handle() then return false end
+
+	local prefix = _append_boundary_required and "\n" or ""
+	local write_ok, write_result, write_detail = pcall(_log_handle.write,
+		_log_handle, prefix .. str .. "\n")
+	if not write_ok or write_result == nil or write_result == false then
+		_append_boundary_required = true
+		return _reject_append_handle("write", write_detail or write_result)
 	end
-	if not _log_handle then
-		Logger.error(LOG, "Cannot append to today.log at %s.",
-			_paths.today_log_path)
-		return
-	end
-	_log_handle:write(str .. "\n")
-	_log_handle:flush()
+
+	_append_boundary_required = false
+	return true
 end
 
 
@@ -354,11 +411,11 @@ function M.init(deps)
 	_state = deps.state
 	_today_log_offset = deps.today_log_offset or 0
 	_today_log_date   = deps.today_log_date   or nil
+	_append_boundary_required = false
 
 	-- Open a persistent append handle for today.log so the hot path never
 	-- pays the cost of open()/close() on every keystroke.
-	_log_handle = io.open(_paths.today_log_path, "a")
-	if not _log_handle then
+	if not _open_append_handle() then
 		Logger.error(LOG, "Cannot open today.log at %s for append — log writes will fail.",
 			_paths.today_log_path)
 	end

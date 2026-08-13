@@ -444,12 +444,27 @@ local function with_remap(options, body)
 
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(delay, callback)
-				local timer = make_timer(delay, callback, "adapter")
+				local handle = {
+					fired = false,
+					committed = false,
+				}
+				local timer = make_timer(delay, function()
+					handle.fired = true
+					handle.committed = false
+					handle.timer = nil
+					callback()
+				end, "adapter")
+				handle.timer = timer
+				handle.committed = true
 				calls.adapter_timers[#calls.adapter_timers + 1] = timer
-				return timer
+				return handle, true
 			end,
-			cancel = function(timer)
-				if timer then timer:stop() end
+			cancel = function(handle)
+				if type(handle) ~= "table" or handle.timer == nil then return true end
+				handle.committed = false
+				handle.timer:stop()
+				handle.timer = nil
+				handle.fired = true
 				return true
 			end,
 		}

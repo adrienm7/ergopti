@@ -29,6 +29,7 @@ local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local i18n       = require("infra.i18n")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "metrics_typing"
 
@@ -41,6 +42,31 @@ local function _get_log_manager()
 	return _log_manager
 end
 
+--- Acquires the module-lifetime ingest subscription before any window is
+--- published. A dashboard without this owner would silently stop refreshing,
+--- so subscription failure is a startup refusal rather than optional telemetry.
+--- @return boolean registered
+local function ensure_ingest_listener()
+	if M and M._ingest_listener_registered then return true end
+	local ok, registered_or_err = xpcall(function()
+		local manager = _get_log_manager()
+		if type(manager) ~= "table" or type(manager.on_ingest_done) ~= "function" then
+			error("LogManager.on_ingest_done is unavailable")
+		end
+		return manager.on_ingest_done(function()
+			M.push_live_update()
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		Logger.error(LOG, "Typing metrics ingest-listener acquisition failed: %s.",
+			tostring(ok and registered_or_err or registered_or_err))
+		return false
+	end
+	M._ingest_listener_registered = true
+	Logger.debug(LOG, "Post-ingest live-update listener registered.")
+	return true
+end
+
 local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
 local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 
@@ -51,6 +77,99 @@ M._app_icon_cache = {}
 --- The listener is registered once for the module lifetime; subsequent
 --- opens reuse it (the dashboard state is on M which is always live).
 M._ingest_listener_registered = false
+local _generation = 0
+local _continuation_timers = {}
+
+--- Cancels one exact scheduler handle without dropping refused cleanup debt.
+--- @param handle table|nil Scheduler handle.
+--- @return boolean settled True only when no native timer remains owned.
+local function cancel_timer(handle)
+	if type(handle) ~= "table" then return true end
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Dashboard timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
+	end
+	return true
+end
+
+--- Cancels the JS request poller while retaining a refused exact handle.
+--- @return boolean settled True only when the poller was released.
+local function cancel_poller()
+	if not M._timer then return true end
+	local handle = M._timer
+	if not cancel_timer(handle) then return false end
+	if M._timer == handle then M._timer = nil end
+	return true
+end
+
+--- Cancels every delayed dashboard continuation independently.
+--- @return boolean settled True only when all exact handles were released.
+local function cancel_continuations()
+	local snapshot = {}
+	for handle in pairs(_continuation_timers) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if cancel_timer(handle) then
+			_continuation_timers[handle] = nil
+		else
+			settled = false
+		end
+	end
+	return settled
+end
+
+--- Invalidates callbacks and releases every timer owned by the current window.
+--- @return boolean settled True only when all exact timers were released.
+local function stop_runtime()
+	_generation = _generation + 1
+	M._pending_full_refresh = false
+	local poller_stopped = cancel_poller()
+	local continuations_stopped = cancel_continuations()
+	return poller_stopped and continuations_stopped
+end
+
+--- Schedules one generation-owned delayed continuation.
+--- @param delay number Delay in seconds.
+--- @param generation integer Dashboard generation.
+--- @param webview table Exact webview owner.
+--- @param callback function Continuation body.
+--- @param label string Diagnostic label.
+--- @return boolean committed True only when the timer was armed.
+local function schedule_continuation(delay, generation, webview, callback, label)
+	local handle
+	local timer_committed = false
+	local ok, candidate, committed = xpcall(function()
+		return TimerScheduler.after(delay, function()
+			if timer_committed ~= true then return end
+			if handle and handle.timer ~= nil then
+				-- TimerScheduler fences one-shot user delivery before attempting stop;
+				-- cleanup debt is retained globally and locally, but must not turn a
+				-- committed first paint into a permanently blank dashboard.
+				Logger.error(LOG, "%s continuation retained timer cleanup debt.", label)
+			else
+				if handle then _continuation_timers[handle] = nil end
+			end
+			if generation ~= _generation or M._wv ~= webview then return end
+			callback()
+		end)
+	end, debug.traceback)
+	handle = candidate
+	if type(handle) == "table" then _continuation_timers[handle] = true end
+	if not ok or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" and cancel_timer(handle) then
+			_continuation_timers[handle] = nil
+		end
+		Logger.error(LOG, "%s continuation timer was not committed: %s.", label,
+			tostring(ok and committed or candidate))
+		return false
+	end
+	timer_committed = true
+	return true
+end
 
 
 
@@ -212,11 +331,11 @@ end
 -- ===============================
 -- ===============================
 
-local function load_and_inject()
-	if not M._wv then return end
+local function load_and_inject(generation, webview)
+	if generation ~= _generation or M._wv ~= webview then return false end
 
 	local manifest = read_manifest_cached()
-	if not M._wv then return end
+	if generation ~= _generation or M._wv ~= webview then return false end
 
 	-- App icons + apps list + first_date computed from manifest.
 	local app_icons      = {}
@@ -263,7 +382,7 @@ local function load_and_inject()
 		initial_data_json  = json.encode(initial_data)
 	end
 
-	if not M._wv then return end
+	if generation ~= _generation or M._wv ~= webview then return false end
 
 	local manifest_json  = json.encode(manifest)
 	local app_icons_json = json.encode(app_icons)
@@ -278,56 +397,76 @@ local function load_and_inject()
 	})
 
 	local function try_inject(remaining)
-		if not M._wv then return end
-		M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
+		if generation ~= _generation or M._wv ~= webview then return end
+		webview:evaluateJavaScript("typeof window.process_manifest", function(t)
+			if generation ~= _generation or M._wv ~= webview then return end
 			if t == "function" then
 				local js = string.format(
 					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
 					manifest_json, app_icons_json, initial_data_json, kc_layout_json)
-				pcall(function() M._wv:evaluateJavaScript(js) end)
+				local ok_inject, inject_result = pcall(function()
+					return webview:evaluateJavaScript(js)
+				end)
+				if not ok_inject or inject_result == false then
+					Logger.error(LOG, "Dashboard manifest injection failed: %s.",
+						tostring(inject_result))
+					return
+				end
 				Logger.success(LOG, "Dashboard manifest and data injected.")
 			elseif remaining > 0 then
-				hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+				schedule_continuation(0.15, generation, webview,
+					function() try_inject(remaining - 1) end, "Dashboard manifest retry")
 			else
 				Logger.error(LOG, "load_and_inject(): process_manifest() not available.")
 			end
 		end)
 	end
 	try_inject(60)
+	return true
 end
 
 --- Refresh just the manifest-backed UI state after an ingest. `process_manifest`
 --- preserves the current filters and requests their n-gram range again, avoiding
 --- load_and_inject()'s expensive all-app prefetch on every live update.
-local function refresh_live_manifest()
-	if not M._wv then return end
+local function refresh_live_manifest(generation, webview)
+	if generation ~= _generation or M._wv ~= webview then return false end
 	local manifest = read_manifest_cached()
-	if not M._wv then return end
+	if generation ~= _generation or M._wv ~= webview then return false end
 	local encoded_ok, manifest_json = pcall(json.encode, manifest)
-	if not encoded_ok then return end
-	pcall(function()
-		M._wv:evaluateJavaScript(string.format(
+	if not encoded_ok then return false end
+	local ok_inject, inject_result = pcall(function()
+		return webview:evaluateJavaScript(string.format(
 			"window.metrics_manifest=%s;if(typeof window.process_manifest==='function'){window._prefetch_data=null;window.process_manifest();}",
 			manifest_json))
 	end)
+	return ok_inject and inject_result ~= false
 end
 
-local function prefill_from_disk_cache()
-	if not M._wv then return false end
+local function prefill_from_disk_cache(generation, webview)
+	if generation ~= _generation or M._wv ~= webview then return false end
 	local cached = load_disk_cache()
 	if not cached or type(cached.manifest) ~= "string" then return false end
 	local function try_inject_cache(remaining)
-		if not M._wv then return end
-		M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
+		if generation ~= _generation or M._wv ~= webview then return end
+		webview:evaluateJavaScript("typeof window.process_manifest", function(t)
+			if generation ~= _generation or M._wv ~= webview then return end
 			if t == "function" then
 				local js = string.format(
 					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
 					cached.manifest or "{}", cached.app_icons or "{}",
 					cached.initial_data or "null", cached.kc_layout or "{}")
-				pcall(function() M._wv:evaluateJavaScript(js) end)
+				local ok_inject, inject_result = pcall(function()
+					return webview:evaluateJavaScript(js)
+				end)
+				if not ok_inject or inject_result == false then
+					Logger.error(LOG, "Dashboard cache injection failed: %s.",
+						tostring(inject_result))
+					return
+				end
 				Logger.success(LOG, "Dashboard pre-filled from disk cache.")
 			elseif remaining > 0 then
-				hs.timer.doAfter(0.10, function() try_inject_cache(remaining - 1) end)
+				schedule_continuation(0.10, generation, webview,
+					function() try_inject_cache(remaining - 1) end, "Dashboard cache retry")
 			end
 		end)
 	end
@@ -357,9 +496,11 @@ function M.show()
 		end)
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
-			M._wv:delete(); M._wv = nil
-			if M._timer then M._timer:stop(); M._timer = nil end
-			return
+			local window = M._wv
+			M._wv = nil
+			local stopped = stop_runtime()
+			pcall(function() window:delete() end)
+			return stopped
 		end
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		pcall(function()
@@ -370,7 +511,7 @@ function M.show()
 		pcall(function()
 			M._wv:evaluateJavaScript("if(window.apply_date_app_filters) window.apply_date_app_filters();")
 		end)
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Opening typing metrics dashboard…")
@@ -381,49 +522,69 @@ function M.show()
 	local assets_dir = resolve_ui_assets_dir("metrics_typing")
 	if not assets_dir then
 		Logger.error(LOG, "Cannot open dashboard — shared UI assets not found.")
-		return
+		return false
 	end
+	if not ensure_ingest_listener() then return false end
 
+	_generation = _generation + 1
+	local generation = _generation
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
 		assets_dir = assets_dir,
 		on_close   = function()
+			if generation ~= _generation then return end
+			_generation = _generation + 1
 			M._wv = nil
-			if M._timer then M._timer:stop(); M._timer = nil end
+			local poller_stopped = cancel_poller()
+			local continuations_stopped = cancel_continuations()
+			if not poller_stopped or not continuations_stopped then
+				Logger.error(LOG, "Typing metrics close retained timer cleanup debt.")
+			end
 			Logger.info(LOG, "Typing metrics dashboard closed.")
 		end,
 	})
-
-	-- Register the ingest listener once for the module lifetime so the
-	-- dashboard refreshes within ≤ 300 ms of every ingest cycle completing,
-	-- regardless of whether the user has interacted with a filter recently.
-	if not M._ingest_listener_registered then
-		_get_log_manager().on_ingest_done(function()
-			M.push_live_update()
-		end)
-		M._ingest_listener_registered = true
-		Logger.debug(LOG, "Post-ingest live-update listener registered.")
+	local webview = M._wv
+	if not webview then
+		Logger.error(LOG, "Typing metrics dashboard webview creation failed.")
+		return false
 	end
 
-	hs.timer.doAfter(0.05, function()
-		local had_cache     = prefill_from_disk_cache()
+	local bootstrap_committed = schedule_continuation(0.05, generation, webview, function()
+		local had_cache     = prefill_from_disk_cache(generation, webview)
 		local refresh_delay = had_cache and 0.40 or 0.05
-		hs.timer.doAfter(refresh_delay, load_and_inject)
-	end)
+		if not schedule_continuation(refresh_delay, generation, webview,
+			function() load_and_inject(generation, webview) end,
+			"Dashboard fresh-data load")
+		then
+			Logger.error(LOG, "Dashboard fresh-data load could not be scheduled.")
+		end
+	end, "Dashboard bootstrap")
+	if not bootstrap_committed then
+		M._wv = nil
+		stop_runtime()
+		pcall(function() webview:delete() end)
+		Logger.error(LOG, "Typing metrics dashboard startup failed: bootstrap timer unavailable.")
+		return false
+	end
 
 	-- JS-side filter request poller.
-	if M._timer then M._timer:stop() end
-	M._timer = hs.timer.new(0.3, function()
-		if not M._wv then
-			M._timer:stop(); M._timer = nil
-			return
-		end
+	if not cancel_poller() then
+		M._wv = nil
+		stop_runtime()
+		pcall(function() webview:delete() end)
+		Logger.error(LOG, "Typing metrics dashboard startup failed: prior poller cleanup remains pending.")
+		return false
+	end
+	local poll_ok, poll_candidate, poll_committed = xpcall(function()
+		return TimerScheduler.every(0.3, function()
+		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
-			M._wv:evaluateJavaScript("window._lua_request", function(req)
+			webview:evaluateJavaScript("window._lua_request", function(req)
+				if generation ~= _generation or M._wv ~= webview then return end
 				if req and type(req) == "string" and req ~= "" and req ~= "null" then
-					pcall(function() M._wv:evaluateJavaScript("window._lua_request = null;") end)
+					pcall(function() webview:evaluateJavaScript("window._lua_request = null;") end)
 					local ok, query = pcall(json.decode, req)
 					if ok and query then
 						if query.action == "clear_cache" then
@@ -438,16 +599,26 @@ function M.show()
 							M._last_query = query
 							local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
 							local js_cmd   = string.format("window.receive_range_data(%s)", json.encode(raw_data))
-							pcall(function() M._wv:evaluateJavaScript(js_cmd) end)
+							pcall(function() webview:evaluateJavaScript(js_cmd) end)
 						end
 					end
 				end
 			end)
 		end)
-	end)
-	M._timer:start()
+		end)
+	end, debug.traceback)
+	if type(poll_candidate) == "table" then M._timer = poll_candidate end
+	if not poll_ok or type(poll_candidate) ~= "table" or poll_committed ~= true then
+		M._wv = nil
+		stop_runtime()
+		pcall(function() webview:delete() end)
+		Logger.error(LOG, "Typing metrics dashboard startup failed: request poller unavailable: %s.",
+			tostring(poll_ok and poll_committed or poll_candidate))
+		return false
+	end
 
 	Logger.success(LOG, "Typing metrics dashboard window opened.")
+	return true
 end
 
 --- Signals that a fresh ingest cycle just completed. Both the n-gram tables
@@ -455,13 +626,22 @@ end
 --- active range without recomputing the global all-app prefetch.
 function M.push_live_update(_unused)
 	if M._wv and not M._pending_full_refresh then
+		local generation = _generation
+		local webview = M._wv
 		M._pending_full_refresh = true
-		hs.timer.doAfter(0, function()
+		if not schedule_continuation(0, generation, webview, function()
 			M._pending_full_refresh = false
-			if M._wv then refresh_live_manifest() end
-		end)
+			if not refresh_live_manifest(generation, webview) then
+				Logger.error(LOG, "Live metrics manifest refresh failed.")
+			end
+		end, "Live metrics manifest refresh") then
+			M._pending_full_refresh = false
+			return false
+		end
 		Logger.debug(LOG, "push_live_update: scheduled full manifest refresh.")
+		return true
 	end
+	return false
 end
 
 return M

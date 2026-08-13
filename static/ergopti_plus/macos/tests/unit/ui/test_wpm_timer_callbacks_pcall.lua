@@ -33,11 +33,23 @@ helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScree
 		local Widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			screen = { mainScreen = function() return nil end },
 			timer  = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 			eventtap = {
-				new = function(_types, _cb) return { start = function() end, stop = function() end } end,
+				new = function(_types, _cb)
+					local tap = { enabled = false }
+					tap.start = function(self) self.enabled = true; return self end
+					tap.stop = function(self) self.enabled = false; return self end
+					tap.isEnabled = function(self) return self.enabled end
+					return tap
+				end,
 				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
 			},
 		})
@@ -109,7 +121,13 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 		end
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 			timer = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 		})

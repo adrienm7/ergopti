@@ -27,6 +27,8 @@ local LOG            = "llm.api_mlx"
 
 -- MLX warmup timeout comes from the shared cross-driver registry ([llm]).
 local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
+local WARMUP_RETRY_DELAY_SEC     = 2
+local PGID_PENDING_TIMEOUT_SEC   = 15.0
 
 -- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
@@ -124,6 +126,31 @@ local _server_pgid_pending  = false
 -- set_active_server_pgid() is never called and _server_pgid_pending stays true forever,
 -- permanently disabling kill_zombie_on_mlx_port. The timer clears the flag after 15 s.
 local _pgid_pending_timeout = nil
+local _pgid_pending_generation = 0
+
+--- Cancels the exact PGID timeout capability without dropping cleanup debt.
+--- @return boolean settled True only when no native timer remains.
+local function cancel_pgid_pending_timeout()
+	local handle = _pgid_pending_timeout
+	if type(handle) ~= "table" then
+		_pgid_pending_timeout = nil
+		return true
+	end
+	if handle.timer == nil then
+		_pgid_pending_timeout = nil
+		return true
+	end
+	local ok, settled_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and settled_or_err == true then
+		if _pgid_pending_timeout == handle then _pgid_pending_timeout = nil end
+		return true
+	end
+	Logger.error(LOG, "PGID pending timeout cleanup was refused; retained exact handle: %s.",
+		tostring(settled_or_err))
+	return false
+end
 
 -- Optional callback registered by models_manager_mlx so api_mlx can request a fresh
 -- server launch when discovery detects a model-ID mismatch that the zombie killer
@@ -152,6 +179,8 @@ local FRESH_LAUNCH_GRACE_SEC     = Timings.sec("llm", "fresh_launch_grace_ms")  
 function M.set_active_server_pgid(pgid)
 	_active_server_pgid  = tonumber(pgid) or nil
 	_server_pgid_pending = false  -- PGID now known; zombie kills can safely use the guard
+	_pgid_pending_generation = _pgid_pending_generation + 1
+	cancel_pgid_pending_timeout()
 	_active_server_pgid_set_at = TimerScheduler.now()
 	Logger.debug(LOG, "Active server PGID guard set to %s.", tostring(_active_server_pgid))
 	-- Immediately fire a guarded kill now that we know which PGID to protect. Any
@@ -256,7 +285,70 @@ local _is_ready          = false
 local _warmup_in_flight  = false
 local _warmup_gen        = 0     -- bumped on reset/load-failure; a warmup callback whose captured gen is stale must NOT flip _is_ready (F-L4)
 local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
+local _warmup_retry_timer = nil  -- exact self-retry capability, including refused cleanup debt
 local _warmup_stopped    = false -- set by stop_warmup(); blocks the self-retry chain during pause/disable (M-3)
+
+--- Cancels one exact warmup timer slot without dropping refused cleanup debt.
+--- @param slot_name string `_warmup_timeout` or `_warmup_retry_timer`.
+--- @return boolean settled True only when the native timer is gone.
+local function cancel_warmup_timer(slot_name)
+	local handle = slot_name == "timeout" and _warmup_timeout or _warmup_retry_timer
+	if type(handle) ~= "table" or handle.timer == nil then
+		if slot_name == "timeout" then
+			_warmup_timeout = nil
+		else
+			_warmup_retry_timer = nil
+		end
+		return true
+	end
+	local ok, settled_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and settled_or_err == true then
+		if slot_name == "timeout" and _warmup_timeout == handle then
+			_warmup_timeout = nil
+		elseif slot_name == "retry" and _warmup_retry_timer == handle then
+			_warmup_retry_timer = nil
+		end
+		return true
+	end
+	Logger.error(LOG, "Warmup %s timer cleanup was refused; retained exact handle: %s.",
+		slot_name, tostring(settled_or_err))
+	return false
+end
+
+--- Schedules one generation-fenced warmup retry with exact timer ownership.
+--- @param model_name string Model identifier.
+--- @param profile table|nil Active profile.
+--- @return boolean committed True only when the retry timer was armed.
+local function schedule_warmup_retry(model_name, profile)
+	if cancel_warmup_timer("retry") ~= true then
+		Logger.error(LOG, "Warmup retry refused — predecessor retry cleanup remains pending.")
+		return false
+	end
+	local retry_generation = _warmup_gen
+	local retry_handle
+	local retry_committed
+	local schedule_ok, schedule_err = xpcall(function()
+		retry_handle, retry_committed = TimerScheduler.after(WARMUP_RETRY_DELAY_SEC, function()
+			if _warmup_retry_timer == retry_handle and retry_handle.timer == nil then
+				_warmup_retry_timer = nil
+			end
+			if retry_committed ~= true or retry_generation ~= _warmup_gen or _warmup_stopped then return end
+			M.warmup(model_name, profile)
+		end)
+	end, debug.traceback)
+	if type(retry_handle) == "table" and retry_handle.timer ~= nil then
+		_warmup_retry_timer = retry_handle
+	end
+	if not schedule_ok or retry_committed ~= true then
+		Logger.error(LOG, "Warmup retry timer did not commit: %s.",
+			tostring(schedule_ok and retry_handle or schedule_err))
+		return false
+	end
+	_warmup_retry_timer = retry_handle
+	return true
+end
 
 -- Permanent load-failure surface. Warmup retries on every non-200, which is correct
 -- for a model that is merely SLOW to load — but a model that can NEVER load (an
@@ -333,13 +425,8 @@ end
 function M.mark_load_failed(model_name, notify)
 	_is_ready = false
 	_warmup_gen = _warmup_gen + 1  -- invalidate any in-flight warmup callback (F-L4)
-	if _warmup_timeout then
-		-- Use TimerScheduler.cancel (not :stop()) — the handle is a {fired,id,timer}
-		-- table with no :stop method; calling :stop() raises and the underlying timer
-		-- keeps running, leaking an orphaned timer that fires and clobbers a future warmup.
-		TimerScheduler.cancel(_warmup_timeout)
-		_warmup_timeout = nil
-	end
+	cancel_warmup_timer("timeout")
+	cancel_warmup_timer("retry")
 	_warmup_in_flight = false
 	if not _load_failed then
 		_load_failed = true
@@ -365,10 +452,8 @@ function M.stop_warmup()
 	_warmup_gen     = _warmup_gen + 1
 	_warmup_stopped = true
 	_warmup_in_flight = false
-	if _warmup_timeout then
-		TimerScheduler.cancel(_warmup_timeout)
-		_warmup_timeout = nil
-	end
+	cancel_warmup_timer("timeout")
+	cancel_warmup_timer("retry")
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, self-retry chain stopped.", _warmup_gen)
 end
 
@@ -452,23 +537,45 @@ function M.reset_endpoints()
 	-- Also clear the in-flight flag so a fresh warmup for the new model is not blocked.
 	_warmup_gen                  = _warmup_gen + 1
 	_warmup_in_flight            = false
+	cancel_warmup_timer("timeout")
+	cancel_warmup_timer("retry")
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
-	-- Cancel any previous safety timeout so rapid successive resets don't stack.
-	if _pgid_pending_timeout then
-		pcall(TimerScheduler.cancel, _pgid_pending_timeout)
-		_pgid_pending_timeout = nil
-	end
-	-- Safety-timeout: if the server crashes before emitting its PID line, this clears
-	-- the pending flag so kill_zombie_on_mlx_port is not blocked for the whole session.
-	_pgid_pending_timeout = TimerScheduler.after(15.0, function()
-		if _server_pgid_pending then
-			Logger.warn(LOG, "PGID pending timeout (15s) — unblocking zombie kills.")
-			_server_pgid_pending  = false
-			_pgid_pending_timeout = nil
+	_pgid_pending_generation = _pgid_pending_generation + 1
+	local pgid_generation = _pgid_pending_generation
+	local pgid_timeout_ready = cancel_pgid_pending_timeout()
+	if pgid_timeout_ready then
+		-- Forward-declare the handle because the callback must compare against the
+		-- exact candidate that owns this reset generation.
+		local pgid_handle
+		local pgid_committed
+		local schedule_ok, schedule_err = xpcall(function()
+			pgid_handle, pgid_committed = TimerScheduler.after(PGID_PENDING_TIMEOUT_SEC, function()
+				if pgid_committed ~= true or pgid_generation ~= _pgid_pending_generation then return end
+				if _pgid_pending_timeout == pgid_handle and pgid_handle.timer == nil then
+					_pgid_pending_timeout = nil
+				end
+				if _server_pgid_pending then
+					Logger.warn(LOG, "PGID pending timeout (%.0fs) — unblocking zombie kills.",
+						PGID_PENDING_TIMEOUT_SEC)
+					_server_pgid_pending = false
+				end
+			end)
+		end, debug.traceback)
+		if type(pgid_handle) == "table" and pgid_handle.timer ~= nil then
+			_pgid_pending_timeout = pgid_handle
 		end
-	end)
+		if not schedule_ok or pgid_committed ~= true then
+			pgid_timeout_ready = false
+			Logger.error(LOG, "PGID pending timeout did not commit; pending guard remains fail-closed: %s.",
+				tostring(schedule_ok and pgid_handle or schedule_err))
+		else
+			_pgid_pending_timeout = pgid_handle
+		end
+	else
+		Logger.error(LOG, "PGID pending timeout replacement refused — predecessor cleanup remains pending.")
+	end
 	-- A fresh launch deserves a fresh verdict: clear any previous load-failure so a
 	-- newly selected (or relaunched) model is given the full warmup budget again.
 	_load_failed                 = false
@@ -476,6 +583,7 @@ function M.reset_endpoints()
 	_discovery_started_at        = nil
 	_warmup_fail_notified        = false
 	Logger.warn(LOG, "Endpoint discovery state reset.")
+	return pgid_timeout_ready
 end
 
 --- Supersedes the in-flight streaming task.
@@ -674,7 +782,6 @@ function M.warmup(model_name, profile)
 		payload = enc
 	end
 
-	_warmup_in_flight = true
 	-- Snapshot the warmup generation: if reset_endpoints()/mark_load_failed() bump it
 	-- while this POST is in flight, the response is for a now-stale server/model and
 	-- its callback must discard itself rather than flip _is_ready=true (F-L4).
@@ -683,22 +790,41 @@ function M.warmup(model_name, profile)
 	-- accepts the TCP connection but never sends a response (e.g. during model
 	-- weight loading or a stale GPU stream), _warmup_in_flight would stay true
 	-- forever, silently blocking every subsequent warmup call.
-	if _warmup_timeout then TimerScheduler.cancel(_warmup_timeout) end
-	local _wt_handle = TimerScheduler.after(WARMUP_POST_TIMEOUT_SEC, function()
-		_warmup_timeout = nil
-		if not _warmup_in_flight then return end
-		_warmup_in_flight = false
-		-- Retire the generation before scheduling the retry. Abandoning a POST does
-		-- not stop the server answering it, and without this bump that late reply
-		-- still matched the generation check and flipped _is_ready — describing a
-		-- request nobody was waiting for any more, on behalf of the retry that had
-		-- meanwhile taken its place.
-		_warmup_gen = _warmup_gen + 1
-		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s (gen %d).",
-			WARMUP_POST_TIMEOUT_SEC, _warmup_gen)
-		TimerScheduler.after(2, function() M.warmup(model_name, profile) end)
-	end)
+	if cancel_warmup_timer("timeout") ~= true then
+		Logger.error(LOG, "Warmup POST refused — predecessor hard-timeout cleanup remains pending.")
+		return
+	end
+	local _wt_handle
+	local timeout_committed
+	local schedule_ok, schedule_err = xpcall(function()
+		_wt_handle, timeout_committed = TimerScheduler.after(WARMUP_POST_TIMEOUT_SEC, function()
+			if _warmup_timeout == _wt_handle and _wt_handle.timer == nil then
+				_warmup_timeout = nil
+			end
+			if timeout_committed ~= true or my_warmup_gen ~= _warmup_gen then return end
+			if not _warmup_in_flight then return end
+			_warmup_in_flight = false
+			-- Retire the generation before scheduling the retry. Abandoning a POST does
+			-- not stop the server answering it, and without this bump that late reply
+			-- still matched the generation check and flipped _is_ready — describing a
+			-- request nobody was waiting for any more, on behalf of the retry that had
+			-- meanwhile taken its place.
+			_warmup_gen = _warmup_gen + 1
+			Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in %.0fs (gen %d).",
+				WARMUP_POST_TIMEOUT_SEC, WARMUP_RETRY_DELAY_SEC, _warmup_gen)
+			schedule_warmup_retry(model_name, profile)
+		end)
+	end, debug.traceback)
+	if type(_wt_handle) == "table" and _wt_handle.timer ~= nil then
+		_warmup_timeout = _wt_handle
+	end
+	if not schedule_ok or timeout_committed ~= true then
+		Logger.error(LOG, "Warmup hard-timeout timer did not commit; POST dispatch refused: %s.",
+			tostring(schedule_ok and _wt_handle or schedule_err))
+		return
+	end
 	_warmup_timeout = _wt_handle
+	_warmup_in_flight = true
 	_warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
 		function(r)
 			local status, body = r.status, r.body
@@ -708,8 +834,7 @@ function M.warmup(model_name, profile)
 			-- the live request's only hard timeout — and warmup POSTs piled up
 			-- with nothing left to bound them.
 			if _warmup_timeout == _wt_handle then
-				TimerScheduler.cancel(_wt_handle)
-				_warmup_timeout = nil
+				cancel_warmup_timer("timeout")
 			end
 			-- Discard a stale warmup: a reset/load-failure since this POST was issued
 			-- means its result describes the OLD server. Do NOT touch _is_ready (F-L4).
@@ -758,9 +883,7 @@ function M.warmup(model_name, profile)
 				-- Retry automatically so the user does not have to manually trigger
 				-- set_llm_enabled / set_llm_model after a slow model load or a
 				-- generation-thread crash during the server hot-swap window.
-				TimerScheduler.after(2, function()
-					M.warmup(model_name, profile)
-				end)
+				schedule_warmup_retry(model_name, profile)
 			end
 		end
 	)

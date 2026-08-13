@@ -23,6 +23,7 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
 local i18n          = require("infra.i18n")
@@ -84,7 +85,10 @@ local _pause_transition = nil
 local _queued_pause_target = nil
 local _pause_transition_serial = 0
 local _tap             = nil
+local _tap_committed   = false
 local _tap_watchdog    = nil
+local _tap_watchdog_committed = false
+local _tap_generation  = 0
 local _key_actions     = {return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit"}
 local _on_pause_change = nil
 local _extras          = {}
@@ -1058,6 +1062,41 @@ local function handle_key(e)
 	return finish(false)
 end
 
+--- Starts one exact eventtap and verifies that it is enabled before commit.
+--- @param tap userdata Eventtap candidate retained by the caller.
+--- @param operation string Context for diagnostics.
+--- @return boolean committed True only when the exact tap is enabled.
+local function start_eventtap_exact(tap, operation)
+	if not tap or type(tap.start) ~= "function" then
+		Logger.error(LOG, "%s failed: eventtap has no start method.", operation)
+		return false
+	end
+	local ok_start, start_result = Logger.pcall(LOG, function() return tap:start() end)
+	if not ok_start or start_result == false then
+		Logger.error(LOG, "%s failed while starting the exact eventtap.", operation)
+		return false
+	end
+	if type(tap.isEnabled) ~= "function" then
+		Logger.error(LOG, "%s failed: eventtap has no enabled-state query.", operation)
+		return false
+	end
+	local ok_state, enabled = Logger.pcall(LOG, function() return tap:isEnabled() end)
+	if not ok_state or enabled ~= true then
+		Logger.error(LOG, "%s failed: the exact eventtap is not enabled.", operation)
+		return false
+	end
+	return true
+end
+
+--- Reports whether one exact eventtap is enabled without hiding query errors.
+--- @param tap userdata Eventtap retained by this module.
+--- @return boolean enabled
+local function eventtap_is_enabled(tap)
+	if not tap or type(tap.isEnabled) ~= "function" then return false end
+	local ok_state, enabled = Logger.pcall(LOG, function() return tap:isEnabled() end)
+	return ok_state and enabled == true
+end
+
 
 
 
@@ -1098,10 +1137,17 @@ end
 --- @param shortcuts table Shortcuts module (must expose start / stop).
 --- @param gestures table Gestures module (must expose enable_all / disable_all).
 --- @param karabiner table|nil Optional Karabiner module (must expose pause / resume).
+--- @return boolean committed True only when both native resources are owned.
 function M.start(keymap, shortcuts, gestures, karabiner)
-	if _tap then
+	if _tap and _tap_committed and _tap_watchdog and _tap_watchdog_committed then
 		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
-		return
+		return true
+	end
+	if _tap or _tap_watchdog then
+		if M.stop() ~= true then
+			Logger.error(LOG, "Script control cannot start while prior native cleanup is pending.")
+			return false
+		end
 	end
 	Logger.start(LOG, "Starting script control…")
 
@@ -1114,29 +1160,69 @@ function M.start(keymap, shortcuts, gestures, karabiner)
 	if not _shortcuts then Logger.warn(LOG, "M.start(): shortcuts module not provided — pause/resume will be partial.") end
 	if not _gestures  then Logger.warn(LOG, "M.start(): gestures module not provided — pause/resume will be partial.") end
 
-	local ok, new_tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.keyDown}, handle_key)
+	_tap_generation = _tap_generation + 1
+	local generation = _tap_generation
+	local tap_candidate
+	local ok, new_tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.keyDown}, function(event)
+		if generation ~= _tap_generation or _tap ~= tap_candidate or not _tap_committed then
+			return false
+		end
+		local ok_handler, consume, replacement_events = Logger.pcall(LOG, handle_key, event)
+		if not ok_handler then return false end
+		return consume, replacement_events
+	end)
+	tap_candidate = new_tap
 	if not ok or not new_tap then
-		Logger.error(LOG, "Failed to create script-control eventtap.")
-		return
+		_tap_generation = _tap_generation + 1
+		Logger.error(LOG, "Failed to create script-control eventtap — %s.", tostring(new_tap))
+		return false
 	end
 
 	_tap = new_tap
-	pcall(function() _tap:start() end)
+	_tap_committed = false
+	if not start_eventtap_exact(_tap, "Script-control startup") then
+		_tap_generation = _tap_generation + 1
+		M.stop()
+		return false
+	end
+	_tap_committed = true
 
 	-- Hard safety net: Hammerspoon normally recovers CoreGraphics timeout signals
 	-- in native code, but any tap still observed disabled must be re-enabled so
 	-- the script-management shortcuts cannot remain stuck off.
-	if _tap_watchdog then pcall(function() _tap_watchdog:stop() end) end
-	_tap_watchdog = hs.timer.doEvery(TAP_WATCHDOG_INTERVAL_SEC, function()
-		if _tap and type(_tap.isEnabled) == "function" and not _tap:isEnabled() then
-			Logger.warn(LOG, "Script-control eventtap was disabled by macOS — re-enabling.")
-			pcall(function() _tap:start() end)
-		end
-	end)
+	local watchdog_candidate
+	local ok_schedule, watchdog_handle, watchdog_committed = pcall(
+		TimerScheduler.every, TAP_WATCHDOG_INTERVAL_SEC, function()
+			if generation ~= _tap_generation
+				or _tap_watchdog ~= watchdog_candidate
+				or not _tap_watchdog_committed
+				or _tap ~= tap_candidate
+				or not _tap_committed then
+				return
+			end
+			if not eventtap_is_enabled(_tap) then
+				Logger.warn(LOG, "Script-control eventtap was disabled by macOS — re-enabling.")
+				start_eventtap_exact(_tap, "Script-control watchdog recovery")
+			end
+		end)
+	watchdog_candidate = watchdog_handle
+	if ok_schedule and type(watchdog_handle) == "table" then
+		_tap_watchdog = watchdog_handle
+		_tap_watchdog_committed = watchdog_committed == true
+	end
+	if not ok_schedule or type(watchdog_handle) ~= "table" or watchdog_committed ~= true then
+		_tap_generation = _tap_generation + 1
+		M.stop()
+		Logger.error(LOG, "Script-control watchdog could not be armed; eventtap startup rolled back — %s.",
+			tostring(ok_schedule and watchdog_committed or watchdog_handle))
+		return false
+	end
 	Logger.success(LOG, "Script control started.")
+	return true
 end
 
 --- Stops the script-control eventtap.
+--- @return boolean settled True only when both native resources are released.
 function M.stop()
 	if _pause_transition and _pause_transition.timer then
 		pcall(function() _pause_transition.timer:stop() end)
@@ -1144,25 +1230,43 @@ function M.stop()
 	_pause_transition = nil
 	_queued_pause_target = nil
 	_pause_transition_serial = _pause_transition_serial + 1
+	_tap_generation = _tap_generation + 1
 	Logger.start(LOG, "Stopping script control…")
-
-	if not _tap then
-		Logger.debug(LOG, "M.stop(): eventtap was not running — nothing to do.")
-		Logger.success(LOG, "Script control stopped.")
-		return
-	end
+	local settled = true
+	_tap_committed = false
+	_tap_watchdog_committed = false
 
 	if _tap_watchdog then
-		pcall(function() _tap_watchdog:stop() end)
-		_tap_watchdog = nil
+		local ok_cancel, cancelled = pcall(TimerScheduler.cancel, _tap_watchdog)
+		if ok_cancel and cancelled == true then
+			_tap_watchdog = nil
+		else
+			settled = false
+			Logger.error(LOG, "Script-control watchdog stop failed; retained for retry — %s.",
+				tostring(ok_cancel and cancelled or cancelled))
+		end
 	end
 
-	if type(_tap.stop) == "function" then
-		pcall(function() _tap:stop() end)
+	if _tap then
+		local ok_stop, stop_result = pcall(function()
+			if type(_tap.stop) ~= "function" then return false end
+			return _tap:stop()
+		end)
+		if ok_stop and stop_result ~= false then
+			_tap = nil
+		else
+			settled = false
+			Logger.error(LOG, "Script-control eventtap stop failed; retained for retry — %s.",
+				tostring(ok_stop and stop_result or stop_result))
+		end
 	end
-	_tap = nil
 
+	if not settled then
+		Logger.error(LOG, "Script control could not stop completely.")
+		return false
+	end
 	Logger.success(LOG, "Script control stopped.")
+	return true
 end
 
 --- Returns whether the script is currently paused.

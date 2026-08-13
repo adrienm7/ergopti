@@ -344,6 +344,31 @@ function M.build(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 
+	--- Applies the requested binding posture and restores the old one on refusal.
+	--- @param enabled boolean Desired binding state.
+	--- @param previous boolean Previously committed binding state.
+	--- @return boolean committed True only after exact runtime commitment.
+	local function commit_shortcuts_runtime(enabled, previous)
+		local apply = enabled and shortcuts.resume_bindings or shortcuts.pause_bindings
+		local rollback = previous and shortcuts.resume_bindings or shortcuts.pause_bindings
+		if type(apply) ~= "function" or type(rollback) ~= "function" then
+			Logger.error(LOG, "Shortcuts toggle refused because its lifecycle contract is incomplete.")
+			return false
+		end
+
+		local apply_ok, result_or_err = xpcall(apply, debug.traceback)
+		if apply_ok and result_or_err == true then return true end
+		Logger.error(LOG, "Shortcuts runtime toggle did not commit: %s.",
+			tostring(result_or_err))
+
+		local rollback_ok, rollback_result = xpcall(rollback, debug.traceback)
+		if not rollback_ok or rollback_result ~= true then
+			Logger.error(LOG, "Shortcuts runtime rollback did not settle: %s.",
+				tostring(rollback_result))
+		end
+		return false
+	end
+
 	local item = {
 		label   = i18n.get("menu.shortcuts.title"),
 		checked = state.shortcuts or nil,
@@ -355,21 +380,20 @@ function M.build(ctx)
 		-- deliberately left alone: it must keep reporting the stored preference.
 		disabled = paused or nil,
 		action   = (not paused) and function()
-			state.shortcuts = not state.shortcuts
+			local previous = state.shortcuts == true
+			local desired = not previous
 			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
 			-- call shortcuts.start/stop here: stop() also tears down the script-control
 			-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
 			-- Bindings-only proxy that never revives it, so the feature toggle would
 			-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
 			-- the symmetric pair that leave the script-control tap untouched.
-			if state.shortcuts then
-				if type(shortcuts.resume_bindings) == "function" then pcall(shortcuts.resume_bindings) end
-			else
-				if type(shortcuts.pause_bindings) == "function" then pcall(shortcuts.pause_bindings) end
-			end
+			if commit_shortcuts_runtime(desired, previous) ~= true then return false end
+			state.shortcuts = desired
 			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
 			ctx.updateMenu()
+			return true
 		end,
 	}
 

@@ -66,6 +66,54 @@ local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 -- table (mutated here and by api_mlx's cancel_streaming). nil until init().
 local _ctx = nil
 
+-- Exact native timer capabilities whose cancellation was refused. The scheduler
+-- also keeps a strong registry, but this request layer must retain its own debt so
+-- it can prevent a sibling HTTP dispatch until the predecessor is proven inert.
+local _non_stream_timer_cleanup = {}
+
+--- Retains one exact non-stream timeout capability for a later cleanup attempt.
+--- @param handle table|nil TimerScheduler handle.
+local function retain_non_stream_timer_cleanup(handle)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_non_stream_timer_cleanup[handle] = true
+	end
+end
+
+--- Cancels one non-stream timeout and retains it when native stop refuses.
+--- @param handle table|nil TimerScheduler handle.
+--- @return boolean settled True only when no native timer remains.
+local function cancel_non_stream_timer(handle)
+	if type(handle) ~= "table" or handle.timer == nil then
+		if type(handle) == "table" then _non_stream_timer_cleanup[handle] = nil end
+		return true
+	end
+	local ok, settled_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and settled_or_err == true then
+		_non_stream_timer_cleanup[handle] = nil
+		return true
+	end
+	retain_non_stream_timer_cleanup(handle)
+	Logger.error(LOG, "Non-stream timeout cleanup was refused; retained exact handle: %s.",
+		tostring(settled_or_err))
+	return false
+end
+
+--- Retries all retained non-stream timeout cleanup before another HTTP dispatch.
+--- @return boolean settled True only when every predecessor timer settled.
+local function drain_non_stream_timer_cleanup()
+	local snapshot = {}
+	for handle in pairs(_non_stream_timer_cleanup) do
+		snapshot[#snapshot + 1] = handle
+	end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if cancel_non_stream_timer(handle) ~= true then settled = false end
+	end
+	return settled
+end
+
 --- Guard: every public request entry point reads injected controller state.
 --- Logs an ERROR and bails when called before M.init() so a wiring regression is
 --- loud instead of a nil-index crash deep inside a callback.
@@ -241,8 +289,20 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		return
 	end
 
+	if drain_non_stream_timer_cleanup() ~= true then
+		Logger.error(LOG, "MLX request refused — predecessor timeout cleanup is still pending.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	local done = false
-	local timeout_handle = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
+	local timeout_handle
+	local timeout_committed
+	local schedule_ok, schedule_err = xpcall(function()
+		timeout_handle, timeout_committed = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
+			-- after() fences user delivery before attempting native stop. If that stop
+			-- refuses, retain the exact inert capability for the next request boundary.
+			retain_non_stream_timer_cleanup(timeout_handle)
 		if done then return end
 		done = true
 		-- A SUPERSEDED request must not report failure. Nothing cancels this timer
@@ -259,14 +319,22 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		end
 		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
-	end)
+		end)
+	end, debug.traceback)
+	if not schedule_ok or timeout_committed ~= true then
+		retain_non_stream_timer_cleanup(timeout_handle)
+		Logger.error(LOG, "MLX request timeout did not commit — HTTP dispatch refused: %s.",
+			tostring(schedule_ok and timeout_handle or schedule_err))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
 
 	_infer_client.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
 			if done then return end
 			done = true
-			TimerScheduler.cancel(timeout_handle)
+			cancel_non_stream_timer(timeout_handle)
 
 			if status ~= 200 then
 				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))

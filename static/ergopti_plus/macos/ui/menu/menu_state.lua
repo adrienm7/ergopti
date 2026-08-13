@@ -60,6 +60,27 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		return ok, err
 	end
 
+	--- Calls a lifecycle method whose contract requires an exact true result.
+	--- @param label string Human-readable description for the warning.
+	--- @param fn function|nil Required lifecycle method.
+	--- @param ... any Arguments forwarded to fn.
+	--- @return boolean committed True only after exact runtime commitment.
+	local function try_exact(label, fn, ...)
+		if type(fn) ~= "function" then
+			sync_failed = true
+			Logger.warn(LOG, "sync_state_to_modules: %s is unavailable.", label)
+			return false
+		end
+		local ok, result_or_err = pcall(fn, ...)
+		if not ok or result_or_err ~= true then
+			sync_failed = true
+			Logger.warn(LOG, "sync_state_to_modules: %s did not commit — %s",
+				label, tostring(result_or_err))
+			return false
+		end
+		return true
+	end
+
 	local keymap           = deps.keymap
 	local gestures         = deps.gestures
 	local hotstring_editor = deps.hotstring_editor
@@ -402,9 +423,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- stop()/start() would kill the tap; pause_bindings/resume_bindings is safe.
 	if core_mods.shortcuts_mod then
 		if state.shortcuts then
-			if type(core_mods.shortcuts_mod.resume_bindings) == "function" then try("shortcuts.resume_bindings", core_mods.shortcuts_mod.resume_bindings) end
+			try_exact("shortcuts.resume_bindings", core_mods.shortcuts_mod.resume_bindings)
 		else
-			if type(core_mods.shortcuts_mod.pause_bindings) == "function" then try("shortcuts.pause_bindings", core_mods.shortcuts_mod.pause_bindings) end
+			try_exact("shortcuts.pause_bindings", core_mods.shortcuts_mod.pause_bindings)
 		end
 	end
 	if core_mods.shortcuts_mod and type(state.script_control_shortcuts) == "table"

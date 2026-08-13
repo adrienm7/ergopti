@@ -71,6 +71,9 @@ local function with_fixture(failure_mode, body)
 					self.stopped = self.stopped + 1
 					return self
 				end
+				function tap:isEnabled()
+					return self.started > self.stopped
+				end
 				fixture.taps[#fixture.taps + 1] = tap
 				return tap
 			end,

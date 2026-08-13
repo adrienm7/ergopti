@@ -137,7 +137,8 @@ helpers.describe("ingest survives a Metrics OFF/ON toggle", function()
 		-- stubbed for a precondition this test does not measure.
 		sqlite.open = false
 
-		lm.ensure_ingest_running()
+		helpers.assert_eq(true, lm.ensure_ingest_running(),
+			"re-arm must report that the timer ownership committed")
 
 		helpers.assert_true(sqlite.open == true,
 			"ensure_ingest_running() must re-open the cache M.stop() closed. Re-arming only the "
@@ -152,7 +153,8 @@ helpers.describe("ingest survives a Metrics OFF/ON toggle", function()
 		sqlite.open = true
 		local before = sqlite.open_calls
 
-		lm.ensure_ingest_running()
+		helpers.assert_eq(true, lm.ensure_ingest_running(),
+			"an already-live timer must satisfy the exact re-arm contract")
 
 		helpers.assert_eq(sqlite.open_calls, before,
 			"an already-open cache must not be re-opened — ensure_ingest_running() is called "

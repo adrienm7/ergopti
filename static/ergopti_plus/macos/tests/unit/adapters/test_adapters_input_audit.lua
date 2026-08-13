@@ -73,14 +73,23 @@ end)
 helpers.describe("adapters-input-2: timer_scheduler cancelAll must reach unretained timers", function()
 	helpers.it("a fire-and-forget timer is still cancelled by cancelAll() after GC", function()
 		local stopped = { count = 0 }
-		-- Custom hs.timer stub whose handle records stop() invocations so the test
-		-- can prove cancelAll() actually reached the underlying timer.
+		-- Faithful native timer double: the scheduler now owns new/start/running
+		-- transactionally, and Hammerspoon's start/stop methods return the timer
 		local timer_stub = {
-			doAfter = function(_, _fn)
-				return { stop = function() stopped.count = stopped.count + 1 end }
-			end,
-			doEvery = function(_, _fn)
-				return { stop = function() stopped.count = stopped.count + 1 end }
+			new = function(_, _fn)
+				local running = false
+				local timer = {}
+				function timer:start()
+					running = true
+					return self
+				end
+				function timer:running() return running end
+				function timer:stop()
+					stopped.count = stopped.count + 1
+					running = false
+					return self
+				end
+				return timer
 			end,
 			secondsSinceEpoch = function() return 0 end,
 			absoluteTime = function() return 0 end,
@@ -90,7 +99,9 @@ helpers.describe("adapters-input-2: timer_scheduler cancelAll must reach unretai
 
 		-- Schedule WITHOUT retaining the returned handle (fire-and-forget), the
 		-- exact pattern used by api_mlx/api_ollama/api_remote (e.g. after(0, fn)).
-		Scheduler.after(10, function() end)
+		local committed = select(2, Scheduler.after(10, function() end))
+		helpers.assert_eq(committed, true,
+			"the fixture must prove it armed a real scheduler-owned timer before dropping it")
 
 		-- Force a GC: with a weak-value registry the dropped handle is collected
 		-- and its entry vanishes, so cancelAll() can no longer stop the timer.
@@ -99,7 +110,9 @@ helpers.describe("adapters-input-2: timer_scheduler cancelAll must reach unretai
 
 		Scheduler.cancelAll()
 
-		helpers.assert_true(stopped.count >= 1,
+		helpers.assert_eq(stopped.count, 1,
 			"cancelAll() must stop the underlying hs.timer even when the handle was not retained")
+		helpers.assert_eq(Scheduler.activeCount(), 0,
+			"the strong registry must release the settled fire-and-forget timer")
 	end)
 end)

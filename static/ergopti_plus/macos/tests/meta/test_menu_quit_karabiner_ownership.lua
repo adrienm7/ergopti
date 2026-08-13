@@ -68,7 +68,9 @@ local function load_menu_quit_action()
 		get = function() return "" end,
 		get_config_dir = function() return "" end,
 	}
-	package.loaded["ui.menu.menu_state"] = { sync_state_to_modules = function() end }
+	package.loaded["ui.menu.menu_state"] = {
+		sync_state_to_modules = function() return true end,
+	}
 	package.loaded["ui.menu.menu_watchers"] = {
 		start_config_watcher = function() return {} end,
 		start_theme_watcher = function() return {} end,
@@ -132,7 +134,7 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 		end
 	end)
 
-	helpers.it("falls back to the coordinator when timer scheduling throws or returns nil", function()
+	helpers.it("falls back when timer scheduling throws, returns nil, or explicitly refuses", function()
 		local quit_action, exit_calls, stock_calls = load_menu_quit_action()
 		local saved_do_after = _G.hs.timer.doAfter
 		local saved_exit = os.exit
@@ -145,6 +147,7 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 		for _, case in ipairs({
 			{ label = "throw", schedule = function() error("menu timer scheduling fault") end },
 			{ label = "nil", schedule = function() return nil end },
+			{ label = "false", schedule = function() return false end },
 		}) do
 			_G.hs.timer.doAfter = case.schedule
 			local before = #exit_calls

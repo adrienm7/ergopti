@@ -114,6 +114,7 @@ helpers.describe("gestures startup degraded mode", function()
 	package.loaded["modules.gestures.engine"] = {
 		init = function() end,
 		process_frame = function() end,
+		stop = function() return true end,
 	}
 	package.loaded["modules.gestures.conflicts"] = {
 		on_action_changed = function() end,

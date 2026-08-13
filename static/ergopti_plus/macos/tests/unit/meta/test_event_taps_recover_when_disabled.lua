@@ -65,7 +65,10 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 		local source = production_unit("local TAP_WATCHDOG_SEC = 1")
 
 		helpers.assert_contains(source,
-			"pcall(hs.timer.new, TAP_WATCHDOG_SEC, tap_watchdog)")
+			"pcall(hs.timer.new, TAP_WATCHDOG_SEC, function()")
+		helpers.assert_contains(source,
+			"Logger.pcall(LOG, tap_watchdog, candidate, generation)")
+		helpers.assert_contains(source, "_watchdog_timer ~= timer")
 		helpers.assert_contains(source, "not eventtap_is_enabled(name, t)")
 		helpers.assert_contains(source, "start_eventtap(name, t)")
 	end)
@@ -74,18 +77,26 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 		local source = production_unit("local TAP_WATCHDOG_INTERVAL_SEC = 5")
 
 		helpers.assert_contains(source,
-			"hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC, function()")
+			"acquire_recurring_timer(TAP_WATCHDOG_INTERVAL_SEC,")
+		helpers.assert_contains(source,
+			"function(candidate) _tap_watchdog_timer = candidate end")
 		helpers.assert_contains(source, "not KeyboardHook.isRunning()")
-		helpers.assert_contains(source, "KeyboardHook.start()")
+		helpers.assert_contains(source,
+			"local restart_ok, restarted = Logger.pcall(LOG, KeyboardHook.start)")
+		helpers.assert_contains(source,
+			"local state_ok, running = Logger.pcall(LOG, KeyboardHook.isRunning)")
+		helpers.assert_contains(source,
+			"restart_ok and restarted == true and state_ok and running == true")
 	end)
 
 	helpers.it("retains script-control tap-state polling and restart", function()
 		local source = production_unit("local TAP_WATCHDOG_INTERVAL_SEC = 2")
 
 		helpers.assert_contains(source,
-			"hs.timer.doEvery(TAP_WATCHDOG_INTERVAL_SEC, function()")
-		helpers.assert_contains(source, "not _tap:isEnabled()")
-		helpers.assert_contains(source, "_tap:start()")
+			"TimerScheduler.every, TAP_WATCHDOG_INTERVAL_SEC, function()")
+		helpers.assert_contains(source, "not eventtap_is_enabled(_tap)")
+		helpers.assert_contains(source,
+			"start_eventtap_exact(_tap, \"Script-control watchdog recovery\")")
 	end)
 
 end)

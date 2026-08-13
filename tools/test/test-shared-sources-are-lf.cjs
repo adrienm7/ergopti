@@ -4,9 +4,10 @@
  * ==============================================================================
  * MODULE: LF Line-Ending Guard (Lua, TOML, JSON)
  * DESCRIPTION:
- * Every `.lua`, `.toml` and `.json` file under `static/ergopti_plus/` uses LF.
- * The AutoHotkey half is enforced separately by test-ahk-encoding.cjs, which also
- * checks the BOM that AHK v2 requires; nothing covered the other three.
+ * Every staged `.lua`, `.toml` and `.json` file under `static/ergopti_plus/`
+ * uses LF. The AutoHotkey half is enforced separately by
+ * test-ahk-encoding.cjs, which also checks the BOM that AHK v2 requires;
+ * nothing covered the other three.
  *
  * ROOT CAUSE ENCODED:
  * `tools/format_toml.py` wrote its output with Python's default newline
@@ -34,9 +35,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
 const EXTS = new Set(['.lua', '.toml', '.json']);
 const SKIP_DIR = new Set(['vendor', 'node_modules', 'build']);
@@ -48,26 +49,34 @@ const MIN_FILES = 800;
 const offenders = [];
 let checked = 0;
 
-(function walk(dir) {
-	if (!fs.existsSync(dir)) return;
-	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-		const p = path.join(dir, e.name);
-		if (e.isDirectory()) {
-			if (!SKIP_DIR.has(e.name)) walk(p);
-			continue;
-		}
-		if (!EXTS.has(path.extname(e.name))) continue;
-		checked++;
-		const buf = fs.readFileSync(p);
-		let crlf = 0;
-		for (let i = 1; i < buf.length; i++) {
-			if (buf[i] === 0x0a && buf[i - 1] === 0x0d) crlf++;
-		}
-		if (crlf > 0) {
-			offenders.push({ rel: path.relative(ROOT, p).split(path.sep).join('/'), crlf });
-		}
+const tracked = execFileSync(
+	'git',
+	['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'],
+	{ cwd: ROOT, encoding: 'utf8' }
+)
+	.split('\0')
+	.filter(Boolean)
+	.map((rel) => rel.split(path.sep).join('/'))
+	.filter((rel) => EXTS.has(path.extname(rel)))
+	.filter((rel) => !rel.split('/').some((segment) => SKIP_DIR.has(segment)));
+
+const unreadable = [];
+for (const rel of tracked) {
+	const file = path.join(ROOT, rel);
+	if (!fs.existsSync(file)) {
+		unreadable.push(rel);
+		continue;
 	}
-})(SP);
+	checked++;
+	const buf = fs.readFileSync(file);
+	let crlf = 0;
+	for (let i = 1; i < buf.length; i++) {
+		if (buf[i] === 0x0a && buf[i - 1] === 0x0d) crlf++;
+	}
+	if (crlf > 0) {
+		offenders.push({ rel, crlf });
+	}
+}
 
 const errors = [];
 
@@ -76,6 +85,10 @@ if (checked < MIN_FILES) {
 		`scanned only ${checked} file(s) (floor ${MIN_FILES}) — the walk is broken, and every file would ` +
 			'then look clean'
 	);
+}
+
+for (const rel of unreadable) {
+	errors.push(`${rel}: tracked in the index but unreadable from the working tree`);
 }
 
 for (const o of offenders) {

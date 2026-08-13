@@ -170,10 +170,9 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 		-- into a path error.
 		local adapter_src = helpers.read_driver_source("function M.getForegroundApp")
 		helpers.assert_true(adapter_src ~= nil, "adapters/process_lifecycle.lua source must be locatable")
-		local guard_pos = adapter_src:find("pcall(function()", 1, true)
-		local watcher_pos = adapter_src:find("_app_watcher = hs.application.watcher.new", 1, true)
 		helpers.assert_true(
-			guard_pos ~= nil and watcher_pos ~= nil and guard_pos < watcher_pos,
+			adapter_src:find(
+				"xpcall%(function%(%)%s*return%s+hs%.application%.watcher%.new", 1, false) ~= nil,
 			"ProcessLifecycle must create hs.application.watcher inside a pcall guard"
 		)
 	end)

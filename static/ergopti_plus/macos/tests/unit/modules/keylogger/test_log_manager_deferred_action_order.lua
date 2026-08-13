@@ -20,6 +20,7 @@ local function load_fixture(options)
 	package.loaded["modules.keylogger.export"] = nil
 	package.loaded["keylogger.metrics"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local appended = {}
 	local sink_failures = options.sink_failures or 0
@@ -32,6 +33,7 @@ local function load_fixture(options)
 				error("transient JSONL failure")
 			end
 			appended[#appended + 1] = entry
+			return true
 		end,
 		read_new_entries = function() return {}, 0 end,
 		get_offset = function() return 0 end,
@@ -72,11 +74,33 @@ local function load_fixture(options)
 
 	local delayed = {}
 	local failed_allocations = options.failed_allocations or 0
+	local deferred_stop_failures = options.deferred_stop_failures or 0
+	local deferred_stop_calls = 0
 	local now_ns = 1000000000
-	local function timer_handle(delay, callback, recurring)
-		local handle = { delay = delay, callback = callback, running = true }
-		function handle:stop() self.running = false end
-		function handle:start() self.running = true; return self end
+	local function timer_handle(delay, callback, recurring, is_deferred, starts_running)
+		local handle = {
+			delay = delay,
+			callback = callback,
+			running = starts_running == true,
+		}
+		function handle:stop()
+			if is_deferred then
+				deferred_stop_calls = deferred_stop_calls + 1
+				if deferred_stop_failures > 0 then
+					deferred_stop_failures = deferred_stop_failures - 1
+					return false
+				end
+			end
+			self.running = false
+			return self
+		end
+		function handle:start()
+			self.running = true
+			if is_deferred and options.deferred_activate_then_throw then
+				error("deferred timer activated before start raised")
+			end
+			return self
+		end
 		function handle:fire()
 			if not self.running then return end
 			if not recurring then self.running = false end
@@ -89,14 +113,26 @@ local function load_fixture(options)
 			now_ns = now_ns + 1000000
 			return now_ns
 		end,
-		new = function(delay, callback) return timer_handle(delay, callback, true) end,
+		new = function(delay, callback)
+			local is_deferred = delay <= 0.1
+			if is_deferred and failed_allocations > 0 then
+				failed_allocations = failed_allocations - 1
+				return nil
+			end
+			local handle = timer_handle(delay, callback, true, is_deferred, false)
+			if is_deferred then delayed[#delayed + 1] = handle end
+			return handle
+		end,
 		doAfter = function(delay, callback)
 			if failed_allocations > 0 then
 				failed_allocations = failed_allocations - 1
 				return nil
 			end
-			local handle = timer_handle(delay, callback, false)
+			local handle = timer_handle(delay, callback, false, true, true)
 			delayed[#delayed + 1] = handle
+			if options.deferred_activate_then_throw then
+				error("deferred timer activated before doAfter raised")
+			end
 			return handle
 		end,
 	}
@@ -140,6 +176,8 @@ local function load_fixture(options)
 		state = state,
 		appended = appended,
 		wpm_calls = function() return wpm_calls end,
+		deferred_timer_count = function() return #delayed end,
+		deferred_stop_calls = function() return deferred_stop_calls end,
 		fire_next = function()
 			for _, handle in ipairs(delayed) do
 				if handle.running then handle:fire(); return true end
@@ -204,12 +242,37 @@ helpers.describe("log_manager deferred action boundaries", function()
 		helpers.assert_eq(fixture.appended[2].action, "after")
 		fixture.log_manager.stop()
 	end)
+
+	helpers.it("retains an activated candidate when start and rollback both fail", function()
+		local fixture = load_fixture({
+			deferred_activate_then_throw = true,
+			deferred_stop_failures = 1,
+		})
+		helpers.assert_true(fixture.log_manager.defer_flush_buffer())
+		helpers.assert_eq(fixture.deferred_timer_count(), 1,
+			"the failed acquisition must still have one exact native candidate")
+
+		fixture.log_manager.append_log({ type = "system_event", action = "after" })
+		helpers.assert_eq(fixture.deferred_timer_count(), 1,
+			"cleanup debt must block a sibling drain timer")
+		helpers.assert_true(fixture.fire_next())
+		helpers.assert_eq(#fixture.appended, 0,
+			"an uncommitted candidate callback must stay fenced")
+
+		helpers.assert_true(fixture.log_manager.stop(),
+			"teardown must retry the exact candidate and synchronously drain its FIFO")
+		helpers.assert_eq(fixture.deferred_stop_calls(), 2)
+		helpers.assert_eq(#fixture.appended, 2)
+		helpers.assert_eq(fixture.appended[1].text, "old")
+		helpers.assert_eq(fixture.appended[2].action, "after")
+	end)
 end)
 
 for _, name in ipairs({
 	"modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.aggregator",
 	"modules.keylogger.export", "keylogger.metrics", "infra.logger",
+	"adapters.timer_scheduler",
 }) do
 	package.loaded[name] = nil
 end

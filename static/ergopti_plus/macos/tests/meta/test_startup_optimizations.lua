@@ -94,10 +94,25 @@ helpers.describe("startup: gestures pre-warm does not re-initialise its sub-modu
 			"Actions.init must run once at module load — re-calling it in the pre-warm logs a spurious 'called more than once'")
 	end)
 
-	helpers.it("Engine.init is called exactly once (at module load, not in pre-warm)", function()
-		local count = select(2, src:gsub("Engine%.init%(", ""))
-		helpers.assert_eq(count, 1,
-			"Engine.init must run once at module load — re-calling it in the pre-warm logs a spurious 'called more than once'")
+	helpers.it("the pre-warm body never calls Engine.init", function()
+		local prewarm_at = src:find("local function prewarm_dependencies()", 1, true)
+		local prewarm_end = prewarm_at and src:find("\nlocal function kickstart_hid", prewarm_at, true)
+		helpers.assert_true(prewarm_at ~= nil and prewarm_end ~= nil,
+			"the pre-warm body must remain independently locatable")
+		local prewarm = src:sub(prewarm_at, prewarm_end - 1)
+		helpers.assert_true(prewarm:find("Engine.init", 1, true) == nil,
+			"pre-warming dependencies must not reinitialize the live engine at boot")
+	end)
+
+	helpers.it("a post-stop Engine.init remains lifecycle-gated", function()
+		local gate = src:find("if engine_needs_init then", 1, true)
+		local reinit = gate and src:find("Engine.init(CoreState, Actions)", gate, true)
+		local stop = src:find("xpcall(Engine.stop", 1, true)
+		local debt = stop and src:find("engine_needs_init = true", stop, true)
+		helpers.assert_true(gate ~= nil and reinit ~= nil and gate < reinit,
+			"Engine.init may recur only after the lifecycle marks a stopped engine for restart")
+		helpers.assert_true(stop ~= nil and debt ~= nil and stop < debt,
+			"the restart gate must be armed only after Engine.stop succeeds")
 	end)
 end)
 

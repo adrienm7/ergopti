@@ -24,6 +24,7 @@ local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ProgressiveReveal = require("modules.llm.progressive_reveal")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
@@ -102,11 +103,18 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and _post_and_parse_streaming or _post_and_parse
+	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
+	local function request_is_current()
+		return type(request_id_provider) ~= "function"
+			or initial_request_id == nil
+			or request_id_provider() == initial_request_id
+	end
 
 	local t0 = TimerScheduler.now()
 	post_fn(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
+			if not request_is_current() then return end
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
@@ -115,17 +123,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			-- With streaming ON: on_partial_cb already showed each pred token by token;
 			-- emit the final call directly to replace stream placeholders with diff colors.
 			if not streaming and #results > 1 then
-				local function reveal_next(idx)
-					if idx > #results then return end
-					local subset = {}
-					for j = 1, idx do subset[j] = results[j] end
-					local is_final = (idx == #results)
-					-- Pass is_batch_progressive=true so prediction_engine bypasses the
-					-- streaming_multi early-return for these intermediate calls
-					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
-					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
-				end
-				reveal_next(1)
+				ProgressiveReveal.deliver(results, on_success, ms, request_is_current)
 			else
 				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end

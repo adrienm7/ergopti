@@ -62,6 +62,15 @@ helpers.describe("task_lifecycle: only a real native start commits", function()
 		helpers.assert_eq(0, #errors)
 	end)
 
+	helpers.it("models the canonical hs.task start return contract", function()
+		package.loaded["tests.stubs.hs"] = nil
+		local hs_stub = require("tests.stubs.hs")
+		local task = hs_stub.task.new("/bin/echo", function() end, { "hello" })
+		helpers.assert_not_nil(task, "the canonical task stub must construct a handle")
+		helpers.assert_eq(task, task:start(),
+			"hs.task:start() must return its accepted task handle, never nil")
+	end)
+
 	helpers.it("logs callback throws and preserves successful multi-returns", function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()

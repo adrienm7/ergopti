@@ -68,7 +68,10 @@ helpers.describe("set_llm_model resolves the backend at call time (not capture t
 
 		local fn_start = src:find("function M.set_llm_model(model_name)", 1, true)
 		helpers.assert_true(fn_start ~= nil, "set_llm_model must exist")
-		local region = src:sub(fn_start, fn_start + 220)
+		local next_top_level_fn = src:find("\nfunction M%.[%w_]+%(", fn_start + 1)
+		helpers.assert_true(next_top_level_fn ~= nil,
+			"set_llm_model must be followed by another top-level module function")
+		local region = src:sub(fn_start, next_top_level_fn - 1)
 		helpers.assert_true(region:find("core_llm.get_backend()", 1, true) ~= nil,
 			"set_llm_model must resolve the backend via core_llm.get_backend() at call time")
 	end)

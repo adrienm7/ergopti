@@ -146,7 +146,7 @@ local function load_remap(initially_enabled, options)
 			ctx.hotkey_starts = ctx.hotkey_starts + 1
 			return "monitor"
 		end,
-		start_input_source_watcher = function() end,
+		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}

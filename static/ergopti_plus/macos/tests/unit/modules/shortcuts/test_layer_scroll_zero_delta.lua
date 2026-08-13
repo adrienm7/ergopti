@@ -40,6 +40,7 @@ local DELTA_PROPERTY = "scrollWheelEventDeltaAxis1"
 local function make_layer_scroll_ctx()
 	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
@@ -52,7 +53,11 @@ local function make_layer_scroll_ctx()
 	-- scroll tap. Capture both callbacks in creation order.
 	hs.eventtap.new = function(_types, cb)
 		ctx.taps[#ctx.taps + 1] = cb
-		return { start = function() end, stop = function() end }
+		local tap = { enabled = false }
+		function tap:start() self.enabled = true; return self end
+		function tap:stop() self.enabled = false; return self end
+		function tap:isEnabled() return self.enabled end
+		return tap
 	end
 
 	hs.eventtap.event.properties[DELTA_PROPERTY] = DELTA_PROPERTY

@@ -223,6 +223,7 @@ local function load_enabled_remap(options)
 		end,
 		start_input_source_watcher = function()
 			calls.input_source_watchers = calls.input_source_watchers + 1
+			return true
 		end,
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,

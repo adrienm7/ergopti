@@ -29,6 +29,8 @@
 --- 5. macOS limits acknowledged: TCC and System Extension approvals require
 ---    explicit user clicks that no script can bypass. The wizard reduces
 ---    the friction to ~3 clicks total but never pretends to skip them.
+--- 6. Exact timer ownership: polls and delayed continuations share one
+---    generation-scoped slot so stop cannot leave a callback that reopens UI.
 --- ==============================================================================
 
 local M = {}
@@ -39,6 +41,7 @@ local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -50,6 +53,12 @@ local LOG = "karabiner.onboarding"
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
 M._active_tasks = {}
+
+-- One lifecycle epoch owns every poll, delayed continuation, and installer
+-- completion spawned by the current wizard chain
+local _wizard_epoch = 0
+local _timer_owner = nil
+local run_wizard_step
 
 -- Resolve our own directory at load time so the manifest lookup works whether
 -- this file is symlinked, run from the project tree, or deployed elsewhere.
@@ -87,6 +96,8 @@ local URL_SYSTEM_EXTENSIONS = "x-apple.systempreferences:com.apple.LoginItems-Se
 -- timer resources if the user never completes the action.
 local POLL_INTERVAL_SEC = 3
 local POLL_TIMEOUT_SEC  = 300
+local INSTALL_SETTLE_DELAY_SEC = 2
+local NEXT_STEP_DELAY_SEC = 1
 
 
 --- File-existence test that does not pull in lfs (not available in HS by default).
@@ -544,28 +555,190 @@ end
 -- =====================================
 -- =====================================
 
+--- Cancels one exact wizard timer while retaining a refused native capability.
+--- @param owner table Timer transaction owner.
+--- @param context string Operation requesting cancellation.
+--- @return boolean settled True only when no native timer can remain.
+local function cancel_timer_owner(owner, context)
+	if type(owner) ~= "table" then return true end
+	owner.committed = false
+	if not owner.handle then
+		if owner.acquiring then return false end
+		if _timer_owner == owner then _timer_owner = nil end
+		return true
+	end
+	local ok, result = xpcall(function()
+		return TimerScheduler.cancel(owner.handle)
+	end, debug.traceback)
+	if ok and result == true then
+		owner.handle = nil
+		if _timer_owner == owner then _timer_owner = nil end
+		return true
+	end
+	Logger.error(LOG, "%s: exact onboarding timer cleanup remains pending — %s.",
+		context, tostring(result))
+	return false
+end
+
+--- Settles callback-inert cleanup debt before any sibling timer acquisition.
+--- @param context string Acquisition requesting the timer slot.
+--- @return boolean available True only when the exact slot is free.
+local function settle_timer_slot(context)
+	if not _timer_owner then return true end
+	if _timer_owner.committed == true then
+		Logger.error(LOG, "%s: onboarding timer sibling rejected while an active owner exists.", context)
+		return false
+	end
+	return cancel_timer_owner(_timer_owner, context)
+end
+
+--- Invokes one wizard callback with a traceback in the Ergopti file logger.
+--- @param label string Stable callback label.
+--- @param callback function|nil Callback to invoke.
+--- @return boolean ok True when the callback completed.
+local function invoke_wizard_callback(label, callback)
+	if type(callback) ~= "function" then return true end
+	local ok, err = xpcall(callback, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback failed: %s.", label, tostring(err))
+	end
+	return ok
+end
+
+--- Acquires one exact recurring or one-shot timer transaction.
+--- @param method string TimerScheduler method name.
+--- @param delay number Delay or interval in seconds.
+--- @param epoch number Wizard lifecycle epoch.
+--- @param label string Stable operation label.
+--- @param callback function fun(owner: table)
+--- @return boolean committed True only when the native timer was armed.
+local function arm_owned_timer(method, delay, epoch, label, callback)
+	if epoch ~= _wizard_epoch then return false end
+	if settle_timer_slot(label) ~= true then return false end
+	local scheduler = TimerScheduler[method]
+	if type(scheduler) ~= "function" then
+		Logger.error(LOG, "%s: TimerScheduler.%s is unavailable.", label, method)
+		return false
+	end
+
+	local owner = {
+		acquiring = true,
+		committed = false,
+		epoch = epoch,
+		handle = nil,
+		label = label,
+	}
+	_timer_owner = owner
+	local candidate
+	local schedule_ok, handle_or_err, committed = xpcall(function()
+		return scheduler(delay, function()
+			if _timer_owner ~= owner then return end
+			if owner.committed ~= true then
+				if owner.acquiring ~= true then
+					cancel_timer_owner(owner, label .. " stale callback")
+				end
+				return
+			end
+			if owner.epoch ~= _wizard_epoch then
+				cancel_timer_owner(owner, label .. " stale epoch")
+				return
+			end
+			if method == "after" then
+				owner.committed = false
+				if cancel_timer_owner(owner, label .. " completion") ~= true then return end
+			end
+			invoke_wizard_callback(label, function() callback(owner) end)
+		end)
+	end, debug.traceback)
+	candidate = handle_or_err
+	owner.handle = type(candidate) == "table" and candidate or nil
+	owner.acquiring = false
+
+	if not schedule_ok or committed ~= true or type(candidate) ~= "table" then
+		owner.committed = false
+		cancel_timer_owner(owner, label .. " acquisition rollback")
+		Logger.error(LOG, "%s: onboarding timer acquisition failed — %s.",
+			label, tostring(handle_or_err))
+		return false
+	end
+	owner.committed = true
+	return true
+end
+
+--- Schedules the next wizard step under the current lifecycle epoch.
+--- @param delay number Delay before the next step.
+--- @param epoch number Wizard lifecycle epoch.
+--- @param label string Stable operation label.
+--- @return boolean committed True only when the continuation is owned.
+local function schedule_wizard_step(delay, epoch, label)
+	return arm_owned_timer("after", delay, epoch, label, function()
+		if epoch == _wizard_epoch then run_wizard_step(epoch) end
+	end)
+end
+
 --- Polls a predicate until it becomes true or the global timeout elapses.
---- On success, fires on_done; on timeout, fires on_timeout. The repeating
---- timer is stopped automatically as soon as either branch is taken.
 --- @param predicate function fun(): boolean
 --- @param on_done function fun()
 --- @param on_timeout function|nil fun()
-local function poll_until(predicate, on_done, on_timeout)
+--- @param epoch number Wizard lifecycle epoch.
+--- @return boolean committed True only when the recurring timer was armed.
+local function poll_until(predicate, on_done, on_timeout, epoch)
 	local started = os.time()
-	local timer
-	timer = hs.timer.doEvery(POLL_INTERVAL_SEC, function()
-		local ok, result = pcall(predicate)
-		if ok and result == true then
-			timer:stop()
-			on_done()
+	local terminal = false
+
+	--- Completes one terminal branch only after the recurring timer is settled.
+	--- @param owner table Timer transaction owner.
+	--- @param callback function|nil Terminal callback to invoke.
+	local function finish(owner, callback)
+		if terminal then
+			cancel_timer_owner(owner, "poll_until duplicate terminal")
+			return
+		end
+		terminal = true
+		owner.committed = false
+		if cancel_timer_owner(owner, "poll_until terminal") ~= true then return end
+		if epoch == _wizard_epoch then invoke_wizard_callback("poll_until terminal", callback) end
+	end
+
+	local committed = arm_owned_timer("every", POLL_INTERVAL_SEC, epoch, "poll_until", function(owner)
+		if terminal then
+			cancel_timer_owner(owner, "poll_until stale tick")
+			return
+		end
+		local ok, result = xpcall(predicate, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "poll_until predicate failed: %s.", tostring(result))
+			finish(owner, on_timeout)
+			return
+		end
+		if result == true then
+			finish(owner, on_done)
 			return
 		end
 		if os.time() - started > POLL_TIMEOUT_SEC then
-			timer:stop()
 			Logger.warn(LOG, "poll_until: timeout after %ds.", POLL_TIMEOUT_SEC)
-			if on_timeout then on_timeout() end
+			finish(owner, on_timeout)
 		end
 	end)
+	if committed ~= true and epoch == _wizard_epoch then
+		terminal = true
+		invoke_wizard_callback("poll_until acquisition failure", on_timeout)
+	end
+	return committed
+end
+
+--- Cancels every wizard continuation and invalidates queued async completions.
+--- @return boolean settled True only when no native onboarding timer can remain.
+function M.stop()
+	_wizard_epoch = _wizard_epoch + 1
+	if not _timer_owner then return true end
+	local owner = _timer_owner
+	owner.committed = false
+	local settled = cancel_timer_owner(owner, "M.stop")
+	if not settled then
+		Logger.error(LOG, "Onboarding stop incomplete; exact timer cleanup retained for retry.")
+	end
+	return settled
 end
 
 --- Builds a French-language summary of the missing pieces from a health report.
@@ -582,16 +755,14 @@ local function summarize_missing(report)
 	return table.concat(lines, "\n")
 end
 
---- Runs the first-run wizard step that matches the user's actual situation.
---- Each invocation handles ONE missing dependency, schedules a re-poll on
---- success, and the next call handles the next missing dependency. The user
---- experiences a sequence of one-click dialogs separated by macOS prompts.
---- Safe to call repeatedly — does nothing once everything is operational.
-function M.run_first_run_wizard()
+--- Runs one first-run wizard step for an already-owned lifecycle epoch.
+--- @param epoch number Wizard lifecycle epoch.
+run_wizard_step = function(epoch)
+	if epoch ~= _wizard_epoch then return false end
 	local report = M.health_check()
 	if report.all_ok then
 		Logger.info(LOG, "Onboarding: KE stack fully operational — wizard not needed.")
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Onboarding wizard step…")
@@ -612,6 +783,7 @@ function M.run_first_run_wizard()
 			return
 		end
 		M.install_karabiner_elements(function(ok_install, err_install)
+			if epoch ~= _wizard_epoch then return end
 			if not ok_install then
 				dialog_util.block_alert(
 					i18n.get("karabiner.install_error_title"),
@@ -621,7 +793,10 @@ function M.run_first_run_wizard()
 			end
 			-- Wait briefly for the new binary to register, then re-poll to
 			-- catch the next required step (sysext approval).
-			hs.timer.doAfter(2.0, function() M.run_first_run_wizard() end)
+			if schedule_wizard_step(INSTALL_SETTLE_DELAY_SEC, epoch,
+				"post-install wizard continuation") ~= true then
+				run_wizard_step(epoch)
+			end
 		end)
 		Logger.success(LOG, "Onboarding wizard step completed (install in flight).")
 		return
@@ -642,9 +817,13 @@ function M.run_first_run_wizard()
 		poll_until(M.is_sysext_activated,
 			function()
 				notify(i18n.get("karabiner.onboarding.ext_activated"), "success")
-				hs.timer.doAfter(1.0, function() M.run_first_run_wizard() end)
+				if schedule_wizard_step(NEXT_STEP_DELAY_SEC, epoch,
+					"post-system-extension wizard continuation") ~= true then
+					run_wizard_step(epoch)
+				end
 			end,
-			function() notify(i18n.get("karabiner.onboarding.ext_timeout"), "warning") end)
+			function() notify(i18n.get("karabiner.onboarding.ext_timeout"), "warning") end,
+			epoch)
 		Logger.success(LOG, "Onboarding wizard step completed (waiting on sysext).")
 		return
 	end
@@ -664,14 +843,40 @@ function M.run_first_run_wizard()
 		poll_until(M.is_grabber_running,
 			function()
 				notify(i18n.get("karabiner.onboarding.daemon_ready"), "success")
-				hs.timer.doAfter(1.0, function() M.run_first_run_wizard() end)
+				if schedule_wizard_step(NEXT_STEP_DELAY_SEC, epoch,
+					"post-daemon wizard continuation") ~= true then
+					run_wizard_step(epoch)
+				end
 			end,
-			function() notify(i18n.get("karabiner.onboarding.daemon_timeout"), "warning") end)
+			function() notify(i18n.get("karabiner.onboarding.daemon_timeout"), "warning") end,
+			epoch)
 		Logger.success(LOG, "Onboarding wizard step completed (waiting on daemon).")
 		return
 	end
 
 	Logger.success(LOG, "Onboarding wizard step completed (no actionable step).")
+	return true
+end
+
+--- Starts a fresh first-run wizard chain after settling any older timer owner.
+--- Each invocation invalidates queued completions from the preceding chain.
+--- @return boolean|nil started False only when cleanup or execution failed.
+function M.run_first_run_wizard()
+	_wizard_epoch = _wizard_epoch + 1
+	local epoch = _wizard_epoch
+	if _timer_owner then
+		local owner = _timer_owner
+		owner.committed = false
+		if cancel_timer_owner(owner, "run_first_run_wizard replacement") ~= true then
+			return false
+		end
+	end
+	local ok, result = xpcall(function() return run_wizard_step(epoch) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Onboarding wizard execution failed: %s.", tostring(result))
+		return false
+	end
+	return result
 end
 
 return M

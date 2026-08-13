@@ -27,19 +27,19 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 		local calls = { bindings_start = 0, bindings_stop = 0, kbd_start = 0, kbd_stop = 0, sc_start = 0, sc_stop = 0 }
 		package.loaded["modules.shortcuts.bindings"] = {
 			DEFAULT_CHATGPT_URL = "",
-			start      = function() calls.bindings_start = calls.bindings_start + 1 end,
-			stop       = function() calls.bindings_stop  = calls.bindings_stop  + 1 end,
+			start      = function() calls.bindings_start = calls.bindings_start + 1; return true end,
+			stop       = function() calls.bindings_stop  = calls.bindings_stop  + 1; return true end,
 			is_started = function() return true end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = {
 			ACTIONS = {}, ACTION_LABELS = {},
-			start = function() calls.sc_start = calls.sc_start + 1 end,
-			stop  = function() calls.sc_stop  = calls.sc_stop  + 1 end,
+			start = function() calls.sc_start = calls.sc_start + 1; return true end,
+			stop  = function() calls.sc_stop  = calls.sc_stop  + 1; return true end,
 			is_paused = function() return false end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-			start = function() calls.kbd_start = calls.kbd_start + 1 end,
-			stop  = function() calls.kbd_stop  = calls.kbd_stop  + 1 end,
+			start = function() calls.kbd_start = calls.kbd_start + 1; return true end,
+			stop  = function() calls.kbd_stop  = calls.kbd_stop  + 1; return true end,
 		}
 		local Shortcuts = helpers.load_with_stubs("modules.shortcuts")
 		return Shortcuts, calls
@@ -92,8 +92,10 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 		local src = helpers.read_driver_source("local function build_wrap_symbols_submenu")
 		helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
 
-		-- Isolate the top-level feature toggle fn: it sets `state.shortcuts = not state.shortcuts`.
-		local toggle_start = src:find("state%.shortcuts%s*=%s*not%s+state%.shortcuts", 1)
+		-- Isolate the top-level feature toggle by its transaction's desired-state
+		-- derivation.  The runtime must commit before `state.shortcuts` is published,
+		-- so the former direct assignment is intentionally absent.
+		local toggle_start = src:find("local%s+desired%s*=%s*not%s+previous", 1)
 		helpers.assert_true(toggle_start ~= nil, "could not locate the Shortcuts feature toggle fn")
 		local toggle = src:sub(toggle_start, toggle_start + 600)
 

@@ -12,7 +12,8 @@
 local helpers = require("tests.helpers")
 
 
-local function load_gate()
+local function load_gate(options)
+	options = options or {}
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -44,6 +45,7 @@ local function load_gate()
 	}
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(delay, callback)
+			local call_index = #timers + 1
 			local handle = {
 				delay = delay,
 				callback = callback,
@@ -51,7 +53,12 @@ local function load_gate()
 				timer = {},
 			}
 			timers[#timers + 1] = handle
-			return handle
+			if options.reject_timer_at == call_index then
+				handle.timer = nil
+				handle.cancelled = true
+				return handle, false
+			end
+			return handle, true
 		end,
 		cancel = function(handle)
 			if type(handle) == "table" then
@@ -192,6 +199,36 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(#fixture.sent, 1)
 		helpers.assert_true(not fixture.replay.is_pending())
 		fixture.synthetic.cancel(tx)
+	end)
+
+	helpers.it("passes the physical terminator when watchdog acquisition is refused", function()
+		local fixture = load_gate({ reject_timer_at = 1 })
+		local tx = new_transaction(fixture)
+		fixture.synthetic.seal(tx)
+
+		helpers.assert_true(not fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = tx,
+		}), "without a watchdog the module must not claim ownership of Enter")
+		helpers.assert_true(not fixture.replay.is_pending())
+		helpers.assert_eq(#fixture.sent, 0,
+			"failure before commit must not synthesize a second terminator")
+	end)
+
+	helpers.it("rolls back the watchdog when the paste settle fence is refused", function()
+		local fixture = load_gate({ reject_timer_at = 2 })
+		local tx = new_transaction(fixture)
+		fixture.synthetic.seal(tx)
+
+		helpers.assert_true(not fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r",
+			transaction = tx, min_delay = 0.08,
+		}), "both timers must commit before the physical key is owned")
+		helpers.assert_true(not fixture.replay.is_pending())
+		helpers.assert_true(fixture.timers[1].cancelled,
+			"fence refusal must cancel the exact watchdog candidate")
+		fixture.timers[1].callback()
+		helpers.assert_eq(#fixture.sent, 0,
+			"a queued callback from rolled-back acquisition must remain identity-fenced")
 	end)
 
 	helpers.it("discard makes queued watchdog, fence, and completion callbacks inert", function()
