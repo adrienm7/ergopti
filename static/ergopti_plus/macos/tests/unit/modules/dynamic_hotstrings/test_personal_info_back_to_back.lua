@@ -7,7 +7,7 @@
 local helpers = require("tests.helpers")
 
 local TARGET  = "modules.dynamic_hotstrings.personal_info"
-local TRIGGER = "â˜…"
+local TRIGGER = "★"
 
 local function key(char)
 	return {
@@ -87,6 +87,7 @@ helpers.describe("personal_info: consecutive expansions have no blind interval",
 		helpers.assert_eq(#record.attempts, 2,
 			"both user actions must reach the real module's replacement seam")
 		helpers.assert_eq(record.attempts[1].text, "Alice")
+		helpers.assert_true(record.attempts[1].emitter_ran)
 		helpers.assert_eq(record.attempts[2].text, "alice@example.test")
 	end)
 
