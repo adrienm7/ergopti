@@ -1909,6 +1909,21 @@ arbitrary editor.
 Primary references are Darwin's [`rename(2)` manual](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)
 and Apple's [TOCTOU guidance](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html).
 
+Replacement writers that do cooperate now share one stable adjacent
+`<resolved_path>.ergoptiplus-write-lock-v1` inode. Both `FileSystem.write()` and
+`FileSystem.write_if_unchanged()` open it without truncation and take the
+non-blocking exclusive [`hs.fs.lock`](https://www.hammerspoon.org/docs/hs.fs.html#lock)
+before staging, source comparison and rename. The pathname is intentionally
+never unlinked: recreating it could split contenders across two inodes. A
+module-local owner table also rejects same-process re-entry because POSIX record
+locks are process-associated. `unlock` plus close runs on every protected exit;
+if Hammerspoon is killed, Darwin releases the process's `fcntl(F_SETLK)` lock,
+so there is no PID/age-based stale-lock deletion. Contention is a visible
+fail-closed save, not a blocking wait. This closes the compare/rename interval
+between cooperating Ergopti **replacement** writers, including the unconditional
+reset sibling. It does not make `create_if_absent()` advisory-lock-aware and does
+not constrain any external writer.
+
 The detached `ergopti-verify-fs-cas-v2` prototype from 2026-08-09 was rejected
 on 2026-08-13. Its own 40 modeled cases passed, but an adversarial interleaving
 showed it overwrote a foreign `OLD` sidecar and still returned success. Its
@@ -1916,7 +1931,7 @@ showed it overwrote a foreign `OLD` sidecar and still returned success. Its
 missing-`live` interval that a crash could make permanent, and
 `lstat -> open -> lstat` remained vulnerable to pathname ABA. Do not revive or
 port that implementation. Preserve the current complete-file rename and
-classified-path protections while treating cross-process lost-update exclusion
+classified-path protections while treating exclusion of non-cooperating writers
 as an open architecture constraint, not a completed CAS fix.
 
 Regression tests must drive behavior, not grep spelling: preserve sentinel bytes under EACCES, directory, dangling-link and malformed-content cases; inject `write -> nil`, `close -> false`, and `rename -> false`; simulate a file appearing or changing between read and publication; then assert the file, live state, cache, UI, timer/submodule startup, and user notification all remain uncommitted. Related [[project-ahk-unreadable-config-persists-defaults]], [[project-hs-karabiner-exact-lease-isolation]], [[feedback-regression-tests]].

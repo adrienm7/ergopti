@@ -22,6 +22,7 @@
 
 local helpers = require("tests.helpers")
 local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
+local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local HOST_ATTRIBUTES = hs.fs.attributes
 local HOST_SYMLINK_ATTRIBUTES = hs.fs.symlinkAttributes
 local HOST_MKDIR = hs.fs.mkdir
@@ -50,7 +51,8 @@ end
 -- @param symlink_targets table|nil Optional final-link targets returned by lstat.
 -- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
 -- @param confirmed_absences table|nil Optional paths absent from their listed parent.
-local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override)
+local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override,
+		lock_override, unlock_override)
 	local staging_locks = {}
 	package.loaded["adapters.file_system"] = nil
 	package.loaded["infra.fs_dir"] = nil
@@ -95,6 +97,12 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 				if type(attributes) == "table" then return attributes end
 				attributes = HOST_ATTRIBUTES(path)
 				if type(attributes) == "table" then return attributes end
+				-- Stock Windows Lua cannot lstat a zero-byte file while another
+				-- fixture handle owns it. Model the stable lock inode explicitly so
+				-- contention reaches the injected fcntl primitive, as it does on macOS.
+				if path:sub(-#WRITE_LOCK_SUFFIX) == WRITE_LOCK_SUFFIX then
+					return { mode = "file" }
+				end
 				return nil, attributes_err or "lstat failed"
 			end,
 			mkdir = function(path)
@@ -113,6 +121,8 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 				return true
 			end,
 			link = link_override,
+			lock = lock_override or function() return true end,
+			unlock = unlock_override or function() return true end,
 		},
 	})
 	return adapter, staging_locks
@@ -1012,9 +1022,284 @@ end)
 
 
 
+-- =====================================================
+-- =====================================================
+-- ======= 2/ Cooperative replacement serialization ===
+-- =====================================================
+-- =====================================================
+
+helpers.describe("adapters.file_system: cooperative replacement writer lock", function()
+	local function seed(path, content)
+		local handle = assert(io.open(path, "w"))
+		assert(handle:write(content))
+		assert(handle:close())
+	end
+
+	local function read_all(path)
+		local handle = assert(io.open(path, "r"))
+		local content = handle:read("*a")
+		handle:close()
+		return content
+	end
+
+	local function run_nested_competitor(use_unconditional_writer)
+		local path = os.tmpname():gsub("\\", "/")
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		seed(path, "v0")
+
+		local owner = nil
+		local lock_calls = { A = 0, B = 0 }
+		local unlock_calls = { A = 0, B = 0 }
+		local function lock_api(name)
+			return function()
+				lock_calls[name] = lock_calls[name] + 1
+				if owner ~= nil then return nil, "injected busy lock" end
+				owner = name
+				return true
+			end, function()
+				unlock_calls[name] = unlock_calls[name] + 1
+				if owner ~= name then return nil, "wrong injected owner" end
+				owner = nil
+				return true
+			end
+		end
+		local lock_a, unlock_a = lock_api("A")
+		local lock_b, unlock_b = lock_api("B")
+		local adapter_a = make_adapter(nil, nil, nil, nil, lock_a, unlock_a)
+		local adapter_b = make_adapter(nil, nil, nil, nil, lock_b, unlock_b)
+		local original_open = io.open
+		local original_rename = os.rename
+		local competitor_written, competitor_err = nil, nil
+		local competitor_renames = 0
+		local in_publication_hook = false
+
+		io.open = function(open_path, mode)
+			if open_path == lock_path and mode == "a+" then
+				return { close = function() return true end }
+			end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if new_path == path and in_publication_hook then
+				competitor_renames = competitor_renames + 1
+			end
+			if new_path == path and not in_publication_hook then
+				in_publication_hook = true
+				if use_unconditional_writer then
+					competitor_written, competitor_err = adapter_b.write(path, "writer B")
+				else
+					competitor_written, competitor_err = adapter_b.write_if_unchanged(path, "writer B", {
+						status = "ok",
+						content = "v0",
+					})
+				end
+				in_publication_hook = false
+			end
+			if new_path == path then os.remove(new_path) end -- model POSIX replacement on Windows
+			return original_rename(old_path, new_path)
+		end
+
+		local call_ok, writer_a_result = xpcall(function()
+			return adapter_a.write_if_unchanged(path, "writer A", {
+				status = "ok",
+				content = "v0",
+			})
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		local final_content = read_all(path)
+		os.remove(path)
+		os.remove(lock_path)
+		if not call_ok then error(writer_a_result, 0) end
+
+		helpers.assert_eq(writer_a_result, true, "the lock owner must publish its complete candidate")
+		helpers.assert_eq(competitor_written, false,
+			"a nested cooperating writer must fail closed instead of entering the compare/rename gap")
+		helpers.assert_true(type(competitor_err) == "string" and competitor_err ~= "",
+			"lock contention must surface a concrete refusal")
+		helpers.assert_eq(competitor_renames, 0, "the losing writer must never reach publication")
+		helpers.assert_eq(lock_calls.A, 1)
+		helpers.assert_eq(lock_calls.B, 1,
+			"the behavioral repro must reach the shared non-blocking kernel-lock boundary")
+		helpers.assert_eq(unlock_calls.A, 1)
+		helpers.assert_eq(unlock_calls.B, 0, "a process that never acquired must never unlock")
+		helpers.assert_nil(owner, "the winning transaction must release its process lock")
+		helpers.assert_eq(final_content, "writer A",
+			"exactly the sole lock owner may determine the committed bytes")
+	end
+
+	helpers.it("serializes two conditional Ergopti writers across the final compare/rename gap", function()
+		run_nested_competitor(false)
+	end)
+
+	helpers.it("serializes unconditional reset against a conditional Ergopti writer", function()
+		run_nested_competitor(true)
+	end)
+
+	helpers.it("checks the expected source only after lock acquisition and releases after rename", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		seed(path, "v0")
+		local events = {}
+		local held = false
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			events[#events + 1] = "lock"
+			held = true
+			seed(path, "changed before comparison")
+			return true
+		end, function()
+			events[#events + 1] = "unlock"
+			held = false
+			return true
+		end)
+		local original_open = io.open
+		local original_rename = os.rename
+		local renames = 0
+		io.open = function(open_path, mode)
+			if open_path == lock_path and mode == "a+" then
+				return { close = function()
+					events[#events + 1] = "close"
+					return true
+				end }
+			end
+			if open_path == path and mode == "r" and held then
+				events[#events + 1] = "expected-read"
+			end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if new_path == path then
+				renames = renames + 1
+				events[#events + 1] = "rename"
+			end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, written = xpcall(function()
+			return adapter.write_if_unchanged(path, "candidate", {
+				status = "ok",
+				content = "v0",
+			})
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		local final_content = read_all(path)
+		os.remove(path)
+		os.remove(lock_path)
+		if not call_ok then error(written, 0) end
+
+		helpers.assert_eq(written, false, "a source changed before the protected comparison must lose")
+		helpers.assert_eq(renames, 0)
+		helpers.assert_eq(events[1], "lock", "kernel ownership must precede every source read")
+		helpers.assert_eq(events[#events - 1], "unlock")
+		helpers.assert_eq(events[#events], "close")
+		helpers.assert_true(table.concat(events, ","):find("expected-read", 1, true) ~= nil,
+			"the protected transaction must re-read its expected source")
+		helpers.assert_eq(final_content, "changed before comparison")
+	end)
+
+	helpers.it("releases after rename failure so the next cooperating writer can progress", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		seed(path, "old")
+		local held = false
+		local locks, unlocks, closes = 0, 0, 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			locks = locks + 1
+			if held then return nil, "still held" end
+			held = true
+			return true
+		end, function()
+			unlocks = unlocks + 1
+			held = false
+			return true
+		end)
+		local original_open = io.open
+		local original_rename = os.rename
+		local refuse_first = true
+		io.open = function(open_path, mode)
+			if open_path == lock_path and mode == "a+" then
+				return { close = function() closes = closes + 1; return true end }
+			end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if new_path == path and refuse_first then
+				refuse_first = false
+				return nil, "injected rename refusal"
+			end
+			if new_path == path then os.remove(new_path) end -- model POSIX replacement on Windows
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, first, second = xpcall(function()
+			local first_result = adapter.write(path, "first")
+			local second_result = adapter.write(path, "second")
+			return first_result, second_result
+		end, debug.traceback)
+		io.open = original_open
+		os.rename = original_rename
+		local final_content = read_all(path)
+		os.remove(path)
+		os.remove(lock_path)
+		if not call_ok then error(first, 0) end
+
+		helpers.assert_eq(first, false)
+		helpers.assert_eq(second, true, "a failed transaction must not strand the process mutex")
+		helpers.assert_eq(locks, 2)
+		helpers.assert_eq(unlocks, 2)
+		helpers.assert_eq(closes, 2)
+		helpers.assert_true(not held)
+		helpers.assert_eq(final_content, "second")
+	end)
+
+	helpers.it("keeps one stable regular lock inode and rejects a directory at that pathname", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		local adapter = make_adapter()
+		local original_rename = os.rename
+		os.rename = function(old_path, new_path)
+			if new_path == path then os.remove(new_path) end -- model POSIX replacement on Windows
+			return original_rename(old_path, new_path)
+		end
+		local first_written = adapter.write(path, "one")
+		local first_lock = io.open(lock_path, "r")
+		helpers.assert_true(first_lock ~= nil, "the stable cooperative lock file must persist")
+		if first_lock then first_lock:close() end
+		local second_written = adapter.write(path, "two")
+		os.rename = original_rename
+		helpers.assert_eq(first_written, true)
+		helpers.assert_eq(second_written, true,
+			"a later writer must reuse, not unlink/recreate, the stable lock pathname")
+		os.remove(path)
+		os.remove(lock_path)
+
+		local directory_target = os.tmpname():gsub("\\", "/")
+		local directory_lock = directory_target .. WRITE_LOCK_SUFFIX
+		os.remove(directory_target)
+		os.remove(directory_lock)
+		assert(HOST_MKDIR(directory_lock))
+		local directory_adapter = make_adapter()
+		local written = directory_adapter.write(directory_target, "blocked")
+		helpers.assert_eq(written, false,
+			"a directory/symlink collision must fail closed before staging or publication")
+		helpers.assert_nil(io.open(directory_target, "r"))
+		HOST_RMDIR(directory_lock)
+	end)
+end)
+
+
+
+
 -- ==========================================
 -- ==========================================
--- ======= 2/ Source-shape assertion ========
+-- ======= 3/ Source-shape assertion ========
 -- ==========================================
 -- ==========================================
 

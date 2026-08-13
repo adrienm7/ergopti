@@ -879,6 +879,19 @@ not honestly implementable as another Lua rename sequence.
 Primary references: Apple's open-source Darwin [`rename(2)` manual](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)
 and [Secure Coding Guide on TOCTOU](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html).
 
+**2026-08-13 bounded follow-up.** The smaller useful part was completed without
+the rejected recovery protocol. `FileSystem.write()` and
+`write_if_unchanged()` now take the same stable adjacent non-blocking
+`hs.fs.lock` before staging, comparison and rename. That closes the gap among
+cooperating Ergopti replacement writers, including unconditional reset, while
+contention fails visibly and no stale lock is reclaimed: Darwin releases the
+process-associated `fcntl` lock on process death and the empty lock inode stays
+in place. Behavioral tests inject a second conditional writer and an
+unconditional sibling precisely inside the former compare/rename gap, assert
+zero loser renames, verify lock-before-read-before-release ordering, and prove a
+rename failure does not strand the next writer. The non-cooperating-writer and
+native crash/APFS limits above remain.
+
 **Fix commits.** `46bc59b9f`, `ce407718a`, `fa5becaff`, `3cb2c4a23` and
 `a21930037` establish the transaction from codec through platform pathname.
 
@@ -1829,8 +1842,10 @@ executed.
   layout-switch, multiple-keyboard and first-touch gesture scenarios.
 - Replay the classified-path/create-only/POSIX-order matrix on APFS with real
   `hs.fs.symlinkAttributes`, dangling links, permission denial and two processes
-  racing publication; the Windows host's injected identities are causal tests,
-  not a native filesystem result.
+  racing publication. Include `SIGKILL` of a process holding the new stable
+  `hs.fs.lock`, then require a second Hammerspoon process to acquire it within a
+  bound. The Windows host's injected identities/lock owner are causal tests, not
+  a native filesystem result.
 - Failure-inject one real AppKit menu save after boot and verify runtime hotkeys,
   LLM/profile state, gesture registries and any queued keylogger start visibly
   return to the last committed values without a success notification.
