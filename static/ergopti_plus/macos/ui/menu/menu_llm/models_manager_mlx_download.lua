@@ -26,6 +26,7 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -486,7 +487,7 @@ function M.install(ctx)
 			-- Starts a tail -f task that streams the Python log file back to Lua in real time;
 			-- also polls the exit file every 3 s to catch completion reliably
 			local function start_tail_monitor()
-				_tail_task = hs.task.new("/usr/bin/tail", function()
+				_tail_task = TaskLifecycle.native("MLX download log tail", "/usr/bin/tail", function()
 					-- Tail exited (killed by do_cancel or process gone) — check exit file
 					hs.timer.doAfter(0.5, function()
 						local ef = io.open(_exit_path, "r")
@@ -499,7 +500,10 @@ function M.install(ctx)
 
 				if _tail_task then
 					if deps.active_tasks then deps.active_tasks["download_tail"] = _tail_task end
-					pcall(function() _tail_task:start() end)
+					if not TaskLifecycle.start(_tail_task, "MLX download log tail") then
+						if deps.active_tasks then deps.active_tasks["download_tail"] = nil end
+						_tail_task = nil
+					end
 				end
 
 				-- Periodic poll: tail can miss the very last flush before Python exits
@@ -515,7 +519,7 @@ function M.install(ctx)
 
 			-- Short-lived launcher: resolves Python, installs deps, cleans stale cache, then
 			-- exits after spawning the detached Python process and printing its PID
-			local launcher_task = hs.task.new(script_path, function(code, stdout, stderr)
+			local launcher_task = TaskLifecycle.native("MLX detached download launcher", script_path, function(code, stdout, stderr)
 				if deps.active_tasks then deps.active_tasks["download"] = nil end
 				-- stdout/stderr are empty when a streaming callback is active — _dl_pid was already
 				-- set by the streaming callback which received the __DLPID__ sentinel
@@ -558,7 +562,18 @@ function M.install(ctx)
 
 			if launcher_task then
 				if deps.active_tasks then deps.active_tasks["download"] = launcher_task end
-				pcall(function() launcher_task:start() end)
+				if not TaskLifecycle.start(launcher_task, "MLX detached download launcher") then
+					if deps.active_tasks then deps.active_tasks["download"] = nil end
+					pcall(deps.update_icon)
+					if download_window then pcall(download_window.complete, false, target_model) end
+					pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
+						string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
+				end
+			else
+				pcall(deps.update_icon)
+				if download_window then pcall(download_window.complete, false, target_model) end
+				pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
+					string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
 			end
 		end
 
@@ -729,7 +744,7 @@ function M.install(ctx)
 		end
 
 		-- Start a new tail -f on the existing log file
-		_tail_task = hs.task.new("/usr/bin/tail", function()
+		_tail_task = TaskLifecycle.native("MLX reattached download log tail", "/usr/bin/tail", function()
 			hs.timer.doAfter(0.5, function()
 				local ef3 = io.open(exit_path, "r")
 				if ef3 then ef3:close(); handle_done_reattached() end
@@ -741,7 +756,12 @@ function M.install(ctx)
 
 		if _tail_task then
 			deps.active_tasks["download_tail"] = _tail_task
-			pcall(function() _tail_task:start() end)
+			if not TaskLifecycle.start(_tail_task, "MLX reattached download log tail") then
+				_tail_task = nil
+				-- Keep the logical monitor sentinel: the exit-file poll remains the
+				-- reliable completion backstop even when streaming cannot start.
+				deps.active_tasks["download_tail"] = true
+			end
 		end
 
 		-- Poll for exit file in case tail misses the final flush

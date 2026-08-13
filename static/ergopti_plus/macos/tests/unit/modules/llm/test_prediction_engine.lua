@@ -461,6 +461,51 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 		helpers.assert_true(ok, "perform_check must not throw on the dispatch path: " .. tostring(err))
 		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
 	end)
+
+	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
+		local core = package.loaded["modules.llm"]
+		local tooltip = package.loaded["ui.tooltip"]
+		local warmup = package.loaded["modules.llm.warmup_controller"]
+		local previous_model = core.get_current_model
+		local previous_backend = core.get_backend
+		local previous_ready = core.is_backend_ready
+		local previous_fetch = core.fetch_llm_prediction
+		local previous_show_loading = tooltip.show_loading
+		local previous_show_predictions = tooltip.show_predictions
+		local previous_schedule = warmup.schedule_warmup_with_retry
+		local shows, fetches, warmups = 0, 0, 0
+
+		core.get_current_model = function() return "" end
+		core.get_backend = function() return "mlx" end
+		core.is_backend_ready = function() return true end
+		core.fetch_llm_prediction = function() fetches = fetches + 1 end
+		tooltip.show_loading = function() shows = shows + 1; return true end
+		tooltip.show_predictions = function() shows = shows + 1; return true end
+		warmup.schedule_warmup_with_retry = function() warmups = warmups + 1 end
+
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			warmups = 0
+			PE.set_llm_model("")
+			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_eq(shows, 0,
+				"a stale MLX ready flag must not paint a loading or prediction surface")
+			helpers.assert_eq(fetches, 0)
+			helpers.assert_eq(warmups, 0,
+				"No Model is a disabled identity, not an empty model to warm")
+		end, debug.traceback)
+
+		core.get_current_model = previous_model
+		core.get_backend = previous_backend
+		core.is_backend_ready = previous_ready
+		core.fetch_llm_prediction = previous_fetch
+		tooltip.show_loading = previous_show_loading
+		tooltip.show_predictions = previous_show_predictions
+		warmup.schedule_warmup_with_retry = previous_schedule
+		PE.set_llm_enabled(false)
+		if not ok then error(err, 0) end
+	end)
 end)
 
 

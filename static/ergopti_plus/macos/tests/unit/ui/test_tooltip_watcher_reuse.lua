@@ -1471,4 +1471,137 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			CASES[1].watcher_count + CASES[2].watcher_count,
 			"recovery must create exactly one hotstring watcher set")
 	end)
+
+	helpers.it("(llm-stream-navigation-session) same-request repaint preserves Enter semantics", function()
+		local context = load_tooltip(CASES[1])
+		local accepted = {}
+		context.tooltip.set_accept_callback(function(index)
+			accepted[#accepted + 1] = index
+			return true
+		end)
+		local function stream_repaint(predictions, request_id, producer_index)
+			local display_index = producer_index or context.tooltip.get_current_index() or 1
+			return context.tooltip.show_predictions(
+				predictions, display_index, true, nil, nil, nil, nil, nil, nil, nil,
+				request_id)
+		end
+		helpers.assert_eq(stream_repaint({ "first", "second" }, "request-a"), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(125, {}, "")), true)
+		helpers.assert_eq(context.tooltip.get_current_index(), 2)
+
+		-- A token repaint can race after the physical arrow but before its deferred
+		-- semantic callback. Even if its producer still carries row one, it must not
+		-- undo the synchronously committed cursor or its Enter semantics.
+		helpers.assert_eq(stream_repaint(
+			{ "first updated", "second updated" }, "request-a", 1), true)
+		helpers.assert_eq(context.tooltip.get_current_index(), 2,
+			"same-stream rendering must not overwrite a newer physical navigation")
+		key_watcher = context.created[CASES[1].watcher_count]
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(36, {}, "\r")), true,
+			"Enter must remain owned after a same-request streaming repaint")
+		drain_deferred_actions(context.timers)
+		helpers.assert_eq(accepted, { 2 },
+			"the row still highlighted on screen must be accepted exactly once")
+
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "new first", "new second" }, 1, true, nil, nil, nil, nil, nil, nil,
+			nil, "request-b"), true)
+		key_watcher = context.created[CASES[1].watcher_count]
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(36, {}, "\r")), false,
+			"a genuinely new request must reset navigation engagement")
+	end)
+
+	helpers.it("(llm-navigation-enter-order) commits the arrow index before deferred repaint", function()
+		local context = load_tooltip(CASES[1])
+		local accepted = {}
+		context.tooltip.set_accept_callback(function(index)
+			accepted[#accepted + 1] = index
+			return true
+		end)
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "first", "second" }, 1, true, nil, nil, nil, {}, nil, nil, nil,
+			"request-a"), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(125, {}, "")), true,
+			"Down must be consumed as tooltip navigation")
+		helpers.assert_eq(context.tooltip.get_current_index(), 2,
+			"the O(1) selection state must commit before the run-loop repaint")
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(36, {}, "\r")), true,
+			"immediate Enter must observe and own the newly selected row")
+		helpers.assert_eq(accepted, {},
+			"acceptance must remain deferred outside the eventtap callback")
+		drain_deferred_actions(context.timers)
+		helpers.assert_eq(accepted, { 2 },
+			"Down then Enter must accept row two exactly once in physical event order")
+	end)
+
+	helpers.it("(llm-navigation-action-order) a later arrow cannot cancel an earlier accepted Tab", function()
+		local context = load_tooltip(CASES[1])
+		local accepted = {}
+		context.tooltip.set_accept_callback(function(index)
+			accepted[#accepted + 1] = index
+			return true
+		end)
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "first", "second" }, 1, true, nil, nil, nil, {}, nil, nil, nil,
+			"request-a"), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(48, {}, "\t")), true,
+			"Tab must consume and enqueue acceptance of row one")
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(125, {}, "")), true,
+			"the later Down event is classified against the still-visible tooltip")
+		drain_deferred_actions(context.timers)
+		helpers.assert_eq(accepted, { 1 },
+			"a later navigation classification must not invalidate an earlier consumed action")
+	end)
+
+	helpers.it("(llm-stream-action-order) a token repaint cannot cancel an accepted Enter", function()
+		local context = load_tooltip(CASES[1])
+		local accepted = {}
+		context.tooltip.set_accept_callback(function(index)
+			accepted[#accepted + 1] = index
+			return true
+		end)
+		local function stream_repaint(predictions)
+			return context.tooltip.show_predictions(
+				predictions, context.tooltip.get_current_index() or 1, true,
+				nil, nil, nil, {}, nil, nil, nil, "request-a")
+		end
+		helpers.assert_eq(stream_repaint({ "first", "second" }), true)
+		helpers.assert_eq(context.tooltip.navigate(1), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(36, {}, "\r")), true)
+
+		-- Simulate a stream token callback winning the run-loop race against the
+		-- already queued acceptance callback.
+		helpers.assert_eq(stream_repaint({ "first updated", "second updated" }), true)
+		drain_deferred_actions(context.timers)
+		helpers.assert_eq(accepted, { 2 },
+			"same-request rendering must not revoke an earlier consumed action")
+	end)
+
+	helpers.it("(llm-navigation-coalescing) rapid arrows render and notify only their final index", function()
+		local context = load_tooltip(CASES[1])
+		local navigated = {}
+		context.tooltip.set_navigate_callback(function(index)
+			navigated[#navigated + 1] = index
+			return true
+		end)
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "first", "second", "third" }, 1, true,
+			nil, nil, nil, {}, nil, nil, nil, "request-a"), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(125, {}, "")), true)
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(125, {}, "")), true)
+		helpers.assert_eq(context.tooltip.get_current_index(), 3,
+			"both O(1) state transitions must commit in physical order")
+		helpers.assert_eq(navigated, {}, "semantic callbacks stay outside the eventtap")
+		drain_deferred_actions(context.timers)
+		helpers.assert_eq(navigated, { 3 },
+			"superseded AX renders must coalesce instead of notifying the final row twice")
+	end)
 end)

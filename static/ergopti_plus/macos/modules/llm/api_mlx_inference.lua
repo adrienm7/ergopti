@@ -760,6 +760,12 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
 			return
 		end
+		if exit_code ~= 0 then
+			Logger.error(LOG, "[%s] #%d STREAM transport failed (exit=%s) — discarding partial output.",
+				tostring(model_name), req_id, tostring(exit_code))
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
+		end
 
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining

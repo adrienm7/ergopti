@@ -48,6 +48,28 @@ local function pcall_log(name, fn, ...)
 	return ok, err
 end
 
+--- Revokes the prediction-engine identity before a remote-entry mutation.
+--- ApiRemote fences callbacks and readiness, while the keymap bridge owns the
+--- already-visible tooltip and request counters; both halves must transition.
+--- @param keymap table Keymap facade injected by menu_llm.
+--- @param label string Mutation label for diagnostics.
+--- @return boolean committed
+local function reset_prediction_identity(keymap, label)
+	if type(keymap) ~= "table" or type(keymap.reset_predictions) ~= "function" then
+		Logger.error(LOG, "Cannot %s: keymap.reset_predictions is unavailable.", tostring(label))
+		return false
+	end
+	local ok, committed = xpcall(function()
+		return keymap.reset_predictions(false)
+	end, debug.traceback)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Cannot %s: prediction identity reset did not commit (result: %s).",
+			tostring(label), tostring(committed))
+		return false
+	end
+	return true
+end
+
 
 
 
@@ -60,7 +82,7 @@ end
 
 --- Builds the API entries submenu and returns the title string and menu table.
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.
---- @param ctx table Context with fields: state, paused, update_menu, WarmupCtrl.
+--- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
 --- @return string|nil title   Title string for the parent row, or nil.
 --- @return table|nil  menu    The entries submenu, rendered from row data.
 function M.build(ctx)
@@ -68,6 +90,7 @@ function M.build(ctx)
 	local paused      = ctx.paused
 	local update_menu = ctx.update_menu
 	local WarmupCtrl  = ctx.WarmupCtrl
+	local keymap      = ctx.keymap
 
 	if state.llm_backend ~= "api" then
 		return nil, nil
@@ -96,10 +119,13 @@ function M.build(ctx)
 			checked  = (e.id == active_id),
 			disabled = paused or nil,
 			action       = not paused and function()
+				if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
 				api_remote.set_active_entry_id(e.id)
+				state.llm_model = tostring(e.model or "")
 				pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
 				WarmupCtrl.warmup("api_set_active")
 				update_menu()
+				return true
 			end or nil
 		})
 	end
@@ -181,6 +207,7 @@ function M.build(ctx)
 					-- needs an active entry to probe credentials against, but we
 					-- don't want to write a bad token into the Keychain. Persist only
 					-- on success; on failure, roll the in-memory state back.
+					if reset_prediction_identity(keymap, "stage remote API entry") ~= true then return false end
 					api_remote.set_entries(clone)
 					api_remote.set_active_entry_id(id)
 					update_menu()
@@ -260,6 +287,7 @@ function M.build(ctx)
 			for _, x in ipairs(api_remote.get_entries() or {}) do
 				if x.id ~= active_entry.id then table.insert(kept, x) end
 			end
+			if reset_prediction_identity(keymap, "delete remote API entry") ~= true then return false end
 			api_remote.set_entries(kept)
 			api_remote.set_active_entry_id(kept[1] and kept[1].id or "")
 			pcall_log("persist_api_entries(delete)", llm_mod.persist_api_entries)
@@ -290,13 +318,14 @@ end
 --- Builds the "active model" submenu when the remote API backend is selected.
 --- Mirrors Windows ``_LLM_Menu_BuildApiEntriesMenu()`` — local catalogue rows
 --- are hidden because they have no ``urls.api`` entry in models.json.
---- @param ctx table Context with fields: state, paused, update_menu, WarmupCtrl.
+--- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
 --- @return table menu Populated API entry picker.
 function M.build_model_picker(ctx)
 	local state       = ctx.state
 	local paused      = ctx.paused
 	local update_menu = ctx.update_menu
 	local WarmupCtrl  = ctx.WarmupCtrl
+	local keymap      = ctx.keymap
 
 	local api_remote = llm_mod.api_remote
 	local entries    = (api_remote and api_remote.get_entries()) or {}
@@ -309,12 +338,14 @@ function M.build_model_picker(ctx)
 		disabled = paused or nil,
 		action      = not paused and function()
 			if api_remote and api_remote.set_active_entry_id then
+				if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
 				api_remote.set_active_entry_id("")
 				state.llm_model = ""
 				pcall_log("persist_api_entries(clear_active)", llm_mod.persist_api_entries)
-				WarmupCtrl.warmup("api_clear_active")
 				update_menu()
+				return true
 			end
+			return false
 		end or nil,
 	})
 
@@ -333,11 +364,13 @@ function M.build_model_picker(ctx)
 			checked  = (e.id == active_id),
 			disabled = paused or nil,
 			action       = not paused and function()
+				if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
 				api_remote.set_active_entry_id(e.id)
 				state.llm_model = tostring(e.model or "")
 				pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
 				WarmupCtrl.warmup("api_set_active")
 				update_menu()
+				return true
 			end or nil,
 		})
 	end

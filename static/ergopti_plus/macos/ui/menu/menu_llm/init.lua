@@ -315,8 +315,19 @@ function M.create(deps)
 				keymap      = keymap,
 				save_prefs  = save_prefs,
 				update_menu = update_menu,
+				runtime_gate = function()
+						local script_control = deps.script_control
+						if not script_control or type(script_control.is_paused) ~= "function" then return true end
+						local ok, paused = xpcall(script_control.is_paused, debug.traceback)
+						if not ok then
+								Logger.error(LOG, "Cannot read pause state during model switch: %s", tostring(paused))
+								return false
+						end
+						return paused ~= true
+				end,
 		})
 		local switch_model                     = switcher.switch_model
+		local disable_model                    = switcher.disable_model
 		local get_display_model_name           = switcher.get_display_model_name
 		local get_model_power_level            = switcher.get_model_power_level
 		local apply_recommended_prompt_profile = switcher.apply_recommended_prompt_profile
@@ -367,6 +378,17 @@ function M.create(deps)
 				end
 				state.llm_model_power = get_model_power_level(display_name)
 				Logger.debug(LOG, string.format("Model power on startup: %d.", state.llm_model_power))
+		elseif state.llm_model == "" then
+				-- An explicitly persisted No Model must override the prediction
+				-- engine's backend default after reload, not merely hide the menu label.
+				if keymap and type(keymap.set_llm_model) == "function" then
+						pcall_log("keymap.set_llm_model(No Model)", keymap.set_llm_model, "")
+				end
+				if keymap and type(keymap.set_llm_display_model_name) == "function" then
+						pcall_log("keymap.set_llm_display_model_name(No Model)",
+							keymap.set_llm_display_model_name, "")
+				end
+				state.llm_model_power = nil
 		end
 
 		if state.llm_num_predictions ~= nil and keymap and type(keymap.set_llm_num_predictions) == "function" then
@@ -508,6 +530,7 @@ function M.create(deps)
 						local api_title, api_menu = ApiPanel.build({
 								state       = state,
 								paused      = paused,
+								keymap      = keymap,
 								update_menu = update_menu,
 								WarmupCtrl  = WarmupCtrl,
 						})
@@ -600,6 +623,7 @@ function M.create(deps)
 						model_submenu = ApiPanel.build_model_picker({
 								state       = state,
 								paused      = paused,
+								keymap      = keymap,
 								update_menu = update_menu,
 								WarmupCtrl  = WarmupCtrl,
 						})
@@ -608,6 +632,7 @@ function M.create(deps)
 								state         = state,
 								models_mgr    = models_mgr,
 								switch_model  = switch_model,
+								disable_model = disable_model,
 								save_prefs    = save_prefs,
 								update_menu   = update_menu,
 								DEFAULT_STATE = M.DEFAULT_STATE,

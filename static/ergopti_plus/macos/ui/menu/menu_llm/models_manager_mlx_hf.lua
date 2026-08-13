@@ -26,6 +26,7 @@ local notifications = require("infra.notifications")
 local ui_builder    = require("ui.ui_builder")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
@@ -257,7 +258,7 @@ except Exception as e:
 PY
 		]]
 
-		local task = hs.task.new("/bin/bash", function(code)
+		local task = TaskLifecycle.native("HuggingFace login", "/bin/bash", function(code)
 			if deps.active_tasks then deps.active_tasks["hf_login"] = nil end
 
 			if code == 0 then
@@ -277,7 +278,11 @@ PY
 
 		if task then
 			deps.active_tasks["hf_login"] = task
-			pcall(function() task:start() end)
+			if not TaskLifecycle.start(task, "HuggingFace login") then
+				deps.active_tasks["hf_login"] = nil
+				pcall(notifications.notify, i18n.get("mlx.hf_connection_failed"), nil, "error")
+				if type(on_done) == "function" then pcall(on_done, false) end
+			end
 		else
 			pcall(notifications.notify, i18n.get("mlx.hf_connection_failed"), nil, "error")
 			if type(on_done) == "function" then pcall(on_done, false) end

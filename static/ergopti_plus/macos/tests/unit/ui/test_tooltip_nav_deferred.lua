@@ -29,23 +29,27 @@ helpers.describe("tooltip_llm navigation is deferred off the eventtap thread", f
 		return src
 	end
 
-	helpers.it("Shift+Tab navigation uses the retained post-eventtap FIFO", function()
+	helpers.it("(tooltip-navigation-deferred) Shift+Tab navigation uses the retained post-eventtap FIFO", function()
 		local src = read_src()
-		local start = src:find('defer_runtime_action("LLM tooltip Shift-Tab navigation"', 1, true)
-		helpers.assert_not_nil(start, "Shift+Tab must enter the retained deferred-action API")
-		helpers.assert_true(src:sub(start, start + 300):find("M.navigate(direction)", 1, true) ~= nil,
-			"the deferred Shift+Tab closure must own navigation")
+		local label_at = src:find('"LLM tooltip Shift-Tab navigation"', 1, true)
+		helpers.assert_not_nil(label_at, "Shift+Tab must enter the retained deferred-action API")
+		local branch = src:sub(math.max(1, label_at - 100), label_at + 100)
+		helpers.assert_true(branch:find("defer_navigation(", 1, true) ~= nil
+			and branch:find("direction", 1, true) ~= nil,
+			"the Shift+Tab direction must be committed by the deferred renderer path")
 	end)
 
-	helpers.it("arrow navigation uses the retained post-eventtap FIFO", function()
+	helpers.it("(tooltip-navigation-deferred) arrow navigation uses the retained post-eventtap FIFO", function()
 		local src = read_src()
-		local start = src:find('defer_runtime_action("LLM tooltip arrow navigation"', 1, true)
-		helpers.assert_not_nil(start, "arrow navigation must enter the retained deferred-action API")
-		helpers.assert_true(src:sub(start, start + 300):find("M.navigate(nav_direction)", 1, true) ~= nil,
-			"the deferred arrow closure must own navigation")
+		local label_at = src:find('"LLM tooltip arrow navigation"', 1, true)
+		helpers.assert_not_nil(label_at, "arrow navigation must enter the retained deferred-action API")
+		local branch = src:sub(math.max(1, label_at - 100), label_at + 100)
+		helpers.assert_true(branch:find("defer_navigation(", 1, true) ~= nil
+			and branch:find("nav_direction", 1, true) ~= nil,
+			"the arrow direction must be committed by the deferred renderer path")
 	end)
 
-	helpers.it("every navigation call in the eventtap belongs to a deferred action", function()
+	helpers.it("(tooltip-navigation-deferred) every navigation call in the eventtap belongs to a deferred action", function()
 		local src = read_src()
 		-- Isolate the keyDown watcher body (from its creation to start_watchers' end).
 		local s = src:find("event_types.keyDown", 1, true)
@@ -53,15 +57,17 @@ helpers.describe("tooltip_llm navigation is deferred off the eventtap thread", f
 		local body = src:sub(s, s + 7000):gsub("%-%-[^\n]*", "")
 		local count, pos = 0, 1
 		while true do
-			local at = body:find("M.navigate(", pos, true)
+			local at = body:find("defer_navigation(", pos, true)
 			if not at then break end
 			count = count + 1
-			local prefix = body:sub(math.max(1, at - 300), at)
-			helpers.assert_true(prefix:find("defer_runtime_action", 1, true) ~= nil,
-				"navigation call " .. count .. " must remain inside a retained deferred action")
 			pos = at + 1
 		end
 		helpers.assert_eq(count, 2,
 			"the guard must enumerate both current navigation branches")
+		local helper_start = src:find("local function defer_navigation", 1, true)
+		local helper_body = helper_start and src:sub(helper_start, helper_start + 1000) or ""
+		helpers.assert_true(helper_body:find("defer_runtime_action(label", 1, true) ~= nil
+			and helper_body:find("return render_navigation()", 1, true) ~= nil,
+			"defer_navigation may commit O(1) state inline, but its AX/canvas render must use the retained FIFO")
 	end)
 end)

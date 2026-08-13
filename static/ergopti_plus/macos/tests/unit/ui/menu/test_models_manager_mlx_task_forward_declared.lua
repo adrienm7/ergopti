@@ -3,25 +3,22 @@
 --- ==============================================================================
 --- MODULE: Regression — models_manager_mlx_server closure-nil forward declarations
 --- DESCRIPTION:
---- start_server (extracted to models_manager_mlx_server.lua in the models-manager split) has
---- three hs.task sites whose callbacks reference the task handle itself (not a
---- hardcoded string key):
+--- start_server (extracted to models_manager_mlx_server.lua in the models-manager
+--- split) has three hs.task sites whose callbacks reference the task handle itself
+--- (not a hardcoded string key):
 ---
 ---   1. sweep    — pre-launch port sweep; callback clears _active_tasks[sweep]
 ---   2. probe_task — HTTP probe loop; callback clears _active_tasks[probe_task]
 ---   3. task (mlx-server bash kill) — callback compares
 ---      deps.active_tasks["mlx_server"] == task to guard the cleanup
 ---
---- All three used `local X = hs.task.new(...)`, which binds _G.X (nil) inside the
---- closure. For sweep/probe_task: _active_tasks[nil] = nil → "table index is
---- nil" (swallowed to HS Console). For the bash-kill task: the comparison would
---- always be `deps.active_tasks["mlx_server"] == nil`, unconditionally clearing the
---- active-task slot even when a different MLX process is running.
+--- An inline `local X = <constructor>(...)` form binds _G.X (nil) inside the
+--- callback closure. For sweep/probe_task: _active_tasks[nil] = nil → "table
+--- index is nil" (swallowed to HS Console). For the bash-kill task: the comparison
+--- would always be `deps.active_tasks["mlx_server"] == nil`, unconditionally
+--- clearing the active-task slot even when a different MLX process is running.
 ---
---- Other hs.task.new calls in this file (hf_login, tail, launcher_task, etc.) use
---- hardcoded string keys in their callbacks and are safe with the inline form.
----
---- Fix: forward-declare the three dangerous handles (split `local X; X = hs.task.new`).
+--- Fix: forward-declare each handle before TaskLifecycle.native constructs the task.
 --- This test pins the ROOT CAUSE for each dangerous site.
 --- ==============================================================================
 
@@ -31,14 +28,10 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 	-- The three dangerous hs.task sites live inside start_server, which moved to
 	-- the server-lifecycle sibling module during the models-manager split.
 	--
-	-- Selected by a literal unique to that module rather than by path, so moving
-	-- it cannot turn these invariants into a path error. The module declares no
-	-- function name unique to it, and the assertions below compare source
-	-- POSITIONS — so the anchor has to be one that resolves to exactly one file,
-	-- which was verified: "sweep = hs.task.new(" appears in no other production
-	-- Lua file.
+	-- Selected by a function declaration unique to that production module rather
+	-- than by path, so moving it cannot turn these invariants into a path error.
 	local function read_src()
-		local src = helpers.read_driver_source("sweep = hs.task.new(")
+		local src = helpers.read_driver_source("function obj.start_server")
 		helpers.assert_true(src ~= nil, "models_manager_mlx_server.lua source must be locatable")
 		return src
 	end
@@ -46,14 +39,15 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 
 	-- ===== Site 1: sweep =====
 
-	helpers.it("sweep handle is forward-declared before the hs.task.new closure", function()
+	helpers.it("sweep handle is forward-declared before the constructor closure", function()
 		local src = read_src()
 		local decl_pos = src:find("local sweep\n", 1, true)
-		local new_pos  = src:find("sweep = hs.task.new(", 1, true)
+		local new_pos  = src:find("sweep = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_pos ~= nil, "sweep must be forward-declared as `local sweep`")
-		helpers.assert_true(new_pos  ~= nil, "sweep must be assigned via `sweep = hs.task.new(`")
+		helpers.assert_true(new_pos  ~= nil,
+			"sweep must be assigned via `sweep = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must precede the hs.task.new closure so the callback captures the upvalue")
+			"forward declaration must precede the constructor closure so the callback captures the upvalue")
 	end)
 
 	helpers.it("sweep GC-pin release is guarded against nil sweep", function()
@@ -67,14 +61,15 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 
 	-- ===== Site 2: probe_task =====
 
-	helpers.it("probe_task handle is forward-declared before the hs.task.new closure", function()
+	helpers.it("probe_task handle is forward-declared before the constructor closure", function()
 		local src = read_src()
 		local decl_pos = src:find("local probe_task\n", 1, true)
-		local new_pos  = src:find("probe_task = hs.task.new(", 1, true)
+		local new_pos  = src:find("probe_task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_pos ~= nil, "probe_task must be forward-declared as `local probe_task`")
-		helpers.assert_true(new_pos  ~= nil, "probe_task must be assigned via `probe_task = hs.task.new(`")
+		helpers.assert_true(new_pos  ~= nil,
+			"probe_task must be assigned via `probe_task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must precede the hs.task.new closure")
+			"forward declaration must precede the constructor closure")
 	end)
 
 	helpers.it("probe_task GC-pin release is guarded against nil probe_task", function()

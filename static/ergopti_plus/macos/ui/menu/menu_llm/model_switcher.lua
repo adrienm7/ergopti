@@ -65,7 +65,7 @@ local PROFILE_POWER_LEVELS = {
 ---   keymap        table    Keymap module (optional).
 ---   save_prefs    function Persists state to disk.
 ---   update_menu   function Redraws the tray menu.
---- @return table Instance with fields: switch_model, set_llm_profile,
+--- @return table Instance with fields: switch_model, disable_model, set_llm_profile,
 ---   apply_recommended_prompt_profile, get_display_model_name, get_model_power_level.
 function M.new(ctx)
 	local state       = ctx.state
@@ -73,6 +73,8 @@ function M.new(ctx)
 	local keymap      = ctx.keymap
 	local save_prefs  = ctx.save_prefs
 	local update_menu = ctx.update_menu
+	local runtime_gate = type(ctx.runtime_gate) == "function"
+		and ctx.runtime_gate or function() return true end
 
 	-- Monotonically-increasing token so stale async callbacks from a previous
 	-- switch attempt are silently discarded when a new switch is initiated.
@@ -433,9 +435,17 @@ function M.new(ctx)
 		end
 
 		local function unlock_predictions()
-			if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
+			local gate_ok, runtime_available = xpcall(runtime_gate, debug.traceback)
+			if not gate_ok then
+				Logger.error(LOG, "MLX model switch runtime gate raised: %s", tostring(runtime_available))
+				runtime_available = false
+			end
+			if mlx_was_enabled and state.llm_enabled == true and runtime_available == true
+				and keymap and type(keymap.set_llm_enabled) == "function" then
 				Logger.debug(LOG, "MLX model switch: predictions unlocked.")
 				pcall(keymap.set_llm_enabled, true)
+			elseif mlx_was_enabled then
+				Logger.debug(LOG, "MLX model switch: unlock skipped because the live runtime gate is closed.")
 			end
 		end
 
@@ -485,8 +495,49 @@ function M.new(ctx)
 		end)
 	end
 
+	--- Commits the explicit "No Model" state to runtime and preferences.
+	--- This is a model-identity change, so it also invalidates any pending
+	--- requirements callback before clearing the prediction engine model.
+	--- @return boolean True only when runtime and persistence both commit.
+	local function disable_model()
+		req_token = req_token + 1
+		local previous_model = state.llm_model
+		local previous_power = state.llm_model_power
+		local previous_actual = models_mgr.get_actual_model_name(previous_model)
+
+		if not keymap or type(keymap.set_llm_model) ~= "function"
+			or type(keymap.set_llm_display_model_name) ~= "function" then
+			Logger.error(LOG, "Cannot select No Model: keymap model setters are unavailable.")
+			return false
+		end
+		local runtime_ok, runtime_err = xpcall(function()
+			keymap.set_llm_model("")
+			keymap.set_llm_display_model_name("")
+		end, debug.traceback)
+		if not runtime_ok then
+			Logger.error(LOG, "Cannot select No Model: runtime update raised: %s", tostring(runtime_err))
+			pcall(keymap.set_llm_model, previous_actual)
+			pcall(keymap.set_llm_display_model_name, previous_model)
+			return false
+		end
+
+		state.llm_model = ""
+		state.llm_model_power = nil
+		if save_prefs() ~= true then
+			state.llm_model = previous_model
+			state.llm_model_power = previous_power
+			pcall(keymap.set_llm_model, previous_actual)
+			pcall(keymap.set_llm_display_model_name, previous_model)
+			return false
+		end
+		Logger.info(LOG, "Model disabled; runtime and preferences now have no active model.")
+		update_menu()
+		return true
+	end
+
 	return {
 		switch_model                      = switch_model,
+		disable_model                     = disable_model,
 		set_llm_profile                   = set_llm_profile,
 		apply_recommended_prompt_profile  = apply_recommended_prompt_profile,
 		get_display_model_name            = get_display_model_name,
