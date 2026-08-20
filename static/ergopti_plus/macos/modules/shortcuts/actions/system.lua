@@ -32,20 +32,15 @@ local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local KeyState      = require("adapters.key_state")
-local ShellRunner   = require("adapters.shell_runner")
 local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 
 local LOG = "shortcuts.actions.system"
-
--- Absolute paths: the interactive layer must not inherit its binaries from PATH,
--- which differs between a login shell and the Hammerspoon process.
-local MKDIR_BIN         = "/bin/mkdir"
-local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
 
 -- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
@@ -744,22 +739,7 @@ local function capture_frontmost_window()
 		notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
 		return
 	end
-	local home = os.getenv("HOME") or "~"
-	local dir  = home .. "/Pictures/screenshots"
-	local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
-	-- mkdir then screencapture, chained through the completion callback: the
-	-- directory has to exist before the capture runs. Both are asynchronous.
-	ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function()
-		ShellRunner.spawn(SCREENCAPTURE_BIN, { "-l", tostring(id), filename }, function(exit_code)
-			if exit_code == 0 then
-				notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
-				return
-			end
-			Logger.warn(LOG, "screencapture -l exited with code %s — no file written.",
-				tostring(exit_code))
-			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-		end).start()
-	end).start()
+	return ScreenshotSave.save({ "-l", tostring(id) }, "screenshot")
 end
 
 --- Captures the frontmost window on the physical @/# key (key-code 10).

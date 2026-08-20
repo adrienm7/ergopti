@@ -59,7 +59,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-012` — transactional pause-owner registry
 - [x] `HS-013` — this fix commit; exact handles are reused and six focused edit/menu repros pass
 - [x] `HS-014` — present in starting `dev` via `c6d081890`; independently replayed bind lifecycle tests
-- [ ] `HS-015` — shared screenshot-save transaction
+- [x] `HS-015` — this fix commit; both entry-point families share one exact screenshot-save transaction and 15 focused repros pass
 - [x] `HS-016` — present in starting `dev` via `c6d081890`; independently replayed callback-observability tests
 - [x] `HS-017` — `ea924a686` (`fix(macos): order updater responses monotonically`)
 - [x] `HS-018` — this fix commit; local health generations now invalidate on every committed backend switch
@@ -341,22 +341,23 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Regression test.** Add `tests/unit/lib/test_vscode_bridge_bind_transaction.lua`. A native-faithful server returning self from `start()` and `0` from `getPort()` must yield `start_server()==false`, one ERROR, no success line, and no published live server. Port `7878` is the positive control. Add a native macOS integration case that pre-binds the port.
 
-### `HS-015` — Gesture screenshot-save actions omit directory and task-result handling
+### `HS-015` — Duplicated screenshot-save pipelines silently fail and reuse same-second targets
 
 - **Severity:** Medium
 - **Confidence:** High
 - **Guarantee:** `G2`
-- **Source:** `modules/gestures/actions.lua:573-618`; correct sibling `modules/shortcuts/actions/system.lua:747-762`
+- **Source before fix:** `modules/gestures/actions.lua:573-632` at `c6d081890`; `modules/shortcuts/actions/system.lua:747-762`
+- **Fixed source:** `modules/shortcuts/actions/screenshot_save.lua:135-178`; callers at `modules/gestures/actions.lua:599-612` and `modules/shortcuts/actions/system.lua:733-745`
 
-**Reproduction.** On a user account where `~/Pictures/screenshots` does not exist, bind and fire `screenshot_window_save`, `screenshot_region_save`, or `screenshot_fullscreen_save`. `screencapture` receives a target in a missing directory and exits non-zero. The gesture path has no mkdir, ignores `ShellRunner.spawn(...).start()`, has no completion callback, and produces neither file nor failure notice. Native task-start refusal is another silent no-op.
+**Reproduction.** The audited gesture implementation launched `screencapture` into `~/Pictures/screenshots` without first creating the directory and ignored native task refusal. Starting `dev` later contained a partial gesture-only repair from `c6d081890`, but the independently duplicated shortcut path still ignored mkdir exit plus both `ShellRunner` start results. Bind the physical instant-screenshot action, inject mkdir exit nonzero or task-start refusal, and no file is produced while the callback cannot reject the action. Separately, fire either same-mode save action twice within one wall-clock second: both old pipelines derive the same pathname and the later capture can overwrite the first.
 
-**Root cause and silence.** Gestures duplicated the screenshot pipeline but omitted the shortcut sibling’s asynchronous mkdir→capture transaction and all terminal-result handling.
+**Root cause and silence.** Two entry-point families owned separate asynchronous mkdir/capture pipelines with different subsets of the required checks. Neither had a collision-resistant target allocator. Task refusal is returned rather than thrown, so an ignored `start()` result is silent; repeated second-resolution names mutate the correct path twice without raising.
 
-**Existing test/backstop checked.** No test names the gesture screenshot IDs. `tests/unit/modules/shortcuts/test_actions_system.lua:783-818` explicitly proves the parent may not exist and asserts mkdir-before-capture, but covers only the sibling.
+**Existing test/backstop checked.** No pre-fix test names the gesture screenshot IDs. `tests/unit/modules/shortcuts/test_actions_system.lua:792-828` proves positive mkdir-before-capture order, but its task double always starts successfully and it does not deliver mkdir failure, capture refusal, or two saves in one second. It therefore does not contradict either current reproduction.
 
-**Fix.** Share one screenshot-save primitive and propagate mkdir start/exit and capture start/exit failures to file log and user notification.
+**Fix implemented.** `modules/shortcuts/actions/screenshot_save.lua` is now the single lifecycle owner. It allocates a PID/monotonic-tick/process-sequence target, requires exact construction and `start()==true` at both stages, starts capture only after mkdir exit `0`, and reports every terminal refusal to the file logger and user. All three gesture save IDs and the instant-window shortcut call this owner and propagate its immediate result.
 
-**Regression test.** Add `tests/unit/modules/gestures/test_screenshot_save_transaction.lua`. With temporary `HOME` and a missing directory, invoke the real gesture action. Assert first task is `/bin/mkdir -p`, no capture exists before mkdir success, then exactly one capture targets the path. For start false and nonzero exit at each stage, assert one ERROR/notification and no success.
+**Regression test.** `tests/unit/modules/gestures/test_screenshot_save_transaction.lua:148-277` behaviorally covers construction nil/throw, start nil/false/throw and nonzero exit at both stages; it asserts exact mkdir→capture order, one visible failure, no false success, distinct targets for two same-tick saves, and truthful gesture propagation. The existing shortcut test still drives the real shared owner and proves the window ID reaches `screencapture` only after mkdir commits. The focused `HS-015` replay passes `15/15`.
 
 ### `HS-016` — Bare callback `pcall`s turn consumed actions and cleanup chains into silent success
 
