@@ -32,9 +32,15 @@ let package = Package(
 		.package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
 	],
 	targets: [
+		.target(
+			name: "CPOSIXCompatibility",
+			path: "Sources/CPOSIXCompatibility",
+			publicHeadersPath: "include"
+		),
 		.executableTarget(
 			name: "ErgoptiPlus",
 			dependencies: [
+				"CPOSIXCompatibility",
 				.product(name: "Sparkle", package: "Sparkle")
 			],
 			path: "Sources/ErgoptiPlus",

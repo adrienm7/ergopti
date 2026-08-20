@@ -37,6 +37,10 @@ const PACKAGE = fs.readFileSync(
 	'utf8'
 );
 const SWIFT_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
+const POSIX_SHIM = fs.readFileSync(
+	path.join(SWIFT_ROOT, 'Sources', 'CPOSIXCompatibility', 'CPOSIXCompatibility.c'),
+	'utf8'
+);
 
 function readSwiftTree(directory) {
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -117,8 +121,14 @@ check(!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
 	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment');
 check(!/\bDarwin\.fork\s*\(/.test(SWIFT_SOURCES),
 	'Swift 6.3 marks `Darwin.fork()` unavailable; use the posix_spawn test helper');
-check(/@_silgen_name\("flock"\)[\s\S]*?func c_flock\s*\(/.test(SWIFT_SOURCES),
-	'the Swift launcher must retain its libc flock symbol binding');
+check(/ergopti_flock_compat\s*\(/.test(SWIFT_SOURCES),
+	'the Swift launcher must retain its C ABI flock compatibility shim');
+check(/return flock\s*\(descriptor, operation\)/.test(POSIX_SHIM),
+	'the C compatibility target must call the real BSD flock function');
+check(/"CPOSIXCompatibility"/.test(PACKAGE),
+	'Package.swift must link the explicit C POSIX compatibility target');
+check(/SWIFT_BACKTRACE:\s*enable=yes/.test(swiftJob),
+	'the Swift XCTest job must emit an actionable backtrace after a native crash');
 check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its owned posix_spawn environment builder');
 check(/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES),
