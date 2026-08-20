@@ -56,6 +56,7 @@ global CONFIG_SAVE_RESOLVE_DEFERRED := 2
 global CONFIG_FULL_SAVE_RETRY_DELAY_MS := -100
 global CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS := -1000
 global CONFIG_FULL_SAVE_BOOT_DELAY_MS := -500
+global CONFIG_OBSOLETE_SECTION_PREFIXES := ["ahk"]
 
 ; A one-shot timer is only a wake-up mechanism: Reload terminates it. Keep the
 ; actual full-save obligation in a generation counter so a terminal transition
@@ -1236,6 +1237,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		global ConfigurationFile
 		global CONFIG_SAVE_FAILED, CONFIG_SAVE_OK, CONFIG_SAVE_DEFERRED
 		global CONFIG_FULL_SAVE_RETRY_DELAY_MS, CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+		global CONFIG_OBSOLETE_SECTION_PREFIXES
 		; Guard: the driver must be fully initialised before writing config — prevents
 		; a partial config flush triggered by the -500 ms boot timer from clobbering the
 		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
@@ -1322,7 +1324,8 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				if HasMethod(WriterFn, "Call")
 					Written := WriterFn.Call(BoundPath, Updates)
 				else
-					Written := TOML_BatchWrite(BoundPath, Updates)
+					Written := TOML_BatchWrite(BoundPath, Updates,
+						CONFIG_OBSOLETE_SECTION_PREFIXES)
 				} catch as Err {
 						Written := false
 						try LoggerError("ConfigIO", "The full configuration {1} raised an error: {2}.",

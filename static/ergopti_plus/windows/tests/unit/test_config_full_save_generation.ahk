@@ -273,6 +273,38 @@ _CFGFS_WriterReceivesBatchAndStrictStatus() {
 Test("config full save: writer receives batch and status is strict (config-full-save-generation) (config-full-save-writer-contract)",
 	_CFGFS_WriterReceivesBatchAndStrictStatus)
 
+_CFGFS_DefaultWriterRemovesObsoleteDriverNamespace() {
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := A_Temp . "\ergopti_full_save_legacy_namespace_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	try {
+		FileAppend("[ahk.layout]`nergopti_base = false`n`n"
+			. "[layout]`nergopti_base = true`n`n"
+			. "[future_extension]`nkeep = 42`n", Path, "UTF-8-RAW")
+		_CFGFS_Prepare(Path)
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(
+			0, _CFGFS_Timer, true, 0, _CFGFS_Collect))
+		Data := ParseTomlFile(Path)
+		AssertFalse(Data.Has("ahk.layout"),
+			"a canonical full save must retire the obsolete [ahk.*] namespace")
+		AssertTrue(Data.Has("layout"),
+			"removing the legacy namespace must preserve canonical sections")
+		AssertTrue(Data.Has("future_extension"),
+			"cleanup must preserve unrelated forward-compatible sections")
+		AssertEqual(42, Data["future_extension"]["keep"])
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: canonical writer removes obsolete [ahk.*] sections "
+	. "(config-v2-legacy-namespace-cleanup)",
+	_CFGFS_DefaultWriterRemovesObsoleteDriverNamespace)
+
 _CFGFS_NewGenerationIsNotOverAcknowledged() {
 	global _CFGFS_RequestDuringWrite, _CFGFS_WriterCalls, _CFGFS_TimerCalls
 	global CONFIG_SAVE_OK
