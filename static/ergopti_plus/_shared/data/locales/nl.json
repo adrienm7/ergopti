@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "Opstartfout: het bestand _generated/features_manifest.ahk ontbreekt of is beschadigd.\n\nVoer `npm run build:manifest` uit vanuit de projectmap en start het script opnieuw.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ontbreekt",
+	"startup.native_logger_unavailable": "ErgoptiPlus kan niet starten omdat de systeemeigen logboekservice niet beschikbaar is. Start ErgoptiPlus via het startprogramma.",
 	"tap_hold.action.disable": "Native key",
 	"tap_hold.disable_all": "Alles uitschakelen",
 	"tap_hold.group.alt_gr": "AltGr",

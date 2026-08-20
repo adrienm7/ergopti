@@ -49,7 +49,7 @@ local function load_fixture()
 
 	local accept_calls = 0
 	local llm = setmetatable({
-		init = function() end,
+		init = function() return true end,
 		observe_action_epoch = function() end,
 		reset_for_action_epoch = function() return true end,
 		handle_llm_keys = function()

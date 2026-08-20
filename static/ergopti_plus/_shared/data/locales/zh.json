@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "启动错误：_generated/features_manifest.ahk 文件缺失或已损坏。\n\n从项目目录运行 `npm run build:manifest`，然后重新启动脚本。",
 	"startup.manifest_title": "ErgoptiPlus — manifest 缺失",
+	"startup.native_logger_unavailable": "ErgoptiPlus 无法启动，因为其原生日志服务不可用。请通过 ErgoptiPlus 启动器启动。",
 	"tap_hold.action.disable": "原生按键",
 	"tap_hold.disable_all": "全部禁用",
 	"tap_hold.group.alt_gr": "AltGr",

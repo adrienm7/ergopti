@@ -151,25 +151,36 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		os.remove(path)
 		local original_open = io.open
 		local writes = 0
+		local disk = nil
+		local reader_calls = 0
 		with_cleanup(function()
 			io.open = function(candidate, mode)
 				if candidate == path and mode == "r" then return nil, "missing", 2 end
 				return original_open(candidate, mode)
 			end
-			local editor = load_editor({
+			local editor, dispatch = load_editor({
 				create_if_absent = function(candidate)
 					writes = writes + 1
 					helpers.assert_eq(candidate, path, "the baseline must target the configured path")
+					disk = "[_meta]\nsections_order = []\n"
 					return true
 				end,
-			}, { parse = function() return { sections = {}, sections_order = {} }, true end }, {
+			}, { parse = function()
+				reader_calls = reader_calls + 1
+				return { sections = {}, sections_order = {} }, true
+			end }, {
 				read_with_status = function(candidate)
 					helpers.assert_eq(candidate, path)
-					return nil, "absent"
+					if disk == nil then return nil, "absent" end
+					return disk, "ok"
 				end,
 			})
 			editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+			editor.open("menu")
+			dispatch({ action = "ready" })
 			helpers.assert_eq(writes, 1, "exact absence must publish exactly one baseline")
+			helpers.assert_true(reader_calls > 0,
+				"the committed baseline must read back and unlock the real editor data path")
 		end, function()
 			io.open = original_open
 			os.remove(path)
@@ -251,23 +262,164 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 				helpers.assert_eq(candidate, path)
 				return "[_meta]\nsections_order = []\n", "ok"
 			end,
-			write = function(candidate, content)
+			write = function()
+				error("the editor must not downgrade an exact snapshot to an unconditional write", 0)
+			end,
+			write_if_unchanged = function(candidate, content, expected_source)
 				writes = writes + 1
 				helpers.assert_eq(candidate, path,
 					"the writer must keep the requested symlink pathname for adapter resolution")
 				helpers.assert_true(type(content) == "string" and content:find("%[_meta%]") ~= nil,
 					"the real TOML writer must pass its complete serialized payload")
+				helpers.assert_eq(expected_source, {
+					status = "ok",
+					content = "[_meta]\nsections_order = []\n",
+				}, "the exact editor snapshot must cross the filesystem boundary")
 				return true
 			end,
 		}
 		local editor, dispatch = load_editor(nil, {
 			parse = function() return { sections = {}, sections_order = {} }, true end,
 		}, file_system)
-		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.init(path, {
+			PERSONAL_GROUP_NAME = "personal",
+			reload_toml = function() return true end,
+		}, function() end, 50)
 		editor.open("menu")
 		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
 		helpers.assert_eq(writes, 1,
-			"a save through a readable symlink must publish through FileSystem.write exactly once")
+			"a save through a readable symlink must publish conditionally exactly once")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("preserves an external edit that wins while the editor is open", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local initial = "[_meta]\nsections_order = []\n"
+		local external = "[_meta]\nsections_order = []\n# external winner\n"
+		local disk = initial
+		local publications = 0
+		local file_system = {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return disk, "ok"
+			end,
+			-- Causal old-code seam: unconditional publication erases B.
+			write = function(_candidate, content)
+				publications = publications + 1
+				disk = external
+				disk = content
+				return true
+			end,
+			write_if_unchanged = function(_candidate, _content, expected_source)
+				publications = publications + 1
+				helpers.assert_eq(expected_source,
+					{ status = "ok", content = initial },
+					"the exact bytes used by the open editor must reach publication")
+				disk = external
+				return false, "source changed"
+			end,
+		}
+		local editor, dispatch, state = load_editor(nil, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, file_system)
+		local reloads = 0
+		local keymap = {
+			PERSONAL_GROUP_NAME = "personal",
+			disable_group = function() reloads = reloads + 1 end,
+			load_toml = function() reloads = reloads + 1 end,
+			enable_group = function() reloads = reloads + 1 end,
+		}
+		editor.init(path, keymap, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+
+		helpers.assert_eq(publications, 1)
+		helpers.assert_eq(disk, external,
+			"the external winner must survive byte-for-byte")
+		helpers.assert_eq(reloads, 0,
+			"a stale editor candidate must not replace the live hotstring group")
+		helpers.assert_true(state.notifications > 0,
+			"the rejected stale save must remain visible to the user")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("keeps the previous live group and reports a post-save reload refusal", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local initial = "[_meta]\nsections_order = []\n"
+		local reloads = 0
+		local menu_updates = 0
+		local editor, dispatch, state = load_editor({
+			write_if_unchanged = function(_candidate, _data, expected_source)
+				helpers.assert_eq(expected_source, { status = "ok", content = initial })
+				return true, nil, "[_meta]\nsections_order = []\n# saved\n"
+			end,
+		}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return initial, "ok"
+			end,
+		})
+		local keymap = {
+			PERSONAL_GROUP_NAME = "personal",
+			reload_toml = function(group, candidate)
+				reloads = reloads + 1
+				helpers.assert_eq(group, "personal")
+				helpers.assert_eq(candidate, path)
+				return false
+			end,
+			disable_group = function()
+				error("the editor must not own a half-transactional disable step", 0)
+			end,
+			load_toml = function()
+				error("the editor must use the atomic reload boundary", 0)
+			end,
+		}
+		editor.init(path, keymap, function() menu_updates = menu_updates + 1 end, 50)
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+
+		helpers.assert_eq(reloads, 1,
+			"a durable save must request exactly one atomic live-group replacement")
+		helpers.assert_true(state.notifications > 0,
+			"a refused live replacement must be visible instead of looking successful")
+		helpers.assert_eq(menu_updates, 0,
+			"the menu must not publish a new live state after registry rollback")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("logs a deferred menu-refresh callback failure after a committed save", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local initial = "[_meta]\nsections_order = []\n"
+		local editor, dispatch = load_editor({
+			write_if_unchanged = function()
+				return true, nil, "[_meta]\nsections_order = []\n# saved\n"
+			end,
+		}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, {
+			read_with_status = function() return initial, "ok" end,
+		})
+		editor.init(path, {
+			PERSONAL_GROUP_NAME = "personal",
+			reload_toml = function() return true end,
+		}, function()
+			error("injected deferred menu refresh failure", 0)
+		end, 50)
+		local Logger = require("infra.logger")
+		local lines = {}
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		local timers_before = #_G.hs.timer.__timers
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+		helpers.assert_eq(#_G.hs.timer.__timers, timers_before + 1)
+		_G.hs.timer.__timers[#_G.hs.timer.__timers]:fire()
+		Logger.set_sink(nil)
+
+		helpers.assert_contains(table.concat(lines, "\n"), "Deferred menu refresh failed",
+			"an async callback throw must reach the file-logger pipeline")
 		package.loaded["ui.hotstring_editor"] = nil
 	end)
 

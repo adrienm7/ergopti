@@ -42,6 +42,7 @@ let package = Package(
 				.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))
 			],
 			linkerSettings: [
+				.linkedFramework("Security"),
 				// dyld resolves @rpath by walking each entry in LC_RPATH; without
 				// this entry the loader cannot find Sparkle.framework at runtime
 				// because SPM does not inject this path automatically for dynamic

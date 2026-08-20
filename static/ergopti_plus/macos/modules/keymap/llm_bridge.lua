@@ -44,6 +44,7 @@ local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
+local _keymap_defaults = nil  -- Exact defaults owner paired with _state.
 -- A failed action-epoch reset must not let stale prediction state consume user
 -- input. This gate is intentionally bridge-wide: keymap, expander, tooltip and
 -- menu callbacks all enter the prediction engine through this module.
@@ -1662,32 +1663,40 @@ end
 --- Must be called exactly once before any other public function in this module.
 --- @param core_state table The shared state object from keymap/init.lua.
 --- @param keymap_defaults table The DEFAULT_STATE table from keymap/init.lua.
+--- @return boolean committed True only when the prediction engine is ready.
 function M.init(core_state, keymap_defaults)
 	Logger.start(LOG, "Initializing LLM bridge…")
 
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table (got %s) — bridge non-functional.", type(core_state))
-		return
+		return false
 	end
 	if type(keymap_defaults) ~= "table" then
 		Logger.error(LOG, "M.init(): keymap_defaults must be a table (got %s) — bridge non-functional.", type(keymap_defaults))
-		return
+		return false
 	end
 
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state and _keymap_defaults == keymap_defaults then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 
+	if engine.init(core_state) ~= true then
+		Logger.error(LOG, "M.init(): prediction-engine dependency initialization refused.")
+		return false
+	end
 	_state = core_state
+	_keymap_defaults = keymap_defaults
 	if type(engine.set_runtime_guard) == "function" then
 		engine.set_runtime_guard(M.is_runtime_available)
 	end
 	if type(tooltip.set_runtime_guard) == "function" then
 		tooltip.set_runtime_guard(M.is_runtime_available)
 	end
-	engine.init(core_state)
-
 	-- Seed preview toggles from the canonical keymap defaults.
 	-- The menu will override these values at startup via set_preview_*_enabled().
 	is_star_preview_enabled        = (keymap_defaults.preview_star_enabled        ~= false)
@@ -1695,6 +1704,7 @@ function M.init(core_state, keymap_defaults)
 
 	Logger.success(LOG, "LLM bridge initialized (buffer: '%s', %d mapping(s)).",
 		tostring(_state.buffer or ""), #(_state.mappings or {}))
+	return true
 end
 
 --- Stops the persistent Escape trap event tap and releases the reference.

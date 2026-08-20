@@ -9,28 +9,31 @@
 
 local helpers = require("tests.helpers")
 
-local function load_emergency()
+local function load_emergency(logger_error)
 	local noop = function() end
 	package.loaded["infra.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
-		error = noop, success = noop, done = noop, trace = noop,
+		error = logger_error or noop, success = noop, done = noop, trace = noop,
 	}
 	package.loaded["infra.emergency_exit"] = nil
 	return require("infra.emergency_exit")
 end
 
-local function harness(request_exit, schedule_result)
+local function harness(request_exit, schedule_result, timer_stop_result)
 	local calls = { exits = 0, timer_stops = 0 }
 	local deadline_callback = nil
 	local timer = {
 		stop = function()
 			calls.timer_stops = calls.timer_stops + 1
+			if timer_stop_result == "raises" then error("synthetic timer stop failure") end
+			if timer_stop_result == false then return false end
 			return true
 		end,
 	}
 	local options = {
 		reason = "launcher_loss",
 		deadline_seconds = 0.25,
+		exit_code = 70,
 		schedule = function(delay, callback)
 			calls.delay = delay
 			deadline_callback = callback
@@ -38,7 +41,10 @@ local function harness(request_exit, schedule_result)
 			if schedule_result == "synchronous" then callback() end
 			return timer
 		end,
-		request_exit = request_exit,
+		request_exit = function(reason, code, on_aborted)
+			calls.request_exit_code = code
+			return request_exit(reason, code, on_aborted)
+		end,
 		exit = function(code)
 			calls.exits = calls.exits + 1
 			calls.exit_code = code
@@ -54,9 +60,12 @@ helpers.describe("bounded emergency exit", function()
 
 		helpers.assert_true(emergency.request(options))
 		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.request_exit_code, 70,
+			"the exact-fence path must preserve the internal-failure status too")
 		deadline()()
 		helpers.assert_eq(calls.exits, 1)
-		helpers.assert_eq(calls.exit_code, 0)
+		helpers.assert_eq(calls.exit_code, 70,
+			"internal failure must remain distinguishable from a normal user exit")
 		helpers.assert_eq(calls.timer_stops, 1)
 	end)
 
@@ -109,5 +118,31 @@ helpers.describe("bounded emergency exit", function()
 			"the handle returned after an inline fire must be stopped immediately")
 		helpers.assert_eq(request_calls, 0,
 			"an already-expired deadline must not start asynchronous fence work")
+	end)
+
+	helpers.it("the raw deadline exits even when timer stop and logger diagnostics fail", function()
+		for _, stop_result in ipairs({ false, "raises" }) do
+			local logger_calls = 0
+			local emergency = load_emergency(function()
+				logger_calls = logger_calls + 1
+				error("synthetic logger failure")
+			end)
+			local options, calls, deadline = harness(
+				function() return true end,
+				nil,
+				stop_result
+			)
+
+			helpers.assert_true(emergency.request(options))
+			local callback_ok = pcall(deadline())
+			helpers.assert_true(callback_ok,
+				"hs.timer must not swallow a logger exception before the hard exit")
+			helpers.assert_eq(calls.timer_stops, 1)
+			helpers.assert_true(logger_calls >= 1,
+				"the causal fixture must execute the failing diagnostic path")
+			helpers.assert_eq(calls.exits, 1,
+				"the deadline must invoke EOF exit regardless of diagnostic failures")
+			helpers.assert_eq(calls.exit_code, 70)
+		end
 	end)
 end)

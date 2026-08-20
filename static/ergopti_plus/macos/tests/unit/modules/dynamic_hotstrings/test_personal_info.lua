@@ -89,6 +89,9 @@ helpers.describe("Personal info pause guard", function()
 	end)
 end)
 
+
+
+
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
@@ -111,6 +114,80 @@ helpers.describe("PersonalInfo getters", function()
 
 	helpers.it("get_info returns a table (possibly empty before init)", function()
 		helpers.assert_eq(type(PI.get_info()), "table")
+	end)
+end)
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 5/ Runtime saves never mutate retained defaults =============
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("PersonalInfo defaults remain immutable across restart", function()
+	helpers.it("does not resurrect saved personal data after the file is removed", function()
+		local path = "/virtual/personal-info-default-alias.toml"
+		local disk = nil
+		local file_system = require("adapters.file_system")
+		local original_read = file_system.read_with_status
+		local original_create = file_system.create_if_absent
+		local original_write = file_system.write_if_unchanged
+		local ok, err = xpcall(function()
+			file_system.read_with_status = function(candidate)
+				if candidate ~= path then return original_read(candidate) end
+				if disk == nil then return nil, "absent" end
+				return disk, "ok"
+			end
+			file_system.create_if_absent = function(candidate, content)
+				helpers.assert_eq(candidate, path)
+				if disk ~= nil then return false, "exists" end
+				disk = content
+				return true, "created"
+			end
+			file_system.write_if_unchanged = function(candidate, content, expected_source)
+				helpers.assert_eq(candidate, path)
+				local unchanged = type(expected_source) == "table"
+					and expected_source.status == (disk == nil and "absent" or "ok")
+					and (disk == nil or expected_source.content == disk)
+				if not unchanged then return false, "source changed" end
+				disk = content
+				return true
+			end
+
+			PI.stop()
+			helpers.assert_eq(PI.start("", nil, path), true)
+			local info_section = type(disk) == "string"
+				and disk:match("%[info%]\n(.-)\n%[letters%]")
+			helpers.assert_true(type(info_section) == "string",
+				"first launch must publish the canonical [info]/[letters] schema")
+			helpers.assert_true(info_section:find('first_name = "', 1, true) ~= nil,
+				"the [info] section must contain real personal-information fields")
+			helpers.assert_true(disk:find('p = "first_name"', 1, true) ~= nil,
+				"the [letters] section must contain real aliases")
+			helpers.assert_true(disk:find('table:', 1, true) == nil,
+				"nested runtime tables must never be stringified into the persisted schema")
+			helpers.assert_true(info_section:find('info = "', 1, true) == nil
+				and info_section:find('letters = "', 1, true) == nil,
+				"runtime wrapper keys are not canonical personal-info fields")
+			local original_default = PI.get_info().first_name
+			helpers.assert_true(original_default ~= "PRIVATE-DEFAULT-ALIAS-SENTINEL")
+			helpers.assert_eq(PI.save_info({
+				first_name = "PRIVATE-DEFAULT-ALIAS-SENTINEL",
+			}), true)
+			PI.stop()
+			disk = nil
+
+			helpers.assert_eq(PI.start("", nil, path), true)
+			helpers.assert_eq(PI.get_info().first_name, original_default,
+				"a new missing file must use immutable defaults, not prior-session PII")
+		end, debug.traceback)
+		PI.stop()
+		file_system.read_with_status = original_read
+		file_system.create_if_absent = original_create
+		file_system.write_if_unchanged = original_write
+		if not ok then error(err, 0) end
 	end)
 end)
 

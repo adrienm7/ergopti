@@ -331,7 +331,7 @@ local function load_categories()
 			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-	if read_status == "absent" then return {}, "absent" end
+	if read_status == "absent" then return {}, "absent", { status = "absent" } end
 	if read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
 			tostring(read_status))
@@ -343,17 +343,26 @@ local function load_categories()
 		Logger.error(LOG, "App categories contain invalid JSON; edit refused.")
 		return nil, "failed"
 	end
-	return data, "ok"
+	return data, "ok", { status = "ok", content = content }
 end
 
-local function save_categories(data)
+local function save_categories(data, source_snapshot)
+	if type(source_snapshot) ~= "table" then
+		Logger.error(LOG, "App categories save refused without an exact source snapshot.")
+		return false
+	end
 	local encode_ok, encoded = pcall(json.encode, data)
 	if not encode_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "App categories encode failed; changes were not saved.")
 		return false
 	end
 
-	local write_ok, committed = pcall(FileSystem.write, CATEGORIES_FILE, encoded)
+	local write_ok, committed = pcall(
+		FileSystem.write_if_unchanged,
+		CATEGORIES_FILE,
+		encoded,
+		source_snapshot
+	)
 	if not write_ok or committed ~= true then
 		Logger.error(LOG, "App-categories atomic publication did not commit; changes were not saved.")
 		return false
@@ -409,10 +418,10 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
-	local cats = load_categories()
+	local cats, _, source_snapshot = load_categories()
 	if not cats then return false end
 	cats[app_name] = { type = chosen_cat, score = score }
-	if not save_categories(cats) then return false end
+	if not save_categories(cats, source_snapshot) then return false end
 	if generation ~= nil then
 		push_categories_to_ui(generation, webview)
 	elseif M._wv then
@@ -462,14 +471,14 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 					c2.text, i18n.get("button.ok"), i18n.get("common.cancel"))
 				if not owner_is_current(generation, webview) then return end
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
-					local cats = load_categories()
+					local cats, _, source_snapshot = load_categories()
 					if not cats then return end
 					for _, entry in pairs(cats) do
 						if type(entry) == "table" and entry.type == c2.text then
 							entry.type = new_name
 						end
 					end
-					if save_categories(cats) then
+					if save_categories(cats, source_snapshot) then
 						if generation ~= nil then
 							push_categories_to_ui(generation, webview)
 						elseif M._wv then

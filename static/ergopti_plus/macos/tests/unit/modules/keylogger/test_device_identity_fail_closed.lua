@@ -66,6 +66,8 @@ local function run_unowned_case(failure)
 		export_init = 0,
 		rotation_init = 0,
 		timer_new = 0,
+		publication_path = nil,
+		concurrent_raw = nil,
 	}
 
 	package.loaded["modules.keylogger.sqlite_writer"] = {
@@ -249,14 +251,35 @@ local function run_publication_case(failure)
 	package.loaded["keylogger.metrics"] = {}
 	package.loaded["adapters.file_system"] = {
 		read_with_status = function(path)
-			helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
-				"the candidate device.json must cross the classified read boundary")
 			calls.classified_reads = calls.classified_reads + 1
+			if calls.classified_reads == 1 then
+				helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
+					"the enumerated device.json must cross the classified read boundary")
+			else
+				helpers.assert_eq(path, calls.publication_path,
+					"a concurrent winner must be read back from the exact create-only target")
+				return calls.concurrent_raw, "ok"
+			end
 			return nil, "absent"
 		end,
+		-- Causal old-code seam: the unconditional writer would overwrite any
+		-- identity that appeared after the absence scan.
 		write = function()
 			calls.publication_calls = calls.publication_calls + 1
-			return failure == nil
+			return failure ~= "write"
+		end,
+		create_if_absent = function(path, payload)
+			calls.publication_calls = calls.publication_calls + 1
+			calls.publication_path = path
+			if failure == "write" then return false, "error", "simulated create failure" end
+			if failure == "concurrent_match" or failure == "concurrent_mismatch" then
+				calls.concurrent_raw = payload
+				if failure == "concurrent_mismatch" then
+					calls.concurrent_raw = '{"device_id":"other-device","host_signature":"OTHER-HOST"}'
+				end
+				return false, "exists"
+			end
+			return true, "created"
 		end,
 	}
 
@@ -301,9 +324,10 @@ local function run_publication_case(failure)
 	local ok, failure_detail = xpcall(function()
 		local initialized = module.init(make_state())
 		module.log_shortcut("cmd+c", "Finder")
-		helpers.assert_eq(calls.classified_reads, 1,
-			"only the adapter's proven-absent status may authorize a new identity")
-		if failure then
+		local concurrent = failure == "concurrent_match" or failure == "concurrent_mismatch"
+		helpers.assert_eq(calls.classified_reads, concurrent and 2 or 1,
+			"only proven absence or an exact concurrent-winner read may authorize identity")
+		if failure == "write" or failure == "concurrent_mismatch" then
 			helpers.assert_eq(initialized, false,
 				"identity publication failure must make initialization fail closed")
 			helpers.assert_eq(calls.sqlite_init, 0,
@@ -380,11 +404,19 @@ end)
 -- =========================================
 
 helpers.describe("log_manager device identity publication", function()
-	helpers.it("atomic-write refusal exposes no generated identity", function()
+	helpers.it("create-only refusal exposes no generated identity", function()
 		run_publication_case("write")
 	end)
 
 	helpers.it("publishes once after a proven-absent candidate identity", function()
 		run_publication_case(nil)
+	end)
+
+	helpers.it("adopts a valid identity that wins the create-only target", function()
+		run_publication_case("concurrent_match")
+	end)
+
+	helpers.it("refuses an inconsistent identity that wins the create-only target", function()
+		run_publication_case("concurrent_mismatch")
 	end)
 end)

@@ -72,6 +72,8 @@ helpers.describe("init.lua shutdown uses exact Karabiner lease revocation", func
 		helpers.assert_true(region:find("teardown = teardown_all_resources", 1, true) ~= nil)
 		helpers.assert_true(region:find("reload = function", 1, true) ~= nil)
 		helpers.assert_true(region:find("exit = function", 1, true) ~= nil)
+		helpers.assert_true(region:find("reload_guard.clear_silent()", 1, true) ~= nil,
+			"terminal rollback must not log after the native sink finalizer")
 	end)
 
 	helpers.it("uses the terminal keylogger shutdown boundary after the exact fence", function()

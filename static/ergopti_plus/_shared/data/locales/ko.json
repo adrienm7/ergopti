@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "시작 오류: _generated/features_manifest.ahk 파일이 없거나 손상되었습니다.\n\n프로젝트 디렉터리에서 `npm run build:manifest`를 실행한 후 스크립트를 다시 시작하세요.",
 	"startup.manifest_title": "ErgoptiPlus — manifest 누락",
+	"startup.native_logger_unavailable": "네이티브 로깅 서비스를 사용할 수 없어 ErgoptiPlus를 시작할 수 없습니다. 전용 런처를 통해 ErgoptiPlus를 시작하세요.",
 	"tap_hold.action.disable": "기본 키",
 	"tap_hold.disable_all": "모두 비활성화",
 	"tap_hold.group.alt_gr": "AltGr",

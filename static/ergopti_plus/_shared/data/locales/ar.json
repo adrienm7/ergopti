@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_title": "ErgoptiPlus — ملف manifest مفقود",
+	"startup.native_logger_unavailable": "لا يمكن بدء ErgoptiPlus لأن خدمة التسجيل الأصلية غير متاحة. شغّل ErgoptiPlus عبر المشغّل الخاص به.",
 	"tap_hold.action.disable": "المفتاح الأصلي",
 	"tap_hold.disable_all": "تعطيل الكل",
 	"tap_hold.group.alt_gr": "AltGr",

@@ -52,7 +52,7 @@ end
 -- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
 -- @param confirmed_absences table|nil Optional paths absent from their listed parent.
 local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override,
-		lock_override, unlock_override)
+		lock_override, unlock_override, mkdir_override)
 	local staging_locks = {}
 	package.loaded["adapters.file_system"] = nil
 	package.loaded["infra.fs_dir"] = nil
@@ -106,7 +106,10 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 				return nil, attributes_err or "lstat failed"
 			end,
 			mkdir = function(path)
-				if path:sub(-#STAGING_LOCK_SUFFIX) ~= STAGING_LOCK_SUFFIX then return HOST_MKDIR(path) end
+				if path:sub(-#STAGING_LOCK_SUFFIX) ~= STAGING_LOCK_SUFFIX then
+					if type(mkdir_override) == "function" then return mkdir_override(path) end
+					return HOST_MKDIR(path)
+				end
 				if staging_locks[path] then return nil, "File exists" end
 				local created, create_err = HOST_MKDIR(path)
 				if created ~= true then return created, create_err end
@@ -373,6 +376,152 @@ helpers.describe("adapters.file_system: classified reads and create-only publica
 		local content = fh:read("*a"); fh:close()
 		helpers.assert_eq(content, "foreign winner", "the concurrent winner must never be overwritten")
 		os.remove(target)
+	end)
+
+	helpers.it("prepares multiple missing parent levels before classifying the final file absent", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_prepared_parent"
+		local first = root .. "/.config"
+		local second = first .. "/karabiner"
+		local destination = second .. "/karabiner.json"
+		local prepared, detail, content, status
+		local call_ok, call_err = xpcall(function()
+			os.remove(root)
+			assert(HOST_MKDIR(root))
+			local adapter = make_adapter()
+			prepared, detail = adapter.prepare_parent_for_create(destination)
+			content, status = adapter.read_with_status(destination)
+		end, debug.traceback)
+		HOST_RMDIR(second)
+		HOST_RMDIR(first)
+		HOST_RMDIR(root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(prepared, true, tostring(detail))
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "absent",
+			"only the final name may remain absent after parent preparation")
+	end)
+
+	helpers.it("fails closed when mkdir cannot create a missing parent", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_denied_parent"
+		local denied_parent = root .. "/karabiner"
+		local destination = denied_parent .. "/karabiner.json"
+		os.remove(root)
+		assert(HOST_MKDIR(root))
+		local adapter = make_adapter(nil, nil, nil, nil, nil, nil, function(path)
+			if path == denied_parent then return nil, "Permission denied" end
+			return HOST_MKDIR(path)
+		end)
+
+		local prepared, detail = adapter.prepare_parent_for_create(destination)
+
+		helpers.assert_eq(prepared, false)
+		helpers.assert_true(type(detail) == "string" and detail:find("Permission denied", 1, true) ~= nil,
+			"the exact mkdir refusal must remain visible")
+		helpers.assert_nil(HOST_ATTRIBUTES(denied_parent),
+			"a refused parent must not be reported or modelled as created")
+		HOST_RMDIR(root)
+	end)
+
+	helpers.it("accepts a concurrent directory winner after mkdir reports File exists", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_parent_winner"
+		local won_parent = root .. "/karabiner"
+		local destination = won_parent .. "/karabiner.json"
+		local mkdir_calls = 0
+		local prepared, detail, content, status
+		local call_ok, call_err = xpcall(function()
+			os.remove(root)
+			assert(HOST_MKDIR(root))
+			local adapter = make_adapter(nil, nil, nil, nil, nil, nil, function(path)
+				mkdir_calls = mkdir_calls + 1
+				if path == won_parent then
+					assert(HOST_MKDIR(path))
+					return nil, "File exists"
+				end
+				return HOST_MKDIR(path)
+			end)
+			prepared, detail = adapter.prepare_parent_for_create(destination)
+			content, status = adapter.read_with_status(destination)
+		end, debug.traceback)
+		HOST_RMDIR(won_parent)
+		HOST_RMDIR(root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(prepared, true, tostring(detail))
+		helpers.assert_eq(mkdir_calls, 1,
+			"the concurrent winner must be accepted without a second mkdir attempt")
+		helpers.assert_nil(content)
+		helpers.assert_eq(status, "absent",
+			"the winner authorizes only the final classified-absence read")
+	end)
+
+	helpers.it("rejects a concurrent non-directory winner after mkdir reports File exists", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_parent_file_winner"
+		local won_path = root .. "/karabiner"
+		local destination = won_path .. "/karabiner.json"
+		local prepared, detail
+		local call_ok, call_err = xpcall(function()
+			os.remove(root)
+			assert(HOST_MKDIR(root))
+			local adapter = make_adapter(nil, nil, nil, nil, nil, nil, function(path)
+				if path == won_path then
+					local winner = assert(io.open(path, "w"))
+					assert(winner:write("foreign winner")); assert(winner:close())
+					return nil, "File exists"
+				end
+				return HOST_MKDIR(path)
+			end)
+			prepared, detail = adapter.prepare_parent_for_create(destination)
+		end, debug.traceback)
+		os.remove(won_path)
+		HOST_RMDIR(root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(prepared, false)
+		helpers.assert_true(type(detail) == "string" and detail:find("not a directory", 1, true) ~= nil,
+			"a file or symlink winner must never authorize descendant creation")
+	end)
+
+	helpers.it("rejects a parent symlink retargeted during directory creation", function()
+		local request_root = os.tmpname():gsub("\\", "/") .. "_prepare_request"
+		local target_a = os.tmpname():gsub("\\", "/") .. "_prepare_target_a"
+		local target_b = os.tmpname():gsub("\\", "/") .. "_prepare_target_b"
+		local link_path = request_root .. "/karabiner-link"
+		local created_parent_a = target_a .. "/karabiner"
+		local untouched_parent_b = target_b .. "/karabiner"
+		local destination = link_path .. "/karabiner/karabiner.json"
+		local current_target = target_a
+		local prepared, detail
+		local call_ok, call_err = xpcall(function()
+			os.remove(request_root)
+			os.remove(target_a)
+			os.remove(target_b)
+			assert(HOST_MKDIR(request_root))
+			assert(HOST_MKDIR(target_a))
+			assert(HOST_MKDIR(target_b))
+			local adapter = make_adapter({
+				[link_path] = function()
+					return { mode = "link", target = current_target, dev = 7, ino = 11 }
+				end,
+			}, nil, nil, nil, nil, nil, function(path)
+				local created, create_err = HOST_MKDIR(path)
+				if path == created_parent_a and created == true then current_target = target_b end
+				return created, create_err
+			end)
+			prepared, detail = adapter.prepare_parent_for_create(destination)
+		end, debug.traceback)
+		HOST_RMDIR(created_parent_a)
+		HOST_RMDIR(untouched_parent_b)
+		HOST_RMDIR(target_a)
+		HOST_RMDIR(target_b)
+		HOST_RMDIR(request_root)
+		if not call_ok then error(call_err) end
+
+		helpers.assert_eq(prepared, false)
+		helpers.assert_true(type(detail) == "string" and detail:find("symlink target changed", 1, true) ~= nil,
+			"retargeting must invalidate the observed route")
+		helpers.assert_nil(HOST_ATTRIBUTES(untouched_parent_b),
+			"preparation must never follow the replacement target after the race")
 	end)
 end)
 

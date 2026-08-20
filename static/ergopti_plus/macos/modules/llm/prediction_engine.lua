@@ -188,6 +188,14 @@ local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
 
+--- Stable dependency identity for WarmupController. A retry after a later child
+--- refuses must present the same function object, not a fresh closure that the
+--- controller correctly treats as an ownership replacement attempt.
+--- @return boolean enabled
+local function get_runtime_llm_enabled()
+	return is_llm_enabled
+end
+
 
 
 
@@ -1310,25 +1318,43 @@ end
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @return boolean committed True only when every dependency is ready.
 function M.init(core_state)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s).", type(core_state))
-		return
+		return false
 	end
-	_state = core_state
+	if _state then
+		if _state == core_state then
+			Logger.warn(LOG, "M.init() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
+		return false
+	end
 
-	-- Initialize submodules with their required dependencies
-	WarmupController.init({
+	-- A parent may only publish this engine after every child reports an exact
+	-- commitment. Children treat a duplicate with the same retained binding as
+	-- success, so a retry can converge after a later child refused.
+	if WarmupController.init({
 		core_llm        = core_llm,
-		get_llm_enabled = function() return is_llm_enabled end,
-	})
-	StreamingHandler.init({
+		get_llm_enabled = get_runtime_llm_enabled,
+	}) ~= true then
+		Logger.error(LOG, "M.init(): warmup-controller dependency initialization refused.")
+		return false
+	end
+	if StreamingHandler.init({
 		core_llm  = core_llm,
 		tooltip   = tooltip,
 		keylogger = keylogger,
-	})
+	}) ~= true then
+		Logger.error(LOG, "M.init(): streaming-handler dependency initialization refused.")
+		return false
+	end
 
+	_state = core_state
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
+	return true
 end
 
 --- Public alias so the expander can re-arm the LLM timer after a text replacement.

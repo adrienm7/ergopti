@@ -97,7 +97,7 @@ local function run_scenario()
 	}
 	package.loaded["modules.llm.prediction_engine"] = {
 		set_runtime_guard = function() end,
-		init = function() end,
+		init = function() return true end,
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 	}

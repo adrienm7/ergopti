@@ -57,6 +57,7 @@ local _info            = {}
 local _letters         = {}
 local _base_dir        = ""
 local _info_toml_path  = ""
+local _source_snapshot = nil
 
 local _keymap    = nil
 local _active_start_token = nil
@@ -147,6 +148,28 @@ local DEFAULT_CONFIG = {
 		w = "work_email_address",
 	},
 }
+
+--- Copies one flat configuration map so runtime edits can never mutate the
+--- module-level defaults retained across stop/start cycles.
+--- @param source table
+--- @return table copy
+local function copy_config_map(source)
+	local copy = {}
+	for key, value in pairs(source or {}) do copy[key] = value end
+	return copy
+end
+
+--- Returns a fresh default configuration with no mutable table shared with
+--- DEFAULT_CONFIG. Personal data saved during one session must never become the
+--- fallback for a later missing or partially populated file.
+--- @return table config
+local function fresh_default_config()
+	return {
+		trigger_char = DEFAULT_CONFIG.trigger_char,
+		info = copy_config_map(DEFAULT_CONFIG.info),
+		letters = copy_config_map(DEFAULT_CONFIG.letters),
+	}
+end
 
 
 
@@ -293,13 +316,14 @@ end
 --- @param toml_path string Absolute path to personal_info.toml.
 --- @return table|nil config The loaded/default configuration, or nil on read failure.
 --- @return boolean was_missing True if the file did not exist on disk and defaults were used.
+--- @return table|nil source_snapshot Exact classified bytes used to build the config.
 local function load_config(toml_path)
 	Logger.debug(LOG, "Loading personal info from '%s'…", toml_path)
 	local content, read_status = FileSystem.read_with_status(toml_path)
 	if read_status ~= "ok" then
 		if read_status == "absent" then
 			Logger.info(LOG, "personal_info.toml not found — using default values.")
-			return DEFAULT_CONFIG, true
+			return fresh_default_config(), true, { status = "absent" }
 		end
 		Logger.error(LOG, "personal_info.toml could not be read; startup refused "
 			.. "(failure content withheld).")
@@ -328,7 +352,39 @@ local function load_config(toml_path)
 		trigger_char = DEFAULT_CONFIG.trigger_char,
 		info         = merged_info,
 		letters      = merged_letters,
-	}, false
+	}, false, { status = "ok", content = content }
+end
+
+--- Replaces a published table without invalidating references held by consumers.
+--- @param target table Published table.
+--- @param source table Validated replacement.
+local function replace_table_contents(target, source)
+	for key in pairs(target) do target[key] = nil end
+	for key, value in pairs(source) do target[key] = value end
+end
+
+--- Adopts a valid external winner only when it demonstrably differs from the
+--- snapshot that the rejected save attempted to replace. Ordinary I/O failures
+--- against unchanged bytes keep the current runtime state, preserving rollback.
+--- @param expected_source table Snapshot used by the rejected publication.
+local function adopt_changed_config(expected_source)
+	local config, was_missing, current_source = load_config(_info_toml_path)
+	if type(config) ~= "table" or was_missing or type(current_source) ~= "table"
+		or current_source.status ~= "ok"
+	then
+		return
+	end
+	if type(expected_source) == "table"
+		and expected_source.status == current_source.status
+		and expected_source.content == current_source.content
+	then
+		return
+	end
+	if type(config.info) ~= "table" or type(config.letters) ~= "table" then return end
+	replace_table_contents(_info, config.info)
+	replace_table_contents(_letters, config.letters)
+	_source_snapshot = current_source
+	Logger.warn(LOG, "Personal-info save rejected a stale candidate and adopted the external winner.")
 end
 
 --- Persists updated info fields through a preview-fenced atomic transaction.
@@ -349,14 +405,20 @@ function M.save_info(new_info)
 	local content = serialize_config(candidate)
 	if not invalidate_preview_before_save() then return false end
 
-	if FileSystem.write(_info_toml_path, content) ~= true then
+	if type(_source_snapshot) ~= "table" then
+		Logger.error(LOG, "Personal-info save refused because its source snapshot is unavailable.")
+		return false
+	end
+	local expected_source = _source_snapshot
+	if FileSystem.write_if_unchanged(_info_toml_path, content, expected_source) ~= true then
 		Logger.error(LOG, "Personal-info atomic publication did not commit.")
+		adopt_changed_config(expected_source)
 		return false
 	end
 
 	-- Preserve the shared table identity held by dependent engines
-	for key in pairs(_info) do _info[key] = nil end
-	for key, value in pairs(candidate) do _info[key] = value end
+	replace_table_contents(_info, candidate)
+	_source_snapshot = { status = "ok", content = content }
 
 	Logger.info(LOG, "Personal info configuration saved successfully.")
 	return true
@@ -812,7 +874,7 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		_info_toml_path = _base_dir .. "../hotstrings/personal_info.toml"
 	end
 
-	local config, was_missing = load_config(_info_toml_path)
+	local config, was_missing, source_snapshot = load_config(_info_toml_path)
 	if type(config) ~= "table" then
 		Logger.warn(LOG, "Module disabled because configuration is missing or invalid.")
 		return rollback_start(token, "configuration load")
@@ -820,6 +882,7 @@ function M.start(base_dir, keymap_module, info_toml_path)
 
 	_info    = type(config.info) == "table" and config.info or {}
 	_letters = type(config.letters) == "table" and config.letters or {}
+	_source_snapshot = source_snapshot
 
 	-- Source the trigger from the real, user-configurable magic key, exactly as
 	-- the sibling RulesEngine already does. personal_info.toml's trigger_char is
@@ -838,24 +901,26 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- re-creation on the next launch (mirrors the AHK side's behaviour).
 	if was_missing then
 		Logger.info(LOG, "Writing default personal_info.toml at '%s'…", _info_toml_path)
-		local candidate = {
-			trigger_char = config.trigger_char,
-			info = _info,
-			letters = _letters,
-		}
+		-- serialize_config receives the flat [info] map. Passing the surrounding
+		-- runtime configuration would stringify its nested tables and publish an
+		-- invalid first-launch schema (`info = "table: ..."`).
+		local serialized = serialize_config(_info)
 		local _, create_status = FileSystem.create_if_absent(
 			_info_toml_path,
-			serialize_config(candidate)
+			serialized
 		)
 		if create_status == "exists" then
-			local concurrent = load_config(_info_toml_path)
+			local concurrent, _, concurrent_snapshot = load_config(_info_toml_path)
 			if type(concurrent) ~= "table" then
 				return rollback_start(token, "concurrent default configuration load")
 			end
 			_info = concurrent.info
 			_letters = concurrent.letters
+			_source_snapshot = concurrent_snapshot
 		elseif create_status ~= "created" then
 			return rollback_start(token, "default configuration publication")
+		else
+			_source_snapshot = { status = "ok", content = serialized }
 		end
 	end
 

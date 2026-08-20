@@ -15,6 +15,8 @@
 //      Hammerspoon crash terminates Ergopti.
 //   3. Host Sparkle (SPUStandardUpdaterController) so the in-app updater can
 //      ship new releases over the configured appcast.
+//   4. Install a private inherited umask before Hammerspoon or a native helper
+//      can create configuration-bearing transaction sidecars.
 //
 // FEATURES & RATIONALE:
 //  - Foreground LSUIElement=NO so notification badges work; we hide the
@@ -51,6 +53,21 @@ let kErgoptiBundleId = "com.ergoptiplus.app"
 // MJConfigDir is a community myth — variables.m uses MJConfigFile exclusively.
 let kHammerspoonConfigKey = "MJConfigFile"
 
+// The embedded Hammerspoon process and every native helper inherit this mask.
+// Its staging directories and sidecars can contain complete configuration bytes,
+// so group/other permissions must be removed before any child or worker starts
+let kPrivateProcessUmask: mode_t = 0o077
+
+/// Installs the process-wide private creation mask before any child is spawned.
+/// - Parameter setter: Injectable Darwin boundary used by the launcher tests.
+/// - Returns: The process mask that was active before the installation.
+@discardableResult
+func installPrivateProcessUmask(
+	setter: (mode_t) -> mode_t = { Darwin.umask($0) }
+) -> mode_t {
+	return setter(kPrivateProcessUmask)
+}
+
 /// Stable user-writable bootstrap file used by the bundled Lua resolver.
 /// The Lua source itself lives inside signed application resources, so deriving
 /// paths.toml from MJConfigFile would make every first-run write target the app
@@ -67,17 +84,25 @@ func managedPathsFile(homeDirectory: String = NSHomeDirectory()) -> String {
 ///   - base: Environment inherited by the Swift launcher.
 ///   - launcherPid: Current Swift launcher process identifier.
 ///   - launcherBundleId: Current launcher bundle identifier when observable.
+///   - loggerEndpoint: Pre-bound native logger authority for this exact child.
 /// - Returns: Environment safe to assign to the embedded Hammerspoon child.
 func launcherChildEnvironment(
 	base: [String: String],
 	launcherPid: Int32,
-	launcherBundleId: String?
+	launcherBundleId: String?,
+	loggerEndpoint: LoggerDatagramEndpoint? = nil
 ) -> [String: String] {
 	var environment = base
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
+	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)
+	environment.removeValue(forKey: kLoggerDatagramTokenEnvironment)
 	if let launcherBundleId, !launcherBundleId.isEmpty {
 		environment["ERGOPTI_LAUNCHER_BUNDLE_ID"] = launcherBundleId
+	}
+	if let loggerEndpoint {
+		environment[kLoggerDatagramPortEnvironment] = String(loggerEndpoint.port)
+		environment[kLoggerDatagramTokenEnvironment] = loggerEndpoint.token
 	}
 	return environment
 }
@@ -319,11 +344,14 @@ enum LauncherLog {
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsProcess: Process?
+	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let processRunner: (Process) throws -> Void
 	private let fatalReporter: ((String) -> Void)?
+	private let applicationTerminator: (Any?) -> Void
 	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
+	private let loggerWorkerFactory: () -> LoggerDatagramServing?
 	private let guardianRegistrationQueue = DispatchQueue(
 		label: "com.ergoptiplus.remap-guardian.registration",
 		qos: .userInitiated
@@ -335,19 +363,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - launcherIdentityReader: Captures the running launcher's exact file identity.
 	///   - processRunner: Performs the sole embedded-Hammerspoon child start.
 	///   - fatalReporter: Test-only observer replacing the modal fatal UI.
+	///   - applicationTerminator: Ends AppKit after a clean child shutdown.
 	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
+	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
 		processRunner: @escaping (Process) throws -> Void = { try $0.run() },
 		fatalReporter: ((String) -> Void)? = nil,
+		applicationTerminator: @escaping (Any?) -> Void = { NSApp.terminate($0) },
 		guardianRegistrar: @escaping (String) -> RemapGuardianRegistrationStatus =
-			remapGuardianRegistrationStatus
+			remapGuardianRegistrationStatus,
+		loggerWorkerFactory: @escaping () -> LoggerDatagramServing? = {
+			LoggerDatagramWorker()
+		}
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.processRunner = processRunner
 		self.fatalReporter = fatalReporter
+		self.applicationTerminator = applicationTerminator
 		self.guardianRegistrar = guardianRegistrar
+		self.loggerWorkerFactory = loggerWorkerFactory
 		super.init()
 	}
 
@@ -434,6 +470,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		if let proc = hsProcess, proc.isRunning {
 			proc.terminate()
 		}
+		// The DispatchSource cancel handler is asynchronous. Explicitly relinquish
+		// the logger socket while AppKit is still alive instead of assuming process
+		// teardown will eventually run the worker's deinitializer.
+		loggerWorker?.stop()
+		loggerWorker = nil
 	}
 
 
@@ -532,6 +573,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			fail("Running launcher executable identity is unavailable.")
 			return
 		}
+		guard let activeLoggerWorker = loggerWorker ?? loggerWorkerFactory() else {
+			fail("Native Hammerspoon logger transport could not be started.")
+			return
+		}
+		loggerWorker = activeLoggerWorker
 
 		let proc = Process()
 		proc.executableURL = URL(fileURLWithPath: binaryPath)
@@ -541,7 +587,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		var env = launcherChildEnvironment(
 			base: ProcessInfo.processInfo.environment,
 			launcherPid: ProcessInfo.processInfo.processIdentifier,
-			launcherBundleId: Bundle.main.bundleIdentifier
+			launcherBundleId: Bundle.main.bundleIdentifier,
+			loggerEndpoint: activeLoggerWorker.endpoint
 		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
@@ -557,14 +604,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		proc.environment = env
 
 		proc.terminationHandler = { [weak self] terminated in
-			// When Hammerspoon exits (crash or clean quit), the launcher quits
-			// too so the user is never left with an orphaned process.
 			let code = terminated.terminationStatus
 			NSLog("[Ergopti] embedded Hammerspoon exited with code \(code)")
 			LauncherLog.write("embedded Hammerspoon exited with code \(code)")
-			DispatchQueue.main.async {
-				NSApp.terminate(self)
-			}
+			DispatchQueue.main.async { self?.handleEmbeddedHammerspoonExit(status: code) }
 		}
 
 		do {
@@ -572,8 +615,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			hsProcess = proc
 			LauncherLog.write("embedded Hammerspoon launched at \(binaryPath)")
 		} catch {
+			loggerWorker?.stop()
+			loggerWorker = nil
 			fail("Failed to launch embedded Hammerspoon: \(error.localizedDescription)")
 		}
+	}
+
+	/// Surfaces an unexpected child death while the independent guardian enforces
+	/// remap revocation. Clean exits retain the visually-fused app lifecycle.
+	func handleEmbeddedHammerspoonExit(status: Int32) {
+		if status != 0 && !applicationIsTerminating {
+			fail(
+				"Embedded Hammerspoon stopped unexpectedly (status \(status)). "
+					+ "ErgoptiPlus remap revocation is being enforced by the independent guardian."
+			)
+			return
+		}
+		applicationTerminator(self)
 	}
 
 
@@ -629,6 +687,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // The launcher binary also serves every headless native lease role.
 // Branch before touching NSApplication, CFPreferences or Sparkle so a helper
 // spawned by Hammerspoon owns no GUI/application lifecycle.
+installPrivateProcessUmask()
+
+if KeychainTokenWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(KeychainTokenWorker.run(arguments: CommandLine.arguments))
+}
+
 if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KarabinerLeaseWorker.run(arguments: CommandLine.arguments))
 }

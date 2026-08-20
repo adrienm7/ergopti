@@ -78,8 +78,9 @@ helpers.describe("api_remote entry identity generation", function()
 	end)
 
 	helpers.it("(remote-identity-generation) discards an old inference callback after the active entry changes", function()
-		local post_and_parse = get_upvalue(ApiRemote.fetch_batch, "post_and_parse")
-		local infer_client = get_upvalue(post_and_parse, "_infer_client")
+		local infer_client = get_upvalue(ApiRemote.cancel_streaming, "_infer_client")
+		helpers.assert_true(infer_client ~= nil,
+			"cancel_streaming and request dispatch must share the owned inference client")
 		local original_post = infer_client.post
 		local callback
 		infer_client.post = function(_, _, _, on_done) callback = on_done end

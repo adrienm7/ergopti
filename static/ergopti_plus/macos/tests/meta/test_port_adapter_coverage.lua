@@ -288,7 +288,7 @@ local LUA_IO_OS_BASELINE_UI = 54
 
 -- macos/init.lua — the entry point. One file, but the one file every launch
 -- runs. First measured 2026-07-31 at 46 hs.* and 2 io.open/os.execute lines.
-local LUA_HS_BASELINE_ENTRY    = 28
+local LUA_HS_BASELINE_ENTRY    = 29  -- +1: fatal native-logger preflight refusal captures hs.alert once for a protected, bounded visible error before os.exit; this runs before adapters/menu/input exist and prevents an invisible inert child.
 local LUA_IO_OS_BASELINE_ENTRY = 1
 
 helpers.describe("meta: _shared/ code purity", function()

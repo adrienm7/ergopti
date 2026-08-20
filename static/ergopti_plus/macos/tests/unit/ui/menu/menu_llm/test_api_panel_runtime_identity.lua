@@ -43,7 +43,10 @@ helpers.describe("API panel runtime identity transaction", function()
 		}
 		package.loaded["modules.llm"] = {
 			api_remote = api_remote,
-			persist_api_entries = function() events[#events + 1] = "persist" end,
+			persist_api_entries = function(callback)
+				events[#events + 1] = "persist"
+				callback(true, nil, true)
+			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = {

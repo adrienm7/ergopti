@@ -1,22 +1,14 @@
 --- tests/unit/llm/test_token_and_install_quoting.lua
 
 --- ==============================================================================
---- MODULE: Regression — the last un-migrated quoting sites, and a failure
----         sentinel that destroyed the stored token
+--- MODULE: Regression — token references remain immutable and shell quoting
 ---         (token-and-install-quoting)
 --- DESCRIPTION:
 --- Two findings that both turn a transient failure into a permanent one.
 ---
----   M8  A DENIED KEYCHAIN DESTROYED THE TOKEN. get_active_entry lazily
----       decrypts the stored reference and caches the result on the live entry.
----       TokenCrypto.decrypt reports failure by returning "" — indistinguishable
----       from a legitimately empty value once cached — and a locked or
----       permission-denied Keychain produces exactly that. The empty string
----       replaced the encrypted REFERENCE in memory, and the next
----       persist_api_entries wrote it back to disk. The user's API token was
----       then gone, not merely unavailable: the reference that could have been
----       retried had been overwritten. The async prewarm path cached the same
----       sentinel the same way.
+---   M8  A DENIED KEYCHAIN DESTROYED THE TOKEN. Cleartext was cached by
+---       replacing the persisted reference on the live entry. The resolver now
+---       keeps cleartext in a private cache and metadata entries stay immutable.
 ---
 ---   M3  THE PRIVILEGED INSTALL WAS NOT QUOTED. The shell-quoting campaign
 ---       routed 41 sites through text_utils.shell_quote, but install_system
@@ -39,62 +31,18 @@ local helpers = require("tests.helpers")
 -- =========================================================================
 -- =========================================================================
 
-helpers.describe("api_remote: a failed Keychain decrypt is not cached", function()
-	helpers.it("keeps the encrypted reference when decrypt returns the empty sentinel", function()
-		local src = helpers.read_driver_source("get_active_entry")
+helpers.describe("api_remote: persisted token references are immutable", function()
+	helpers.it("keeps cleartext in a private cache rather than the entry table", function()
+		local src = helpers.read_driver_source("function M.resolve_active_entry")
 		helpers.assert_true(src ~= nil and src ~= "",
-			"api_remote must be locatable by its get_active_entry symbol")
-
-		-- Anchored on the decrypt CALL rather than the function header:
-		-- read_driver_source concatenates every file naming the symbol, so the
-		-- header may resolve into a file that merely references it.
-		local at = src:find("TokenCrypto.decrypt(entry.token)", 1, true)
-		helpers.assert_true(at ~= nil, "the lazy decrypt call must exist")
-		-- Comments stripped: the fix's own explanation names the sentinel.
-		local body = src:sub(at, at + 1400):gsub("%-%-[^\n]*", "")
-
-		-- The specific variable, not a bare ~= "" anywhere in the window: the
-		-- function contains other emptiness checks, and the loose form passed
-		-- against the unfixed source.
-		helpers.assert_true(
-			body:find('cleartext ~= ""', 1, true) ~= nil,
-			"the lazy decrypt must cache only a NON-EMPTY result. \"\" is TokenCrypto.decrypt's "
-				.. "failure sentinel, and caching it replaces the encrypted reference in the live "
-				.. "entry — which the next persist_api_entries then writes to disk, destroying a "
-				.. "token that was merely unavailable"
-		)
-	end)
-
-	helpers.it("the async prewarm applies the same guard", function()
-		local src = helpers.read_driver_source("decrypt_async")
-		helpers.assert_true(src ~= nil and src ~= "",
-			"the prewarm path must be locatable")
-
-		-- Anchored on the CALL SITE, not the name: read_driver_source concatenates
-		-- every file containing the symbol, and decrypt_async is defined in
-		-- api_token_crypto — so the first match is the definition, whose body has
-		-- no cache-back to guard.
-		local at = src:find("TokenCrypto.decrypt_async(entry.token", 1, true)
-		helpers.assert_true(at ~= nil, "the async prewarm call site must exist")
-		local body = src:sub(at, at + 900):gsub("%-%-[^\n]*", "")
-
-		helpers.assert_true(
-			body:find('cleartext ~= ""', 1, true) ~= nil,
-			"the prewarm caches back on the same field through the same sentinel, so it needs the "
-				.. "identical non-empty guard. Fixing only the lazy path leaves the destructive "
-				.. "write reachable from the timer that runs on every boot"
-		)
-	end)
-
-	helpers.it("the sentinel really is the empty string", function()
-		-- The guard above is only meaningful because decrypt reports failure this
-		-- way. Assert it from the source of truth rather than from memory.
-		local src = helpers.read_driver_source("is_encrypted")
-		helpers.assert_true(src ~= nil and src ~= "",
-			"the token crypto module must be locatable")
-		helpers.assert_true(src:find('return ""', 1, true) ~= nil,
-			"TokenCrypto must still report a failed decrypt by returning the empty string — if "
-				.. "that ever changes to nil, the non-empty guards above must change with it")
+			"api_remote must be locatable by its resolver")
+		local uncommented = src:gsub("%-%-[^\n]*", "")
+		helpers.assert_true(uncommented:find("local _token_cache", 1, true) ~= nil,
+			"resolved cleartext must live outside persisted entry objects")
+		helpers.assert_true(uncommented:find("entry%.token%s*=%s*[^=]") == nil,
+			"no resolver or prewarm path may replace an entry's Keychain reference")
+		helpers.assert_true(uncommented:find("TokenCrypto.decrypt(", 1, true) == nil,
+			"the removed synchronous failure-sentinel path must stay absent")
 	end)
 end)
 

@@ -141,10 +141,12 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 	helpers.it("retains complete controlled teardown without running it in native shutdown", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
 		local teardown = at(code, "local function teardown_all_resources")
+		local finalizer = at(code, "local function finalize_teardown_resources")
 		local shutdown = at(code, "local function shutdown_all_resources()")
 		local armed = at(code, "hs.shutdownCallback = shutdown_all_resources")
-		helpers.assert_true(teardown ~= nil and shutdown ~= nil and armed ~= nil)
-		local teardown_body = code:sub(teardown, shutdown - 1)
+		helpers.assert_true(teardown ~= nil and finalizer ~= nil and shutdown ~= nil and armed ~= nil)
+		local teardown_body = code:sub(teardown, finalizer - 1)
+		local finalizer_body = code:sub(finalizer, shutdown - 1)
 		local shutdown_body = code:sub(shutdown, armed - 1)
 
 		-- Moving the assignment must not have moved a truncated copy of it: the
@@ -160,12 +162,19 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		end
 		helpers.assert_true(
 			teardown_body:match(
-				"TeardownTransaction%.run_with_finalizer%s*%(%s*_local_teardown_state%s*,%s*steps%s*,%s*timer_finalizer") ~= nil,
-			"throws and explicit false results must remain visible and retryable per teardown step, "
-				.. "and the process-wide timer drain must remain dependent on their success"
+				"TeardownTransaction%.run%s*%(%s*_local_teardown_state%s*,%s*steps%s*%)") ~= nil,
+			"throws and explicit false results must remain visible and retryable per local teardown step"
 		)
-		helpers.assert_true(teardown_body:find("TimerScheduler.cancelAll", 1, true) ~= nil,
-			"the dependent finalizer must still drain the scheduler after every owner settles")
+		local cancel_at = at(finalizer_body, "TimerScheduler.cancelAll")
+		local logger_stop_at = at(finalizer_body, "Logger.stop_async_sink")
+		local terminal_at = at(finalizer_body, "_controlled_terminal_finalized = true")
+		helpers.assert_true(cancel_at ~= nil and logger_stop_at ~= nil and terminal_at ~= nil
+			and cancel_at < logger_stop_at and logger_stop_at < terminal_at,
+			"the post-drain finalizer must release timers then logger before publishing terminal state")
+		helpers.assert_true(code:find("teardown = teardown_all_resources", 1, true) ~= nil
+			and code:find("begin_drain = Logger.begin_async_sink_shutdown", 1, true) ~= nil
+			and code:find("finalize_teardown = finalize_teardown_resources", 1, true) ~= nil,
+			"the coordinator must preserve local teardown -> native drain -> finalizer ordering")
 		helpers.assert_true(teardown_body:find("_local_teardown_complete", 1, true) == nil,
 			"teardown must never certify itself before resource release has run")
 		helpers.assert_true(shutdown_body:find("request_exact_lease_revoke", 1, true) ~= nil,

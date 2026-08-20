@@ -407,6 +407,23 @@ end
 -- ==================================
 -- ==================================
 
+-- Exact source bytes are retained per destination because the menu edits a
+-- full-document model long after boot. A last-moment check inside the adapter
+-- cannot detect an external edit that landed before save() was called.
+local _source_snapshots = {}
+
+--- Classifies one preference source without interpreting its contents.
+--- @param prefs_file string Destination path.
+--- @return table|nil snapshot Exact `ok`/`absent` source classification.
+local function classify_source(prefs_file)
+	local content, read_status = FileSystem.read_with_status(prefs_file)
+	if read_status == "ok" and type(content) == "string" then
+		return { status = "ok", content = content }
+	end
+	if read_status == "absent" then return { status = "absent" } end
+	return nil
+end
+
 --- Load preferences from the TOML configuration file and normalise
 --- it to the flat dict the rest of the codebase expects.
 --- @param prefs_file string Path to <config_dir>/hammerspoon/config.toml.
@@ -431,7 +448,11 @@ end
 function M.load(prefs_file)
 	local content, read_status = FileSystem.read_with_status(prefs_file)
 	if read_status ~= "ok" then
-		if read_status == "absent" then return {}, "absent" end
+		if read_status == "absent" then
+			_source_snapshots[prefs_file] = { status = "absent" }
+			return {}, "absent"
+		end
+		_source_snapshots[prefs_file] = nil
 		Logger.error(LOG, "config.toml could not be read; treating it as corrupt "
 			.. "(failure content withheld).")
 		return {}, "corrupt"
@@ -439,6 +460,7 @@ function M.load(prefs_file)
 
 	local dec_ok, tbl = pcall(TomlCodec.decode, content)
 	if not dec_ok or type(tbl) ~= "table" then
+		_source_snapshots[prefs_file] = nil
 		-- Loud, and never silently overwritten. The user's settings are still on
 		-- disk and are recoverable by hand; treating this as "fresh install" is
 		-- what destroys them.
@@ -449,6 +471,7 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
+	_source_snapshots[prefs_file] = { status = "ok", content = content }
 	return flatten_from_disk(tbl), "ok"
 end
 
@@ -543,6 +566,16 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		return false
 	end
 	local existing = M.snapshot(state, hotfiles, core_mods)
+	local expected_source = _source_snapshots[prefs_file]
+	if type(expected_source) ~= "table" then
+		expected_source = classify_source(prefs_file)
+		if type(expected_source) ~= "table" then
+			Logger.error(LOG, "Cannot classify '%s' before saving preferences.",
+				tostring(prefs_file))
+			return false
+		end
+		_source_snapshots[prefs_file] = expected_source
+	end
 
 	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
 	if not ok or type(encoded) ~= "string" then
@@ -552,12 +585,18 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		return false
 	end
 
-	local write_ok, written = pcall(FileSystem.write, prefs_file, encoded)
+	local write_ok, written = pcall(
+		FileSystem.write_if_unchanged,
+		prefs_file,
+		encoded,
+		expected_source
+	)
 	if not write_ok or written ~= true then
 		Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
 			tostring(prefs_file))
 		return false
 	end
+	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
 	return true, existing
 end
 

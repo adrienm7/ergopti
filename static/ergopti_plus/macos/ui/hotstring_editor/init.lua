@@ -63,6 +63,7 @@ local _hotkey          = nil
 local _is_focused      = false
 local _pending_mode    = "menu"
 local _file_ready      = false
+local _source_snapshot = nil
 -- Personal source-default priority, read from _shared/modules/hotstrings/priority.json by
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
@@ -128,9 +129,17 @@ end
 local function ensure_file()
 	if type(_toml_path) ~= "string" or _toml_path == "" then return false end
 
-	local _, read_status = FileSystem.read_with_status(_toml_path)
-	if read_status == "ok" then return true end
+	local read_ok, content, read_status = pcall(FileSystem.read_with_status, _toml_path)
+	if not read_ok then
+		_source_snapshot = nil
+		return false
+	end
+	if read_status == "ok" and type(content) == "string" then
+		_source_snapshot = { status = "ok", content = content }
+		return true
+	end
 	if read_status ~= "absent" then
+		_source_snapshot = nil
 		Logger.error(LOG, "Personal hotstrings file could not be read; editor remains read-only "
 			.. "(failure content withheld).")
 		return false
@@ -138,9 +147,20 @@ local function ensure_file()
 
 	local write_ok, written = pcall(toml_writer.create_if_absent, _toml_path, empty_toml_data())
 	if not write_ok or written ~= true then
+		_source_snapshot = nil
 		Logger.error(LOG, "Personal hotstrings baseline publication did not commit.")
 		return false
 	end
+	local verify_ok, committed_content, committed_status = pcall(
+		FileSystem.read_with_status,
+		_toml_path
+	)
+	if not verify_ok or committed_status ~= "ok" or type(committed_content) ~= "string" then
+		_source_snapshot = nil
+		Logger.error(LOG, "Personal hotstrings baseline could not be read back exactly.")
+		return false
+	end
+	_source_snapshot = { status = "ok", content = committed_content }
 	return true
 end
 
@@ -184,9 +204,24 @@ local function load_js_data(open_mode)
 	if _file_ready and type(_toml_path) == "string" then
 		local ok, parsed, parse_status = pcall(toml_reader.parse, _toml_path)
 		if ok and type(parsed) == "table" and parse_status == true then
-			raw = parsed
+			local verify_ok, current, current_status = pcall(
+				FileSystem.read_with_status,
+				_toml_path
+			)
+			local source_unchanged = verify_ok and current_status == "ok"
+				and type(_source_snapshot) == "table"
+				and _source_snapshot.status == "ok"
+				and current == _source_snapshot.content
+			if source_unchanged then
+				raw = parsed
+			else
+				_file_ready = false
+				_source_snapshot = nil
+				Logger.error(LOG, "Personal hotstrings changed while the editor snapshot was loading.")
+			end
 		else
 			_file_ready = false
+			_source_snapshot = nil
 			Logger.error(LOG, "Personal hotstrings parse failed; editor remains read-only "
 				.. "(failure content withheld).")
 		end
@@ -330,26 +365,52 @@ local function handle_message(msg)
 			return
 		end
 		
+		if type(_source_snapshot) ~= "table" then
+			Logger.error(LOG, "Personal hotstrings save refused without an exact source snapshot.")
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
+			return
+		end
 		local toml_data = js_to_toml(data)
-		local ok_write, err = pcall(toml_writer.write, _toml_path, toml_data)
+		local ok_write, written, write_err, committed_content = pcall(
+			toml_writer.write_if_unchanged,
+			_toml_path,
+			toml_data,
+			_source_snapshot
+		)
 		
-		if ok_write and err == true then
-			if type(_keymap) == "table" and type(_keymap.load_toml) == "function" then
-				pcall(function()
-					-- Same group the boot loader used, so this REPLACES the boot copy
-					-- instead of racing it. It also keeps the group's priority, its
-					-- per-group expansion delay and any user override applying to the
-					-- reloaded rows, all of which are keyed by group name.
-					local group = M.get_reload_group_name()
-					_keymap.disable_group(group)
-					_keymap.load_toml(group, _toml_path)
-					_keymap.enable_group(group)
-					if type(_keymap.sort_mappings) == "function" then _keymap.sort_mappings() end
-				end)
+		if ok_write and written == true and type(committed_content) == "string" then
+			_source_snapshot = { status = "ok", content = committed_content }
+			local reload_ok, reloaded = xpcall(function()
+				if type(_keymap) ~= "table" or type(_keymap.reload_toml) ~= "function" then
+					return false
+				end
+				-- The registry owns disable + load as one transaction. If parsing or
+				-- indexing fails, the exact old mappings remain live instead of leaving
+				-- the personal group half-disabled.
+				return _keymap.reload_toml(M.get_reload_group_name(), _toml_path)
+			end, debug.traceback)
+			if not reload_ok or reloaded ~= true then
+				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back.")
+				pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
+				return
 			end
-			if type(_update_menu) == "function" then hs.timer.doAfter(0, function() pcall(_update_menu) end) end
+			if type(_update_menu) == "function" then
+				local scheduled, timer_or_err = xpcall(function()
+					return hs.timer.doAfter(0, function()
+						local updated, update_err = xpcall(_update_menu, debug.traceback)
+						if not updated then
+							Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
+						end
+					end)
+				end, debug.traceback)
+				if not scheduled or timer_or_err == nil or timer_or_err == false then
+					Logger.error(LOG, "Deferred menu refresh could not be scheduled: %s.",
+						tostring(timer_or_err))
+				end
+			end
 		else
-			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), tostring(err), "error")
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"),
+				tostring(ok_write and write_err or written), "error")
 		end
 		return
 	end

@@ -26,7 +26,7 @@ local function fresh_runtime(effects)
 		check_modifiers = function() return false end,
 	}
 	package.loaded["modules.llm.prediction_engine"] = {
-		init = function() end,
+		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,
 		reset = function()

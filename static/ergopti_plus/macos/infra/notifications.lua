@@ -76,46 +76,89 @@ local TYPE_PREFIX = {
 	info    = "ℹ️",
 }
 
+--- Runs one notification-click focus step without letting an async native
+--- callback escape only to the Hammerspoon console.
+--- @param label string Stable non-private operation label.
+--- @param operation function Native focus operation.
+local function run_click_step(label, operation)
+	local ok, result_or_err = xpcall(operation, debug.traceback)
+	if not ok or result_or_err == false then
+		Logger.warn(LOG, "Notification click %s failed: %s.",
+			label, tostring(result_or_err))
+		return false
+	end
+	return true
+end
+
 --- Sends a system notification with the Ergopti+ branding.
 --- An optional `kind` parameter ("success", "error", "warning", "info") prepends
 --- the matching emoji to the title so notifications are scannable at a glance.
 --- @param title_or_msg string Main title when body is provided, or message when body is omitted.
 --- @param body string|nil Optional detail body.
 --- @param kind string|nil Optional type: "success" | "error" | "warning" | "info".
+--- @return boolean dispatched True only when the native notification accepted send().
+--- @return string|nil error_message Exact native refusal detail.
 function M.notify(title_or_msg, body, kind)
-    if title_or_msg == nil then return end
-    local title_text = "Ergopti+"
-    local info_text = tostring(title_or_msg)
+	if title_or_msg == nil then return false, "notification title is required" end
+	local title_text = "Ergopti+"
+	local info_text = tostring(title_or_msg)
 
-    if body ~= nil then
-        title_text = tostring(title_or_msg)
-        info_text = tostring(body)
-    end
+	if body ~= nil then
+		title_text = tostring(title_or_msg)
+		info_text = tostring(body)
+	end
 
-    local prefix = kind and TYPE_PREFIX[kind]
-    if prefix then
-        title_text = prefix .. " " .. title_text
-    end
+	local prefix = kind and TYPE_PREFIX[kind]
+	if prefix then title_text = prefix .. " " .. title_text end
 
-    -- Ensure the notification process never crashes the script
-    pcall(function()
-        local n = hs.notify.new(function()
-            pcall(hs.focus)
-            pcall(function()
-                local app = hs.application.get("Hammerspoon")
-                if app then app:activate(true) end
-            end)
-        end, {
-            title           = title_text,
-            informativeText = info_text,
-            contentImage    = _get_logo(),
-        })
-        if n and type(n.send) == "function" then
-            n:send()
-        end
-    end)
+	local created, notification_or_err = xpcall(function()
+		return hs.notify.new(function()
+			if type(hs.focus) == "function" then
+				run_click_step("global focus", hs.focus)
+			end
+			if hs.application and type(hs.application.get) == "function" then
+				run_click_step("application activation", function()
+					local app = hs.application.get("com.ergoptiplus.app")
+						or hs.application.get("Hammerspoon")
+					if app and type(app.activate) == "function" then
+						return app:activate(true)
+					end
+					return true
+				end)
+			end
+		end, {
+			title           = title_text,
+			informativeText = info_text,
+			contentImage    = _get_logo(),
+		})
+	end, debug.traceback)
+	if not created or notification_or_err == nil or notification_or_err == false then
+		local detail = "Notification construction failed: " .. tostring(notification_or_err)
+		-- ERROR would request another notification and recurse through this exact
+		-- failing boundary. The caller escalates false through the runtime fail-safe;
+		-- this WARNING preserves a direct-call diagnostic without creating a loop.
+		Logger.warn(LOG, "%s.", detail)
+		return false, detail
+	end
 
-	Logger.info(LOG, "Notification dispatched (%s): %s — %s.", tostring(kind or "default"), title_text, info_text)
+	local notification = notification_or_err
+	if type(notification.send) ~= "function" then
+		local detail = "Notification object has no send capability"
+		Logger.warn(LOG, "%s.", detail)
+		return false, detail
+	end
+	local sent, sent_or_err = xpcall(function()
+		return notification:send()
+	end, debug.traceback)
+	if not sent or sent_or_err == nil or sent_or_err == false then
+		local detail = "Notification send failed: " .. tostring(sent_or_err)
+		Logger.warn(LOG, "%s.", detail)
+		return false, detail
+	end
+
+	Logger.info(LOG, "Notification dispatched (%s): %s — %s.",
+		tostring(kind or "default"), title_text, info_text)
+	return true
 end
 
 --- Prints styled debug information to the Hammerspoon console if DEBUG is enabled.
@@ -132,9 +175,12 @@ function M.debugLog(...)
 	
 	local msg = table.concat(parts, " ")
 	
-	pcall(function()
-		hs.console.printStyledtext("[Ergopti+] " .. os.date("%H:%M:%S") .. " " .. msg)
-	end)
+	local ok, err = xpcall(function()
+		return hs.console.printStyledtext("[Ergopti+] " .. os.date("%H:%M:%S") .. " " .. msg)
+	end, debug.traceback)
+	if not ok then
+		Logger.warn(LOG, "Styled debug console output failed: %s.", tostring(err))
+	end
 end
 
 return M

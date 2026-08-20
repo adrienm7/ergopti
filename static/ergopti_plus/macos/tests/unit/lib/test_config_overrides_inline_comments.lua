@@ -177,6 +177,24 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		end)
 	end)
 
+	helpers.it("never executes table-looking text inside a multiline string", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		with_tmp([==[[llm]
+app_profile_overrides = """
+[features]
+llm.enabled = false
+"""
+]==], function(path)
+			local applied = Overrides.apply(path)
+			helpers.assert_eq(applied, 0,
+				"only the owned [script]/[features] tables may publish settings")
+			helpers.assert_nil(stored["llm.enabled"],
+				"a header and assignment inside a string are inert user data")
+		end)
+	end)
+
 end)
 
 

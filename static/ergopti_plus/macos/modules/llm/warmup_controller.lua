@@ -269,27 +269,33 @@ end
 --- Initializes the warmup controller with its required dependencies.
 --- Must be called exactly once before schedule_warmup_with_retry.
 --- @param deps table Must contain: core_llm (table), get_llm_enabled (function).
+--- @return boolean committed True only when every dependency is ready.
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
 	if type(deps) ~= "table" then
 		Logger.error(LOG, "M.init(): deps must be a table — module non-functional.")
-		return
+		return false
 	end
 	if _core_llm then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _core_llm == deps.core_llm and _get_llm_enabled == deps.get_llm_enabled then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 	if type(deps.core_llm) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.core_llm must be a table — module non-functional.")
-		return
+		return false
 	end
 	if type(deps.get_llm_enabled) ~= "function" then
 		Logger.error(LOG, "M.init(): deps.get_llm_enabled must be a function — module non-functional.")
-		return
+		return false
 	end
 	_core_llm        = deps.core_llm
 	_get_llm_enabled = deps.get_llm_enabled
 	Logger.success(LOG, "Initialized.")
+	return true
 end
 
 return M

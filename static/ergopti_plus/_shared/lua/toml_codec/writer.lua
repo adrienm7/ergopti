@@ -215,12 +215,16 @@ local function publish_content(path, content, file_adapter, expected_source)
 					.. tostring(current_detail or current_status)
 			end
 		end
-		local call_ok, written, write_detail = pcall(
-			file_adapter.write,
-			path,
-			content,
-			expected_source
-		)
+		-- A classified source precondition is useful only if it crosses the same
+		-- serialization boundary as publication. macOS exposes that stronger
+		-- optional capability because its ordinary FileSystem.write contract is
+		-- deliberately two-argument; passing a third Lua argument to write() merely
+		-- discards it and leaves a race between this precheck and lock acquisition.
+		local publisher = type(expected_source) == "table"
+			and type(file_adapter.write_if_unchanged) == "function"
+			and file_adapter.write_if_unchanged
+			or file_adapter.write
+		local call_ok, written, write_detail = pcall(publisher, path, content, expected_source)
 		if call_ok and written == true then return true end
 		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
 	end
@@ -262,8 +266,9 @@ end
 --- Writes a TOML file from a hotstrings data structure.
 --- @param path string Destination file path.
 --- @param data table  The configuration dictionary.
---- @return boolean, string|nil True on success, or false and error string.
-function M.write(path, data, file_adapter, create_only)
+--- @param expected_source table|nil Optional exact source precondition.
+--- @return boolean, string|nil, string|nil Commit, error, and committed payload.
+function M.write(path, data, file_adapter, create_only, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Invalid path provided for TOML write.")
 		return false, "Invalid path provided."
@@ -357,6 +362,7 @@ function M.write(path, data, file_adapter, create_only)
 
 	local payload = table.concat(L, "\n")
 	local published, publish_err
+	local committed_payload = nil
 	if create_only == true and type(file_adapter) == "table"
 			and type(file_adapter.create_if_absent) == "function" then
 		local call_ok, created, create_status, create_detail = pcall(
@@ -366,8 +372,10 @@ function M.write(path, data, file_adapter, create_only)
 		)
 		published = call_ok and (created == true or create_status == "exists")
 		publish_err = create_detail or create_status
+		if call_ok and created == true then committed_payload = payload end
 	else
-		published, publish_err = publish_content(path, payload, file_adapter)
+		published, publish_err = publish_content(path, payload, file_adapter, expected_source)
+		if published then committed_payload = payload end
 	end
 	if not published then
 		Logger.error(LOG, "Failed to publish TOML file: %s.", tostring(publish_err))
@@ -375,7 +383,7 @@ function M.write(path, data, file_adapter, create_only)
 	end
 
 	Logger.info(LOG, "TOML configuration saved successfully.")
-	return true
+	return true, nil, committed_payload
 end
 
 

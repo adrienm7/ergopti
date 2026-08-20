@@ -74,7 +74,7 @@ function M.run(options)
 	local reset_count = 0
 	local arm_chain_count = 0
 	local engine = {
-		init = noop,
+		init = function() return true end,
 		set_runtime_guard = noop,
 		consume = function(index)
 			if index ~= 1 then return nil, nil end
@@ -133,13 +133,13 @@ function M.run(options)
 	}
 	package.loaded["adapters.tooltip_renderer"] = { hide = noop }
 	package.loaded["modules.keymap.registry"] = {
-		init = noop,
+		init = function() return true end,
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {}
 	package.loaded["modules.keymap.terminator_replay"] = {
-		init = noop,
+		init = function() return true end,
 		flush_now = noop,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
@@ -173,7 +173,7 @@ function M.run(options)
 	local expander
 	if options.expander_failure then
 		expander = {
-			init = noop,
+			init = function() return true end,
 			perform_text_replacement = function() return false end,
 		}
 		package.loaded["modules.keymap.expander"] = expander

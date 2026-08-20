@@ -1081,24 +1081,43 @@ end
 --- @param core_state table The shared CoreState object.
 --- @param registry_mod table The registry module.
 --- @param llm_mod table The LLM bridge module.
+--- @return boolean committed True only when every dependency is ready.
 function M.init(core_state, registry_mod, llm_mod)
-	if type(core_state)  ~= "table" then Logger.error(LOG, "M.init(): core_state must be a table."); return end
-	if type(registry_mod) ~= "table" then Logger.error(LOG, "M.init(): registry_mod must be a table."); return end
-	if type(llm_mod)     ~= "table" then Logger.error(LOG, "M.init(): llm_mod must be a table."); return end
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table.")
+		return false
+	end
+	if type(registry_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): registry_mod must be a table.")
+		return false
+	end
+	if type(llm_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): llm_mod must be a table.")
+		return false
+	end
 
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state and _registry == registry_mod and _llm == llm_mod then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 
 	Logger.start(LOG, "Initializing expander…")
+	-- The replay gate reads the same synthetic-echo counters the expander writes,
+	-- so it is handed the identical state object before this module publishes any
+	-- of its own dependencies.
+	if TerminatorReplay.init(core_state) ~= true then
+		Logger.error(LOG, "M.init(): terminator replay dependency initialization refused.")
+		return false
+	end
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
-	-- The replay gate reads the same synthetic-echo counters the expander writes,
-	-- so it is handed the identical state object rather than a copy.
-	TerminatorReplay.init(core_state)
 	Logger.success(LOG, "Expander initialized.")
+	return true
 end
 
 return M

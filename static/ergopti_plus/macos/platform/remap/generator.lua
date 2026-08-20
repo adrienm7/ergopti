@@ -2209,7 +2209,7 @@ end
 --- @param legacy_context table|nil Fourth return value from build_karabiner_json.
 --- @return table|nil config Merged configuration ready to be JSON-encoded.
 --- @return string|nil error_message Validation or read failure.
---- @return string|nil expected_raw Exact source bytes, or nil for observed absence.
+--- @return table|nil source_snapshot Exact classified source used for the merge.
 function M.merge_into_existing_config(
 	hs_config,
 	karabiner_out,
@@ -2248,30 +2248,24 @@ function M.merge_into_existing_config(
 		return nil, legacy_err
 	end
 
-	local read_ok, raw = pcall(FileSystem.read, karabiner_out)
+	local read_ok, raw, read_status, read_detail = pcall(
+		FileSystem.read_with_status,
+		karabiner_out
+	)
 	if not read_ok then
 		local err = "existing karabiner.json read raised: " .. tostring(raw)
 		Logger.error(LOG, "Merge aborted: %s.", err)
 		return nil, err
 	end
-	if raw == nil then
-		local exists = false
-		if type(FileSystem.exists) == "function" then
-			local exists_ok, exists_result = pcall(FileSystem.exists, karabiner_out)
-			if not exists_ok then
-				local err = "existing karabiner.json existence check raised: " .. tostring(exists_result)
-				Logger.error(LOG, "Merge aborted: %s.", err)
-				return nil, err
-			end
-			exists = exists_result == true
-		end
-		if exists then
-			local err = "existing karabiner.json exists but could not be read"
-			Logger.error(LOG, "Merge aborted: %s.", err)
-			return nil, err
-		end
+	if read_status == "absent" then
 		Logger.debug(LOG, "No existing karabiner.json — using generated managed config unchanged.")
-		return hs_config, nil, nil
+		return hs_config, nil, { status = "absent" }
+	end
+	if read_status ~= "ok" or type(raw) ~= "string" then
+		local err = "existing karabiner.json could not be read: "
+			.. tostring(read_detail or read_status or "invalid read result")
+		Logger.error(LOG, "Merge aborted: %s.", err)
+		return nil, err
 	end
 
 	local decode_ok, existing = pcall(hs.json.decode, raw)
@@ -2376,15 +2370,13 @@ function M.merge_into_existing_config(
 		#legacy_fingerprints,
 		target_index_or_err
 	)
-	return existing, nil, raw
+	return existing, nil, { status = "ok", content = raw }
 end
 
 --- Re-reads, merges, encodes, and publishes the current Karabiner config.
---- The live file is read immediately before the merge, and FileSystem.write owns
---- the repository's proven atomic replacement semantics. Stock and personal
---- Karabiner processes are never restarted or signalled by this operation.
---- A non-cooperating external writer can still replace the pathname after this
---- function returns; do not claim cross-process compare-and-swap guarantees.
+--- The exact bytes read for the merge remain the publication precondition, so a
+--- stock Karabiner or editor write that lands after the read is never overwritten.
+--- Stock and personal Karabiner processes are never restarted or signalled.
 --- @param hs_config table Valid generated managed configuration.
 --- @param karabiner_out string Absolute path to the live karabiner.json.
 --- @param legacy_fingerprints table|nil Non-owning legacy fingerprints.
@@ -2398,7 +2390,21 @@ function M.merge_and_deploy_config(
 	legacy_fingerprints,
 	legacy_context
 )
-	local merge_ok, merged, merge_err = pcall(
+	local prepare_parent = FileSystem.prepare_parent_for_create
+	if type(prepare_parent) ~= "function" then
+		local detail = "parent preparation failed: filesystem capability is unavailable"
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+	local prepare_ok, prepared, prepare_detail = pcall(prepare_parent, karabiner_out)
+	if not prepare_ok or prepared ~= true then
+		local detail = "parent preparation failed: "
+			.. tostring(prepare_ok and prepare_detail or prepared)
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+
+	local merge_ok, merged, merge_err, source_snapshot = pcall(
 		M.merge_into_existing_config,
 		hs_config,
 		karabiner_out,
@@ -2410,6 +2416,13 @@ function M.merge_and_deploy_config(
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
 	end
+	if type(source_snapshot) ~= "table"
+		or (source_snapshot.status ~= "ok" and source_snapshot.status ~= "absent")
+		or (source_snapshot.status == "ok" and type(source_snapshot.content) ~= "string") then
+		local detail = "merge failed: exact source snapshot is missing"
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
 
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
 	if not encode_ok or type(content) ~= "string" then
@@ -2418,7 +2431,12 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
-	local call_ok, deployed, deploy_detail = pcall(M.deploy_string, content, karabiner_out)
+	local call_ok, deployed, deploy_detail = pcall(
+		M.deploy_string,
+		content,
+		karabiner_out,
+		source_snapshot
+	)
 	if not call_ok or deployed ~= true then
 		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
@@ -2441,16 +2459,37 @@ end
 --- Two strategies: direct write (S1), then mkdir + retry (S2).
 --- @param content string The string content to write.
 --- @param dst string Absolute destination path.
+--- @param expected_source table|nil Exact source snapshot for derived content;
+---        nil only when `content` is independent of the destination's old bytes.
 --- @return boolean, string ok, detail.
-function M.deploy_string(content, dst)
+function M.deploy_string(content, dst, expected_source)
 	Logger.trace(LOG, "Deploy: writing %d byte(s) → '%s'…", #content, dst)
 
 	local parent = dst:match("^(.*)/[^/]+$")
+	local conditional = type(expected_source) == "table"
+	local writer = conditional and FileSystem.write_if_unchanged or FileSystem.write
+	if type(writer) ~= "function" then
+		local detail = conditional
+			and "conditional filesystem writer is unavailable"
+			or "filesystem writer is unavailable"
+		Logger.error(LOG, "Deploy aborted — %s.", detail)
+		return false, detail
+	end
+	local function publish_once()
+		if conditional then return writer(dst, content, expected_source) end
+		return writer(dst, content)
+	end
 
 	-- S1: direct write via port FileSystem — works for regular paths and symlinks
-	if FileSystem.write(dst, content) then
+	local written, write_detail = publish_once()
+	if written == true then
 		Logger.done(LOG, "Deploy S1 (direct write) succeeded: '%s'.", dst)
 		return true, "ok"
+	end
+	if conditional then
+		local detail = tostring(write_detail or "source changed before publication")
+		Logger.error(LOG, "Deploy aborted — conditional publication refused for '%s': %s.", dst, detail)
+		return false, detail
 	end
 	Logger.debug(LOG, "Deploy S1 failed — destination not directly writable: '%s'.", dst)
 
@@ -2461,7 +2500,7 @@ function M.deploy_string(content, dst)
 		)
 		Logger.debug(LOG, "Deploy S2 mkdir -p rc=%s: %s",
 			tostring(mkdir_rc), (mkdir_out or ""):gsub("%s+$", ""))
-		if FileSystem.write(dst, content) then
+		if publish_once() == true then
 			Logger.done(LOG, "Deploy S2 (mkdir + write) succeeded: '%s'.", dst)
 			return true, "ok"
 		end
@@ -2493,7 +2532,7 @@ function M.deploy_file(src, dst)
 	end
 	Logger.debug(LOG, "Deploy: read %d byte(s) from source.", #content)
 
-	return M.deploy_string(content, dst)
+	return M.deploy_string(content, dst, nil)
 end
 
 --- Exposes the resolved KC physical log path so karabiner/init can create

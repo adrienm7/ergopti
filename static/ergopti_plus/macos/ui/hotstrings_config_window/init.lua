@@ -30,6 +30,7 @@ local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local TomlReader        = require("infra.toml.reader")
+local TomlRecordEditor  = require("infra.toml.record_editor")
 local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
 local Paths            = require("infra.paths")
@@ -520,75 +521,38 @@ local function patch_personal_toml(toml_path, section, field, value)
 			toml_path, tostring(read_ok and read_detail or content))
 		return false
 	end
-	local lines = {}
-	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
-		table.insert(lines, (raw:gsub("\r$", "")))
-	end
-	while #lines > 0 and lines[#lines] == "" do table.remove(lines) end
-
 	-- The header we are looking for depends on whether section is set
 	local target_header = section
 		and ("[_meta.sections." .. section .. "]")
 		or  "[_meta]"
-
-	-- Scan once: find the header line and collect its span until next header.
-	-- field_lines collects ALL indices of duplicate field= lines so that a
-	-- hand-authored TOML with two delay= in the same block does not leave a
-	-- stale copy behind after patching.
-	local header_line = nil
-	local field_lines = {}  -- all indices of existing field=… inside the block
-	local next_header = nil -- index of the next [section] after our block
-
-	for i, ln in ipairs(lines) do
-		local trimmed = ln:match("^%s*(.-)%s*$")
-		if trimmed == target_header then
-			header_line = i
-		elseif header_line and not next_header then
-			if trimmed:match("^%[") then
-				-- Entered a new TOML section — stop scanning
-				next_header = i
-			elseif trimmed:match("^" .. field .. "%s*=") then
-				table.insert(field_lines, i)
-			end
-		end
-	end
-
+	local val_str = nil
 	if value ~= nil then
-		-- Build the raw value string
-		local val_str
-		if field == "delay" then
+		if field == "delay" or field == "priority" then
 			val_str = tostring(value)
 		elseif field == "show_tooltip" then
 			val_str = value and "true" or "false"
 		else
 			val_str = '"' .. tostring(value) .. '"'
 		end
-		local new_line = field .. " = " .. val_str
-
-		if #field_lines > 0 then
-			-- Replace the first occurrence; remove all extras in reverse order
-			-- so earlier indices remain valid during removal.
-			lines[field_lines[1]] = new_line
-			for k = #field_lines, 2, -1 do
-				table.remove(lines, field_lines[k])
-			end
-		elseif header_line then
-			-- Insert the new field right after the header
-			table.insert(lines, header_line + 1, new_line)
-		else
-			-- The target header does not exist — append it at the end
-			table.insert(lines, "")
-			table.insert(lines, target_header)
-			table.insert(lines, new_line)
-		end
-	else
-		-- Remove all occurrences in reverse order so earlier indices stay valid
-		for k = #field_lines, 1, -1 do
-			table.remove(lines, field_lines[k])
-		end
+	end
+	local patched, patch_err = TomlRecordEditor.patch_table_field(
+		content,
+		target_header,
+		field,
+		val_str
+	)
+	if not patched then
+		Logger.error(LOG, "patch_personal_toml: source scan failed for '%s' — %s.",
+			toml_path, tostring(patch_err))
+		return false
 	end
 
-	local write_ok, committed = pcall(FileSystem.write, toml_path, table.concat(lines, "\n") .. "\n")
+	local write_ok, committed = pcall(
+		FileSystem.write_if_unchanged,
+		toml_path,
+		patched,
+		{ status = "ok", content = content }
+	)
 	if not write_ok or committed ~= true then
 		Logger.error(LOG, "patch_personal_toml: atomic publication failed for '%s'.", toml_path)
 		return false

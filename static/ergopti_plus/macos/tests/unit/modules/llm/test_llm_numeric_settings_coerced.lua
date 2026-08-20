@@ -88,7 +88,7 @@ package.loaded["modules.llm"] = {
 
 package.loaded["modules.llm.warmup_controller"] = {
 	schedule_warmup_with_retry = function(_reason) end,
-	init                       = function(_cfg) end,
+	init                       = function(_cfg) return true end,
 	start                      = function() end,
 	stop                       = function() end,
 }
@@ -101,7 +101,7 @@ package.loaded["modules.llm.api_mlx"] = {
 }
 
 package.loaded["modules.llm.streaming_handler"] = {
-	init                = function(_cfg) end,
+	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
 	arm_watchdog        = function(_cfg) return true end,
 	stop_watchdog       = function() return true end,

@@ -91,6 +91,9 @@ helpers.describe("preferences — parameterized gesture action TOML round-trip",
 		helpers.assert_eq(flat.gesture_action_parameters.tap_3__open_url, "https://saved.example/path")
 		helpers.assert_true(flat.gesture_actions.action_parameters == nil,
 			"the parameter table must never be treated as a gesture action slot")
+		local _, absent_status = Prefs.load(tmp)
+		helpers.assert_eq(absent_status, "absent",
+			"the intentional deletion must be acknowledged before a create-only save")
 
 		local fake_gestures = {
 			get_all_actions = function() return { tap_3 = "open_url" } end,

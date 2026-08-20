@@ -28,16 +28,23 @@ local _ = helpers.load_with_stubs("infra.logger")
 local State    = helpers.load_with_stubs("modules.keymap.state")
 local Registry = helpers.load_with_stubs("modules.keymap.registry")
 
+local REGISTRY_OWNERSHIP = {
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+}
+
 --- Builds a fresh registry with a clean shared state.
 --- @return table state, table R
 local function fresh_registry()
-	package.loaded["modules.keymap.registry"]    = nil
-	package.loaded["modules.keymap.terminators"] = nil
-	local R     = require("modules.keymap.registry")
-	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
-	R.init(state)
-	Registry = R
-	return state, R
+	return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
+		local R = require("modules.keymap.registry")
+		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
+		helpers.assert_eq(R.init(state), true)
+		Registry = R
+		return state, R
+	end)
 end
 
 

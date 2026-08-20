@@ -46,6 +46,18 @@ local function fixture_path(suffix)
 	return path
 end
 
+--- Returns a unique personal TOML file containing explicit bytes.
+--- @param suffix string Test discriminator.
+--- @param content string Fixture bytes.
+--- @return string path
+local function fixture_path_with_content(suffix, content)
+	local path = os.tmpname() .. "_" .. suffix .. ".toml"
+	local fh = assert(io.open(path, "w"))
+	assert(fh:write(content))
+	assert(fh:close())
+	return path
+end
+
 --- Reads a complete fixture.
 --- @param path string Fixture path.
 --- @return string content
@@ -95,7 +107,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			install_config_stub()
 			package.loaded["adapters.file_system"] = {
 				read_with_status = function() return SENTINEL, "ok" end,
-				write = function() return false end,
+				write_if_unchanged = function() return false end,
 			}
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 			local notifications = 0
@@ -139,6 +151,43 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		os.remove(path)
 	end)
 
+	helpers.it("a nested array cannot hide the existing personal field", function()
+		local matrix_record = table.concat({
+			"future_matrix = [",
+			"  [1, 2],",
+			"]",
+		}, "\n")
+		local initial = "[_meta]\n" .. matrix_record .. "\ndelay = 0.33\n"
+		local path = fixture_path_with_content("nested_array", initial)
+		install_config_stub()
+		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		local notifications = 0
+		win._on_config_changed = function() notifications = notifications + 1 end
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_delay",
+			group = "personal",
+			personal_path = path,
+			ms = 420,
+		} }), true)
+
+		local content = read_fixture(path)
+		local _, delay_count = content:gsub("delay%s*=", "")
+		helpers.assert_eq(delay_count, 1,
+			"the continuation line must not create a duplicate owned field")
+		helpers.assert_contains(content, matrix_record,
+			"the unowned nested record must remain byte-identical")
+		local codec = require("infra.toml.codec")
+		local decode_ok, decoded = pcall(codec.decode, content)
+		helpers.assert_true(decode_ok and type(decoded) == "table",
+			"the UI must publish valid TOML after the real bridge action")
+		helpers.assert_eq(decoded._meta.future_matrix[1][2], 2)
+		helpers.assert_eq(decoded._meta.delay, 0.42)
+		helpers.assert_eq(notifications, 1)
+		os.remove(path)
+	end)
+
 	for _, case in ipairs({
 		{ label = "EACCES", status = "error", detail = "permission denied" },
 		{ label = "failed source close", status = "error", detail = "close failed" },
@@ -157,7 +206,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 					reads = reads + 1
 					return nil, case.status, case.detail
 				end,
-				write = function() writes = writes + 1 return true end,
+				write_if_unchanged = function() writes = writes + 1 return true end,
 			}
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 			local committed = win._on_message({ body = {
@@ -183,7 +232,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 				events[#events + 1] = "read"
 				return SENTINEL, "ok"
 			end,
-			write = function(candidate)
+			write_if_unchanged = function(candidate)
 				helpers.assert_eq(candidate, path)
 				events[#events + 1] = "retarget-refused"
 				return false
@@ -201,6 +250,53 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.assert_eq(#events, 2)
 		helpers.assert_eq(notifications, 0)
 		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
+
+	helpers.it("preserves an external edit that lands after the patch read", function()
+		local path = fixture_path("external_winner")
+		local external = "[_meta]\ndelay = 0.91\n# external winner\n"
+		install_config_stub()
+		local publications = 0
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return SENTINEL, "ok"
+			end,
+			-- Causal old-code seam: an unconditional publication would erase B.
+			write = function(candidate, content)
+				publications = publications + 1
+				local competitor = assert(io.open(candidate, "w"))
+				assert(competitor:write(external))
+				assert(competitor:close())
+				local stale = assert(io.open(candidate, "w"))
+				assert(stale:write(content))
+				assert(stale:close())
+				return true
+			end,
+			write_if_unchanged = function(candidate, _content, expected_source)
+				publications = publications + 1
+				helpers.assert_eq(expected_source,
+					{ status = "ok", content = SENTINEL },
+					"the exact patch input must cross the publication boundary")
+				local competitor = assert(io.open(candidate, "w"))
+				assert(competitor:write(external))
+				assert(competitor:close())
+				return false, "source changed"
+			end,
+		}
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		local notifications = 0
+		win._on_config_changed = function() notifications = notifications + 1 end
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_delay", group = "personal", personal_path = path, ms = 420,
+		} }), false)
+		helpers.assert_eq(publications, 1)
+		helpers.assert_eq(read_fixture(path), external,
+			"the external winner must survive byte-for-byte")
+		helpers.assert_eq(notifications, 0,
+			"a stale personal patch must publish no runtime/UI state")
 		os.remove(path)
 	end)
 end)

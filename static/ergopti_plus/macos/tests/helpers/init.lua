@@ -83,6 +83,40 @@ end
 -- =====================================
 -- =====================================
 
+--- Runs a fixture against freshly required modules, then restores the exact
+--- package cache entries even if setup or an assertion raises. Stateful parent
+--- modules and their exact-owned children must be listed together; otherwise a
+--- reload creates an impossible hybrid that production correctly refuses.
+--- @param module_names string[] Unique dotted Lua module names.
+--- @param callback function Fixture callback.
+--- @return ... Callback results.
+function M.with_fresh_modules(module_names, callback)
+	assert(type(module_names) == "table", "module_names must be a table")
+	assert(type(callback) == "function", "callback must be a function")
+	local saved = {}
+	local seen = {}
+	for index, module_name in ipairs(module_names) do
+		assert(type(module_name) == "string" and module_name ~= "",
+			"module_names entries must be non-empty strings")
+		assert(not seen[module_name], "duplicate module name: " .. module_name)
+		seen[module_name] = true
+		saved[index] = package.loaded[module_name]
+		package.loaded[module_name] = nil
+	end
+
+	local outcome = { n = 0 }
+	local function capture(...)
+		outcome.n = select("#", ...)
+		for index = 1, outcome.n do outcome[index] = select(index, ...) end
+	end
+	capture(xpcall(callback, debug.traceback))
+	for index, module_name in ipairs(module_names) do
+		package.loaded[module_name] = saved[index]
+	end
+	if not outcome[1] then error(outcome[2], 0) end
+	return (table.unpack or unpack)(outcome, 2, outcome.n)
+end
+
 --- Reloads a module after wiping the package cache and stubbing `hs`.
 --- @param module_name string Dotted Lua module name to require.
 --- @param hs_overrides table|nil Optional table merged onto the default `hs` stub.
@@ -101,6 +135,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	package.loaded[module_name] = nil
+	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
+	-- consumes the replay module's exact commitment, and replay correctly refuses
+	-- rebinding to a different CoreState. Reloading only the parent would therefore
+	-- create an impossible hybrid fixture (fresh parent, stale child).
+	if module_name == "modules.keymap.expander" then
+		package.loaded["modules.keymap.terminator_replay"] = nil
+	end
 	package.loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
 	-- into the next. Modules that override hs.execute or hs.timer with a partial
@@ -512,6 +553,12 @@ function M.make_logger_stub()
 		build   = function() return noop end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
+		start_async_sink = function() return true end,
+		classify_async_sink_boot_environment = function() return "standalone" end,
+		set_async_sink_failure_handler = function() return true end,
+		begin_async_sink_shutdown = function(callback) callback(true); return true end,
+		stop_async_sink = function() return true end,
+		async_sink_status = function() return { active = true } end,
 	}
 end
 

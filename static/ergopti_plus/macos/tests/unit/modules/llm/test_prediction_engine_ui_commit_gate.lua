@@ -106,7 +106,7 @@ local function load_fixture(loading_result, options)
 	}
 	package.loaded["modules.llm"] = core
 	package.loaded["modules.llm.warmup_controller"] = {
-		init = function() end,
+		init = function() return true end,
 		stop = function() end,
 		schedule_warmup_with_retry = function() end,
 	}
@@ -123,7 +123,7 @@ local function load_fixture(loading_result, options)
 		end,
 	}
 	package.loaded["modules.llm.streaming_handler"] = {
-		init = function() end,
+		init = function() return true end,
 		build_callbacks = function()
 			if options.callback_factory_error then error("callback factory failed") end
 			if options.callback_factory_invalid then return nil, nil, nil end

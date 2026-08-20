@@ -75,6 +75,11 @@ function ahkStr(s) {
 	return '"' + s.replace(/`/g, '``').replace(/"/g, '`"') + '"';
 }
 
+/** A Swift double-quoted string literal. */
+function swiftStr(s) {
+	return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+
 const BANNER_WHY =
 	'Both drivers used to parse the TOML themselves — two hand-rolled\n' +
 	'array-of-tables parsers, each of which had to have the same bug fixed\n' +
@@ -160,11 +165,41 @@ function emitAhk() {
 	);
 }
 
+// -- Native macOS launcher -----------------------------------------------------
+
+function emitSwift() {
+	const rows = forPlatform('hs').map((e) =>
+		`\t${swiftStr(`ErgoptiPlus_${e.name}.log`)},`
+	);
+
+	return (
+		'// Sources/ErgoptiPlus/LoggerTopics.generated.swift\n' +
+		'// AUTO-GENERATED from _shared/modules/logger/sub_files.toml.\n' +
+		'// DO NOT EDIT BY HAND -- run `npm run codegen:logger-sub-files` to refresh.\n' +
+		'\n' +
+		'// ==============================================================================\n' +
+		'// MODULE: Native Logger Topical Filename Set\n' +
+		'// DESCRIPTION:\n' +
+		'// Restricts authenticated logger datagrams to the same canonical filenames\n' +
+		'// routed by the Hammerspoon logger. Generating this set prevents the native\n' +
+		'// validator from becoming a second source that can reject a newly added topic.\n' +
+		'// ==============================================================================\n' +
+		'\n' +
+		'let kLoggerTopicalFileNames: Set<String> = [\n' +
+		rows.join('\n') +
+		'\n]\n'
+	);
+}
+
 // ── Write ───────────────────────────────────────────────────────────────────
 
 const targets = [
 	[path.join(SP, 'macos/_generated/logger_sub_files.lua'), emitLua()],
-	[path.join(SP, 'windows/_generated/logger_sub_files.ahk'), emitAhk()]
+	[path.join(SP, 'windows/_generated/logger_sub_files.ahk'), emitAhk()],
+	[
+		path.join(SP, 'macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'),
+		emitSwift()
+	]
 ];
 
 for (const [abs, content] of targets) {

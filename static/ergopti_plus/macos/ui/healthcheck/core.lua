@@ -210,7 +210,7 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.file_system",
-		contract = { "read", "write", "exists" },
+		contract = { "read", "write", "exists", "prepare_parent_for_create" },
 		wired    = true,
 	},
 	{
@@ -241,6 +241,11 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.keyboard_hook",
 		contract = { "start", "stop" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.log_transport",
+		contract = { "start", "enqueue", "drain", "stop", "status" },
 		wired    = true,
 	},
 	{

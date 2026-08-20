@@ -54,7 +54,7 @@ package.loaded["modules.llm.app_filter"] = {
 	is_blocked = function(_state, _apps, _url, _secure) return false end,
 }
 package.loaded["modules.llm.streaming_handler"] = {
-	init                = function(_cfg) end,
+	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
 	arm_watchdog        = function(_cfg) return true end,
 	stop_watchdog       = function() return true end,

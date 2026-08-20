@@ -10,9 +10,10 @@
 --- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
 --- _shared/lua/logger owns the canonical line format, the eight variants, the
 --- 200-entry ring and the five-second dedup window — items 4, 5 and 8 below. This
---- file owns everything that touches the filesystem or the console: the unified
---- daily log, its purge, the errors-only mirror, the topical fan-out, the
---- level-aware flush policy and the print() tee. The split is not cosmetic: the
+--- file owns the production in-memory handoff, topical routing policy, deferred
+--- console/notification delivery, and the synchronous early-boot/test fallback.
+--- The native launcher worker owns production file persistence, daily rotation,
+--- retention purge and errors/topical fan-out. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
 --- held to ONE implementation of those rules, and this half is pinned as
 --- behaviour by tests/unit/lib/test_logger_file_sinks.lua.
@@ -30,7 +31,8 @@
 ---    Seeing a START without a following SUCCESS points to a silent failure.
 --- 5. Deduplication: consecutive identical lines are suppressed automatically;
 ---    a count summary is printed when the run breaks, using the same color/level.
---- 6. Unified rotating file sink: one file per calendar day under <config>/logs/,
+--- 6. Unified rotating file sink: the acknowledged native worker writes one file
+---    per calendar day under <config>/logs/,
 ---    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
 ---    Files older than max_age_days are purged automatically on init and after
 ---    the first successful write of each new calendar day.
@@ -38,7 +40,7 @@
 ---    based on module tag matching, giving focused tail targets per feature area.
 --- 8. Timestamp format: HHhMMminSSsNNNms — matches the AHK driver exactly so both
 ---    log files look identical when tailed side by side.
---- 9. Errors-only sink: WARNING and ERROR lines are also written to
+--- 9. Errors-only sink: the native worker also writes WARNING and ERROR lines to
 ---    ErgoptiPlus_errors_YYYY-MM-DD.log (daily rotation + purge). Provides a
 ---    small dedicated file for quick triage of failures.
 --- ==============================================================================
@@ -98,6 +100,16 @@ local PURGE_NOON_HOUR = 12
 -- no grammar to get wrong and no "file unavailable" branch to diverge in.
 local SUB_LOG_NAMES = require("_generated.logger_sub_files")
 
+-- LogTransport routes a hostile oversized record in bounded 8 KiB windows.
+-- Retaining exactly the longest-pattern-minus-one suffix makes a literal that
+-- crosses a window boundary observable without ever rescanning the full line.
+local ROUTE_OVERLAP_BYTES = 0
+for _, sub in ipairs(SUB_LOG_NAMES) do
+	for _, pattern in ipairs(sub.patterns) do
+		ROUTE_OVERLAP_BYTES = math.max(ROUTE_OVERLAP_BYTES, #pattern - 1)
+	end
+end
+
 -- The platform-neutral core, shared with the Linux daemon and mirrored by the
 -- AutoHotkey driver. It owns the four algorithms this file used to carry its own
 -- copy of: the canonical line format, the eight variants, the 200-entry ring, and
@@ -118,6 +130,7 @@ local SUB_LOG_NAMES = require("_generated.logger_sub_files")
 -- also true of the running driver. A test that needs either one clean asks for
 -- it: ring_buffer_clear() / reset_dedup().
 local Core = require("logger")
+local LogTransport = require("adapters.log_transport")
 
 
 
@@ -258,6 +271,50 @@ local _sub_handles    = {}
 -- surrounding pcall then swallows the "attempt to call a nil value" that follows.
 local _log
 local _driver_sink
+local _route_line
+
+-- Production switches to the native ACKed transport before any input owner is
+-- activated. Early boot and headless unit tests deliberately retain the local
+-- sink until M.start_async_sink() commits the socket and its owned pump timer.
+local _async_sink_active = false
+local _async_sink_error = nil
+local ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC = 2.0
+local _async_sink_failure_handler = nil
+local _pending_async_sink_failure = nil
+local _async_sink_failure_handler_error = nil
+local ASYNC_SINK_MANAGED_ENV_KEYS = {
+	"ERGOPTI_LAUNCHER_PID",
+	"ERGOPTI_LAUNCHER_BUNDLE_ID",
+	"ERGOPTI_LOG_PORT",
+	"ERGOPTI_LOG_TOKEN",
+}
+
+-- M.error() sets this only while the shared core emits that exact error line.
+-- Core may first deliver a dedup summary for the PREVIOUS streak, but always
+-- delivers the actual accepted line last. The sink therefore remembers each
+-- record and M.error attaches to the final one after emit() returns. This avoids
+-- copying and suffix-scanning an arbitrarily large user-derived message on HID.
+local _pending_error_notification = nil
+
+--- Delivers one transport failure at a protected non-HID boundary. The adapter
+--- invokes this function only from its pump callback; queue exhaustion reached
+--- from keyDown merely stores adapter state until that pump runs.
+--- @param detail any Exact transport failure detail.
+local function _on_async_sink_failed(detail)
+	local exact = tostring(detail or "unknown asynchronous logger transport failure")
+	_async_sink_error = exact
+	if _pending_async_sink_failure == nil then _pending_async_sink_failure = exact end
+	if type(_async_sink_failure_handler) ~= "function" then return end
+
+	local pending = _pending_async_sink_failure
+	local ok, handler_err = xpcall(_async_sink_failure_handler, debug.traceback, pending)
+	if ok then
+		_pending_async_sink_failure = nil
+		_async_sink_failure_handler_error = nil
+	else
+		_async_sink_failure_handler_error = tostring(handler_err)
+	end
+end
 
 --- Executes one purge boundary and makes an unexpected callback failure visible.
 --- Hammerspoon reports timer exceptions only to its Console, while the file log
@@ -318,6 +375,55 @@ local function _schedule_log_purge(log_dir, max_age_days, inline_without_timer)
 	-- already completed synchronously.
 	if not slot.delivered then slot.timer = timer_or_err end
 	return true
+end
+
+--- Stops every still-owned Lua purge timer before the native logger assumes
+--- retention ownership. A timer is removed only after stop() and its observable
+--- running state both prove that its callback can no longer fire.
+--- @return boolean settled True when no Lua purge timer remains live.
+--- @return string|nil detail First exact cleanup refusal, when unsettled.
+local function _stop_pending_purge_timers()
+	local settled = true
+	local first_error = nil
+	for token, slot in pairs(_pending_purge_timers) do
+		local timer = slot and slot.timer or nil
+		if timer ~= nil then
+			local method_ok, stop_method = pcall(function() return timer.stop end)
+			local stop_ok, stop_result = false, nil
+			if method_ok and type(stop_method) == "function" then
+				stop_ok, stop_result = pcall(stop_method, timer)
+			end
+
+			local state_ok = false
+			if stop_ok and stop_result ~= false then
+				local member_ok, running_member = pcall(function() return timer.running end)
+				if member_ok and type(running_member) == "function" then
+					local probe_ok, running = pcall(running_member, timer)
+					state_ok = probe_ok and running == false
+				elseif member_ok and type(running_member) == "boolean" then
+					state_ok = running_member == false
+				elseif type(timer) == "table" then
+					-- Narrow compatibility for injected test doubles: a successful
+					-- stop method is their only observable native-state contract.
+					state_ok = true
+				end
+			end
+
+			if state_ok then
+				slot.timer = nil
+				_pending_purge_timers[token] = nil
+			else
+				settled = false
+				if first_error == nil then
+					first_error = string.format("purge timer %s refused exact stop: %s",
+						tostring(token), tostring(stop_result or stop_method))
+				end
+			end
+		else
+			_pending_purge_timers[token] = nil
+		end
+	end
+	return settled, first_error
 end
 
 --- Configures the log file path under <config_dir>/hammerspoon/logs/ with
@@ -493,6 +599,59 @@ function M.set_error_notification_handler(fn)
 	_error_notification_handler = (type(fn) == "function") and fn or nil
 end
 
+--- Registers the fail-safe invoked when the native transport reports an exact
+--- runtime failure. Transport failures are never delivered from enqueue()/HID;
+--- the adapter reports them from its pump. A failure that predated registration
+--- is retained and delivered synchronously here so boot ordering cannot lose it.
+--- @param fn function Callback with signature fn(exact_error).
+--- @return boolean installed True when the handler accepted pending delivery.
+--- @return string|nil error_message Protected handler failure detail.
+function M.set_async_sink_failure_handler(fn)
+	if type(fn) ~= "function" then
+		return false, "async sink failure handler must be a function"
+	end
+	_async_sink_failure_handler = fn
+	if _pending_async_sink_failure == nil then return true end
+
+	local pending = _pending_async_sink_failure
+	local ok, handler_err = xpcall(fn, debug.traceback, pending)
+	if not ok then
+		_async_sink_failure_handler_error = tostring(handler_err)
+		return false, _async_sink_failure_handler_error
+	end
+	_pending_async_sink_failure = nil
+	_async_sink_failure_handler_error = nil
+	return true
+end
+
+--- Classifies whether boot owns a complete launcher logger authority. All four
+--- values form one trust boundary. `standalone` is a diagnostic for complete
+--- absence, not permission to arm the full driver: root boot accepts only
+--- `managed`, and fails visibly before input for `standalone` or `invalid`.
+--- @param getenv function|nil Injectable environment reader.
+--- @return string mode `managed`, `standalone`, or `invalid`.
+--- @return string|nil detail Exact missing/unreadable-variable diagnosis.
+function M.classify_async_sink_boot_environment(getenv)
+	local reader = type(getenv) == "function" and getenv or os.getenv
+	local present = 0
+	local missing = {}
+	for _, name in ipairs(ASYNC_SINK_MANAGED_ENV_KEYS) do
+		local ok, value = pcall(reader, name)
+		if not ok then
+			return "invalid", "managed logger environment read failed for " .. name
+		end
+		if type(value) == "string" and value ~= "" then
+			present = present + 1
+		else
+			missing[#missing + 1] = name
+		end
+	end
+	if present == 0 then return "standalone" end
+	if present == #ASYNC_SINK_MANAGED_ENV_KEYS then return "managed" end
+	return "invalid", "managed logger environment is partial; missing "
+		.. table.concat(missing, ", ")
+end
+
 --- Registers (or clears) a callable test sink that receives every formatted
 --- log line as a plain string. Pass nil to remove. Intended for unit tests only.
 --- @param fn function|nil One-arity function receiving the line string, or nil to clear.
@@ -570,6 +729,18 @@ local function _matches_any(line, patterns)
 		if line:find(p, 1, true) then return true end
 	end
 	return false
+end
+
+--- Derives the native worker's topical fan-out outside the HID callback.
+--- LogTransport calls this only from its TimerScheduler-owned pump.
+--- @param line string Canonical formatted log line.
+--- @return table names Validated topical filenames selected for this line.
+_route_line = function(line)
+	local names = {}
+	for _, sub in ipairs(SUB_LOG_NAMES) do
+		if _matches_any(line, sub.patterns) then names[#names + 1] = sub.name end
+	end
+	return names
 end
 
 --- Builds the HHhMMminSSsNNNms timestamp string matching the AHK driver format.
@@ -746,6 +917,24 @@ end
 --- @param line string The complete formatted line, timestamp included.
 --- @param variant string The core's lowercase variant name ("info", "warn", …).
 _driver_sink = function(line, variant)
+	if _async_sink_active then
+		-- An explicitly installed test sink is the sole synchronous observation
+		-- allowed here. Production never registers one.
+		if _test_sink then pcall(_test_sink, line, variant) end
+
+		-- The eventtap boundary ends here: enqueue() only appends one immutable
+		-- in-memory record. Routing, JSON, UDP, console, notification and every
+		-- filesystem operation happen after the native worker's exact ACK.
+		local ok, record_or_err, enqueue_err = pcall(LogTransport.enqueue, line, variant)
+		if not ok or type(record_or_err) ~= "table" then
+			_async_sink_error = tostring(ok and enqueue_err or record_or_err)
+			return
+		end
+		local pending = _pending_error_notification
+		if pending then pending.record = record_or_err end
+		return
+	end
+
 	local level = Core.level_of(variant) or Core.LEVELS.INFO
 
 	-- Routed through _console_out so the print() tee (Section 7) does not
@@ -774,6 +963,163 @@ _driver_sink = function(line, variant)
 			end
 		end)
 	end
+end
+
+--- Commits the authenticated native logger transport before input activation.
+--- The old Lua purge timer and every open local file handle are settled first,
+--- so exactly one runtime owns retention and persistence after this returns.
+--- @param scheduler table TimerScheduler adapter used to own the UDP pump.
+--- @param transport_overrides table|nil Narrow dependency injection for causal
+---   tests (`bootstrap_socket_factory`, endpoint credentials and clock only).
+--- @return boolean committed True only when the transport owns socket + timer.
+--- @return string|nil error_message Exact fail-fast reason on refusal.
+function M.start_async_sink(scheduler, transport_overrides)
+	if _async_sink_active then return true end
+	if transport_overrides ~= nil and type(transport_overrides) ~= "table" then
+		return false, "transport_overrides must be a table when provided"
+	end
+
+	local purges_stopped, purge_err = _stop_pending_purge_timers()
+	if not purges_stopped then return false, purge_err end
+
+	if _file_handle then
+		local ok, closed, close_err = pcall(function() return _file_handle:close() end)
+		if not ok or closed ~= true then
+			return false, "unified boot log handle refused close: "
+				.. tostring(ok and close_err or closed)
+		end
+		_file_handle = nil
+		_last_log_date = nil
+		_last_log_path = nil
+	end
+	for path, entry in pairs(_sub_handles) do
+		local ok, closed, close_err = pcall(function() return entry.fh:close() end)
+		if not ok or closed ~= true then
+			-- The refusing topical handle remains published for an exact retry.
+			return false, "topical boot log handle refused close: " .. tostring(path)
+				.. " — " .. tostring(ok and close_err or closed)
+		end
+		_sub_handles[path] = nil
+		_sub_file_date[path] = nil
+	end
+	_unflushed_debug = 0
+
+	local options = {
+		scheduler = scheduler,
+		log_dir = _log_dir,
+		retention_days = _log_retention_days or DEFAULT_LOG_RETENTION_DAYS,
+		route_line = _route_line,
+		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
+		on_delivered = function(record)
+			if type(record) ~= "table" or type(record.line) ~= "string" then
+				return false, "delivered log record is malformed"
+			end
+			_console_out(record.line)
+			local notification = record.notification
+			if type(notification) == "table" and _error_notification_handler then
+				local notified, delivered_or_err, notification_err = xpcall(
+					_error_notification_handler,
+					debug.traceback,
+					tostring(notification.module_name),
+					tostring(notification.message)
+				)
+				if not notified or delivered_or_err ~= true then
+					local detail = notified and (notification_err or delivered_or_err)
+						or delivered_or_err
+					return false, "error notification delivery failed: " .. tostring(detail)
+				end
+			end
+			return true
+		end,
+		on_failed = _on_async_sink_failed,
+	}
+	-- Production supplies none of these. Tests inject only native boundaries that
+	-- cannot exist in the headless Lua process; routing and delivery stay owned by
+	-- this module so the behavioural assertions still exercise the real handoff.
+	for _, name in ipairs({
+		"bootstrap_socket_factory", "bootstrap_timeout_sec", "port", "token",
+		"getenv", "clock", "max_batch_records",
+	}) do
+		if transport_overrides and transport_overrides[name] ~= nil then
+			options[name] = transport_overrides[name]
+		end
+	end
+	local ok, committed_or_err, transport_err = pcall(LogTransport.start, options)
+	if not ok or committed_or_err ~= true then
+		return false, tostring(ok and transport_err or committed_or_err)
+	end
+	_async_sink_error = nil
+	_async_sink_active = true
+	return true
+end
+
+--- Begins an asynchronous native drain without blocking Hammerspoon's run loop.
+--- LogTransport retains its queue, socket and pump until every record has an
+--- exact native ACK. A bounded timeout reports failure through on_done but never
+--- discards those capabilities inside this module. Root termination owns the
+--- non-zero EOF policy because local consumers have already stopped and cannot
+--- be rolled back into a live driver.
+--- @param on_done function Callback `(drained:boolean, detail:string|nil)`.
+--- @return boolean committed True only when exact callback ownership committed.
+--- @return string|nil error_message Immediate refusal detail.
+function M.begin_async_sink_shutdown(on_done)
+	if type(on_done) ~= "function" then return false, "on_done callback is required" end
+	if not _async_sink_active then
+		local ok, callback_err = xpcall(function() on_done(true, "transport already inactive") end,
+			debug.traceback)
+		if not ok then
+			_async_sink_error = "inactive shutdown callback failed: " .. tostring(callback_err)
+			return false, _async_sink_error
+		end
+		return true
+	end
+	if type(LogTransport.drain) ~= "function" then
+		return false, "log transport has no asynchronous shutdown capability"
+	end
+
+	local callback_fired = false
+	local function complete(drained, detail)
+		if callback_fired then return end
+		callback_fired = true
+		if drained ~= true then _async_sink_error = tostring(detail or "native log drain failed") end
+		local ok, callback_err = xpcall(on_done, debug.traceback, drained == true, detail)
+		if not ok then
+			_on_async_sink_failed("shutdown callback failed: " .. tostring(callback_err))
+		end
+	end
+	local ok, committed_or_err, begin_err = xpcall(function()
+		return LogTransport.drain(complete, ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC)
+	end, debug.traceback)
+	if not ok or committed_or_err ~= true then
+		return false, tostring(ok and begin_err or committed_or_err)
+	end
+	return true
+end
+
+--- Stops the asynchronous logger's owned socket/timer resources.
+--- @return boolean settled
+function M.stop_async_sink()
+	local ok, settled, stop_err = pcall(LogTransport.stop)
+	if not ok or settled ~= true then
+		_async_sink_error = tostring(ok and stop_err or settled)
+		return false
+	end
+	_async_sink_active = false
+	return true
+end
+
+--- Exposes transport health without granting callers mutable queue ownership.
+function M.async_sink_status()
+	local ok, status = pcall(LogTransport.status)
+	if not ok or type(status) ~= "table" then
+		return { active = _async_sink_active, last_error = _async_sink_error or tostring(status) }
+	end
+	if _async_sink_error ~= nil and status.last_error == nil then
+		status.last_error = _async_sink_error
+	end
+	status.pending_failure = _pending_async_sink_failure
+	status.failure_handler_error = _async_sink_failure_handler_error
+	return status
 end
 
 --- Points the core's three single-slot hooks at THIS module instance.
@@ -892,15 +1238,38 @@ function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) en
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.error(module_name, msg, ...)
+	local ok, base = pcall(tostring, msg)
+	local text = ok and base or "???"
+	if select("#", ...) > 0 then
+		local ok_f, formatted = pcall(string.format, text, ...)
+		text = ok_f and formatted or text
+	end
+
+	local pending = {
+		module_name = tostring(module_name),
+		message = text,
+		record = nil,
+	}
+	_pending_error_notification = pending
 	local emitted = _log("ERROR", module_name, msg, ...)
-	if emitted and _error_notification_handler then
-		local ok, base = pcall(tostring, msg)
-		local text = ok and base or "???"
-		if select("#", ...) > 0 then
-			local ok_f, formatted = pcall(string.format, text, ...)
-			text = ok_f and formatted or text
+	_pending_error_notification = nil
+	if emitted and _async_sink_active and type(pending.record) == "table" then
+		pending.record.notification = {
+			module_name = pending.module_name,
+			message = pending.message,
+		}
+	end
+	if emitted and not _async_sink_active and _error_notification_handler then
+		local notified, delivered_or_err, notification_err = xpcall(
+			_error_notification_handler,
+			debug.traceback,
+			tostring(module_name),
+			text
+		)
+		if not notified or delivered_or_err ~= true then
+			_async_sink_error = "error notification delivery failed: "
+				.. tostring(notified and notification_err or delivered_or_err)
 		end
-		pcall(_error_notification_handler, tostring(module_name), text)
 	end
 end
 
@@ -1076,7 +1445,16 @@ function M.install_runtime_error_capture()
 			local stamp = _timestamp()
 			for subline in (msg .. "\n"):gmatch("(.-)\n") do
 				if subline ~= "" then
-					pcall(_write_to_file, stamp .. " [CONSOLE] [console] " .. subline)
+					local line = stamp .. " [CONSOLE] [console] " .. subline
+					if _async_sink_active then
+						local queued, record_or_err, enqueue_err = pcall(
+							LogTransport.enqueue, line, "info")
+						if not queued or type(record_or_err) ~= "table" then
+							_async_sink_error = tostring(queued and enqueue_err or record_or_err)
+						end
+					else
+						pcall(_write_to_file, line)
+					end
 				end
 			end
 		end

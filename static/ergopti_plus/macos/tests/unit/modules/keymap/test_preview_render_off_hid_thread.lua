@@ -201,7 +201,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		}
 		package.loaded["modules.llm.prediction_engine"] = {
 			set_runtime_guard = function() end,
-			init = function() end,
+			init = function() return true end,
 			get_llm_enabled = function() return false end,
 			reset = function() reset_count = reset_count + 1; return true end,
 		}

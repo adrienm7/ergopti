@@ -167,19 +167,19 @@ helpers.describe("launcher guard — boot race closure", function()
 		end)
 	end)
 
-	helpers.it("keeps direct developer Hammerspoon supported when launcher env is absent", function()
+	helpers.it("keeps the launcher-guard module inert when tested without a parent PID", function()
 		with_guard({}, function(guard, hs_stub)
 			local quit_count = 0
 			local started = guard.init(function() quit_count = quit_count + 1 end)
 
 			helpers.assert_true(started,
-				"standalone developer Hammerspoon must remain a supported mode")
+				"the isolated guard module must allow its explicit no-parent mode")
 			helpers.assert_eq(quit_count, 0,
-				"missing launcher variables in standalone mode must not request quit")
+				"the isolated no-parent guard must not request quit")
 			helpers.assert_eq(#hs_stub.application.watcher.__watchers, 0,
-				"standalone mode must not arm a watcher for an unknown parent")
+				"the isolated no-parent guard must not arm an unknown watcher")
 			helpers.assert_eq(#hs_stub.application.__queries, 0,
-				"standalone mode must not probe an invented PID")
+				"the isolated no-parent guard must not probe an invented PID")
 		end)
 	end)
 

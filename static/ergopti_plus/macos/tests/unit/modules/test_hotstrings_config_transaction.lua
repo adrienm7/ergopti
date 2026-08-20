@@ -41,7 +41,7 @@ local function fresh_module(path, write_result)
 	local fixture_io = require("tests.support.file_system_write_stub")
 	package.loaded["adapters.file_system"] = {
 		read_with_status = fixture_io.read_with_status,
-		write = function() return write_result end,
+		write_if_unchanged = function() return write_result end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
@@ -65,7 +65,7 @@ local function init_with_read_status(path, status, detail)
 			if status == "ok" then return SENTINEL, "ok" end
 			return nil, status, detail
 		end,
-		write = function()
+		write_if_unchanged = function()
 			calls.writes = calls.writes + 1
 			return true
 		end,
@@ -130,7 +130,7 @@ helpers.describe("hotstrings config: failed source reads stay fail-closed", func
 				if phase == "ok" then return SENTINEL, "ok" end
 				return nil, "error", "dangling symlink target"
 			end,
-			write = function() calls.writes = calls.writes + 1 return true end,
+			write_if_unchanged = function() calls.writes = calls.writes + 1 return true end,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = nil
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
@@ -156,9 +156,10 @@ helpers.describe("hotstrings config: failed source reads stay fail-closed", func
 				helpers.assert_eq(candidate, path)
 				return nil, "absent", "not found"
 			end,
-			write = function(candidate, content)
+			write_if_unchanged = function(candidate, content, expected_source)
 				helpers.assert_eq(candidate, path)
 				helpers.assert_contains(content, "[rolls]")
+				helpers.assert_eq(expected_source.status, "absent")
 				writes = writes + 1
 				return true
 			end,
@@ -211,7 +212,7 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 				events[#events + 1] = "read"
 				return SENTINEL, "ok"
 			end,
-			write = function(candidate)
+			write_if_unchanged = function(candidate)
 				helpers.assert_eq(candidate, path)
 				events[#events + 1] = "retarget-refused"
 				return false
@@ -226,11 +227,51 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 		helpers.assert_eq(events[1], "read")
 		helpers.assert_eq(events[2], "retarget-refused",
 			"publication must remain delegated to the symlink-revalidating adapter")
-		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(events[3], "read",
+			"a failed publication must revalidate whether the committed source changed")
+		helpers.assert_eq(#events, 3)
 		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33)
 		helpers.assert_eq(mod.resolve("rolls", nil), before,
 			"the last committed memo must survive a TOCTOU refusal")
 		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
+
+	helpers.it("an external edit wins instead of being overwritten by a stale in-memory candidate", function()
+		local path = fixture_path("external_edit")
+		local external = "[rolls]\ndelay = 0.91\n\n[abbrevs]\ncolor = \"#123456\"\n"
+		local snapshots = {}
+		local fixture_io = require("tests.support.file_system_write_stub")
+		package.loaded["adapters.file_system"] = {
+			read_with_status = fixture_io.read_with_status,
+			write_if_unchanged = function(candidate, content, expected_source)
+				helpers.assert_eq(candidate, path)
+				snapshots[#snapshots + 1] = expected_source
+				local current, status = fixture_io.read_with_status(candidate)
+				if status ~= expected_source.status
+					or (status == "ok" and current ~= expected_source.content) then
+					return false, "source changed"
+				end
+				return fixture_io.write(candidate, content)
+			end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+
+		helpers.assert_eq(fixture_io.write(path, external), true,
+			"the competing driver must publish its complete version before the setter")
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", 0.7), false,
+			"a candidate derived from the old source must lose the compare-and-publish race")
+		helpers.assert_eq(read_fixture(path), external,
+			"the exact external version must survive the rejected stale candidate")
+		helpers.assert_eq(#snapshots, 1)
+		helpers.assert_eq(snapshots[1].status, "ok")
+		helpers.assert_eq(snapshots[1].content, SENTINEL,
+			"publication must compare against the exact bytes used to build memory")
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.91,
+			"a proven conflict must adopt the external committed version in memory")
+		helpers.assert_eq(mod.get_user_override("abbrevs", nil).color, "#123456")
 		os.remove(path)
 	end)
 

@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
 	"startup.manifest_title": "ErgoptiPlus — manifest eksik",
+	"startup.native_logger_unavailable": "Yerel günlük hizmeti kullanılamadığı için ErgoptiPlus başlatılamıyor. ErgoptiPlus'ı kendi başlatıcısı üzerinden başlatın.",
 	"tap_hold.action.disable": "Yerel tuş",
 	"tap_hold.disable_all": "Tümünü devre dışı bırak",
 	"tap_hold.group.alt_gr": "AltGr",

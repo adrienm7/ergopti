@@ -141,4 +141,40 @@ helpers.describe("helper assertions (smoke)", function()
     end)
   end)
 
+  -- ========================================================================
+  -- 6. transactional module-cache fixtures
+  -- ========================================================================
+
+  helpers.describe("with_fresh_modules", function()
+    helpers.it("restores exact cache entries after success and failure", function()
+      local module_name = "tests.__with_fresh_modules_probe"
+      local original = {}
+      package.loaded[module_name] = original
+      local ok, err = xpcall(function()
+        local first, middle, last = helpers.with_fresh_modules({ module_name }, function()
+          helpers.assert_nil(package.loaded[module_name], "the fixture must start fresh")
+          package.loaded[module_name] = { replacement = true }
+          return "first", nil, "last"
+        end)
+        helpers.assert_eq(first, "first")
+        helpers.assert_nil(middle, "nil callback results must retain their position")
+        helpers.assert_eq(last, "last")
+        helpers.assert_true(package.loaded[module_name] == original,
+          "the exact prior cache object must be restored after success")
+
+        local raised = pcall(function()
+          helpers.with_fresh_modules({ module_name }, function()
+            package.loaded[module_name] = { replacement = true }
+            error("CONTROLLED_FIXTURE_FAILURE")
+          end)
+        end)
+        helpers.assert_true(not raised, "the fixture exception must be re-raised")
+        helpers.assert_true(package.loaded[module_name] == original,
+          "the exact prior cache object must be restored after failure")
+      end, debug.traceback)
+      package.loaded[module_name] = nil
+      if not ok then error(err, 0) end
+    end)
+  end)
+
 end)

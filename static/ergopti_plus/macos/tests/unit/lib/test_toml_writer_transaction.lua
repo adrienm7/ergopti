@@ -216,4 +216,39 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 		helpers.assert_eq(writes, 0,
 			"a file created after the absence proof must never be overwritten")
 	end)
+
+	helpers.it("carries the snapshot into the adapter's serialized publication boundary", function()
+		local initial = "[features]\nenabled = false\n"
+		local ordinary_writes = 0
+		local guarded_writes = 0
+		local adapter = {
+			read_with_status = function()
+				-- Both the batch read and the shared last-moment precheck see the
+				-- original bytes. The competing writer commits after this return,
+				-- while the platform adapter is waiting to acquire its stable lock.
+				return initial, "ok"
+			end,
+			write = function()
+				ordinary_writes = ordinary_writes + 1
+				return true
+			end,
+			write_if_unchanged = function(_path, _content, expected_source)
+				guarded_writes = guarded_writes + 1
+				helpers.assert_eq(expected_source.status, "ok")
+				helpers.assert_eq(expected_source.content, initial,
+					"the exact batch snapshot must survive into lock-owned publication")
+				return false, "source changed while acquiring publication lock"
+			end,
+		}
+
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "features", key = "enabled", value = true },
+		}, adapter)
+		helpers.assert_eq(ok, false,
+			"a sibling commit between the shared precheck and adapter lock must win, not be overwritten")
+		helpers.assert_eq(guarded_writes, 1,
+			"classified batch publication must use the adapter's serialized precondition")
+		helpers.assert_eq(ordinary_writes, 0,
+			"calling the two-argument write port would silently discard the snapshot")
+	end)
 end)

@@ -672,32 +672,38 @@ end
 --- Initializes the streaming handler with its required dependencies.
 --- Must be called exactly once before any other function.
 --- @param deps table Must contain: core_llm (table), tooltip (table), keylogger (table).
+--- @return boolean committed True only when every dependency is ready.
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
 	if type(deps) ~= "table" then
 		Logger.error(LOG, "M.init(): deps must be a table — module non-functional.")
-		return
+		return false
 	end
 	if _core_llm then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keylogger == deps.keylogger then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 	if type(deps.core_llm) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.core_llm must be a table — module non-functional.")
-		return
+		return false
 	end
 	if type(deps.tooltip) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.tooltip must be a table — module non-functional.")
-		return
+		return false
 	end
 	if type(deps.keylogger) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.keylogger must be a table — module non-functional.")
-		return
+		return false
 	end
 	_core_llm  = deps.core_llm
 	_tooltip   = deps.tooltip
 	_keylogger = deps.keylogger
 	Logger.success(LOG, "Initialized.")
+	return true
 end
 
 return M

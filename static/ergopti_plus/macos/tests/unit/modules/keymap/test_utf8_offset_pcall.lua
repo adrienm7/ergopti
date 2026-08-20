@@ -485,7 +485,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 
 		-- Minimal prediction engine stub — all operations are no-ops.
 		local engine_stub = {
-			init                    = function() end,
+			init                    = function() return true end,
 			get_llm_enabled         = function() return false end,
 			stop_timer              = function() return true end,
 			start_timer             = function() end,

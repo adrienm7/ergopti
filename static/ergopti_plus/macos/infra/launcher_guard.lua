@@ -428,9 +428,11 @@ end
 -- =====================================
 
 --- Initializes and arms the launcher guard when the Swift launcher exported an
---- exact PID; direct developer Hammerspoon remains intentionally unguarded.
+--- exact PID. Without that variable this module is intentionally inert so its
+--- lifecycle can be tested in isolation; root boot independently requires the
+--- complete native logger authority before it can arm the full driver.
 --- @param emergency_quit function Callback invoked once with a reason string.
---- @return boolean started Whether standalone mode is valid or the guard armed.
+--- @return boolean started Whether the isolated no-parent mode or guard committed.
 function M.init(emergency_quit)
 	if _initialized then
 		Logger.warn(LOG, "init() called more than once — ignoring duplicate call.")
@@ -446,7 +448,7 @@ function M.init(emergency_quit)
 	_emergency_quit = emergency_quit
 	local raw_pid = os.getenv(LAUNCHER_PID_ENV)
 	if raw_pid == nil or raw_pid == "" then
-		Logger.success(LOG, "Swift launcher liveness guard disabled for standalone Hammerspoon.")
+		Logger.success(LOG, "Swift launcher liveness guard disabled: no parent PID was supplied.")
 		return true
 	end
 
