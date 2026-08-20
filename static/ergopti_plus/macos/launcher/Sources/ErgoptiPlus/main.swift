@@ -42,21 +42,8 @@ import Sparkle
 // ==================================
 // ==================================
 
-// Bundle identifier the embedded Hammerspoon will run under. Picked so the
-// embedded HS reads its preferences from ~/Library/Preferences/com.ergoptiplus.app.plist
-// and cannot collide with a stock Hammerspoon install (org.hammerspoon.Hammerspoon).
-let kErgoptiBundleId = "com.ergoptiplus.app"
-
-// Key Hammerspoon reads to locate its Lua config dir. Default would be
-// ~/.hammerspoon; we override to keep Ergopti's tree fully self-contained.
-// Hammerspoon reads MJConfigFile (full path to init.lua), not MJConfigDir.
-// MJConfigDir is a community myth — variables.m uses MJConfigFile exclusively.
-let kHammerspoonConfigKey = "MJConfigFile"
-
-// The embedded Hammerspoon process and every native helper inherit this mask.
-// Its staging directories and sidecars can contain complete configuration bytes,
-// so group/other permissions must be removed before any child or worker starts
-let kPrivateProcessUmask: mode_t = 0o077
+// Shared bootstrap constants live in LauncherConstants.swift so XCTest imports
+// initialized storage instead of executable-entry-point globals.
 
 /// Installs the process-wide private creation mask before any child is spawned.
 /// - Parameter setter: Injectable Darwin boundary used by the launcher tests.
