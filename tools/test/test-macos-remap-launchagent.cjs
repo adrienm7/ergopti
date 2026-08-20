@@ -228,7 +228,7 @@ for (const required of [
 	'endLiveTransport()',
 	'--karabiner-lease-guardian',
 	'dispatchMain()',
-	'flock(',
+	'ergoptiFlock(',
 	'fsync(',
 	'ARMED',
 ]) {
