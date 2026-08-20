@@ -7,7 +7,7 @@
 ; that mutate state: debounce-armed numeric writes, color/tooltip change
 ; handlers, reset-all and set-all-grey bulk operations, the window-close flush,
 ; source-aware override dispatch (SetOverride / ClearOverride / Resolve /
-; ReadTomlMeta), and the personal TOML [_meta] in-place patcher.
+; ReadTomlMeta), and the personal TOML [_meta] atomic patcher.
 ;
 ; RATIONALE:
 ; Extracted from init.ahk so the write path is isolated in one file and the
@@ -28,6 +28,97 @@
 ; a ~1.3 s re-registration on every color pick would be a serious regression in
 ; a window whose numeric edits already fire on a debounce.
 global HCW_REBUILD_ON_WRITE_FIELDS := Map("delay", true, "priority", true)
+
+
+; Execute every persistence callback and collapse their strict Boolean results
+; into one outcome. AHK v2 considers the string "0" equal to false, so accepting
+; truthy strings here would turn an adapter protocol violation into a false
+; success. Reconciliation always runs once; exactly one terminal callback then
+; observes the aggregate result. Outcome["ok"] describes durable writes only;
+; callback failures are contained and logged by _HCW_RunOutcomeCallback.
+_HCW_RunWriteBatch(WriteFns, ReconcileFn := 0, SuccessFn := 0, FailureFn := 0) {
+	Outcome := Map(
+		"ok", true,
+		"attempted", 0,
+		"succeeded", 0,
+		"failed", 0,
+		"failed_indices", [],
+		"failure_reported", false
+	)
+	for Index, WriteFn in WriteFns {
+		Outcome["attempted"] += 1
+		WriteOk := false
+		try {
+			Result := HasMethod(WriteFn, "Call") ? WriteFn.Call() : false
+			WriteOk := (Result is Integer) && Result == 1
+		} catch as Err {
+			try LoggerError("HotstringsConfigWindow",
+				"Persistence writer {1} raised an error: {2}.", Index, Err.Message)
+		}
+		if WriteOk {
+			Outcome["succeeded"] += 1
+		} else {
+			Outcome["failed"] += 1
+			Outcome["failed_indices"].Push(Index)
+		}
+	}
+	Outcome["ok"] := Outcome["failed"] == 0
+	_HCW_RunOutcomeCallback(ReconcileFn, Outcome, "reconciliation")
+	if Outcome["ok"] {
+		_HCW_RunOutcomeCallback(SuccessFn, Outcome, "success")
+	} else {
+		_HCW_RunOutcomeCallback(FailureFn, Outcome, "failure")
+	}
+	return Outcome
+}
+
+; Outcome callbacks are UI/backstop work reached from Gui, timer, and COM event
+; threads. A notifier or stale control must not turn an already-contained write
+; refusal into an unhandled driver exception.
+_HCW_RunOutcomeCallback(CallbackFn, Outcome, Label) {
+	if !HasMethod(CallbackFn, "Call")
+		return true
+	try {
+		CallbackFn.Call(Outcome)
+		return true
+	} catch as Err {
+		try LoggerError("HotstringsConfigWindow",
+			"Write-batch {1} callback failed: {2}.", Label, Err.Message)
+		return false
+	}
+}
+
+_HCW_ReportWriteFailure(Outcome) {
+	if (Outcome is Map)
+		Outcome["failure_reported"] := true
+	StateUnchanged := !(Outcome is Map) || Outcome.Get("succeeded", 0) == 0
+	return ConfigReportPersistenceFailure(
+		"the hotstrings configuration change", 0, "", StateUnchanged)
+}
+
+_HCW_ReconcileNativeCurrent(Outcome) {
+	_HCW_LoadCurrent()
+}
+
+_HCW_ReconcileNativeReset(Outcome) {
+	; A partial bulk failure can still have durably changed a baked delay or
+	; priority. Rebuild before showing canonical state so tooltip and engine agree.
+	if Outcome["succeeded"] > 0
+		_HCW_RepublishIfBakedField("delay")
+	if !Outcome["ok"]
+		_HCW_LoadCurrent()
+}
+
+_HCW_CompleteNativeReset(Outcome) {
+	global _HCWGui, _HCWWidgets
+	if (_HCWGui != 0)
+		_HCWGui.Destroy()
+	; Destroy() does not fire OnEvent('Close'), so clear globals manually to
+	; prevent OpenHotstringsConfigWindow from showing a destroyed Gui.
+	_HCWGui := 0
+	_HCWWidgets := 0
+	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+}
 
 
 
@@ -64,35 +155,151 @@ _HCW_OnPriorityChanged() {
 	_HCW_ArmNumericWrite("priority", Entry, Sec, Prio)
 }
 
-; Arm (or re-arm) the debounce timer for a numeric field. Each new keystroke
-; cancels the previous one-shot timer and starts a fresh window, so the
-; expensive _HCW_SetOverride / _HCW_LoadCurrent runs once when the user pauses
-; rather than on every digit. The clamped value AND the current selection are
-; captured here so the write lands on the right entry even if the user switches
-; selection or closes the window before the timer fires.
+; Replace only an edit for the same entry/section/field. Delay and priority have
+; independent controls, so one global replaceable slot loses whichever field
+; was typed first when both change inside the same debounce window.
+_HCW_NumericWriteMatches(Pending, Entry, Sec, Field) {
+	; Catalogue rebuilds replace Entry objects even when they describe the same
+	; logical source. Key is the stable identity shared by common, personal, and
+	; extension entries; object identity would strand old timer payloads.
+	return Pending.Entry.Key == Entry.Key && Pending.Sec == Sec
+		&& Pending.Field == Field
+}
+
+_HCW_QueueNumericWrite(PendingWrites, Pending, ReplaceExisting := true) {
+	for Index, Existing in PendingWrites {
+		if _HCW_NumericWriteMatches(
+			Existing, Pending.Entry, Pending.Sec, Pending.Field) {
+			if ReplaceExisting
+				PendingWrites[Index] := Pending
+			return PendingWrites.Length
+		}
+	}
+	PendingWrites.Push(Pending)
+	return PendingWrites.Length
+}
+
+; Reinsert only writers that refused or raised. If a newer edit arrived while
+; the old batch yielded to I/O, preserve that newer queued value rather than
+; overwriting it with the failed snapshot.
+_HCW_RequeueFailedNumericWrites(PendingWrites, Outcome) {
+	global _HCW_PendingNumericWrites
+	Requeued := 0
+	for _, Index in Outcome.Get("failed_indices", []) {
+		if (Index < 1 || Index > PendingWrites.Length)
+			continue
+		Before := _HCW_PendingNumericWrites.Length
+		_HCW_QueueNumericWrite(
+			_HCW_PendingNumericWrites, PendingWrites[Index], false)
+		if (_HCW_PendingNumericWrites.Length > Before)
+			Requeued += 1
+	}
+	return Requeued
+}
+
+; Remove only the pending value invalidated by a per-field reset. The reverse
+; walk is safe if a malformed/re-entrant caller managed to enqueue duplicates.
+_HCW_RemoveNumericWrite(PendingWrites, Entry, Sec, Field) {
+	Removed := 0
+	Index := PendingWrites.Length
+	while (Index >= 1) {
+		Pending := PendingWrites[Index]
+		if _HCW_NumericWriteMatches(Pending, Entry, Sec, Field) {
+			PendingWrites.RemoveAt(Index)
+			Removed += 1
+		}
+		Index -= 1
+	}
+	return Removed
+}
+
+_HCW_CancelNumericWrite(Entry, Sec, Field) {
+	global _HCW_PendingNumericWrites
+	Removed := _HCW_RemoveNumericWrite(_HCW_PendingNumericWrites, Entry, Sec, Field)
+	if (_HCW_PendingNumericWrites.Length == 0)
+		SetTimer(_HCW_FlushNumericWrite, 0)
+	return Removed
+}
+
+; Reset All invalidates every queued candidate. Disarm without flushing: writing
+; a value immediately before clearing it is redundant, and a refusal of that
+; obsolete write must not prevent the reset from reaching its real writes.
+_HCW_CancelAllNumericWrites() {
+	global _HCW_PendingNumericWrites
+	Removed := (_HCW_PendingNumericWrites is Array)
+		? _HCW_PendingNumericWrites.Length : 0
+	_HCW_PendingNumericWrites := []
+	SetTimer(_HCW_FlushNumericWrite, 0)
+	return Removed
+}
+
+; Convert the captured values into one aggregate persistence batch. Keeping
+; this transformation explicit makes the queue contract behaviour-testable:
+; every distinct queued field must produce exactly one writer invocation.
+_HCW_RunNumericWriteBatch(PendingWrites, WriterFn, ReconcileFn := 0, FailureFn := 0) {
+	Writes := []
+	for _, Pending in PendingWrites {
+		Writes.Push(WriterFn.Bind(
+			Pending.Entry, Pending.Sec, Pending.Field, Pending.Value))
+	}
+	return _HCW_RunWriteBatch(Writes, ReconcileFn, 0, FailureFn)
+}
+
+; Arm (or re-arm) the shared debounce timer. Repeated digits in one field
+; coalesce, while edits to another field remain queued. The clamped value and
+; current selection are captured so navigation cannot retarget the write.
 _HCW_ArmNumericWrite(Field, Entry, Sec, Value) {
-	global _HCW_PendingNumericWrite, _HCW_NUMERIC_DEBOUNCE_MS
-	_HCW_PendingNumericWrite := { Field: Field, Entry: Entry, Sec: Sec, Value: Value }
+	global _HCW_PendingNumericWrites, _HCW_NUMERIC_DEBOUNCE_MS
+	_HCW_QueueNumericWrite(_HCW_PendingNumericWrites,
+		{ Field: Field, Entry: Entry, Sec: Sec, Value: Value })
 	SetTimer(_HCW_FlushNumericWrite, -_HCW_NUMERIC_DEBOUNCE_MS)
 }
 
-; Fired once the numeric-edit burst settles. Persists the single captured
-; override and refreshes the controls. Safe to call eagerly (e.g. on selection
-; change or window close) to commit an in-flight edit; it is a no-op when no
-; write is pending.
-_HCW_FlushNumericWrite() {
-	global _HCW_PendingNumericWrite
-	Pending := _HCW_PendingNumericWrite
-	if !IsObject(Pending) {
-		return
+; Fired once the numeric-edit burst settles. Drain snapshots until the queue is
+; stable: file I/O may yield, and a new Change event can enqueue another value
+; while an earlier snapshot is being persisted. A nested timer/transition sees
+; the active owner and blocks instead of declaring that incomplete drain done.
+_HCW_FlushNumericWrite(RefreshOnSuccess := true, WriterFn := 0,
+	RefreshFn := 0, FailureFn := 0) {
+	global _HCW_PendingNumericWrites, _HCW_NumericDrainActive
+	if _HCW_NumericDrainActive
+		return false
+	if !(_HCW_PendingNumericWrites is Array)
+		_HCW_PendingNumericWrites := []
+	if (_HCW_PendingNumericWrites.Length == 0)
+		return true
+	if !HasMethod(WriterFn, "Bind")
+		WriterFn := _HCW_SetOverride
+	if !HasMethod(RefreshFn, "Call")
+		RefreshFn := _HCW_LoadCurrent
+	if !HasMethod(FailureFn, "Call")
+		FailureFn := _HCW_ReportWriteFailure.Bind()
+
+	_HCW_NumericDrainActive := true
+	WroteAny := false
+	try {
+		loop {
+			PendingWrites := _HCW_PendingNumericWrites
+			if (PendingWrites.Length == 0)
+				break
+			; Clear before I/O so re-entrant input lands in a fresh queue that the
+			; next loop iteration observes.
+			_HCW_PendingNumericWrites := []
+			SetTimer(_HCW_FlushNumericWrite, 0)
+			Outcome := _HCW_RunNumericWriteBatch(
+				PendingWrites, WriterFn, 0, FailureFn)
+			if !Outcome["ok"] {
+				_HCW_RequeueFailedNumericWrites(PendingWrites, Outcome)
+				return false
+			}
+			WroteAny := true
+		}
+		if (RefreshOnSuccess && WroteAny)
+			RefreshFn.Call()
+		return true
+	} finally {
+		_HCW_NumericDrainActive := false
 	}
-	; Clear the pending slot AND cancel the armed one-shot timer first so an
-	; eager flush followed by the timer firing cannot persist the same write
-	; twice.
-	_HCW_PendingNumericWrite := 0
-	SetTimer(_HCW_FlushNumericWrite, 0)
-	_HCW_SetOverride(Pending.Entry, Pending.Sec, Pending.Field, Pending.Value)
-	_HCW_LoadCurrent()
 }
 
 _HCW_OnColorChanged() {
@@ -104,12 +311,12 @@ _HCW_OnColorChanged() {
 		return
 	}
 	Hex := _HCW_CurrentColorOptions[Idx].Hex
-	if (Hex == "") {
-		_HCW_ClearOverride(Entry, Sec, "color")
-	} else {
-		_HCW_SetOverride(Entry, Sec, "color", Hex)
-	}
-	_HCW_LoadCurrent()
+	WriteFn := (Hex == "")
+		? _HCW_ClearOverride.Bind(Entry, Sec, "color")
+		: _HCW_SetOverride.Bind(Entry, Sec, "color", Hex)
+	Outcome := _HCW_RunWriteBatch([WriteFn], _HCW_ReconcileNativeCurrent.Bind(),
+		0, _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
 }
 
 _HCW_OnTooltipChanged() {
@@ -117,99 +324,120 @@ _HCW_OnTooltipChanged() {
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
 	Val := (_HCWWidgets.TooltipChk.Value == 1)
-	_HCW_SetOverride(Entry, Sec, "show_tooltip", Val)
-	_HCW_LoadCurrent()
+	Outcome := _HCW_RunWriteBatch([
+		_HCW_SetOverride.Bind(Entry, Sec, "show_tooltip", Val)
+	], _HCW_ReconcileNativeCurrent.Bind(), 0, _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
 }
 
 _HCW_ClearField(Field) {
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
-	_HCW_ClearOverride(Entry, Sec, Field)
-	_HCW_LoadCurrent()
+	; A timer armed by the value being reset must not restore it after the clear.
+	_HCW_CancelNumericWrite(Entry, Sec, Field)
+	Outcome := _HCW_RunWriteBatch([
+		_HCW_ClearOverride.Bind(Entry, Sec, Field)
+	], _HCW_ReconcileNativeCurrent.Bind(), 0, _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
+}
+
+; Build backend-neutral reset operations once for both native and WebView
+; presentations. Personal TOML requires one write per supported field, while
+; the override store clears all fields through its empty-field operation.
+_HCW_BuildResetAllPlan(CategoryList, SectionsFn := 0, PersonalFields := 0) {
+	if !HasMethod(SectionsFn, "Call")
+		SectionsFn := _HCW_GetSections
+	if !(PersonalFields is Array)
+		PersonalFields := _PersonalTomlOverrideFields()
+	Plan := []
+	for _, Entry in CategoryList {
+		Sections := SectionsFn.Call(Entry)
+		if Entry.IsPersonal {
+			for _, Field in PersonalFields
+				Plan.Push({ Kind: "personal", Path: Entry.Path, Sec: "", Field: Field })
+			for _, Sec in Sections {
+				for _, Field in PersonalFields {
+					Plan.Push({ Kind: "personal", Path: Entry.Path,
+						Sec: Sec.Name, Field: Field })
+				}
+			}
+		} else {
+			Category := Entry.IsExtension ? "ext." . Entry.ExtId : Entry.Key
+			Plan.Push({ Kind: "override", Category: Category, Sec: "", Field: "" })
+			for _, Sec in Sections {
+				Plan.Push({ Kind: "override", Category: Category,
+					Sec: Sec.Name, Field: "" })
+			}
+		}
+	}
+	return Plan
+}
+
+_HCW_BuildResetAllWrites(CategoryList) {
+	Writes := []
+	for _, Item in _HCW_BuildResetAllPlan(CategoryList) {
+		if (Item.Kind == "personal") {
+			Writes.Push(_HCW_PatchTomlMeta.Bind(
+				Item.Path, Item.Sec, Item.Field, ""))
+		} else {
+			Writes.Push(HotstringsClearOverride.Bind(
+				Item.Category, Item.Sec, Item.Field))
+		}
+	}
+	return Writes
 }
 
 _HCW_ResetAll() {
 	global _HCW_CATEGORY_LIST, _HCWGui, _HCWWidgets
-	; Commit any debounced numeric edit BEFORE the reset loop runs. Flushing
-	; AFTER the loop (the previous order) let a still-pending edit — armed by
-	; _HCW_ArmNumericWrite up to _HCW_NUMERIC_DEBOUNCE_MS ago — persist on top
-	; of the override the reset loop just cleared, silently un-resetting that
-	; one field. Flushing first makes the loop's Clear/PatchTomlMeta calls the
-	; genuinely last write for every field.
-	_HCW_FlushNumericWrite()
-	for _, E in _HCW_CATEGORY_LIST {
-		if E.IsPersonal {
-			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
-			_HCW_PatchTomlMeta(E.Path, "", "color", "")
-			_HCW_PatchTomlMeta(E.Path, "", "priority", "")
-			for _, Sec in _HCW_GetSections(E) {
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "delay", "")
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "priority", "")
-			}
-		} else if E.IsExtension {
-			HotstringsClearOverride("ext." . E.ExtId, "", "")
-			for _, Sec in _HCW_GetSections(E) {
-				HotstringsClearOverride("ext." . E.ExtId, Sec.Name, "")
-			}
-		} else {
-			HotstringsClearOverride(E.Key, "", "")
-			for _, Sec in _HCW_GetSections(E) {
-				HotstringsClearOverride(E.Key, Sec.Name, "")
-			}
-		}
-	}
-	; The loop above clears delay and priority through the storage primitives
-	; DIRECTLY, so it never passes the _HCW_SetOverride / _HCW_ClearOverride choke
-	; point where the republish lives. Both fields are baked into every Spec at
-	; registration: clearing them only bumps the resolve generation, so the window
-	; and the tooltip would advertise the default delay while the engine kept
-	; gating on the value the user had set. One rebuild for the whole reset rather
-	; than one per entry — the reset is a single user action, not N of them.
-	_HCW_RepublishIfBakedField("delay")
-	if (_HCWGui != 0) {
-		_HCWGui.Destroy()
-	}
-	; Destroy() does not fire OnEvent('Close'), so clear globals manually to
-	; prevent OpenHotstringsConfigWindow from trying to Show() a destroyed Gui
-	_HCWGui := 0
-	_HCWWidgets := 0
-	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+	; The reset supersedes every pending numeric candidate. Cancel before the
+	; loop so no timer can restore a cleared value and no obsolete write failure
+	; can block the reset itself.
+	_HCW_CancelAllNumericWrites()
+	Writes := _HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)
+	Outcome := _HCW_RunWriteBatch(Writes, _HCW_ReconcileNativeReset.Bind(),
+		_HCW_CompleteNativeReset.Bind(), _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
 }
 
 ; Force every category/extension to grey at file level; clear per-section colour
-; overrides for a consistent cascade. Personal file TOMLs are patched in-place.
+; overrides for a consistent cascade. Personal file TOMLs are patched atomically.
 _HCW_SetAllGrey() {
 	global _HCW_CATEGORY_LIST
 	Grey := "#6e6e73"
+	Writes := []
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
-			_HCW_PatchTomlMeta(E.Path, "", "color", Grey)
+			Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, "", "color", Grey))
 			for _, Sec in _HCW_GetSections(E) {
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
+				Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, Sec.Name, "color", ""))
 			}
 		} else if E.IsExtension {
-			HotstringsSetOverride("ext." . E.ExtId, "", "color", Grey)
+			Writes.Push(HotstringsSetOverride.Bind("ext." . E.ExtId, "", "color", Grey))
 			for _, Sec in _HCW_GetSections(E) {
-				HotstringsClearOverride("ext." . E.ExtId, Sec.Name, "color")
+				Writes.Push(HotstringsClearOverride.Bind("ext." . E.ExtId, Sec.Name, "color"))
 			}
 		} else {
-			HotstringsSetOverride(E.Key, "", "color", Grey)
+			Writes.Push(HotstringsSetOverride.Bind(E.Key, "", "color", Grey))
 			for _, Sec in _HCW_GetSections(E) {
-				HotstringsClearOverride(E.Key, Sec.Name, "color")
+				Writes.Push(HotstringsClearOverride.Bind(E.Key, Sec.Name, "color"))
 			}
 		}
 	}
-	_HCW_LoadCurrent()
+	Outcome := _HCW_RunWriteBatch(Writes, _HCW_ReconcileNativeCurrent.Bind(),
+		0, _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
 }
 
 _HCW_OnClose() {
-	global _HCWGui, _HCWWidgets
+	global _HCWGui, _HCWWidgets, _HCW_LastSelection
 	; Commit any numeric edit still inside the debounce window before tearing
 	; down the widgets, otherwise the last value the user typed would be lost.
-	_HCW_FlushNumericWrite()
+	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false))
+		return 1
 	_HCWGui := 0
 	_HCWWidgets := 0
+	_HCW_LastSelection := 0
+	return 0
 }
 
 
@@ -238,8 +466,10 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 	} else {
 		Ok := HotstringsSetOverride(Entry.Key, Sec, Field, Value)
 	}
-	_HCW_RepublishIfBakedField(Field)
-	return Ok
+	Persisted := (Ok is Integer) && Ok != 0
+	if Persisted
+		_HCW_RepublishIfBakedField(Field)
+	return Persisted
 }
 
 ; @returns {Boolean} True when the cleared state was persisted.
@@ -251,8 +481,10 @@ _HCW_ClearOverride(Entry, Sec, Field) {
 	} else {
 		Ok := HotstringsClearOverride(Entry.Key, Sec, Field)
 	}
-	_HCW_RepublishIfBakedField(Field)
-	return Ok
+	Persisted := (Ok is Integer) && Ok != 0
+	if Persisted
+		_HCW_RepublishIfBakedField(Field)
+	return Persisted
 }
 
 ; Re-register live when the field just written is one the engine baked at
@@ -334,24 +566,20 @@ _HCW_ReadTomlMeta(Path, Sec) {
 ; @returns {Boolean} True when the file was rewritten; false when the patch was
 ;          refused or the write failed — in both cases the file is untouched.
 _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
-	if !FileExist(Path) {
+	try return _PersonalTomlCommitPatch(Path,
+		_HCW_BuildTomlMetaPatch.Bind(Sec, Field, Value))
+	catch as Err {
+		try LoggerError("HotstringsConfigWindow",
+			"Failed to patch TOML meta in '{1}': {2}.", Path, Err.Message)
 		return false
 	}
+}
 
-	FileContent := ReadTomlFile(Path)
-	; ReadTomlFile returns "" for an EXISTING file it could not open (a sync
-	; client's exclusive handle, an AV scan, another editor) and records the path
-	; in the shared unreadable sentinel precisely so writers of this shape refuse
-	; — the same guard ApplyConfigToml, WritePersonalToml and TOML_BatchWrite
-	; already carry. Without it "I could not read it" is indistinguishable from
-	; "it was empty": the scan below finds nothing, and the rewrite serialises
-	; that emptiness over the original — "Réinitialiser tout" truncates
-	; personal_hotstrings.toml to zero bytes and every personal hotstring in it
-	; is gone, under a success notification.
-	if TOML_UnreadableFile(Path) {
-		try LoggerError("HotstringsConfigWindow", "Refusing to patch '{1}': its current contents could not be read, and rewriting from an unread file discards every hotstring it holds.", Path)
-		return false
-	}
+; Pure transformation used only after _PersonalTomlCommitPatch owns the path
+; and has read a fresh durable snapshot. Keeping every filesystem operation in
+; that shared helper prevents this window from bypassing the personal editor's
+; logical lease or truncating the target before a fallible write completes.
+_HCW_BuildTomlMetaPatch(Sec, Field, Value, FileContent) {
 	Lines := StrSplit(FileContent, "`n", "`r")
 	Field := StrLower(Field)
 	Sec   := StrLower(Sec)
@@ -403,8 +631,6 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 		Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
 	}
 
-	_ParseTomlGroupConfig_InvalidatePath(Path)
-
 	NewContent := ""
 	for I, L in Out {
 		NewContent .= L
@@ -412,24 +638,7 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 			NewContent .= "`n"
 		}
 	}
-	try {
-		F := FileOpen(Path, "w", "UTF-8")
-		; FileOpen throws in v2 rather than returning falsy, so this is belt and
-		; braces — but it turns any future falsy return into a loud error instead
-		; of a skipped write against a file that has already been truncated.
-		if !IsObject(F) {
-			throw Error("FileOpen returned no handle for '" . Path . "'.")
-		}
-		F.Write(NewContent)
-		; Close explicitly rather than leaving it to the collector: the config
-		; window rewrites the same file several times in a row, and a handle still
-		; open on the previous pass makes the next one fail for no visible reason.
-		F.Close()
-	} catch as Err {
-		try LoggerError("HotstringsConfigWindow", "Failed to write TOML meta to '{1}': {2}.", Path, Err.Message)
-		return false
-	}
-	return true
+	return NewContent
 }
 
 ; Format a value for TOML output.

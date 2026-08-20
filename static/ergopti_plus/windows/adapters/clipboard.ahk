@@ -32,15 +32,165 @@
 ; FAIL-SAFE:
 ; All A_Clipboard assignments are wrapped in try/catch. Any clipboard-access
 ; failure (locked clipboard, restricted context) returns false rather than throwing.
+; Bitmap files are published through CB_WriteBitmapFile(), which transfers one
+; Win32 HBITMAP to the clipboard only after its caller has validated ownership.
 ; ==============================================================================
 
 
 
 
 
+; =====================================
+; =====================================
+; ======= 1/ Ownership Registry =======
+; =====================================
+; =====================================
+
+; Clipboard notifications are delivered after the assignment which caused
+; them, often after the producer has already returned (and, for clipboard
+; paste transports, after a deferred restore).  Keyboard synthetic markers
+; therefore cannot identify this traffic.  Keep the mutation ownership at the
+; clipboard boundary itself: every adapter assignment reserves one FIFO
+; notification record before touching the OS, and an explicit transaction can
+; keep synthetic Ctrl+V owned until its delayed restore finishes.
+class CBClipboardOwner {
+	static generation := 0
+	static mutation_id := 0
+	static active := Map()
+	static pending := []
+}
+
+; Starts an out-of-order-safe clipboard transaction.  PreserveProvenance is
+; true for temporary save/write/paste/restore dances: their intermediate
+; payloads must not replace the keylogger's last genuine user-copy metadata.
+; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
+; capture and screenshots do not hide unrelated physical paste actions merely
+; because they also happen to own a clipboard snapshot.
+CB_BeginOwnedTransaction(Source := "", SuppressPaste := false, PreserveProvenance := true) {
+	PreviousCritical := Critical("On")
+	try {
+		Token := ++CBClipboardOwner.generation
+		CBClipboardOwner.active[Token] := Map(
+			"source", Source,
+			"suppress_paste", SuppressPaste ? true : false,
+			"preserve_provenance", PreserveProvenance ? true : false)
+		return Token
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Releases exactly the token returned by CB_BeginOwnedTransaction.  A Map of
+; live tokens, rather than a single boolean, makes nested and out-of-order
+; deferred completions safe.
+CB_EndOwnedTransaction(Token) {
+	PreviousCritical := Critical("On")
+	try {
+		if !CBClipboardOwner.active.Has(Token)
+			return false
+		CBClipboardOwner.active.Delete(Token)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; True only while a clipboard transaction which actually emits Ctrl+V is live.
+; The keylogger's pass-through hotkey uses this to discard the driver's paste
+; without silencing physical pastes during non-paste clipboard jobs.
+CB_IsDriverPasteActive() {
+	PreviousCritical := Critical("On")
+	try {
+		for _, Owner in CBClipboardOwner.active {
+			if Owner["suppress_paste"]
+				return true
+		}
+		return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Reserve before A_Clipboard is assigned, so even a callback which becomes
+; runnable during the OS operation already has an ownership record to consume.
+_CB_BeginOwnedMutation() {
+	PreviousCritical := Critical("On")
+	try {
+		PreserveProvenance := CBClipboardOwner.active.Count > 0
+		for _, Owner in CBClipboardOwner.active {
+			if !Owner["preserve_provenance"] {
+				PreserveProvenance := false
+				break
+			}
+		}
+		MutationId := ++CBClipboardOwner.mutation_id
+		CBClipboardOwner.pending.Push(Map(
+			"id", MutationId,
+			"kind", PreserveProvenance ? "temporary" : "replace"))
+		return MutationId
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Reserves the next notification for a clipboard write performed by another
+; process at the driver's request (Ctrl+C selection capture, Snipping Tool).
+; The caller owns the returned id and must cancel it if the external producer
+; never changes the clipboard.
+CB_ExpectOwnedChange() {
+	return _CB_BeginOwnedMutation()
+}
+
+CB_CancelExpectedChange(MutationId) {
+	_CB_CancelOwnedMutation(MutationId)
+}
+
+_CB_CancelOwnedMutation(MutationId) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, Mutation in CBClipboardOwner.pending {
+			if (Mutation["id"] == MutationId) {
+				CBClipboardOwner.pending.RemoveAt(Index)
+				return
+			}
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Consumes one Windows clipboard notification in mutation order.  Returns a
+; String classification for driver traffic and false for a genuine user
+; change; callers must type-check because AHK v2 considers the String "0"
+; equal to false.
+CB_ConsumeOwnedChange() {
+	PreviousCritical := Critical("On")
+	try {
+		if !CBClipboardOwner.pending.Length
+			return false
+		Mutation := CBClipboardOwner.pending.RemoveAt(1)
+		return Mutation["kind"]
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Drop notifications which predate observer registration.  Active transaction
+; tokens deliberately survive: a deferred restore still owns its synthetic
+; paste even if the keylogger observer is restarted in the middle.
+CB_DiscardOwnedNotifications() {
+	PreviousCritical := Critical("On")
+	try CBClipboardOwner.pending := []
+	finally Critical(PreviousCritical)
+}
+
+
+
+
+
 ; ====================================
 ; ====================================
-; ======= 1/ Adapter Functions =======
+; ======= 2/ Adapter Functions =======
 ; ====================================
 ; ====================================
 
@@ -60,10 +210,12 @@ CB_Read() {
 ; @param Text {String} The text to place on the clipboard.
 ; @return {Boolean} True on success, false on error.
 CB_Write(Text) {
+	MutationId := _CB_BeginOwnedMutation()
 	try {
 		A_Clipboard := Text
 		return true
 	} catch {
+		_CB_CancelOwnedMutation(MutationId)
 		return false
 	}
 }
@@ -91,10 +243,12 @@ CB_Save() {
 CB_Restore(Saved) {
 	if (Saved == "__CB_SAVE_ERROR__")
 		return false
+	MutationId := _CB_BeginOwnedMutation()
 	try {
 		A_Clipboard := Saved
 		return true
 	} catch {
+		_CB_CancelOwnedMutation(MutationId)
 		return false
 	}
 }
@@ -125,10 +279,12 @@ CB_RestoreAll(Saved) {
 		try LoggerWarn("Clipboard", "CB_RestoreAll: skipping restore — Saved is the __CB_SAVE_ERROR__ sentinel from a failed CB_SaveAll.")
 		return false
 	}
+	MutationId := _CB_BeginOwnedMutation()
 	try {
 		A_Clipboard := Saved
 		return true
 	} catch {
+		_CB_CancelOwnedMutation(MutationId)
 		return false
 	}
 }
@@ -149,6 +305,63 @@ CB_HasImage() {
 		|| DllCall("IsClipboardFormatAvailable", "UInt", 8)
 		|| DllCall("IsClipboardFormatAvailable", "UInt", 17)
 	return false
+}
+
+; Publishes a staged BMP file as CF_BITMAP. Screenshot workers write only the
+; private file; the owning AHK generation calls this function after completion,
+; so a canceled or orphaned child process cannot mutate the clipboard by itself.
+; The HBITMAP ownership transfers to Windows only when SetClipboardData succeeds.
+CB_WriteBitmapFile(Path) {
+	static IMAGE_BITMAP := 0
+	static CF_BITMAP := 2
+	static LR_LOADFROMFILE := 0x10
+	static LR_CREATEDIBSECTION := 0x2000
+	MutationId := 0
+	BitmapHandle := 0
+	ClipboardOpened := false
+	ClipboardMutated := false
+	try {
+		BitmapHandle := DllCall("User32\LoadImageW", "Ptr", 0, "Str", Path,
+			"UInt", IMAGE_BITMAP, "Int", 0, "Int", 0,
+			"UInt", LR_LOADFROMFILE | LR_CREATEDIBSECTION, "Ptr")
+		if !BitmapHandle
+			throw Error("LoadImageW could not load the staged bitmap")
+		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		if !ClipboardOpened
+			throw Error("OpenClipboard failed")
+		; No clipboard notification can be ours until the file is loaded and the
+		; clipboard lock is held. Reserving earlier could consume an unrelated user
+		; copy while LoadImageW or OpenClipboard was still in progress.
+		MutationId := _CB_BeginOwnedMutation()
+		if !DllCall("User32\EmptyClipboard", "Int")
+			throw Error("EmptyClipboard failed")
+		ClipboardMutated := true
+		if !DllCall("User32\SetClipboardData", "UInt", CF_BITMAP, "Ptr", BitmapHandle, "Ptr")
+			throw Error("SetClipboardData(CF_BITMAP) failed")
+		BitmapHandle := 0
+		return true
+	} catch as Err {
+		; EmptyClipboard itself emits the owned notification. Cancel the reservation
+		; only when the clipboard never changed, otherwise the observer must consume it.
+		if MutationId && !ClipboardMutated
+			_CB_CancelOwnedMutation(MutationId)
+		; Release the global clipboard lock before file-backed logging can yield.
+		if ClipboardOpened {
+			try DllCall("User32\CloseClipboard")
+			ClipboardOpened := false
+		}
+		if BitmapHandle {
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+			BitmapHandle := 0
+		}
+		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
+		return false
+	} finally {
+		if ClipboardOpened
+			try DllCall("User32\CloseClipboard")
+		if BitmapHandle
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+	}
 }
 
 ; True when another process currently holds the clipboard open, i.e. reading or

@@ -111,6 +111,7 @@ graph TD
         WINDOWS_timer_scheduler["TimerScheduler.ahk"]
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
+        WINDOWS_uia_worker["UiaWorker.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]
         WINDOWS_window_manager["WindowManager.ahk"]
     end

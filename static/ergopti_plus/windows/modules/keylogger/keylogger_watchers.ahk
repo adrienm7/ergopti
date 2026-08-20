@@ -67,6 +67,7 @@ class KLWatchConst {
 		static MICRO_IDLE_TIMEOUT_MS    := 30000
 		static SESSION_TIMEOUT_MS       := 300000
 		static IDLE_CHECK_INTERVAL_MS   := 10000   ; HS IDLE_CHECK_INTERVAL_SEC * 1000
+		static WTS_REGISTER_RETRY_MS    := 30000
 
 		; WM_* / WTS_* / PBT_* numeric codes — these are Windows ABI
 		; constants, not magic numbers. Cited inline so a reviewer can
@@ -121,6 +122,10 @@ class KLWatch {
 		; Lifecycle handles.
 		static idle_check_timer    := unset
 		static wts_registered      := false
+		; Concrete idle sentinel: reading a static assigned ``unset`` throws in AHK
+		; v2, including immediately after the one-shot releases its ownership.
+		static wts_retry_timer     := false
+		static wts_failure_reported := false
 		static session_msg_handler := unset
 		static power_msg_handler   := unset
 }
@@ -325,6 +330,81 @@ KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
 ; ============================
 ; ============================
 
+; Registers the main script window for session-change broadcasts and owns one
+; bounded retry callback when Windows temporarily refuses the subscription. A
+; BOOL result must be type-checked: AHK considers the string "0" equal to false,
+; so a loose comparison could publish a false registration as live authority.
+_KL_Watchers_TryRegisterWts(RegisterFn := 0, ScheduleFn := 0) {
+		if KLWatch.wts_registered
+				return true
+		Registered := 0
+		RegisterError := ""
+		try Registered := HasMethod(RegisterFn, "Call")
+				? RegisterFn.Call(A_ScriptHwnd,
+						KLWatchConst.NOTIFY_FOR_THIS_SESSION)
+				: DllCall("Wtsapi32\WTSRegisterSessionNotification",
+						"Ptr", A_ScriptHwnd,
+						"UInt", KLWatchConst.NOTIFY_FOR_THIS_SESSION,
+						"Int")
+		catch as Err
+				RegisterError := Err.Message
+		if (Registered is Integer) && Registered != 0 {
+				KLWatch.wts_registered := true
+				KLWatch.wts_failure_reported := false
+				return true
+		}
+		if !KLWatch.wts_failure_reported {
+				KLWatch.wts_failure_reported := true
+				if (RegisterError != "") {
+						try LoggerWarn("Keylogger",
+								"WTS session notification registration failed: {1}; retrying.",
+								RegisterError)
+				} else {
+						try LoggerWarn("Keylogger",
+								"WTS session notification registration was refused; retrying.")
+				}
+		}
+		_KL_Watchers_ScheduleWtsRetry(RegisterFn, ScheduleFn)
+		return false
+}
+
+_KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
+		if KLWatch.HasOwnProp("wts_retry_timer")
+				&& IsObject(KLWatch.wts_retry_timer)
+				return true
+		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(RegisterFn, ScheduleFn)
+		KLWatch.wts_retry_timer := RetryFn
+		try {
+				if HasMethod(ScheduleFn, "Call") {
+						Scheduled := ScheduleFn.Call(RetryFn,
+								-KLWatchConst.WTS_REGISTER_RETRY_MS)
+						if !((Scheduled is Integer) && Scheduled == 1)
+								throw Error("the WTS retry scheduler refused the callback")
+				} else {
+						SetTimer(RetryFn, -KLWatchConst.WTS_REGISTER_RETRY_MS)
+				}
+				return true
+		} catch as Err {
+				KLWatch.wts_retry_timer := false
+				try LoggerError("Keylogger",
+						"Could not schedule WTS registration recovery: {1}.",
+						Err.Message)
+				return false
+		}
+}
+
+_KL_Watchers_RetryWtsRegistration(RegisterFn := 0, ScheduleFn := 0) {
+		KLWatch.wts_retry_timer := false
+		; SetTimer bypasses native Suspend. Do not touch session-notification state
+		; while paused, but retain one future attempt so resume cannot lose the
+		; feature for the rest of the process lifetime.
+		if A_IsSuspended {
+				_KL_Watchers_ScheduleWtsRetry(RegisterFn, ScheduleFn)
+				return false
+		}
+		return _KL_Watchers_TryRegisterWts(RegisterFn, ScheduleFn)
+}
+
 KL_Watchers_Start() {
 		; Idempotent — successive calls are no-ops once the timer is armed.
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer)
@@ -336,14 +416,7 @@ KL_Watchers_Start() {
 		; Register WTS notifications on the script's main window. The HWND
 		; comes from A_ScriptHwnd, which AHK v2 always exposes for the
 		; default script window (hidden by default but guaranteed to exist).
-		if !KLWatch.wts_registered {
-				try {
-						DllCall("Wtsapi32\WTSRegisterSessionNotification",
-								"Ptr",  A_ScriptHwnd,
-								"UInt", KLWatchConst.NOTIFY_FOR_THIS_SESSION)
-						KLWatch.wts_registered := true
-				}
-		}
+		_KL_Watchers_TryRegisterWts()
 
 		; OnMessage pins the callback for the lifetime of the script. We
 		; keep the bound function reference around so KL_Watchers_Stop can
@@ -359,10 +432,15 @@ KL_Watchers_Stop() {
 				try SetTimer(KLWatch.idle_check_timer, 0)
 				KLWatch.idle_check_timer := unset
 		}
+		if KLWatch.HasOwnProp("wts_retry_timer") && IsObject(KLWatch.wts_retry_timer) {
+				try SetTimer(KLWatch.wts_retry_timer, 0)
+				KLWatch.wts_retry_timer := false
+		}
 		if KLWatch.wts_registered {
 				try DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd)
 				KLWatch.wts_registered := false
 		}
+		KLWatch.wts_failure_reported := false
 		if KLWatch.HasOwnProp("session_msg_handler") && IsObject(KLWatch.session_msg_handler) {
 				try OnMessage(KLWatchConst.WM_WTSSESSION_CHANGE, KLWatch.session_msg_handler, 0)
 				KLWatch.session_msg_handler := unset

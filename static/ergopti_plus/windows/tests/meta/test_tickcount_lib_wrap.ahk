@@ -39,12 +39,13 @@ _TCLW_TooltipWrapSafe() {
 	Assert(Src != "", "the ui/tooltip module must be readable")
 
 	; Negative: bare subtraction without mask must not appear
-	Assert(!InStr(Src, "return (A_TickCount - _LLM_Tooltip_ShownAt) < _LLM_TOOLTIP_MIN_DISPLAY_MS"),
-		"tooltip.ahk must not use bare (A_TickCount - _LLM_Tooltip_ShownAt) without & 0xFFFFFFFF mask (tickcount-wrap)")
+	Assert(!InStr(Src, "return (A_TickCount - Record.ShownAt) < _LLM_TOOLTIP_MIN_DISPLAY_MS"),
+		"tooltip.ahk must not use bare (A_TickCount - Record.ShownAt) without & 0xFFFFFFFF mask (tickcount-wrap)")
 
 	; Positive: masked form must be present
-	Assert(InStr(Src, "(_LLM_Tooltip_ShownAt) & 0xFFFFFFFF) < _LLM_TOOLTIP_MIN_DISPLAY_MS") > 0,
-		"tooltip.ahk must mask the LLM tooltip delta with & 0xFFFFFFFF (tickcount-wrap)")
+	Assert(InStr(Src, "(Record.ShownAt) & 0xFFFFFFFF)") > 0
+		and InStr(Src, "< _LLM_TOOLTIP_MIN_DISPLAY_MS") > 0,
+		"tooltip.ahk must mask the surface record's LLM grace delta with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("tickcount-wrap: tooltip.ahk LLM grace comparison uses & 0xFFFFFFFF mask", _TCLW_TooltipWrapSafe)
 
@@ -58,14 +59,14 @@ Test("tickcount-wrap: tooltip.ahk LLM grace comparison uses & 0xFFFFFFFF mask", 
 ; =========================================================================
 
 _TCLW_MetricsFocusWrapSafe() {
-	Src := _TCLW_ReadSource("infra/metrics/metrics_filters.ahk")
-	Assert(Src != "", "infra/metrics/metrics_filters.ahk must be readable")
-
-	Assert(!InStr(Src, "(A_TickCount - MetricsFocusCache.state.last_at) < MF_FOCUS_TTL_MS"),
-		"metrics_filters.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")
-
-	Assert(InStr(Src, "(MetricsFocusCache.state.last_at) & 0xFFFFFFFF) < MF_FOCUS_TTL_MS") > 0,
-		"metrics_filters.ahk must mask the focus cache delta with & 0xFFFFFFFF (tickcount-wrap)")
+	Body := _DriverFuncBody("_MF_RefreshFocusNonCritical")
+	Assert(Body != "", "_MF_RefreshFocusNonCritical must be discoverable")
+	Assert(!RegExMatch(Body,
+		"s)\(\(\s*\w+\s*-\s*\(MetricsFocusCache\.state\.last_at\)\)\s*<\s*MF_FOCUS_TTL_MS"),
+		"metrics_filters.ahk must not compare its captured clock to the focus timestamp without an unsigned mask (tickcount-wrap)")
+	Assert(RegExMatch(Body,
+		"s)\(\(\s*\w+\s*-\s*\(MetricsFocusCache\.state\.last_at\)\)\s*&\s*0xFFFFFFFF\)\s*<\s*MF_FOCUS_TTL_MS"),
+		"metrics_filters.ahk must mask the complete captured-clock delta with & 0xFFFFFFFF before the focus TTL comparison (tickcount-wrap)")
 }
 Test("tickcount-wrap: metrics_filters.ahk focus TTL comparison uses & 0xFFFFFFFF mask", _TCLW_MetricsFocusWrapSafe)
 
@@ -110,3 +111,45 @@ _TCLW_CrashReporterWrapSafe() {
 		"crash_reporter.ahk must mask the uptime delta with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("tickcount-wrap: crash_reporter.ahk uptime division uses & 0xFFFFFFFF mask", _TCLW_CrashReporterWrapSafe)
+
+
+; The old tests above cover four historical sites.  This class ratchet covers
+; every first-party absolute-deadline sibling found by the adversarial pass, so
+; fixing one function cannot leave another rollover bug behind.
+_TCLW_NoFirstPartyAbsoluteDeadlines() {
+	Cases := [
+		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining("],
+		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired("],
+		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired("],
+		["UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
+		["GestureCaptureRegion", '"deadline", A_TickCount +', '"started_tick"'],
+		["GestureDirectCapturePoll", 'A_TickCount < State["deadline"]', "TickExpired("],
+		["GestureScreenshotRegion", '"selection_deadline", A_TickCount +', '"selection_started_tick"'],
+		["GestureRegionCapturePoll", 'A_TickCount >= State["save_deadline"]', "TickExpired("],
+		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
+		["_TakeNotePoll", 'A_TickCount >= Job["deadline"]', "TickExpired("],
+		["_CrashReport_SysInfo", "Deadline := A_TickCount +", "TickExpired("],
+		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', '"start_tick"'],
+		["_LLMRemote_PollRequest", 'entry.Has("deadline_tick")', "_LLM_DeadlineExpired("],
+		["SpotlightMouseAt", '_Spotlight_State["Deadline"] := A_TickCount +', '"StartedTick"'],
+		["_SpotlightTick", 'A_TickCount >= _Spotlight_State["Deadline"]', "TickExpired("]
+	]
+	Assert(Cases.Length >= 15,
+		"tickcount absolute-deadline ratchet must enumerate the complete audited sibling class")
+	for Spec in Cases {
+		Body := _DriverFuncBody(Spec[1])
+		Assert(Body != "", Spec[1] . " must be discoverable in the driver source")
+		Assert(!InStr(Body, Spec[2]),
+			Spec[1] . " must not retain the rollover-unsafe absolute deadline: " . Spec[2])
+		Assert(InStr(Body, Spec[3]) > 0,
+			Spec[1] . " must route deadline arithmetic through the wrap-safe tick primitive")
+	}
+	Show := _DriverFuncBody("_TooltipShowNow")
+	Present := _DriverFuncBody("_TooltipPresentStack")
+	Assert(InStr(Show, "_TooltipCreateLifecyclePlan(") > 0,
+		"_TooltipShowNow must carry origin+duration pairs instead of publishing an absolute deadline")
+	Assert(InStr(Present, "_TooltipLifecycleDeadlineBounds(") > 0,
+		"the final pixel transaction must resolve tooltip deadlines through the wrap-safe owner")
+}
+Test("tickcount-wrap: every audited first-party absolute deadline uses origin plus duration",
+	_TCLW_NoFirstPartyAbsoluteDeadlines)

@@ -220,38 +220,59 @@ _LLM_Menu_PerAppProfileRows() {
 }
 
 _LLM_Menu_AddOverrideForActiveApp() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _LLM_Menu_AddOverrideForActiveApp()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	app := ""
 	try app := StrLower(WinGetProcessName("A"))
 	app := RegExReplace(app, "\.exe$", "")
 	if (app == "")
-		return
-	_LLM_Menu["app_profile_overrides"][app] := _LLM_Menu["profile_id"]
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+		return false
+	return LLM_Menu_CommitMutation("the active-application profile override",
+		(Candidate) => _LLM_Menu_SetOverrideCandidate(Candidate, app),
+		_LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_SetOverrideCandidate(Candidate, AppName) {
+	if !(Candidate is Map)
+			|| !(Candidate["app_profile_overrides"] is Map)
+		return false
+	Candidate["app_profile_overrides"][AppName] := Candidate["profile_id"]
+	return true
 }
 
 _LLM_Menu_ClearOverrideFor(app_name) {
 	global _LLM_Menu
 	overrides := _LLM_Menu["app_profile_overrides"]
 	if !(overrides is Map) or !overrides.Has(app_name)
-		return
-	overrides.Delete(app_name)
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+		return false
+	return LLM_Menu_CommitMutation("the application profile override removal",
+		(Candidate) => _LLM_Menu_ClearOverrideCandidate(Candidate, app_name),
+		_LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_ClearOverrideCandidate(Candidate, AppName) {
+	Overrides := Candidate["app_profile_overrides"]
+	if !(Overrides is Map) || !Overrides.Has(AppName)
+		return false
+	Overrides.Delete(AppName)
+	return true
 }
 
 _LLM_Menu_ToggleAutoProfile() {
-	global _LLM_Menu
-	_LLM_Menu["auto_profile_for_model"] := !_LLM_Menu["auto_profile_for_model"]
-	; Re-evaluate immediately on enable so the next prediction uses the
-	; recommended profile without waiting for the user to switch model.
-	if _LLM_Menu["auto_profile_for_model"]
-		LLM_Menu_AutoApplyProfileForModel()
-	LLM_Menu_SaveConfig()
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the automatic LLM profile setting",
+		_LLM_Menu_ToggleAutoProfileCandidate, _LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_ToggleAutoProfileCandidate(Candidate) {
+	Candidate["auto_profile_for_model"] := !Candidate["auto_profile_for_model"]
+	if Candidate["auto_profile_for_model"]
+		LLM_Menu_AutoApplyProfileForModel(Candidate)
+	return true
 }
 
 
@@ -270,6 +291,12 @@ _LLM_Menu_ToggleAutoProfile() {
  * @param {Map} profile - The user profile Map object.
  */
 LLM_Menu_OnUserProfileClick(profile) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_OnUserProfileClick(profile)
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	pid    := profile.Has("id")    ? profile["id"]    : ""
 	plabel := profile.Has("label") ? profile["label"] : pid
@@ -291,27 +318,43 @@ LLM_Menu_OnUserProfileClick(profile) {
 	} else if (choice == "Cancel") {
 		confirm := MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
 		if (confirm == "Yes") {
-			for i, p in _LLM_Menu["user_profiles"] {
-				if (p.Has("id") && p["id"] == pid) {
-					_LLM_Menu["user_profiles"].RemoveAt(i)
-					break
-				}
-			}
-			if (_LLM_Menu["profile_id"] == pid)
-				_LLM_Menu["profile_id"] := "basic"
-			LLM_Menu_SaveConfig()
-			LLM_Engine_Init(LLM_Menu_BuildOpts())
-			LLM_Menu_Build()
-			if IsSet(LLM_Menu_BindProfileHotkeys)
-				(LLM_Menu_BindProfileHotkeys)()
+			return LLM_Menu_CommitMutation("the custom LLM profile removal",
+				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
+				_LLM_Menu_ApplyProfileCommitted)
 		}
 	}
+	return true
+}
+
+_LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
+	for Index, Profile in Candidate["user_profiles"] {
+		if (Profile.Has("id") && Profile["id"] == ProfileId) {
+			Candidate["user_profiles"].RemoveAt(Index)
+			if Candidate["profile_id"] == ProfileId
+				Candidate["profile_id"] := "basic"
+			return true
+		}
+	}
+	return false
+}
+
+_LLM_Menu_ApplyProfileCommitted(*) {
+	_LLM_Menu_ApplyStandardCommitted()
+	if IsSet(LLM_Menu_BindProfileHotkeys)
+		(LLM_Menu_BindProfileHotkeys)()
+	return true
 }
 
 /**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
 LLM_Menu_PromptCreateProfile() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptCreateProfile()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
@@ -342,11 +385,17 @@ LLM_Menu_PromptCreateProfile() {
 		"batch",         false
 	)
 
-	_LLM_Menu["user_profiles"].Push(new_profile)
-	_LLM_Menu["profile_id"] := pid
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the custom LLM profile creation",
+		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
+		_LLM_Menu_ApplyProfileCommitted)
+}
+
+_LLM_Menu_AddProfileCandidate(Candidate, Profile) {
+	if !(Candidate["user_profiles"] is Array) || !(Profile is Map)
+		return false
+	Candidate["user_profiles"].Push(LLM_Menu_DeepClone(Profile))
+	Candidate["profile_id"] := Profile["id"]
+	return true
 }
 
 /**
@@ -354,6 +403,12 @@ LLM_Menu_PromptCreateProfile() {
  * @param {Map} profile - The user profile to edit.
  */
 LLM_Menu_PromptEditProfile(profile) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptEditProfile(profile)
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	pid := profile.Has("id") ? profile["id"] : ""
 
@@ -375,17 +430,20 @@ LLM_Menu_PromptEditProfile(profile) {
 	if (ib_prompt.Result != "OK")
 		return
 
-	; Update in the array in place
-	for i, p in _LLM_Menu["user_profiles"] {
-		if (p.Has("id") && p["id"] == pid) {
-			_LLM_Menu["user_profiles"][i]["label"]         := new_label
-			_LLM_Menu["user_profiles"][i]["system_single"] := ib_prompt.Value
-			break
+	return LLM_Menu_CommitMutation("the custom LLM profile edit",
+		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
+			new_label, ib_prompt.Value), _LLM_Menu_ApplyProfileCommitted)
+}
+
+_LLM_Menu_EditProfileCandidate(Candidate, ProfileId, Label, Prompt) {
+	for Profile in Candidate["user_profiles"] {
+		if (Profile.Has("id") && Profile["id"] == ProfileId) {
+			Profile["label"] := Label
+			Profile["system_single"] := Prompt
+			return true
 		}
 	}
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return false
 }
 
 /**
@@ -397,6 +455,12 @@ LLM_Menu_PromptEditProfile(profile) {
  * is the supported way to customise a built-in's system prompt.
  */
 LLM_Menu_CloneActiveBuiltinProfile() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_CloneActiveBuiltinProfile()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	src_id := _LLM_Menu["profile_id"]
 	; Pull the source profile from the live registry — covers the case
@@ -415,14 +479,15 @@ LLM_Menu_CloneActiveBuiltinProfile() {
 		"system_multi_template", src_profile.Has("system_multi_template") ? src_profile["system_multi_template"] : "",
 		"batch",                 src_profile.Has("batch") and src_profile["batch"] == true
 	)
-	_LLM_Menu["user_profiles"].Push(new_profile)
-	_LLM_Menu["profile_id"] := new_id
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	Committed := LLM_Menu_CommitMutation("the built-in LLM profile clone",
+		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
+		_LLM_Menu_ApplyProfileCommitted)
+	if !Committed
+		return false
 	; Immediately open the edit dialog so the user lands directly into
 	; what they wanted: a customisable copy of the built-in prompt.
 	LLM_Menu_PromptEditProfile(new_profile)
+	return true
 }
 
 /**
@@ -486,16 +551,13 @@ LLM_RecommendProfileForModel(model) {
  *
  * @returns {string} Profile id in effect after the call.
  */
-LLM_Menu_AutoApplyProfileForModel() {
-	global _LLM_Menu
-	if !_LLM_Menu["auto_profile_for_model"]
-		return _LLM_Menu["profile_id"]
-	recommended := LLM_RecommendProfileForModel(_LLM_Menu["model"])
-	if (recommended == "" or recommended == _LLM_Menu["profile_id"])
-		return _LLM_Menu["profile_id"]
-	_LLM_Menu["profile_id"] := recommended
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
+LLM_Menu_AutoApplyProfileForModel(MenuState) {
+	if !MenuState["auto_profile_for_model"]
+		return MenuState["profile_id"]
+	recommended := LLM_RecommendProfileForModel(MenuState["model"])
+	if (recommended == "" or recommended == MenuState["profile_id"])
+		return MenuState["profile_id"]
+	MenuState["profile_id"] := recommended
 	return recommended
 }
 

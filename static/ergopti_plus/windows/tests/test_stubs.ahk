@@ -80,6 +80,10 @@ global ScriptInformation := Map(
     "LogLevel", "INFO",
 )
 
+; Mirrors the process identity initialized by ErgoptiPlus.ahk before the driver
+; include graph starts. Production code must never read the nonexistent A_Pid.
+global DriverPid := DllCall("GetCurrentProcessId", "UInt")
+
 ; v2 Features Map — canonical state container. Hydrated at boot from the
 ; user's v2 config.toml by ApplyConfigToml. All runtime reads go through
 ; Features directly.
@@ -337,6 +341,10 @@ IsCategoryGated(Category) {
 }
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
+; Stable locator used by the LLM trigger WAL. Boot is intentionally not loaded
+; by the unit runner, so give lifecycle tests a process-private absent journal
+; instead of letting owner discovery fail because the production global is unset.
+global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 
 ; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
@@ -365,14 +373,6 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; in ErgoptiPlus.ahk must be mirrored here or the first read from a unit test
 ; raises "global variable has not been assigned a value".
 global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
-
-; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in
-; infra/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk
-; (false) so the canonicaliser knows it is allowed to run; the test runner
-; does not include ErgoptiPlus.ahk, so the helper would otherwise raise
-; "global variable has not been assigned a value" the first time a test
-; writes through TOML_BatchWrite / TOML_Write.
-global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Hotstring engine globals normally maintained by modules/keymap/layout.ahk.
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
@@ -487,9 +487,12 @@ ToggleSuspend() {
 ; call sites so production keeps ONE reload rule with no silent fallback — a
 ; guarded call would degrade to a bare Reload exactly where the guarantee
 ; matters. Records the request so a test can assert the pause was carried.
-ReloadPreservingSuspend() {
+ReloadPreservingSuspend(BeforeReloadFn := 0, ExistingOwner := 0) {
     global _Stub_SentText
+    if HasMethod(BeforeReloadFn, "Call")
+        BeforeReloadFn.Call()
     _Stub_SentText.Push({ kind: "reload_preserving_suspend" })
+    return true
 }
 
 OneShotShift() {
@@ -619,34 +622,101 @@ global _Stub_LlmTooltipCalls   := []   ; recorded LLM_Tooltip_Show calls
 global _Stub_LlmLogCalls       := []   ; recorded KL_LogLlm calls
 global _Stub_LlmLogFailedCalls := []   ; recorded KL_LogLlmFailed calls
 global _Stub_LlmSuggestedCalls := []   ; recorded KL_LogLlmSuggested calls
+global _Stub_LlmTooltipVisible := false
+global _Stub_LlmTooltipLoading := false
+global _Stub_LlmTooltipText := ""
+global _Stub_LlmPresentedRecord := 0
 
 global LLM_TOOLTIP_PLACEHOLDER := "★"
 
-LLM_Tooltip_Show(slots, active := 1, is_final := false) {
-    global _Stub_LlmTooltipCalls
-    _Stub_LlmTooltipCalls.Push({ slots: slots, active: active, is_final: is_final })
+LLM_Tooltip_Show(slots, active := 1, is_final := false,
+        PresentationMeta := 0) {
+    global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible
+    global _Stub_LlmTooltipLoading, _Stub_LlmTooltipText
+    global _Stub_LlmPresentedRecord
+    Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+    Source := Meta.Get("accept_source", Map())
+    SlotSnapshot := (slots is Array) ? slots.Clone() : [slots]
+    ActiveIdx := Max(1, Min(active, SlotSnapshot.Length))
+    Lifecycle := {
+        OfferId: Meta.Get("offer_id", 0), AcceptSource: Source,
+        AppName: Meta.Get("app_name", ""), Slots: SlotSnapshot.Clone(),
+        Suggested: is_final ? true : false, Outcome: ""
+    }
+    _Stub_LlmPresentedRecord := {
+        Kind: "prediction", Slots: SlotSnapshot, ActiveIdx: ActiveIdx,
+        Lifecycle: Lifecycle, IsFinal: is_final ? true : false,
+        Generation: 1, ShownAt: A_TickCount
+    }
+    _Stub_LlmTooltipVisible := true
+    _Stub_LlmTooltipLoading := false
+    _Stub_LlmTooltipText := SlotSnapshot.Length > 0
+        ? _LLM_SlotGetTextStub(SlotSnapshot[ActiveIdx]) : ""
+    _Stub_LlmTooltipCalls.Push({ slots: slots, active: active,
+        is_final: is_final, meta: Meta })
+    return 1
+}
+
+_LLM_SlotGetTextStub(Slot) {
+    if IsObject(Slot) and Slot.HasOwnProp("Text")
+        return Slot.Text
+    return (Slot is String) ? Slot : ""
+}
+
+LLM_Tooltip_IsRenderGenerationCurrent(RenderGeneration) {
+    return RenderGeneration == 1
 }
 
 LLM_Tooltip_SetDisplayOpts(Opts) {
     ; no-op for tests
 }
 
-LLM_Tooltip_ShowLoading() {
-    global _Stub_LlmTooltipCalls
-    _Stub_LlmTooltipCalls.Push({ loading: true })
+LLM_Tooltip_ShowLoading(PresentationMeta := 0) {
+    global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible
+    global _Stub_LlmTooltipLoading, _Stub_LlmTooltipText
+    global _Stub_LlmPresentedRecord
+    Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+    Lifecycle := {
+        OfferId: Meta.Get("offer_id", 0),
+        AcceptSource: Meta.Get("accept_source", Map()),
+        AppName: Meta.Get("app_name", ""), Slots: [],
+        Suggested: false, Outcome: ""
+    }
+    _Stub_LlmPresentedRecord := {
+        Kind: "loading", Slots: [], ActiveIdx: 0,
+        Lifecycle: Lifecycle, IsFinal: false,
+        Generation: 1, ShownAt: 0
+    }
+    _Stub_LlmTooltipVisible := true
+    _Stub_LlmTooltipLoading := true
+    _Stub_LlmTooltipText := ""
+    _Stub_LlmTooltipCalls.Push({ loading: true, meta: Meta })
 }
 
 LLM_Tooltip_Hide(accepted := false) {
-    global _Stub_LlmTooltipCalls
+    global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible
+    global _Stub_LlmTooltipLoading, _Stub_LlmTooltipText
+    global _Stub_LlmPresentedRecord
     _Stub_LlmTooltipCalls.Push({ hide: true, accepted: accepted })
+    _Stub_LlmTooltipVisible := false
+    _Stub_LlmTooltipLoading := false
+    _Stub_LlmTooltipText := ""
+    _Stub_LlmPresentedRecord := 0
+}
+
+LLM_Tooltip_HideExact(ExpectedRecord, accepted := false) {
+    global _Stub_LlmPresentedRecord
+    if (IsObject(_Stub_LlmPresentedRecord)
+        and ObjPtr(_Stub_LlmPresentedRecord) != ObjPtr(ExpectedRecord))
+        return false
+    LLM_Tooltip_Hide(accepted)
+    return true
 }
 
 ; Visibility probes used by the engine to decide whether to paint the violet
 ; loading spinner (macOS parity: keep an existing prediction instead of
 ; replacing it with a spinner). Default false so the spinner path runs exactly as
 ; before; a test may flip these globals to simulate a prediction already on screen.
-global _Stub_LlmTooltipVisible := false
-global _Stub_LlmTooltipLoading := false
 
 LLM_Tooltip_IsVisible() {
     global _Stub_LlmTooltipVisible
@@ -656,6 +726,48 @@ LLM_Tooltip_IsVisible() {
 LLM_Tooltip_IsLoading() {
     global _Stub_LlmTooltipLoading
     return _Stub_LlmTooltipLoading
+}
+
+LLM_Tooltip_GetText() {
+    global _Stub_LlmTooltipText
+    return _Stub_LlmTooltipText
+}
+
+LLM_Tooltip_GetPresentedToken() {
+    global _Stub_LlmPresentedRecord
+    return _Stub_LlmPresentedRecord
+}
+
+LLM_Tooltip_GetAcceptSnapshot() {
+    global _Stub_LlmPresentedRecord
+    Record := _Stub_LlmPresentedRecord
+    if !IsObject(Record) or Record.Kind != "prediction"
+            or Record.Lifecycle.Outcome != ""
+        return 0
+    Text := _LLM_SlotGetTextStub(Record.Slots[Record.ActiveIdx])
+    return {
+        Record: Record, Text: Text, Slots: Record.Slots.Clone(),
+        ActiveIdx: Record.ActiveIdx,
+        AcceptSource: Record.Lifecycle.AcceptSource,
+        AppName: Record.Lifecycle.AppName
+    }
+}
+
+LLM_Tooltip_ClaimAcceptance(ExpectedRecord) {
+    global _Stub_LlmPresentedRecord
+    if !IsObject(_Stub_LlmPresentedRecord)
+            or ObjPtr(_Stub_LlmPresentedRecord) != ObjPtr(ExpectedRecord)
+            or _Stub_LlmPresentedRecord.Lifecycle.Outcome != ""
+        return 0
+    _Stub_LlmPresentedRecord.Lifecycle.Outcome := "claimed"
+    return _Stub_LlmPresentedRecord.Lifecycle
+}
+
+LLM_Tooltip_FinalizeAcceptance(Lifecycle, Accepted) {
+    if !IsObject(Lifecycle) or Lifecycle.Outcome != "claimed"
+        return false
+    Lifecycle.Outcome := Accepted ? "accepted" : "dismissed"
+    return true
 }
 
 LLM_Deps_IsReady() {
@@ -707,15 +819,46 @@ global _Stub_AppendLogRows := []      ; recorded KL_AppendLog entries (Map each)
 global _Stub_RoiHotstringCalls := []  ; recorded KL_Roi_OnHotstring calls
 global _Stub_WpmPushCalls := []       ; recorded WPMWidget_Push calls
 global _Stub_FlushBufferCalls := 0    ; how many times the typing buffer was flushed
+global _Stub_AppendLogAccept := true
+global _Stub_AppendLogRejectSuspend := false
+global _Stub_AppendLogHook := 0
+global _Stub_FlushBufferMutates := false
+global _Stub_FlushBufferDeferred := false
 
-KL_AppendLog(entry) {
-    global _Stub_AppendLogRows
-    _Stub_AppendLogRows.Push(entry)
+KL_AppendLog(entry, &RejectedBySuspend := false) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept
+	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	RejectedBySuspend := _Stub_AppendLogRejectSuspend
+	if RejectedBySuspend {
+		if IsObject(_Stub_AppendLogHook)
+			_Stub_AppendLogHook.Call(entry)
+		return false
+	}
+	if _Stub_AppendLogAccept
+		_Stub_AppendLogRows.Push(entry)
+	if IsObject(_Stub_AppendLogHook)
+		_Stub_AppendLogHook.Call(entry)
+	return _Stub_AppendLogAccept
 }
 
-KL_FlushBuffer() {
-    global _Stub_FlushBufferCalls
-    _Stub_FlushBufferCalls += 1
+KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
+	global _Stub_FlushBufferCalls, _Stub_FlushBufferMutates
+	global _Stub_FlushBufferDeferred
+	DeferredByActiveFlush := _Stub_FlushBufferDeferred
+	if DeferredByActiveFlush
+		return false
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
+	_Stub_FlushBufferCalls += 1
+	if _Stub_FlushBufferMutates {
+		Keylogger.buffer_events := []
+		Keylogger.buffer_text := ""
+		Keylogger.rich_chunks := []
+		Keylogger.session_clicks := 0
+		Keylogger.session_scrolls := 0
+		Keylogger.mouse_distance := 0
+	}
+	return true
 }
 
 ; Records is_private too: the production accumulator keys its half-life map on
@@ -761,10 +904,16 @@ class Keylogger {
     ; encryption IV per row.
     static device_id      := "test-device"
     static next_event_id  := 1
+	static lifecycle_generation := 0
+    static _pending_entries := []
+	static _retry_snapshots := []
     ; Ledger location + lifecycle flag, read by modules/keylogger/
     ; keylogger_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
     ; missing field here is a crash in the migration test rather than a skip.
     static initialized    := false
+    ; Mirrors the production terminal lease read by KL_LogHotstring. Tests leave
+    ; it false unless they explicitly exercise shutdown-owned publication.
+    static _shutting_down := false
     static by_device_dir  := ""
     static data_sql_path  := ""
     ; Read by KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk):
@@ -801,4 +950,3 @@ KL_WriteAtomic(path, content) {
     try FileDelete(path)
     FileAppend(content, path, "UTF-8")
 }
-

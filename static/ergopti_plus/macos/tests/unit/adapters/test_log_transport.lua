@@ -992,8 +992,10 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 		context.transport.enqueue("deliver-once", "done")
 		context.state.pump()
 		local callback_ok, callback_err = pcall(context.ack, context, 1)
-		helpers.assert_true(callback_ok,
-			"the native socket callback must contain delivery-hook exceptions: " .. tostring(callback_err))
+		if not callback_ok then
+			error("the native socket callback must contain delivery-hook exceptions: "
+				.. tostring(callback_err), 0)
+		end
 		helpers.assert_eq(context.transport.status().queued, 0,
 			"an exact durable ACK owns dequeue even when a secondary hook fails")
 		helpers.assert_eq(#context.state.delivered, 1)
@@ -1471,8 +1473,9 @@ helpers.describe("LogTransport teardown ownership", function()
 			error("synthetic drain owner failure")
 		end, 0.25), true)
 		local pump_ok, pump_err = pcall(context.state.pump)
-		helpers.assert_true(pump_ok,
-			"timer boundary must contain a drain-owner exception: " .. tostring(pump_err))
+		if not pump_ok then
+			error("timer boundary must contain a drain-owner exception: " .. tostring(pump_err), 0)
+		end
 		helpers.assert_contains(context.transport.status().last_error, "drain callback failed")
 		helpers.assert_eq(context.transport.status().accepting, false)
 		helpers.assert_eq(context.transport.stop(), true,

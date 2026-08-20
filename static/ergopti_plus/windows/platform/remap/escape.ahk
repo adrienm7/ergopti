@@ -60,7 +60,8 @@ _EscapeHoldModKey() {
 		return
 	}
 	ModKey := _EscapeHoldModKey()
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	try {
 		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {

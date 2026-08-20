@@ -114,29 +114,15 @@ FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 ; @param Value   New value (bool, or string for alpha props like a letter/link).
 ; @param Prop    Optional alpha property leaf (e.g. "letter"); omit for the
 ;                enabled/plain toggle.
+; @param WriterFn Optional strict batch-writer seam used by behavioural tests.
+; @param NotifyFn Optional persistence-failure notifier seam.
 ; @return        true on success, false when the path does not resolve.
-WriteFeatureV2(FeaturesMap, V2Path, Value, Prop := "") {
+WriteFeatureV2(FeaturesMap, V2Path, Value, Prop := "", WriterFn := 0,
+		NotifyFn := 0) {
 	global ConfigurationFile
-	Loc := FeatureLocateV2(FeaturesMap, V2Path, Prop)
-	if (Loc == false) {
-		; Mirror WriteFeatureBatchV2's logging so a single-path write on an
-		; unresolved/unseeded feature is never silent (personal-hotstring-live-
-		; toggle-seed) — previously this returned false with zero logging.
-		try LoggerWarn("FeatureIO", "WriteFeatureV2: unresolved v2 path '{1}' — skipped.", V2Path)
-		return false
-	}
-	Node := Loc["v2_node"]
-	K := Loc["key"]
-	; Persistence is the commit point. Mutating the live Features Map first leaves
-	; an enabled-but-not-durable feature when the write fails (read-only disk,
-	; antivirus lock, interrupted profile sync).
-	if !TOML_Write(Value, ConfigurationFile, Loc["section"], K) {
-		try LoggerError("FeatureIO", "WriteFeatureV2: persistence failed for '{1}'.", V2Path)
-		return false
-	}
-	if (Type(Node) == "Map")
-		Node[K] := Value
-	return true
+	BuildFn := _FeatureBuildSinglePlan.Bind(FeaturesMap, V2Path, Value, Prop)
+	return ConfigCommitBuilt(ConfigurationFile, "feature '" . V2Path . "'",
+		BuildFn, WriterFn, NotifyFn)
 }
 
 ; Apply a batch of v2-path mutations to ``FeaturesMap`` in one read-modify-write
@@ -145,32 +131,77 @@ WriteFeatureV2(FeaturesMap, V2Path, Value, Prop := "") {
 ; @param FeaturesMap  The Features Map to mutate. Always passed explicitly by
 ;                      the caller (feedback_loader_target_explicit) — this
 ;                      function never reaches for a global itself.
+; @param WriterFn Optional strict batch-writer seam used by behavioural tests.
+; @param NotifyFn Optional persistence-failure notifier seam.
 ; @return  Number of entries applied.
-WriteFeatureBatchV2(FeaturesMap, Entries) {
+WriteFeatureBatchV2(FeaturesMap, Entries, WriterFn := 0, NotifyFn := 0) {
 	global ConfigurationFile
+	CommitState := { applied: 0 }
+	BuildFn := _FeatureBuildBatchPlan.Bind(FeaturesMap, Entries, CommitState)
+	Committed := ConfigCommitBuilt(ConfigurationFile, "the feature batch",
+		BuildFn, WriterFn, NotifyFn)
+	return Committed ? CommitState.applied : 0
+}
+
+; Builds one detached leaf candidate. TargetNode retains the explicit
+; FeaturesMap identity; CandidateNode carries the unpublished value until the
+; global transaction gateway confirms that config.toml is durable.
+_FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop, WriterName) {
+	Loc := FeatureLocateV2(FeaturesMap, V2Path, Prop)
+	if (Loc == false) {
+		try LoggerWarn("FeatureIO", "{1}: unresolved v2 path '{2}' — skipped.",
+			WriterName, V2Path)
+		return false
+	}
+	TargetNode := Loc["v2_node"]
+	Key := Loc["key"]
+	CandidateNode := TargetNode.Clone()
+	CandidateNode[Key] := Value
+	return {
+		update: { Section: Loc["section"], Key: Key, Value: Value },
+		target_node: TargetNode,
+		candidate_node: CandidateNode,
+		key: Key
+	}
+}
+
+_FeatureBuildSinglePlan(FeaturesMap, V2Path, Value, Prop) {
+	Candidate := _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop,
+		"WriteFeatureV2")
+	if !(Candidate is Object)
+		return false
+	return {
+		updates: [Candidate.update],
+		publish: _FeaturePublishCandidates.Bind([Candidate])
+	}
+}
+
+_FeatureBuildBatchPlan(FeaturesMap, Entries, CommitState) {
 	Updates := []
+	Candidates := []
 	for Entry in Entries {
 		V2Path := Entry["path"]
-		Value  := Entry["value"]
-		Prop   := Entry.Has("prop") ? Entry["prop"] : ""
-		Loc := FeatureLocateV2(FeaturesMap, V2Path, Prop)
-		if (Loc == false) {
-			try LoggerWarn("FeatureIO", "WriteFeatureBatchV2: unresolved v2 path '{1}' — skipped.", V2Path)
+		Value := Entry["value"]
+		Prop := Entry.Has("prop") ? Entry["prop"] : ""
+		Candidate := _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop,
+			"WriteFeatureBatchV2")
+		if !(Candidate is Object)
 			continue
-		}
-		Node := Loc["v2_node"]
-		K := Loc["key"]
-		Updates.Push({ Section: Loc["section"], Key: K, Value: Value, Node: Node })
+		Updates.Push(Candidate.update)
+		Candidates.Push(Candidate)
 	}
-	if (Updates.Length > 0 and !TOML_BatchWrite(ConfigurationFile, Updates)) {
-		try LoggerError("FeatureIO", "WriteFeatureBatchV2: persistence failed; live features were not changed.")
-		return 0
+	CommitState.applied := Updates.Length
+	if (Updates.Length = 0)
+		return { noop: true }
+	return {
+		updates: Updates,
+		publish: _FeaturePublishCandidates.Bind(Candidates)
 	}
-	for _, Update in Updates {
-		if (Type(Update.Node) == "Map")
-			Update.Node[Update.Key] := Update.Value
-	}
-	return Updates.Length
+}
+
+_FeaturePublishCandidates(Candidates) {
+	for Candidate in Candidates
+		Candidate.target_node[Candidate.key] := Candidate.candidate_node[Candidate.key]
 }
 
 ; Read the runtime state of a v2 feature. Returns a Map keyed by the v2 property

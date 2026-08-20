@@ -72,7 +72,7 @@ assert(fs.existsSync(macosOverridePath), 'macOS config_overrides.lua exists');
 if (fs.existsSync(macosOverridePath)) {
 	const src = fs.readFileSync(macosOverridePath, 'utf8');
 	assert(src.includes('function M.coerce'), "macOS config_overrides.lua exports M.coerce");
-	assert(src.includes('match_quoted_prefix'), "macOS config_overrides.lua has match_quoted_prefix helper");
+	assert(src.includes('TomlCodec.decode'), "macOS config_overrides.lua delegates full-file parsing to the shared TOML codec");
 }
 
 // AHK: config_shortcuts.ahk defines CS_CoerceValue

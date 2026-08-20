@@ -47,49 +47,62 @@ _LLM_Menu_CoerceIniArray(raw) {
 	return [s]
 }
 
-_LLM_Menu_SyncToFeatures() {
+_LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	global _LLM_Menu, Features
-	if !IsSet(Features) or !IsSet(_LLM_Menu)
-		return
-	if !Features.Has("llm")
-		return
-	llm := Features["llm"]
-	llm["enabled"]                            := _LLM_Menu["enabled"]
-	llm["models"]["ollama"]                   := _LLM_Menu["model"]
-	llm["models"]["selected"]                 := _LLM_Menu["backend"]
-	llm["profiles"]["active"]                 := _LLM_Menu["profile_id"]
-	llm["profiles"]["num_predictions"]        := _LLM_Menu["n_predictions"]
-	llm["profiles"]["auto_profile_for_model"]   := _LLM_Menu["auto_profile_for_model"]
-	llm["generation"]["temperature"]          := Float(_LLM_Menu["temperature"])
-	llm["generation"]["min_words"]            := _LLM_Menu["min_words"]
-	llm["generation"]["max_words"]            := _LLM_Menu["max_words"]
-	llm["generation"]["context_length"]       := _LLM_Menu["ctx_chars"]
-	llm["generation"]["auto_raise_temp"]        := _LLM_Menu["auto_raise_temp"]
-	llm["generation"]["reset_on_nav"]           := _LLM_Menu["reset_on_nav"]
-	llm["display"]["show_info_bar"]             := _LLM_Menu["show_info_bar"]
-	llm["display"]["streaming"]                 := _LLM_Menu["streaming"]
-	llm["display"]["streaming_multi"]           := _LLM_Menu["show_all_at_once"]
-	llm["display"]["pred_indent"]               := _LLM_Menu["pred_indent"]
-	llm["trigger"]["debounce_ms"]               := _LLM_Menu["debounce_ms"]
-	llm["trigger"]["instant_on_word_end"]         := _LLM_Menu["instant_on_word_end"]
-	llm["trigger"]["after_hotstring"]           := _LLM_Menu["after_hotstring"]
-	llm["trigger"]["inline_autotype"]           := _LLM_Menu["inline_autotype"]
-	llm["trigger"]["url_bar_filter_enabled"]    := _LLM_Menu["disable_url_bars"]
-	llm["trigger"]["secure_filter_enabled"]     := _LLM_Menu["disable_password_fields"]
-	llm["navigation"]["val_modifiers"]          := _LLM_Menu_ModifiersStringToArray(_LLM_Menu["val_modifiers"])
+	if !(MenuState is Map) {
+		if !IsSet(_LLM_Menu)
+			return false
+		MenuState := _LLM_Menu
+	}
+	if !(FeaturesTarget is Map) {
+		if !IsSet(Features) or !(Features is Map)
+			return false
+		FeaturesTarget := Features
+	}
+	if !FeaturesTarget.Has("llm") or !(FeaturesTarget["llm"] is Map)
+		return false
+	llm := FeaturesTarget["llm"]
+	llm["enabled"]                            := MenuState["enabled"]
+	llm["models"]["ollama"]                   := MenuState["model"]
+	llm["models"]["selected"]                 := MenuState["backend"]
+	llm["profiles"]["active"]                 := MenuState["profile_id"]
+	llm["profiles"]["num_predictions"]        := MenuState["n_predictions"]
+	llm["profiles"]["auto_profile_for_model"]   := MenuState["auto_profile_for_model"]
+	llm["generation"]["temperature"]          := Float(MenuState["temperature"])
+	llm["generation"]["min_words"]            := MenuState["min_words"]
+	llm["generation"]["max_words"]            := MenuState["max_words"]
+	llm["generation"]["context_length"]       := MenuState["ctx_chars"]
+	llm["generation"]["auto_raise_temp"]        := MenuState["auto_raise_temp"]
+	llm["generation"]["reset_on_nav"]           := MenuState["reset_on_nav"]
+	llm["display"]["show_info_bar"]             := MenuState["show_info_bar"]
+	llm["display"]["streaming"]                 := MenuState["streaming"]
+	llm["display"]["streaming_multi"]           := MenuState["show_all_at_once"]
+	llm["display"]["pred_indent"]               := MenuState["pred_indent"]
+	llm["trigger"]["debounce_ms"]               := MenuState["debounce_ms"]
+	llm["trigger"]["instant_on_word_end"]         := MenuState["instant_on_word_end"]
+	llm["trigger"]["after_hotstring"]           := MenuState["after_hotstring"]
+	llm["trigger"]["inline_autotype"]           := MenuState["inline_autotype"]
+	llm["trigger"]["url_bar_filter_enabled"]    := MenuState["disable_url_bars"]
+	llm["trigger"]["secure_filter_enabled"]     := MenuState["disable_password_fields"]
+	llm["navigation"]["val_modifiers"]          := _LLM_Menu_ModifiersStringToArray(MenuState["val_modifiers"])
+	return true
 }
 
-_LLM_Menu_AppendPersistedUpdates(Updates) {
+_LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 	global _LLM_Menu
-	Updates.Push({ Section: "llm", Key: "trigger_shortcut", Value: _LLM_Menu["trigger_shortcut"] })
+	if !(MenuState is Map)
+		MenuState := _LLM_Menu
+	Updates.Push({ Section: "llm", Key: "trigger_shortcut", Value: MenuState["trigger_shortcut"] })
 	; Ollama port lives under [llm] as a flat key (like trigger_shortcut) — it is
 	; NOT in the Features schema, so it round-trips via the TOML write here + the
 	; cache read in the saved-opts loader, not via _LLM_Menu_SyncToFeatures.
-	if _LLM_Menu.Has("ollama_port")
-		Updates.Push({ Section: "llm", Key: "ollama_port", Value: _LLM_Menu["ollama_port"] })
+	if MenuState.Has("ollama_port")
+		Updates.Push({ Section: "llm", Key: "ollama_port", Value: MenuState["ollama_port"] })
+	if MenuState.Has("api_entry_id")
+		Updates.Push({ Section: "llm", Key: "api_entry_id", Value: MenuState["api_entry_id"] })
 	Updates.Push({ Section: "llm.navigation", Key: "nav_modifiers",
-		Value: _LLM_Menu_ModifiersStringToArray(_LLM_Menu["nav_modifiers"]) })
-	apps := _LLM_Menu.Has("disabled_apps") ? _LLM_Menu["disabled_apps"] : []
+		Value: _LLM_Menu_ModifiersStringToArray(MenuState["nav_modifiers"]) })
+	apps := MenuState.Has("disabled_apps") ? MenuState["disabled_apps"] : []
 	if !(apps is Array)
 		apps := []
 	Updates.Push({ Section: "llm.trigger", Key: "disabled_apps", Value: apps })
@@ -133,6 +146,9 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
 		if (raw != "_" and IsInteger(raw))
 			opts["ollama_port"] := Integer(raw)
+		raw := IniCacheGet(Cache, "llm", "api_entry_id")
+		if (raw != "_")
+			opts["api_entry_id"] := String(raw)
 		raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
 		if (raw != "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)

@@ -55,21 +55,16 @@ global KLR_NGRAM_LIVE_TABLE := Map(
 		"w_bg", "ngram_word_bigrams"
 )
 
-KLR_BuildNgramFilter(start_date, end_date, selected_apps) {
+KLR_BuildNgramFilter(start_date, end_date, selected_apps := unset) {
 		clauses := []
 		if (start_date != "")
 				clauses.Push("date >= " . SQLite_Q(start_date))
 		if (end_date != "")
 				clauses.Push("date <= " . SQLite_Q(end_date))
-		if (selected_apps is Array && selected_apps.Length > 0) {
-				quoted := []
-				for _, a in selected_apps
-						quoted.Push(SQLite_Q(a))
-				clause := "app IN ("
-				for i, q in quoted
-						clause .= (i = 1 ? "" : ",") . q
-				clause .= ")"
-				clauses.Push(clause)
+		if IsSet(selected_apps) {
+				app_predicate := KLR_BuildNgramAppPredicate(selected_apps)
+				if (app_predicate != "")
+						clauses.Push(app_predicate)
 		}
 		if (clauses.Length = 0)
 				return ""
@@ -79,28 +74,53 @@ KLR_BuildNgramFilter(start_date, end_date, selected_apps) {
 		return out
 }
 
-KLR_NewNgramItem(c, t, e, esrc_json) {
-		item := Map("c", c, "t", t, "e", e, "hs", 0, "llm", 0, "o", 0)
-		; esrc_json is a small fixed-shape JSON object {"hotstring":N,"llm":N,
-		; "none":N}. The dashboard reads item.hs / item.llm / item.o directly
-		; (and derives manual = c - hs - llm - o); it NEVER parses esrc_json.
-		; So decode the synthetic source counts here with a cheap regex — a
-		; full JSON parser is overkill for this shape — mirroring the macOS
-		; sqlite_reader.lua read_ngrams path. Without this the per-n-gram
-		; hotstring/LLM colouring is silently lost (every token reads hs=llm=0).
-		if (esrc_json != "" && esrc_json != "{}") {
-				if RegExMatch(esrc_json, '"hotstring"\s*:\s*(\d+)', &m_hs)
-						item["hs"] := Integer(m_hs[1])
-				if RegExMatch(esrc_json, '"llm"\s*:\s*(\d+)', &m_llm)
-						item["llm"] := Integer(m_llm[1])
-				item["esrc_json"] := esrc_json
-		}
-		return item
+; "Unknown" is a transport bucket, not a selectable application. The WebView
+; deliberately omits it from the app picker and always renders it alongside a
+; real-app selection, so every SQL projection must apply the same policy.
+KLR_BuildNgramAppPredicate(selected_apps) {
+		if !(selected_apps is Array)
+				throw TypeError("selected_apps must be an Array when explicitly set")
+		if (selected_apps.Length = 0)
+				return "app = " . SQLite_Q("Unknown")
+		quoted := []
+		for _, app_name in selected_apps
+				quoted.Push(SQLite_Q(app_name))
+		predicate := "(app IN ("
+		for index, quoted_app in quoted
+				predicate .= (index = 1 ? "" : ",") . quoted_app
+		return predicate . ") OR app = " . SQLite_Q("Unknown") . ")"
+}
+
+KLR_BuildNgramAppClause(selected_apps) {
+		predicate := KLR_BuildNgramAppPredicate(selected_apps)
+		return predicate != "" ? " AND " . predicate : ""
+}
+
+; One SQL projection owns the dashboard's source taxonomy. Source counts are
+; additive across device/date rows, so selecting one JSON blob with MIN/MAX is
+; never valid. `none` means physical/manual input and is deliberately excluded
+; from `o`; every other synthetic source (for example case-transform) belongs
+; there. Invalid legacy blobs contribute zero, matching the old tolerant reader
+; without allowing one malformed row to abort an otherwise valid projection.
+KLR_NgramSourceProjection(esrc_column := "esrc_json") {
+		valid_json := "CASE WHEN json_valid(" . esrc_column . ") THEN "
+				. esrc_column . " ELSE '{}' END"
+		return " SUM(COALESCE(json_extract(" . valid_json
+				. ",'$.hotstring'),0)) AS hs,"
+				. " SUM(COALESCE(json_extract(" . valid_json
+				. ",'$.llm'),0)) AS llm,"
+				. " SUM(COALESCE((SELECT SUM(CASE WHEN src.key NOT IN "
+				. "('hotstring','llm','none') AND src.type IN ('integer','real') "
+				. "THEN CAST(src.value AS INTEGER) ELSE 0 END) FROM json_each("
+				. valid_json . ") AS src),0)) AS o"
+}
+
+KLR_NewNgramItem(c, t, e, hs := 0, llm := 0, other := 0) {
+		return Map("c", c, "t", t, "e", e,
+				"hs", hs, "llm", llm, "o", other)
 }
 
 KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
-		if !IsSet(selected_apps)
-				selected_apps := []
 		out := Map(
 				"c", Map(),
 				"bg", Map(),
@@ -119,29 +139,32 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
 		if !db
 				return out
 
-		where := KLR_BuildNgramFilter(start_date, end_date, selected_apps)
+		where := IsSet(selected_apps)
+				? KLR_BuildNgramFilter(start_date, end_date, selected_apps)
+				: KLR_BuildNgramFilter(start_date, end_date)
 
 		for code, tbl in KLR_NGRAM_TYPE_TABLE {
 				sql := "SELECT token,"
 						. " SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
-						. " MIN(esrc_json) AS esrc_json"
+						. KLR_NgramSourceProjection()
 						. " FROM " . tbl . where . " GROUP BY token"
 						. " LIMIT " . KLReadConst.MAX_NGRAM_ROWS
 				for r in SQLite_Query(db, sql)
-						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"], r["esrc_json"])
+						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
+								r["hs"], r["llm"], r["o"])
 		}
 
 		sc_sql := "SELECT token, SUM(c) AS c FROM ngram_shortcuts" . where . " GROUP BY token"
 		for r in SQLite_Query(db, sc_sql)
-				out["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				out["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
 
 		scbg_sql := "SELECT token, SUM(c) AS c FROM ngram_shortcut_bigrams" . where . " GROUP BY token"
 		for r in SQLite_Query(db, scbg_sql)
-				out["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				out["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
 
 		kc_sql := "SELECT keycode, SUM(c) AS c FROM ngram_keycodes" . where . " GROUP BY keycode"
 		for r in SQLite_Query(db, kc_sql)
-				out["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				out["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0)
 
 		; The scancode heatmap, mirroring the keycode projection above. The walker
 		; WRITES ngram_scancodes and the live 500 ms path fills today, so the
@@ -151,7 +174,7 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
 		; of cross-driver testing could surface a gap that exists only here.
 		sc_kb_sql := "SELECT scancode, SUM(c) AS c FROM ngram_scancodes" . where . " GROUP BY scancode"
 		for r in SQLite_Query(db, sc_kb_sql)
-				out["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				out["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0)
 
 		return out
 }
@@ -174,22 +197,11 @@ KLR_FAST_LIMIT := 500
 ; Returns a string fragment ready to splice into prefetch JSON:
 ;   {"app1": {"c": {...}, "bg": {...}, ...}, "app2": {...}, ...}
 KLR_BuildTodayIdxJson(db, selected_apps := unset) {
-		if !IsSet(selected_apps)
-				selected_apps := []
 		if !db
 				return "{}"
 		today := FormatTime(A_Now, "yyyy-MM-dd")
 
-		app_clause := ""
-		if (selected_apps is Array && selected_apps.Length > 0) {
-				quoted := []
-				for _, a in selected_apps
-						quoted.Push(SQLite_Q(a))
-				app_clause := " AND app IN ("
-				for i, q in quoted
-						app_clause .= (i = 1 ? "" : ",") . q
-				app_clause .= ")"
-		}
+		app_clause := IsSet(selected_apps) ? KLR_BuildNgramAppClause(selected_apps) : ""
 
 		; Per-(app, type) aggregations. Each row maps a single app to a
 		; JSON object of all its tokens for that ngram type. We accumulate
@@ -201,9 +213,10 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
 		; app in O(rows-aggregated) on the SQLite side.
 		for code, tbl in KLR_NGRAM_LIVE_TABLE {
 				sql := "SELECT app, json_group_object(token, json_object("
-						. "'c', c, 't', t, 'e', e, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+						. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)) AS j"
 						. " FROM (SELECT app, token,"
-						. "        SUM(c) AS c, SUM(td) AS t, SUM(e) AS e"
+						. "        SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
+						. KLR_NgramSourceProjection()
 						. "        FROM " . tbl
 						. "        WHERE date = " . SQLite_Q(today) . app_clause
 						. "        GROUP BY app, token)"
@@ -293,28 +306,17 @@ KLR__JsonEscape(s) {
 }
 
 KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
-		if !IsSet(selected_apps)
-				selected_apps := []
 		today := FormatTime(A_Now, "yyyy-MM-dd")
 		today_idx := Map()
 		if !db
 				return Map("historical", Map(), "today", today_idx)
 
-		app_clause := ""
-		if (selected_apps is Array && selected_apps.Length > 0) {
-				quoted := []
-				for _, a in selected_apps
-						quoted.Push(SQLite_Q(a))
-				app_clause := " AND app IN ("
-				for i, q in quoted
-						app_clause .= (i = 1 ? "" : ",") . q
-				app_clause .= ")"
-		}
+		app_clause := IsSet(selected_apps) ? KLR_BuildNgramAppClause(selected_apps) : ""
 
 		for code, tbl in KLR_NGRAM_LIVE_TABLE {
 				sql := "SELECT app, token,"
 						. " SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
-						. " MIN(esrc_json) AS esrc_json"
+						. KLR_NgramSourceProjection()
 						. " FROM " . tbl
 						. " WHERE date = " . SQLite_Q(today) . app_clause
 						. " GROUP BY app, token"
@@ -324,7 +326,8 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
 						app := r["app"]
 						if !today_idx.Has(app)
 								today_idx[app] := KLR_NewTodayBucket()
-						today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"], r["esrc_json"])
+						today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
+								r["hs"], r["llm"], r["o"])
 				}
 		}
 
@@ -362,7 +365,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
-				today_idx[app]["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				today_idx[app]["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0)
 		}
 
 		; Scancode heatmap data (ngram_scancodes) — Windows side.
@@ -373,7 +376,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
-				today_idx[app]["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				today_idx[app]["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0)
 		}
 
 		; Shortcuts (sc) and shortcut bigrams — also commonly viewed tabs.
@@ -384,7 +387,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
-				today_idx[app]["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				today_idx[app]["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
 		}
 		scbg_sql := "SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams"
 				. " WHERE date = " . SQLite_Q(today) . app_clause
@@ -393,13 +396,11 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
-				today_idx[app]["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+				today_idx[app]["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
 		}
 }
 
 KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset) {
-		if !IsSet(selected_apps)
-				selected_apps := []
 		today := FormatTime(A_Now, "yyyy-MM-dd")
 
 		; Historical: everything strictly before today.
@@ -407,28 +408,21 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
 		; AHK v2 throws « Expected a Number but got a String » when comparing
 		; two strings with `<`. Use StrCompare for the lexicographic test.
 		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
-		historical := KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
+		historical := IsSet(selected_apps)
+				? KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
+				: KLR_ReadNgrams(db, start_date, hist_end)
 
 		; Today: per-app n-gram dict for each app touched today.
 		today_idx := Map()
 		if !db
 				return Map("historical", historical, "today", today_idx)
 
-		app_clause := ""
-		if (selected_apps is Array && selected_apps.Length > 0) {
-				quoted := []
-				for _, a in selected_apps
-						quoted.Push(SQLite_Q(a))
-				app_clause := " AND app IN ("
-				for i, q in quoted
-						app_clause .= (i = 1 ? "" : ",") . q
-				app_clause .= ")"
-		}
+		app_clause := IsSet(selected_apps) ? KLR_BuildNgramAppClause(selected_apps) : ""
 
 		for code, tbl in KLR_NGRAM_TYPE_TABLE {
 				sql := "SELECT app, token,"
 						. " SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
-						. " MIN(esrc_json) AS esrc_json"
+						. KLR_NgramSourceProjection()
 						. " FROM " . tbl
 						. " WHERE date = " . SQLite_Q(today) . app_clause
 						. " GROUP BY app, token"
@@ -437,7 +431,8 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
 						app := r["app"]
 						if !today_idx.Has(app)
 								today_idx[app] := KLR_NewTodayBucket()
-						today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"], r["esrc_json"])
+						today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
+								r["hs"], r["llm"], r["o"])
 				}
 		}
 

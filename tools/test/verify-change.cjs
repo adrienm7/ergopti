@@ -92,6 +92,126 @@ function checkTestsAreRegistered(files) {
 }
 
 /**
+ * Finds a braced AHK function definition without assuming that its parameter
+ * list fits on one line. The scanner deliberately balances nested parentheses
+ * and ignores strings/comments: defaults such as `Map("key", Value())` must not
+ * truncate the signature, while a column-zero call site must not count as a
+ * definition.
+ * @param {string} source - One or more AHK source files.
+ * @param {string} name - Exact function name to find.
+ * @returns {boolean} Whether a matching definition exists.
+ */
+function hasAhkFunctionDefinition(source, name) {
+	const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const candidates = source.matchAll(new RegExp(`^[ \\t]*${escapedName}[ \\t]*\\(`, 'gm'));
+
+	for (const candidate of candidates) {
+		let lexicalIndex = 0;
+		let candidateStringQuote = '';
+		let candidateInLineComment = false;
+		let candidateInBlockComment = false;
+		while (lexicalIndex < candidate.index) {
+			const char = source[lexicalIndex];
+			const next = source[lexicalIndex + 1] || '';
+			if (candidateInLineComment) {
+				if (char === '\n') candidateInLineComment = false;
+			} else if (candidateInBlockComment) {
+				if (char === '*' && next === '/') {
+					candidateInBlockComment = false;
+					lexicalIndex += 1;
+				}
+			} else if (candidateStringQuote) {
+				if (char === '`') lexicalIndex += 1;
+				else if (char === candidateStringQuote) candidateStringQuote = '';
+			} else if (char === ';') candidateInLineComment = true;
+			else if (char === '/' && next === '*') {
+				candidateInBlockComment = true;
+				lexicalIndex += 1;
+			} else if (char === '"' || char === "'") candidateStringQuote = char;
+			lexicalIndex += 1;
+		}
+		if (candidateStringQuote || candidateInLineComment || candidateInBlockComment) continue;
+
+		let index = candidate.index + candidate[0].lastIndexOf('(');
+		let depth = 0;
+		let stringQuote = '';
+		let inLineComment = false;
+		let inBlockComment = false;
+		let closedAt = -1;
+
+		for (; index < source.length; index += 1) {
+			const char = source[index];
+			const next = source[index + 1] || '';
+
+			if (inLineComment) {
+				if (char === '\n') inLineComment = false;
+				continue;
+			}
+			if (inBlockComment) {
+				if (char === '*' && next === '/') {
+					inBlockComment = false;
+					index += 1;
+				}
+				continue;
+			}
+			if (stringQuote) {
+				if (char === '`') {
+					index += 1;
+					continue;
+				}
+				if (char === stringQuote) stringQuote = '';
+				continue;
+			}
+
+			if (char === ';') {
+				inLineComment = true;
+				continue;
+			}
+			if (char === '/' && next === '*') {
+				inBlockComment = true;
+				index += 1;
+				continue;
+			}
+			if (char === '"' || char === "'") {
+				stringQuote = char;
+				continue;
+			}
+			if (char === '(') depth += 1;
+			else if (char === ')') {
+				depth -= 1;
+				if (depth === 0) {
+					closedAt = index;
+					break;
+				}
+			}
+		}
+
+		if (closedAt < 0) continue;
+		index = closedAt + 1;
+		while (index < source.length) {
+			if (/\s/.test(source[index])) {
+				index += 1;
+				continue;
+			}
+			if (source[index] === ';') {
+				const newline = source.indexOf('\n', index + 1);
+				index = newline < 0 ? source.length : newline + 1;
+				continue;
+			}
+			if (source[index] === '/' && source[index + 1] === '*') {
+				const end = source.indexOf('*/', index + 2);
+				index = end < 0 ? source.length : end + 2;
+				continue;
+			}
+			break;
+		}
+		if (source[index] === '{') return true;
+	}
+
+	return false;
+}
+
+/**
  * _DriverFuncBody returns "" for a name it cannot find, which makes every
  * ABSENCE assertion built on it pass vacuously. AHK v2 makes this worse: a call
  * to a function that does not exist is not a load-time error, so a typo or a
@@ -123,8 +243,9 @@ function checkScannedSymbolsExist(files) {
 		const src = fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 		for (const m of src.matchAll(/_DriverFuncBody\(\s*"([A-Za-z_][\w]*)"\s*\)/g)) {
 			const name = m[1];
-			// Same anchor _DriverFuncBody uses: a DEFINITION line, not a call site.
-			const defined = new RegExp(`^[ \\t]*${name}\\([^\\r\\n]*\\)\\s*\\{`, 'm').test(driverSource);
+			// Match the same definition grammar as _DriverFuncBody, including
+			// multiline signatures and nested default expressions.
+			const defined = hasAhkFunctionDefinition(driverSource, name);
 			if (!defined) {
 				problems.push(
 					`${f} scans _DriverFuncBody("${name}") but no such function is defined in the driver — the body comes back empty and every absence assertion on it passes vacuously`,
@@ -398,7 +519,7 @@ function main() {
 // every selectable gate resolves to a real command, without spawning any suite.
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
-module.exports = { RULES, GATE_COMMANDS, selectGates };
+module.exports = { RULES, GATE_COMMANDS, selectGates, hasAhkFunctionDefinition };
 
 if (require.main === module) {
 	process.exit(main());

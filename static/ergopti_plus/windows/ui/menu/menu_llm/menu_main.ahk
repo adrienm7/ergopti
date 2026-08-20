@@ -116,7 +116,7 @@ LLM_Menu_Build() {
 	_rows := _LLM_MenuLayout_Rows()
 	; Diagnostic breakdown of the detached staging work. Publishing and pruning
 	; happen only after every row has been successfully constructed.
-	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", A_TickCount - _tStaged)
+	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", TickElapsed(_tStaged))
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
 	for _i, _row in _rows
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational, _MR_Get(_row, "health_dot", false))
@@ -150,7 +150,7 @@ LLM_Menu_Build() {
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
 	}
-	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), A_TickCount - _t0)
+	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), TickElapsed(_t0))
 	} catch as e {
 		; A failed staged build leaves the previous tree live. This is fail-closed
 		; for output: no menu action disappears merely because a new row failed.

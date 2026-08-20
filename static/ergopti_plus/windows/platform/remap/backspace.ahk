@@ -64,7 +64,8 @@ _BackspaceHoldModKey() {
 		return
 	}
 	ModKey := _BackspaceHoldModKey()
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	try {
 		KeyWait("BackSpace", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {

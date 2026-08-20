@@ -8,11 +8,9 @@
 ; own copy of something the engine already owned.
 ;
 ;   L-04  COLLISION PRECEDENCE, WRITTEN TWICE. _PrefixCandidateBeats restated
-;         the engine's _HSE_Beats rule and had drifted: it defaulted a missing
-;         Priority to 0 where the engine defaults to 50, and had no GroupOrder
-;         or Seq tiebreak at all. Two implementations of "which trigger wins"
-;         mean the tooltip can rank a collision differently from the engine that
-;         fires it — the user is shown one expansion and gets another.
+;         the engine's _HSE_Beats rule and had drifted. Delegating that helper
+;         was still insufficient: the preview retained a second candidate set,
+;         provider union and post-selection predicate around the shared sort.
 ;
 ;   L-32  NEAR-MISS ANALYTICS, BLINDED. The star-fire path re-seeds the preview
 ;         from HSE_Buffer, so the buffer handed to _CheckNearMiss can hold
@@ -24,6 +22,11 @@
 ;   L-07/L-31  DEAD CODE. _SuffixAfterLastBoundary was orphaned when its only
 ;         caller was deleted, and TooltipRearmTimer had no callers at all while
 ;         still being advertised as public API.
+;
+;   G5  PERSONAL PROVIDER, SECOND MATCHER. The @ provider resolved only its own
+;         exact trigger and rebuilt personal output from mutable state. It could
+;         therefore advertise a fallback a shorter registered suffix beat, or a
+;         newly saved value an old registered Spec could not emit.
 ;
 ; ROOT CAUSE ENCODED: a duplicated rule is not fixed by keeping the two copies
 ; in step — it is fixed by deleting the second one. Convention 5.6 says the same
@@ -38,46 +41,46 @@
 
 
 
-; ==================================================================
-; ==================================================================
-; ======= 1/ Collision precedence has exactly one owner ============
-; ==================================================================
-; ==================================================================
+; ================================================================
+; ================================================================
+; ======= 1/ The complete preview decision has one owner ===========
+; ================================================================
+; ================================================================
 
-; The preview and the engine must reach the SAME verdict on the same pair, or
-; the tooltip promises an expansion the engine will not choose.
-_PESO_PrecedenceAgreesWithTheEngine() {
-	; Longer trigger wins regardless of priority.
-	Long  := { Trigger: "abcd", Length: 4, Priority: 10 }
-	Short := { Trigger: "abc",  Length: 3, Priority: 99 }
-	Assert(_PrefixCandidateBeats(Long, Short) == _HSE_Beats(Long, Short),
-		"the preview and the engine must agree that the longer trigger wins")
-	Assert(_PrefixCandidateBeats(Long, Short),
-		"the longer trigger must win — that is the first rule of the shared precedence")
+; This is deliberately transitive. Checking only the collector body would miss
+; a sibling provider registered elsewhere or a compatibility predicate called
+; one level above it — the exact incomplete-application pattern this repository
+; has shipped repeatedly.
+_PESO_CanonicalDecisionOwnsEveryPreviewRule() {
+	Src := _DriverSourceNoComments()
+	Collect := _StripFullLineComments(_DriverFuncBody("_PrefixCollectCandidates"))
+	Oracle := _StripFullLineComments(_DriverFuncBody("HSE_PreviewNextDecision"))
+	RowBuilder := _StripFullLineComments(_DriverFuncBody("_PrefixCandidateFromDecision"))
+	Assert(Src != "", "the driver source must be readable")
+	Assert(Collect != "" and Oracle != "" and RowBuilder != "",
+		"the collector, canonical engine oracle and decision-to-row adapter must all exist")
 
-	; Equal length: higher priority wins, on both sides.
-	HiPrio := { Trigger: "abc", Length: 3, Priority: 80 }
-	LoPrio := { Trigger: "abd", Length: 3, Priority: 20 }
-	Assert(_PrefixCandidateBeats(HiPrio, LoPrio) == _HSE_Beats(HiPrio, LoPrio),
-		"the preview and the engine must agree on the priority tiebreak")
+	Assert(InStr(Collect, "HSE_PreviewNextDecision") > 0,
+		"the collector must ask the canonical engine decision directly")
+	Assert(InStr(Oracle, "HSE_FeedChar") > 0
+		and InStr(Oracle, "HSE_TryPersonalInfoCombo") > 0
+		and InStr(Oracle, "HSE_TryRepeatKey") > 0
+		and InStr(Oracle, "_HSE_PrepareDispatchDecision") > 0,
+		"one oracle must own registered matching, ordered fallbacks and every dispatch preflight gate")
+	Assert(InStr(RowBuilder, "FireDecision: Decision") > 0,
+		"the canonical decision must cross the renderer boundary intact")
 
-	; The drifted default is the interesting case: a candidate carrying NO
-	; Priority compared against one that does. The preview defaulted it to 0 and
-	; the engine to 50, so the two ranked this pair differently.
-	NoPrio  := { Trigger: "abc", Length: 3 }
-	Mid     := { Trigger: "abd", Length: 3, Priority: 30 }
-	Assert(_PrefixCandidateBeats(NoPrio, Mid) == _HSE_Beats(NoPrio, Mid),
-		"a candidate with no Priority must be ranked identically by both. The preview defaulted it to 0 and the engine to 50, so exactly this pair could be ordered one way in the tooltip and the other way by the engine")
-}
-
-; Delegation, not duplication: the rule must have one definition.
-_PESO_PreviewDelegatesRatherThanRestates() {
-	Body := _DriverFuncBody("_PrefixCandidateBeats")
-	Assert(Body != "", "_PrefixCandidateBeats() must exist in the driver source")
-	Assert(InStr(Body, "_HSE_Beats") > 0,
-		"the preview's precedence must delegate to the engine's rule. Restating it is what let the two drift apart, and keeping two copies in step by hand is not a fix")
-	Assert(InStr(Body, "Priority") == 0,
-		"the preview must not restate the priority tiebreak at all — the whole rule belongs to one owner")
+	for Removed in ["_PreviewEngineWouldFire(", "_PrefixCandidateBeats(",
+			"_PrefixSortCandidates(", "_PrefixCollectFromProviders(",
+			"HotstringPrefixWatcherRegisterPreviewProvider(",
+			"PersonalInfoPreviewProvider(", "_PrefixPreviewProviders"] {
+		Assert(InStr(Src, Removed) == 0,
+			"no production sibling may retain a second preview decision path: " . Removed)
+	}
+	for Forbidden in ["_PrefixIndex", "_PrefixPreviewProviders", "HSE_PreviewNextMatch"] {
+		Assert(InStr(Collect, Forbidden) == 0,
+			"the production collector must not route around the complete decision: " . Forbidden)
+	}
 }
 
 
@@ -141,10 +144,63 @@ _PESO_PostFireLlmSchedulingSurvives() {
 }
 
 
-Test("meta preview-engine-single-owner: precedence agrees with the engine",
-	_PESO_PrecedenceAgreesWithTheEngine)
-Test("meta preview-engine-single-owner: the preview delegates rather than restates",
-	_PESO_PreviewDelegatesRatherThanRestates)
+
+
+
+; ====================================================================
+; ====================================================================
+; ======= 4/ Immutable display values cross every boundary ===========
+; ====================================================================
+; ====================================================================
+
+; The field and value snapshot must cross every producer boundary. A renderer
+; contract alone is a false green if one registration site silently drops it.
+_PESO_PersonalSnapshotCrossesEveryBoundary() {
+	Builder := _StripFullLineComments(_DriverFuncBody("CreateHotstring"))
+	Registration := _StripFullLineComments(_DriverFuncBody("_HS_RegisterTextExpansionAndDynamic"))
+	Fallback := _StripFullLineComments(_DriverFuncBody("HSE_TryPersonalInfoCombo"))
+	Display := _StripFullLineComments(_DriverFuncBody("_PrefixDecisionDisplayText"))
+	Assert(Builder != "" and Registration != "" and Fallback != "" and Display != "",
+		"every personal-preview producer and consumer must be discoverable before checking the snapshot contract")
+
+	Assert(InStr(Builder, "Meta.PreviewFields") > 0 and InStr(Builder, "Meta.PreviewValues") > 0,
+		"CreateHotstring must transport both halves of optional preview snapshot metadata onto the registered Spec")
+	Assert(InStr(Registration, 'Set("PreviewFields"') > 0
+		and InStr(Registration, 'Set("PreviewValues"') > 0,
+		"imperative personal-info registrations must attach the fields and values captured with their replacement")
+	Assert(InStr(Fallback, "PreviewFields:") > 0 and InStr(Fallback, "PreviewValues:") > 0,
+		"the fire-time personal fallback must return the same snapshot shape as a registered personal Spec")
+	Assert(InStr(Display, "Spec.PreviewFields") > 0 and InStr(Display, "Spec.PreviewValues") > 0
+		and InStr(Display, "PersonalInformation") == 0,
+		"the row adapter must render the winning Spec's immutable snapshot and never re-read mutable personal state")
+}
+
+; Dynamic replacements may change on every call. The visible-decision claim is
+; therefore part of the single-owner invariant: dispatch must reuse the resolved
+; base that produced the pixels, not merely ask the same callable again.
+_PESO_VisibleDynamicValueCrossesIntoDispatch() {
+	Dispatch := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
+	Claim := _StripFullLineComments(_DriverFuncBody("HotstringPrefixWatcherClaimVisibleDecision"))
+	Publish := _StripFullLineComments(_DriverFuncBody("HotstringPrefixWatcherPublishVisibleDecisions"))
+	Current := _StripFullLineComments(_DriverFuncBody("_PrefixFireDecisionStillCurrent"))
+	Assert(Dispatch != "" and Claim != "" and Publish != "" and Current != "",
+		"dispatch and both visible-decision ownership boundaries must exist")
+	Assert(InStr(Dispatch, "HotstringPrefixWatcherClaimVisibleDecision") > 0
+		and InStr(Dispatch, "VisibleDecision.ResolvedBase") > 0,
+		"dispatch must claim and reuse the exact dynamic base that produced the visible row")
+	Assert(InStr(Claim, "SpecIdentity") > 0
+		and InStr(Claim, "_PrefixFireDecisionStillCurrent") > 0,
+		"a visible value may be claimed only by the exact Spec after the shared currency gate")
+	Assert(InStr(Current, "BufferAfterCompletion") > 0
+		and InStr(Current, "RegistryGeneration") > 0,
+		"the shared currency gate must bind the decision to its completed buffer and registry generation")
+	Assert(InStr(Publish, "_PrefixFireDecisionStillCurrent") > 0,
+		"publication must reject a decision that became stale before pixels committed")
+}
+
+
+Test("meta preview-engine-single-owner: the complete preview decision has one owner",
+	_PESO_CanonicalDecisionOwnsEveryPreviewRule)
 Test("meta preview-engine-single-owner: the word tail is the current word",
 	_PESO_WordTailIsTheCurrentWord)
 Test("meta preview-engine-single-owner: the near-miss scan measures the word",
@@ -153,3 +209,7 @@ Test("meta preview-engine-single-owner: the dead code is removed",
 	_PESO_DeadCodeIsRemoved)
 Test("meta preview-engine-single-owner: post-fire LLM scheduling survives",
 	_PESO_PostFireLlmSchedulingSurvives)
+Test("meta preview-engine-single-owner: personal snapshot crosses every producer boundary",
+	_PESO_PersonalSnapshotCrossesEveryBoundary)
+Test("meta preview-engine-single-owner: the visible dynamic value crosses into dispatch",
+	_PESO_VisibleDynamicValueCrossesIntoDispatch)

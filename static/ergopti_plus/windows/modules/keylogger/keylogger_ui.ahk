@@ -131,17 +131,22 @@ KLUI_LaunchWindow(url, title) {
 		global _ConfigDir
 		KLUI.pending[which] := true
 		if !KLPF_RequestBuild(which, _ConfigDir . "metrics", "full", 0,
-						KLUI_OnPrefetchReady.Bind(which, url, title)) {
-				KLUI.pending.Delete(which)
+						KLUI_OnPrefetchTerminal.Bind(which, url, title)) {
+				if KLUI.pending.Has(which)
+						KLUI.pending.Delete(which)
 				return 0
 		}
 		return 0
 }
 
-KLUI_OnPrefetchReady(which, url, title, *) {
+KLUI_OnPrefetchTerminal(which, url, title, status, *) {
 		if !KLUI.pending.Has(which)
 				return
 		KLUI.pending.Delete(which)
+		if (status != "ok") {
+				try LoggerError("Keylogger", "Edge metrics prefetch failed for '{1}' (status={2}); dashboard was not launched.", which, status)
+				return
+		}
 		pid := KLUI_LaunchEdge(url, title)
 		if (which = "typing")
 				KLUI.typing_pid := pid

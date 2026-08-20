@@ -28,8 +28,17 @@ _MakeFreqSetter(Seconds) {
 ; from the tray menu so the user has both entry points.
 OpenPersonalShortcuts(*) {
 	Path := ScriptInformation["PersonalAhkPath"]
-	EnsurePersonalShortcutsFile(Path)
-	Run('notepad.exe "' . Path . '"')
+	if !EnsurePersonalShortcutsFile(Path, false) {
+		ConfigReportPersistenceFailure("the personal shortcuts bootstrap")
+		return false
+	}
+	try {
+		Run('notepad.exe "' . Path . '"')
+		return true
+	} catch as Err {
+		try LoggerError("Menu", "Could not open personal shortcuts at '{1}': {2}.", Path, Err.Message)
+		return false
+	}
 }
 
 ; Opens the per-user log directory (under <ConfigDir>/autohotkey/logs/) in Explorer.

@@ -86,12 +86,15 @@ _PNW_RecoversAfterDeletingATerminator() {
 ; abandoned". Nothing was typed and nothing moved the caret, so the engine still
 ; holds the word and the preview must too.
 _PNW_ExpiryTimerDoesNotWipeThePreview() {
-	Body := _DriverFuncBody("_TooltipTimerFn")
-	Assert(Body != "", "_TooltipTimerFn() must exist in the driver source")
-	Assert(InStr(Body, "_ResetPrefixBuffer") == 0,
+	TimerBody := _DriverFuncBody("_TooltipTimerFn")
+	HideBody := _DriverFuncBody("_TooltipTimerHideOrRetry")
+	Assert(InStr(TimerBody, "_TooltipTimerHideOrRetry(") > 0,
+		"_TooltipTimerFn must delegate teardown to the generation-owned hide/retry helper")
+	Assert(InStr(TimerBody, "_ResetPrefixBuffer") == 0
+		and InStr(HideBody, "_ResetPrefixBuffer") == 0,
 		"the tooltip auto-hide timer must not reset the preview buffer. It fires precisely when NOTHING happened — no keystroke, no caret move — so the engine still holds the word, and wiping the preview alone makes the two describe different text after any mid-word pause")
-	Assert(InStr(Body, "TooltipHide") > 0,
-		"the timer must still hide the tooltip — that is its actual job")
+	Assert(InStr(HideBody, "TooltipHide(") > 0,
+		"the timer's delegated owner-aware helper must still hide the tooltip — that is its actual job")
 }
 
 ; A declined raw callback changed nothing on screen, and the engine buffer is
@@ -120,10 +123,26 @@ _PNW_LockWorkstationResetIsPhysical() {
 ; And the recovery must actually be wired into the backspace path, not merely
 ; available.
 _PNW_BackspaceRecoveryIsWired() {
-	Body := _DriverFuncBody("_PrefixFeedBackspace")
-	Assert(Body != "", "_PrefixFeedBackspace() must exist in the driver source")
-	Assert(InStr(Body, "_PrefixWordTailFromEngine") > 0,
-		"the backspace path must recover the preview from the engine when its own buffer is empty — an empty preview does not mean there is nothing on screen, only that a terminator reset it earlier")
+	Wrapper := _DriverFuncBody("_PrefixFeedBackspace")
+	Commit := _DriverFuncBody("_PrefixCommitBackspace")
+	Finish := _DriverFuncBody("_PrefixFinishBackspace")
+	Assert(Wrapper != "", "_PrefixFeedBackspace() must exist in the driver source")
+	Assert(Commit != "", "_PrefixCommitBackspace() must own the paired buffer mutation")
+	Assert(Finish != "", "_PrefixFinishBackspace() must own the deferred tooltip work")
+
+	CommitCall := InStr(Wrapper, "Commit := _PrefixCommitBackspace()")
+	FinishCall := InStr(Wrapper, "_PrefixFinishBackspace(Commit)")
+	Assert(CommitCall > 0 and FinishCall > CommitCall,
+		"the physical backspace path must commit both buffers before finishing the tooltip update")
+
+	EngineBackspace := InStr(Commit, "HSE_FeedBackspace(true)")
+	EmptyPreviewGate := InStr(Commit, '_PrefixBuffer == ""', true, EngineBackspace)
+	Recovery := InStr(Commit, "_PrefixWordTailFromEngine()", true, EmptyPreviewGate)
+	Publish := InStr(Commit, "_PrefixSetBuffer(NextPrefixBuffer)", true, Recovery)
+	Assert(EngineBackspace > 0 and EmptyPreviewGate > EngineBackspace
+		and Recovery > EmptyPreviewGate and Publish > Recovery,
+		"when the preview is empty, the committed backspace must first decrement the engine, "
+		. "recover its newly exposed word tail, then publish that value through the canonical writer")
 }
 
 

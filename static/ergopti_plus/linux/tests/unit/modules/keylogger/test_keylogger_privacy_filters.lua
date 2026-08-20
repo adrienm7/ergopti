@@ -30,12 +30,22 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fakes = helpers.load_module("tests.fakes")
 
 local DRIVER_ROOT = helpers.driver_root()
 
+-- Privacy toggles persist by design. Running these behavioural tests over the
+-- real adapter would therefore modify the developer's own configuration and
+-- make the next suite run depend on the previous one. Keep every case on a
+-- fresh in-memory store, then restore the exact modules this file displaced.
+local _previous_storage = package.loaded["adapters.storage"]
+local _previous_keylogger = package.loaded["modules.keylogger.keylogger"]
+
 --- Reloads the keylogger with fresh module state.
 local function fresh_keylogger()
-	local kl = helpers.load_module("modules.keylogger.keylogger")
+	package.loaded["adapters.storage"] = Fakes.storage()
+	package.loaded["modules.keylogger.keylogger"] = nil
+	local kl = require("modules.keylogger.keylogger")
 	kl.init({})
 	return kl
 end
@@ -269,9 +279,6 @@ helpers.describe("keylogger privacy — coverage never narrows", function()
 	end)
 end)
 
-
-
-
 -- =========================================
 -- =========================================
 -- ======= 4/ The Daemon Feeds Them ========
@@ -340,3 +347,6 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 			"the keyword list must not be duplicated into this driver")
 	end)
 end)
+
+package.loaded["adapters.storage"] = _previous_storage
+package.loaded["modules.keylogger.keylogger"] = _previous_keylogger

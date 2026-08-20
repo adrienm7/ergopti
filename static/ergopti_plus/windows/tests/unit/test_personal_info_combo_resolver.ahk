@@ -68,9 +68,11 @@ global _PICR_LETTERS := Map(
 _PICR_Resolve(Buffer) {
 	global HSE_Buffer, HSE_Suppressed, HSE_RebuildInProgress, HSE_PersonalInfoCombosEnabled
 	global PersonalInformation, PersonalInformationLetters, _PICR_MK, _PICR_INFO, _PICR_LETTERS
+	InfoWasSet := IsSet(PersonalInformation)
+	LettersWereSet := IsSet(PersonalInformationLetters)
 	PrevBuf := HSE_Buffer
-	PrevInfo := PersonalInformation
-	PrevLetters := PersonalInformationLetters
+	PrevInfo := InfoWasSet ? PersonalInformation : 0
+	PrevLetters := LettersWereSet ? PersonalInformationLetters : 0
 	PrevEnabled := HSE_PersonalInfoCombosEnabled
 	PrevSuppressed := HSE_Suppressed
 	PrevRebuild := HSE_RebuildInProgress
@@ -84,8 +86,14 @@ _PICR_Resolve(Buffer) {
 		return HSE_TryPersonalInfoCombo(_PICR_MK)
 	} finally {
 		HSE_Buffer := PrevBuf
-		PersonalInformation := PrevInfo
-		PersonalInformationLetters := PrevLetters
+		if InfoWasSet
+			PersonalInformation := PrevInfo
+		else
+			PersonalInformation := unset
+		if LettersWereSet
+			PersonalInformationLetters := PrevLetters
+		else
+			PersonalInformationLetters := unset
 		HSE_PersonalInfoCombosEnabled := PrevEnabled
 		HSE_Suppressed := PrevSuppressed
 		HSE_RebuildInProgress := PrevRebuild
@@ -191,7 +199,11 @@ Test("combo resolver: one unknown letter declines the whole combo",
 _PICR_EmptyFieldDeclinesWholeCombo() {
 	global HSE_Buffer, PersonalInformation, PersonalInformationLetters
 	global HSE_PersonalInfoCombosEnabled, HSE_Suppressed, HSE_RebuildInProgress, _PICR_MK
-	PrevBuf := HSE_Buffer, PrevInfo := PersonalInformation, PrevLetters := PersonalInformationLetters
+	InfoWasSet := IsSet(PersonalInformation)
+	LettersWereSet := IsSet(PersonalInformationLetters)
+	PrevBuf := HSE_Buffer
+	PrevInfo := InfoWasSet ? PersonalInformation : 0
+	PrevLetters := LettersWereSet ? PersonalInformationLetters : 0
 	PrevEnabled := HSE_PersonalInfoCombosEnabled, PrevSup := HSE_Suppressed, PrevReb := HSE_RebuildInProgress
 	PersonalInformation := Map("last_name", "Dupont", "first_name", "")
 	PersonalInformationLetters := Map("n", "last_name", "p", "first_name")
@@ -204,7 +216,15 @@ _PICR_EmptyFieldDeclinesWholeCombo() {
 		Assert(!IsObject(Spec),
 			"a blank field must decline the whole combo — expanding the rest shifts every later value into the wrong form field, which is worse than nothing happening")
 	} finally {
-		HSE_Buffer := PrevBuf, PersonalInformation := PrevInfo, PersonalInformationLetters := PrevLetters
+		HSE_Buffer := PrevBuf
+		if InfoWasSet
+			PersonalInformation := PrevInfo
+		else
+			PersonalInformation := unset
+		if LettersWereSet
+			PersonalInformationLetters := PrevLetters
+		else
+			PersonalInformationLetters := unset
 		HSE_PersonalInfoCombosEnabled := PrevEnabled, HSE_Suppressed := PrevSup, HSE_RebuildInProgress := PrevReb
 	}
 }
@@ -218,7 +238,11 @@ Test("combo resolver: a blank field declines the whole combo",
 _PICR_GuardsDecline() {
 	global HSE_Buffer, HSE_PersonalInfoCombosEnabled, HSE_Suppressed, HSE_RebuildInProgress
 	global PersonalInformation, PersonalInformationLetters, _PICR_MK, _PICR_INFO, _PICR_LETTERS
-	PrevBuf := HSE_Buffer, PrevInfo := PersonalInformation, PrevLetters := PersonalInformationLetters
+	InfoWasSet := IsSet(PersonalInformation)
+	LettersWereSet := IsSet(PersonalInformationLetters)
+	PrevBuf := HSE_Buffer
+	PrevInfo := InfoWasSet ? PersonalInformation : 0
+	PrevLetters := LettersWereSet ? PersonalInformationLetters : 0
 	PrevEnabled := HSE_PersonalInfoCombosEnabled, PrevSup := HSE_Suppressed, PrevReb := HSE_RebuildInProgress
 	PersonalInformation := _PICR_INFO
 	PersonalInformationLetters := _PICR_LETTERS
@@ -234,7 +258,15 @@ _PICR_GuardsDecline() {
 		Assert(!IsObject(HSE_TryPersonalInfoCombo(_PICR_MK)),
 			"during a live rebuild the matcher answers '' for EVERY sequence — that means 'cannot answer now', not 'nothing claims this', and expanding then beats the registered tag that is about to come back")
 	} finally {
-		HSE_Buffer := PrevBuf, PersonalInformation := PrevInfo, PersonalInformationLetters := PrevLetters
+		HSE_Buffer := PrevBuf
+		if InfoWasSet
+			PersonalInformation := PrevInfo
+		else
+			PersonalInformation := unset
+		if LettersWereSet
+			PersonalInformationLetters := PrevLetters
+		else
+			PersonalInformationLetters := unset
 		HSE_PersonalInfoCombosEnabled := PrevEnabled, HSE_Suppressed := PrevSup, HSE_RebuildInProgress := PrevReb
 	}
 }

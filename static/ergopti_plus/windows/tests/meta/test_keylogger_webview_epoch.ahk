@@ -15,7 +15,7 @@ _KLWVE_OldTimersAndBridgeCallbacksCannotReachReplacement() {
     First := _DriverFuncBody("KLWV_DelayedFirstPush")
     Full := _DriverFuncBody("KLWV_DelayedFullBuild")
     Bridge := _DriverFuncBody("KLWV_OnWebMessage")
-    Range := _DriverFuncBody("KLWV_OnRangeBuildReady")
+    Range := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     Current := _DriverFuncBody("KLWV_IsCurrent")
 
     Assert(InStr(Open, "Epoch := ++KLWV.epoch") > 0,
@@ -25,7 +25,7 @@ _KLWVE_OldTimersAndBridgeCallbacksCannotReachReplacement() {
     Assert(InStr(Open, "KLWV_DelayedFirstPush.Bind(which, Epoch)") > 0,
         "the delayed first-push timer must capture the owner epoch")
     Assert(InStr(First, "KLWV_IsCurrent(which, Epoch)") > 0
-            && InStr(First, "KLWV_DelayedFullBuild.Bind(which, Epoch)") > 0,
+            && InStr(First, "KLWV_DelayedFullBuild.Bind(which, Epoch, 0)") > 0,
         "first-push must validate and propagate the owner epoch to full build")
     Assert(InStr(Full, "KLWV_IsCurrent(which, Epoch)") > 0,
         "full build must reject a timer from a closed/reopened host")

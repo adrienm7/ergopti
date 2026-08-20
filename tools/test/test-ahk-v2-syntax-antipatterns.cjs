@@ -24,6 +24,8 @@
  *    driver refused to start at all, and nothing caught it because ui/ files are
  *    not reachable from run_all.ahk — their only gate was an Ahk2Exe compile
  *    nobody runs. Braces on the if/else bodies are the fix.
+ * 4. JavaScript's strict-equality operator (`===`). AHK v2's case-sensitive
+ *    equality operator is `==`; `===` aborts parsing with `Missing operand`.
  *
  * FEATURES & RATIONALE:
  * - Cross-platform: runs in the JS validation layer (npm run test:js) so a parse
@@ -70,6 +72,38 @@ const errors = [];
 // matched.
 const BLOCK_ARROW = /=>\s*\{\s*(\w+\s*[(.]|\w+\s*:=)/g;
 
+// AHK strings may legitimately embed JavaScript containing `===`, so this
+// scanner removes both quote styles and an inline comment before checking the
+// remaining AHK code. Backtick escapes consume the following source character.
+function stripAhkStringsAndComment(line) {
+	let out = '';
+	let quote = '';
+	for (let i = 0; i < line.length; i += 1) {
+		const char = line[i];
+		if (quote) {
+			if (char === '`') {
+				out += ' ';
+				if (i + 1 < line.length) {
+					i += 1;
+					out += ' ';
+				}
+				continue;
+			}
+			if (char === quote) quote = '';
+			out += ' ';
+			continue;
+		}
+		if (char === '"' || char === "'") {
+			quote = char;
+			out += ' ';
+			continue;
+		}
+		if (char === ';') break;
+		out += char;
+	}
+	return out;
+}
+
 // Words AHK v2 refuses as identifiers. The list is deliberately the control-flow
 // keywords rather than every reserved name: those are the ones that read as
 // perfectly ordinary variable names ("Case", "Loop", "Until", "Catch") and so are
@@ -85,14 +119,34 @@ const RESERVED_LOWER = new Set(
 for (const file of files) {
 	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
 	const src = fs.readFileSync(file, 'utf8');
-	// Blank out full-line comments while preserving line numbering.
-	const codeLines = src.split(/\r?\n/).map((l) => (l.trim().startsWith(';') ? '' : l));
+	// Blank out full-line and documentation-block comments while preserving line
+	// numbering. Project block comments use AHK's line-leading /* ... */ form.
+	let inBlockComment = false;
+	const codeLines = src.split(/\r?\n/).map((line) => {
+		const trimmed = line.trim();
+		if (inBlockComment) {
+			if (trimmed.includes('*/')) inBlockComment = false;
+			return '';
+		}
+		if (trimmed.startsWith('/*')) {
+			if (!trimmed.includes('*/')) inBlockComment = true;
+			return '';
+		}
+		return trimmed.startsWith(';') ? '' : line;
+	});
 
 	codeLines.forEach((line, i) => {
 		if (/"{3,}/.test(line)) {
 			errors.push(
 				`${rel}:${i + 1}: three or more consecutive double-quotes — AHK v1 quote escaping; ` +
 					'in v2 a literal quote is `" (backtick-quote).'
+			);
+		}
+		const executable = stripAhkStringsAndComment(line);
+		if (/(?<!!)===(?!=)/.test(executable)) {
+			errors.push(
+				`${rel}:${i + 1}: JavaScript-style strict equality (===) — AHK v2 uses == ` +
+				'for case-sensitive equality; === aborts parsing with `Missing operand`.'
 			);
 		}
 	});

@@ -492,36 +492,43 @@ Test("HSE factories register with no options (no UnsetError) and default to comm
 ; per-section priority override reaches the ~3000 bundled hotstrings (previously they
 ; always landed at the common tier 10, ignoring the override).
 TestHSE_NoExplicitPriorityResolvesOverrideCascade() {
-    global _HotstringsOverrides, HSE_PRIORITY_COMMON
-    Saved := _HotstringsOverrides
-    _HotstringsOverrides := Map()
-    HotstringsResolveBumpGen()
+	global _HotstringsOverrides, _HotstringsOverridesPath, HSE_PRIORITY_COMMON
+	SavedOverrides := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_engine_priority_overrides.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
+	HotstringsResolveBumpGen()
+	try {
+		; No override → the common source default (synthetic non-personal/ext category).
+		HSE_TestReset()
+		CreateHotstring("*?", "qzc", "o", Map("Category", "phase3cat", "Section", "names"))
+		HSE_FeedReset(true)
+		HSE_FeedChar("q")
+		HSE_FeedChar("z")
+		M := HSE_FeedChar("c")
+		AssertTrue(M != "", "trigger must fire")
+		AssertEqual(HSE_PRIORITY_COMMON, M.Priority,
+			"no override → a no-explicit-priority registration lands at the common source default")
 
-    ; No override → the common source default (synthetic non-personal/ext category).
-    HSE_TestReset()
-    CreateHotstring("*?", "qzc", "o", Map("Category", "phase3cat", "Section", "names"))
-    HSE_FeedReset(true)
-    HSE_FeedChar("q")
-    HSE_FeedChar("z")
-    M := HSE_FeedChar("c")
-    AssertTrue(M != "", "trigger must fire")
-    AssertEqual(HSE_PRIORITY_COMMON, M.Priority,
-        "no override → a no-explicit-priority registration lands at the common source default")
-
-    ; A section-level override must reach the no-explicit-priority (generated-style) path.
-    HotstringsSetOverride("phase3cat", "names", "priority", 42)
-    HSE_TestReset()
-    CreateHotstring("*?", "qzd", "o", Map("Category", "phase3cat", "Section", "names"))
-    HSE_FeedReset(true)
-    HSE_FeedChar("q")
-    HSE_FeedChar("z")
-    M2 := HSE_FeedChar("d")
-    AssertTrue(M2 != "", "trigger must fire")
-    AssertEqual(42, M2.Priority,
-        "a per-section priority override reaches a no-explicit-priority (generated-style) registration")
-
-    _HotstringsOverrides := Saved
-    HotstringsResolveBumpGen()
+		; A section-level override must reach the no-explicit-priority (generated-style) path.
+		HotstringsSetOverride("phase3cat", "names", "priority", 42)
+		HSE_TestReset()
+		CreateHotstring("*?", "qzd", "o", Map("Category", "phase3cat", "Section", "names"))
+		HSE_FeedReset(true)
+		HSE_FeedChar("q")
+		HSE_FeedChar("z")
+		M2 := HSE_FeedChar("d")
+		AssertTrue(M2 != "", "trigger must fire")
+		AssertEqual(42, M2.Priority,
+			"a per-section priority override reaches a no-explicit-priority (generated-style) registration")
+	} finally {
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
 }
 Test("HSE no-explicit-priority registration honours the section override cascade",
     TestHSE_NoExplicitPriorityResolvesOverrideCascade)
@@ -1143,3 +1150,128 @@ TestHSE_DeclinedRawCallbackReportsNotFired() {
 }
 Test("HSE: a declined raw callback reports 'not fired' so it is never logged as an expansion",
     TestHSE_DeclinedRawCallbackReportsNotFired)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 9/ Focused-control input generations ========
+; ======================================================
+; ======================================================
+
+; Seed the exact AHK-06 state: both buffers believe ``ia`` sits left of the
+; caret and a preview row is live. The caller owns cleanup because these are
+; production globals shared by every test in the runner.
+_HSE_SeedArmedInputContext(Token, Generation) {
+    global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixInputContextGeneration
+    global _KLLastShownSuggestion
+    HSE_TestReset()
+    HSE_Register("", "ia", (*) => "", { Replacement: "IA" })
+    HSE_FeedChar("i", true)
+    HSE_FeedChar("a", true)
+    _PrefixBuffer := "ia"
+    _PrefixFocusedControlToken := Token
+    _PrefixInputContextGeneration := Generation
+    _KLLastShownSuggestion := { Trigger: "ia", Output: "IA", Category: "autocorrection", IsPrivate: false }
+}
+
+TestHSE_InputContextGenerationGuardsRelocation() {
+    global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixInputContextGeneration
+    global _KLLastShownSuggestion, _Stub_RecordedSends
+    PrevPrefix := _PrefixBuffer
+    PrevToken := _PrefixFocusedControlToken
+    PrevGeneration := _PrefixInputContextGeneration
+    PrevSuggestion := _KLLastShownSuggestion
+    PrevKeyloggerInit := Keylogger.initialized
+    ResetHotstringRecorders()
+    Keylogger.initialized := false
+    try {
+        ; Exact AHK-06 reproductions: both genuine Ctrl chords invalidate before
+        ; their target control exists, then Space arrives after the token changes.
+        for TestCase in [{ VK: 0x46, Label: "Ctrl+F" }, { VK: 0x4C, Label: "Ctrl+L" }] {
+            ResetHotstringRecorders()
+            _HSE_SeedArmedInputContext(1001, 40)
+            AssertTrue(_PrefixHandleCtrlContextChord(TestCase.VK, true, false),
+                TestCase.Label . " must publish a new input-context generation")
+            AssertEqual("", HSE_Buffer,
+                TestCase.Label . " must clear the engine buffer before focus can move")
+            AssertEqual("", _PrefixBuffer,
+                TestCase.Label . " must clear the preview buffer in the same transaction")
+            AssertEqual("", _KLLastShownSuggestion,
+                TestCase.Label . " must remove the preview row owned by the old control")
+            AssertEqual(0, _PrefixFocusedControlToken,
+                TestCase.Label . " must stay unbound until the destination is observable")
+            AssertEqual(41, _PrefixInputContextGeneration)
+
+            AssertTrue(_PrefixEnsureInputContext(2002),
+                "the next physical character must bind the destination control")
+            AssertEqual(42, _PrefixInputContextGeneration)
+            Match := HSE_FeedChar(" ", true)
+            if (Match != "")
+                HSE_DispatchMatch(Match, HSE_LastEndChar)
+            AssertEqual("", Match,
+                TestCase.Label . " followed by Space must not reuse old-control trigger ia")
+            AssertEqual(0, _Stub_RecordedSends.Length,
+                "no stale match means no backspace burst can target the destination")
+            AssertEqual("", _KLLastShownSuggestion,
+                "Space in the destination must not resurrect the old preview row")
+        }
+
+        ; The token is canonical. Bypass the F/L classifier so a chord-only fix
+        ; cannot satisfy the test.
+        _HSE_SeedArmedInputContext(3003, 80)
+        AssertTrue(_PrefixEnsureInputContext(4004))
+        AssertEqual("", HSE_Buffer,
+            "a focused-control token change must invalidate the engine without a known chord")
+        AssertEqual("", _PrefixBuffer,
+            "a focused-control token change must invalidate the preview without a known chord")
+        AssertEqual("", _KLLastShownSuggestion,
+            "the old control's preview row must be dismissed")
+        AssertEqual(81, _PrefixInputContextGeneration)
+        AssertEqual("", HSE_FeedChar(" ", true),
+            "Space in the new control must not complete the old control's ia trigger")
+
+        ; A transient adapter failure ignores input. Recovery must preserve the
+        ; unknown-boundary verdict or a later suffix can erase ignored text.
+        _HSE_SeedArmedInputContext(6006, 160)
+        AssertFalse(_PrefixEnsureInputContext(0),
+            "an unverifiable target must fail closed before HSE sees the character")
+        AssertFalse(HSE_StartIsWordBoundary,
+            "losing focus identity must mark left-hand text unknown")
+
+        AssertTrue(_PrefixEnsureInputContext(6006),
+            "tracking may resume even when a windowless control falls back to the same token")
+        AssertFalse(HSE_StartIsWordBoundary,
+            "focus recovery must not invent a boundary after one or more ignored characters")
+        HSE_FeedChar("i", true)
+        HSE_FeedChar("a", true)
+        AssertEqual("", HSE_FeedChar(" ", true),
+            "a suffix typed after unverifiable text must not backspace that unknown text")
+
+        ; AltGr raises synthetic Ctrl on Windows. It must remain a character path,
+        ; not be mistaken for either relocation command.
+        for VK in [0x46, 0x4C] {
+            _HSE_SeedArmedInputContext(5005, 120)
+            AssertFalse(_PrefixHandleCtrlContextChord(VK, true, true),
+                "AltGr's synthetic Ctrl must not be classified as genuine Ctrl+F/Ctrl+L")
+            AssertEqual("ia", HSE_Buffer,
+                "an AltGr character must keep the engine context until OnChar feeds it")
+            AssertEqual("ia", _PrefixBuffer,
+                "an AltGr character must keep the preview context until OnChar feeds it")
+            AssertEqual(120, _PrefixInputContextGeneration,
+                "AltGr must not advance the focused-control generation")
+        }
+    } finally {
+        Keylogger.initialized := PrevKeyloggerInit
+        ResetHotstringRecorders()
+        HSE_TestReset()
+        _PrefixBuffer := PrevPrefix
+        _PrefixFocusedControlToken := PrevToken
+        _PrefixInputContextGeneration := PrevGeneration
+        _KLLastShownSuggestion := PrevSuggestion
+    }
+}
+Test("HSE input-context-generation: focused-control ownership blocks stale Ctrl+F/Ctrl+L fires",
+    TestHSE_InputContextGenerationGuardsRelocation)

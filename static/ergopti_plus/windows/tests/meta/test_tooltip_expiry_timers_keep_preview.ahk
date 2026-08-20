@@ -5,8 +5,9 @@
 ;         (tooltip-expiry-timers-keep-preview)
 ; DESCRIPTION:
 ; _PrefixBuffer (what the tooltip describes) and HSE_Buffer (what the engine will
-; match) must always describe the same screen. The tooltip module runs TWO
-; deadline-driven teardowns, and the invariant was fixed at one of them only:
+; match) must always describe the same screen. The tooltip module has two
+; deadline-driven teardown ROUTES, represented by three timer callbacks (the
+; exact dequeue deadline forwards to its poll):
 ;
 ;   - _TooltipTimerFn      — the whole-surface safety/auto-hide deadline. Fixed,
 ;                            and pinned by test_preview_never_wiped_alone.ahk.
@@ -24,9 +25,10 @@
 ; SCOPE: source introspection. Both callbacks are SetTimer targets that tear down
 ; real Gui/GDI surfaces, so they cannot be driven headlessly.
 ;
-; The site list is DERIVED from the driver source (every _Tooltip*Fn timer
-; callback) rather than enumerated by hand — the defect here was precisely a
-; hand-written list that named one of two siblings.
+; The site list is DERIVED from the driver source (every _Tooltip*Fn callback,
+; regardless of its parameter list) rather than enumerated by hand. Each
+; callback's tooltip-local call graph is inspected, so forwarding through an
+; owner-aware helper cannot make a teardown disappear from the guard.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,17 +43,42 @@
 ; ======================================================================
 ; ======================================================================
 
-; Every top-level `_Tooltip<Something>Fn()` in the driver source. A new expiry
-; timer added later joins this set automatically instead of being forgotten.
+; Every top-level `_Tooltip<Something>Fn(...)` in the driver source. Parameters
+; may be required or optional; the old `()`-only regex silently lost both
+; dequeue callbacks after they gained generation/surface ownership arguments.
 _TETKP_TimerCallbackNames() {
 	Src := _DriverSourceNoComments()
 	Names := []
 	Pos := 1
-	while (Pos := RegExMatch(Src, "m)^(_Tooltip\w*Fn)\(\)\s*\{", &M, Pos)) {
+	while (Pos := RegExMatch(Src, "m)^(_Tooltip\w*Fn)\([^)]*\)\s*\{", &M, Pos)) {
 		Names.Push(M[1])
 		Pos += StrLen(M[0])
 	}
 	return Names
+}
+
+; Does Name's tooltip-local call graph contain Needle? Seen prevents helper
+; cycles from recursing forever. Dynamic discovery uses OrEmpty deliberately:
+; a token such as a method call is not a top-level tooltip helper and therefore
+; has no body to traverse.
+_TETKP_ReachableContains(Name, Needle, Seen := unset) {
+	if !IsSet(Seen)
+		Seen := Map()
+	if Seen.Has(Name)
+		return false
+	Seen[Name] := true
+	Body := _DriverFuncBodyOrEmpty(Name)
+	if (Body == "")
+		return false
+	if (InStr(Body, Needle) > 0)
+		return true
+	Pos := 1
+	while RegExMatch(Body, "\b(_Tooltip[A-Za-z0-9_]+)\s*\(", &Call, Pos) {
+		Pos := Call.Pos + Call.Len
+		if _TETKP_ReachableContains(Call[1], Needle, Seen)
+			return true
+	}
+	return false
 }
 
 _TETKP_TheClassIsDiscovered() {
@@ -62,9 +89,12 @@ _TETKP_TheClassIsDiscovered() {
 	Seen := Map()
 	for Name in Names
 		Seen[Name] := true
-	for Required in ["_TooltipTimerFn", "_TooltipDequeuePollFn"] {
+	for Required in ["_TooltipTimerFn", "_TooltipDequeueDeadlineFn",
+		"_TooltipDequeuePollFn"] {
 		Assert(Seen.Has(Required),
-			Required . " must be discovered by the timer-callback scan — it is one of the two deadline-driven teardowns this guard exists for")
+			Required . " must be discovered by the signature-agnostic callback scan")
+		Assert(_TETKP_ReachableContains(Required, "TooltipHide("),
+			Required . " must still reach the canonical tooltip teardown through its helper call graph")
 	}
 }
 
@@ -81,20 +111,16 @@ _TETKP_TheClassIsDiscovered() {
 _TETKP_NoExpiryTimerWipesThePreview() {
 	Checked := 0
 	for Name in _TETKP_TimerCallbackNames() {
-		Body := _DriverFuncBody(Name)
-		; Only the callbacks that actually tear the surface down are in scope;
-		; the deferred-show timer builds, it does not expire anything.
-		Assert(Body != "",
-			Name . "() must exist — a missing body would silently drop it from this scan and "
-			. "make the absence assertion below vacuous for that callback")
-		if (InStr(Body, "TooltipHide") == 0)
+		; Only callbacks whose tooltip-local graph tears a surface down are in scope;
+		; owner timers may forward through retry/deadline helpers first.
+		if !_TETKP_ReachableContains(Name, "TooltipHide(")
 			continue
 		Checked += 1
-		Assert(InStr(Body, "_ResetPrefixBuffer") == 0,
+		Assert(!_TETKP_ReachableContains(Name, "_ResetPrefixBuffer("),
 			Name . " must not reset the preview buffer. It fires on a DEADLINE, i.e. precisely when nothing happened — no keystroke, no caret move — so the engine still holds the word. Wiping the preview alone makes the two buffers describe different text, and no later keystroke in that word can reproduce the prefix the tooltip needs, so the suggestion never comes back")
 	}
-	Assert(Checked >= 2,
-		"both deadline-driven teardowns must be in scope (only " . Checked . " seen) — the previous guard covered one of the two and was structurally blind to the other")
+	Assert(Checked >= 3,
+		"both deadline-driven teardown routes, including the dequeue forwarder, must be in scope (only " . Checked . " callback(s) seen)")
 }
 
 ; The teardown itself is the job and must not be removed by an over-eager fix.

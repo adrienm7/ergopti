@@ -24,9 +24,9 @@
  *    shared notation knows, and every catalogue modifier id is an accepted alias
  *    of it, so a chord written with the catalogue's vocabulary parses.
  * 3. Key spellings — every catalogue key whose AutoHotkey spelling differs from
- *    its chord key appears in the adapter's native-key map with exactly that
- *    spelling, and nothing appears there that the catalogue does not justify
- *    beyond a documented allowance.
+ *    its chord key appears in the adapter's native-key map with exactly its
+ *    `windows_hotkey_key` spelling. This is deliberately separate from
+ *    brace-capable `windows_key`, which feeds Send rather than Hotkey.
  * 4. Slot vocabulary — the id → chord-key maps the two drivers keep for their
  *    shortcut slots agree with the catalogue's `chord_key`, so "enter" means the
  *    same key on both.
@@ -56,9 +56,16 @@ const HS_SLOTS = path.join(ROOT, 'static/ergopti_plus/macos/modules/shortcuts/ke
 const CATALOGUE_MOD_TO_CANONICAL = { ctrl: 'ctrl', shift: 'shift', alt: 'alt', win: 'cmd' };
 
 // Keys the adapter may spell natively without a catalogue entry. These are keys
-// no slot uses today but that any chord may legitimately name; listing them here
-// means an UNLISTED extra entry is a finding, not noise.
-const ADAPTER_ONLY_KEYS = new Set(['enter', 'tab', 'escape', 'backspace', 'delete']);
+// no slot uses today but that any chord may legitimately name. The values are
+// part of the contract too: a Set would justify a brace-wrapped or mistyped
+// spelling without comparing it to the exact Hotkey() syntax.
+const ADAPTER_ONLY_KEYS = Object.freeze({
+	enter: 'enter',
+	tab: 'tab',
+	escape: 'escape',
+	backspace: 'backspace',
+	delete: 'delete'
+});
 
 const errors = [];
 
@@ -254,16 +261,25 @@ for (const mod of (catalogue.platforms.macos || {}).modifiers || []) {
 // ==================================================
 // ==================================================
 
-const justifiedNativeKeys = new Set(ADAPTER_ONLY_KEYS);
+const justifiedNativeKeys = new Set(Object.keys(ADAPTER_ONLY_KEYS));
+
+for (const [chordKey, winHotkeyKey] of Object.entries(ADAPTER_ONLY_KEYS)) {
+	if (ahkNativeKeys[chordKey] !== winHotkeyKey) {
+		fail(
+			`AutoHotkey Hotkey spelling of adapter-only key "${chordKey}": expected "${winHotkeyKey}", ` +
+				`HOTKEY_KEY_NATIVE says "${ahkNativeKeys[chordKey]}"`
+		);
+	}
+}
 
 for (const entry of catalogue.keys || []) {
 	const chordKey = chordKeyOf(entry);
-	const winKey = entry.windows_key || entry.id;
-	if (winKey !== chordKey) {
+	const winHotkeyKey = entry.windows_hotkey_key || chordKey;
+	if (winHotkeyKey !== chordKey || entry.windows_hotkey_key) {
 		justifiedNativeKeys.add(chordKey);
-		if (ahkNativeKeys[chordKey] !== winKey) {
+		if (ahkNativeKeys[chordKey] !== winHotkeyKey) {
 			fail(
-				`AutoHotkey spelling of "${entry.id}" (chord key "${chordKey}"): catalogue says "${winKey}", ` +
+				`AutoHotkey Hotkey spelling of "${entry.id}" (chord key "${chordKey}"): catalogue says "${winHotkeyKey}", ` +
 					`HOTKEY_KEY_NATIVE says "${ahkNativeKeys[chordKey]}"`
 			);
 		}

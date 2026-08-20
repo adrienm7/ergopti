@@ -248,38 +248,75 @@ _WS_BuildSymbolRows() {
 	return Rows
 }
 
-; Toggle a built-in symbol and refresh the tray.
-_WS_MenuToggle(OpenChar) {
-	WrapSymbols_Toggle(OpenChar)
-	RebuildTrayMenu()
+; Rebuild only after a strictly acknowledged durable wrap-symbol commit. A
+; refused writer, replace or final authorization must leave the visible tray
+; projection unchanged instead of advertising a state that never committed.
+_WS_MenuRebuildAfterCommit(Committed, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; A caller may wrap the menu callback itself. Tray construction can be
+		; expensive and must remain interruptible even after persistence returns.
+		Critical("Off")
+		try return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+	try Rebuilt := HasMethod(RebuildFn, "Call")
+		? RebuildFn.Call() : RebuildTrayMenu()
+	catch as Err {
+		try LoggerError("WrapSymbols",
+			"Could not rebuild the tray after the durable wrap-symbol commit: {1}.",
+			Err.Message)
+		return false
+	}
+	if !(Rebuilt is Integer) || Rebuilt != 1 {
+		try LoggerError("WrapSymbols",
+			"The tray rebuild refused the durable wrap-symbol projection.")
+		return false
+	}
+	return 1
+}
+
+; Toggle a built-in symbol and refresh the tray after durable publication.
+_WS_MenuToggle(OpenChar, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_Toggle(OpenChar, WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Enable or disable all built-in symbols, then refresh.
-_WS_MenuSetAll(Enable) {
+_WS_MenuSetAll(Enable, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
 	if Enable {
-		WrapSymbols_EnableAll()
+		Committed := WrapSymbols_EnableAll(WriterFn, ReplaceFn, DeleteFn)
 	} else {
-		WrapSymbols_DisableAll()
+		Committed := WrapSymbols_DisableAll(WriterFn, ReplaceFn, DeleteFn)
 	}
-	RebuildTrayMenu()
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Enable or disable every symbol in one group at once, then refresh.
-_WS_MenuSetGroup(OpenChars, Enable) {
-	WrapSymbols_SetMany(OpenChars, Enable)
-	RebuildTrayMenu()
+_WS_MenuSetGroup(OpenChars, Enable, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, RebuildFn := 0) {
+	Committed := WrapSymbols_SetMany(OpenChars, Enable,
+		WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Reset to factory defaults, then refresh.
-_WS_MenuReset() {
-	WrapSymbols_Reset()
-	RebuildTrayMenu()
+_WS_MenuReset(WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_Reset(WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Remove a custom symbol pair (1-based index), then refresh.
-_WS_MenuRemoveCustom(Idx) {
-	WrapSymbols_RemoveCustom(Idx)
-	RebuildTrayMenu()
+_WS_MenuRemoveCustom(Idx, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_RemoveCustom(Idx,
+		WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Open a two-step GUI dialog to add a custom wrap-symbol pair.
@@ -309,7 +346,6 @@ _WS_MenuAddCustom() {
 		RightChar := LeftChar
 	}
 
-	WrapSymbols_AddCustom(LeftChar, RightChar)
-	RebuildTrayMenu()
+	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
+	return _WS_MenuRebuildAfterCommit(Committed)
 }
-

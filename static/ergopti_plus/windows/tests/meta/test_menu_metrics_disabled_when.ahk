@@ -325,3 +325,23 @@ _MMDW_MigratedRowsAreDeclarative() {
 	}
 }
 Test("menu-metrics-disabled-when: the migrated privacy rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)
+
+_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels() {
+	for Name in ["_MET_ShortcutTypingRows", "_MET_ShortcutAppsRows"] {
+		Body := _DriverFuncBody(Name)
+		Assert(InStr(Body, "_MET_PromptShortcutAndRefresh(") > 0,
+			Name . " must route its click through the tray-refresh owner")
+		Assert(InStr(Body, "MS_PromptShortcut(") = 0,
+			Name . " must not leave a direct click path with a stale label snapshot")
+	}
+	Wrapper := _DriverFuncBody("_MET_PromptShortcutAndRefresh")
+	Assert(InStr(Wrapper, "RebuildTrayMenu()") > 0,
+		"the shortcut action must request the canonical tray generation owner")
+	Assert(InStr(Wrapper, "(Result is Integer) && Result == 1") > 0
+		and InStr(Wrapper, "(RefreshResult is Integer) && RefreshResult == 1") > 0,
+		"prompt and tray outcomes must both reject truthy String statuses")
+	Assert(InStr(Wrapper, "After == Before") > 0,
+		"a surfaced cleanup failure must still refresh when its warning label changed")
+}
+Test("menu-metrics-disabled-when: shortcut clicks strictly refresh committed projections",
+	_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels)

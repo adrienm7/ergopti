@@ -74,9 +74,9 @@ _URLC_EveryAsyncFetchRegisters() {
 	; true the assertions below are pinning the wrong mechanism.
 	Cancel := _DriverFuncBody("_Updater_CancelAsyncChecks")
 	Assert(Cancel != "", "_Updater_CancelAsyncChecks() must exist in the driver source")
-	Assert(InStr(Cancel, "_UpdaterAsyncRequests.Clear()") > 0,
-		"prerequisite: async cancellation works by draining _UpdaterAsyncRequests, so anything absent from that map cannot be cancelled at all")
-
+	Assert(InStr(Cancel, "_Updater_SwapAsyncRequestsForBoundary(") > 0
+		and InStr(Cancel, "_UpdaterAsyncRequests.Clear()") == 0,
+		"prerequisite: cancellation atomically replaces _UpdaterAsyncRequests before delivering the retired registry, so reentrant work cannot be abandoned")
 	Fetches := _URLC_MatchingFunctions("m)^(_Updater_Fetch[A-Za-z0-9_]*Async)\([^\r\n]*\)\s*\{")
 	Assert(Fetches.Length >= 2,
 		"the async-fetch scan must find every _Updater_Fetch*Async function (found " . Fetches.Length . "): a scan that matches nothing must not be able to pass")
@@ -84,11 +84,36 @@ _URLC_EveryAsyncFetchRegisters() {
 	for _, Fn in Fetches {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . "() was found by the source scan but its body could not be resolved")
-		Assert(InStr(Body, "_UpdaterAsyncRequests[") > 0,
-			Fn . " must register its request in the shared _UpdaterAsyncRequests map: _Updater_CancelAsyncChecks drains only that map, so an unregistered request survives the suspend teardown and keeps polling and talking to the network while the driver is paused (updater-releases-list-uncancellable)")
+		RegisterAt := InStr(Body, "_Updater_RegisterAsyncRequestOwner(")
+		SendAt := RegisterAt > 0
+			? InStr(Body, "_Updater_SendOwnedAsyncRequest(", , RegisterAt)
+			: 0
+		Assert(RegisterAt > 0 and SendAt > RegisterAt,
+			Fn . " must publish an exact owner in the shared registry before transport preparation and Send: an unregistered request survives suspend and keeps talking to the network while the driver is paused (updater-releases-list-uncancellable)")
+		for _, Effect in [
+				"ComObject(", ".Open(", ".SetRequestHeader(",
+				".SetTimeouts(", ".Send("] {
+			EffectAt := InStr(Body, Effect)
+			Assert(EffectAt == 0 or EffectAt > RegisterAt,
+				Fn . " performs " . Effect
+				. " before publishing its exact owner; source ordering must make every yielding transport effect cancellable (updater-owner-before-preparation)")
+		}
 	}
+	Registrar := _DriverFuncBody("_Updater_RegisterAsyncRequestOwner")
+	Assert(Registrar != "",
+		"the exact async-owner registrar must exist")
+	CriticalAt := InStr(Registrar, 'Critical("On")')
+	PolicyAt := CriticalAt > 0
+		? InStr(Registrar, "_Updater_RequestPolicy(Request)", , CriticalAt)
+		: 0
+	PublishAt := PolicyAt > 0
+		? InStr(Registrar, "_UpdaterAsyncRequests[Owner.Id] := Record", , PolicyAt)
+		: 0
+	Assert(CriticalAt > 0 and PolicyAt > CriticalAt and PublishAt > PolicyAt,
+		"the shared registrar must publish each exact transport owner under the request-policy Critical boundary")
 }
-Test("updater: every async fetch registers in the shared cancellation registry (updater-releases-list-uncancellable)", _URLC_EveryAsyncFetchRegisters)
+Test("updater AHK-31: every async fetch owns registry membership before Send (updater-owner-before-preparation)",
+	_URLC_EveryAsyncFetchRegisters)
 
 
 
@@ -115,10 +140,53 @@ _URLC_EveryWinHttpPollHonoursCancellation() {
 		if (InStr(Body, "WaitForResponse") == 0)
 			continue
 		Checked += 1
-		Assert(InStr(Body, "_UpdaterAsyncRequests.Has(") > 0,
-			Fn . " must no-op once its registry entry has been cancelled: without that check the re-armed 250 ms timer keeps running through a pause for the whole poll budget, which is exactly the state _Updater_CancelAsyncChecks exists to prevent (updater-releases-list-uncancellable)")
+		LookupAt := InStr(Body, "_UpdaterAsyncRequests.Has(")
+		AcquireAt := LookupAt > 0
+			? InStr(Body, "_Updater_AcquireAsyncSendLease(", , LookupAt)
+			: 0
+		WaitAt := AcquireAt > 0
+			? InStr(Body, "WaitForResponse", , AcquireAt)
+			: 0
+		StatusAt := WaitAt > 0 ? InStr(Body, ".Status", , WaitAt) : 0
+		BodyAt := WaitAt > 0 ? InStr(Body, ".ResponseText", , WaitAt) : 0
+		FinallyAt := WaitAt > 0 ? InStr(Body, "finally", , WaitAt) : 0
+		ReleaseAt := FinallyAt > 0
+			? InStr(Body, "_Updater_ReleaseAsyncSendLease(Owner)", , FinallyAt)
+			: 0
+		TakeAt := ReleaseAt > 0
+			? InStr(Body, "_Updater_TakeAsyncRequest(", , ReleaseAt)
+			: 0
+		Assert(LookupAt > 0 and AcquireAt > LookupAt
+			and WaitAt > AcquireAt
+			and StatusAt > WaitAt and StatusAt < FinallyAt
+			and BodyAt > WaitAt and BodyAt < FinallyAt
+			and ReleaseAt > FinallyAt
+			and TakeAt > ReleaseAt,
+			Fn . " must lease its exact record across WaitForResponse/Status/ResponseText, release in finally, then exact-take completion; otherwise cancellation can Abort/callback while COM is on the stack (updater-operation-lease)")
 	}
 	Assert(Checked >= 2,
 		"at least both WinHTTP completion polls must have been checked (checked " . Checked . "): a filter that excludes everything must not be able to pass")
 }
 Test("updater: every WinHTTP completion poll no-ops once cancelled (updater-releases-list-uncancellable)", _URLC_EveryWinHttpPollHonoursCancellation)
+
+_URLC_SendTransactionUsesOneLease() {
+	Sender := _DriverFuncBody("_Updater_SendOwnedAsyncRequest")
+	Assert(Sender != "", "_Updater_SendOwnedAsyncRequest() must exist")
+	AcquireAt := InStr(Sender, "_Updater_AcquireAsyncSendLease(Owner)")
+	PrepareAt := AcquireAt > 0
+		? InStr(Sender, "PrepareFn.Call(Owner)", , AcquireAt)
+		: 0
+	CommitAt := PrepareAt > 0
+		? InStr(Sender, "_Updater_CommitAsyncSendLease(Owner)", , PrepareAt)
+		: 0
+	SendAt := CommitAt > 0 ? InStr(Sender, "Http.Send()", , CommitAt) : 0
+	FinallyAt := SendAt > 0 ? InStr(Sender, "finally", , SendAt) : 0
+	ReleaseAt := FinallyAt > 0
+		? InStr(Sender, "_Updater_ReleaseAsyncSendLease(Owner)", , FinallyAt)
+		: 0
+	Assert(AcquireAt > 0 and PrepareAt > AcquireAt and CommitAt > PrepareAt
+		and SendAt > CommitAt and FinallyAt > SendAt and ReleaseAt > FinallyAt,
+		"one exact operation lease must cover preparation, Send commit, COM Send and finally release (updater-operation-lease)")
+}
+Test("updater AHK-31: one lease covers preparation through Send return (updater-operation-lease)",
+	_URLC_SendTransactionUsesOneLease)

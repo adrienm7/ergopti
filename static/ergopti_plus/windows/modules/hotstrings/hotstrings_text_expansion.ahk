@@ -89,8 +89,11 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			; out of the debug fire-trace. Without it the expansion is recorded
 			; verbatim, twice per row, into a log that is replicated to every other
 			; device and kept for fourteen days.
+			InfoTagValue := PersonalInformation[InfoTagField]
 			CreateHotstring("*", "@" . InfoTag . ScriptInformation["MagicKey"],
-				PersonalInformation[InfoTagField], Map("FinalResult", True).Set("IsPrivate", True))
+				InfoTagValue, Map("FinalResult", True).Set("IsPrivate", True)
+					.Set("Category", "personal")
+					.Set("PreviewFields", [InfoTagField]).Set("PreviewValues", [InfoTagValue]))
 		}
 
 		; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
@@ -103,10 +106,11 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 		; Generate all possible combinations of letters between 1 and PatternMaxLength characters
 		GeneratePersonalInformationHotstrings(
 			PersonalInformationHotstrings,
+			PersonalInformationLetters,
 			Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["pattern_max_length"]
 		)
 
-		GeneratePersonalInformationHotstrings(hotstrings, maxLen) {
+		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
 			keys := []
 			; ``hotstrings`` is a Map keyed by the alias LETTER (n, t, …); the combo
 			; generator needs those keys, not the personal-data values. The 2-var Map
@@ -116,7 +120,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			for k, _ in hotstrings
 				keys.Push(k)
 			loop maxLen
-				Generate(keys, hotstrings, "", A_Index)
+				Generate(keys, hotstrings, fieldsByLetter, "", A_Index)
 		}
 
 		; In case email is "^a" we want to send raw string and not Ctrl + A.
@@ -127,33 +131,40 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			return SendEscapeLiteral(text)
 		}
 
-		Generate(keys, hotstrings, combo, len) {
+		Generate(keys, hotstrings, fieldsByLetter, combo, len) {
 			if (len == 0) {
 				value := ""
+				PreviewFields := []
+				PreviewValues := []
 				loop parse, combo {
-					if (hotstrings.Has(A_LoopField)) {
+					if (hotstrings.Has(A_LoopField) and fieldsByLetter.Has(A_LoopField)) {
 						if (value != "") {
 							value := value . "{Tab}"
 						}
 
 						value := value . hotstrings[A_LoopField]
+						PreviewFields.Push(fieldsByLetter[A_LoopField])
+						PreviewValues.Push(hotstrings[A_LoopField])
 					}
 				}
 				if (value != "") {
-					CreateHotstringCombo(combo, EscapeSpecialChars(value))
+					CreateHotstringCombo(combo, EscapeSpecialChars(value),
+						PreviewFields, PreviewValues)
 				}
 				return
 			}
 			for _, key in keys {
-				Generate(keys, hotstrings, combo . key, len - 1)
+				Generate(keys, hotstrings, fieldsByLetter, combo . key, len - 1)
 			}
 		}
 
 		; Every combo concatenates one or more personal_info fields, so the whole
 		; generated family is private for the same reason the single-field tags are.
-		CreateHotstringCombo(combo, value) {
+		CreateHotstringCombo(combo, value, PreviewFields, PreviewValues) {
 			CreateHotstring("*", "@" combo "" . ScriptInformation["MagicKey"], value, Map("OnlyText", False).Set(
-				"FinalResult", True).Set("IsPrivate", True))
+				"FinalResult", True).Set("IsPrivate", True)
+				.Set("Category", "personal")
+				.Set("PreviewFields", PreviewFields).Set("PreviewValues", PreviewValues))
 		}
 
 		; Every combo LONGER than pattern_max_length is resolved at fire time by

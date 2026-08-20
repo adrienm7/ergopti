@@ -8,7 +8,7 @@
 ; Updater_InstallRelease previously wrote the downloaded binary to disk and
 ; immediately launched the swap script with no verification. A CDN truncation,
 ; network timeout, or error-page body (e.g. "Service Unavailable" HTML) would
-; silently produce a zero-byte or tiny file that the batch script then moved
+; silently produce a zero-byte or tiny file that the swap worker then published
 ; into place as the production exe — bricking the installation.
 ;
 ; The fix adds two complementary guards in modules/updater.ahk:
@@ -83,7 +83,7 @@ _DIG_ContentLengthCheckPresent() {
 	Assert(InStr(Worker, "$ExpectedSize = [int64]$Response.ContentLength") > 0,
 		"Worker must read Content-Length before accepting a downloaded executable (download-no-integrity-partial-safety)")
 	Assert(InStr(Worker, "$ActualSize -ne $ExpectedSize") > 0,
-		"Worker must reject a Content-Length mismatch before publishing the swap batch (download-no-integrity-partial-safety)")
+		"Worker must reject a Content-Length mismatch before publishing the swap payload (download-no-integrity-partial-safety)")
 }
 Test("updater: install path reads Content-Length header to detect truncated downloads (download-no-integrity-partial-safety)", _DIG_ContentLengthCheckPresent)
 

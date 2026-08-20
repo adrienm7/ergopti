@@ -252,6 +252,7 @@ local function load_log_manager_fixture(sink_failures)
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
 		write = function() return true end,
+		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
 	}
 	local manager = require("modules.keylogger.log_manager")

@@ -272,9 +272,6 @@ global _LLM_Menu_Loaded  := false
 ; short so the dropdown is ready almost immediately for a user who opens it.
 global LLM_MENU_BUILD_DEFER_MS := 200
 
-; Active trigger hotkey object — deleted and recreated on every shortcut change
-global _LLM_Menu_TriggerHk := unset
-
 
 
 
@@ -291,11 +288,14 @@ global _LLM_Menu_TriggerHk := unset
 ; (init → build → action handlers) purely for human readability.
 
 #Include persist.ahk
+#Include transactions.ahk
 #Include init.ahk
 #Include menu_main.ahk
 #Include menu_models.ahk
 #Include menu_api_entries.ahk
 #Include menu_profiles.ahk
+#Include trigger_journal.ahk
+#Include trigger_shortcut.ahk
 #Include menu_settings.ahk
 #Include actions.ahk
 #Include tab_accept.ahk

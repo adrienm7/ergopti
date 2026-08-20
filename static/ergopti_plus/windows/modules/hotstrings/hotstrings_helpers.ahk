@@ -61,7 +61,7 @@ RegisterEmojisSymbolsDeferred() {
 		; massively overstates the true cost — this line shows the real registration time.
 		_emojiStart := A_TickCount
 		_RegisterEmojisSymbolsSections()
-		try LoggerInfo("Hotstrings", "Emoji/symbol HSE sections registered in {1} ms.", A_TickCount - _emojiStart)
+		try LoggerInfo("Hotstrings", "Emoji/symbol HSE sections registered in {1} ms.", TickElapsed(_emojiStart))
 		; Build the prefix-watcher PREVIEW index ONCE, here, at the end of the deferred
 		; pass. This is the single index build (the earlier warm-up SetTimer was removed):
 		; by now HotstringsResolve is memoised for every section — including the emoji/
@@ -117,10 +117,10 @@ CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
 	)
 }
 
-; Returns the { Bs, Ins } buffer effect _HSE_DispatchRawCallback resyncs from: when
+; Returns the { Ok, Bs, Ins } transaction _HSE_DispatchRawCallback resyncs from: when
 ; the deadkey fires it has back-spaced 2 chars (the "ê" + the key) and sent
 ; MappedValue, so the net buffer change is { Bs: 2, Ins: MappedValue }; when it
-; declines it sends nothing and returns { Bs: 0, Ins: "" } (buffer untouched).
+; declines or the atomic send fails it returns Ok:false with no buffer effect.
 ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 	if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Delay) {
 		; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
@@ -133,25 +133,27 @@ ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 		; a configurable key like ] or \ would break the pattern if embedded directly.
 		if (Ch3 != "" and !RegExMatch(Ch3, "^[A-Za-z]$") and Ch3 != MK) { ; Everything except a letter or the configured magic key
 			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
-			SendNewResult("{BackSpace 2}", False)
-			SendNewResult(MappedValue)
-			return { Bs: 2, Ins: MappedValue }
+			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
+				return { Ok: true, Bs: 2, Ins: MappedValue }
+			return { Ok: false, Bs: 0, Ins: "" }
 		} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
-			SendNewResult("{BackSpace 2}", False)
-			SendNewResult(MappedValue)
-			return { Bs: 2, Ins: MappedValue }
+			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
+				return { Ok: true, Bs: 2, Ins: MappedValue }
+			return { Ok: false, Bs: 0, Ins: "" }
 		}
 	}
-	return { Bs: 0, Ins: "" }
+	return { Ok: false, Bs: 0, Ins: "" }
 }
 
 ; Ellipsis raw-callback: "..." → "…", but only after a letter (otherwise it would
-; break code like the JS spread « [...a, ...b] »). Returns the { Bs, Ins } buffer
-; effect for HSE resync (back-spaces the 3 dots, inserts "…").
+; break code like the JS spread « [...a, ...b] »). Returns the { Ok, Bs, Ins }
+; transaction for HSE resync (back-spaces the 3 dots, inserts "…"). Ok stays false
+; unless the single output burst completed successfully.
 _EllipsisRawCallback(*) {
 	if (GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$") {
-		SendNewResult("{BackSpace 3}…", False)
-		return { Bs: 3, Ins: "…" }
+		if SendNewResult("{BackSpace 3}…", False)
+			return { Ok: true, Bs: 3, Ins: "…" }
+		return { Ok: false, Bs: 0, Ins: "" }
 	}
-	return { Bs: 0, Ins: "" }
+	return { Ok: false, Bs: 0, Ins: "" }
 }

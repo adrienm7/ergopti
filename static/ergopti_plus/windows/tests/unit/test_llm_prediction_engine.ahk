@@ -575,7 +575,7 @@ _CacheHit_ExactMatchReturnsCachedResults() {
 	global _LLM_Engine, _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
 	; Seed the cache with a known context and results
-	LLM_Engine_Init(Map())
+	LLM_Engine_Init(Map("app_profile_overrides", Map()))
 	; These cases exercise the cache and debounce paths, not the privacy gate.
 	; State the posture explicitly: the shared default now BLOCKS secure fields,
 	; and the production gate fails closed when the detector cannot answer —
@@ -584,6 +584,8 @@ _CacheHit_ExactMatchReturnsCachedResults() {
 	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["intelligence", "intelligent"]
+	_LLM_Engine["last_semantic_signature"] :=
+		_LLM_Engine_RequestSemanticSignature(_LLM_Engine["profile_id"])
 	id_before := _LLM_Engine["request_id"]
 	; Fire with the exact same context — should hit cache and bump request_id
 	LLM_Engine_FirePrediction("intelligen")
@@ -599,7 +601,7 @@ _CacheHit_PrefixMatchSlicesResults() {
 	; Cache: context "intelligen", predicted suffix "ce alone" (starts with "ce ").
 	; Firing with ctx="intelligence " gives typed_delta="ce " which matches the
 	; start of the cached slot — prefix-cache hits and slices to "alone".
-	LLM_Engine_Init(Map())
+	LLM_Engine_Init(Map("app_profile_overrides", Map()))
 	; These cases exercise the cache and debounce paths, not the privacy gate.
 	; State the posture explicitly: the shared default now BLOCKS secure fields,
 	; and the production gate fails closed when the detector cannot answer —
@@ -608,6 +610,8 @@ _CacheHit_PrefixMatchSlicesResults() {
 	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["ce alone"]
+	_LLM_Engine["last_semantic_signature"] :=
+		_LLM_Engine_RequestSemanticSignature(_LLM_Engine["profile_id"])
 	; Now fire with a context that extends the cache by "ce " — prefix match
 	; should slice the cached prediction to the remaining suffix "alone"
 	id_before := _LLM_Engine["request_id"]
@@ -688,11 +692,12 @@ _FirePrediction_DoesNotCancelOllamaAsync() {
 Test("LLM_Engine_FirePrediction: does not cancel in-flight Ollama WinHTTP",
 	_FirePrediction_DoesNotCancelOllamaAsync)
 _OnVariantFail_FallsBackFromStreaming() {
-	state := Map("request_id", 1, "streaming", true, "attempt_index", 2,
+	state := Map("request_id", 1, "semantic_signature", "variant-test", "streaming", true, "attempt_index", 2,
 		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [], "requested", 1,
 		"dispatch_fn", (*) => "", "base_temp", 0.1, "ctx", "some context")
 	global _LLM_Engine
 	_LLM_Engine["request_id"] := 1
+	_LLM_Engine["active_request_signature"] := "variant-test"
 	_LLM_Engine_OnVariantFail(state)
 	AssertFalse(state["streaming"], "streaming must be disabled after stream failure")
 }

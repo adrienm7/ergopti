@@ -193,17 +193,29 @@ I18nWarmFallbacks() {
 ; The reload is debounced: rapid successive calls cancel the pending reload
 ; so only the last selected locale triggers a script restart, preventing a
 ; stale intermediate language from landing when the user switches quickly.
-I18nSetLocale(Code) {
+I18nSetLocale(Code, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed, ConfigurationFile, _I18nReloadDebounceMs
 	if _I18nLocale == Code
-		return
-	_I18nLocale           := Code
-	_I18nCacheLoaded      := false
-	_I18nFallbacksWarmed  := false
-	try TOML_BatchWrite(ConfigurationFile, [{ Section: "script", Key: "locale", Value: Code }])
+		return true
+	Updates := [{ Section: "script", Key: "locale", Value: Code }]
+	if !ConfigCommitUpdates(ConfigurationFile, Updates,
+		"the locale switch to '" . Code . "'", WriterFn, NotifyFn)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		_I18nLocale           := Code
+		_I18nCacheLoaded      := false
+		_I18nFallbacksWarmed  := false
+	} finally {
+		Critical(PreviousCritical)
+	}
 	; Cancel any previously scheduled reload, then arm a new one.
 	; Using a negative period makes SetTimer fire once after the delay.
-	SetTimer(_I18nDoReload, -_I18nReloadDebounceMs)
+	if HasMethod(TimerFn, "Call")
+		TimerFn.Call(_I18nDoReload, -_I18nReloadDebounceMs)
+	else
+		SetTimer(_I18nDoReload, -_I18nReloadDebounceMs)
+	return true
 }
 
 ; Called by the debounce timer — performs the actual script reload. LoggerStart
@@ -215,8 +227,13 @@ I18nSetLocale(Code) {
 _I18nDoReload() {
 	global _I18nLocale
 	try LoggerStart("i18n", "Switching locale to '{1}'…", _I18nLocale)
-	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", _I18nLocale)
-	ReloadPreservingSuspend()
+	if !ReloadPreservingSuspend(_I18nReloadReady.Bind(_I18nLocale))
+		try LoggerError("i18n", "Locale '{1}' was saved, but reload was aborted because suspend state could not be handed off.", _I18nLocale)
+}
+
+; Completes the locale lifecycle immediately before the successful Reload.
+_I18nReloadReady(Locale, *) {
+	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", Locale)
 }
 
 ; Return the locale code of the active locale.
@@ -299,4 +316,3 @@ I18n_LocaleRows() {
 I18nBuildLanguageMenu(LangMenu) {
 	MenuRenderer_FillFromList(LangMenu, "language_menu", "locales", I18n_LocaleRows)
 }
-

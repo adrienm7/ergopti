@@ -3,27 +3,29 @@
 #Requires AutoHotkey v2.0
 
 _THPPP_CandidateCommitsOnlyAfterWrite() {
-    for _, FnName in ["WriteTapHoldTap", "WriteTapHoldHold", "WriteTapHoldNative"] {
-        Body := _DriverFuncBody(FnName)
-        WritePos := InStr(Body, "_TH_WriteTapHoldToml(Candidate)")
-        PublishPos := InStr(Body, "TapHold := Candidate")
-        Assert(WritePos > 0 && PublishPos > WritePos,
-            FnName . " must persist its candidate before publishing TapHold")
-        Assert(InStr(Body, "if !_TH_WriteTapHoldToml(Candidate)") > 0,
-            FnName . " must return failure without publishing a failed write")
-    }
-    DisabledBody := _DriverFuncBody("_TH_WriteTapHoldDisabled")
-    DisabledWritePos := InStr(DisabledBody, "_TH_WriteTapHoldToml(Candidate)")
-    DisabledPublishPos := InStr(DisabledBody, "TapHold := Candidate")
-    Assert(DisabledWritePos > 0 && DisabledPublishPos > DisabledWritePos,
-        "disable-all must persist its candidate before publishing TapHold")
-    Assert(InStr(DisabledBody, "TapHold[" . Chr(34) . "keys" . Chr(34) . "] := Map()") == 0,
-        "disable-all must not clear the live TapHold map before persistence")
+	for FnName in ["WriteTapHoldTap", "WriteTapHoldHold", "WriteTapHoldNative",
+			"_TH_WriteTapHoldDisabled"] {
+		Body := _DriverFuncBody(FnName)
+		Assert(Body != "", FnName . " must remain source-visible")
+		Assert(InStr(Body, "_TH_CommitTapHoldMutation(") > 0,
+			FnName . " must delegate to the single persist-before-publish transaction")
+		Assert(InStr(Body, "TapHold :=") == 0,
+			FnName . " must never mutate the live Map before persistence")
+	}
+	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
+	WritePos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)")
+	ReplacePos := InStr(WriterBody, "FSAtomicMoveReplace(StagePath, BoundPath)")
+	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, OwnerToken")
+	Assert(WritePos > 0 && ReplacePos > WritePos && PublishPos > ReplacePos,
+		"the shared writer must durably stage and atomically replace before publishing TapHold")
+	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
+	Assert(Publisher != "" && InStr(Publisher, "TapHold := Candidate") > 0,
+		"one memory-only helper must own live TapHold publication")
 	MenuSource := _DriverDirConcat("ui/menu")
 	Assert(InStr(MenuSource, "WriteTapHoldNative(this.KeyId)") > 0,
-        "the Disable action must use the single-write native transaction")
-    DisableAllBody := _DriverFuncBody("_TH_DisableAll")
-    Assert(InStr(DisableAllBody, "if !_TH_WriteTapHoldDisabled()") > 0,
-        "Disable all must not reload after a failed persistence transaction")
+		"the Disable action must use the single-write native transaction")
+	DisableAllBody := _DriverFuncBody("_TH_DisableAll")
+	Assert(InStr(DisableAllBody, "if !_TH_WriteTapHoldDisabled()") > 0,
+		"Disable all must not reload after a failed persistence transaction")
 }
 Test("tap-hold: failed persistence cannot publish partial live state", _THPPP_CandidateCommitsOnlyAfterWrite)

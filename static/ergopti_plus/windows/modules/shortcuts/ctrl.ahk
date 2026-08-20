@@ -36,7 +36,7 @@ if Features["shortcuts"]["paste_without_formatting"] {
 		; Deferred clipboard restore for PasteWithoutFormatting. Runs on a negative-delay
 		; SetTimer so the synthetic ^v has already consumed the coerced text before the
 		; user's original (possibly non-text) clipboard is put back.
-		_PasteWithoutFormattingRestore(OldClip, OwnedSequence) {
+		_PasteWithoutFormattingRestore(OldClip, OwnedSequence, OwnerToken) {
 				global _SEND_INSTANT_CLIP_BUSY
 				try {
 						; Do not overwrite a copy made after our temporary plain-text
@@ -44,6 +44,8 @@ if Features["shortcuts"]["paste_without_formatting"] {
 						if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
 								CB_RestoreAll(OldClip)
 				} finally {
+						if OwnerToken
+								CB_EndOwnedTransaction(OwnerToken)
 						_SEND_INSTANT_CLIP_BUSY := false
 				}
 		}
@@ -77,17 +79,21 @@ if Features["shortcuts"]["paste_without_formatting"] {
 								PlainText := CB_Read()
 								_SEND_INSTANT_CLIP_BUSY := true
 								OwnedSequence := 0
+								OwnerToken := 0
 								try {
+										OwnerToken := CB_BeginOwnedTransaction("paste_without_formatting", true)
 										if !CB_Write(PlainText)
 												throw Error("clipboard write failed")
 										OwnedSequence := CB_GetSequenceNumber()
 										if !OwnedSequence
 												throw Error("clipboard sequence unavailable")
 										SendFinalResult("^v")
-										SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
+										SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 								} catch as e {
 										if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
 												CB_RestoreAll(OldClip)
+										if OwnerToken
+												CB_EndOwnedTransaction(OwnerToken)
 										_SEND_INSTANT_CLIP_BUSY := false
 										try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard and guard restored: {1}.", e.Message)
 								}

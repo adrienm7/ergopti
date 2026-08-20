@@ -78,14 +78,13 @@ _LIAS_InlineInjectionIsGated() {
 		"the staleness gate before the injection must RETURN on a supersede — logging it and falling through would "
 		. "inject the stale text anyway")
 
-	; The synthetic-guard and metrics side effects must also sit AFTER the gate, or
-	; a superseded result still marks synthetic input and counts a suggestion.
-	MarkPos := InStr(Body, "KL_MarkSynthetic(")
-	Assert(MarkPos > 0, "prerequisite: the inline path must still tag its injection as synthetic")
-	Assert(FirstGate < MarkPos,
-		"the staleness gate must precede the synthetic tagging and the suggestion accounting too: a superseded "
-		. "result that still marks synthetic input leaves the keylogger's guard depth and the suggested/accepted "
-		. "pairing describing an injection that never happened")
+	; Admission capture and transaction construction must also sit AFTER the gate;
+	; a superseded result must not enqueue a ticket or count an accepted output.
+	TransactionPos := InStr(Body, "_LLM_Bridge_NewInjectionTransaction(")
+	Assert(TransactionPos > 0 and FirstGate < TransactionPos and TransactionPos < InjectPos,
+		"the staleness gate must precede immutable transaction construction and the injection itself")
+	Assert(InStr(Body, "KL_MarkSynthetic(") = 0,
+		"inline output uses InputHook-invisible SendInput and must not mark unrelated FIFO-time typing synthetic")
 }
 
 ; Suspend is the OTHER reason this branch must not act, and it was already

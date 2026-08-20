@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Canonical modifier-key actions shared by the Windows, macOS and Linux drivers. Labels are deliberately language-neutral and must be rendered verbatim. \"chord_key\" is the key name the shared chord notation uses (_shared/lua/chord and its AutoHotkey twin); it is present only where it differs from the id, and its absence means the id IS the chord key. The per-platform *_key fields are what each OS calls that same key, and tools/test/test-chord-native-mapping-single-source.cjs holds the drivers to them.",
+  "description": "Canonical modifier-key actions shared by the Windows, macOS and Linux drivers. Labels are deliberately language-neutral and must be rendered verbatim. \"chord_key\" is the key name the shared chord notation uses (_shared/lua/chord and its AutoHotkey twin); it is present only where it differs from the id, and its absence means the id IS the chord key. Windows distinguishes Send syntax (windows_key, braces allowed) from Hotkey syntax (windows_hotkey_key, always bare). The remaining per-platform *_key fields are what each OS calls that same key, and tools/test/test-chord-native-mapping-single-source.cjs holds the drivers to them.",
   "keys": [
     { "id": "a", "label": "A" },
     { "id": "b", "label": "B" },
@@ -43,6 +43,7 @@
       "label": "Space",
       "chord_key": "space",
       "windows_key": "{Space}",
+      "windows_hotkey_key": "space",
       "macos_key": "space",
       "linux_key": "space",
       "karabiner_key": "spacebar"
@@ -52,6 +53,7 @@
       "label": "Enter",
       "chord_key": "return",
       "windows_key": "{Enter}",
+      "windows_hotkey_key": "enter",
       "macos_key": "return",
       "linux_key": "Return",
       "karabiner_key": "return_or_enter"

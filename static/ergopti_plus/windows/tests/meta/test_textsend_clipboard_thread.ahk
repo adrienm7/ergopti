@@ -110,7 +110,7 @@ _TSCT_ClipWaitTimeoutIsSmall() {
 	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
 	Assert(InStr(Src, "TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC := 0.2") > 0,
 		"A small finite ClipWait timeout constant (0.2 s) must be defined so the wait never stalls perceptibly")
-	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
+	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {")
 	Assert(Body != "", "_TextSendClipboard helper must exist")
 	Assert(!InStr(Body, "ClipWait(1)"),
 		"_TextSendClipboard must NOT call ClipWait(1) - a full second blocks far too long; use the small finite TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC")
@@ -132,7 +132,7 @@ Test("text_sender: clipboard ClipWait uses a small finite timeout (textsend-clip
 ; ClipWait's boolean must gate the paste: on timeout, no ^v and a loud LoggerError.
 _TSCT_ClipWaitReturnChecked() {
 	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
+	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {")
 	Assert(Body != "", "_TextSendClipboard helper must exist")
 	Assert(InStr(Body, "if !ClipWait(") > 0,
 		"_TextSendClipboard must consult ClipWait's return value - a timeout must abort the paste, not be treated as success (fail-fast rule 5.3)")
@@ -158,7 +158,7 @@ _TSCT_RestoreGuardedByGeneration() {
 	Assert(InStr(Src, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"A module generation counter (_TEXT_CLIPBOARD_GENERATION) must exist to serialise overlapping clipboard restores")
 
-	WriteBody := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
+	WriteBody := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {")
 	Assert(InStr(WriteBody, "_TEXT_CLIPBOARD_GENERATION += 1") > 0,
 		"_TextSendClipboard must bump the generation counter so each injection claims a unique slot")
 
@@ -183,6 +183,9 @@ _TSCT_ClipboardRequestsAreFifoSerialized() {
 		"clipboard TextSend must own an explicit FIFO and busy state; a generation counter alone drops superseded requested output")
 	Assert(InStr(TextBody, "_TEXT_CLIPBOARD_QUEUE.Push") > 0,
 		"TextSend must enqueue each clipboard request instead of starting competing workers")
+	Assert(InStr(TextBody, "Opts: RequestOpts") > 0
+			and InStr(StartBody, "Request.Opts") > 0,
+		"the FIFO must preserve the immutable admission/commit options until the real paste boundary")
 	Assert(InStr(TextBody, "CB_SaveAll()") == 0,
 		"TextSend must not snapshot on the keyboard caller; a user copy while queued would make that snapshot stale")
 	Assert(InStr(StartBody, "_TEXT_CLIPBOARD_QUEUE.RemoveAt(1)") > 0 and InStr(StartBody, "_TEXT_CLIPBOARD_BUSY := true") > 0,

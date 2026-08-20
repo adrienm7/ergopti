@@ -83,18 +83,18 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 			new = function() return state end,
 		}
 		package.loaded["modules.keymap.registry"] = api({
-			init = noop,
+			init = function() return true end,
 			is_repeat_feature_enabled = function() return false end,
 			set_repeat_feature_enabled = noop,
 		})
 		package.loaded["modules.keymap.expander"] = api({
-			init = noop,
+			init = function() return true end,
 			perform_text_replacement = function()
 				expander_calls = expander_calls + 1
 				return false
 			end,
 		})
-		package.loaded["modules.keymap.llm_bridge"] = api({ init = noop })
+		package.loaded["modules.keymap.llm_bridge"] = api({ init = function() return true end })
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()

@@ -12,7 +12,7 @@
 
 _KLWVFS_CallbacksFailSafe() {
     Push := _DriverFuncBody("KLWV_PushPrefetch")
-    Range := _DriverFuncBody("KLWV_OnRangeBuildReady")
+    Range := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     First := _DriverFuncBody("KLWV_DelayedFirstPush")
     Full := _DriverFuncBody("KLWV_DelayedFullBuild")
 
@@ -24,9 +24,9 @@ _KLWVFS_CallbacksFailSafe() {
     Assert(InStr(Range, "try KLWV.windows") > 0
             && InStr(Range, "catch as err") > 0
             && InStr(Range, "LoggerError") > 0,
-        "KLWV_OnRangeBuildReady must contain and log WebView delivery failures")
+        "KLWV_OnRangeBuildTerminal must contain and log WebView delivery failures")
     Assert(InStr(Range, "A_IsSuspended") > 0,
-        "KLWV_OnRangeBuildReady must become inert when Suspend occurs after range dispatch")
+        "KLWV_OnRangeBuildTerminal must queue a canceled terminal when Suspend occurs after range dispatch")
     Assert(InStr(First, "A_IsSuspended") > 0 && InStr(Full, "A_IsSuspended") > 0,
         "delayed WebView builds must not run while the driver is suspended")
 }

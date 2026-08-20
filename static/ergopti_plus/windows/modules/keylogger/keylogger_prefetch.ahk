@@ -67,6 +67,8 @@ class KLPFWorker {
 		static jobs := Map()
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
+		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
+		static publish_fn := 0
 }
 
 KLPF_IsWorkerInvocation() {
@@ -77,15 +79,45 @@ KLPF_IsWorkerInvocation() {
 		return false
 }
 
-KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_ready := unset) {
+KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true) {
 		global _ConfigDir
+		terminal := IsSet(on_terminal) ? on_terminal : 0
 		if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
+				|| (mode != "full" && mode != "live" && mode != "manifest") {
+				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
 				return false
+		}
 
-		KLPF_CancelBuild(which)
+		; Live ingest uses replace_active=false: an in-flight full/history or live
+		; projection owns its generation until terminal publication. The caller keeps
+		; one dirty bit and coalesces every intervening ingest behind that owner.
+		if KLPFWorker.jobs.Has(which) {
+				if !replace_active
+						return false
+				KLPF_CancelBuild(which)
+				; A terminal callback is allowed to install a newer owner. Never let the
+				; older request which triggered cancellation overwrite that re-entrant job.
+				if KLPFWorker.jobs.Has(which) {
+						KLPF_InvokeTerminal(terminal, "canceled")
+						return false
+				}
+		}
 
 		generation := ++KLPFWorker.generation
 		stage := KLPF_PrefetchPath(which) . ".stage." . generation
+		; Reserve the scheduler slot before any filesystem/process work. A timer may
+		; interrupt FileDelete or ShellRunner construction; it must observe this job
+		; and coalesce rather than start a sibling worker in that window.
+		job := Map(
+				"generation", generation,
+				"epoch", epoch,
+				"stage", stage,
+				"handle", 0,
+				"kind", "prefetch",
+				"mode", mode,
+				"on_terminal", terminal
+		)
+		KLPFWorker.jobs[which] := job
 		try FileDelete(stage)
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
@@ -97,30 +129,55 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_ready := un
 						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
 		done := KLPF_OnWorkerDone.Bind(which, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
-		handle := spawn.Call(executable, args, done)
-		if !handle.start()
+		try handle := spawn.Call(executable, args, done)
+		catch as err {
+				try LoggerError("KLReader", "Could not spawn background metrics projection for '{1}': {2}", which, err.Message)
+				KLPF_CompleteJob(which, generation, "failed")
 				return false
-		KLPFWorker.jobs[which] := Map(
-				"generation", generation,
-				"epoch", epoch,
-				"stage", stage,
-				"handle", handle,
-				"kind", "prefetch",
-				"on_ready", IsSet(on_ready) ? on_ready : 0
-		)
+		}
+		; Cancellation may have won while ShellRunner_Spawn yielded. Do not start a
+		; handle whose reservation and terminal were already retired.
+		if !KLPFWorker.jobs.Has(which)
+				|| KLPFWorker.jobs[which]["generation"] != generation {
+				try handle.terminate()
+				return false
+		}
+		job["handle"] := handle
+		try started := handle.start()
+		catch as err {
+				try LoggerError("KLReader", "Could not start background metrics projection for '{1}': {2}", which, err.Message)
+				KLPF_CompleteJob(which, generation, "failed")
+				return false
+		}
+		if !KLPFWorker.jobs.Has(which)
+				return true
+		if !started {
+				KLPF_CompleteJob(which, generation, "failed")
+				return false
+		}
 		return true
 }
 
-KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_ready := unset) {
+KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		global _ConfigDir
+		terminal := IsSet(on_terminal) ? on_terminal : 0
 		if A_IsSuspended || (which != "typing") || (metrics_dir = "") || !(query is Map)
+				|| !query.Has("apps") || !(query["apps"] is Array)
+				|| !query.Has("start_date") || !query.Has("end_date") {
+				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
 				return false
+		}
 		job_key := "range:" . which
 		KLPF_CancelBuild(job_key)
 		generation := ++KLPFWorker.generation
 		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage." . generation . ".json"
 		try FileDelete(stage)
-		apps_json := KL_JsonEncode(query["apps"])
+		try apps_json := KL_JsonEncode(query["apps"])
+		catch as err {
+				try LoggerError("KLReader", "Could not encode selected-range projection request: {1}", err.Message)
+				KLPF_InvokeTerminal(terminal, "failed")
+				return false
+		}
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
 				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
@@ -133,17 +190,38 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_ready := unset) {
 						query["start_date"], query["end_date"], apps_json]
 		done := KLPF_OnWorkerDone.Bind(job_key, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
-		handle := spawn.Call(executable, args, done)
-		if !handle.start()
+		try handle := spawn.Call(executable, args, done)
+		catch as err {
+				try LoggerError("KLReader", "Could not spawn selected-range projection worker: {1}", err.Message)
+				KLPF_InvokeTerminal(terminal, "failed")
 				return false
+		}
+		; Publish ownership before start(): a test seam or very fast worker may
+		; complete synchronously from start(), and that terminal callback must see
+		; and retire the live job instead of racing an as-yet-unregistered entry.
 		KLPFWorker.jobs[job_key] := Map(
 				"generation", generation,
 				"epoch", epoch,
 				"stage", stage,
 				"handle", handle,
 				"kind", "range",
-				"on_ready", IsSet(on_ready) ? on_ready : 0
+				"on_terminal", terminal
 		)
+		try started := handle.start()
+		catch as err {
+				try LoggerError("KLReader", "Could not start selected-range projection worker: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		; start() may synchronously drive the completion seam. The missing job is
+		; proof that its terminal already won; never reinterpret the handle's return
+		; value and emit a contradictory second terminal afterward.
+		if !KLPFWorker.jobs.Has(job_key)
+				return true
+		if !started {
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
 		return true
 }
 
@@ -151,9 +229,81 @@ KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
 				return
 		job := KLPFWorker.jobs[which]
+		if job.Get("terminal_claimed", false) {
+				; Completion keeps the registry entry through atomic publish and callback.
+				; Record a suspend/replacement that interrupts that yielded region; the
+				; completing owner will downgrade its terminal before delivery.
+				job["cancel_requested"] := true
+				try job["handle"].terminate()
+				return
+		}
+		; Claim terminal ownership before terminate(): a process handle is allowed
+		; to invoke done synchronously while being killed. Deleting the job first
+		; makes that callback stale, so cancel remains the one terminal outcome.
+		KLPF_CompleteJob(which, job["generation"], "canceled")
 		try job["handle"].terminate()
-		try FileDelete(job["stage"])
-		KLPFWorker.jobs.Delete(which)
+}
+
+KLPF_InvokeTerminal(on_terminal, status, stage := "") {
+		if !IsObject(on_terminal)
+				return false
+		try {
+				on_terminal.Call(status, stage)
+				return true
+		} catch as err {
+				try LoggerError("KLReader", "Background metrics terminal callback failed (status={1}): {2}", status, err.Message)
+				return false
+		}
+}
+
+; Retire any projection job exactly once. The registry entry remains published
+; through atomic publication and the terminal callback so re-entrant ingest sees
+; the active owner and coalesces behind it. A range callback owns its successful
+; private stage only if it returns.
+KLPF_CompleteJob(job_key, generation, status, stage := "") {
+		if !KLPFWorker.jobs.Has(job_key)
+				return false
+		job := KLPFWorker.jobs[job_key]
+		if (job["generation"] != generation)
+				return false
+		if job.Get("terminal_claimed", false)
+				return false
+		job["terminal_claimed"] := true
+
+		owned_stage := job["stage"]
+		if (status = "ok") && ((stage = "") || (stage != owned_stage) || !FSExists(owned_stage))
+				status := "failed"
+
+		delivery_stage := ""
+		if (status = "ok") {
+				if (job["kind"] = "range") {
+						delivery_stage := owned_stage
+				} else {
+						publish := IsObject(KLPFWorker.publish_fn) ? KLPFWorker.publish_fn : KLPF_MoveAtomic
+						published := false
+						try published := publish.Call(owned_stage, KLPF_PrefetchPath(job_key))
+						catch as err
+								try LoggerError("KLReader", "Background metrics publish threw for '{1}': {2}", job_key, err.Message)
+						if !published {
+								status := "failed"
+								try LoggerError("KLReader", "Background metrics projection could not publish '{1}'.", job_key)
+						}
+				}
+		}
+		; File publication can yield to Suspend or a newer explicit request. Keep
+		; the old owner discoverable for that whole region, then honor cancellation
+		; before any UI callback is allowed to publish stale work.
+		if job.Get("cancel_requested", false) || A_IsSuspended
+				status := "canceled"
+		if (status != "ok")
+				FSDelete(owned_stage)
+		delivered := KLPF_InvokeTerminal(job["on_terminal"], status, delivery_stage)
+		if (job["kind"] = "range") && !delivered && (delivery_stage != "")
+				FSDelete(delivery_stage)
+		if KLPFWorker.jobs.Has(job_key)
+				&& KLPFWorker.jobs[job_key]["generation"] = generation
+				KLPFWorker.jobs.Delete(job_key)
+		return delivered
 }
 
 KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
@@ -162,28 +312,11 @@ KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
 		job := KLPFWorker.jobs[which]
 		if (job["generation"] != generation)
 				return
-		KLPFWorker.jobs.Delete(which)
 		stage := job["stage"]
-		if A_IsSuspended || (exit_code != 0) || !FileExist(stage) {
-				try FileDelete(stage)
+		status := A_IsSuspended ? "canceled" : ((exit_code != 0) || !FSExists(stage) ? "failed" : "ok")
+		if (status = "failed")
 				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}).", which, exit_code)
-				return
-		}
-		if (job["kind"] = "range") {
-				if IsObject(job["on_ready"]) {
-						try job["on_ready"].Call(SubStr(which, 7), job["epoch"], stage)
-				} else {
-						try FileDelete(stage)
-				}
-				return
-		}
-		if !KLPF_MoveAtomic(stage, KLPF_PrefetchPath(which)) {
-				try FileDelete(stage)
-				try LoggerError("KLReader", "Background metrics projection could not publish '{1}'.", which)
-				return
-		}
-		if IsObject(job["on_ready"])
-				try job["on_ready"].Call(which, job["epoch"])
+		KLPF_CompleteJob(which, generation, status, stage)
 }
 
 ; Runs in the detached /force instance.  It exits before the normal boot block,

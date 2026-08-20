@@ -47,7 +47,7 @@
 	TimeBefore := A_TickCount
 	Released := KeyWait("SC02A", "T" . DurationSec)
 	TimeAfter := A_TickCount
-	ElapsedMs := TimeAfter - TimeBefore
+	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	GuardMs := DurationSec * 1000
 	tap := Released and (ElapsedMs <= GuardMs)
 	if LoggerIsDebugEnabled() {
@@ -102,7 +102,7 @@ _LShiftDispatch() {
 	TimeBefore := A_TickCount
 	Released := KeyWait("SC01D", "T" . DurationSec)
 	TimeAfter := A_TickCount
-	ElapsedMs := TimeAfter - TimeBefore
+	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	GuardMs := DurationSec * 1000
 	tap := Released and (ElapsedMs <= GuardMs)
 	if LoggerIsDebugEnabled() {

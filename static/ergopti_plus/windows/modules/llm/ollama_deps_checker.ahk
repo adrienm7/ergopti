@@ -204,7 +204,7 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		LoggerInfo("LLM", "DoCheck_Result — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
 		return
 	}
-	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " (A_TickCount - t_start) " ms, result=" (running ? "running" : "not running") ".")
+	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " TickElapsed(t_start) " ms, result=" (running ? "running" : "not running") ".")
 	if running {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"

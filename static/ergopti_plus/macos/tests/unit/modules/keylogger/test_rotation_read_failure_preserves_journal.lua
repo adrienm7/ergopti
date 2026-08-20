@@ -150,6 +150,7 @@ local function run_rollover_case(failure_mode)
 		package.loaded["keylogger.metrics"] = {}
 		package.loaded["adapters.file_system"] = {
 			write = function() return true end,
+			create_if_absent = function() return true, "created" end,
 			read = function() return nil end,
 		}
 

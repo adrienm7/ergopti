@@ -595,13 +595,22 @@ function M.show()
 							-- a fetch against the freshly wiped state (ui-windows-b-3).
 							M._last_query = nil
 							Logger.info(LOG, "Caches cleared by user reset.")
+					else
+						M._last_query = query
+						local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
+						local request_id = tonumber(query.request_id)
+						local js_cmd
+						if request_id and request_id > 0 and request_id % 1 == 0 then
+							js_cmd = string.format(
+								"window.receive_range_data(%s,%d)", json.encode(raw_data), request_id)
 						else
-							M._last_query = query
-							local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
-							local js_cmd   = string.format("window.receive_range_data(%s)", json.encode(raw_data))
-							pcall(function() webview:evaluateJavaScript(js_cmd) end)
+							-- Backward compatibility for a cached dashboard loaded before the
+							-- request-id protocol was introduced.
+							js_cmd = string.format("window.receive_range_data(%s)", json.encode(raw_data))
 						end
+						pcall(function() webview:evaluateJavaScript(js_cmd) end)
 					end
+				end
 				end
 			end)
 		end)

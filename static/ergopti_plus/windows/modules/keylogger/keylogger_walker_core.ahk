@@ -38,6 +38,11 @@
 ; boot-order bug, not a silent default. The non-timing fields (bucket arrays,
 ; counts, caps) are walker-specific and stay literal.
 class KLWConst {
+		; Accepted LLM rows carrying this marker are the canonical source for
+		; output that bypassed InputHook (SendInput/clipboard). Older accepted
+		; rows are deliberately unmarked because their SendEvent keystrokes are
+		; already present in events_typing and replaying both would double-count.
+		static LLM_ACCEPTED_METRICS_SOURCE := "events_llm:v1"
 		static MAX_KEYSTROKE_DELAY_MS    := 0   ; <- keylogger.max_keystroke_delay_ms
 		static THINK_PAUSE_MS            := 0   ; <- keylogger.think_pause_ms
 		static UI_PAUSE_BUCKETS_MS       := [1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000]
@@ -69,6 +74,28 @@ KeyloggerWalkerLoadTimings() {
 		KLWConst.SESSION_GAP_MS           := TimingsGet("keylogger", "session_gap_ms")
 		KLWConst.AUTO_REPEAT_MAX_DELAY_MS := TimingsGet("keylogger", "auto_repeat_max_delay_ms")
 		KLWConst.HOLD_THRESHOLD_MS        := TimingsGet("keylogger", "hold_threshold_ms")
+}
+
+; Split an AHK UTF-16 string into logical Unicode characters. Keeping surrogate
+; pairs intact is mandatory for both gross LLM counts and n-gram tokens: an
+; astral character such as an emoji is one user-visible output, not two halves.
+KLW_StringToLogicalCharacters(Text) {
+		Characters := []
+		Position := 1
+		TextLength := StrLen(Text)
+		while (Position <= TextLength) {
+				Width := 1
+				FirstUnit := Ord(SubStr(Text, Position, 1))
+				if (FirstUnit >= 0xD800 && FirstUnit <= 0xDBFF
+						&& Position < TextLength) {
+						SecondUnit := Ord(SubStr(Text, Position + 1, 1))
+						if (SecondUnit >= 0xDC00 && SecondUnit <= 0xDFFF)
+								Width := 2
+				}
+				Characters.Push(SubStr(Text, Position, Width))
+				Position += Width
+		}
+		return Characters
 }
 
 ; QWERTY VK → finger column. Modifiers + thumb keys absent on purpose so

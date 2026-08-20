@@ -15,10 +15,15 @@
 
 
 
-; Single Gui that holds the entire tooltip stack.
-global _TooltipGui := 0
-; Metadata per row (H, W, IsSep) kept for corner/border calculations.
-global _TooltipRowGuis := []
+; Single publication owner for the visible content, border, raw HWND backstops,
+; position and render generation. Builders never touch it: they prepare a
+; detached record and _TooltipPresentStack swaps this ONE reference only after
+; the final owner/context/deadline checks. That removes the former partial-state
+; class where a re-entrant renderer could observe a new Gui with an old border.
+; Shape while visible:
+;   { Gui, Rows, Border, Pos, ContentHwnds, BorderHwnds, Generation,
+;     LlmPresented }
+global _TooltipActiveSurface := 0
 
 ; Generation counter incremented on every TooltipShow. The timer callback
 ; compares its captured generation against this value and aborts if they
@@ -30,16 +35,24 @@ global _TooltipTimerGeneration := 0
 ; Tooltip GUI creation and UIA positioning can take tens of milliseconds. The
 ; prefix watcher calls TooltipShow on every character, so debounce render work
 ; until typing is idle instead of running GDI/COM in the keyboard callback.
-global _TooltipPendingActive := false
-global _TooltipPendingItems := 0
-global _TooltipPendingDurationSec := 0
+;
+; The pending request is ONE immutable record. Publishing its fields separately
+; allowed a re-entrant TooltipShow to splice Items from request B to the
+; Duration/Origin of request A, while an older deferred callback could clear B.
+; RequestSerial follows the record through the final pixel commit, so an A
+; callback that already detached its record still loses after B is requested.
+global _TooltipPendingRequest := 0
+global _TooltipRequestSerial := 0
 global TOOLTIP_RENDER_DEBOUNCE_MS := 75
+; A due owner cannot erase a newer request while that request is preparing, but
+; consuming the one-shot would leave the old surface immortal if preparation is
+; later refused. Retry with the same immutable generation/surface owner.
+global _TOOLTIP_OWNER_RETRY_MS := 25
 ; Carries the caller's safety-deadline choice ACROSS the render debounce. A
 ; caller that must outlive the 3 s auto-hide (the LLM spinner, whose inference
 ; legitimately runs longer) cannot express that by cancelling _TooltipTimerFn
 ; after TooltipShow returns: the timer is not armed until _TooltipPresentStack
 ; runs, TOOLTIP_RENDER_DEBOUNCE_MS later, so such a cancel is a silent no-op.
-global _TooltipPendingArmSafety := true
 ; Tick at which the render was REQUESTED, carried across the debounce so a row's
 ; expiry is anchored at the request instead of at present time.
 ;
@@ -50,7 +63,6 @@ global _TooltipPendingArmSafety := true
 ; _TOOLTIP_TIMEOUT_DECREMENT_SEC could not absorb a variable latency, so the
 ; preview outlived the window it was previewing: the user saw the suggestion,
 ; pressed the magic key, and nothing was emitted.
-global _TooltipPendingOriginMs := 0
 
 ; Reuse the non-caret anchor briefly for LLM refreshes and repeated preview
 ; renders in controls without a native caret. The foreground HWND fence makes
@@ -116,14 +128,19 @@ global _TOOLTIP_STATS_LOG_EVERY := 100
 
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
-; DurationSec values, TooltipShow stores the full item list here with absolute
-; expiry timestamps (A_TickCount + duration_ms). The dequeue poll timer removes
+; DurationSec values, TooltipShow stores the full item list here with a
+; wrap-safe origin tick plus duration. The dequeue poll timer removes
 ; expired rows and re-renders the surviving stack so a short row disappears first
 ; and longer rows stay visible (e.g. output1@1s + output2@2s → both 0.8s, then
 ; output2 alone for another 1.0s after the 0.2s decrement).
-; Shape: Array of { ..item fields.., ExpireMs: integer }
+; Shape: Array of { ..item fields.., ExpireOriginTick: integer,
+;                   ExpireDurationMs: integer }
 ; 0 when no dequeue cycle is active (all items have DurationSec = 0).
 global _TooltipDequeueItems := 0
+; Exact one-shot for the earliest canonical absolute row deadline. It is distinct
+; from the always-armed 100 ms watchdog so arming a precise expiry never converts
+; that repeating timer into a one-shot. Replaced/cancelled with surface ownership.
+global _TooltipDequeueDeadlineTimer := 0
 
 ; When true, TooltipHide() calls from external sources (prefix watcher resets,
 ; lookup misses, renderer) are silently ignored — the dequeue poll timer owns
@@ -132,20 +149,30 @@ global _TooltipDequeueItems := 0
 ; TooltipHide() during an active dequeue cycle.
 global _TooltipDequeueActive := false
 
-; Stable function references. A single named function per timer is mandatory
-; so SetTimer can cancel it by identity — each closure literal produces a
-; distinct object that SetTimer treats as a different timer.
+; Timer callbacks must have stable identities. Named lifecycle callbacks are
+; cancelled by name; each deferred-show request stores its own bound token in
+; the immutable request record so replacement/cancellation uses that exact Fn.
 _TooltipTimerFn() {
     global _TooltipGeneration, _TooltipTimerGeneration
+    global _TooltipActiveSurface
     ; SetTimer bypasses native Suspend, like both sibling timers in this file
     ; already guard against. The suspend reactor has already hidden the tooltip
     ; and reset the engine, so a fire while paused would only tear down a
     ; surface that is already gone.
     if A_IsSuspended
         return
-    if (_TooltipTimerGeneration != _TooltipGeneration)
-        return
-    TooltipHide("TimerFn", true)
+    ExpectedGeneration := 0
+    ExpectedSurface := 0
+    PreviousCritical := Critical("On")
+    try {
+        if (_TooltipTimerGeneration != _TooltipGeneration)
+            return
+        ExpectedGeneration := _TooltipGeneration
+        ExpectedSurface := _TooltipActiveSurface
+    } finally {
+        Critical(PreviousCritical)
+    }
+	_TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface)
     ; The preview buffer is deliberately NOT reset here.
     ;
     ; This timer means "the tooltip has been on screen a while", not "the user
@@ -161,54 +188,153 @@ _TooltipTimerFn() {
     ; terminator, a caret move, a fire — each of which resets the engine too.
 }
 
-_TooltipDeferredShowFn() {
-    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingArmSafety, _TooltipPendingOriginMs
-    if !_TooltipPendingActive
-        return
-    Items := _TooltipPendingItems
-    DurationSec := _TooltipPendingDurationSec
-    ArmSafety := _TooltipPendingArmSafety
-    OriginMs := _TooltipPendingOriginMs
-    _TooltipPendingActive := false
-    _TooltipPendingItems := 0
-    _TooltipPendingDurationSec := 0
-    _TooltipPendingArmSafety := true
-    _TooltipPendingOriginMs := 0
-    if A_IsSuspended
-        return
-    _TooltipShowNow(Items, DurationSec, ArmSafety, OriginMs)
+_TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface) {
+	global _TooltipGeneration, _TooltipActiveSurface
+	global _TOOLTIP_OWNER_RETRY_MS
+	if A_IsSuspended
+		return false
+	; TooltipHide refuses an exact old-surface timeout while a newer request is
+	; pending. That refusal is safe only if the one-shot remains live.
+	if TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)
+		return true
+	RetryCurrentOwner := false
+	PreviousCritical := Critical("On")
+	try {
+		RetryCurrentOwner := _TooltipSurfaceOwnerMatches(
+			ExpectedGeneration, _TooltipGeneration,
+			ExpectedSurface, _TooltipActiveSurface)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if RetryCurrentOwner
+		SetTimer(_TooltipTimerHideOrRetry.Bind(
+			ExpectedGeneration, ExpectedSurface), -_TOOLTIP_OWNER_RETRY_MS)
+	return false
+}
+
+_TooltipDeferredShowFn(ExpectedSerial) {
+	global _TooltipPendingRequest
+	Request := 0
+	; Snapshot one complete tuple atomically. Keep it globally visible until it
+	; either pixel-commits or fails: old surface timers/polls must see that a newer
+	; output is pending and may not cancel it during GUI/UIA work.
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(_TooltipPendingRequest)
+			return
+		if (_TooltipPendingRequest.Serial != ExpectedSerial)
+			return
+		Request := _TooltipPendingRequest
+	} finally {
+		Critical(PreviousCritical)
+	}
+	try {
+		if A_IsSuspended
+			return
+		_TooltipShowNow(Request.Items, Request.DurationSec,
+			Request.ArmSafety, Request.OriginMs, Request.Serial,
+			Request.CommitFn)
+	} finally {
+		; Failure/refusal retires only this tuple. If B replaced A during a
+		; yield, A cannot erase B here.
+		PreviousCritical := Critical("On")
+		try {
+			if (IsObject(_TooltipPendingRequest)
+				and ObjPtr(_TooltipPendingRequest) == ObjPtr(Request))
+				_TooltipPendingRequest := 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
 }
 
 ; Dequeue poll timer — runs every 100 ms while a dequeue cycle is active.
 ; Polling avoids the AHK v2 issue where one-shot timers armed from an
 ; InputHook OnChar thread never fire: the repeating timer is registered
 ; from the main script body at startup and always runs in the main thread.
-_TooltipDequeuePollFn() {
+_TooltipSurfaceOwnerMatches(ExpectedGeneration, CurrentGeneration,
+    ExpectedSurface, CurrentSurface) {
+    return (ExpectedGeneration == CurrentGeneration
+        and IsObject(ExpectedSurface) and IsObject(CurrentSurface)
+        and ObjPtr(ExpectedSurface) == ObjPtr(CurrentSurface)
+        and ExpectedSurface.Generation == ExpectedGeneration)
+}
+
+; A -1 serial marks a direct/non-debounced presenter. Deferred TooltipShow
+; requests carry a non-negative monotonic serial so an old A callback cannot commit
+; after request B was published, even while B is still waiting on its debounce.
+_TooltipRequestOwnerMatches(ExpectedSerial, CurrentSerial) {
+    return ExpectedSerial == -1 or ExpectedSerial == CurrentSerial
+}
+
+_TooltipDequeueDeadlineFn(ExpectedGeneration, ExpectedSurface) {
+    global _TooltipGeneration, _TooltipActiveSurface
+    global _TooltipDequeueDeadlineTimer
+	global _TooltipPendingRequest, _TOOLTIP_OWNER_RETRY_MS
+    if A_IsSuspended
+        return
+    PreviousCritical := Critical("On")
+    try {
+        if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+            _TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+            return
+		; Preserve this exact owner while request B is between publication and
+		; pixel commit. The repeating watchdog is only 100 ms precise; rearming the
+		; canonical one-shot prevents a visibly stale interval after B is refused.
+		if IsObject(_TooltipPendingRequest) {
+			_TooltipDequeueDeadlineTimer :=
+				_TooltipDequeueDeadlineFn.Bind(
+					ExpectedGeneration, ExpectedSurface)
+			SetTimer(_TooltipDequeueDeadlineTimer,
+				-_TOOLTIP_OWNER_RETRY_MS)
+			return
+		}
+        ; Clear only this still-current one-shot owner. A newer render has a
+        ; distinct surface token and leaves its replacement callback untouched.
+        _TooltipDequeueDeadlineTimer := 0
+    } finally {
+        Critical(PreviousCritical)
+    }
+    _TooltipDequeuePollFn(ExpectedGeneration, ExpectedSurface)
+}
+
+_TooltipDequeuePollFn(ExpectedGeneration := unset, ExpectedSurface := 0) {
     global _TooltipDequeueItems, _TooltipGeneration, _TooltipTimerGeneration
-    global _TooltipDequeueActive
+    global _TooltipDequeueActive, _TooltipActiveSurface
+    global _TooltipPendingRequest
     ; SetTimer callbacks BYPASS native Suspend (it only disarms hotkeys/hotstrings),
     ; so this 100 ms poll can otherwise rebuild/reveal a tooltip while the driver is
     ; paused — up to ~5 times inside the 500 ms _SuspendStateWatchdog gap when suspend
     ; is toggled OUTSIDE ToggleSuspend. « pause = AHK éteint »: bail out and leave the
     ; items untouched; they are re-evaluated on resume or torn down by the watchdog.
     if A_IsSuspended
-        return
-    if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
-        return
-    if (_TooltipTimerGeneration != _TooltipGeneration) {
-        ; Generation mismatch while dequeue is still flagged active — a new
-        ; TooltipShow superseded this cycle.  Clear the active flag so
-        ; subsequent TooltipHide calls are no longer gated.
-        if _TooltipDequeueActive
-            _TooltipDequeueActive := false
-        return
+        return false
+    ItemsSnapshot := 0
+    PreviousCritical := Critical("On")
+    try {
+        if IsObject(_TooltipPendingRequest)
+            return false
+        if !IsSet(ExpectedGeneration) {
+            ExpectedGeneration := _TooltipGeneration
+            ExpectedSurface := _TooltipActiveSurface
+        }
+        if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+            _TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+            return false
+        if (_TooltipTimerGeneration != ExpectedGeneration
+            or _TooltipDequeueItems == 0
+            or !IsObject(_TooltipDequeueItems))
+            return false
+        ItemsSnapshot := _TooltipDequeueItems
+    } finally {
+        Critical(PreviousCritical)
     }
     Now := A_TickCount
     ; Check if the earliest deadline has passed.
     NeedDequeue := false
-    for , Item in _TooltipDequeueItems {
-        if (Item.ExpireMs > 0 and Now >= Item.ExpireMs) {
+    for , Item in ItemsSnapshot {
+        if (Item.ExpireDurationMs > 0
+            and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, Now)) {
             NeedDequeue := true
             break
         }
@@ -216,12 +342,13 @@ _TooltipDequeuePollFn() {
     if !NeedDequeue
         return
     Remaining := []
-    for , Item in _TooltipDequeueItems {
-        if (Item.ExpireMs == 0 or Now < Item.ExpireMs)
+    for , Item in ItemsSnapshot {
+        if (Item.ExpireDurationMs == 0
+            or !TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, Now))
             Remaining.Push(Item)
     }
     if (Remaining.Length == 0) {
-        TooltipHide("PollEmpty", true)
+        TooltipHide("PollEmpty", true, ExpectedGeneration, ExpectedSurface)
         ; The preview buffer is deliberately NOT reset here — identical reasoning
         ; to _TooltipTimerFn above, of which this is the per-row sibling.
         ;
@@ -233,9 +360,9 @@ _TooltipDequeuePollFn() {
         ;
         ; The preview is reset by the events that genuinely invalidate it — a
         ; terminator, a caret move, a fire — each of which resets the engine too.
-        return
+        return true
     }
-    ; Rebuild without the expired rows. Preserve ExpireMs so the poll
+    ; Rebuild without the expired rows. Preserve the origin/duration pair so the poll
     ; timer continues tracking the remaining deadlines correctly.
     RebuildItems := []
     for , Item in Remaining {
@@ -245,8 +372,8 @@ _TooltipDequeuePollFn() {
         Copy.DurationSec := 0
         RebuildItems.Push(Copy)
     }
-    _TooltipDequeueItems := Remaining
-    _TooltipDequeueRebuild(RebuildItems)
+    _TooltipDequeueRebuild(RebuildItems, ExpectedGeneration, ExpectedSurface)
+    return true
 }
 
 ; TooltipDequeueInit() must be called once at script startup (from ErgoptiPlus.ahk)
@@ -325,27 +452,9 @@ Tooltip_UpdateStyles() {
 }
 Tooltip_UpdateStyles()
 
-; Border overlay Gui — single frameless window covering the entire stack.
-global _TooltipBorderGui := 0
-
-; Defensive Hwnd tracking — every Gui handle shown by this module is pushed
-; here, and TooltipHide drains the arrays via raw Win32 DestroyWindow as a
-; last-chance sweep. Without this safety net, a Gui.Destroy that silently
-; failed (every Destroy site is wrapped in `try` so a transient Win32 error
-; would not propagate) leaked a window onto the screen, and successive
-; TooltipShow calls stacked more ghosts — exactly the « plein de tooltips
-; sur mon écran » symptom. DestroyWindow on a stale handle is a no-op
-; (returns FALSE, no exception) so the sweep is safe to run unconditionally.
-global _TooltipShownHwnds := []
-global _TooltipShownBorderHwnds := []
-; Last resolved screen position — reused by dequeue destack rebuilds so the
-; surviving rows do not jump while rows above them expire.
-global _TooltipLastPos := 0
-
-; Cap on the tracking arrays so a long typing session cannot grow them
-; unbounded. Each entry is a single Ptr (8 B) so the cap is generous;
-; the value matters mostly as an upper bound on the sweep iteration.
-global _TOOLTIP_HWND_TRACK_CAP := 32
+; Raw HWND backstops live inside each immutable surface record. The retired
+; record therefore carries exactly the handles its deferred disposer owns;
+; candidate preparation never appends into the active owner's tracking state.
 
 ; Auto-hide is shortened by this many seconds (with a hard floor) so the
 ; tooltip vanishes a beat before the actual expansion window closes —
@@ -390,27 +499,44 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; deadline. Pass it as an argument — never by cancelling _TooltipTimerFn after
 ; this call returns: rendering is deferred by TOOLTIP_RENDER_DEBOUNCE_MS, so the
 ; timer does not exist yet at that point and the cancel silently does nothing.
-TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
-    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global TOOLTIP_RENDER_DEBOUNCE_MS, _TooltipPendingArmSafety
-    global _TooltipPendingOriginMs
+TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
+	global _TooltipPendingRequest, _TooltipRequestSerial
+	global TOOLTIP_RENDER_DEBOUNCE_MS
 
     if A_IsSuspended {
         TooltipHide("Suspend", true)
         return
     }
-    ; Each new keystroke supersedes the prior request. Negative SetTimer is a
-    ; one-shot debounce: continuous typing keeps the expensive GUI/UIA work off
-    ; the hot path, and the newest preview is rendered once the user pauses.
-    _TooltipPendingItems := Items
-    _TooltipPendingDurationSec := DurationSec
-    _TooltipPendingArmSafety := ArmSafety
-    ; Stamp the request, not the render: everything after this line (the debounce,
-    ; the Gui build, the UIA resolve) is latency the row's deadline must NOT be
-    ; pushed back by, because the engine's own window keeps running meanwhile.
-    _TooltipPendingOriginMs := A_TickCount
-    _TooltipPendingActive := true
-    SetTimer(_TooltipDeferredShowFn, -TOOLTIP_RENDER_DEBOUNCE_MS)
+	; Stamp and allocate before the transaction: neither action touches shared
+	; state, and no GUI/COM work is allowed under Critical.
+	Request := {
+		Items: Items,
+		DurationSec: DurationSec,
+		ArmSafety: ArmSafety,
+		CommitFn: CommitFn,
+		; Everything after this read (debounce, Gui build, UIA resolve) consumes
+		; the row's canonical interval; the render must never re-anchor it.
+		OriginMs: A_TickCount,
+		Serial: 0,
+		TimerFn: 0
+	}
+	; Each new keystroke supersedes the prior request. State publication and timer
+	; ownership are one short transaction; the deferred callback takes the same
+	; immutable record under the same barrier.
+	PreviousCritical := Critical("On")
+	try {
+		OldRequest := _TooltipPendingRequest
+		if (IsObject(OldRequest) and OldRequest.HasOwnProp("TimerFn")
+			and IsObject(OldRequest.TimerFn))
+			SetTimer(OldRequest.TimerFn, 0)
+		_TooltipRequestSerial += 1
+		Request.Serial := _TooltipRequestSerial
+		Request.TimerFn := _TooltipDeferredShowFn.Bind(Request.Serial)
+		_TooltipPendingRequest := Request
+		SetTimer(Request.TimerFn, -TOOLTIP_RENDER_DEBOUNCE_MS)
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Runs from the debounced timer, never directly from the prefix watcher.
@@ -419,9 +545,13 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
 ; OriginMs is the tick at which the render was REQUESTED. Row deadlines are
 ; measured from it, never from present time: the engine's time-activation gate
 ; runs from the keystroke, so anchoring the preview on the render would let it
-; promise an expansion the engine has already refused. 0 means "no origin
-; supplied" and falls back to present time.
-_TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
+; promise an expansion the engine has already refused. An omitted origin falls
+; back to present time; tick 0 is a valid request origin at counter rollover.
+_TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
+		RequestSerial := -1, CommitFn := 0) {
+	global _TooltipGeneration
+	EntryGeneration := _TooltipGeneration
+	OwnedPresentation := HasMethod(CommitFn, "Call")
 
     ; While the script is suspended nothing may paint — « pause = AHK éteint ».
     ; The per-callback input guards normally prevent reaching here, but the
@@ -435,12 +565,12 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
     ; While a real prediction OWNS the shared surface, refuse any incidental rebuild
     ; that would clobber it — chiefly the hotstring prefix watcher's per-keystroke
     ; preview lookups. The prediction itself renders through _TooltipBuildGuiLlm
-    ; (never here), and the LLM loading spinner sets _LLM_Tooltip_Loading before
-    ; calling us, so neither is blocked; only hotstring previews are deferred until
+    ; (never here), and both prediction/loading candidates carry an owned commit
+    ; callback, so neither is blocked; only hotstring previews are deferred until
     ; the prediction is dismissed. NOTE: blocking the NewShow hide alone (in
     ; TooltipHide) is not enough — this function rebuilds the Gui regardless, so the
     ; bail must live here too.
-    if LLM_TooltipOwnsSurface()
+    if (LLM_TooltipOwnsSurface() and !OwnedPresentation)
         return
 
     ; Normalise to an Array of { Text, ColorHex } objects.
@@ -450,50 +580,95 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
         Items := [Items]
     }
 
-    ; Destroy any currently visible tooltip before rebuilding — ensures the old
-    ; window is gone even if its auto-hide timer has not fired yet. Without this,
-    ; a tooltip that was shown at a different screen position can remain visible
-    ; as a ghost while the new one appears elsewhere.
-    ; Force=true bypasses the dequeue guard — a new TooltipShow always supersedes.
-    TooltipHide("NewShow", true)
+    ; A canonical FireDecision may arrive with an absolute origin/duration pair.
+    ; The render debounce is part of that interval, not permission to restart it:
+    ; discard rows that have already expired before doing any GUI/UIA work.
+    if !OwnedPresentation
+		Items := _TooltipFilterUnexpiredDeadlineItems(Items)
+    if (Items.Length == 0) {
+        TooltipHide("DeadlineExpiredBeforeBuild", true, EntryGeneration,
+            unset, RequestSerial)
+        return
+    }
+    ; The buffer can change while this request waits behind either debounce.
+    ; Ask the engine-owned oracle instead of reproducing its matching rules here.
+    if !OwnedPresentation {
+		DecisionCurrent := false
+		try DecisionCurrent := _TooltipDecisionItemsStillCurrent(Items)
+		catch Error as Err {
+			_UiOracleReportError(
+				"Visible-decision freshness check failed: " . Err.Message)
+			TooltipHide("DecisionCheckFailBeforeBuild", true, EntryGeneration,
+				unset, RequestSerial)
+			return
+		}
+		if !DecisionCurrent {
+			TooltipHide("DecisionStaleBeforeBuild", true, EntryGeneration,
+				unset, RequestSerial)
+			return
+		}
+    }
+	; Convert durations to immutable origin/duration pairs before any GUI/UIA
+	; work. The common pixel commit resolves their CURRENT remainder atomically
+	; with timer publication; no sampled remainder crosses an interruptible call.
+	if !IsSet(OriginMs)
+		OriginMs := A_TickCount
+	LifecyclePlan := _TooltipCreateLifecyclePlan(
+		Items, DurationSec, OriginMs)
 
-    ; Bump the generation counter so any in-flight timer from the previous
-    ; tooltip knows it is stale and must not call TooltipHide().
-    global _TooltipGeneration, _TooltipTimerGeneration
-    global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
-    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
+    ; Reserve the render without tearing down the current surface. The candidate
+    ; is built off-global and the common presenter later swaps one surface record;
+    ; if GUI/UIA pumps a newer renderer, this generation loses without touching
+    ; either the old owner or the newer winner. Cancel the prior lifecycle timers
+    ; now so the old owner cannot disappear halfway through candidate preparation.
+    global _TooltipGeneration, _TooltipTimerGeneration, _TooltipRequestSerial
     global _TooltipDequeueItems, _TooltipDequeueActive
-    _TooltipGeneration += 1
+    global _TooltipDequeueDeadlineTimer
+    PreviousCritical := Critical("On")
+    try {
+        if (_TooltipGeneration != EntryGeneration)
+            return
+        if !_TooltipRequestOwnerMatches(RequestSerial, _TooltipRequestSerial)
+            return
+        _TooltipGeneration += 1
+        RenderGeneration := _TooltipGeneration
+        _TooltipTimerGeneration := RenderGeneration
+        SetTimer(_TooltipTimerFn, 0)
+        if IsObject(_TooltipDequeueDeadlineTimer)
+            SetTimer(_TooltipDequeueDeadlineTimer, 0)
+        _TooltipDequeueDeadlineTimer := 0
+        _TooltipDequeueItems := 0
+        _TooltipDequeueActive := false
+    } finally {
+        Critical(PreviousCritical)
+    }
     ; A rendering pass owns only the generation it created.  `_TooltipBuildGui`
     ; and `_TooltipResolvePosition` can pump/re-enter through GUI/COM, so a newer
     ; TooltipShow or TooltipHide may complete before this invocation resumes.
     ; Never let the older invocation arm a timer, present, or clean up the newer
     ; surface after that point.
-    RenderGeneration := _TooltipGeneration
-
-    ; Timer already cancelled by TooltipHide("NewShow") above — this is a
-    ; belt-and-suspenders guard in case TooltipHide returned early for any reason.
-    SetTimer(_TooltipTimerFn, 0)
-
     _hpBuild := HotPath_Now()
+    Row := 0
     try {
-        _TooltipBuildGui(Items)
+        Row := _TooltipBuildGui(Items)
     } catch {
-        if (RenderGeneration == _TooltipGeneration)
-            TooltipHide("BuildFail", true)
+        TooltipHide("BuildFail", true, RenderGeneration,
+            unset, RequestSerial)
         return
     }
     HotPath_LogIfSlow("Tooltip.Build", _hpBuild, Items.Length . " item(s)")
-    if (RenderGeneration != _TooltipGeneration)
+    if (RenderGeneration != _TooltipGeneration
+        or !_TooltipRequestOwnerMatches(
+            RequestSerial, _TooltipRequestSerial)) {
+        if IsObject(Row)
+            _TooltipQueueSurfaceDisposal(
+                _TooltipCreateDetachedSurface(Row, RenderGeneration))
         return
+    }
 
-    ; Cache in a local variable to prevent "Invalid index" crashes if a
-    ; concurrent TooltipHide clears the global array during the
-    ; _TooltipResolvePosition yield point.
-    Rows := _TooltipRowGuis
-    if (Rows.Length == 0) {
-        if (RenderGeneration == _TooltipGeneration)
-            TooltipHide("NoRows", true)
+    if !IsObject(Row) {
+        TooltipHide("NoRows", true, RenderGeneration,
+            unset, RequestSerial)
         return
     }
 
@@ -502,131 +677,39 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
     _hpResolve := HotPath_Now()
     Pos := _TooltipResolvePosition()
     HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
-    if (RenderGeneration != _TooltipGeneration)
+    if (RenderGeneration != _TooltipGeneration
+        or !_TooltipRequestOwnerMatches(
+            RequestSerial, _TooltipRequestSerial)) {
+        _TooltipQueueSurfaceDisposal(
+            _TooltipCreateDetachedSurface(Row, RenderGeneration))
         return
-    Row := Rows[1]
-    ; Snapshot generation before present so any exception still arms the timer
-    ; correctly and the ghost cannot outlive the safety deadline.
-    _TooltipTimerGeneration := _TooltipGeneration
+    }
     _hpPresent := HotPath_Now()
+    Presented := false
     try {
-        _TooltipPresentStack(Pos, Row, ArmSafety)
+        Presented := _TooltipPresentStack(Pos, Row, ArmSafety,
+			OwnedPresentation ? [] : Items,
+			RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan,
+			CommitFn)
     } catch {
-        if (RenderGeneration == _TooltipGeneration)
-            TooltipHide("ShowFail", true)
+        TooltipHide("ShowFail", true, RenderGeneration,
+            unset, RequestSerial)
+        return
+    }
+    ; Drain sub-step attribution even when the final freshness/deadline commit
+    ; refuses the reveal; otherwise its marks leak into the next render.
+    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail())
+    if !Presented {
+        TooltipHide("StaleBeforeReveal", true, RenderGeneration,
+            unset, RequestSerial)
         return
     }
     ; Detail carries the per-sub-step attribution _TooltipPresentStack accumulated.
-    ; Draining it here (rather than logging each step) is what makes the breakdown
+    ; Draining it above (rather than logging each step) is what makes the breakdown
     ; visible at all: every sub-step is below the profiler's 5 ms floor.
-    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail())
     ; Counted here and nowhere else: this is the exact point at which pixels are
     ; on screen, so it is the denominator every "Slow Tooltip.*" line needs.
     _TooltipNoteRenderPresented()
-    if (RenderGeneration != _TooltipGeneration)
-        return
-
-    ; Collect per-item durations. When items carry distinct non-zero durations,
-    ; we run the dequeue path so each row gets its own lifetime. When all
-    ; durations are identical (or zero), we fall back to the simple single-timer
-    ; path — which is the LLM tooltip case (all slots share one timeout).
-    global _TooltipDequeueItems
-
-    HasAnyDur := false
-    HasMixedDur := false
-    FirstDur := 0
-    for , Item in Items {
-        D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-        if (D > 0) {
-            HasAnyDur := true
-            if (FirstDur == 0)
-                FirstDur := D
-            else if (D != FirstDur)
-                HasMixedDur := true
-        }
-    }
-    ; When rebuilding from the poll timer the items already carry ExpireMs
-    ; and DurationSec = 0 — detect that via the ExpireMs field.
-    IsDequeueRebuild := false
-    for , Item in Items {
-        if Item.HasOwnProp("ExpireMs") {
-            IsDequeueRebuild := true
-            break
-        }
-    }
-
-    ; Anchor every deadline computed below on the moment the render was ASKED
-    ; for. Present time is that moment plus TOOLTIP_RENDER_DEBOUNCE_MS plus the
-    ; Gui build and the position resolve, and the engine's window has been
-    ; running throughout — so measuring from here is what let the preview
-    ; outlive the expansion it was advertising.
-    OriginMs := (OriginMs > 0) ? OriginMs : A_TickCount
-
-    if (IsDequeueRebuild or (HasAnyDur and HasMixedDur)) {
-        ; Dequeue path — each item tracks its own absolute expiry.
-        ; The poll timer (_TooltipDequeuePollFn, 100 ms) checks these
-        ; deadlines and rebuilds the stack when any row expires.
-        Now := A_TickCount
-        _TooltipDequeueItems := []
-        MaxMs := 0
-        for , Item in Items {
-            D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-            if IsDequeueRebuild and Item.HasOwnProp("ExpireMs") {
-                ExpMs := Item.ExpireMs
-            } else if (D > 0) {
-                Eff := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC, D - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-                ExpMs := OriginMs + Round(Eff * 1000)
-            } else {
-                ExpMs := 0   ; no expiry for this row
-            }
-            Copy := {}
-            for k, v in Item.OwnProps()
-                Copy.%k% := v
-            Copy.ExpireMs := ExpMs
-            _TooltipDequeueItems.Push(Copy)
-            ; MaxMs = latest expiry — drives the safety timer fallback.
-            if (ExpMs > 0) {
-                Remaining := Max(50, ExpMs - Now)
-                if (Remaining > MaxMs)
-                    MaxMs := Remaining
-            }
-        }
-        ; Safety net: arm on the LONGEST duration so the tooltip cannot
-        ; outlive the last item even if the poll timer never fires.
-        if (MaxMs > 0)
-            SetTimer(_TooltipTimerFn, -MaxMs)
-        _TooltipDequeueActive := true
-    } else {
-        ; Simple single-timer path (all durations identical, or zero).
-        _TooltipDequeueItems := 0
-        EffectiveDur := DurationSec
-        for , Item in Items {
-            D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-            if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
-                EffectiveDur := D
-        }
-        if (EffectiveDur > 0) {
-            Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
-                EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-            ; Same anchor as the dequeue path: the deadline is absolute, so the
-            ; timer period is what is LEFT of it, not the full duration again.
-            ; The 50 ms floor mirrors the dequeue path and is mandatory — a
-            ; non-positive period would be read by SetTimer as "disable", leaving
-            ; the surface with no auto-hide at all.
-            ExpMs := OriginMs + Round(Effective * 1000)
-            SetTimer(_TooltipTimerFn, -Max(50, ExpMs - A_TickCount))
-            ; Guard the tooltip for its declared duration — same protection as
-            ; the dequeue path. Without this, LookupNoMatch / ResetBuf events
-            ; arriving before the timer fires would kill the tooltip instantly.
-            _TooltipDequeueActive := true
-        } else {
-            ; No declared duration — tooltip stays until explicitly hidden,
-            ; so no guard is needed (and we must not block future hides).
-            _TooltipDequeueActive := false
-        }
-        ; else: the safety timer armed inside the try block above remains
-        ; the auto-hide deadline — no further action needed here.
-    }
 }
 
 ; Hide all tooltip rows and the border overlay immediately.
@@ -651,131 +734,151 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
 ; immediate visual hide and state hand-off. Gui resource destruction is deferred
 ; onto a one-shot timer. Do NOT add a fade-out, animation await, or any blocking
 ; call here. The meta test test_tooltip_hide_non_blocking.ahk pins this contract.
-TooltipHide(DbgTag := "?", Force := false) {
-    global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
-    global _TooltipShownHwnds, _TooltipShownBorderHwnds
+_TooltipReportDebug(Message) {
+    if A_IsCritical {
+        SetTimer(_TooltipReportDebug.Bind(Message), -1)
+        return
+    }
+    try LoggerDebug("LLM.tt", "{1}", Message)
+}
+
+TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
+        ExpectedSurface := unset, ExpectedRequestSerial := unset) {
+    global _TooltipActiveSurface
     global _TooltipDequeueItems, _TooltipDequeueActive
+    global _TooltipDequeueDeadlineTimer
     global _TooltipGeneration, _TooltipTimerGeneration
-    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingOriginMs
-    ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
-    ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
-    ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
-    ; (deliberate LLM_TooltipHide), etc. This is the primary lens for the
-    ; "prediction vanished the instant it appeared" class of bug.
-    global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
-    _llm_on_screen  := IsSet(_LLM_Tooltip_Visible) and (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading)
-    _llm_was_visible := IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
-    _llm_was_loading := IsSet(_LLM_Tooltip_Loading) and _LLM_Tooltip_Loading
-    ; Surface ownership: while a REAL prediction occupies the shared surface, the
-    ; hotstring autocomplete lifecycle must never tear it down — not its buffer
-    ; resets (ResetBuf), lookup misses (LookupNoMatch/LookupLen0), nor a new lookup
-    ; (NewShow). Those fire from the prefix watcher's own timers and per-keystroke
-    ; scans, so without this a background reset blanked a prediction the user was
-    ; calmly reading ("arrêté, rien touché"). This holds for the WHOLE display, not
-    ; just the minimum-display window. Only authoritative hides pass: explicit LLM
-    ; accept/dismiss ("LLM"), the prediction's own auto-hide timer ("TimerFn"), and
-    ; driver suspension ("Suspend"). A real keystroke / pointer move dismisses via
-    ; LLM_TooltipHide, i.e. tag "LLM", so user dismissal is unaffected.
-    if (DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface()) {
-        ; Diagnostic: the prediction is PROTECTED — it stays on screen. An idle
-        ; prediction should emit KEPT for every background hotstring reset and never
-        ; a HIDE, so this line is the lens for "did it stay or vanish?".
-        if _llm_on_screen
-            try LoggerDebug("LLM.tt", "KEPT: hide tag={1} ignored — a prediction owns the surface.", DbgTag)
-        return
-    }
-    ; A "TimerFn"/"Suspend" hide tears the surface down without routing through
-    ; LLM_TooltipHide (which is what normally clears ownership). Clear the flags here
-    ; so a later hotstring preview is not blocked forever by a stale "visible" flag.
-    if ((DbgTag == "TimerFn" or DbgTag == "Suspend") and _llm_was_visible) {
-        _LLM_Tooltip_Visible := false
-        _LLM_Tooltip_Loading := false
-        _LLM_Tooltip_ShownAt := 0
-    }
-    ; This hide actually proceeds (it passed the ownership guard) — record WHO tore
-    ; the surface down. For a shown prediction the only expected tags here are
-    ; "LLM" (user keystroke / pointer / accept), "TimerFn" (auto-hide), "Suspend".
-    if _llm_on_screen
-        try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
-            DbgTag, (Force ? "true" : "false"),
-            (_llm_was_visible ? "true" : "false"), (_llm_was_loading ? "true" : "false"))
-    ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
-    ; External callers (prefix watcher resets, lookup misses) must not interrupt
-    ; it — they would hide the post-expansion rows before their time.
-    if (!Force and _TooltipDequeueActive)
-        return
-    ; A hide is authoritative over a queued preview. Stop the debounce before
-    ; tearing down the current surface so a stale timer cannot resurrect it.
-    _TooltipPendingActive := false
-    _TooltipPendingItems := 0
-    _TooltipPendingDurationSec := 0
-    _TooltipPendingOriginMs := 0
-    SetTimer(_TooltipDeferredShowFn, 0)
-    ; Hiding is a render transition too. Invalidate any renderer currently
-    ; waiting in UIA/GUI work before it can resume and resurrect this surface.
-    _TooltipGeneration += 1
-    _TooltipTimerGeneration := _TooltipGeneration
-    SetTimer(_TooltipTimerFn, 0)
-    _TooltipDequeueItems := 0
-    _TooltipDequeueActive := false
-
-    ; Step 1 — hide border first (direct SW_HIDE), then content via DeferWindowPos.
-    ; WS_EX_LAYERED windows do not reliably respond to SWP_HIDEWINDOW inside a
-    ; DeferWindowPos batch — the compositor can still composit the border for an
-    ; extra frame after EndDeferWindowPos returns, causing a visible ghost outline.
-    ; Hiding the border with a direct ShowWindow(SW_HIDE=0) before scheduling the
-    ; content hide ensures the border is already invisible when DWM composites the
-    ; next frame that removes the content — worst case is "content alone" (rounded
-    ; fill, correct), never "border alone" (empty ghost outline).
-    if _TooltipBorderGui {
-        try GR_Hide(_TooltipBorderGui.Hwnd)
-    }
-    ; Hide content rows atomically — all rows disappear in the same DWM frame.
-    ; SWP flags: NOSIZE|NOMOVE|NOZORDER|NOACTIVATE|HIDEWINDOW.
-    SWP_HIDE_FLAGS := 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0080
-    HideCount := _TooltipRowGuis.Length
-    if HideCount > 0 {
-        HDWP := DllCall("User32\BeginDeferWindowPos", "Int", HideCount, "Ptr")
-        if HDWP {
-            for , Row in _TooltipRowGuis {
-                if HDWP
-                    ; .Hwnd throws "Gui has no window" if the Gui was already
-                    ; destroyed by a concurrent hide (e.g. LLM_TooltipHide ran
-                    ; immediately before this call). Skip destroyed Guis silently —
-                    ; Destroy() below will confirm they are already gone.
-                    try HDWP := DllCall("User32\DeferWindowPos",
-                        "Ptr", HDWP, "Ptr", Row.Gui.Hwnd,
-                        "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
-                        "UInt", SWP_HIDE_FLAGS, "Ptr")
+    global _TooltipPendingRequest, _TooltipRequestSerial
+    RetiredSurface := 0
+    DismissedRecord := 0
+    RefusedReason := ""
+    Authorized := false
+    _llm_on_screen := false
+    _llm_was_visible := false
+    _llm_was_loading := false
+    PreviousCritical := Critical("On")
+    try {
+        LlmRecord := IsSet(_LLM_TooltipPresentedFromSurface)
+            ? _LLM_TooltipPresentedFromSurface(_TooltipActiveSurface) : 0
+        _llm_on_screen := IsObject(LlmRecord)
+        _llm_was_visible := _llm_on_screen
+            and LlmRecord.Kind == "prediction"
+        _llm_was_loading := _llm_on_screen
+            and LlmRecord.Kind == "loading"
+        if (IsSet(ExpectedRequestSerial) and ExpectedRequestSerial != -1
+            and ExpectedRequestSerial != _TooltipRequestSerial) {
+            RefusedReason := "request_owner"
+        } else if (IsSet(ExpectedSurface)
+            and IsObject(_TooltipPendingRequest)) {
+            ; A timer/poll may have captured the old surface immediately before
+            ; request B published. The exact surface can still match in that
+            ; tiny gap, but B already owns the next output and must not be erased.
+            RefusedReason := "pending_request"
+        } else if (IsSet(ExpectedSurface)
+            and (!IsObject(ExpectedSurface)
+                or !IsObject(_TooltipActiveSurface)
+                or ObjPtr(ExpectedSurface) != ObjPtr(_TooltipActiveSurface)
+                or (IsSet(ExpectedGeneration)
+                    and (!ExpectedSurface.HasOwnProp("Generation")
+                        or ExpectedSurface.Generation
+                            != ExpectedGeneration)))) {
+            RefusedReason := "surface_owner"
+        } else if (IsSet(ExpectedGeneration)
+            and !IsSet(ExpectedSurface)
+            and ExpectedGeneration != _TooltipGeneration) {
+            RefusedReason := "generation"
+        } else if (DbgTag != "LLM" and DbgTag != "Suspend"
+            and DbgTag != "TimerFn" and _llm_was_visible) {
+            RefusedReason := "llm_owner"
+        } else if (!Force and _TooltipDequeueActive) {
+            RefusedReason := "dequeue_owner"
+        } else {
+            Authorized := true
+            if IsSet(HotstringPrefixWatcherClearVisibleDecisions) {
+                ; Pure detach only. Privacy/keylogger work is emitted below after
+                ; restoring the caller's interruptibility.
+                try DismissedRecord := HotstringPrefixWatcherClearVisibleDecisions(false)
+                catch Error as Err
+                    _UiOracleReportError(
+                        "Visible-decision clear failed: " . Err.Message)
             }
-            if HDWP
-                DllCall("User32\EndDeferWindowPos", "Ptr", HDWP)
+            if (IsObject(_TooltipPendingRequest)
+                and _TooltipPendingRequest.HasOwnProp("TimerFn")
+                and IsObject(_TooltipPendingRequest.TimerFn))
+                SetTimer(_TooltipPendingRequest.TimerFn, 0)
+            _TooltipPendingRequest := 0
+            _TooltipRequestSerial += 1
+            _TooltipGeneration += 1
+            _TooltipTimerGeneration := _TooltipGeneration
+            SetTimer(_TooltipTimerFn, 0)
+            if IsObject(_TooltipDequeueDeadlineTimer)
+                SetTimer(_TooltipDequeueDeadlineTimer, 0)
+            _TooltipDequeueDeadlineTimer := 0
+            _TooltipDequeueItems := 0
+            _TooltipDequeueActive := false
+            RetiredSurface := _TooltipActiveSurface
+            if IsSet(_LLM_TooltipRetireSurfaceRecord)
+                _LLM_TooltipRetireSurfaceRecord(RetiredSurface)
+            ; Keep pixels and ownership truthful in one transaction. Deferring
+            ; this exact raw hide left a window where the user still saw A while
+            ; every semantic probe already reported no tooltip. Destruction and
+            ; logging remain deferred; only bounded ShowWindow/GR_Hide calls run
+            ; here against the captured owner.
+            _TooltipHideSurfaceObjects(RetiredSurface)
+            _TooltipActiveSurface := 0
         }
+    } finally {
+        Critical(PreviousCritical)
     }
-
-    ; Detach ownership BEFORE scheduling destruction. A subsequent show receives
-    ; fresh globals and cannot be torn down by this old generation's worker.
-    RetiredBorder := _TooltipBorderGui
-    RetiredRows := _TooltipRowGuis
-    RetiredGeneration := _TooltipGeneration
-    _TooltipBorderGui := 0
-    _TooltipGui := 0
-    _TooltipRowGuis := []
-    _TooltipShownHwnds := []
-    _TooltipShownBorderHwnds := []
-    SetTimer(_TooltipDisposeRetired.Bind(RetiredBorder, RetiredRows, RetiredGeneration), -1)
+    if (RefusedReason == "llm_owner" and _llm_on_screen)
+        _TooltipReportDebug(Format(
+            "KEPT: hide tag={1} ignored — a prediction owns the surface.",
+            DbgTag))
+    if !Authorized
+        return false
+    if _llm_on_screen
+        _TooltipReportDebug(Format(
+            "HIDE tag={1} force={2} (was visible={3} loading={4}).",
+            DbgTag, (Force ? "true" : "false"),
+            (_llm_was_visible ? "true" : "false"),
+            (_llm_was_loading ? "true" : "false")))
+    if (IsObject(DismissedRecord)
+        and IsSet(HotstringPrefixWatcherEmitDismissedRecord)) {
+        try HotstringPrefixWatcherEmitDismissedRecord(DismissedRecord)
+        catch Error as Err
+            _UiOracleReportError(
+                "Visible-decision dismissal failed: " . Err.Message)
+    }
+    if IsSet(_LLM_TooltipScheduleMetricDrain)
+        _LLM_TooltipScheduleMetricDrain()
+    _TooltipQueueSurfaceDisposal(RetiredSurface)
+    return true
 }
 
 ; Releases hidden Gui objects after TooltipHide has returned to the keyboard
 ; caller. The captured objects are never read from global ownership state, so a
 ; newer render cannot be disposed by an older hide timer.
-_TooltipDisposeRetired(RetiredBorder, RetiredRows, RetiredGeneration) {
+_TooltipDisposeRetired(RetiredSurface) {
+    if !IsObject(RetiredSurface)
+        return
+    RetiredGeneration := RetiredSurface.HasOwnProp("Generation")
+        ? RetiredSurface.Generation : 0
     try {
-        if RetiredBorder
-            try RetiredBorder.Destroy()
-        if (RetiredRows is Array) {
-            for , Row in RetiredRows {
+        ; Raw HWNDs go first while they are still the captured owner's handles.
+        ; Gui.Destroy remains the object-level backstop afterward. Both lists are
+        ; bounded by the surface itself, never by session length.
+        if (RetiredSurface.BorderHwnds is Array) {
+            for , Hwnd in RetiredSurface.BorderHwnds
+                try GR_DestroyWindow(Hwnd)
+        }
+        if (RetiredSurface.ContentHwnds is Array) {
+            for , Hwnd in RetiredSurface.ContentHwnds
+                try GR_DestroyWindow(Hwnd)
+        }
+        if RetiredSurface.Border
+            try RetiredSurface.Border.Destroy()
+        if (RetiredSurface.Rows is Array) {
+            for , Row in RetiredSurface.Rows {
                 try Row.Gui.Destroy()
             }
         }
@@ -788,8 +891,34 @@ _TooltipDisposeRetired(RetiredBorder, RetiredRows, RetiredGeneration) {
 ; currently visible. Used by the LLM bridge to avoid firing predictions while
 ; a hotstring overlay is on screen — mirrors the HS tooltip.is_visible() check.
 TooltipIsVisible() {
-    global _TooltipGui
-    return IsSet(_TooltipGui) and _TooltipGui != 0
+    global _TooltipActiveSurface
+    PreviousCritical := Critical("On")
+    try {
+        Surface := IsSet(_TooltipActiveSurface) ? _TooltipActiveSurface : 0
+        LlmRecord := (IsObject(Surface)
+            and IsSet(_LLM_TooltipPresentedFromSurface))
+            ? _LLM_TooltipPresentedFromSurface(Surface) : 0
+    } finally {
+        Critical(PreviousCritical)
+    }
+    if !IsObject(Surface)
+        return false
+    return !IsObject(LlmRecord)
 }
 
-
+; Identity fence for post-presentation callbacks that intentionally run outside
+; the pixel commit. Object identity closes ABA: even if a later render happens
+; to reuse the same integer generation after a test/reset, it is not this owner.
+TooltipSurfaceTokenIsCurrent(SurfaceToken) {
+    global _TooltipActiveSurface, _TooltipGeneration
+    if !IsObject(SurfaceToken)
+        return false
+    PreviousCritical := Critical("On")
+    try {
+        return (IsObject(_TooltipActiveSurface)
+            and ObjPtr(_TooltipActiveSurface) == ObjPtr(SurfaceToken)
+            and SurfaceToken.Generation == _TooltipGeneration)
+    } finally {
+        Critical(PreviousCritical)
+    }
+}

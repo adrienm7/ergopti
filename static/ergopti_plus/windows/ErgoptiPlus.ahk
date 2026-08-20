@@ -3,6 +3,49 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; A rollback recovery executable is a byte-for-byte copy of the last known-good
+; compiled driver named ``Current.exe.<guid>.recovery.exe``. Detect it before the
+; mutex and before any hook can be registered. The helper is defined in the
+; updater include below and is available here because AHK hoists function
+; definitions across the merged #Include graph.
+global _UpdaterRecoveryShapedTarget := A_IsCompiled
+	? _Updater_RecoveryTargetForExecutable(A_ScriptFullPath) : ""
+global _UpdaterRecoveryDescriptor := A_IsCompiled
+	? _Updater_LoadRecoveryDescriptor(A_ScriptFullPath) : 0
+; A recovery-shaped filename is data, never authority. A stale artifact that no
+; longer owns its tiny transaction claim exits before the mutex, Bundle_Init or
+; any message pump, so double-clicking it cannot downgrade a healthy driver.
+if (_UpdaterRecoveryShapedTarget != ""
+	and !(_UpdaterRecoveryDescriptor is Map))
+	ExitApp(0)
+if (_UpdaterRecoveryDescriptor is Map)
+	try A_TrayMenu.Delete()
+global _UpdaterRecoveryPublishTarget := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Target"] : ""
+global _UpdaterRecoveryPublishStage := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Stage"] : ""
+global _UpdaterRecoveryClaimPath := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Claim"] : ""
+global _UpdaterRecoveryCleanupPath := ""
+if A_IsCompiled {
+	try _UpdaterRecoveryCleanupPath := _Updater_RecoveryCleanupPathForCurrent(
+		A_ScriptFullPath, EnvGet("ERGOPTI_UPDATER_RECOVERY_CLEANUP"))
+	; The value is single-use inheritance from the recovery process. Clear the
+	; parent copy before any later child is spawned.
+	try EnvSet("ERGOPTI_UPDATER_RECOVERY_CLEANUP", "")
+}
+global _UpdaterRecoveryPublishAttemptCount := 0
+global _UpdaterRecoveryCleanupAttemptCount := 0
+global _UpdaterRecoveryHandoffPending := false
+global _UpdaterRecoveryExitInvocation := false
+global _UpdaterRecoverySuspendPrepared := false
+global _UpdaterInheritedBootReadyName := ""
+if A_IsCompiled {
+	try _UpdaterInheritedBootReadyName := _Updater_ValidateBootReadyEventName(
+		EnvGet("ERGOPTI_UPDATER_BOOT_READY"))
+	try EnvSet("ERGOPTI_UPDATER_BOOT_READY", "")
+}
+
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
 ; script's load (~875-1460 ms parse), and terminating a hung/dialog-blocked old
@@ -18,9 +61,9 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; closed: the OS releases the mutex when this process exits, so a successor's wait
 ; unblocks the instant we die.
 ;
-; EXEMPT: the detached keylogger-prefetch worker. The driver deliberately
-; re-runs this entry with /force and --keylogger-prefetch-worker to compute a
-; metrics projection; that worker registers no hook, no log owner and no tray,
+; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
+; deliberately re-runs this entry with /force and a worker flag; those workers
+; register no hook, no log owner and no tray,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
 ; auto-execute statement while the worker's own gate sits ~300 lines below, so
 ; every worker spawned while the driver is alive blocked the full wait on the
@@ -30,7 +73,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
 global _DriverMutexHandle := 0
-if !KLPF_IsWorkerInvocation()
+if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation())
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
@@ -222,6 +265,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; It defines a FUNCTION rather than a global, so this ordering is a convenience
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
+#Include infra/tick_count.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
 #Include infra/hotpath_profiler.ahk
@@ -239,7 +283,12 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/clipboard.ahk
 #Include adapters/timer_scheduler.ahk
 #Include adapters/file_system.ahk
+; Crash-safe multi-file config transitions bind strict Windows-only filesystem
+; operations at this integration boundary; the portable core remains OS-free.
+#Include infra/config_transition.ahk
+#Include infra/config_transition_runtime.ahk
 #Include adapters/window_info.ahk
+#Include adapters/uia_worker.ahk
 #Include adapters/hotkey_registrar.ahk
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
@@ -257,6 +306,13 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include modules/keymap/uia_selection_worker.ahk
+
+; Compiled workers reuse this executable. Exit into the minimal worker loop as
+; soon as its UIA/window dependencies exist, before loading keylogger/WebView
+; modules or running any normal-driver initialiser.
+if UIASW_IsWorkerInvocation()
+	UIASW_WorkerMain()
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
@@ -365,6 +421,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_av_state.ahk
 #Include modules/keylogger/keylogger_network.ahk
 #Include modules/keylogger/keylogger_clipboard.ahk
+#Include modules/keylogger/keylogger_roi_prune.ahk
 #Include modules/keylogger/keylogger_trigger_roi.ahk
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
@@ -426,6 +483,12 @@ BootProfile_Stamp("Module includes initialised")
 ; =============================================
 
 #Include infra/boot.ahk
+
+; A pending trigger transaction belongs to the stable paths.toml locator, not
+; necessarily to the config directory selected for this boot. Resolve it before
+; onboarding or the first cached parse can observe and re-save split authority.
+if !LLM_TriggerJournalRecoverAtBoot()
+	throw Error("LLM trigger journal recovery failed before configuration boot")
 
 #Include infra/feature_state.ahk
 
@@ -660,11 +723,19 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 
-EnsurePersonalShortcutsFile(Path, AllowReload := true) {
+EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
+		ReplaceFn := 0, ReadFn := 0) {
 		global PERSONAL_SHORTCUTS_TEMPLATE
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				Critical("Off")
+				try return EnsurePersonalShortcutsFile(Path, AllowReload,
+						WriterFn, ReplaceFn, ReadFn)
+				finally Critical(InheritedCritical)
+		}
 		if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
 				try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
-				return
+				return false
 		}
 		FileWasCreated := false
 		if !FileExist(Path) {
@@ -674,15 +745,17 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true) {
 								DirCreate(Dir)
 						}
 						Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
-						; Every generated AHK source must be UTF-8 with BOM and LF.
-						; `UTF-8-RAW` silently creates a parser-risking BOM-less file.
-						FileAppend(Template, Path, "UTF-8")
+						; A complete same-directory stage is published atomically. The old
+						; FileAppend path could leave a truncated AHK source on interruption.
+						if !_PersonalShortcutsPublishFile(Path, Chr(0xFEFF) . Template,
+								WriterFn, ReplaceFn, ReadFn, true)
+								throw Error("the personal shortcuts file could not be published atomically")
 						FileWasCreated := true
 						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
 				} catch as e {
 						try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
 								Path, e.Message)
-						return
+						return false
 				}
 		}
 		StubDir := ""
@@ -690,7 +763,7 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true) {
 				LocalAppData := ResolveLocalAppDataDir()
 				if (LocalAppData == "") {
 						try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
-						return
+						return false
 				}
 				StubDir := LocalAppData . "\Ergopti\_generated"
 		} else {
@@ -705,20 +778,22 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true) {
 				. "#Include *i " . Path . "`n"
 		Existing := ""
 		if FileExist(StubPath) {
-				try Existing := FileRead(StubPath, "UTF-8-RAW")
+				try Existing := HasMethod(ReadFn, "Call")
+						? ReadFn.Call(StubPath) : FSRead(StubPath)
 		}
+		if (Existing is String) and SubStr(Existing, 1, 1) == Chr(0xFEFF)
+				Existing := SubStr(Existing, 2)
 		StubMatches := (Existing == DesiredStub)
 		if !StubMatches {
 				try {
-						if FileExist(StubPath) {
-								FileDelete(StubPath)
-						}
-						FileAppend(DesiredStub, StubPath, "UTF-8")
+						if !_PersonalShortcutsPublishFile(StubPath,
+								Chr(0xFEFF) . DesiredStub, WriterFn, ReplaceFn, ReadFn)
+								throw Error("the forwarding stub could not be published atomically")
 						try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
 				} catch as e {
 						try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
 								StubPath, e.Message)
-						return
+						return false
 				}
 		}
 		if FileWasCreated or !StubMatches {
@@ -728,7 +803,7 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true) {
 						; written file is an empty template, so nothing needs re-including before the
 						; user has even edited it. Their next Reload picks up the edits.
 						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
-						return
+						return true
 				}
 				try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
 				Reload
@@ -739,12 +814,68 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true) {
 				; process is ready, but there is never two owners of the keyboard.
 				ExitApp(0)
 		}
+		return true
+}
+
+; Publish one generated AHK file only after its full bytes can be re-read from
+; the stage. This helper is deliberately status-bearing so menu/gesture callers
+; never open a path whose creation silently failed.
+_PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
+		ReadFn := 0, CreateOnly := false) {
+		static StageSequence := 0
+		OwnerToken := _ConfigWriteLeaseTryAcquire(
+				Path, "personal-shortcuts-publication")
+		if !(OwnerToken is Object) {
+				try LoggerError("ErgoptiPlus",
+						"Could not publish generated personal shortcuts at '{1}': another configuration transaction owns the target.",
+						Path)
+				return false
+		}
+		StagePath := ""
+		try {
+				StageSequence += 1
+				StagePath := Path . "." . A_NowUTC . "." . A_ScriptHwnd . "."
+						. A_TickCount . "." . StageSequence . ".stage"
+				Written := HasMethod(WriterFn, "Call")
+						? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
+				if !((Written is Integer) && Written == 1)
+						return false
+				Observed := HasMethod(ReadFn, "Call")
+						? ReadFn.Call(StagePath) : FSRead(StagePath)
+				if !(Observed is String) or Observed != Content {
+						try FSDelete(StagePath)
+						return false
+				}
+				; The writer/read seam can yield to a path relocation or another
+				; user action. Only the exact still-live owner may publish its stage.
+				if !_ConfigWriteLeaseOwns(OwnerToken, Path) {
+						try FSDelete(StagePath)
+						return false
+				}
+				Replaced := HasMethod(ReplaceFn, "Call")
+						? ReplaceFn.Call(StagePath, Path, CreateOnly)
+						: (CreateOnly ? FSAtomicMoveCreate(StagePath, Path)
+								: FSAtomicMoveReplace(StagePath, Path))
+				if !((Replaced is Integer) && Replaced == 1) {
+						try FSDelete(StagePath)
+						; Another process may have won creation after our initial absence
+						; probe. Its user-owned file is success, never something to replace.
+						if CreateOnly && FileExist(Path)
+								return true
+						return false
+				}
+				return true
+		} finally {
+				_ConfigWriteLeaseRelease(OwnerToken)
+		}
 }
 
 try {
-		EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
 		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+		ExitApp(1)
 }
 #InputLevel 2
 #Include *i _generated/personal_shortcuts.ahk
@@ -759,6 +890,7 @@ global _HSCategorySnapshot := Map()
 try _HSSnapshotAllCategories()
 ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
 
+#Include modules/take_note.ahk
 #Include modules/gestures/init.ahk
 #Include modules/gestures/click.ahk
 #Include modules/gestures/screenshots.ahk
@@ -811,7 +943,10 @@ _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
 A_TrayMenu.Delete()
-SetTimer(SaveFullConfig, -500)
+if !(IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
+		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
+}
 
 ; HookDispatcher owns the process-wide mouse Hotkeys consumed by four independent
 ; features (hotstring prefix-watcher click-reset, CapsWord cancel, gesture
@@ -832,12 +967,11 @@ if !HookDispatcher.Start() {
 if MetricsShortcuts.enabled {
 		LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
 				WPMWidget.visible, WPMWidget.show_graph)
-		; Refresh the metrics focus cache off the keystroke thread via a periodic timer
-		; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block on a
-		; busy foreground window) never land on the hot path. Armed here — inside the
-		; metrics gate and BEFORE KL_Init below — because the cache has exactly one
-		; reader, MF_ShouldFilter, which the keylogger consults per event: with metrics
-		; off the poll would issue blocking probes nobody reads.
+		; Refresh one canonical focus snapshot from a resident periodic timer. The
+		; title transaction has an OS-enforced deadline and every partial identity is
+		; published invalid, so same-thread keyboard consumers remain bounded and
+		; privacy fail-closed. Arm inside the metrics gate and BEFORE KL_Init: with
+		; metrics off, no consumer needs this snapshot.
 		MF_StartFocusRefresh()
 		; (The WebView2 widget cold-start is armed at the very END of boot — after
 		; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
@@ -847,7 +981,10 @@ if MetricsShortcuts.enabled {
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
 		KL_Init(_ConfigDir . "metrics")
-		MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+		MetricsBindingsReady := MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+		if !((MetricsBindingsReady is Integer) && MetricsBindingsReady == 1)
+			try LoggerError("MetricsShortcuts",
+				"One or more metrics shortcuts could not be activated during boot; continuing with explicit recovery state.")
 		; HookDispatcher is already started unconditionally above.
 		KL_Hook_Start()
 		KL_Watchers_Start()
@@ -866,7 +1003,10 @@ BootProfile_Mark("Metrics/keylogger started")
 ; RAM-buffered metrics (KL_Stop) before the process tears down. Registered
 ; unconditionally: the handler is fully try-wrapped and KL_Stop is a no-op when
 ; metrics are disabled (Keylogger.initialized stays false).
-OnExit(Ergopti_OnShutdown)
+; Prepend the refusal-capable lifecycle callback ahead of the logger flush.
+; Returning nonzero must stop every later callback before any teardown occurs;
+; on acceptance the logger remains last and persists terminal cleanup logs.
+OnExit(Ergopti_OnShutdown, -1)
 LoggerInfo("ErgoptiPlus", "Tray menu built and icon set.")
 
 
@@ -934,6 +1074,21 @@ BootProfile_Mark("Prefix watcher index complete")
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+
+; A last-known-good rollback copy first becomes a fully functional driver. Only
+; after the ready contract exists may it republish itself atomically to the
+; canonical Current.exe and request the guarded OnExit handoff. A canonical
+; Current.exe similarly retires the old recovery copy only after it is ready.
+_Updater_ArmRecoveryMaintenanceAfterReady()
+
+; Warm the persistent selection worker after the ready contract is published.
+; Its dedicated source entry parses only UIA + the worker, so this does not
+; replay the full driver boot, and no provider call happens until an idle-gated
+; request arrives. Starting it here prevents the first wrap action after a
+; reload from racing a cold worker process.
+if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected")
+	&& Features["shortcuts"]["wrap_text_if_selected"]
+	SetTimer(UIASW_Start, -1)
 
 ; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
 ; All the heavy off-critical-path work is armed HERE, after the driver is ready,

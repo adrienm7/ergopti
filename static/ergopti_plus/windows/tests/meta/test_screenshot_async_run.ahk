@@ -11,13 +11,13 @@
 ; blocked ALL keyboard processing (input drops, modifier key hangs) for the
 ; entire duration of the PowerShell process — typically 300-800 ms.
 ;
-; The fix replaces RunWait with Run (async) so the hook thread returns
-; immediately. The TrayTip notification fires optimistically before the file
-; appears on disk; the race is acceptable because the notification is cosmetic.
+; The final fix routes every entry point through one staged ShellRunner owner.
+; The hotkey contains no process launch at all, and success is emitted only after
+; the current generation publishes its private stage.
 ;
 ; This test inspects shortcuts/win.ahk source and asserts:
 ;   1. RunWait is NOT used in the screenshot block.
-;   2. A Run( call IS present in the screenshot block.
+;   2. The hotkey delegates to GestureScreenshotInstant without a sibling worker.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -67,7 +67,7 @@ _SAR_ShortcutsSource() {
 ; ==========================================================
 
 _SAR_NoRunWait() {
-	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
+	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
 	Assert(block != "",
 		"shortcuts/win.ahk: SC029 screenshot hotkey block must be present")
 	Assert(InStr(block, "RunWait") = 0,
@@ -76,26 +76,25 @@ _SAR_NoRunWait() {
 Test("Screenshot hotkey: RunWait not used in SC029 block (screenshot-async-run)", _SAR_NoRunWait)
 
 
-_SAR_AsyncRunPresent() {
-	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
-	; Run( with an opening paren distinguishes the Run function from RunWait.
-	Assert(InStr(block, "Run(") > 0,
-		"shortcuts/win.ahk: SC029 must call Run() (async) instead of RunWait for the PowerShell capture process")
+_SAR_SharedWorkerDelegatePresent() {
+	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
+	Assert(InStr(block, "GestureScreenshotInstant()") > 0,
+		"shortcuts/win.ahk: SC029 must delegate to the shared screenshot worker owner")
+	Assert(InStr(block, "Run(") = 0 && InStr(block, "powershell") = 0,
+		"shortcuts/win.ahk: SC029 must not retain an unowned sibling worker process")
 }
-Test("Screenshot hotkey: async Run() used in SC029 block (screenshot-async-run)", _SAR_AsyncRunPresent)
+Test("Screenshot hotkey: shared worker delegate owns SC029 (screenshot-async-run)", _SAR_SharedWorkerDelegatePresent)
 
 _SAR_HotkeyBoundariesAreContained() {
-	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
-	Assert(InStr(block, "try") > 0 && InStr(block, "catch as Err") > 0,
-		"SC029 must contain desktop, filesystem, and Run failures inside the hotkey callback")
-	Assert(InStr(block, "LoggerError") > 0,
-		"SC029 must log an OS launch failure rather than silently losing the screenshot action")
+	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
+	Assert(InStr(block, "GestureScreenshotInstant()") > 0,
+		"SC029 must hand desktop, filesystem, process, and publication failures to the shared owner")
 	Assert(InStr(block, "MsgBox") = 0,
 		"SC029 must not open a modal dialog from the keyboard hotkey thread")
-	Assert(InStr(block, "TrayTip") > 0,
-		"SC029 must give nonblocking feedback for both unavailable windows and launch failures")
+	Assert(InStr(block, "TrayTip") = 0 && InStr(block, "FileMove") = 0,
+		"SC029 must not duplicate terminal feedback or publication outside the shared owner")
 }
-Test("Screenshot hotkey: SC029 contains OS failures and never blocks on a modal dialog", _SAR_HotkeyBoundariesAreContained)
+Test("Screenshot hotkey: SC029 delegates every OS boundary to one owner", _SAR_HotkeyBoundariesAreContained)
 
 _SAR_GestureInstantBoundariesAreContained() {
 	Body := _DriverFuncBody("GestureScreenshotInstant")
@@ -120,8 +119,9 @@ Test("Gesture screenshot: instant capture contains OS failures and remains nonbl
 
 ; F-H07: GestureCaptureRegion (window/fullscreen capture) used RunWait, blocking the
 ; keyboard hook thread for the whole PowerShell capture (~300-1500 ms) on every such
-; screenshot gesture — the SC029 fix missed it. It must now use async Run. (The region
-; Region saving used to be deliberately synchronous, but that blocked the hook thread for
+; screenshot gesture — the SC029 fix missed it. It now delegates launch to the
+; shared asynchronous owner. Region saving used to be deliberately synchronous,
+; but that blocked the hook thread for
 ; up to the 30-second Snipping Tool selection plus a PowerShell process.  Its transaction
 ; is now timer-driven; the hotkey must never contain either a long ClipWait or RunWait.
 _SAR_GestureCaptureNoRunWait() {
@@ -129,10 +129,12 @@ _SAR_GestureCaptureNoRunWait() {
 	Assert(Body != "", "GestureCaptureRegion(X,Y,W,H,Mode,Path) must exist")
 	Assert(InStr(Body, "RunWait") = 0,
 		"GestureCaptureRegion must not use RunWait — it blocks the keyboard hook thread on every window/fullscreen screenshot gesture (gesture-capture-async-run)")
-	Assert(InStr(Body, "Run(") > 0,
-		"GestureCaptureRegion must launch the capture via async Run()")
+	Assert(InStr(Body, "_GestureScreenshotCreateWorker") > 0,
+		"GestureCaptureRegion must register its staged process through the shared ShellRunner owner")
+	Assert(InStr(Body, "Run(") = 0,
+		"GestureCaptureRegion must not bypass worker ownership with a raw process launch")
 }
-Test("Gesture screenshot: GestureCaptureRegion uses async Run, not RunWait (gesture-capture-async-run)", _SAR_GestureCaptureNoRunWait)
+Test("Gesture screenshot: GestureCaptureRegion uses shared async ownership (gesture-capture-async-run)", _SAR_GestureCaptureNoRunWait)
 
 _SAR_RegionCaptureNoBlockingWait() {
         Body := _DriverFuncBody("GestureScreenshotRegion")
@@ -147,17 +149,20 @@ Test("Gesture screenshot: region save defers selection and PowerShell (gesture-r
 _SAR_DirectCaptureConfirmsOutputBeforeSuccess() {
 	CaptureBody := _DriverFuncBody("GestureCaptureRegion")
 	PollBody := _DriverFuncBody("GestureDirectCapturePoll")
+	WorkerDoneBody := _DriverFuncBody("GestureDirectCaptureWorkerDone")
 	CompleteBody := _DriverFuncBody("GestureScreenshotComplete")
 	WindowBody := _DriverFuncBody("GestureScreenshotWindow")
-	Assert(InStr(CaptureBody, "Run(") > 0 and InStr(CaptureBody, "&Pid)") > 0
+	Assert(InStr(CaptureBody, "_GestureScreenshotCreateWorker") > 0
 		and InStr(CaptureBody, "_GestureDirectCaptures[Epoch]") > 0
 		and InStr(CaptureBody, "SetTimer(GestureDirectCapturePoll.Bind(Epoch)") > 0,
-		"direct screenshot capture must retain its worker identity and defer completion; a successful Run only proves process launch")
-	Assert(InStr(PollBody, 'ProcessExist(State["pid"])') > 0
-		and InStr(PollBody, 'FileExist(State["path"])') > 0
-		and InStr(PollBody, 'CB_GetSequenceNumber() != State["clipboard_sequence"]') > 0
-		and InStr(PollBody, "CB_HasImage()") > 0,
-		"completion must require a terminated worker plus a save-file or new image clipboard postcondition")
+		"direct screenshot capture must publish an epoch-bound worker before start and defer completion")
+	Assert(InStr(PollBody, "TickExpired(") > 0
+		and InStr(PollBody, "GestureDirectCaptureFinish(Epoch, false") > 0,
+		"direct timeout polling must retire the owner and cancel its retained worker")
+	Assert(InStr(WorkerDoneBody, '_GestureScreenshotFileExists(Job["stage"])') > 0
+		and InStr(WorkerDoneBody, "_GestureScreenshotPublishFile") > 0
+		and InStr(WorkerDoneBody, "_GestureScreenshotPublishClipboard") > 0,
+		"only worker completion may validate and publish the current private stage")
 	Assert(InStr(CompleteBody, "if !Ok") > 0 and InStr(CompleteBody, "LoggerSuccess") > 0,
 		"only the confirmed completion callback may emit screenshot success")
 	Assert(InStr(WindowBody, "LoggerSuccess") = 0,

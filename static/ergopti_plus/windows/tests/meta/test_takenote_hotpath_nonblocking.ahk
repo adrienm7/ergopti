@@ -1,42 +1,48 @@
 ﻿; tests/meta/test_takenote_hotpath_nonblocking.ahk
 
 ; ==============================================================================
-; MODULE: Take Note Hotkey Non-Blocking Tests
+; MODULE: Take Note Entry-Point Non-Blocking Tests
 ; DESCRIPTION:
-; Win+N used WinWait/WinWaitActive and Sleep on the keyboard thread. A delayed
-; Notepad launch could freeze all remapping for ten seconds. The hotkey now only
-; launches/queues; a bounded, suspend-aware timer owns later window work.
+; Win+N and the gesture action are sibling entry points for one logical action.
+; Every sibling must only enqueue; a bounded, suspend-aware timer owns file,
+; launch, focus, maximise, and final-send work away from the dispatch callback.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_TNNB_TakeNoteQueuesInsteadOfWaiting() {
-	Body := _DriverFuncBody("TakeNote")
-	Assert(Body != "", "TakeNote must exist in modules/shortcuts/win.ahk")
-	Assert(!InStr(Body, "WinWait(") and !InStr(Body, "WinWaitActive(") and !InStr(Body, "Sleep("),
-		"TakeNote must not wait or sleep on the keyboard hotkey thread")
-	QueuePos := InStr(Body, "_TakeNoteQueueFinalize(FileName, !WindowAlreadyOpen)")
-	RunPos := InStr(Body, "Run('notepad.exe")
-	Assert(QueuePos > 0 and RunPos > QueuePos,
-		"TakeNote must queue the bounded finalizer before launching a new Notepad process")
-	Assert(InStr(Body, "} catch as Err") > 0 and InStr(Body, "LoggerError") > 0,
-		"TakeNote must contain file/shell failures rather than throwing from the hotkey")
+_TNNB_EveryEntryPointOnlyQueues() {
+	Banned := ["WinWait(", "WinWaitActive(", "Sleep(", "FileAppend(",
+		"Run(", "WMActivate(", "WinMaximize(", "SendFinalResult("]
+	for EntryName in ["TakeNote", "GestureTakeNote"] {
+		Body := _DriverFuncBody(EntryName)
+		Assert(Body != "", EntryName . " must remain a reachable action entry point")
+		for Call in Banned {
+			Assert(!InStr(Body, Call), EntryName . " must not execute " . Call
+				. " on the keyboard/gesture dispatch thread (takenote-hotpath-nonblocking)")
+		}
+		Assert(InStr(Body, "_TakeNoteQueueFromFeatures(") > 0,
+			EntryName . " must delegate to the one shared asynchronous note job")
+	}
 }
-Test("shortcuts: TakeNote queues Notepad finalization without hotkey waits (takenote-hotpath-nonblocking)",
-	_TNNB_TakeNoteQueuesInsteadOfWaiting)
+Test("take note: every action entry point only enqueues the shared job (takenote-hotpath-nonblocking)",
+	_TNNB_EveryEntryPointOnlyQueues)
 
 _TNNB_PollOwnsDeadlineAndSuspendGate() {
 	Body := _DriverFuncBody("_TakeNotePoll")
+	RescheduleBody := _DriverFuncBody("_TakeNoteReschedule")
 	Q := Chr(34)
 	Assert(Body != "", "_TakeNotePoll must own the deferred note-window work")
-	Assert(InStr(Body, "A_IsSuspended") > 0,
+	Assert(InStr(Body, "Ops.IsSuspended()") > 0,
 		"the deferred note-window finalizer must cancel when the driver is suspended")
-	Assert(InStr(Body, "A_TickCount >= Job[" . Q . "deadline" . Q . "]") > 0,
-		"the deferred note-window finalizer must stop at its finite launch deadline")
-	Assert(InStr(Body, "SetTimer(Job[" . Q . "timer" . Q . "], -TAKE_NOTE_POLL_INTERVAL_MS)") > 0,
+	Assert(InStr(Body, "TickExpired(Job[" . Q . "started_tick" . Q . "], Job[" . Q . "timeout_ms" . Q . "], Ops.NowTick())") > 0,
+		"the deferred note-window finalizer must stop at its finite wrap-safe launch deadline")
+	Assert(InStr(RescheduleBody, "Ops.Schedule(Job[" . Q . "timer" . Q . "], TAKE_NOTE_POLL_INTERVAL_MS)") > 0,
 		"the deferred note-window finalizer must use one-shot bounded polling rather than a blocking wait")
-	Assert(InStr(Body, "WinMaximize(Job[" . Q . "pattern" . Q . "])") > 0,
+	Assert(InStr(Body, "Ops.Maximize(Job[" . Q . "pattern" . Q . "])") > 0,
 		"the deferred success path must retain the original maximize effect")
+	Assert(InStr(Body, "Ops.FileExists(") > 0 and InStr(Body, "Ops.Launch(") > 0
+		and InStr(Body, "Ops.SendFinal(") > 0,
+		"the shared deferred job must own file, launch, and final input side effects")
 }
-Test("shortcuts: TakeNote poll is deadline-owned and suspend-aware (takenote-hotpath-nonblocking)",
+Test("take note: shared poll owns every side effect, deadline, and suspend gate (takenote-hotpath-nonblocking)",
 	_TNNB_PollOwnsDeadlineAndSuspendGate)

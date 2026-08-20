@@ -225,9 +225,10 @@ _CountEnabledForCategory(V1Cat) {
 
 ; Collect every canonical v2 feature path that belongs to the Hotstrings
 ; category: flat TOML categories (autocorrection, distances_reduction, …),
-; dynamic hotstrings, and personal TOML sections. Used by the "tout activer"
-; actions to enable every individual feature in one v2 batch write.
-_CollectAllHotstringsV2Paths() {
+; dynamic hotstrings, and personal TOML sections. Runtime-discovered personal
+; nodes are seeded only in the caller's detached candidate, never in live state
+; before persistence succeeds.
+_CollectAllHotstringsV2Paths(FeaturesTarget) {
 	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
 	Paths := []
 
@@ -254,7 +255,7 @@ _CollectAllHotstringsV2Paths() {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
-				EnsurePersonalHotstringFeature(SecName)
+				_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
 				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}
@@ -262,5 +263,4 @@ _CollectAllHotstringsV2Paths() {
 
 	return Paths
 }
-
 

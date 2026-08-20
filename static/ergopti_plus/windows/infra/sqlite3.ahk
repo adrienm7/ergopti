@@ -64,6 +64,18 @@ _SQLite_ProgressYield(user_data) {
 
 global _SQLite_ProgressCb := CallbackCreate(_SQLite_ProgressYield, "C", 1)
 
+SQLite_ClearProgressHandler(db, YieldOps) {
+		if (YieldOps > 0)
+				DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler",
+						"Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+}
+
+SQLite_FinalizeStatement(pstmt) {
+		if !pstmt
+				return SQLiteConst.OK
+		return DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt, "Int")
+}
+
 
 
 
@@ -131,6 +143,89 @@ SQLite_Close(db) {
 		DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", db)
 }
 
+; Clone a live in-memory database into a private candidate.  Callers may mutate
+; the candidate freely and publish it only after every input has validated;
+; sqlite3_backup copies the complete schema/data image without serialising it
+; through SQL text or exposing a half-applied update to readers.
+SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
+		if !source_db
+				return 0
+
+		; `candidate` and `backup` stay owned by this function until the success
+		; flag / zeroing operation explicitly transfers or releases each handle.
+		; The optional callbacks are deterministic fault-injection seams for the
+		; ownership test; production callers use the real DllCall/SQLite_Close path.
+		candidate := 0
+		backup := 0
+		clone_succeeded := false
+		try {
+				candidate := SQLite_Open(":memory:")
+				if !candidate
+						return 0
+				main_ptr := SQLite_StrToUtf8("main", &main_buf)
+				if IsObject(before_call)
+						before_call.Call("backup_init")
+				backup := DllCall(SQLiteConst.DLL . "\sqlite3_backup_init",
+						"Ptr", candidate,
+						"Ptr", main_ptr,
+						"Ptr", source_db,
+						"Ptr", main_ptr,
+						"Ptr")
+				if !backup
+						return 0
+
+				if IsObject(before_call)
+						before_call.Call("backup_step")
+				step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_backup_step",
+						"Ptr", backup, "Int", -1, "Int")
+				if IsObject(before_call)
+						before_call.Call("backup_finish")
+				finish_rc := DllCall(SQLiteConst.DLL . "\sqlite3_backup_finish",
+						"Ptr", backup, "Int")
+				; sqlite3_backup_finish always destroys the backup object once the call
+				; returns, including when its result reports an SQLite error.
+				backup := 0
+				if (step_rc != SQLiteConst.DONE || finish_rc != SQLiteConst.OK)
+						return 0
+
+				clone_succeeded := true
+				return candidate
+		} catch as err {
+				try LoggerError("sqlite3", "In-memory database clone failed: {1}", err.Message)
+				return 0
+		} finally {
+				; A throw before the normal finish returns leaves the backup owned here.
+				; Cleanup is best-effort and must never replace the fail-closed result.
+				if backup {
+						try {
+								if IsObject(before_call)
+										before_call.Call("cleanup_finish")
+								DllCall(SQLiteConst.DLL . "\sqlite3_backup_finish",
+										"Ptr", backup, "Int")
+						} catch as cleanup_err {
+								try LoggerError("sqlite3", "In-memory database clone could not finish its failed backup: {1}", cleanup_err.Message)
+						}
+				}
+				if (candidate && !clone_succeeded) {
+						try {
+								if IsObject(close_fn)
+										close_fn.Call(candidate)
+								else
+										SQLite_Close(candidate)
+						} catch as cleanup_err {
+								try LoggerError("sqlite3", "In-memory database clone could not close its failed candidate: {1}", cleanup_err.Message)
+						}
+				}
+		}
+}
+
+SQLite_IsAutocommit(db) {
+		if !db
+				return false
+		return DllCall(SQLiteConst.DLL . "\sqlite3_get_autocommit",
+				"Ptr", db, "Int") != 0
+}
+
 SQLite_LastError(db) {
 		if !db
 				return ""
@@ -186,8 +281,7 @@ SQLite_Exec(db, sql, YieldOps := 0) {
 						; Surface the SQLite error so callers can diagnose schema mismatches
 						; rather than silently receiving an empty result set.
 						try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc={1}): {2}", rc, SQLite_LastError(db))
-						if (YieldOps > 0)
-								DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+						SQLite_ClearProgressHandler(db, YieldOps)
 						return false
 				}
 				if pstmt {
@@ -204,17 +298,28 @@ SQLite_Exec(db, sql, YieldOps := 0) {
 						; ever checked "!= ROW", so a CONSTRAINT/ERROR code was previously
 						; treated identically to a clean DONE — the row silently vanished
 						; with zero trace (F20).
-						if (step_rc != SQLiteConst.DONE)
-								try LoggerWarn("sqlite3", "sqlite3_step returned rc={1} (not DONE) — row rejected: {2}", step_rc, SQLite_LastError(db))
-						DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+						if (step_rc != SQLiteConst.DONE) {
+								try LoggerError("sqlite3", "sqlite3_step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
+								SQLite_FinalizeStatement(pstmt)
+								SQLite_ClearProgressHandler(db, YieldOps)
+								return false
+						}
+						finalize_rc := SQLite_FinalizeStatement(pstmt)
+						if (finalize_rc != SQLiteConst.OK) {
+								try LoggerError("sqlite3", "sqlite3_finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
+								SQLite_ClearProgressHandler(db, YieldOps)
+								return false
+						}
 				}
-				if (!ptail || ptail = cur)
-						break
+				if (!ptail || ptail = cur) {
+						try LoggerError("sqlite3", "sqlite3_prepare_v2 made no forward progress.")
+						SQLite_ClearProgressHandler(db, YieldOps)
+						return false
+				}
 				cur := ptail
 		}
 
-		if (YieldOps > 0)
-				DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+		SQLite_ClearProgressHandler(db, YieldOps)
 
 		return true
 }
@@ -252,8 +357,7 @@ SQLite_Query(db, sql, YieldOps := 0) {
 				"Int")
 		pstmt := NumGet(pstmt_buf, 0, "Ptr")
 		if (rc != SQLiteConst.OK || !pstmt) {
-				if (YieldOps > 0)
-						DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+				SQLite_ClearProgressHandler(db, YieldOps)
 				return out
 		}
 
@@ -297,10 +401,9 @@ SQLite_Query(db, sql, YieldOps := 0) {
 				}
 				out.Push(row)
 		}
-		DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+		SQLite_FinalizeStatement(pstmt)
 
-		if (YieldOps > 0)
-				DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+		SQLite_ClearProgressHandler(db, YieldOps)
 
 		return out
 }
@@ -379,7 +482,7 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0) {
 				if (YieldEvery > 0 && Mod(delivered, YieldEvery) = 0)
 						Sleep(-1)
 		}
-		DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+		SQLite_FinalizeStatement(pstmt)
 		if (rc != SQLiteConst.DONE && rc != SQLiteConst.ROW)
 				ok := false
 		return ok ? delivered : -1

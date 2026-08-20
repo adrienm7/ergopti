@@ -37,6 +37,14 @@
 ; the config window must beat the category default, and clearing it must fall
 ; back rather than leave the section pinned.
 TestHotstringsFull_SectionDelayBeatsCategory() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_full_precedence_overrides.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
+	HotstringsResolveBumpGen()
 	Cat := "_hsfull_precedence_probe"
 	Sec := "probe_section"
 	try {
@@ -56,8 +64,10 @@ TestHotstringsFull_SectionDelayBeatsCategory() {
 		AssertEqual(111, HotstringsResolve(Cat, Sec).Delay,
 			"clearing the section delay must fall back to the category, not stay pinned to the cleared value")
 	} finally {
-		HotstringsClearOverride(Cat, Sec)
-		HotstringsClearOverride(Cat, "")
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
 	}
 }
 Test("Hotstrings full: a per-section delay overrides the category and falls back when cleared",
@@ -439,7 +449,14 @@ Test("Hotstrings full: synthetic input is filtered by provenance, not by a time 
 ; is the single place this can be enforced, and the fallback has to be the
 ; global default rather than the bad value or zero.
 TestHSFull_BadDelayFallsBackToTheGlobalDefault() {
-	global GLOBAL_DEFAULT_DELAY
+	global GLOBAL_DEFAULT_DELAY, _HotstringsOverrides, _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_full_bad_delay_overrides.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
+	HotstringsResolveBumpGen()
 	Cat := "_hsfull_baddelay_probe"
 	try {
 		; An override cleared back to "" is exactly what the config window writes
@@ -450,7 +467,10 @@ TestHSFull_BadDelayFallsBackToTheGlobalDefault() {
 		AssertEqual(GLOBAL_DEFAULT_DELAY, HotstringsResolve(Cat).Delay,
 			"an empty delay must fall back to the global default, not resolve to 0 or to the previous value")
 	} finally {
-		HotstringsClearOverride(Cat, "")
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
 	}
 }
 Test("Hotstrings full: an empty delay falls back to the global default",

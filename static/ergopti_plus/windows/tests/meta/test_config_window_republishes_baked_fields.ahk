@@ -69,8 +69,9 @@ _CWRB_BothWritersRepublish() {
 		; the value that is about to be replaced.
 		WritePos := InStr(Body, "Hotstrings" . (InStr(FuncName, "Clear") ? "Clear" : "Set") . "Override")
 		Assert(WritePos > 0, FuncName . " must still perform the override write")
-		Assert(WritePos < RepubPos,
-			"the republish must come AFTER the write in " . FuncName . " — re-registering first would bake the value being replaced")
+		PersistedGuardPos := InStr(Body, "if Persisted")
+		Assert(WritePos < PersistedGuardPos and PersistedGuardPos < RepubPos,
+			"the republish in " . FuncName . " must run only after a strict successful persistence result — rebuilding after a refused write would publish a rejected in-memory candidate")
 	}
 }
 
@@ -103,7 +104,7 @@ _CWRB_WrittenFields() {
 	Fields := Map()
 	Pos := 1
 	while (FoundPos := RegExMatch(Src,
-		'_HCW_(?:SetOverride|ClearOverride|ArmNumericWrite)\((?:[^,]*,){0,2}\s*"([a-z_]+)"', &M, Pos)) {
+		'_HCW_(?:SetOverride|ClearOverride)(?:\.Bind)?\((?:[^,]*,){2}\s*"([a-z_]+)"', &M, Pos)) {
 		Pos := FoundPos + M.Len
 		Fields[M[1]] := true
 	}

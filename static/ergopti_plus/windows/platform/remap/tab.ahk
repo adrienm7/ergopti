@@ -54,7 +54,8 @@ _TabHoldModKey() {
 SC00F::LAlt
 SC00F::
 {
-	TapHoldSyntheticKeyDown("LAlt")
+	if !TapHoldSyntheticKeyDown("LAlt")
+		return
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
 	if tap {
 		if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") { ; LAlt physically held
@@ -63,7 +64,8 @@ SC00F::
 			; The synthetic LAlt Down armed above must always be released
 			; regardless of Suspend state; only AltTabMonitor()'s side effect
 			; is guarded.
-			TapHoldSyntheticKeyUp("LAlt")
+			if !TapHoldSyntheticKeyUp("LAlt")
+				return
 			TapHoldDispatchTap("tab", AltTabMonitor)
 		}
 	} else {
@@ -115,10 +117,12 @@ $SC00F:: {
 			LoggerDebug("TapHold", "Tab hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
 	if tap {
-		TapHoldSyntheticKeyUp(ModKey)
+		if !TapHoldSyntheticKeyUp(ModKey)
+			return
 		_TabDispatch()
 		return
 	}

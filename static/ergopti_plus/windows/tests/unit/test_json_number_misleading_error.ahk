@@ -105,3 +105,22 @@ _JNME_BareExponentThrows() {
 		"Malformed '1e' must throw a JSON-position error — got: " . Msg)
 }
 Test("JSON parser: malformed '1e' throws JSON-position error (full-regex guard)", _JNME_BareExponentThrows)
+
+_JNME_TrailingDocumentDataThrows() {
+	for Input in ['{"ok":true}garbage', "[1] [2]", "true false"] {
+		Msg := _JNME_CaptureThrowMessage(Input)
+		Assert(Msg != "", "JsonParse must reject a valid root followed by a second token: " . Input)
+		Assert(InStr(Msg, "JSON") > 0 and InStr(Msg, "position") > 0,
+			"trailing-data rejection must identify JSON and its position — got: " . Msg)
+	}
+}
+Test("JSON parser: trailing tokens after one root are rejected",
+	_JNME_TrailingDocumentDataThrows)
+
+_JNME_TrailingWhitespaceStillParses() {
+	Parsed := JsonParse('  {"ok":true} ' . "`t`r`n")
+	AssertTrue(Parsed is Map)
+	AssertTrue(Parsed["ok"])
+}
+Test("JSON parser: trailing JSON whitespace remains valid",
+	_JNME_TrailingWhitespaceStillParses)

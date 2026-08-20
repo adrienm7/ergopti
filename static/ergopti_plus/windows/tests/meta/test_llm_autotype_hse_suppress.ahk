@@ -6,15 +6,9 @@
 ; Static source guard for the llm-autotype-no-hse-suppress finding.
 ;
 ; LLM_Bridge_OnAccept (Tab-accept) and LLM_Engine_OnResults (inline auto-type)
-; both call TextSend to inject the prediction text. Without suppression, the
-; injected characters pass through the hotstring InputHook and are observed by
-; both HSE and the prefix watcher, potentially triggering a false hotstring
-; match on the appended text (e.g. if the prediction ends with a known trigger).
-;
-; The fix wraps each TextSend with PrefixWatcherSuppress(true) before and a
-; deferred PrefixWatcherSuppress(false) after (mirroring the HSE_DispatchMatch
-; pattern). HSE_HardReset and _ResetPrefixBuffer are called synchronously after
-; TextSend to clear the stale pre-prediction buffer state.
+; both call TextSend to inject the prediction text. Atomic mode uses SendInput,
+; which InputHook ignores, and commits HSE plus preview state after the OS output
+; without holding a suppression guard across the clipboard FIFO.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -58,16 +52,17 @@ _LAHS_WindowStripped(Src, Anchor) {
 _LAHS_AcceptSuppressesBefore() {
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
-	Assert(InStr(Body, "PrefixWatcherSuppress") > 0,
-		"LLM_Bridge_OnAccept must call PrefixWatcherSuppress to mute the hotstring InputHook before injecting the prediction")
+	Assert(InStr(Body, "_LLM_Bridge_InjectionOptions(Transaction)") > 0
+			and InStr(Body, "PrefixWatcherSuppress") = 0,
+		"manual acceptance must use atomic InputHook-invisible output, not queue-wide prefix suppression")
 }
 Test("llm_bridge: LLM_Bridge_OnAccept calls PrefixWatcherSuppress to suppress hotstring observation during inject (llm-autotype-no-hse-suppress)", _LAHS_AcceptSuppressesBefore)
 
 _LAHS_AcceptResetsHSE() {
-	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
-	Assert(Body != "", "_LLM_Bridge_OnInjectComplete must exist in modules/keymap/llm_bridge.ahk")
-	Assert(InStr(Body, "if !Ok") > 0 && InStr(Body, "HSE_HardReset") > 0,
-		"LLM accept must reset HSE only from the successful TextSend completion, never before async output lands")
+	Body := _DriverFuncBody("_LLM_Bridge_CommitInjectedText")
+	Assert(Body != "" and InStr(Body, "_PrefixCommitInputContext") > 0
+			and InStr(Body, "if !A_IsCritical") > 0,
+		"manual acceptance must reset HSE and preview inside the successful atomic output commit")
 }
 Test("llm_bridge: successful LLM inject completion resets HSE after output lands (llm-autotype-no-hse-suppress)", _LAHS_AcceptResetsHSE)
 
@@ -83,15 +78,17 @@ Test("llm_bridge: successful LLM inject completion resets HSE after output lands
 _LAHS_InlineAutoTypeSuppresses() {
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_exec.ahk")
-	Assert(InStr(Body, "PrefixWatcherSuppress") > 0,
-		"LLM_Engine_OnResults inline auto-type must call PrefixWatcherSuppress to mute the hotstring InputHook before TextSend")
+	Assert(InStr(Body, "_LLM_Bridge_InjectionOptions(Transaction)") > 0
+			and InStr(Body, "PrefixWatcherSuppress") = 0,
+		"inline auto-type must use atomic InputHook-invisible output, not queue-wide prefix suppression")
 }
 Test("prediction_engine: inline auto-type calls PrefixWatcherSuppress before TextSend (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeSuppresses)
 
 _LAHS_InlineAutoTypeResetsHSE() {
-	Body := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
-	Assert(Body != "", "LLM_Engine_OnInlineInjectComplete must exist in modules/llm/prediction_exec.ahk")
-	Assert(InStr(Body, "if !Ok") > 0 && InStr(Body, "HSE_HardReset") > 0,
-		"inline auto-type must reset HSE only after successful output completion")
+	Body := _DriverFuncBody("_LLM_Bridge_CommitInjectedText")
+	Complete := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
+	Assert(InStr(Body, "_PrefixCommitInputContext") > 0
+			and InStr(Complete, "HSE_HardReset") = 0,
+		"inline HSE state must commit atomically with output and never be rewritten by open-thread completion")
 }
 Test("prediction_engine: successful inline output completion resets HSE (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeResetsHSE)

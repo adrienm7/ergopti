@@ -31,12 +31,42 @@
 ; ======================================
 ; ======================================
 
+_LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
+	global _LLM_Menu, _LLM_Menu_Loaded
+	if _LLM_Menu_Loaded
+		return false
+	static _str_keys := ["model", "profile_id", "language", "temperature",
+		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
+		"api_entry_id"]
+	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
+		"ctx_chars", "pred_indent", "ollama_port"]
+	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring",
+		"reset_on_nav", "disable_url_bars", "disable_password_fields",
+		"show_info_bar", "streaming", "show_all_at_once", "auto_raise_temp",
+		"auto_profile_for_model", "onboarding_seen", "inline_autotype"]
+	static _arr_keys := ["user_profiles", "disabled_apps"]
+	for key in _str_keys
+		if saved_opts.Has(key)
+			_LLM_Menu[key] := saved_opts[key]
+	for key in _num_keys
+		if saved_opts.Has(key)
+			_LLM_Menu[key] := saved_opts[key]
+	for key in _bool_keys
+		if saved_opts.Has(key)
+			_LLM_Menu[key] := saved_opts[key]
+	for key in _arr_keys
+		if saved_opts.Has(key) && (saved_opts[key] is Array)
+			_LLM_Menu[key] := saved_opts[key]
+	return true
+}
+
 /**
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
  */
 LLM_Menu_Init(saved_opts := Map()) {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
+	global _LLM_Menu_Loaded
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 
 	; Defensive: a previous session that crashed mid-install would have
@@ -50,26 +80,18 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; (driver-baseline-priority-reverted-to-normal).
 	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 
-	static _str_keys := ["model", "profile_id", "language", "temperature", "nav_modifiers", "val_modifiers", "trigger_shortcut", "backend"]
-	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent", "ollama_port"]
-	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring", "reset_on_nav",
-		"disable_url_bars", "disable_password_fields", "show_info_bar", "streaming",
-		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model", "onboarding_seen",
-		"inline_autotype"]
-	static _arr_keys := ["user_profiles", "disabled_apps"]
-
-	for key in _str_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	for key in _num_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	for key in _bool_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	for key in _arr_keys
-		if saved_opts.Has(key) && (saved_opts[key] is Array)
-			_LLM_Menu[key] := saved_opts[key]
+	; saved_opts derives from the boot-only _IniCache snapshot. A tray rebuild
+	; calls initMenu again after live commits, so replaying that snapshot here
+	; would roll every LLM setting back in memory while disk keeps the new value.
+	; Restore persisted values exactly once; later builds use the published map.
+	FirstRestore := _LLM_Menu_RestoreSavedOptsOnce(saved_opts)
+	; Map-valued overrides are outside the scalar/array restore table. Install
+	; them before any model correction can persist a full detached candidate;
+	; otherwise an early correction would durably serialize the default empty Map
+	; over the user's application-specific profiles.
+	if FirstRestore && saved_opts.Has("app_profile_overrides")
+			&& (saved_opts["app_profile_overrides"] is Map)
+		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
 
 	; Keep Features["llm"] aligned with tray state so the deferred startup
 	; SaveFullConfig() (~500 ms) does not rewrite num_predictions (etc.) back
@@ -87,14 +109,16 @@ LLM_Menu_Init(saved_opts := Map()) {
 	if (_LLM_Menu["backend"] == "ollama")
 		LLM_Menu_EnsureModelReady()
 
-	; Restore trigger shortcut hotkey
-	if (_LLM_Menu["trigger_shortcut"] != "")
-		LLM_Menu_ApplyTriggerShortcut(_LLM_Menu["trigger_shortcut"])
-
-	; Restore per-app profile overrides Map (defaults to empty when the
-	; config never carried the field).
-	if saved_opts.Has("app_profile_overrides") and (saved_opts["app_profile_overrides"] is Map)
-		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
+	; Reconcile the native owner even for an empty string. This is essential on
+	; explicit reload and also prevents a stale live handle from surviving while
+	; the row says that the shortcut is disabled.
+	if FirstRestore {
+		TriggerReady := LLM_Menu_ApplyTriggerShortcut(
+			_LLM_Menu["trigger_shortcut"])
+		if !((TriggerReady is Integer) && TriggerReady == 1)
+			try LoggerError("LLM",
+				"Initial trigger shortcut activation remained incomplete.")
+	}
 
 	; Restore persisted remote API entries (lives in api_entries.json next to
 	; the main config.toml — kept separate because the array-of-maps shape
@@ -161,6 +185,5 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; doesn't trigger spurious rebuilds.
 	SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 
-	global _LLM_Menu_Loaded
 	_LLM_Menu_Loaded := true
 }

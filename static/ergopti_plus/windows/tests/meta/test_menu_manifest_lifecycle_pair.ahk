@@ -48,16 +48,16 @@ _MMLP_AllPostTraceFallbacksCloseLifecycle() {
 
 _MMLP_OnboardingAndLiveRebuildCloseTheirLifecycles() {
     Preload := _DriverFuncBody("_Onboarding_PreloadFromExistingConfig")
-    Rebuild := _DriverFuncBody("RebuildHotstringsLive")
+    Rebuild := _DriverFuncBody("_RebuildHotstringsLiveOnce")
 
     Assert(InStr(Preload, "LoggerTrace") > 0 && InStr(Preload, "LoggerDone") > 0,
         "Onboarding config preload must close its traced lifecycle on fallback paths")
     Assert(InStr(Rebuild, "LoggerStart") > 0 && InStr(Rebuild, "catch as e") > 0
             && InStr(Rebuild, "LoggerError") > 0 && InStr(Rebuild, "throw e") > 0,
-        "RebuildHotstringsLive must log and rethrow failures so its LoggerStart never has a silent unmatched exit")
+        "the serialized live-rebuild pass must log and rethrow failures so its LoggerStart never has a silent unmatched exit")
 }
 
 Test("menu manifest: every traced fallback closes its logger lifecycle",
     _MMLP_AllPostTraceFallbacksCloseLifecycle)
-Test("onboarding/menu: traced lifecycle failures are closed and propagated",
+Test("onboarding/menu: traced lifecycle failures are closed and propagated (menu-rebuild-lifecycle-pair)",
     _MMLP_OnboardingAndLiveRebuildCloseTheirLifecycles)

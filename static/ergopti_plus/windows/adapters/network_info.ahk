@@ -20,8 +20,9 @@
 ; from the Crypto adapter), never the raw network name.
 ;
 ; FAIL-SAFE:
-; All DllCall paths are wrapped in try/catch. Functions return null or false
-; rather than throwing when the underlying API is unavailable.
+; All DllCall paths are wrapped in try/catch. Port functions return null or
+; false, and the stateful snapshot returns typed "unknown", rather than throwing
+; when the underlying API is unavailable.
 ;
 ; Requires: Crypto
 ; ==============================================================================
@@ -44,6 +45,13 @@ global NI_WLAN_API_VERSION                    := 2
 global NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION := 7
 ; Win32 ERROR_SUCCESS
 global NI_ERROR_SUCCESS                       := 0
+
+; Tri-state WLAN observation contract. A successful enumeration with no
+; connected interface is a real disconnect; API failures are unknown and must
+; never be mistaken for a disconnect by stateful consumers.
+global NI_WIFI_STATUS_CONNECTED               := "connected"
+global NI_WIFI_STATUS_DISCONNECTED            := "disconnected"
+global NI_WIFI_STATUS_UNKNOWN                 := "unknown"
 
 ; DOT11_SSID field offsets inside WLAN_CONNECTION_ATTRIBUTES (64-bit layout)
 global NI_WLAN_OFFSET_SSID_LEN                := 520  ; uSSIDLength (UInt)
@@ -76,9 +84,9 @@ global NI_IF_OPER_STATUS_UP                   := 1
 
 ; Lifetime of one WLAN query result, in ms. The NetworkInfo port exposes the
 ; SSID and the signal strength as two independent methods, but both values come
-; out of the SAME WLAN_CONNECTION_ATTRIBUTES buffer, and every caller asks for
-; them back to back — so a stateless implementation pays two full round-trips
-; for one buffer. WlanOpenHandle is an RPC to the WLAN AutoConfig service and
+; out of the SAME WLAN_CONNECTION_ATTRIBUTES buffer. Callers may ask for them
+; back to back, so a stateless implementation pays two full round-trips for one
+; buffer. WlanOpenHandle is an RPC to the WLAN AutoConfig service and
 ; dominates the cost (measured on this machine: 9.3 ms of the 18.0 ms a keylogger
 ; tick spent querying twice, against 9.8 ms for a single query). It runs as a
 ; DllCall on the AHK script thread, which cannot be interrupted mid-flight, so a
@@ -126,7 +134,7 @@ _NI_SsidOctetsToHashInput(pBytes, len) {
 ; _NI_QueryWlan exit path so that a failed query is memoised exactly like a
 ; successful one — otherwise the most expensive case (the WLAN service not
 ; answering) would be the one re-paid on every call.
-global NI_WLAN_CACHE                          := Map()
+global NI_WLAN_CACHE                          := Map("status", NI_WIFI_STATUS_UNKNOWN)
 global NI_WLAN_CACHE_AT                       := 0
 
 ; Publishes a query result as the current cache entry and hands it back, so the
@@ -139,10 +147,11 @@ _NI_CacheWlanResult(result) {
 }
 
 
-; Queries wlanapi.dll for the first connected Wi-Fi interface. Returns a Map
-; with "ssid" (an encoding-independent hex serialisation of the raw SSID octets,
-; suitable for hashing) and "signal_pct" (integer 0-100) on success, or an
-; empty Map when no Wi-Fi adapter is connected or the API is unavailable.
+; Queries wlanapi.dll for the first connected Wi-Fi interface. Every result has
+; a typed "status": connected includes "ssid" (an encoding-independent hex
+; serialisation of the raw SSID octets) and "signal_pct" (integer 0-100),
+; disconnected means enumeration succeeded with no connected interface, and
+; unknown means the API failed or returned malformed connection attributes.
 ;
 ; Why native wlanapi rather than netsh: WScript.Shell.Exec spawns a visible
 ; cmd.exe window on every poll tick — visually disruptive and blocks input.
@@ -164,76 +173,93 @@ _NI_QueryWlan() {
         and ((A_TickCount - NI_WLAN_CACHE_AT) & 0xFFFFFFFF) < NI_WLAN_CACHE_TTL_MS)
         return NI_WLAN_CACHE
 
-    result := Map()
+    result           := Map("status", NI_WIFI_STATUS_UNKNOWN)
+    hClient          := 0
+    client_owned     := false
+    pIfaceList       := 0
+    iface_list_owned := false
 
-    hClient := 0
-    pdwNeg  := 0
-    rc := DllCall("Wlanapi\WlanOpenHandle",
-        "UInt", NI_WLAN_API_VERSION, "Ptr", 0,
-        "UInt*", &pdwNeg, "Ptr*", &hClient, "UInt")
-    if (rc != NI_ERROR_SUCCESS or hClient = 0)
-        return _NI_CacheWlanResult(result)
-
-    pIfaceList := 0
-    rc := DllCall("Wlanapi\WlanEnumInterfaces",
-        "Ptr", hClient, "Ptr", 0, "Ptr*", &pIfaceList, "UInt")
-    if (rc != NI_ERROR_SUCCESS or pIfaceList = 0) {
-        DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
-        return _NI_CacheWlanResult(result)
-    }
-
-    ; WLAN_INTERFACE_INFO_LIST: dwNumberOfItems(4) + dwIndex(4) = 8 bytes header.
-    ; Each WLAN_INTERFACE_INFO = GUID(16) + WCHAR[256](512) + isState(4) = 532 bytes.
-    nItems := NumGet(pIfaceList, 0, "UInt")
-    ; finally guarantees pIfaceList and hClient are always freed even if an
-    ; exception is thrown inside the loop body (e.g. from a bad NumGet address
-    ; or an unexpected DllCall failure that the loop body does not catch itself).
     try {
-        Loop nItems {
-            pIface := pIfaceList + 8 + (A_Index - 1) * 532
-            ; isState at offset 528 (GUID 16 + description 512). State 1 = connected.
-            if (NumGet(pIface, 528, "UInt") != 1)
-                continue
+        pdwNeg := 0
+        rc := DllCall("Wlanapi\WlanOpenHandle",
+            "UInt", NI_WLAN_API_VERSION, "Ptr", 0,
+            "UInt*", &pdwNeg, "Ptr*", &hClient, "UInt")
+        if (rc = NI_ERROR_SUCCESS and hClient != 0) {
+            client_owned := true
+            rc := DllCall("Wlanapi\WlanEnumInterfaces",
+                "Ptr", hClient, "Ptr", 0, "Ptr*", &pIfaceList, "UInt")
+            if (rc = NI_ERROR_SUCCESS and pIfaceList != 0) {
+                iface_list_owned := true
+                ; A successful enumeration starts as a proven disconnect. Seeing
+                ; a connected interface moves it back to unknown until its
+                ; attributes have been validated completely.
+                result := Map("status", NI_WIFI_STATUS_DISCONNECTED)
 
-            guid := Buffer(16, 0)
-            DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
+                ; WLAN_INTERFACE_INFO_LIST: dwNumberOfItems(4) + dwIndex(4)
+                ; = 8-byte header. Each WLAN_INTERFACE_INFO is 532 bytes.
+                nItems := NumGet(pIfaceList, 0, "UInt")
+                Loop nItems {
+                    pIface := pIfaceList + 8 + (A_Index - 1) * 532
+                    ; isState at +528. WLAN_INTERFACE_STATE_CONNECTED = 1.
+                    if (NumGet(pIface, 528, "UInt") != 1)
+                        continue
 
-            pData     := 0
-            cbData    := 0
-            valueType := 0
-            rc := DllCall("Wlanapi\WlanQueryInterface",
-                "Ptr",   hClient,
-                "Ptr",   guid,
-                "UInt",  NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION,
-                "Ptr",   0,
-                "UInt*", &cbData,
-                "Ptr*",  &pData,
-                "UInt*", &valueType,
-                "UInt")
-            ; Bounds check: WlanQueryInterface must have returned a buffer large
-            ; enough to hold the signal-quality field at +576; a truncated result
-            ; would make the +576 NumGet read past the allocation.
-            if (rc = NI_ERROR_SUCCESS and pData and cbData >= NI_WLAN_MIN_CONN_ATTR_SIZE) {
-                ssid_len := NumGet(pData, NI_WLAN_OFFSET_SSID_LEN, "UInt")
-                if (ssid_len > 0 and ssid_len <= NI_WLAN_MAX_SSID_LEN) {
-                    ; Hash the raw octets (not a UTF-8 re-decode) so the digest is
-                    ; stable for non-UTF-8 SSIDs — see _NI_SsidOctetsToHashInput.
-                    ssid       := _NI_SsidOctetsToHashInput(pData + NI_WLAN_OFFSET_SSID_DATA, ssid_len)
-                    signal_pct := NumGet(pData, NI_WLAN_OFFSET_SIGNAL_QUALITY, "UInt")
-                    if (signal_pct > 100)
-                        signal_pct := 100
-                    result["ssid"]       := ssid
-                    result["signal_pct"] := signal_pct
+                    result := Map("status", NI_WIFI_STATUS_UNKNOWN)
+                    guid := Buffer(16, 0)
+                    DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
+
+                    pData     := 0
+                    data_owned := false
+                    cbData    := 0
+                    valueType := 0
+                    try {
+                        rc := DllCall("Wlanapi\WlanQueryInterface",
+                            "Ptr",   hClient,
+                            "Ptr",   guid,
+                            "UInt",  NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION,
+                            "Ptr",   0,
+                            "UInt*", &cbData,
+                            "Ptr*",  &pData,
+                            "UInt*", &valueType,
+                            "UInt")
+                        if (rc = NI_ERROR_SUCCESS and pData)
+                            data_owned := true
+                        ; Bounds check before reading signal quality at +576.
+                        if (rc != NI_ERROR_SUCCESS or !pData
+                            or cbData < NI_WLAN_MIN_CONN_ATTR_SIZE)
+                            continue
+
+                        ssid_len := NumGet(pData, NI_WLAN_OFFSET_SSID_LEN, "UInt")
+                        if (ssid_len <= 0 or ssid_len > NI_WLAN_MAX_SSID_LEN)
+                            continue
+
+                        ; Hash the raw octets (not a UTF-8 re-decode) so the
+                        ; digest remains stable for non-UTF-8 SSIDs.
+                        ssid := _NI_SsidOctetsToHashInput(
+                            pData + NI_WLAN_OFFSET_SSID_DATA, ssid_len)
+                        signal_pct := NumGet(pData, NI_WLAN_OFFSET_SIGNAL_QUALITY, "UInt")
+                        if (signal_pct > 100)
+                            signal_pct := 100
+                        result := Map(
+                            "status",     NI_WIFI_STATUS_CONNECTED,
+                            "ssid",       ssid,
+                            "signal_pct", signal_pct
+                        )
+                        break
+                    } finally {
+                        if data_owned
+                            try DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
+                    }
                 }
             }
-            if (rc = NI_ERROR_SUCCESS and pData)
-                DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
-            if (result.Count > 0)
-                break
         }
+    } catch {
+        result := Map("status", NI_WIFI_STATUS_UNKNOWN)
     } finally {
-        DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
-        DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
+        if iface_list_owned
+            try DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
+        if client_owned
+            try DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
     }
     return _NI_CacheWlanResult(result)
 }
@@ -254,8 +280,8 @@ _NI_QueryWlan() {
 NI_GetSsidHash() {
     try {
         info := _NI_QueryWlan()
-        if (info.Count = 0)
-            return ""   ; no Wi-Fi — return empty string (null equivalent in AHK)
+        if (info.Get("status", NI_WIFI_STATUS_UNKNOWN) != NI_WIFI_STATUS_CONNECTED)
+            return ""   ; no proven Wi-Fi connection
         return CryptoSha256(info["ssid"])
     } catch {
         return ""
@@ -268,11 +294,43 @@ NI_GetSsidHash() {
 NI_GetSignalStrength() {
     try {
         info := _NI_QueryWlan()
-        if (info.Count = 0)
+        if (info.Get("status", NI_WIFI_STATUS_UNKNOWN) != NI_WIFI_STATUS_CONNECTED)
             return ""
         return info["signal_pct"]
     } catch {
         return ""
+    }
+}
+
+
+; Returns one internally consistent WLAN observation for stateful consumers.
+; Unknown is deliberately distinct from disconnected: callers must preserve
+; their last accepted state when the adapter cannot prove either outcome.
+NI_GetWifiSnapshot() {
+    try {
+        info   := _NI_QueryWlan()
+        status := info.Get("status", NI_WIFI_STATUS_UNKNOWN)
+        if (status = NI_WIFI_STATUS_DISCONNECTED)
+            return Map("status", NI_WIFI_STATUS_DISCONNECTED)
+        if (status != NI_WIFI_STATUS_CONNECTED)
+            return Map("status", NI_WIFI_STATUS_UNKNOWN)
+
+        ssid := info.Get("ssid", "")
+        signal_pct := info.Get("signal_pct", "")
+        if !(ssid is String) or ssid = "" or !(signal_pct is Number)
+            return Map("status", NI_WIFI_STATUS_UNKNOWN)
+
+        ssid_hash := CryptoSha256(ssid)
+        if !(ssid_hash is String) or ssid_hash = ""
+            return Map("status", NI_WIFI_STATUS_UNKNOWN)
+
+        return Map(
+            "status",     NI_WIFI_STATUS_CONNECTED,
+            "ssid_hash",  ssid_hash,
+            "signal_pct", signal_pct
+        )
+    } catch {
+        return Map("status", NI_WIFI_STATUS_UNKNOWN)
     }
 }
 

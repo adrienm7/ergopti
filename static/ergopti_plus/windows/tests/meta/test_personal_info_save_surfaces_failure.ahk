@@ -30,33 +30,41 @@
 
 ; ==================================================================
 ; ==================================================================
-; ======= 1/ The caller branches on the write result ===============
+; ======= 1/ Every caller branches on the transaction result =======
 ; ==================================================================
 ; ==================================================================
 
 _PISF_SaveBranchesBeforeReload() {
-	Body := _DriverFuncBody("_PiEdWeb_Save")
-	Assert(Body != "", "_PiEdWeb_Save must exist in the driver source")
+	for FunctionName in ["_PiEdWeb_Save", "ProcessUserInput"] {
+		Body := _DriverFuncBody(FunctionName)
+		Assert(Body != "", FunctionName . " must exist in the driver source")
+		Assert(InStr(Body, "InheritedCritical := A_IsCritical") > 0
+			&& InStr(Body, 'Critical("Off")') > 0,
+			FunctionName . " must defuse caller Critical before persistence, feedback and reload")
 
-	GuardPos := InStr(Body, "if !WritePersonalInfoToml")
-	Assert(GuardPos > 0,
-		"_PiEdWeb_Save must branch on WritePersonalInfoToml's result — discarding it is what turned a reported write failure back into a silent one")
+		GuardPos := InStr(Body, "if !PersonalInfoCommitValues")
+		Assert(GuardPos > 0,
+			FunctionName . " must branch on the shared admitted transaction — a direct writer call can publish RAM before durability and bypass the global terminal barrier")
+		Assert(RegExMatch(Body,
+			"PersonalInformation\s*\[[^\]]+\]\s*:=") == 0,
+			FunctionName . " must never mutate PersonalInformation directly before the transaction commits")
 
-	; Spelling-independent: the reload now routes through ReloadPreservingSuspend()
-	; so saving from this editor cannot silently un-pause the driver. The INVARIANT
-	; is unchanged — the failure branch must come before whatever reloads — and
-	; matching either spelling stops this becoming a false green after a rename.
-	ReloadPos := RegExMatch(Body, "Reload(?:PreservingSuspend)?\(")
-	Assert(ReloadPos > 0, "prerequisite: the success path still reloads so the engine rebuilds its expansions")
-	Assert(GuardPos < ReloadPos,
-		"the failure branch must come BEFORE Reload(). Reloading after a failed write re-reads the unchanged file and discards the in-memory edits — the editor window is the only place the user's values still exist at that point")
-
-	Assert(RegExMatch(Body, "if !WritePersonalInfoToml[\s\S]{0,400}?return") > 0,
-		"the failure branch must RETURN — falling through reaches the very Reload() this guards against")
-	Assert(RegExMatch(Body, "if !WritePersonalInfoToml[\s\S]{0,400}?LoggerError") > 0,
-		"the failure must be logged at ERROR level by the caller too: the writer's own line says the file could not be written, this one says the user's edits were kept and not saved")
+		ReloadPos := InStr(Body, "_EditorReloadAfterCommit(")
+		Assert(ReloadPos > 0,
+			"prerequisite: " . FunctionName . " still reloads so the engine rebuilds its expansions")
+		Assert(GuardPos < ReloadPos,
+			"the persistence guard must precede reload in " . FunctionName)
+		Assert(RegExMatch(Body,
+			"if !PersonalInfoCommitValues[\s\S]{0,700}?return") > 0,
+			FunctionName . " must return after a refused transaction")
+		Assert(RegExMatch(Body,
+			"if !PersonalInfoCommitValues[\s\S]{0,700}?LoggerError") > 0,
+			FunctionName . " must log that the typed values remain unsaved")
+		Assert(InStr(Body, "_PersonalInfoReportSaveFailure(") > 0,
+			FunctionName . " must make the failure visible to the user")
+	}
 }
-Test("meta personal-info-save: a failed write is not followed by a Reload that hides it",
+Test("meta personal-info-save: both editors use the admitted transaction and stop before reload",
 	_PISF_SaveBranchesBeforeReload)
 
 
@@ -82,3 +90,27 @@ _PISF_WriterReportsBothOutcomes() {
 }
 Test("meta personal-info-save: the writer reports both outcomes explicitly",
 	_PISF_WriterReportsBothOutcomes)
+
+_PISF_TransactionOwnsBeforeCloneAndPublishesWithReplace() {
+	Body := _DriverFuncBody("PersonalInfoCommitValues")
+	Assert(Body != "", "PersonalInfoCommitValues must exist in the driver source")
+	AcquirePos := InStr(Body, "_PersonalTomlWriteLeaseTryAcquire(")
+	ClonePos := InStr(Body, "PersonalInformation.Clone(")
+	WritePos := InStr(Body, "WritePersonalInfoToml(")
+	PublishPos := InStr(Body, "_PersonalInfoPublishCandidate.Bind(")
+	Assert(AcquirePos > 0 && ClonePos > AcquirePos,
+		"the shared/global owner must be acquired before reading mutable live identity state")
+	Assert(WritePos > ClonePos && PublishPos > WritePos,
+		"one detached candidate must flow to atomic durability and its bound live publication")
+
+	AtomicBody := _DriverFuncBody("_PersonalTomlWriteAtomic")
+	Assert(AtomicBody != "", "the atomic personal TOML publisher must exist")
+	ReplacePos := InStr(AtomicBody, "FSAtomicMoveReplace(StagePath, FilePath)")
+	LivePos := InStr(AtomicBody, "PublishFn.Call(")
+	Assert(ReplacePos > 0 && LivePos > ReplacePos,
+		"live publication must follow the durable non-Critical replace")
+	Assert(InStr(AtomicBody, "FSWriteDurable(StagePath, Content)") > 0,
+		"the private stage must be flushed before the write-through atomic replace")
+}
+Test("meta personal-info-save: ownership precedes clone and replace precedes live publication",
+	_PISF_TransactionOwnsBeforeCloneAndPublishesWithReplace)

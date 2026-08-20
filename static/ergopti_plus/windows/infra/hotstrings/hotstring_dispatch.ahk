@@ -51,25 +51,46 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 ; Specs without dispatch metadata (Replacement undefined — the unit-test
 ; path) fall through to invoking Spec.Callback for backwards
 ; compatibility with the test-only registrations.
+; Mirror one already-resolved screen edit into the longer LLM context. The
+; caller owns the Critical span which also commits the matching HSE edit, so a
+; physical character can never reach only one buffer. Both normal replacements
+; and raw callbacks route here; neither is allowed to re-derive the edit.
+_HSE_MirrorCanonicalEffectToLlm(Effect) {
+		if !A_IsCritical
+				throw Error("_HSE_MirrorCanonicalEffectToLlm requires a Critical buffer transaction.")
+		if !(IsObject(Effect) and Effect.HasOwnProp("DeleteFromEnd")
+				and Effect.HasOwnProp("InsertedText"))
+				throw Error("Canonical hotstring effect is missing DeleteFromEnd or InsertedText.")
+		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
+				and IsSet(_LLM_Bridge_ApplyBufferEdit)) {
+				if (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
+						_LLM_Bridge_ApplyBufferEdit()
+				else
+						_LLM_Bridge_ApplyBufferEdit(Effect.DeleteFromEnd, Effect.InsertedText)
+		}
+}
+
 ; Dispatch a "raw callback" hotstring (the natives migrated into the HSE: the
 ; E-circumflex deadkey and the "..." ellipsis). The callback does ALL of its own
-; conditional, variable-length sending/backspacing and returns a { Bs, Ins } effect
-; (Bs chars removed from the buffer's right, Ins appended) — or a falsy value when
-; it declined to expand. We wrap it with the same prefix-watcher suppression +
+; conditional, variable-length sending/backspacing and returns an { Ok, Bs, Ins }
+; transaction. Ok is true only after output succeeds; Bs chars are then removed
+; from the buffer's right and Ins appended. A false Ok means either a deliberate
+; decline or a contained send failure. We wrap it with the same prefix suppression +
 ; keylogger synthetic-marking the Replacement path uses, and resync HSE_Buffer from
 ; the effect so the next keystroke matches the post-expansion screen. This is what
 ; lets those two former native AHK Hotstring() registrations live in the HSE — no
 ; A_InputLevel dependency remains, so they register on the normal (and live-rebuild)
 ; path like every other section.
-_HSE_DispatchRawCallback(Spec, EndChar) {
+_HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, HSE_Buffer, HSE_MAX_BUFFER_LEN, HSE_StartIsWordBoundary
+		CommittedEffect := 0
 		if !(Spec.HasOwnProp("Callback") and Spec.Callback) {
 				return false
 		}
 		; Whether the callback actually expanded. A raw callback is allowed to DECLINE
 		; (the E-circumflex deadkey and ellipsis guards refuse in the wrong context) by
-		; returning a falsy effect or {Bs:0, Ins:""} — the caller must not then log a fire
-		; or strip the preview buffer for an expansion the user never saw.
+		; returning {Ok:false, Bs:0, Ins:""} — the caller must not then log a fire or
+		; strip the preview buffer for an expansion the user never saw.
 		Fired := false
 		; Route through PrefixWatcherSuppress when available — it delegates to
 		; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
@@ -91,7 +112,13 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 				Effect := (Spec.Callback)(EndChar)
 				; A falsy Effect means the callback declined to expand — leave the buffer
 				; (with the trigger chars still in it) untouched.
-				if (IsObject(Effect) and Effect.HasOwnProp("Bs")) {
+				if (IsObject(Effect) and Effect.HasOwnProp("Ok") and Effect.HasOwnProp("Bs")) {
+						EffectOk := Effect.Ok
+						; The raw callback owns the screen transaction, so its buffer effect is
+						; publishable only with an explicit successful Boolean verdict. This
+						; prevents a failed sender from rewriting HSE_Buffer as if output landed.
+						if !((EffectOk is Integer) and EffectOk)
+								return false
 						BufLen := StrLen(HSE_Buffer)
 						Bs  := Max(0, Min(Effect.Bs, BufLen))
 						if (Bs != Effect.Bs)
@@ -99,12 +126,29 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 						Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
 						; Deleted nothing AND inserted nothing == the callback declined.
 						Fired := (Bs > 0 or Ins != "")
-						HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
-						; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
-						; Ins can never grow the buffer unbounded or drift the boundary flag.
-						if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-								HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-								HSE_StartIsWordBoundary := false
+						if Fired {
+								_BufferCrit := Critical("On")
+								try {
+										HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
+										; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
+										; Ins can never grow the buffer unbounded or drift the boundary flag.
+										if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
+												HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
+												HSE_StartIsWordBoundary := false
+										}
+										CanonicalEffect := {
+												ClearAll: false,
+												DeleteFromEnd: Bs,
+												InsertedText: Ins,
+												EndCharEmitted: false,
+												KnownBoundaryAfter: HSE_Buffer != ""
+														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -1)) > 0
+										}
+										_HSE_MirrorCanonicalEffectToLlm(CanonicalEffect)
+										CommittedEffect := CanonicalEffect
+								} finally {
+										Critical(_BufferCrit)
+								}
 						}
 				}
 		} finally {
@@ -120,13 +164,115 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 				; HSE_Suppressed balanced. The PrefixWatcherSuppress path handles both the
 				; prefix-watcher counter and HSE_Suppressed in one call.
 				if IsSet(PrefixWatcherSuppress) {
-						SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						if Fired
+								SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						else
+								PrefixWatcherSuppress(false)
 				} else {
-						SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						if Fired
+								SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						else
+								HSE_Suppress(false)
 				}
-				SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				if Fired
+						SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				else
+						KL_ClearSynthetic()
 		}
 		return Fired
+}
+
+; Resolve every dispatch gate into one immutable decision shared by the preview
+; and the fire path. Keeping time, casing and callable resolution below in one
+; owner prevents a tooltip from advertising a matcher winner that dispatch will
+; subsequently refuse — or from showing one dynamic value and resolving another
+; after the user presses the completion key.
+; @param FrozenResolvedBase Optional value captured by a decision that is still
+;   visibly presented. When supplied, the callable is not invoked a second time.
+; @return Canonical decision object, or "" when dispatch must decline.
+_HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
+		TypoNbspStripped := false, FrozenResolvedBase := unset) {
+		global LastSentCharacterKeyTime
+		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
+				return ""
+		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
+				return ""
+
+		GateOriginTick := 0
+		GateDurationMs := 0
+		RemainingMs := 0
+		if Spec.HasOwnProp("TimeActivationSeconds")
+				and Spec.TimeActivationSeconds > 0 {
+				if !Spec.HasOwnProp("PrevCharKey") or !IsSet(LastSentCharacterKeyTime)
+						or !(LastSentCharacterKeyTime is Map)
+						return ""
+				PrevKey := Spec.PrevCharKey
+				if (Spec.HasOwnProp("CaseConform") and Spec.CaseConform) {
+						CompletionStripLen := StrLen(EndChar) + (TypoNbspStripped ? 1 : 0)
+						TriggerStart := StrLen(BufferAfterCompletion)
+								- CompletionStripLen - Spec.Length + 1
+						TypedPrev := TriggerStart >= 1
+								? SubStr(BufferAfterCompletion, TriggerStart + Spec.Length - 2, 1)
+								: ""
+						if (TypedPrev != "")
+								PrevKey := TypedPrev
+				}
+				if !LastSentCharacterKeyTime.Has(PrevKey)
+						return ""
+				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
+				GateDurationMs := Round(Spec.TimeActivationSeconds * 1000)
+				ElapsedMs := TickElapsed(GateOriginTick)
+				; Preserve the engine's existing strict comparison: equality is the last
+				; fireable instant. The renderer separately refuses RemainingMs == 0 so
+				; it never paints a promise with no usable interaction window.
+				if (ElapsedMs > GateDurationMs)
+						return ""
+				RemainingMs := Max(0, GateDurationMs - ElapsedMs)
+		}
+
+		if IsSet(FrozenResolvedBase) {
+				ResolvedBase := FrozenResolvedBase
+		} else {
+				ResolvedBase := Spec.Replacement
+				if HasMethod(ResolvedBase) {
+						try ResolvedBase := ResolvedBase.Call()
+						catch as Err {
+						try LoggerError("HSE", "Resolving a dynamic replacement failed; exception detail withheld.")
+								return ""
+						}
+				}
+		}
+		if !(ResolvedBase is String) {
+				try LoggerError("HSE", "A hotstring replacement resolved to '{1}', not String; dispatch declined.", Type(ResolvedBase))
+				return ""
+		}
+
+		IsConform := Spec.HasOwnProp("CaseConform") and Spec.CaseConform
+		Replacement := ResolvedBase
+		if IsConform {
+				CompletionStripLen := StrLen(EndChar) + (TypoNbspStripped ? 1 : 0)
+				TriggerStart := StrLen(BufferAfterCompletion)
+						- CompletionStripLen - Spec.Length + 1
+				if (TriggerStart < 1)
+						return ""
+				TypedTrigger := SubStr(BufferAfterCompletion, TriggerStart, Spec.Length)
+				DoFire := true
+				Replacement := _HSE_ConformReplacement(ResolvedBase, TypedTrigger, Spec.Trigger,
+						(Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
+				if !DoFire
+						return ""
+		}
+
+		return {
+				Spec: Spec,
+				ResolvedBase: ResolvedBase,
+				Replacement: Replacement,
+				OnlyText: Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true,
+				IsConform: IsConform,
+				GateOriginTick: GateOriginTick,
+				GateDurationMs: GateDurationMs,
+				RemainingMs: RemainingMs
+		}
 }
 
 ; Returns TRUE when the match actually produced an expansion, FALSE when it declined
@@ -134,8 +280,10 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 ; conform verdict). Callers use this to decide whether a fire really happened: logging
 ; a fire — or stripping the preview buffer — for a decline reports an expansion the
 ; user never saw.
-HSE_DispatchMatch(Spec, EndChar) {
+HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
+		ForceConsumeEndChar := false) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
+		CommittedEffect := 0
 		if (Spec == "") {
 				return false
 		}
@@ -145,70 +293,34 @@ HSE_DispatchMatch(Spec, EndChar) {
 		; trigger the callback may have left in place.
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
 				; Propagate the callback's own verdict: it alone knows whether it expanded.
-				return _HSE_DispatchRawCallback(Spec, EndChar)
+				return _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect)
 		}
 		if !Spec.HasOwnProp("Replacement") {
-				Invoked := false
 				if Spec.HasOwnProp("Callback") and Spec.Callback {
-						try (Spec.Callback)(EndChar)
-						Invoked := true
+						try return _SendVerdictSucceeded((Spec.Callback)(EndChar))
 				}
-				return Invoked
+				return false
 		}
 
-		; Time-activation gate: refuse to fire when the previous character
-		; was emitted too long ago. Mirrors IsTimeActivationExpired so
-		; cascading hotstrings inherit the same protection they had under
-		; the AHK-native engine.
-		if Spec.HasOwnProp("TimeActivationSeconds")
-				and Spec.TimeActivationSeconds > 0
-				and Spec.HasOwnProp("PrevCharKey") {
-				; The gate keys off LastSentCharacterKeyTime, which UpdateLastSentCharacter
-				; stores by the char AS TYPED (so an UPPER "T" and a lowercase "t" are
-				; distinct entries). A case-conform spec carries the LOWERCASE canonical
-				; PrevCharKey, but the user may have typed the trigger in UPPER/Title — then
-				; the lowercase key-time is never refreshed and the activation wrongly
-				; expires (the "UPPER ct★ fires a few times then stops" regression from
-				; collapsing the per-case variants). For a conform spec read the prev char
-				; AS TYPED from the buffer (the char before the 1-char magic key, mirroring
-				; PrevCharKey = SubStr(Abbreviation, -2, 1)) so the lookup hits the right
-				; cased entry. Non-conform specs keep their precomputed per-case PrevCharKey.
-				PrevKey := Spec.PrevCharKey
-				if (Spec.HasOwnProp("CaseConform") and Spec.CaseConform) {
-						TypedPrev := SubStr(HSE_Buffer, -2, 1)
-						if (TypedPrev != "") {
-								PrevKey := TypedPrev
-						}
-				}
-				if IsTimeActivationExpired(PrevKey, Spec.TimeActivationSeconds) {
-						return false
-				}
-		}
+		; If the currently visible row owns a resolved dynamic value, claim it only
+		; when its registry identity and exact input context still match. Preflight
+		; then rechecks the live time/case gates while reusing that shown value.
+		VisibleDecision := 0
+		if IsSet(HotstringPrefixWatcherClaimVisibleDecision)
+				try VisibleDecision := HotstringPrefixWatcherClaimVisibleDecision(
+						Spec, EndChar, HSE_Buffer)
+		Prepared := IsObject(VisibleDecision)
+				? _HSE_PrepareDispatchDecision(Spec, HSE_Buffer, EndChar,
+						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase)
+				: _HSE_PrepareDispatchDecision(
+						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped)
+		if !IsObject(Prepared)
+				return false
+		IsConform := Prepared.IsConform
+		Replacement := Prepared.Replacement
+		OnlyText := Prepared.OnlyText
 
-		; ── Case-conform gate ───────────────────────────────────────────────────
-		; For a conform spec (registered case-insensitively by CreateCaseSensitiveHotstrings
-		; in place of explicit lower/UPPER/Title variants), resolve the output casing
-		; from the trigger as it was actually typed — the last Spec.Length chars still
-		; sitting in HSE_Buffer (conform specs are always star triggers, EndChar == "",
-		; so no end-char/nbsp offset is involved). Doing this BEFORE we take the
-		; suppress/synthetic locks means a "mixed case → do not fire" verdict is a clean
-		; early return with no lock state to unwind, exactly matching the old behaviour
-		; where no spec was ever registered for a mixed-case trigger.
-		IsConform := Spec.HasOwnProp("CaseConform") and Spec.CaseConform
-		ConformedRepl := ""
-		if IsConform {
-				ResolvedRepl := Spec.Replacement
-				if HasMethod(ResolvedRepl)
-						ResolvedRepl := ResolvedRepl()
-				TypedTrigger := SubStr(HSE_Buffer, -Spec.Length)
-				DoFire := true
-				ConformedRepl := _HSE_ConformReplacement(ResolvedRepl, TypedTrigger, Spec.Trigger,
-						(Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
-				if !DoFire {
-						return false
-				}
-		}
-
+		Fired := false
 		; Route through PrefixWatcherSuppress when available — it delegates to
 		; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
 		; HSE_Suppressed balanced at depth 1. The direct HSE_Suppress(true) path is
@@ -245,28 +357,41 @@ HSE_DispatchMatch(Spec, EndChar) {
 						; the hook chain synchronously. SendInput injects directly into the
 						; kernel input queue, clears the stuck AltGr state before the burst,
 						; and returns immediately — consistent with the SendInput burst below.
-						SendInput("{SC138 Up}")
+						AltGrReleased := false
+						try {
+								if _SendHook {
+										Hook := _SendHook
+										AltGrReleased := _SendVerdictSucceeded(Hook("SendFinalResult", "{SC138 Up}", false))
+								} else {
+										SendInput("{SC138 Up}")
+										AltGrReleased := true
+								}
+						} catch as Err {
+								try LoggerError("HSE", "AltGr release injection failed: {1}", Err.Message)
+						}
+						if !AltGrReleased
+								return false
 				}
 
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
 				BSCount := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
-				; For a conform spec the replacement was already resolved + cased by the
-				; case-conform gate above; otherwise take it straight from the Spec.
-				Replacement := IsConform ? ConformedRepl : Spec.Replacement
-				; Allow a non-conform Replacement to be a callable — resolved at fire time
-				; so dynamic values (dates, live data) are computed on each keystroke.
-				if (!IsConform and HasMethod(Replacement))
-						Replacement := Replacement()
-				OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
+				; Replacement, casing and OnlyText were frozen by the shared decision
+				; preflight above. Never resolve a callable again here: when the tooltip
+				; supplied the visible decision, this exact value is what it promised.
 				; (KLHook global removed)
 				IsNotepadApp := false
-				try {
-						exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
-						IsNotepadApp := (exe = "notepad.exe")
-				}
-				SentBurst := ""   ; exactly what we injected — captured for the fire-trace
+					try {
+							exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+							IsNotepadApp := (exe = "notepad.exe")
+					}
+					; The clipboard route can only paste literal text. A Send-key payload such
+					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
+					; pasting it would silently put the five characters "{Left}" on screen.
+					; Reuse the normal atomic SendInput branch for those entries.
+					IsNotepadApp := IsNotepadApp and OnlyText
+					SentBurst := ""   ; exactly what we injected — captured for the fire-trace
 
 				if IsNotepadApp {
 						; Windows-11 Notepad mis-handles SendInput-injected hotstrings, so the
@@ -276,15 +401,18 @@ HSE_DispatchMatch(Spec, EndChar) {
 						; Mirror the atomic branch's consumed-delimiter guard so a space
 						; (or any other consumed end-char) is not re-injected after the
 						; clipboard paste — same contract as the SendInput path.
-						EndCharEmitted := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+						EndCharEmitted := (EndChar != "" and !ForceConsumeEndChar
+								and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 						_NpCrit := Critical("On")
 						try {
 								; BackSpaceSeq is a control sequence, not emitted text. The actual
 								; last character is recorded explicitly below after the atomic paste.
-								SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)
+								Fired := SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)
 						} finally {
 								Critical(_NpCrit)
 						}
+						if !Fired
+								return false
 						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
 						SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
 				} else {
@@ -303,7 +431,8 @@ HSE_DispatchMatch(Spec, EndChar) {
 						ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
 						; Consume the end-char when it is explicitly listed as consumed —
 						; otherwise always re-inject it so the user sees what they typed.
-						EndCharPart := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+						EndCharPart := (EndChar != "" and !ForceConsumeEndChar
+								and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 						Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 						; Critical so AHK cannot start the next physical key's layout-remap
 						; SendEvent thread between issuing this burst and it draining — keeping
@@ -313,18 +442,30 @@ HSE_DispatchMatch(Spec, EndChar) {
 						; hold. Route through _SendHook when present (test harness) so the entire
 						; atomic burst is recorded and assertions can inspect it; in production
 						; _SendHook is unset and SendInput fires directly.
+						SendError := ""
 						_AtCrit := Critical("On")
 						try {
 								if _SendHook {
 										Hook := _SendHook
-										Hook("SendFinalResult", Burst, false)
+										Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
 								} else {
 										SendInput(Burst)
+										Fired := true
 								}
+						} catch as Err {
+								SendError := Err.Message
 						} finally {
 								Critical(_AtCrit)
 						}
-						UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
+						if !Fired {
+								if SendError != ""
+										try LoggerError("HSE", "Atomic expansion injection failed: {1}", SendError)
+								return false
+						}
+						if OnlyText
+								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
+						else
+								_LSCResetFrom([])
 						SentBurst := Burst
 				}
 
@@ -353,31 +494,49 @@ HSE_DispatchMatch(Spec, EndChar) {
 						}
 				}
 
-				; Mirror the post-expansion screen state into the buffer so the
-				; next keystroke matches against the right context. Done while
-				; suppression is still active so the SetTimer release does not
-				; race with us.
-				HSE_ApplyExpansion(Spec, Replacement, EndChar)
+					; The engine computes the one canonical screen edit, including consumed
+					; delimiters and a stripped typographic nbsp. Apply that SAME immutable
+					; edit to the longer LLM context instead of asking the bridge to predict
+					; the effect again. Keep both state commits in one short Critical span so
+					; a physical OnChar cannot land between the two buffers.
+					_BufferCrit := Critical("On")
+					try {
+							ExpansionEffect := HSE_ApplyExpansion(
+									Spec, Replacement, EndChar, ForceConsumeEndChar)
+							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
+							CommittedEffect := ExpansionEffect
+					} finally {
+							Critical(_BufferCrit)
+					}
 		} finally {
 				; Reset the prefix watcher buffer synchronously so the post-expansion
 				; state is immediately clean. This must happen before the deferred
 				; Suppress(false) fires so that PrefixWatcherSuppress(false) does not
 				; find a stale buffer and clear it 60 ms later — which would erase the
 				; first keystrokes of the next word if the user types quickly.
-				if IsSet(_ResetPrefixBuffer) {
+				if (Fired and IsSet(_ResetPrefixBuffer)) {
 						try _ResetPrefixBuffer(true)
 				}
 				; Release via the same path used to suppress — a single matched pair keeps
 				; HSE_Suppressed balanced. The PrefixWatcherSuppress path handles both the
 				; prefix-watcher counter and HSE_Suppressed in one call.
 				if IsSet(PrefixWatcherSuppress) {
-						SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						if Fired
+								SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						else
+								PrefixWatcherSuppress(false)
 				} else {
-						SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						if Fired
+								SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						else
+								HSE_Suppress(false)
 				}
 				; Release the synthetic flag on the same flush window as the suppression
 				; — clearing inline would let trailing replacement keystrokes look manual.
-				SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				if Fired
+						SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				else
+						KL_ClearSynthetic()
 		}
 		; Reached only when the replacement was actually emitted.
 		return true

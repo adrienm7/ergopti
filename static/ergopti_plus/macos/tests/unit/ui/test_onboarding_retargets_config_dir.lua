@@ -200,6 +200,23 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 	local function fresh_menu_paths()
 		package.loaded["ui.menu.menu_paths"] = nil
 		package.loaded["infra.config_paths"] = nil
+		local saved_file_system = package.loaded["adapters.file_system"]
+		local bootstrap_content = nil
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function()
+				if bootstrap_content == nil then return nil, "absent" end
+				return bootstrap_content, "ok"
+			end,
+			create_if_absent = function(_, content)
+				if bootstrap_content ~= nil then return false, "exists" end
+				bootstrap_content = content
+				return true, "created"
+			end,
+			write_if_unchanged = function(_, content)
+				bootstrap_content = content
+				return true
+			end,
+		}
 		local MP = helpers.load_with_stubs("ui.menu.menu_paths", {
 			fs = {
 				-- Report every directory as already present so ensure_dir does no
@@ -209,7 +226,10 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 				currentDir = function() return "/" end,
 			},
 		})
-		MP.init(make_real_base_dir(), function() end)
+		local initialized = MP.init(make_real_base_dir(), function() end)
+		package.loaded["adapters.file_system"] = saved_file_system
+		helpers.assert_eq(initialized, true,
+			"the real menu_paths fixture must commit its bootstrap before retargeting")
 		return MP
 	end
 

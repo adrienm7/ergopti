@@ -70,14 +70,23 @@ _NTNC_CheckAggStillCleared() {
 }
 
 _NTNC_CheckReplayRunsOnlyOnColdBuild() {
-	Body := _DriverFuncBody("KLR_BuildDatabase")
-	Assert(Body != "", "KLR_BuildDatabase must be present")
-	ColdPos := InStr(Body, "replayed := KLR_RebuildWalkerAggregates(db)")
-	Assert(ColdPos > 0, "cold database construction must replay walker-owned metrics from raw events")
-	WarmPos := InStr(Body, "if KLRCache.db")
-	WarmBranch := SubStr(Body, WarmPos, 900)
-	Assert(!InStr(WarmBranch, "KLR_RebuildWalkerAggregates(KLRCache.db)"),
-		"warm refresh must retain existing walker aggregates instead of replaying all history")
+	BuildBody := _DriverFuncBody("KLR_BuildDatabase")
+	ColdBody := _DriverFuncBody("KLR_BuildColdCandidate")
+	Assert(BuildBody != "", "KLR_BuildDatabase must be present")
+	Assert(ColdBody != "", "KLR_BuildColdCandidate must be present")
+	Assert(InStr(BuildBody, "KLR_BuildColdCandidate") > 0,
+		"cold database construction must route through the private candidate helper")
+
+	ClearPos := InStr(ColdBody, "KLR_ClearAggregates(db)")
+	SqlRebuildPos := InStr(ColdBody, "KLR_RebuildAggregates(db)")
+	WalkerReplayPos := InStr(ColdBody,
+		"replayed := KLR_RebuildWalkerAggregates(db)")
+	Assert(ClearPos > 0 && SqlRebuildPos > ClearPos
+			&& WalkerReplayPos > SqlRebuildPos,
+		"the cold candidate must clear stale rows, rebuild SQL aggregates, then replay walker-owned metrics")
+	Assert(!InStr(BuildBody, "KLR_RebuildWalkerAggregates(KLRCache.db)")
+			&& !InStr(BuildBody, "KLR_RebuildWalkerAggregates(candidate)"),
+		"warm refresh handles must retain walker aggregates instead of replaying all history")
 }
 
 

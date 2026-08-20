@@ -216,11 +216,17 @@ Test("hotstrings: the IsPrivate registration option reaches the Spec (personal-i
 ; a fix applied only at the sink, or only at the funnel, gets wrong.
 _HFLP_QueueAndDrainCarryTheFlag() {
 	global _HSE_FireLogQueue, _HSE_FireLogScheduled, _HFLP_IBAN, _HFLP_TRIGGER
+	global _HSE_FireLogScheduledGeneration, _HSE_FireLogTimer
+	global _PrefixDeferredGeneration
 	PrevQueue := _HSE_FireLogQueue
 	PrevScheduled := _HSE_FireLogScheduled
+	PrevScheduledGeneration := _HSE_FireLogScheduledGeneration
+	PrevTimer := _HSE_FireLogTimer
 	_HSE_FireLogQueue := []
 	; Declared already armed so this leaves no live timer behind in the runner.
 	_HSE_FireLogScheduled := true
+	_HSE_FireLogScheduledGeneration := _PrefixDeferredGeneration
+	_HSE_FireLogTimer := 0
 	try {
 		_HSE_QueueFireLog(_HFLP_TRIGGER, _HFLP_IBAN, "personal", "dynamic", "personal_info", true)
 		AssertEqual(1, _HSE_FireLogQueue.Length, "the fire must reach the queue at all")
@@ -236,6 +242,8 @@ _HFLP_QueueAndDrainCarryTheFlag() {
 	} finally {
 		_HSE_FireLogQueue := PrevQueue
 		_HSE_FireLogScheduled := PrevScheduled
+		_HSE_FireLogScheduledGeneration := PrevScheduledGeneration
+		_HSE_FireLogTimer := PrevTimer
 	}
 }
 Test("hotstrings: the fire-log queue and drain carry the privacy flag to the sink (personal-info-fire-log-leak)",

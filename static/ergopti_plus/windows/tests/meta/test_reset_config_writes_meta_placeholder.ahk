@@ -46,33 +46,40 @@ _RCMP_ReloadBody() {
 
 _RCMP_WritesMetaPlaceholder() {
 	Body := _RCMP_ReloadBody()
+	Helper := _DriverFuncBody("_ConfigResetTransitionTargets")
 	Assert(Body != "", "ReloadWithDefaultConfig must be defined in infra/config_io.ahk")
-
-	Assert(InStr(Body, "FileDelete(") > 0,
-		"ReloadWithDefaultConfig must delete the stale config files on reset")
-
-	Assert(InStr(Body, "[_meta]") > 0,
+	Assert(Helper != "", "the reset target builder must exist")
+	Assert(InStr(Helper, "ConfigTransitionPresentTarget(ConfigPath") > 0,
+		"config.toml must be a present target in the reset WAL")
+	Assert(InStr(Helper, "[_meta]") > 0,
 		"ReloadWithDefaultConfig must write a '[_meta]' placeholder so Onboarding_Run's FileExist(ConfigurationFile) gate stays satisfied and the first-run wizard stays closed after a reset")
-
-	Assert(InStr(Body, "schema_version") > 0,
+	Assert(InStr(Helper, "schema_version") > 0,
 		"the '[_meta]' placeholder must carry a schema_version so the reloaded config parses as a valid v2 config instead of an empty stub")
+	Assert(InStr(Body, "ConfigTransitionCommitOwned(") > 0
+		&& InStr(Body,
+			'ConfigTransitionResultIs(CommitResult, "committed_new")') > 0,
+		"the complete placeholder intention must commit strictly before Reload")
 }
 Test("reset_config: ReloadWithDefaultConfig writes a [_meta] placeholder config", _RCMP_WritesMetaPlaceholder)
 
 
 _RCMP_PlaceholderAfterDeleteBeforeReload() {
 	Body := _RCMP_ReloadBody()
+	Helper := _DriverFuncBody("_ConfigResetTransitionTargets")
 	Assert(Body != "", "ReloadWithDefaultConfig must be defined in infra/config_io.ahk")
-
-	IdxDelete := InStr(Body, "FileDelete(")
-	IdxMeta   := InStr(Body, "[_meta]")
-	; The function is literally named ReloadWithDefaultConfig, so a bare "Reload"
-	; also matches its own signature at position 1 -- search for the trailing
-	; Reload statement starting AFTER the placeholder write instead
-	IdxReload := InStr(Body, "Reload", , IdxMeta)
-
-	Assert(IdxDelete > 0 and IdxMeta > 0 and IdxReload > 0 and IdxDelete < IdxMeta and IdxMeta < IdxReload,
-		"ReloadWithDefaultConfig must write the '[_meta]' placeholder AFTER FileDelete and BEFORE Reload -- writing it before the delete would be clobbered, and a missing or late write lets the deleted config.toml re-trigger the onboarding wizard")
+	Assert(Helper != "")
+	IdxPresent := InStr(Helper, "ConfigTransitionPresentTarget(ConfigPath")
+	IdxTapHold := InStr(Helper, "ConfigTransitionAbsentTarget(TapHoldPath)")
+	IdxApi := InStr(Helper, "ConfigTransitionAbsentTarget(ApiEntriesPath)")
+	IdxBuild := InStr(Body, "_ConfigResetTransitionTargets(")
+	IdxCommit := InStr(Body, "ConfigTransitionCommitOwned(")
+	IdxReload := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
+	Assert(IdxPresent > 0 && IdxTapHold > IdxPresent && IdxApi > IdxTapHold,
+		"reset targets must declare placeholder first and both absent siblings after it")
+	Assert(IdxBuild > 0 && IdxCommit > IdxBuild && IdxReload > IdxCommit,
+		"one WAL must publish every reset intention before Reload")
+	Assert(InStr(Body, "FileDelete(") == 0 && InStr(Body, "FSAppend(") == 0,
+		"no raw mutation may escape the all-old/all-new transition")
 }
 Test("reset_config: the [_meta] placeholder is written after the delete and before Reload", _RCMP_PlaceholderAfterDeleteBeforeReload)
 

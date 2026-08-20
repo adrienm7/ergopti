@@ -96,11 +96,24 @@ _LLM_MenuApiEntryGet(Entry, Key, Default := "") {
 }
 
 _LLM_Menu_SelectApiEntry(Entry) {
-	global _LLM_Menu
-	_LLM_Menu["api_entry_id"] := _LLM_MenuApiEntryGet(Entry, "Id", "")
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	EntryId := _LLM_MenuApiEntryGet(Entry, "Id", "")
+	if !(EntryId is String) || EntryId == ""
+		return false
+	return LLM_Menu_CommitMutation("the active LLM API entry",
+		(Candidate) => _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId),
+		_LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId) {
+	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+		return false
+	for Entry in Candidate["api_entries"] {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
+			Candidate["api_entry_id"] := EntryId
+			return true
+		}
+	}
+	return false
 }
 
 
@@ -119,6 +132,12 @@ _LLM_Menu_SelectApiEntry(Entry) {
 ; so it works on the AHK v2 baseline with no custom Gui — same UX as the
 ; existing single-field prompts the menu already uses.
 _LLM_Menu_PromptApiEntry(EditId) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _LLM_Menu_PromptApiEntry(EditId)
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu, LLM_API_PROVIDERS
 	existing := ""
 	if (EditId != "") {
@@ -200,22 +219,13 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		"Token",    new_token,
 		"Model",    new_model
 	)
-	if (existing != "") {
-		idx := 0
-		for i, e in _LLM_Menu["api_entries"] {
-			if (_LLM_MenuApiEntryGet(e, "Id", "") == _LLM_MenuApiEntryGet(existing, "Id", "")) {
-				idx := i
-				break
-			}
-		}
-		if (idx > 0)
-			_LLM_Menu["api_entries"][idx] := new_entry
-	} else {
-		_LLM_Menu["api_entries"].Push(new_entry)
-		_LLM_Menu["api_entry_id"] := new_entry["Id"]
-	}
-	_LLM_Menu_PersistApiEntries()
-	LLM_Menu_SaveConfig()
+	Committed := LLM_Menu_CommitApiEntriesMutation(
+		(existing != "") ? "the LLM API-entry edit"
+			: "the LLM API-entry creation",
+		(Candidate) => _LLM_Menu_UpsertApiEntryCandidate(Candidate,
+			new_entry, EditId), _LLM_Menu_ApplyStandardCommitted)
+	if !Committed
+		return false
 
 	; Token validation: hit the provider's /models endpoint once with the
 	; freshly-saved credentials so the user finds out NOW (with an explicit
@@ -227,9 +237,30 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; the save path returns immediately and the result is surfaced from the
 	; poll callback once it resolves.
 	try LLM_RemoteIsReady_Async(new_entry, _LLM_Menu_MakeApiValidationHandler(new_name))
+	return true
+}
 
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+_LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
+	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+			|| !(NewEntry is Map) || !NewEntry.Has("Id")
+		return false
+	if EditId != "" {
+		for Index, Entry in Candidate["api_entries"] {
+			if _LLM_MenuApiEntryGet(Entry, "Id", "") == EditId {
+				Candidate["api_entries"][Index] := LLM_Menu_DeepClone(NewEntry)
+				Candidate["api_entry_id"] := NewEntry["Id"]
+				return true
+			}
+		}
+		return false
+	}
+	for Entry in Candidate["api_entries"] {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") == NewEntry["Id"]
+			return false
+	}
+	Candidate["api_entries"].Push(LLM_Menu_DeepClone(NewEntry))
+	Candidate["api_entry_id"] := NewEntry["Id"]
+	return true
 }
 
 ; Builds the async validation callback for an API save. Captured ``Name`` is
@@ -251,6 +282,12 @@ _LLM_Menu_OnApiValidationDone(reachable, Name) {
 }
 
 _LLM_Menu_RemoveActiveApiEntry() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _LLM_Menu_RemoveActiveApiEntry()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	active_id := _LLM_Menu["api_entry_id"]
 	if (active_id == "")
@@ -273,19 +310,30 @@ _LLM_Menu_RemoveActiveApiEntry() {
 	)
 	if (confirm != "Yes")
 		return
-	kept := []
-	for e in _LLM_Menu["api_entries"] {
-		if (_LLM_MenuApiEntryGet(e, "Id", "") != active_id)
-			kept.Push(e)
+	return LLM_Menu_CommitApiEntriesMutation("the LLM API-entry removal",
+		(Candidate) => _LLM_Menu_RemoveApiEntryCandidate(Candidate, active_id),
+		_LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
+	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+		return false
+	Kept := []
+	Removed := false
+	for Entry in Candidate["api_entries"] {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
+			Removed := true
+			continue
+		}
+		Kept.Push(Entry)
 	}
-	_LLM_Menu["api_entries"] := kept
-	_LLM_Menu["api_entry_id"] := (kept.Length > 0)
-		? _LLM_MenuApiEntryGet(kept[1], "Id", "")
+	if !Removed
+		return false
+	Candidate["api_entries"] := Kept
+	Candidate["api_entry_id"] := (Kept.Length > 0)
+		? _LLM_MenuApiEntryGet(Kept[1], "Id", "")
 		: ""
-	_LLM_Menu_PersistApiEntries()
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return true
 }
 
 ; Heuristic: does the active model name suggest a built-in chain-of-thought
@@ -390,33 +438,65 @@ _LLM_Menu_LoadApiEntries() {
 	_LLM_Menu["api_entry_id"] := active
 }
 
-; Write api_entries.json. Called from every CRUD action so the file always
-; reflects the in-memory state. The serialiser only handles the six string
-; fields the dialog writes, which is the entire schema by construction.
-_LLM_Menu_PersistApiEntries() {
-	global _LLM_Menu
-	path := _LLM_Menu_ApiEntriesPath()
-	if (path == "")
-		return
-	entries := _LLM_Menu["api_entries"]
-	if (Type(entries) != "Array")
-		entries := []
+; Builds the exact api_entries.json image for a detached menu candidate. Token
+; encryption therefore happens before the WAL captures either new target; no
+; CRUD action ever writes this sibling store independently of config.toml.
+_LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
+	if !(MenuState is Map) || !MenuState.Has("api_entries")
+			|| !(MenuState["api_entries"] is Array)
+		return false
+	entries := MenuState["api_entries"]
 	lines := []
 	for e in entries {
 		fields := []
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
 			val := _LLM_MenuApiEntryGet(e, field, "")
-			; Encrypt the token via DPAPI before writing. The encrypted
-			; blob is base64-prefixed with ``dpapi:`` so the loader can
-			; detect it; legacy plaintext entries get encrypted on the
-			; first save after this build lands.
-			if (field == "Token" and val != "")
-				val := LLM_ApiToken_Encrypt(val)
+			if !(val is String)
+				return false
+			if (field == "Token" and val != "") {
+				val := HasMethod(EncryptFn, "Call")
+					? EncryptFn.Call(val) : LLM_ApiToken_Encrypt(val)
+				if !(val is String)
+					return false
+			}
 			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}
 		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
 	}
-	body := "[" . _LLM_MenuJoin(lines, ",`n  ") . "]"
+	return "[" . _LLM_MenuJoin(lines, ",`n  ") . "]"
+}
+
+; Legacy one-file seam retained for focused serializer/write tests only. User
+; CRUD actions must use LLM_Menu_CommitApiEntriesMutation so config.toml and
+; api_entries.json cannot split. Unlike the former best-effort writer, every
+; failure now has a strict false result.
+_LLM_Menu_PersistApiEntries(MenuState := 0, WriterFn := 0) {
+	PreviousCritical := Critical("Off")
+	try return _LLM_Menu_PersistApiEntriesNonCritical(MenuState, WriterFn)
+	finally Critical(PreviousCritical)
+}
+
+_LLM_Menu_PersistApiEntriesNonCritical(MenuState, WriterFn) {
+	global _LLM_Menu
+	if !(MenuState is Map)
+		MenuState := _LLM_Menu
+	path := _LLM_Menu_ApiEntriesPath()
+	if (path == "")
+		return false
+	body := _LLM_Menu_SerializeApiEntries(MenuState)
+	if !(body is String)
+		return false
+	if HasMethod(WriterFn, "Call") {
+		try Written := WriterFn.Call(path, body)
+		catch as e {
+			try LoggerError("LLM", "Failed to persist API entries to '{1}': {2}", path, e.Message)
+			return false
+		}
+		if (Written is Integer) && Written == 1
+			return true
+		try LoggerError("LLM", "Failed to persist API entries to '{1}': the writer refused the image.", path)
+		return false
+	}
 	; Ensure the parent directory exists before writing — first run on a
 	; freshly-checked-out repo would otherwise hit ENOENT.
 	SplitPath(path, , &parent)
@@ -429,8 +509,10 @@ _LLM_Menu_PersistApiEntries() {
 		; FileMove with overwrite=1 is atomic within the same volume — avoids a
 		; zero-byte window between FileDelete and FileAppend on crash/power-loss.
 		FileMove(tmp, path, 1)
+		return true
 	} catch as e {
 		try LoggerError("LLM", "Failed to persist API entries to '{1}': {2}", path, e.Message)
+		return false
 	}
 }
 

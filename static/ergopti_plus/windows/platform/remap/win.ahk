@@ -60,7 +60,8 @@ _WinHoldModKey() {
 		return
 	}
 	ModKey := _WinHoldModKey()
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	try {
 		KeyWait("LWin", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {

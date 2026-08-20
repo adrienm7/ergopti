@@ -73,11 +73,11 @@ _MRS_CountBareReload(Src, &Offenders) {
 
 _MRS_CountRouted(Src) {
 	Routed := 0
-	Pos := 1
-	while (Found := InStr(Src, "ReloadPreservingSuspend()", , Pos)) {
-		Routed += 1
-		Pos := Found + 1
-	}
+	for Line in StrSplit(Src, "`n", "`r")
+		; Production calls are indented; the sole column-zero match is the
+		; ReloadPreservingSuspend declaration and must not inflate the canary.
+		if RegExMatch(Line, "^\s+.*\bReloadPreservingSuspend\s*\(")
+			Routed += 1
 	return Routed
 }
 
@@ -95,25 +95,27 @@ _MRS_NoBareReloadAnywhereReachable() {
 	Offenders := ""
 	Count := _MRS_CountBareReload(Src, &Offenders)
 
-	; The ONE legitimate bare Reload() in these trees is the last statement of
-	; ReloadPreservingSuspend itself. Subtract it by reading that body rather than
-	; by hardcoding a file path, so moving the helper does not break the guard.
-	Helper := _DriverFuncBody("ReloadPreservingSuspend")
-	Assert(Helper != "", "ReloadPreservingSuspend() must exist in the driver source")
-	HelperOffenders := ""
-	Allowed := _MRS_CountBareReload(Helper, &HelperOffenders)
-	Assert(Allowed >= 1,
-		"ReloadPreservingSuspend must still end in a real Reload() — otherwise it persists the pause and never restarts")
+	; Reload is now injected into the tested hand-off core, so no production
+	; function needs a direct call. Pin both halves: zero bare calls and the real
+	; callback passed by the lifecycle wrapper.
+	Wrapper := _DriverFuncBody("ReloadPreservingSuspend")
+	Helper := _DriverFuncBody("_ReloadPreservingSuspendNonCritical")
+	Assert(Wrapper != "" && Helper != "",
+		"ReloadPreservingSuspend() and its non-Critical core must exist")
+	Assert(InStr(Wrapper,
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0
+		and InStr(Helper, "SuspendHandoffReload(") > 0
+		and InStr(Helper, "ReloadTerminalInvoke.Bind(") > 0,
+		"ReloadPreservingSuspend must pass the real Reload callback to the tested hand-off core")
 
-	Assert(Count == Allowed,
+	Assert(Count == 0,
 		"no code a paused user can reach may call a bare Reload: native Suspend leaves the tray, every editor "
 		. "window and the language switch fully interactive, and Reload starts a fresh UNSUSPENDED process, so "
 		. "the pause is dropped with nothing in the log. Route it through ReloadPreservingSuspend() "
-		. "(reload-drops-suspend-outside-the-menu-layer) -- found " . Count . " bare Reload(s), expected only the "
-		. Allowed . " inside ReloadPreservingSuspend itself: " . Offenders)
+		. "(reload-drops-suspend-outside-the-menu-layer) -- found " . Count . " bare Reload(s): " . Offenders)
 
 	Routed := _MRS_CountRouted(Src)
-	Assert(Routed >= 25,
+	Assert(Routed >= 24,
 		"the driver must still reload through ReloadPreservingSuspend at its persist-and-restart sites -- a scan "
 		. "that found none would pass the assertion above vacuously (found " . Routed . ")")
 }
@@ -157,17 +159,44 @@ Test("menu: the layout poll still refuses to reload while suspended (reload-drop
 ; ===========================================================
 
 _MRS_HelperPersistsBeforeReloading() {
-	Body := _DriverFuncBody("ReloadPreservingSuspend")
-	Assert(Body != "", "ReloadPreservingSuspend() must exist in the driver source")
+	Wrapper := _DriverFuncBody("ReloadPreservingSuspend")
+	Body := _DriverFuncBody("_ReloadPreservingSuspendNonCritical")
+	Core := _DriverFuncBody("SuspendHandoffReload")
+	CommitWrapper := _DriverFuncBody("ReloadTerminalHandoffCommit")
+	Commit := _DriverFuncBody("_ReloadTerminalHandoffCommitNonCritical")
+	MarkerPath := _DriverFuncBody("_SuspendMarkerPath")
+	Restore := _DriverFuncBody("_SuspendRestoreFromMarker")
+	Assert(Wrapper != "" && Body != "",
+		"ReloadPreservingSuspend() and its non-Critical core must exist")
+	Assert(Core != "", "SuspendHandoffReload() must exist in the driver source")
+	Assert(InStr(Wrapper,
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0,
+		"the public reload entry must delegate after dropping inherited Critical")
 
 	GuardPos  := InStr(Body, "A_IsSuspended")
 	MarkerPos := InStr(Body, "_SuspendMarkerPath()")
-	ReloadPos := InStr(Body, "Reload()")
-	Assert(GuardPos > 0 and MarkerPos > GuardPos and ReloadPos > MarkerPos,
-		"ReloadPreservingSuspend must check A_IsSuspended and write the hand-off marker BEFORE it "
-		. "reloads -- the fresh process is never suspended and nothing else carries the state across")
+	Assert(GuardPos > 0 and MarkerPos > GuardPos and InStr(Body, "SuspendHandoffReload(") > MarkerPos,
+		"ReloadPreservingSuspend must pass the resolved suspended state and marker to the tested hand-off core")
+	PreparePos := InStr(Core, "PrepareFn.Call")
+	ReloadPos := InStr(Core, "ReloadFn.Call")
+	Assert(PreparePos > 0 and ReloadPos > PreparePos
+		and InStr(Core, "return false") > PreparePos,
+		"the hand-off core must prepare inert state before ReloadFn and return without Reload on failure")
+	Assert(InStr(Body, "_SuspendHandoffCommitMarker.Bind(Path)") > 0
+		and InStr(Body, "_SuspendHandoffCancelMarker.Bind(Path)") > 0
+		and InStr(CommitWrapper,
+			"_ReloadTerminalHandoffCommitNonCritical(Record)") > 0
+		and InStr(Commit, "CommitFn.Call()") > 0,
+		"only the terminal OnExit commit may promote pending pause intent")
+	Assert(InStr(MarkerPath, "_PathsFile") > 0
+		and InStr(MarkerPath, "ConfigurationFile") == 0,
+		"the marker must follow the stable paths.toml locator across config relocation")
+	Assert(InStr(Restore, "SuspendHandoffDiscardPending(") > 0
+		and InStr(Restore, "SuspendHandoffConsume(")
+			> InStr(Restore, "SuspendHandoffDiscardPending("),
+		"boot must discard inert preparation debris before consuming live intent")
 }
-Test("menu: ReloadPreservingSuspend persists the pause before reloading (menu-reload-drops-suspend)",
+Test("menu: ReloadPreservingSuspend terminally publishes pause after acceptance (menu-reload-drops-suspend)",
 	_MRS_HelperPersistsBeforeReloading)
 
 
@@ -182,13 +211,17 @@ Test("menu: ReloadPreservingSuspend persists the pause before reloading (menu-re
 
 _MRS_BootRestoreConsumesTheMarkerFirst() {
 	Restore := _DriverFuncBody("_SuspendRestoreFromMarker")
+	Core := _DriverFuncBody("SuspendHandoffConsume")
 	Assert(Restore != "", "_SuspendRestoreFromMarker() must exist in the driver source")
+	Assert(Core != "", "SuspendHandoffConsume() must exist in the driver source")
 
-	DeletePos  := InStr(Restore, "FileDelete(")
-	SuspendPos := InStr(Restore, "ToggleSuspend()")
-	Assert(DeletePos > 0 and SuspendPos > DeletePos,
-		"the hand-off marker must be CONSUMED before the pause is re-applied -- a failure past that "
-		. "point must cost one restored pause, never wedge the driver suspended on every future boot")
+	MovePos := InStr(Core, "MoveFn.Call")
+	DeletePos := InStr(Core, "DeleteFn.Call")
+	SuspendPos := InStr(Core, "ToggleFn.Call")
+	Assert(MovePos > 0 and DeletePos > MovePos and SuspendPos > DeletePos,
+		"the marker must be atomically claimed and consumed before pause is re-applied")
+	Assert(InStr(Restore, "SuspendHandoffConsume(") > 0,
+		"the lifecycle wrapper must route restoration through the tested claim/delete/toggle core")
 	Assert(!InStr(Restore, "Suspend(1)"),
 		"the restore must re-enter the pause through ToggleSuspend, the one path that runs the "
 		. "custom-combination prefix drain: a Reload can land while a prefix key is still physically "

@@ -20,9 +20,9 @@
 ; single suggestion made accepted/suggested exceed 100 %. The distortion appears
 ; only as an implausible ratio in an aggregate — no log line, no error.
 ;
-; The fix moves the emission to the render itself, so any future third producer
-; of a final render inherits it instead of having to remember. This test asserts
-; that placement, not the call sites of today.
+; The fix carries final-render intent into the surface record and emits only
+; after the common reveal/publication succeeds. Any future producer inherits the
+; lifecycle without counting a refused or stale paint.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,22 +45,22 @@ _LCHS_ResetEngineForRender() {
 	_Stub_LlmTooltipCalls   := []
 }
 
-; A final render — whatever produced it — is a suggestion the user can accept.
-_LCHS_FinalRenderEmitsExactlyOneSuggestion() {
+; A final engine render carries lifecycle intent, but only a successful common
+; pixel commit may turn it into a suggestion metric.
+_LCHS_FinalRenderDelegatesSuggestionToSurfaceCommit() {
 	global _Stub_LlmSuggestedCalls, _Stub_LlmTooltipCalls
 	_LCHS_ResetEngineForRender()
 
 	LLM_Engine_OnResults(["intelligence", "intelligent"], "intelligen", 1, true)
 
-	AssertEqual(1, _Stub_LlmSuggestedCalls.Length,
-		"a final render must emit exactly one llm_suggested. The two prediction-cache branches render final, Tab-acceptable tooltips and return before _LLM_Engine_FinalizeRequest ever runs, so an emission owned by the finalizer left those suggestions unlogged while their llm_accepted / llm_dismissed counterparts fired as usual — an acceptance rate computed against an undercount (llm-cache-hit-skips-suggested)")
-	AssertEqual(2, _Stub_LlmSuggestedCalls[1].count,
-		"the event must carry the number of slots actually offered")
-	Assert(_Stub_LlmTooltipCalls.Length > 0,
-		"the render itself must still happen — an emission asserted against a tooltip that was never painted proves nothing")
+	AssertEqual(0, _Stub_LlmSuggestedCalls.Length,
+		"the engine must not log before the common presenter proves that final pixels committed")
+	Assert(_Stub_LlmTooltipCalls.Length > 0
+		and _Stub_LlmTooltipCalls[1].meta.Get("is_final", false),
+		"every final producer, including both cache shortcuts, must carry final lifecycle intent into the surface transaction")
 }
-Test("LLM suggested: a final render emits exactly one llm_suggested",
-	_LCHS_FinalRenderEmitsExactlyOneSuggestion)
+Test("LLM suggested: a final render delegates lifecycle to committed pixels",
+	_LCHS_FinalRenderDelegatesSuggestionToSurfaceCommit)
 
 ; Streaming partials must not inflate the count: they are not acceptable states.
 _LCHS_IntermediateRenderEmitsNothing() {
@@ -91,15 +91,26 @@ Test("LLM suggested: an intermediate render emits nothing",
 _LCHS_EmissionLivesAtTheRenderChokePoint() {
 	Render := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Render != "", "LLM_Engine_OnResults must exist in the driver source")
-	Assert(InStr(Render, "_LLM_Engine_LogSuggested") > 0,
-		"the render must own the llm_suggested emission, so every producer of a final render inherits it")
+	Assert(InStr(Render, "_LLM_Engine_LogSuggested") == 0
+		and InStr(Render, '"is_final", is_final ? true : false') > 0,
+		"the engine render must carry intent without emitting before pixel commit")
+	Presenter := _DriverFuncBody("_TooltipPresentStack")
+	Marker := _DriverFuncBody("_LLM_TooltipMarkSurfaceSuggested")
+	PublishPos := InStr(Presenter,
+		"Published := _TooltipPublishVisibleDecisions(PublishItems)")
+	MarkerPos := InStr(Presenter,
+		"_LLM_TooltipMarkSurfaceSuggested(PreparedSurface)")
+	Assert(PublishPos > 0 and MarkerPos > PublishPos
+		and InStr(Marker,
+			'_LLM_TooltipQueueMetricUnsafe("suggested", Lifecycle)') > 0,
+		"the committed surface must emit exactly after reveal/publication, so refused cache renders remain uncounted")
 
 	Fin := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
 	Assert(Fin != "", "_LLM_Engine_FinalizeRequest must exist in the driver source")
 	Assert(InStr(Fin, "KL_LogLlmSuggested") == 0 and InStr(Fin, "_LLM_Engine_LogSuggested") == 0,
 		"_LLM_Engine_FinalizeRequest must NOT emit the suggestion itself — it is one producer of a final render among several, and owning the event there is what made the two cache branches silent")
 }
-Test("LLM suggested: the emission lives at the render choke point, not in the finalizer",
+Test("LLM suggested: the emission lives at the committed surface, not in the finalizer",
 	_LCHS_EmissionLivesAtTheRenderChokePoint)
 
 

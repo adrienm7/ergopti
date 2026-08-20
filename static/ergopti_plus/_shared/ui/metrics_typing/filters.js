@@ -233,7 +233,9 @@ function reset_filters() {
 	app_state.hour_cutoff = null;
 
 	// Re-select all available apps
+	app_state.selected_apps.clear();
 	app_state.available_apps.forEach((app) => app_state.selected_apps.add(app));
+	app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
 	update_app_btn_text();
 
 	// Intentionally does NOT change app_state.current_tab

@@ -54,14 +54,35 @@ Test("hotstrings: the render guard stays separate from engine suppression (F-14)
 _A0720B4_GlobalKeyWriteFailureIsSurfaced() {
 	Body := _DriverFuncBody("_SaveGlobalKey")
 	Assert(Body != "", "_SaveGlobalKey must exist in infra/hotstrings/hotstrings_io.ahk")
-	Assert(InStr(Body, "catch") > 0 and InStr(Body, "LoggerError") > 0,
-		"_SaveGlobalKey must catch and LOG a failed write — the in-memory value has already changed by then, so a bare try made a read-only or cloud-locked config indistinguishable from a successful save until the setting silently reverted at next boot (copilot-instructions 5.3)")
-	Assert(InStr(Body, ".Close()") > 0,
-		"_SaveGlobalKey must Close() the handle so the write is flushed before any reader sees the file — an unclosed handle leaves even a SUCCESSFUL write observable as a partial file")
-	Assert(InStr(Body, "return false") > 0 and InStr(Body, "return true") > 0,
-		"_SaveGlobalKey must report success or failure to its callers so the menu can surface it")
+	Assert(InStr(Body, "HotstringsSetWordDelimiters(") > 0
+		and InStr(Body, "HotstringsSetConsumedDelimiters(") > 0,
+		"_SaveGlobalKey must delegate both historical keys to the shared delimiter transaction instead of retaining a second writer")
+	Assert(InStr(Body, "FileOpen(") = 0,
+		"_SaveGlobalKey must not truncate the live override file; the whole-file serializer owns the one staged atomic replacement")
+	Transaction := _DriverFuncBody("HotstringsCommitDelimiterUpdate")
+	Assert(Transaction != "", "HotstringsCommitDelimiterUpdate must exist")
+	LeasePos := InStr(Transaction, "_HotstringsOverrideLeaseAcquire(")
+	BuildPos := InStr(Transaction, "BuildFn.Call(")
+	WritePos := InStr(Transaction, "_SaveOverrides(")
+	PublishPos := InStr(Transaction, "_HotstringsPublishDelimiterCandidate.Bind(")
+	Assert(LeasePos > 0 and BuildPos > LeasePos and WritePos > BuildPos
+		and PublishPos > WritePos,
+		"delimiter writes must acquire before candidate construction and hand detached live publication to the atomic whole-file writer")
+	Writer := _DriverFuncBody("_SaveOverrides")
+	Assert(Writer != "", "_SaveOverrides must exist")
+	AuthorizePos := InStr(Writer, "AuthorizeFn.Call()")
+	ReplacePos := InStr(Writer, "FSAtomicMoveReplace(")
+	PublishCallPos := InStr(Writer, "PublishFn.Call()")
+	Assert(AuthorizePos > 0 and ReplacePos > AuthorizePos
+		and PublishCallPos > ReplacePos,
+		"the complete stage must be re-authorized, atomically replaced, and projected live in that order")
+	Publisher := _DriverFuncBody("_HotstringsPublishDelimiterCandidate")
+	Assert(Publisher != ""
+		and InStr(Publisher, "_HotstringsWordDelimiters :=") > 0
+		and InStr(Publisher, "_HotstringsConsumedDelimiters :=") > 0,
+		"one publisher must project both delimiter caches together")
 }
-Test("hotstrings: a failed global-key write is surfaced (F-15)", _A0720B4_GlobalKeyWriteFailureIsSurfaced)
+Test("hotstrings: global-key writes share the admitted atomic transaction (F-15)", _A0720B4_GlobalKeyWriteFailureIsSurfaced)
 
 
 ; F-16 RESOLUTION, also corrected by the suite. Memoizing the manifest read was

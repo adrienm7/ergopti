@@ -89,6 +89,38 @@ _TSTest_AfterActiveCountDecrementsAfterFire() {
 }
 Test("TimerScheduler — after(): activeCount decrements after callback fires", _TSTest_AfterActiveCountDecrementsAfterFire)
 
+_TSTest_RestartAfterPreservesOwnerIdentity() {
+	_TS_ResetRegistry()
+	Calls := 0
+	H := TimerAfter(10, () => (Calls += 1))
+	Owner := H["Fn"]
+	TimerRestartAfter(H, 20)
+	AssertTrue(H["Fn"] == Owner,
+		"AHK-22: restart must reuse the captured callback instead of allocating per keystroke")
+	AssertFalse(H["Fired"], "AHK-22: restarted one-shot must be live")
+	AssertEqual(-20000, H["Interval"], "AHK-22: restart must publish the new delay")
+	AssertEqual(1, TimerActiveCount(), "AHK-22: restart must own exactly one registry slot")
+	H["Fn"]()
+	AssertEqual(1, Calls, "AHK-22: the restarted owner must publish exactly once")
+	AssertEqual(0, TimerActiveCount(), "AHK-22: firing must retire the restarted owner")
+}
+Test("AHK-22 TimerScheduler — restartAfter reuses one exact one-shot owner",
+	_TSTest_RestartAfterPreservesOwnerIdentity)
+
+_TSTest_RestartAfterRejectsRepeatingOwner() {
+	_TS_ResetRegistry()
+	H := TimerEvery(10, () => 0)
+	Threw := false
+	try TimerRestartAfter(H, 20)
+	catch TypeError
+		Threw := true
+	AssertTrue(Threw,
+		"AHK-22: a repeating wrapper cannot impersonate a restartable one-shot owner")
+	TimerCancel(H)
+}
+Test("AHK-22 TimerScheduler — restartAfter rejects a repeating owner",
+	_TSTest_RestartAfterRejectsRepeatingOwner)
+
 
 
 
@@ -332,4 +364,3 @@ _TSTest_CancelAllLeavesNoHandles() {
 		"cancelAll must leave no handle behind; a leaked one keeps an OS timer armed for the life of the process")
 }
 Test("TimerScheduler: 200 timers all register and cancelAll clears every one", _TSTest_CancelAllLeavesNoHandles)
-

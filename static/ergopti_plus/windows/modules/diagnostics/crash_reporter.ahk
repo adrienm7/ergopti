@@ -393,8 +393,8 @@ _CrashReport_SysInfo() {
 		; git is unavailable or the repo is on a disconnected network drive.
 		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
 			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		Deadline := A_TickCount + 500
-		while (!FileExist(TmpFile) and A_TickCount < Deadline)
+		StartedTick := A_TickCount
+		while (!FileExist(TmpFile) and !TickExpired(StartedTick, 500))
 			Sleep(50)
 		if FileExist(TmpFile) {
 			GitHash := Trim(FileRead(TmpFile, "UTF-8"))

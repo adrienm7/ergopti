@@ -43,12 +43,65 @@ _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
 	return Max(5, maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD)
 }
 
+; Return a detached, fail-closed acceptance-source snapshot. Timer callers pass
+; the source captured with the keystroke that armed them; direct/manual callers
+; omit it and capture the currently focused control at dispatch time.
+_LLM_Engine_NormalizeAcceptSource(AcceptSource := unset) {
+	if !IsSet(AcceptSource)
+		return _LLM_Engine_CaptureAcceptSource()
+	if !(AcceptSource is Map)
+		return Map("hwnd", 0, "control", 0)
+	Hwnd := AcceptSource.Get("hwnd", 0)
+	ControlToken := AcceptSource.Get("control", 0)
+	if !(Hwnd is Integer and Hwnd > 0
+			and ControlToken is Integer and ControlToken > 0)
+		return Map("hwnd", 0, "control", 0)
+	return Map("hwnd", Hwnd, "control", ControlToken)
+}
+
+; Resolve the source owned by the request whose tooltip is about to be painted.
+; An id mismatch means the renderer cannot prove ownership and must publish an
+; empty source, making Tab acceptance fail closed.
+_LLM_Engine_RequestAcceptSourceForRender(RequestId := "") {
+	global _LLM_Engine
+	if (RequestId == "")
+		return ""
+	Source := _LLM_Engine.Get("request_accept_source", "")
+	if !(Source is Map)
+		return ""
+	if (Source.Get("request_id", -1) != RequestId)
+		return ""
+	Hwnd := Source.Get("hwnd", 0)
+	ControlToken := Source.Get("control", 0)
+	if !(Hwnd is Integer and Hwnd > 0
+			and ControlToken is Integer and ControlToken > 0)
+		return ""
+	return Map(
+		"hwnd", Hwnd,
+		"control", ControlToken,
+		"request_id", Source.Get("request_id", 0),
+		"app_name", Source.Get("app_name", "")
+	)
+}
+
+_LLM_Engine_AppNameForAcceptSource(Source) {
+	if !(Source is Map)
+		return ""
+	Hwnd := Source.Get("hwnd", 0)
+	if !(Hwnd is Integer and Hwnd > 0)
+		return ""
+	AppName := ""
+	try AppName := WinGetProcessName("ahk_id " . Hwnd)
+	return AppName
+}
+
 /**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
  * @param {string} buffer - Full typed buffer captured at debounce arm time.
+ * @param {Map} AcceptSource - HWND/control snapshot captured when armed.
  */
-LLM_Engine_FirePrediction(buffer) {
+LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	global _LLM_Engine
 
 	; A debounce timer outlives whatever armed it: it is scheduled with SetTimer
@@ -64,6 +117,11 @@ LLM_Engine_FirePrediction(buffer) {
 	}
 	_LLM_Engine["timer_active"] := false
 
+	; Re-derive from live state at the request boundary as a backstop for editors
+	; that mutate an Array/Map in place before calling Init. A missed writer can
+	; therefore cause one cache miss, never a semantically stale cache hit.
+	_LLM_Engine_RefreshSemanticConfig()
+
 	; A debounce timer armed just before the user paused must not fire an HTTP
 	; request or paint a prediction — « pause = tout éteint ».
 	if A_IsSuspended
@@ -71,6 +129,8 @@ LLM_Engine_FirePrediction(buffer) {
 
 	if !_LLM_Engine["enabled"] || buffer == ""
 		return
+
+	AcceptSource := _LLM_Engine_NormalizeAcceptSource(AcceptSource?)
 
 	; Honour the disable_password_fields user preference: skip prediction in
 	; password/secure fields to avoid leaking typed credentials into the LLM
@@ -107,6 +167,11 @@ LLM_Engine_FirePrediction(buffer) {
 	; from previous contexts.
 	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 	this_request_id := _LLM_Engine["request_id"]
+	RequestAcceptSource := AcceptSource.Clone()
+	RequestAcceptSource["request_id"] := this_request_id
+	RequestAcceptSource["app_name"] :=
+		_LLM_Engine_AppNameForAcceptSource(RequestAcceptSource)
+	_LLM_Engine["request_accept_source"] := RequestAcceptSource
 
 	; Honour the disabled_apps user preference: skip prediction entirely when the focused
 	; app is on the user's exclusion list, so typed context never leaves an app the user
@@ -140,7 +205,7 @@ LLM_Engine_FirePrediction(buffer) {
 		if IsSet(LLM_OllamaScheduleWarmupRetry)
 			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
 		retry_ms := Max(500, Min(_LLM_Engine["debounce_ms"], 2000))
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
 		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
 		_LLM_Engine["timer_active"] := true
 		return
@@ -171,6 +236,16 @@ LLM_Engine_FirePrediction(buffer) {
 	ctx := params["context"]
 	tail := params["context_tail"]
 	req_temp := params["temperature"]
+	; The focused application can select a different prompt without changing the
+	; configuration Map. Resolve it before both cache probes and bind it into the
+	; request signature so identical text in two overridden apps cannot share an
+	; answer generated from different instructions.
+	effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
+	profile := LLM_GetActiveProfile(effective_profile_id,
+		_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
+		effective_profile_id, profile)
+	_LLM_Engine["active_request_signature"] := request_semantic_signature
 	; Per-prediction output-token budget computed once by the shared PromptBuilder
 	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
 	; Threaded to every backend below so AHK no longer re-derives its own cap
@@ -199,7 +274,8 @@ LLM_Engine_FirePrediction(buffer) {
 	; ctx could land AFTER the cache hit rendered and clobber the tooltip.
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
-			and _LLM_Engine["last_results"].Length > 0) {
+			and _LLM_Engine["last_results"].Length > 0
+			and _LLM_Engine_CacheOwnsRequest(request_semantic_signature)) {
 		; Cancel both curl streams and in-flight WinHTTP requests so no stale
 		; response lands after the cache hit is already rendered. The remote
 		; sibling has to be cancelled too: its result was already discarded by the
@@ -207,7 +283,8 @@ LLM_Engine_FirePrediction(buffer) {
 		; carrying the typed context survive until the poll tick reaps them.
 		try LLM_OllamaCancelAllAsync()
 		try LLM_RemoteCancelAllAsync()
-		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
+		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true,
+			this_request_id, request_semantic_signature)
 		return
 	}
 
@@ -222,6 +299,7 @@ LLM_Engine_FirePrediction(buffer) {
 			and _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0
+			and _LLM_Engine_CacheOwnsRequest(request_semantic_signature)
 			and StrLen(ctx) > StrLen(_LLM_Engine["last_ctx"])
 			and StrCompare(SubStr(ctx, 1, StrLen(_LLM_Engine["last_ctx"])), _LLM_Engine["last_ctx"], true) == 0) {
 		typed_delta := SubStr(ctx, StrLen(_LLM_Engine["last_ctx"]) + 1)
@@ -244,7 +322,8 @@ LLM_Engine_FirePrediction(buffer) {
 			; child keeps a PII temp file alive.
 			try LLM_OllamaCancelAllAsync()
 			try LLM_RemoteCancelAllAsync()
-			LLM_Engine_OnResults(sliced, ctx, 1, true)
+			LLM_Engine_OnResults(sliced, ctx, 1, true, this_request_id,
+				request_semantic_signature)
 			return
 		}
 	}
@@ -266,7 +345,7 @@ LLM_Engine_FirePrediction(buffer) {
 		remaining := min_interval - elapsed_since_last
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
 		SetTimer(_LLM_Engine["pending_timer"], -remaining)
 		_LLM_Engine["timer_active"] := true
 		return
@@ -288,8 +367,6 @@ LLM_Engine_FirePrediction(buffer) {
 	; over the global profile id — same context, different prompt.
 	; Falls back to the global profile when the active app has no
 	; override or the override id is unknown.
-	effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
-	profile       := LLM_GetActiveProfile(effective_profile_id, _LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
 	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
 	; Inline auto-type mode forces a single variant: typing N
 	; alternatives sequentially into the active document would produce
@@ -372,6 +449,7 @@ LLM_Engine_FirePrediction(buffer) {
 			"max_words",     _LLM_Engine["max_words"],
 			"is_batch",      true,
 			"request_id",    this_request_id,
+			"semantic_signature", request_semantic_signature,
 			"backend",       backend,
 			"model",         log_model,
 			"system_prompt", system_prompt,
@@ -401,6 +479,7 @@ LLM_Engine_FirePrediction(buffer) {
 		"max_words",         _LLM_Engine["max_words"],
 		"is_batch",          is_batch_profile,
 		"request_id",        this_request_id,
+		"semantic_signature", request_semantic_signature,
 		"backend",           backend,
 		"model",             log_model,
 		"system_prompt",     system_prompt,
@@ -467,7 +546,14 @@ _LLM_Engine_ShowLoadingTooltip() {
 			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
 		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
-	try LLM_Tooltip_ShowLoading()
+	RequestId := _LLM_Engine.Get("request_id", 0)
+	Source := _LLM_Engine_RequestAcceptSourceForRender(RequestId)
+	Meta := Map(
+		"offer_id", RequestId,
+		"accept_source", Source,
+		"app_name", (Source is Map) ? Source.Get("app_name", "") : ""
+	)
+	try LLM_Tooltip_ShowLoading(Meta)
 }
 
 ; Single-shot batch dispatch: one async request, the model returns N
@@ -600,7 +686,8 @@ _LLM_Engine_DispatchVariant(state) {
 				break
 			}
 		}
-		LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false)
+		LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false,
+			state["request_id"], state["semantic_signature"])
 	}
 
 	state_ref := state
@@ -649,7 +736,8 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	preview.Push(display)
 	; Active = the slot currently streaming, so Tab during streaming still
 	; produces something sensible.
-	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false)
+	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false,
+		state["request_id"], state["semantic_signature"])
 }
 
 _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
@@ -700,7 +788,8 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	if (state["slots"].Length >= state["requested"]) {
 		active_idx := 1
 	}
-	LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false)
+	LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false,
+		state["request_id"], state["semantic_signature"])
 	_LLM_Engine_DispatchVariant(state)
 }
 
@@ -734,21 +823,23 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 /**
  * True while `state` still describes the request the engine is waiting for.
  *
- * The engine bumps ``request_id`` on every fire, so a callback that was queued
- * before the newest keystroke must not act. The check had four copies of the
- * same expression and — more importantly — was only ever evaluated at callback
- * ENTRY: finalization logs, hides tooltips and calls into the keylogger before
- * it renders, and any of those can yield long enough for a keystroke to
- * supersede the request. The render then painted a prediction for text the user
- * had already moved past, and re-seeded the cache with that stale context so
- * the NEXT prediction inherited it too.
+ * The engine bumps ``request_id`` on every fire, while the semantic signature
+ * binds the callback to the model/prompt/API configuration that dispatched it.
+ * Both must still match: request-id alone cannot distinguish two generations
+ * for identical text across a live configuration or per-application profile
+ * change. The check is repeated after every yielding finalization stage so a
+ * stale callback cannot paint or re-seed the cache.
  * @param {Map} state The per-request state carried by the callback.
  * @returns {Integer} 1 when the request is still current.
  */
 _LLM_Engine_IsCurrent(state) {
 	global _LLM_Engine
+	if !(state is Map) or !state.Has("request_id") or !state.Has("semantic_signature")
+		return false
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	return (state["request_id"] == current_id)
+	return (state["request_id"] == current_id
+		and _LLM_Engine_SignaturesEqual(
+			state["semantic_signature"], _LLM_Engine.Get("active_request_signature", "")))
 }
 
 _LLM_Engine_FinalizeRequest(state) {
@@ -838,6 +929,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	}
 	_LLM_Engine["last_ctx"]     := state["ctx"]
 	_LLM_Engine["last_results"] := state["slots"]
+	_LLM_Engine["last_semantic_signature"] := state["semantic_signature"]
 	; Keep ``last_result`` (singular) for the legacy cache hit path so any
 	; external code still reading that field keeps working.
 	_LLM_Engine["last_result"]  := state["slots"][1]
@@ -845,7 +937,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	; ``request_id`` is threaded through so the render can gate once more on its
 	; own side: LLM_Diff_Compute and the display-opts resolution run between here
 	; and the paint, and both can yield.
-	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"])
+	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true,
+		state["request_id"], state["semantic_signature"])
 }
 
 ; Returns the max number of attempts for ``n`` requested predictions,
@@ -936,11 +1029,10 @@ _LLM_Engine_GetActiveApiEntry() {
  * @param {string}   ctx        - The context that produced these slots.
  * @param {Integer}  active     - 1-based active slot index (the one Tab fires on).
  * @param {boolean}  is_final   - True only on the last update of a request.
- * @param {string}   request_id - Request this render speaks for, when it has one.
- *                                Empty for renders served from the local cache,
- *                                which are current by construction.
+ * @param {string}   request_id - Monotonic request identity that owns this render.
+ * @param {string}   semantic_signature - Generation configuration that owns it.
  */
-LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "") {
+LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "", semantic_signature := "") {
 	global _LLM_Engine, _LLM_Bridge_Buffer
 	; Inline auto-type mode (Copilot-style): the prediction is typed
 	; directly into the active app instead of being shown in a tooltip.
@@ -967,27 +1059,20 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 				; ignore, while a superseded inline auto-type SendTexts model output for
 				; ABANDONED text straight into the document, where nothing takes it back
 				; (llm-inline-autotype-injects-superseded-prediction).
-				if (request_id != "" and !_LLM_Engine_IsCurrent(Map("request_id", request_id))) {
+				if (request_id != "" and !_LLM_Engine_IsCurrent(Map(
+						"request_id", request_id, "semantic_signature", semantic_signature))) {
 					try LoggerInfo("LLM", "Inline auto-type skipped — prediction superseded during render (request #{1}).", request_id)
 					return
 				}
-				; Mute the hotstring InputHook so the injected characters do
-				; not re-enter the engine and trigger false hotstring matches.
-				if IsSet(PrefixWatcherSuppress)
-					try PrefixWatcherSuppress(true)
-				; Tag the auto-typed prediction as synthetic so the keylogger
-				; keeps it out of the manual ``chars`` count and attributes it
-				; to the LLM source — same PII guard as LLM_Bridge_OnAccept.
-				; Without it the model output is recorded as words the human
-				; typed (inflating WPM, polluting n-gram stats).
-				try KL_MarkSynthetic("llm")
-				; The inline flow never reaches the tooltip, so it accounts for its
-				; own suggestion here — the pairing has to hold on both surfaces.
-				_LLM_Engine_LogSuggested(slots.Length)
-				; Completion is sender-owned: a clipboard-mode injection can return
-				; before Ctrl+V or fail after dispatch, so fixed-delay cleanup would
-				; release synthetic guards and commit context before visible output.
-				TextSend(text, 0, LLM_Engine_OnInlineInjectComplete.Bind(text))
+				; Capture the request-owned target and all input generations. TextSend
+				; rechecks them at the real direct/paste boundary, then emits through
+				; SendInput and commits every RAM mirror before physical input resumes.
+				Source := _LLM_Engine_RequestAcceptSourceForRender(request_id)
+				AdmissionSeed := _LLM_Bridge_CaptureAdmissionSeed(Source)
+				Transaction := _LLM_Bridge_NewInjectionTransaction(
+					text, AdmissionSeed, request_id, true, slots, idx)
+				TextSend(text, _LLM_Bridge_InjectionOptions(Transaction),
+					LLM_Engine_OnInlineInjectComplete.Bind(Transaction))
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return
@@ -1026,7 +1111,8 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; caller's check and the paint. Painting after a supersede leaves a prediction
 	; for abandoned text on screen that the keystroke's deferred hide can no longer
 	; dismiss, because the paint itself bumps the tooltip generation it compares.
-	if (is_final and request_id != "" and !_LLM_Engine_IsCurrent(Map("request_id", request_id))) {
+	if (is_final and request_id != "" and !_LLM_Engine_IsCurrent(Map(
+			"request_id", request_id, "semantic_signature", semantic_signature))) {
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
 		return
 	}
@@ -1037,49 +1123,27 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; only purpose was to print the duration onto it.
 	if is_final
 		try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
-	LLM_Tooltip_Show(display_slots, active, is_final)
-	; Emitted AFTER the paint, and here rather than in _LLM_Engine_FinalizeRequest,
-	; because the two prediction-cache shortcuts also render a final, Tab-acceptable
-	; tooltip and return before finalization ever runs. Their ``llm_accepted`` /
-	; ``llm_dismissed`` counterparts hang off the UI lifecycle and fired regardless,
-	; so an engine-scoped emission made the acceptance ratio exceed 100 %.
-	if is_final
-		_LLM_Engine_LogSuggested(slots.Length)
+	RenderAcceptSource := _LLM_Engine_RequestAcceptSourceForRender(request_id)
+	PresentationMeta := Map(
+		"offer_id", request_id,
+		"accept_source", RenderAcceptSource,
+		"app_name", (RenderAcceptSource is Map)
+			? RenderAcceptSource.Get("app_name", "") : "",
+		"is_final", is_final ? true : false
+	)
+	; The common surface transaction publishes pixels, slots, active index,
+	; acceptance target and lifecycle metrics as one owner. A refused/stale render
+	; therefore cannot emit llm_suggested or replace the source of visible A.
+	LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
 }
 
-/**
- * Emits the ``llm_suggested`` keylogger event for one final render.
- *
- * The event pairs 1:1 with exactly one ``llm_accepted`` (Tab) or
- * ``llm_dismissed`` (timeout / typing past it), and the acceptance rate is the
- * ratio of the two. It therefore belongs to every producer of a final render,
- * not to the request finalizer alone.
- * @param {Integer} slot_count Number of slots in the rendered suggestion.
- */
-_LLM_Engine_LogSuggested(slot_count) {
-	try {
-		app_name := ""
-		try app_name := WIGetFocused()["appId"]
-		KL_LogLlmSuggested(app_name, slot_count)
-	}
-}
-
-LLM_Engine_OnInlineInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {
-	global _LLM_Engine, _LLM_Bridge_Buffer
-	try KL_ClearSynthetic()
-	if IsSet(PrefixWatcherSuppress)
-		try PrefixWatcherSuppress(false)
+LLM_Engine_OnInlineInjectComplete(Transaction, Ok := true, ErrorMessage := "") {
 	if !Ok {
 		try LoggerWarn("LLM", "Inline auto-type was not injected: {1}", ErrorMessage)
 		return
 	}
-	_LLM_Engine["inline_last_typed"] := InjectedText
-	if IsSet(_LLM_Bridge_Buffer)
-		_LLM_Bridge_Buffer .= InjectedText
-	if IsSet(HSE_HardReset)
-		try HSE_HardReset()
-	if IsSet(_ResetPrefixBuffer)
-		try _ResetPrefixBuffer()
+	if (ErrorMessage != "")
+		try LoggerWarn("LLM", "Inline output completed with a non-retryable warning: {1}", ErrorMessage)
 }
 
 _LLM_Engine_ResolveBackendLabel() {

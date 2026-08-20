@@ -153,12 +153,7 @@ _HS_PromptDefaultDelay() {
 		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	HotstringsSetOverride("_global", "", "delay", (Val + 0) / 1000)
-	; Persisting the override only bumps the resolve generation; delays are baked into
-	; each spec at REGISTRATION time (LoadHotstringsSection folds them into the spec
-	; meta), so re-register live — the same path a section toggle uses — or the new
-	; delay is silently ignored until the next Reload.
-	RebuildHotstringsLive()
+	return _HS_CommitDelayOverride("_global", (Val + 0) / 1000)
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -193,10 +188,52 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	HotstringsSetOverride(Cat, "", "delay", (Val + 0) / 1000)
-	; Re-register live (see _HS_PromptDefaultDelay) so the new per-category delay takes
-	; effect immediately instead of only after a Reload or an unrelated section toggle.
-	RebuildHotstringsLive()
+	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
+}
+
+; Persist first and rebuild only after a strict successful result. The injected
+; seams keep the menu's failure ordering behaviour-testable without opening an
+; InputBox or registering real hotstrings.
+_HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; Persistence and live hotstring registration may call filesystem/native
+		; adapters. Keep the complete menu action interruptible.
+		Critical("Off")
+		try return _HS_CommitDelayOverride(Cat, Value, SetterFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HasMethod(SetterFn, "Call")
+		? SetterFn.Call(Cat, "", "delay", Value)
+		: HotstringsSetOverride(Cat, "", "delay", Value)
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Failed to persist the '{1}' delay override: {2}.", Cat, Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+
+	; Delays are baked into specs at registration time, so the durable value must
+	; be re-registered live. A refused writer must never rebuild from stale RAM.
+	try {
+		if HasMethod(RebuildFn, "Call")
+			Rebuilt := RebuildFn.Call()
+		else
+			Rebuilt := RebuildHotstringsLive()
+	} catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Delay override for '{1}' was persisted but live rebuild failed: {2}.",
+			Cat, Err.Message)
+		return false
+	}
+	if !(Rebuilt is Integer) || Rebuilt != 1 {
+		try LoggerError("HotstringsMenu",
+			"Delay override for '{1}' was persisted but live rebuild was refused.",
+			Cat)
+		return false
+	}
+	return true
 }
 
 ; List provider: the word-expanders sub-menu, as ROWS.
@@ -269,23 +306,67 @@ _HS_WordExpanderRows() {
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
 ; toggle logic lives in HSE_TerminatorToggleString (infra/hotstrings_config.ahk)
 ; so it is shared with the config window and unit-tested.
-_HS_DelimToggleEntry(CharsArr) {
-	HotstringsSetWordDelimiters(HSE_TerminatorToggleString(HotstringsGetWordDelimiters(), CharsArr))
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+_HS_DelimToggleEntry(CharsArr, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HSE_TerminatorToggleString(CurrentWord, CharsArr),
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Set every built-in catalogue entry on (true) or off (false), preserving any
 ; user-defined custom chars. Delegates to the shared, tested pure function.
-_HS_DelimSetAll(Enable) {
-	HotstringsSetWordDelimiters(HSE_TerminatorSetAllString(HotstringsGetWordDelimiters(), Enable))
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+_HS_DelimSetAll(Enable, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HSE_TerminatorSetAllString(CurrentWord, Enable),
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Reset all delimiters to the built-in defaults.
-_HS_DelimReset() {
+_HS_DelimReset(WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+}
+
+; Execute one delimiter candidate transaction and show the success notice only
+; after strict durable success. A terminal transition or refused writer leaves
+; both engine variables untouched and produces no misleading notification.
+_HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HotstringsCommitDelimiterUpdate(BuildFn, WriterFn, ReplaceFn)
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Delimiter transaction raised before publication: {1}.", Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+
+	try {
+		Message := t("hs_config.notify_delimiters_saved")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, "", "Iconi Mute")
+		else
+			TrayTip(Message, "", "Iconi Mute")
+	} catch as Err {
+		; The durable mutation already succeeded; confine a notifier failure so a
+		; tray callback cannot escape through AHK's menu dispatcher.
+		try LoggerError("HotstringsMenu",
+			"Delimiter settings were saved but the success notification failed: {1}.",
+			Err.Message)
+	}
+	return true
 }
 
 ; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
@@ -313,19 +394,20 @@ _HS_DelimAddCustom() {
 	if (!Result.OK or Result.Char == "") {
 		return
 	}
-	Ch      := Result.Char
-	Current := HotstringsGetWordDelimiters()
-	if (InStr(Current, Ch) > 0) {
-		return  ; Already present — silently ignore
+	return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)
+}
+
+; Add the word and optional consumed membership in ONE transaction. The previous
+; two-setter sequence could publish the word key while the consumed-key write
+; failed, and each setter rebuilt the same whole file from a different snapshot.
+_HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
+	NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: InStr(CurrentWord, Char) ? CurrentWord : CurrentWord . Char,
+		Consumed: (Consume && !InStr(CurrentConsumed, Char))
+			? CurrentConsumed . Char : CurrentConsumed
 	}
-	HotstringsSetWordDelimiters(Current . Ch)
-	if (Result.Consume) {
-		Consumed := HotstringsGetConsumedDelimiters()
-		if (!InStr(Consumed, Ch)) {
-			HotstringsSetConsumedDelimiters(Consumed . Ch)
-		}
-	}
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Called by the OK button of the add-delimiter GUI.
@@ -347,12 +429,18 @@ _HS_DelimRemoveCustom(Char) {
 	if (Res != "Yes") {
 		return
 	}
-	HotstringsSetWordDelimiters(StrReplace(HotstringsGetWordDelimiters(), Char, ""))
-	Consumed := HotstringsGetConsumedDelimiters()
-	if (InStr(Consumed, Char)) {
-		HotstringsSetConsumedDelimiters(StrReplace(Consumed, Char, ""))
+	return _HS_DelimRemoveCustomCommit(Char)
+}
+
+; Remove both memberships from the same admitted snapshot and publish them as a
+; single durable candidate.
+_HS_DelimRemoveCustomCommit(Char, WriterFn := 0, ReplaceFn := 0,
+	NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: StrReplace(CurrentWord, Char, ""),
+		Consumed: StrReplace(CurrentConsumed, Char, "")
 	}
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Dynamic handler: standard hotstring categories.
@@ -891,5 +979,3 @@ _HS_ExtensionRows() {
 	}
 	return Rows
 }
-
-

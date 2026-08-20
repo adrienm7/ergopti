@@ -183,23 +183,75 @@ KLR_BumpMap(m, k, delta) {
 				m[k] := delta
 }
 
+KLR_NumberOrZero(value) {
+		return IsNumber(value) ? value + 0 : 0
+}
+
+; Merge a persisted JSON histogram into the canonical Map consumed by both
+; metrics WebViews. The database can contain one blob per synced device; every
+; numeric member is additive. Malformed legacy rows are isolated and logged
+; without exposing their payload or aborting the rest of the dashboard.
+KLR_MergeJsonNumberMap(target, raw_json, field_name) {
+		if !(target is Map)
+				throw TypeError("KLR JSON-map target must be a Map.")
+		if (raw_json = "" || raw_json = "{}")
+				return true
+		try decoded := JsonParse(raw_json)
+		catch as err {
+				try LoggerError("KLReader", "Invalid {1} JSON ignored: {2}.", field_name, err.Message)
+				return false
+		}
+		if !(decoded is Map) {
+				try LoggerError("KLReader", "Invalid {1} JSON shape ignored; expected an object.", field_name)
+				return false
+		}
+		for bucket, count in decoded
+				KLR_BumpMap(target, String(bucket), count)
+		return true
+}
+
+KLR_AppendJsonNumberArray(target, raw_json, field_name) {
+		if !(target is Array)
+				throw TypeError("KLR JSON-array target must be an Array.")
+		if (raw_json = "" || raw_json = "[]")
+				return true
+		try decoded := JsonParse(raw_json)
+		catch as err {
+				try LoggerError("KLReader", "Invalid {1} JSON ignored: {2}.", field_name, err.Message)
+				return false
+		}
+		if !(decoded is Array) {
+				try LoggerError("KLReader", "Invalid {1} JSON shape ignored; expected an array.", field_name)
+				return false
+		}
+		for _, value in decoded {
+				if IsNumber(value)
+						target.Push(value + 0)
+		}
+		return true
+}
+
 KLR__SumBurst(db, manifest, where) {
 		sql := "SELECT date, app,"
 				. " SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm, MAX(max_chars) AS max_chars,"
 				. " SUM(inter_delay_count) AS inter_count, SUM(inter_delay_sum) AS inter_sum,"
-				. " SUM(inter_delay_sumsq) AS inter_sumsq, MIN(length_buckets_json) AS length_buckets_json"
-				. " FROM agg_app_day_burst" . where . " GROUP BY date, app"
+				. " SUM(inter_delay_sumsq) AS inter_sumsq, length_buckets_json"
+				. " FROM agg_app_day_burst" . where
+				. " GROUP BY date, app, length_buckets_json"
 		for r in SQLite_Query(db, sql) {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
-				a["burst_count_total"] := r["count_total"]
-				a["burst_max_cpm"] := r["max_cpm"]
-				a["burst_max_chars"] := r["max_chars"]
-				a["burst_inter_delay_count"] := r["inter_count"]
-				a["burst_inter_delay_sum"] := r["inter_sum"]
-				a["burst_inter_delay_sumsq"] := r["inter_sumsq"]
-				; Lossy passthrough — the JSON sub-blob is opaque to AHK; emit it
-				; back as a raw JSON-string field so JS can JSON.parse() if needed.
-				a["burst_length_buckets_json"] := r["length_buckets_json"]
+				a["burst_count_total"] += KLR_NumberOrZero(r["count_total"])
+				max_cpm := KLR_NumberOrZero(r["max_cpm"])
+				if (max_cpm > a["burst_max_cpm"])
+						a["burst_max_cpm"] := max_cpm
+				max_chars := KLR_NumberOrZero(r["max_chars"])
+				if (max_chars > a["burst_max_chars"])
+						a["burst_max_chars"] := max_chars
+				a["burst_inter_delay_count"] += KLR_NumberOrZero(r["inter_count"])
+				a["burst_inter_delay_sum"] += KLR_NumberOrZero(r["inter_sum"])
+				a["burst_inter_delay_sumsq"] += KLR_NumberOrZero(r["inter_sumsq"])
+				KLR_MergeJsonNumberMap(a["burst_length_buckets"],
+						r["length_buckets_json"], "burst length buckets")
 		}
 }
 
@@ -208,14 +260,14 @@ KLR__SumSession(db, manifest, where) {
 				. " FROM agg_app_day_session" . where
 		for r in SQLite_Query(db, sql) {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
-				a["session_count_total"] := a["session_count_total"] + (r["count_total"] = "" ? 0 : r["count_total"])
+				a["session_count_total"] += KLR_NumberOrZero(r["count_total"])
 				if (IsNumber(r["longest_ms"]) && r["longest_ms"] > a["session_longest_ms"])
 						a["session_longest_ms"] := r["longest_ms"]
 				if (IsNumber(r["longest_chars"]) && r["longest_chars"] > a["session_longest_chars"])
 						a["session_longest_chars"] := r["longest_chars"]
-				a["session_total_active_ms"] := a["session_total_active_ms"] + (r["total_active_ms"] = "" ? 0 : r[
-						"total_active_ms"])
-				a["session_durations_json"] := r["durations_json"]
+				a["session_total_active_ms"] += KLR_NumberOrZero(r["total_active_ms"])
+				KLR_AppendJsonNumberArray(a["session_durations"],
+						r["durations_json"], "session durations")
 		}
 }
 
@@ -284,9 +336,9 @@ KLR__SumKcHold(db, manifest, where) {
 		for r in SQLite_Query(db, sql) {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["kc_hold"][String(r["keycode"])] := Map(
-						"sum", r["s"],
-						"count", r["c"],
-						"max", r["mx"],
+						"s", r["s"],
+						"n", r["c"],
+						"m", r["mx"],
 						"tap", r["t"],
 						"hold", r["h"]
 				)
@@ -305,32 +357,42 @@ KLR__SumTitles(db, manifest, where) {
 KLR__SumHourly(db, manifest, where) {
 		sql := "SELECT date, app, hour,"
 				. " SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,"
-				. " MIN(e_buckets_json) AS e_buckets_json"
-				. " FROM agg_app_day_hourly" . where . " GROUP BY date, app, hour"
+				. " e_buckets_json"
+				. " FROM agg_app_day_hourly" . where
+				. " GROUP BY date, app, hour, e_buckets_json"
 		for r in SQLite_Query(db, sql) {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
-				a["hourly"][r["hour"]] := Map(
-						"c", r["c"],
-						"e", r["e"],
-						"em", r["em"],
-						"es", r["es"],
-						"e_buckets_json", r["e_buckets_json"]
-				)
+				hour := r["hour"]
+				if !a["hourly"].Has(hour)
+						a["hourly"][hour] := Map("c", 0, "e", 0, "em", 0, "es", 0,
+								"e_buckets", Map())
+				item := a["hourly"][hour]
+				item["c"] += KLR_NumberOrZero(r["c"])
+				item["e"] += KLR_NumberOrZero(r["e"])
+				item["em"] += KLR_NumberOrZero(r["em"])
+				item["es"] += KLR_NumberOrZero(r["es"])
+				KLR_MergeJsonNumberMap(item["e_buckets"],
+						r["e_buckets_json"], "hourly error buckets")
 		}
 }
 
 KLR__SumHourlyMin5(db, manifest, where) {
 		sql := "SELECT date, app, slot,"
 				. " SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,"
-				. " MIN(e_buckets_json) AS e_buckets_json"
-				. " FROM agg_app_day_hourly_min5" . where . " GROUP BY date, app, slot"
+				. " e_buckets_json"
+				. " FROM agg_app_day_hourly_min5" . where
+				. " GROUP BY date, app, slot, e_buckets_json"
 		for r in SQLite_Query(db, sql) {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
-				a["hourly_min5"][r["slot"]] := Map(
-						"c", r["c"],
-						"e", r["e"],
-						"es", r["es"],
-						"e_buckets_json", r["e_buckets_json"]
-				)
+				slot := r["slot"]
+				if !a["hourly_min5"].Has(slot)
+						a["hourly_min5"][slot] := Map("c", 0, "e", 0, "es", 0,
+								"e_buckets", Map())
+				item := a["hourly_min5"][slot]
+				item["c"] += KLR_NumberOrZero(r["c"])
+				item["e"] += KLR_NumberOrZero(r["e"])
+				item["es"] += KLR_NumberOrZero(r["es"])
+				KLR_MergeJsonNumberMap(item["e_buckets"],
+						r["e_buckets_json"], "five-minute error buckets")
 		}
 }

@@ -8,8 +8,9 @@
 ;
 ;   WRITE-ONLY STATE (conventions 5.6). _TooltipPendingGeneration was
 ;   incremented at two sites and read at none, so it looked like the tooltip's
-;   generation-counter discipline applied to the deferred path when it did not —
-;   the actual guard is _TooltipPendingActive plus a timer cancel. REG_NOT_FOUND
+;   generation-counter discipline applied to the deferred path when it did not.
+;   The replacement is the consumed _TooltipRequestSerial carried by one
+;   immutable pending tuple through the pixel commit. REG_NOT_FOUND
 ;   was documented as "the sentinel Reg_Read returns", which Reg_Read never
 ;   returns; storage.ahk declares its own STORAGE_REG_NOT_FOUND instead.
 ;
@@ -45,7 +46,7 @@ _DSSS_NoResurrectedDeadState() {
 	Src := _DriverSourceNoComments()
 
 	Assert(InStr(Src, "_TooltipPendingGeneration") == 0,
-		"_TooltipPendingGeneration is write-only state that was removed — reintroducing it implies the deferred tooltip path validates a generation, which it does not; the real guard is _TooltipPendingActive plus the timer cancel")
+		"_TooltipPendingGeneration was write-only state; deferred ownership now belongs to the consumed _TooltipRequestSerial on the immutable pending request")
 	; Anchored on a non-identifier character so the sibling STORAGE_REG_NOT_FOUND,
 	; which is a real and consumed constant, does not match as a substring.
 	Assert(RegExMatch(Src, "(^|[^A-Za-z0-9_])REG_NOT_FOUND\s*:=") == 0,

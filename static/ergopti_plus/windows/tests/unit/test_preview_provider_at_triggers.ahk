@@ -1,30 +1,20 @@
 ﻿; tests/unit/test_preview_provider_at_triggers.ahk
 
 ; ==============================================================================
-; MODULE: Regression — no trigger starting with "@" ever produced a preview
+; MODULE: Regression — imperative and dynamic triggers use canonical decisions
 ;         (at-triggers-have-no-preview-candidate-source)
 ; DESCRIPTION:
 ; Typing @nptruc, @np or even @n expanded correctly and showed no tooltip at
 ; all. Not one tag of the family, not one combo, not the dates.
 ;
-; ROOT CAUSE ENCODED: the preview's candidate set came from _PrefixIndex and
-; from nowhere else, and _PrefixIndex is written by _AddTriggerToIndex whose
-; only three callers are file-driven — the bundled category TOMLs, their
-; in-memory cache and the extension packs. Every @ trigger is created
-; imperatively at boot by CreateHotstring, which ends at the ENGINE registry and
-; never touches the preview index, and no bundled TOML holds a trigger starting
-; with "@". So no key beginning with "@" could exist in that index,
-; _PrefixCollectCandidates returned an empty array for any @ buffer, and
-; _LookupAndRender hid the tooltip. The defect was a MISSING CANDIDATE SOURCE,
-; not a filter, a buffer reset or a toggle — which is why every assertion below
-; registers its triggers through CreateHotstring exactly as production does, and
-; asks the collector rather than the index.
-;
-; The cure is a provider consulted alongside the index. Inserting the @ triggers
-; INTO the index would work until the next HotstringPrefixWatcherRebuildIndex —
-; a live section toggle, a personal save, the boot-tail warm-up — which builds a
-; fresh Map and swaps it in; the bug would then return intermittently and look
-; like a race, so the tests below also pin that the index is left alone.
+; ROOT CAUSE ENCODED: the preview originally knew only the file index, so every
+; @ trigger registered imperatively at boot fired while the bubble stayed
+; silent. A provider filled that hole but became a second matcher: it resolved
+; personal state independently, could lose to a registered suffix, and could
+; show a dynamic value different from the one dispatch resolved later. The
+; collector now asks HSE_PreviewNextDecision directly. These tests therefore
+; register through the production engine boundary, assert the exact FireDecision
+; carried by each row, and prove the visible dynamic snapshot is consumed once.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -44,13 +34,29 @@
 ; literal here would be testing this file's encoding rather than the masking.
 ; @return The saved state, to be handed back to _PIPP_Teardown.
 _PIPP_Setup() {
-	global HSE_Suppressed
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+	global HSE_RebuildInProgress, HSE_PersonalInfoCombosEnabled, HSE_RepeatEnabled
 	global _PrefixIndex, _TriggerSet, _PrefixBuffer
 	global PersonalInformation, PersonalInformationLetters
-	Saved := { Index: _PrefixIndex, Set: _TriggerSet, Buffer: _PrefixBuffer }
+	InfoWasSet := IsSet(PersonalInformation)
+	LettersWereSet := IsSet(PersonalInformationLetters)
+	Saved := { Index:         _PrefixIndex,
+	           Set:           _TriggerSet,
+	           PrefixBuffer:  _PrefixBuffer,
+	           Suppressed:    HSE_Suppressed,
+	           Rebuild:       HSE_RebuildInProgress,
+	           CombosEnabled: HSE_PersonalInfoCombosEnabled,
+	           RepeatEnabled: HSE_RepeatEnabled,
+	           InfoWasSet:    InfoWasSet,
+	           Info:          InfoWasSet ? PersonalInformation : 0,
+	           LettersWereSet: LettersWereSet,
+	           Letters:       LettersWereSet ? PersonalInformationLetters : 0 }
 	HSE_RegistryClear()
 	HSE_HardReset()
 	HSE_Suppressed := 0
+	HSE_RebuildInProgress := false
+	HSE_PersonalInfoCombosEnabled := true
+	HSE_RepeatEnabled := true
 	HSE_FeedReset(true)
 	_PrefixIndex := Map()
 	_TriggerSet  := Map()
@@ -70,12 +76,27 @@ _PIPP_Setup() {
 
 ; @param Saved The value _PIPP_Setup returned.
 _PIPP_Teardown(Saved) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+	global HSE_RebuildInProgress, HSE_PersonalInfoCombosEnabled, HSE_RepeatEnabled
 	global _PrefixIndex, _TriggerSet, _PrefixBuffer
+	global PersonalInformation, PersonalInformationLetters
 	HSE_RegistryClear()
 	HSE_HardReset()
+	HSE_Suppressed := Saved.Suppressed
+	HSE_RebuildInProgress := Saved.Rebuild
+	HSE_PersonalInfoCombosEnabled := Saved.CombosEnabled
+	HSE_RepeatEnabled := Saved.RepeatEnabled
 	_PrefixIndex  := Saved.Index
 	_TriggerSet   := Saved.Set
-	_PrefixBuffer := Saved.Buffer
+	_PrefixBuffer := Saved.PrefixBuffer
+	if Saved.InfoWasSet
+		PersonalInformation := Saved.Info
+	else
+		PersonalInformation := unset
+	if Saved.LettersWereSet
+		PersonalInformationLetters := Saved.Letters
+	else
+		PersonalInformationLetters := unset
 }
 
 ; The @ triggers exactly as modules/hotstrings registers them: CreateHotstring,
@@ -83,10 +104,22 @@ _PIPP_Teardown(Saved) {
 _PIPP_RegisterAtTriggers() {
 	global ScriptInformation, PersonalInformation
 	MK := ScriptInformation["MagicKey"]
-	CreateHotstring("*", "@n" . MK, PersonalInformation["last_name"], Map("FinalResult", True))
-	CreateHotstring("*", "@np" . MK, "Moreau{Tab}Adrien{Tab}", Map("FinalResult", True))
-	CreateHotstring("*", "@iban" . MK, PersonalInformation["iban"], Map("FinalResult", True))
-	CreateHotstring("*", "@t" . MK, PersonalInformation["phone_number"], Map("FinalResult", True))
+	CreateHotstring("*", "@n" . MK, PersonalInformation["last_name"],
+		Map("FinalResult", True).Set("IsPrivate", True)
+			.Set("PreviewFields", ["last_name"])
+			.Set("PreviewValues", [PersonalInformation["last_name"]]))
+	CreateHotstring("*", "@np" . MK, "Moreau{Tab}Adrien",
+		Map("OnlyText", False).Set("FinalResult", True).Set("IsPrivate", True)
+			.Set("PreviewFields", ["last_name", "first_name"])
+			.Set("PreviewValues", ["Moreau", "Adrien"]))
+	CreateHotstring("*", "@iban" . MK, PersonalInformation["iban"],
+		Map("FinalResult", True).Set("IsPrivate", True)
+			.Set("PreviewFields", ["iban"])
+			.Set("PreviewValues", [PersonalInformation["iban"]]))
+	CreateHotstring("*", "@t" . MK, PersonalInformation["phone_number"],
+		Map("FinalResult", True).Set("IsPrivate", True)
+			.Set("PreviewFields", ["phone_number"])
+			.Set("PreviewValues", [PersonalInformation["phone_number"]]))
 }
 
 ; The masked form of the fixture IBAN, spelled out from the shared policy rather
@@ -138,7 +171,7 @@ _PIPP_MultiLetterComboIsPreviewed() {
 		AssertEqual("Moreau " . Chr(0x21E5) . " Adrien", Row.Output,
 			"a multi-field combo previews its fields joined by the tab glyph. The registered replacement is a send string full of {Tab} escapes, so the row has to be rebuilt from the personal-info values rather than shown raw")
 		Assert(Row.HasOwnProp("IsPrivate") and Row.IsPrivate,
-			"a provider row is private: the collector stamps every one of them, so a source that resolves the user's own data cannot leak it into the 14-day keylogger by forgetting to say so")
+			"a personal decision is private, so resolving the user's own data cannot leak it into the 14-day keylogger")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
@@ -204,11 +237,10 @@ Test("hotstrings: a resolvable @ combo is both previewed and fired (at-triggers-
 	_PIPP_ResolvableComboIsPreviewedAndFires)
 
 
-; The forbidding half, on the tag that genuinely cannot fire. "z" aliases no
-; field, so neither the resolver nor any registration can expand @npz — and the
-; bubble must stay silent. Without this case the test above would pass against a
-; provider that offered a row for every string starting with "@".
-_PIPP_UnresolvableComboIsNotPreviewed() {
+; The forbidding half for the personal resolver. "z" aliases no field, so the
+; @ expansion must not be advertised. The canonical engine still owns its next
+; fallback: because z is mid-word, repeat legitimately wins and must be shown.
+_PIPP_UnresolvableComboYieldsToRepeat() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
 	Saved := _PIPP_Setup()
 	try {
@@ -217,18 +249,146 @@ _PIPP_UnresolvableComboIsNotPreviewed() {
 		HSE_Buffer := "@npz"
 		HSE_StartIsWordBoundary := true
 
-		AssertEqual(0, _PrefixCollectCandidates().Length,
-			"'z' aliases no personal_info field, so @npz can never expand and must produce no row. A tooltip offering an expansion the magic key will not deliver is worse than no tooltip")
+		Rows := _PrefixCollectCandidates()
+		Assert(!IsObject(_PIPP_CandidateFor(Rows, "@npz" . MK)),
+			"'z' aliases no personal_info field, so the tooltip must not invent an @npz expansion")
+		AssertEqual(1, Rows.Length,
+			"the declined personal resolver must yield to the one canonical fallback")
+		AssertEqual("z" . MK, Rows[1].Trigger,
+			"the actual repeat fallback must remain visible instead of being hidden by the failed @ resolver")
 
 		HSE_Buffer := "@npz" . MK
 		Assert(!IsObject(HSE_TryPersonalInfoCombo(MK)),
-			"and the engine must decline it too — the two have to agree in this direction as well")
+			"the personal resolver must decline the same invalid tag")
+		Assert(IsObject(HSE_TryRepeatKey(MK)),
+			"sanity: the repeat fallback shown above must be fireable on the same completed buffer")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: an @ combo that cannot resolve is previewed by nobody (at-triggers-have-no-preview-candidate-source)",
-	_PIPP_UnresolvableComboIsNotPreviewed)
+Test("hotstrings: an unresolvable @ combo yields visibly to repeat (at-triggers-have-no-preview-candidate-source)",
+	_PIPP_UnresolvableComboYieldsToRepeat)
+
+
+; A registered personal Spec is an immutable snapshot until the terminal Reload
+; replaces the process. The editor publishes the new PersonalInformation Map
+; before that Reload and can hold a confirmation MsgBox open in between, so a
+; preview path that re-reads the Map advertises the new value while the engine
+; still owns and emits the old one
+_PIPP_RegisteredSpecSnapshotSurvivesPublishedMapChange() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation, PersonalInformation
+	Saved := _PIPP_Setup()
+	try {
+		MK := ScriptInformation["MagicKey"]
+		_PIPP_RegisterAtTriggers()
+		PersonalInformation["last_name"] := "Nouveau"
+		HSE_Buffer := "@n"
+		HSE_StartIsWordBoundary := true
+
+		Row := _PIPP_CandidateFor(_PrefixCollectCandidates(), "@n" . MK)
+		Assert(IsObject(Row), "the registered @n trigger must still produce a row during the save-to-Reload transition")
+		Winner := HSE_FeedChar(MK, true)
+		Assert(IsObject(Winner), "the engine must still own the registered pre-Reload Spec")
+		AssertEqual("Moreau", Winner.Replacement,
+			"the registered Spec must retain the old value until Reload replaces the process")
+		AssertEqual(Winner.Replacement, Row.Output,
+			"the tooltip must render the registered Spec’s value snapshot, not the newly published PersonalInformation Map")
+	} finally {
+		_PIPP_Teardown(Saved)
+	}
+}
+Test("hotstrings: a personal preview renders the registered value snapshot during save-to-Reload",
+	_PIPP_RegisteredSpecSnapshotSurvivesPublishedMapChange)
+
+
+; The resolver declines a combo whole when any field is blank, because emitting
+; the remaining fields would shift values into the wrong form controls. The
+; canonical preview must not assemble a partial row and must surface the repeat
+; fallback that really wins next.
+_PIPP_BlankFieldComboYieldsToRepeat() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation, PersonalInformation
+	Saved := _PIPP_Setup()
+	try {
+		MK := ScriptInformation["MagicKey"]
+		_PIPP_RegisterAtTriggers()
+		PersonalInformation["first_name"] := ""
+		HSE_Buffer := "@npn"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		Assert(!IsObject(_PIPP_CandidateFor(Rows, "@npn" . MK)),
+			"@npn contains a blank first_name field, so the tooltip must not promise a partial personal expansion")
+		AssertEqual(1, Rows.Length,
+			"declining the personal combo must not hide the canonical repeat fallback")
+		AssertEqual("n" . MK, Rows[1].Trigger,
+			"the visible row must describe the repeat the engine will actually fire")
+		HSE_Buffer := "@npn" . MK
+		Assert(!IsObject(HSE_TryPersonalInfoCombo(MK)),
+			"the engine declines the same combo whole; preview and fire must agree on the blank-field gate")
+		Assert(IsObject(HSE_TryRepeatKey(MK)),
+			"sanity: the shown repeat fallback must fire after the personal gate declines")
+	} finally {
+		_PIPP_Teardown(Saved)
+	}
+}
+Test("hotstrings: a personal combo containing a blank field yields visibly to repeat",
+	_PIPP_BlankFieldComboYieldsToRepeat)
+
+
+; Registered matching runs before the personal fallback. A shorter registered
+; suffix can therefore own the magic-key press even though the visible buffer
+; also spells a longer, resolvable @ combo
+_PIPP_RegisteredSuffixWinnerSuppressesPersonalFallbackRow() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
+	Saved := _PIPP_Setup()
+	try {
+		MK := ScriptInformation["MagicKey"]
+		CreateHotstring("*?", "np" . MK, "registered suffix")
+		HSE_Buffer := "@np"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"the collector must expose the registered suffix selected before the personal fallback")
+		AssertEqual("np" . MK, Rows[1].Trigger,
+			"the visible row must name the real registered winner, never the longer-looking @ fallback")
+		AssertEqual("registered suffix", Rows[1].Output,
+			"the visible output must come from the registered winner's canonical decision")
+		Winner := HSE_FeedChar(MK, true)
+		Assert(IsObject(Winner), "the registered suffix must produce an engine winner")
+		AssertEqual("np" . MK, Winner.Trigger,
+			"the actual engine ordering is registered matcher first, personal fallback second")
+	} finally {
+		_PIPP_Teardown(Saved)
+	}
+}
+Test("hotstrings: a registered suffix winner suppresses a conflicting personal fallback preview",
+	_PIPP_RegisteredSuffixWinnerSuppressesPersonalFallbackRow)
+
+
+; The live-rebuild fence means the registry cannot answer, not that no registered
+; trigger exists. Both registered matches and fallbacks deliberately decline
+; until the new registry generation is fully published
+_PIPP_RebuildFenceHidesPersonalDecisions() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RebuildInProgress, ScriptInformation
+	Saved := _PIPP_Setup()
+	try {
+		MK := ScriptInformation["MagicKey"]
+		_PIPP_RegisterAtTriggers()
+		HSE_Buffer := "@n"
+		HSE_StartIsWordBoundary := true
+		HSE_RebuildInProgress := true
+
+		AssertEqual(0, _PrefixCollectCandidates().Length,
+			"the collector must offer no row while the engine's live-rebuild fence refuses every match")
+		Assert(!IsObject(HSE_FeedChar(MK, true)),
+			"the real matcher must decline the same key during the rebuild window")
+	} finally {
+		_PIPP_Teardown(Saved)
+	}
+}
+Test("hotstrings: the live-rebuild fence hides personal decisions",
+	_PIPP_RebuildFenceHidesPersonalDecisions)
 
 
 ; @dt spells two valid letter aliases (d, t) AND is the short-date trigger. Only
@@ -257,10 +417,9 @@ Test("hotstrings: an @ date trigger previews the date the engine will type (at-t
 	_PIPP_DateTriggerPreviewsItsDate)
 
 
-; A provider must never shadow a trigger the index already answered for: the
-; index row carries the real category, section and priority of the mapping that
-; will fire, and two rows for one trigger would show the same expansion twice.
-_PIPP_ProviderNeverShadowsTheIndex() {
+; The catalogue is allowed to be stale during a registry publication, but it is
+; no longer allowed to answer the user-facing question at all.
+_PIPP_StaleIndexNeverShadowsCanonicalPersonalDecision() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
 	Saved := _PIPP_Setup()
 	try {
@@ -278,35 +437,38 @@ _PIPP_ProviderNeverShadowsTheIndex() {
 			}
 		}
 		AssertEqual(1, Matches,
-			"one trigger, one row: a provider row for a trigger the index already holds must be dropped")
-		AssertEqual("the indexed replacement", _PIPP_CandidateFor(Candidates, "@np" . MK).Output,
-			"and the surviving row must be the INDEX one, which carries the real category, section and priority of the mapping the engine will fire")
+			"one completion must produce one canonical row even when the catalogue holds the same trigger")
+		Row := _PIPP_CandidateFor(Candidates, "@np" . MK)
+		AssertEqual("Moreau " . Chr(0x21E5) . " Adrien", Row.Output,
+			"a stale indexed replacement must never shadow the value owned by the live personal Spec")
+		Assert(Row.HasOwnProp("FireDecision") and IsObject(Row.FireDecision.Spec),
+			"the surviving row must be backed by a complete engine decision, not index metadata")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: a preview provider never shadows an indexed trigger (at-triggers-have-no-preview-candidate-source)",
-	_PIPP_ProviderNeverShadowsTheIndex)
+Test("hotstrings: a stale index never shadows the canonical personal decision (at-triggers-have-no-preview-candidate-source)",
+	_PIPP_StaleIndexNeverShadowsCanonicalPersonalDecision)
 
 
-; The index is rebuilt from scratch by HotstringPrefixWatcherRebuildIndex, which
-; swaps a fresh Map in. Anything written to it outside that loop is erased on the
-; first live section toggle, personal save or warm-up rebuild — so the fix must
-; not have taken that route, and this says so.
+; The auxiliary catalogue is rebuilt from files and swapped wholesale. An
+; imperative secret must not be injected into that separate lifecycle: it would
+; disappear at the next rebuild and, in `_TriggerSet`, enter persisted near-miss
+; analytics with its trigger and raw output.
 _PIPP_TheIndexStaysFileDriven() {
 	global _PrefixIndex, _TriggerSet
 	Saved := _PIPP_Setup()
 	try {
 		_PIPP_RegisterAtTriggers()
 		AssertEqual(0, _PrefixIndex.Count,
-			"registering an @ trigger must not write to the preview index: the index is rebuilt from files and swapped wholesale, so an entry inserted here disappears at the next rebuild and the bug returns looking like a race")
+			"registering an @ trigger must not write to the file-derived auxiliary index")
 		AssertEqual(0, _TriggerSet.Count,
 			"nor to the near-miss trigger set, which forwards Entry.Output to the analytics log — that would write the raw IBAN, SSN and card number into it")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: an @ registration still writes to neither preview index (at-triggers-have-no-preview-candidate-source)",
+Test("hotstrings: an @ registration writes to neither auxiliary catalogue (at-triggers-have-no-preview-candidate-source)",
 	_PIPP_TheIndexStaysFileDriven)
 
 
@@ -473,3 +635,102 @@ _PIPP_PrivateRowStillClosesThePublicOne() {
 }
 Test("hotstrings: a private row still closes out the suggestion it replaced (at-triggers-have-no-preview-candidate-source)",
 	_PIPP_PrivateRowStillClosesThePublicOne)
+
+
+
+
+
+; =======================================================================
+; =======================================================================
+; ======= 5/ A visible dynamic value is one immutable transaction =======
+; =======================================================================
+; =======================================================================
+
+global _PIPP_DynamicResolutionCalls := 0
+
+_PIPP_NextDynamicValue() {
+	global _PIPP_DynamicResolutionCalls
+	_PIPP_DynamicResolutionCalls += 1
+	return "shown-" . _PIPP_DynamicResolutionCalls
+}
+
+_PIPP_VisibleDynamicDecisionImpl() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_LastEndChar, HSE_Suppressed
+	global HSE_SUPPRESS_RELEASE_DELAY_MS
+	global _PIPP_DynamicResolutionCalls, _AHK04_SendCalls, ScriptInformation
+	MK := ScriptInformation["MagicKey"]
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_Suppressed := 0
+	HSE_FeedReset(true)
+	HotstringPrefixWatcherClearVisibleDecisions()
+	_AHK04_SetSendVerdict(true)
+	try {
+		_PIPP_DynamicResolutionCalls := 0
+		Spec := HSE_Register("*?", "dyn" . MK, 0,
+			Map("Replacement", _PIPP_NextDynamicValue, "OnlyText", true,
+				"Category", "dynamichotstrings", "Section", "visible"))
+		HSE_Buffer := "dyn"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"the dynamic star trigger must produce one canonical preview row")
+		Row := Rows[1]
+		AssertEqual("shown-1", Row.Output,
+			"the first callable result is the value committed to pixels")
+		AssertEqual(1, _PIPP_DynamicResolutionCalls,
+			"building one preview decision must resolve the callable exactly once")
+		Assert(ObjPtr(Row.FireDecision.Spec) == ObjPtr(Spec),
+			"the visible decision must retain the exact registered Spec")
+		Assert(HotstringPrefixWatcherPublishVisibleDecisions([Row]),
+			"a current decision must publish as the owner of the visible row")
+
+		Winner := HSE_FeedChar(MK, true)
+		Assert(IsObject(Winner) and ObjPtr(Winner) == ObjPtr(Spec),
+			"the physical completion must select the same Spec the row advertised")
+		Effect := 0
+		Assert(HSE_DispatchMatch(Winner, HSE_LastEndChar, &Effect),
+			"dispatch must commit the visible dynamic decision")
+		AssertEqual(1, _PIPP_DynamicResolutionCalls,
+			"dispatch must reuse the visible ResolvedBase instead of invoking the callable again")
+		AssertEqual(1, _AHK04_SendCalls.Length,
+			"the expansion must be emitted as one atomic send burst")
+		Burst := _AHK04_SendCalls[1].Args[1]
+		Assert(InStr(Burst, "shown-1") > 0 and InStr(Burst, "shown-2") == 0,
+			"the emitted burst must contain exactly the value the tooltip displayed")
+		Assert(IsObject(Effect) and Effect.InsertedText == "shown-1",
+			"the canonical screen effect must commit the same frozen value")
+
+		; Once the visible owner is invalidated, a new user-visible decision is a
+		; new transaction and may legitimately resolve dynamic state again.
+		; Let the real deferred suppression release run first; forcing the counters
+		; down by hand would leave its already-armed timer to underflow later.
+		PreviousCritical := Critical("Off")
+		Sleep(HSE_SUPPRESS_RELEASE_DELAY_MS + 20)
+		Critical(PreviousCritical ? PreviousCritical : "Off")
+		HotstringPrefixWatcherClearVisibleDecisions()
+		HSE_Buffer := "dyn"
+		HSE_StartIsWordBoundary := true
+		NextRows := _PrefixCollectCandidates()
+		AssertEqual(1, NextRows.Length,
+			"the trigger must remain previewable after invalidating the prior visible owner")
+		AssertEqual("shown-2", NextRows[1].Output,
+			"a new decision after invalidation must resolve the callable again")
+		AssertEqual(2, _PIPP_DynamicResolutionCalls,
+			"one old decision plus one new decision must produce exactly two resolutions")
+	} finally {
+		HotstringPrefixWatcherClearVisibleDecisions()
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+
+_PIPP_VisibleDynamicDecisionIsReusedByDispatch() {
+	; Reuse the send-transaction harness that already owns suppression timers,
+	; synthetic-keylogger state and the dry-run sender. A local ad-hoc stub would
+	; let those asynchronous releases leak into the next shared-suite test.
+	_AHK04_RunIsolated(_PIPP_VisibleDynamicDecisionImpl)
+}
+Test("hotstrings: dispatch reuses the visible dynamic value and a new decision resolves again",
+	_PIPP_VisibleDynamicDecisionIsReusedByDispatch)

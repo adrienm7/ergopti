@@ -11,6 +11,718 @@
 ; SetTimer, ReadScript/KeyboardShortcutsConfig) are unaffected.
 ; ==============================================================================
 
+#Include config_write_lease.ahk
+
+; Reports one user-visible error for a configuration mutation that did not
+; reach disk. The TOML writer already logs its low-level failure; this adds the
+; action context and the notification a boolean-returning caller otherwise
+; loses. NotifyFn is injectable so behavioural tests can count the signal
+; without displaying a real TrayTip.
+ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+	if (Detail != "") {
+		try LoggerError("Config", "Could not persist {1}: {2}.", Context, Detail)
+	} else if StateUnchanged {
+		try LoggerError("Config", "Could not persist {1}; live state was left unchanged.", Context)
+	} else {
+		try LoggerError("Config", "Could not fully persist {1}.", Context)
+	}
+	MessageKey := StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"
+	; Failure reporting is a backstop, never a second failure source. Translation,
+	; an injected UI seam, or the native notifier can each throw while the driver
+	; is already handling a refused write. Preserve the false status and the
+	; file-log evidence instead of escaping the menu/timer callback.
+	try {
+		Message := t(MessageKey)
+		Options := Map("title", t("paths_editor.save_failed_title"), "level", "error")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, Options)
+		else
+			NotifierSend(Message, Options)
+	} catch as Err {
+		try LoggerError("Config", "Could not present the persistence failure notification: {1}.", Err.Message)
+	}
+	return false
+}
+
+; SaveFullConfig has three explicit outcomes. Callers must compare against the
+; named constants: DEFERRED means a coalesced retry owns eventual persistence,
+; never that the bytes have already reached disk.
+global CONFIG_SAVE_FAILED := 0
+global CONFIG_SAVE_OK := 1
+global CONFIG_SAVE_DEFERRED := 2
+global CONFIG_SAVE_RESOLVE_BLOCKED := 0
+global CONFIG_SAVE_RESOLVE_RELOAD := 1
+global CONFIG_SAVE_RESOLVE_DEFERRED := 2
+global CONFIG_FULL_SAVE_RETRY_DELAY_MS := -100
+global CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS := -1000
+global CONFIG_FULL_SAVE_BOOT_DELAY_MS := -500
+
+; A one-shot timer is only a wake-up mechanism: Reload terminates it. Keep the
+; actual full-save obligation in a generation counter so a terminal transition
+; can synchronously prove that every accepted request reached disk first.
+_ConfigFullSaveCoordinator(Replacement := unset) {
+	static State := {
+		requested_generation: 0,
+		committed_generation: 0,
+		settled_generation: 0,
+		terminal_required_generation: 0,
+		bound_path: "",
+		bound_path_key: "",
+		reload_required: false,
+		timer_armed: false,
+		reported_failure_generation: 0
+	}
+	if IsSet(Replacement)
+		State := Replacement
+	return State
+}
+
+_ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
+	global ConfigurationFile
+	RequestPath := IsSet(Path) ? String(Path)
+		: (IsSet(ConfigurationFile) ? String(ConfigurationFile) : "")
+	RequestKey := _ConfigWriteLeaseKey(RequestPath)
+	if (RequestKey = "") {
+		try LoggerError("ConfigIO", "Refusing a full-save request without a concrete configuration path.")
+		return 0
+	}
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		if State.reload_required || _ConfigWriteTerminalIsActive()
+			return 0
+		if State.requested_generation > State.settled_generation {
+			if (State.bound_path_key != RequestKey)
+				return 0
+		} else {
+			State.bound_path := RequestPath
+			State.bound_path_key := RequestKey
+		}
+		State.requested_generation += 1
+		if TerminalRequired
+			State.terminal_required_generation := State.requested_generation
+		return State.requested_generation
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_ConfigFullSaveBoundPath() {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try return State.bound_path
+	finally Critical(PreviousCritical)
+}
+
+_ConfigFullSavePathMatches(Path) {
+	State := _ConfigFullSaveCoordinator()
+	Key := _ConfigWriteLeaseKey(Path)
+	PreviousCritical := Critical("On")
+	try return State.bound_path_key != "" && State.bound_path_key == Key
+	finally Critical(PreviousCritical)
+}
+
+_ConfigFullSaveReleaseBindingIfSettled(State) {
+	if State.requested_generation <= State.settled_generation
+			&& !State.reload_required {
+		State.bound_path := ""
+		State.bound_path_key := ""
+	}
+}
+
+_ConfigFullSaveHasPending() {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try return State.requested_generation > State.settled_generation
+	finally Critical(PreviousCritical)
+}
+
+_ConfigFullSaveCapture() {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try return State.requested_generation
+	finally Critical(PreviousCritical)
+}
+
+_ConfigFullSaveAcknowledge(TargetGeneration) {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		TargetGeneration := Min(TargetGeneration, State.requested_generation)
+		if (TargetGeneration > State.committed_generation)
+			State.committed_generation := TargetGeneration
+		if (TargetGeneration > State.settled_generation)
+			State.settled_generation := TargetGeneration
+		_ConfigFullSaveReleaseBindingIfSettled(State)
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Selects disk authority for one failed request only when no older accepted
+; generation would be discarded with it. Settled is not committed: rejection
+; is a policy decision, never a claim that the bytes reached disk.
+_ConfigFullSaveRejectExact(Generation) {
+	if !(Generation is Integer) || Generation <= 0
+		return false
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		if Generation != State.requested_generation
+				|| Generation != State.settled_generation + 1
+			return false
+		State.settled_generation := Generation
+		State.reload_required := true
+		State.timer_armed := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_ConfigFullSaveResolveFailure(Generation, TimerFn := 0) {
+	global CONFIG_SAVE_RESOLVE_BLOCKED, CONFIG_SAVE_RESOLVE_RELOAD
+	global CONFIG_SAVE_RESOLVE_DEFERRED, CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+	if ((Generation is Integer) && Generation == 0)
+		return CONFIG_SAVE_RESOLVE_RELOAD
+	if _ConfigFullSaveRejectExact(Generation)
+		return CONFIG_SAVE_RESOLVE_RELOAD
+	if _ConfigFullSaveHasPending()
+			&& _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS,
+				TimerFn)
+		return CONFIG_SAVE_RESOLVE_DEFERRED
+	return CONFIG_SAVE_RESOLVE_BLOCKED
+}
+
+; Reload is the terminal act that makes an exact rejected generation truly
+; disk-authoritative. If Reload returns because an OnExit gate refused process
+; death, that decision never completed: keeping the seal would make every later
+; menu save a permanent no-op while RAM still displays the rejected candidate.
+; Restore only the exact single rejected generation and retain it as a pending
+; user obligation. A genuinely accepted Reload never returns to call this seam.
+_ConfigFullSaveResumeRejected(Generation, TimerFn := 0) {
+	global CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+	if !(Generation is Integer) || Generation <= 0
+		return false
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		if !State.reload_required
+				|| Generation != State.requested_generation
+				|| Generation != State.settled_generation
+				|| Generation <= State.committed_generation
+			return false
+		State.settled_generation := Generation - 1
+		State.reload_required := false
+		State.timer_armed := false
+	} finally Critical(PreviousCritical)
+	return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS,
+		TimerFn)
+}
+
+_ConfigFullSaveAbandonThrough(TargetGeneration) {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		TargetGeneration := Min(TargetGeneration, State.requested_generation)
+		if (TargetGeneration > State.settled_generation)
+			State.settled_generation := TargetGeneration
+		State.timer_armed := false
+		_ConfigFullSaveReleaseBindingIfSettled(State)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_ConfigFullSaveTimerStarted() {
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try State.timer_armed := false
+	finally Critical(PreviousCritical)
+}
+
+; Coalesces wake-ups but never erases the generation when SetTimer itself
+; fails. TimerFn mirrors SetTimer(Callback, DelayMs) in behavioural tests.
+_ConfigArmFullSaveRetry(DelayMs, TimerFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; SetTimer and failure logging can yield. The coordinator lock below is
+		; sufficient for memory state; never extend a caller's Critical span over
+		; timer registration.
+		Critical("Off")
+		try return _ConfigArmFullSaveRetry(DelayMs, TimerFn)
+		finally Critical(InheritedCritical)
+	}
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		if (State.requested_generation <= State.settled_generation)
+			return true
+		if State.timer_armed
+			return true
+		State.timer_armed := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	try {
+		if (DelayMs = 0)
+			throw ValueError("A full-save retry delay cannot be zero.")
+		if HasMethod(TimerFn, "Call")
+			TimerFn.Call(_SaveFullConfigDeferred, -Abs(DelayMs))
+		else
+			SetTimer(_SaveFullConfigDeferred, -Abs(DelayMs))
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try State.timer_armed := false
+		finally Critical(PreviousCritical)
+		try LoggerError("ConfigIO", "Could not arm the pending full-save retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_ConfigQueueFullSave(DelayMs, TimerFn := 0, TerminalRequired := true) {
+	if !_ConfigFullSaveRequest(TerminalRequired)
+		return false
+	return _ConfigArmFullSaveRetry(DelayMs, TimerFn)
+}
+
+; Commits one logical config mutation in one TOML read-modify-write cycle and,
+; when supplied, finalizes reversible non-memory side effects and publishes the
+; detached candidate before releasing ownership. FinalizeFn runs outside
+; Critical (it may call a guarded OS adapter). PublishFn runs inside one short
+; Critical window and must contain memory swaps only. A throw from either is a
+; PARTIAL failure because the durable write has already succeeded.
+ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
+		PublishFn := 0, FinalizeFn := 0, CompensateFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; The global path owner supplies isolation. Never inherit a caller's
+		; Critical span into durable I/O, finalization, recovery or feedback.
+		Critical("Off")
+		try return ConfigCommitUpdates(Path, Updates, Context, WriterFn,
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn)
+		finally Critical(InheritedCritical)
+	}
+	OwnerToken := _ConfigWriteLeaseTryAcquire(Path, "targeted")
+	if !(OwnerToken is Object) {
+		FailureDetail := "another configuration transaction is already in progress"
+		StateUnchanged := true
+		_ConfigRunPrecommitCompensation(CompensateFn, &FailureDetail, &StateUnchanged)
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+				FailureDetail, StateUnchanged)
+	}
+	return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn, false)
+}
+
+; Executes one strict update batch while the caller retains its transition
+; barrier. Paths/onboarding must keep the same owner through paths.toml or
+; Reload publication, so consuming and releasing it inside _ConfigCommitOwned
+; would reopen the exact interleaving window the barrier exists to close.
+ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
+		WriterFn := 0, NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates,
+			Context, WriterFn, NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_ConfigWriteLeaseOwns(OwnerToken, Path)
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"the borrowed configuration owner is stale or owns another path")
+	FailureDetail := ""
+	if !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
+			"the borrowed configuration writer", &FailureDetail)
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			FailureDetail)
+	return true
+}
+
+; Claims the path before reading any mutable live state, then asks BuildFn for a
+; detached transaction plan. This closes the read/clone -> acquire window that
+; otherwise lets a sibling publish between a stale snapshot and its later write.
+; BuildFn returns { updates, publish?, finalize?, compensate?, cleanup?,
+; rollback_updates?, retain? }. A rollback batch is written through the same
+; writer while this exact lease is still held when primary finalization fails.
+ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ConfigCommitBuilt(Path, Context, BuildFn, WriterFn, NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	OwnerToken := _ConfigWriteLeaseTryAcquire(Path, "built")
+	if !(OwnerToken is Object)
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"another configuration transaction is already in progress")
+	Plan := 0
+	FailureDetail := ""
+	Transferred := false
+	NoOp := false
+	CompensateFn := 0
+	RetainFn := 0
+	StateUnchanged := true
+	try {
+		try Plan := BuildFn.Call()
+		catch as Err
+			FailureDetail := "candidate construction failed: " . Err.Message
+		if (FailureDetail == "" && !(Plan is Object))
+			FailureDetail := "candidate construction was refused"
+		if (FailureDetail == "") {
+			; Resolve the two unwind callbacks before inspecting the rest of the
+			; contract. Even a malformed/noop getter may follow a prepared side effect.
+			CompensateFn := _ConfigPlanGet(Plan, "compensate", 0)
+			RetainFn := _ConfigPlanGet(Plan, "retain", 0)
+			NoOp := !!_ConfigPlanGet(Plan, "noop", false)
+		}
+		if (FailureDetail == "" && !NoOp) {
+			Updates := _ConfigPlanGet(Plan, "updates", 0)
+			if !(Updates is Array)
+				FailureDetail := "candidate construction returned no update batch"
+		}
+		if (FailureDetail == "" && !NoOp) {
+			; Resolve every optional plan property while this frame still owns the
+			; release. A custom getter may throw; that must not strand the path.
+			; Compensation and retention come first so a later throwing getter cannot
+			; strand a side effect that BuildFn already prepared.
+			PublishFn := _ConfigPlanGet(Plan, "publish", 0)
+			FinalizeFn := _ConfigPlanGet(Plan, "finalize", 0)
+			CleanupFn := _ConfigPlanGet(Plan, "cleanup", 0)
+			RollbackUpdates := _ConfigPlanGet(Plan, "rollback_updates", 0)
+			PublishOnFinalizeFailure := !!_ConfigPlanGet(Plan,
+				"publish_on_finalize_failure", false)
+			Transferred := true
+			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
+					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn)
+		}
+	} catch as Err {
+		FailureDetail := "candidate plan inspection failed: " . Err.Message
+	} finally {
+		if !Transferred {
+			if (FailureDetail != "") {
+				Compensated := _ConfigRunPrecommitCompensation(CompensateFn,
+					&FailureDetail, &StateUnchanged)
+				if !Compensated
+					_ConfigRunRecoveryRetention(RetainFn, "compensation_failed",
+						&FailureDetail, &StateUnchanged)
+			}
+			_ConfigWriteLeaseRelease(OwnerToken)
+		}
+	}
+	if NoOp
+		return true
+	return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail,
+		StateUnchanged)
+}
+
+_ConfigPlanGet(Plan, Key, Default := 0) {
+	if (Plan is Map)
+		return Plan.Get(Key, Default)
+	return Plan.HasOwnProp(Key) ? Plan.%Key% : Default
+}
+
+_ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
+		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0) {
+	Failed := false
+	FailureDetail := ""
+	StateUnchanged := true
+	DurableCommitted := false
+	PrimaryFinalized := false
+	try {
+		; A misspelled plan callback used to be treated as "not supplied": the
+		; writer committed, publication was skipped, and the gateway returned true.
+		; Validate the complete optional-callback contract before durable I/O so a
+		; malformed plan cannot split disk state from live state.
+		if !_ConfigValidateCommitCallbacks(PublishFn, FinalizeFn, CompensateFn,
+				CleanupFn, RetainFn, RollbackUpdates,
+				&FailureDetail, &StateUnchanged)
+			Failed := true
+		if !Failed && !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
+				"the configuration writer", &FailureDetail) {
+			Failed := true
+		}
+		if !Failed
+			DurableCommitted := true
+		if Failed && !DurableCommitted {
+			Compensated := _ConfigRunPrecommitCompensation(CompensateFn,
+					&FailureDetail, &StateUnchanged)
+			if !Compensated
+				_ConfigRunRecoveryRetention(RetainFn, "compensation_failed",
+					&FailureDetail, &StateUnchanged)
+		}
+		if !Failed && HasMethod(FinalizeFn, "Call") {
+			try {
+				FinalizeResult := FinalizeFn.Call()
+				if !(FinalizeResult is Integer) || FinalizeResult != 1 {
+					Failed := true
+					StateUnchanged := false
+					FailureDetail := "the durable write succeeded but finalization was refused"
+				}
+			}
+			catch as Err {
+				Failed := true
+				StateUnchanged := false
+				FailureDetail := "the durable write succeeded but finalization failed: " . Err.Message
+			}
+		}
+		if DurableCommitted && !Failed
+			PrimaryFinalized := true
+		if DurableCommitted && Failed && (RollbackUpdates is Array) {
+			; Activation is exception-atomic, so compensation can discard the inert
+			; candidate before restoring the previous durable value. Both operations
+			; remain under this owner; no full-save or sibling writer can interleave.
+			Compensated := _ConfigRunPrecommitCompensation(CompensateFn,
+					&FailureDetail, &StateUnchanged)
+			; Never rewrite old durability while the rejected native candidate may
+			; still be live. Recovery owns that ambiguity and must quiesce it first.
+			RollbackWritten := false
+			if Compensated
+				RollbackWritten := _ConfigInvokeCommitWriter(Path, RollbackUpdates,
+					WriterFn, "the durable rollback writer", &FailureDetail)
+			if Compensated && RollbackWritten {
+				StateUnchanged := true
+			} else {
+				StateUnchanged := false
+				RecoveryStage := Compensated
+					? "rollback_failed" : "compensation_failed"
+				_ConfigRunRecoveryRetention(RetainFn, RecoveryStage,
+					&FailureDetail, &StateUnchanged)
+			}
+		}
+		if PrimaryFinalized && HasMethod(CleanupFn, "Call") {
+			CleanupOk := false
+			try CleanupOk := CleanupFn.Call()
+			catch as Err {
+				FailureDetail .= (FailureDetail != "" ? "; " : "")
+					. "post-commit cleanup failed: " . Err.Message
+			}
+			if !(CleanupOk is Integer) || CleanupOk != 1 {
+				if (FailureDetail == "")
+					FailureDetail := "post-commit cleanup was refused"
+				Failed := true
+				StateUnchanged := false
+				_ConfigRunRecoveryRetention(RetainFn, "cleanup_failed",
+					&FailureDetail, &StateUnchanged)
+			}
+		}
+		; Cleanup happens only after the forward durable value and primary native
+		; authority agree. A cleanup failure therefore publishes that forward
+		; authority plus its explicit recovery handle instead of losing either.
+		ShouldPublish := PrimaryFinalized
+			|| (DurableCommitted && PublishOnFinalizeFailure
+				&& !(RollbackUpdates is Array))
+		if ShouldPublish && HasMethod(PublishFn, "Call") {
+			PublishingAfterFailure := Failed
+			PreviousCritical := Critical("On")
+			try PublishFn.Call()
+			catch as Err {
+				Failed := true
+				StateUnchanged := false
+				FailureDetail .= (FailureDetail != "" ? "; " : "")
+					. (PublishingAfterFailure
+						? "authoritative live publication after finalization failure also failed: "
+						: "the durable write succeeded but live publication failed: ")
+					. Err.Message
+			} finally {
+				Critical(PreviousCritical)
+			}
+		}
+	} finally {
+		_ConfigWriteLeaseRelease(OwnerToken)
+	}
+	if Failed
+		return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail, StateUnchanged)
+	return true
+}
+
+_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
+	try {
+		if HasMethod(WriterFn, "Call")
+			Written := WriterFn.Call(Path, Updates)
+		else
+			Written := TOML_BatchWrite(Path, Updates)
+	} catch as Err {
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. Stage . " failed: " . Err.Message
+		return false
+	}
+	if !((Written is Integer) && Written == 1) {
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. Stage . " refused or returned a malformed status"
+		return false
+	}
+	return true
+}
+
+_ConfigValidateCommitCallbacks(PublishFn, FinalizeFn, CompensateFn,
+		CleanupFn, RetainFn, RollbackUpdates,
+		&FailureDetail, &StateUnchanged) {
+	Valid := true
+	for Spec in [
+			{ name: "live-publication", fn: PublishFn },
+			{ name: "finalization", fn: FinalizeFn },
+			{ name: "pre-commit compensation", fn: CompensateFn },
+			{ name: "post-commit cleanup", fn: CleanupFn },
+			{ name: "recovery retention", fn: RetainFn }
+		] {
+		Fn := Spec.fn
+		if (Fn is Integer) && Fn == 0
+			continue
+		if HasMethod(Fn, "Call")
+			continue
+		Valid := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. Spec.name . " callback is not callable"
+		if (Spec.name == "pre-commit compensation"
+				|| Spec.name == "recovery retention")
+			StateUnchanged := false
+	}
+	if !((RollbackUpdates is Integer) && RollbackUpdates == 0)
+			&& !(RollbackUpdates is Array) {
+		Valid := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "durable rollback updates must be an Array"
+		StateUnchanged := false
+	}
+	return Valid
+}
+
+_ConfigRunRecoveryRetention(RetainFn, Stage, &FailureDetail, &StateUnchanged) {
+	if (RetainFn is Integer) && RetainFn == 0
+		return true
+	if !HasMethod(RetainFn, "Call") {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "recovery retention callback is not callable"
+		return false
+	}
+	Retained := false
+	try Retained := RetainFn.Call(Stage)
+	catch as Err {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "recovery retention raised an error: " . Err.Message
+		return false
+	}
+	if !(Retained is Integer) || Retained != 1 {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "recovery retention was refused"
+		return false
+	}
+	return true
+}
+
+; Undo a reversible effect that had to be prepared before the durable writer
+; (for example reserving a replacement native hotkey Off). This runs before ownership
+; is released and before a notifier can yield, so no observer sees a failed
+; transaction's prepared state after the user is told it was rejected.
+_ConfigRunPrecommitCompensation(CompensateFn, &FailureDetail, &StateUnchanged) {
+	if (CompensateFn is Integer) && CompensateFn == 0
+		return true
+	if !HasMethod(CompensateFn, "Call") {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "pre-commit compensation callback is not callable"
+		return false
+	}
+	Compensated := false
+	try Compensated := CompensateFn.Call()
+	catch as Err {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "pre-commit compensation raised an error: " . Err.Message
+		return false
+	}
+	if !(Compensated is Integer) || Compensated != 1 {
+		StateUnchanged := false
+		FailureDetail .= (FailureDetail != "" ? "; " : "")
+			. "pre-commit compensation was refused or returned a malformed status"
+		return false
+	}
+	return true
+}
+
+; Timer-owned full saves drain an existing generation; they never create a new
+; one. A stale one-shot left behind by a synchronous reload barrier is therefore
+; a no-op. Failed writes keep their generation pending and retry with backoff.
+_SaveFullConfigDeferred(WriterFn := 0, TimerFn := 0, NotifyFn := 0,
+		CollectFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _SaveFullConfigDeferred(WriterFn, TimerFn, NotifyFn,
+			CollectFn)
+		finally Critical(InheritedCritical)
+	}
+	global CONFIG_SAVE_FAILED, CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+	_ConfigFullSaveTimerStarted()
+	if !_ConfigFullSaveHasPending()
+		return true
+	Result := _ConfigDrainFullSave(WriterFn, TimerFn, 0, CollectFn)
+	if (Result = CONFIG_SAVE_FAILED) {
+		_ConfigReportDeferredFullSaveFailure(NotifyFn)
+		_ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS, TimerFn)
+	}
+	return Result
+}
+
+_ConfigReportDeferredFullSaveFailure(NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ConfigReportDeferredFullSaveFailure(NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		if (State.reported_failure_generation >= State.requested_generation)
+			return false
+		State.reported_failure_generation := State.requested_generation
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return ConfigReportPersistenceFailure(
+		"the deferred full configuration save", NotifyFn, "", false)
+}
+
+; Applies canonical feature entries to a detached candidate and appends their
+; TOML triples to the caller-owned batch. No live Map is touched here.
+_ConfigStageFeatureEntries(FeaturesTarget, Entries, Updates) {
+	Applied := 0
+	for Entry in Entries {
+		V2Path := Entry["path"]
+		Value := Entry["value"]
+		Prop := Entry.Has("prop") ? Entry["prop"] : ""
+		Loc := FeatureLocateV2(FeaturesTarget, V2Path, Prop)
+		if !(Loc is Map) {
+			try LoggerWarn("Config", "Could not stage unresolved feature path '{1}'.", V2Path)
+			continue
+		}
+		Loc["v2_node"][Loc["key"]] := Value
+		Updates.Push({ Section: Loc["section"], Key: Loc["key"], Value: Value })
+		Applied += 1
+	}
+	return Applied
+}
+
+; Seeds a runtime-discovered personal section only in the detached candidate.
+_ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
+	SectionName := StrLower(SectionName)
+	if !FeaturesTarget.Has("hotstrings")
+		return false
+	if !FeaturesTarget["hotstrings"].Has("personal")
+		FeaturesTarget["hotstrings"]["personal"] := Map()
+	if !FeaturesTarget["hotstrings"]["personal"].Has(SectionName) {
+		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
+			"enabled", false,
+			"time_activation_seconds", 0)
+	}
+	return true
+}
+
 ToggleAllFeaturesOn(*) {
 		MsgBox(t("dialog.enable_all.warning"))
 		ToggleAllFeatures(1)
@@ -28,44 +740,34 @@ ToggleAllFeaturesOff(*) {
 ; the same accumulator the same way. Declaring it ByRef here made the one call
 ; site (which passes the bare variable) raise a TypeError on every invocation of
 ; "tout desactiver" — AHK v2 requires & at the call site for a ByRef parameter.
-_GlobalClearAllBindings(Updates) {
-		global GestureAssignments, GESTURE_SLOTS, KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, ScriptShortcutAssignments, _IniCache
+_GlobalClearAllBindings(GestureTarget, KeyboardTarget, ScriptTarget, Updates) {
+		global GESTURE_SLOTS, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, _IniCache
 		for Slot in GESTURE_SLOTS {
-				GestureAssignments[Slot] := "none"
+				GestureTarget[Slot] := "none"
 				Updates.Push({ Section: "gestures", Key: Slot, Value: "none" })
 		}
 		KbWritten := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
-				KeyboardShortcutAssignments[Slot] := "none"
+				KeyboardTarget[Slot] := "none"
 				Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
 				KbWritten[Slot] := true
 		}
 		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
 				for Slot, _ in _IniCache["shortcuts.keyboard"] {
 						if !KbWritten.Has(Slot) {
-								KeyboardShortcutAssignments[Slot] := "none"
+								KeyboardTarget[Slot] := "none"
 								Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
 						}
 				}
 		}
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				ScriptShortcutAssignments[Slot] := "none"
+				ScriptTarget[Slot] := "none"
 				Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: "none" })
-		}
-		if IsSet(_TH_WriteTapHoldDisabled) {
-				; A bare try here meant "tout desactiver" reported success while the
-				; tap-hold config could still say enabled on disk — the one write that
-				; turns them off, discarded without a word.
-				try {
-						_TH_WriteTapHoldDisabled()
-				} catch as Err {
-						try LoggerError("Config", "Could not persist the tap-hold disable: {1}", Err.Message)
-				}
 		}
 }
 
 ; Recursively force every leaf under Node to Bool ("tout activer"/"tout
-; desactiver"), mutating Features in place and appending the required
+; desactiver"), mutating the caller's detached tree and appending the required
 ; {Section, Key, Value} TOML writes to Updates. Extracted out of ToggleAllFeatures
 ; as a standalone module function (rather than a nested closure) so the flip
 ; logic is directly testable without triggering ToggleAllFeatures's trailing
@@ -95,48 +797,54 @@ _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 }
 
 ToggleAllFeatures(Value) {
-		global Features, CategoryEnabled, ConfigurationFile
+		global Features, CategoryEnabled, ConfigurationFile, TapHold
+		global GestureAssignments, KeyboardShortcutAssignments, ScriptShortcutAssignments
 		if !IsSet(Features)
-				return
+				return false
 		Bool := (Value = true or Value = 1)
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateTapHold := _HSDeepCloneMap(TapHold)
+		CandidateGestures := GestureAssignments.Clone()
+		CandidateKeyboard := KeyboardShortcutAssignments.Clone()
+		CandidateScript := ScriptShortcutAssignments.Clone()
 		Updates := []
-		for TopKey, TopVal in Features {
+		for TopKey, TopVal in CandidateFeatures {
 				if (Type(TopVal) == "Map")
 						_CollectFeatureFlipUpdates(Bool, TopKey, TopVal, Updates)
 		}
-		for Category, _ in CategoryEnabled {
-				CategoryEnabled[Category] := Bool
+		for Category, _ in CandidateCategories {
+				CandidateCategories[Category] := Bool
 				Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
 		}
-		WPMWidget.visible := Bool
-		WPMWidget.use_colors := Bool
-		WPMWidget.show_graph := Bool
+		CandidateGate := (Category) => _ConfigCandidateCategoryEnabled(
+				CandidateCategories, Category)
+		ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
 		if !Bool
-				_GlobalClearAllBindings(Updates)
-		; Everything above mutated MEMORY. If the write fails, memory and disk
-		; disagree and the Reload below never runs, so the tray keeps rendering a
-		; state that was never saved. Reload anyway on failure: it re-reads the
-		; config from disk, which discards the unpersisted flip and puts the driver
-		; back in a state that matches what the user can see on disk.
+				_GlobalClearAllBindings(CandidateGestures, CandidateKeyboard, CandidateScript, Updates)
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk feature toggle")
+				return false
+
+		; Publish all coupled in-memory views in one non-yielding window. Every
+		; expensive walk and the file write happened against detached candidates.
+		PreviousCritical := Critical("On")
 		try {
-				TOML_BatchWrite(ConfigurationFile, Updates)
-		} catch as Err {
-				try LoggerError("Config", "Bulk feature toggle could not be saved: {1}", Err.Message)
-				try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-				ReloadPreservingSuspend()
-				return
+				Features := CandidateFeatures
+				CategoryEnabled := CandidateCategories
+				GestureAssignments := CandidateGestures
+				KeyboardShortcutAssignments := CandidateKeyboard
+				ScriptShortcutAssignments := CandidateScript
+				TapHold := CandidateTapHold
+				WPMWidget.visible := Bool
+				WPMWidget.use_colors := Bool
+				WPMWidget.show_graph := Bool
+		} finally {
+				Critical(PreviousCritical)
 		}
-		if Bool {
-				HsBatch := []
-				for V2Path in _CollectAllHotstringsV2Paths()
-						HsBatch.Push(Map("path", V2Path, "value", true))
-				if (HsBatch.Length > 0)
-						WriteFeatureBatchV2(Features, HsBatch)
-		}
-		ReloadPreservingSuspend()
+		return ReloadPreservingSuspend()
 }
 
 ToggleAllHotstringsOn(*) {
@@ -148,18 +856,27 @@ ToggleAllHotstringsOff(*) {
 ToggleAllHotstrings(Value) {
 		global CategoryEnabled, ConfigurationFile, Features
 		Bool := (Value = true or Value = 1)
-		; Force every individual section to Bool — "tout activer" turns them all on,
-		; "tout désactiver" turns them all off (a real bulk action, not just the
-		; category gate). The Hotstrings master gate follows so the change is
-		; immediately effective (on) or the whole tree is off (off).
-		CategoryEnabled["Hotstrings"] := Bool
-		TOML_Write(Bool, ConfigurationFile, "category_enabled", "hotstrings")
-		Batch := []
-		for V2Path in _CollectAllHotstringsV2Paths()
-				Batch.Push(Map("path", V2Path, "value", Bool))
-		if (Batch.Length > 0)
-				WriteFeatureBatchV2(Features, Batch)
-		ReloadPreservingSuspend()
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		CandidateCategories["Hotstrings"] := Bool
+		Updates := [{ Section: "category_enabled", Key: "hotstrings", Value: Bool }]
+		Entries := []
+		for V2Path in _CollectAllHotstringsV2Paths(CandidateFeatures)
+				Entries.Push(Map("path", V2Path, "value", Bool))
+		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+		if (Applied != Entries.Length)
+				return ConfigReportPersistenceFailure("the bulk hotstring toggle", 0,
+					"one or more feature paths could not be resolved")
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk hotstring toggle")
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				CategoryEnabled := CandidateCategories
+				Features := CandidateFeatures
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return ReloadPreservingSuspend()
 }
 
 IsCategoryAllEnabled(Categories) {
@@ -186,12 +903,27 @@ _HSDeepCloneMap(M) {
 		return Out
 }
 
+; Snapshots a category from detached Features into a detached snapshot Map.
+_HSSnapshotCategoryTo(FeaturesTarget, SnapshotTarget, V2Cat) {
+		if (FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has(V2Cat))
+				SnapshotTarget[V2Cat] := _HSDeepCloneMap(FeaturesTarget["hotstrings"][V2Cat])
+}
+
+; Restores a category into detached Features from a detached snapshot Map.
+_HSRestoreCategoryFrom(FeaturesTarget, SnapshotTarget, V2Cat) {
+		if !(SnapshotTarget.Has(V2Cat) and FeaturesTarget.Has("hotstrings")
+				and FeaturesTarget["hotstrings"].Has(V2Cat))
+				return
+		Target := FeaturesTarget["hotstrings"][V2Cat]
+		for Section, SecMap in SnapshotTarget[V2Cat]
+				Target[Section] := _HSDeepCloneMap(SecMap)
+}
+
 ; Snapshot one category's current (un-gated) section states into _HSCategorySnapshot.
 _HSSnapshotCategory(V2Cat) {
 		global Features, _HSCategorySnapshot
-		if (IsSet(Features) and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
-				_HSCategorySnapshot[V2Cat] := _HSDeepCloneMap(Features["hotstrings"][V2Cat])
-		}
+		if IsSet(Features) and IsSet(_HSCategorySnapshot)
+				_HSSnapshotCategoryTo(Features, _HSCategorySnapshot, V2Cat)
 }
 
 ; Snapshot every hotstring category. Called once at boot, before gating.
@@ -215,10 +947,16 @@ _HSRestoreCategory(V2Cat) {
 				and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
 				return
 		}
-		Target := Features["hotstrings"][V2Cat]
-		for Section, SecMap in _HSCategorySnapshot[V2Cat] {
-				Target[Section] := _HSDeepCloneMap(SecMap)
-		}
+		_HSRestoreCategoryFrom(Features, _HSCategorySnapshot, V2Cat)
+}
+
+; Resolves a category gate against a detached candidate rather than the live
+; global Map, so master-gate application can finish before the atomic publish.
+_ConfigCandidateCategoryEnabled(CategoryTarget, Category) {
+		global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER
+		if CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)
+				return CategoryTarget.Get("Hotstrings", true)
+		return CategoryTarget.Get(Category, true)
 }
 
 ; Hotstring sub-categories whose entire content the live rebuild can apply, so
@@ -233,62 +971,53 @@ _IsLiveHotstringCategory(Category) {
 }
 
 ToggleCategoryAllFeatures(Category, Value) {
-		global CategoryEnabled, ConfigurationFile, Features, TapHold
+		global CategoryEnabled, ConfigurationFile, Features, TapHold, _HSCategorySnapshot
 		Bool := (Value = true or Value = 1)
 		if _IsLiveHotstringCategory(Category) {
-				; In-process: restore (ON) or snapshot (OFF) the category's sections, flip the
-				; gate, re-apply all master gates, then rebuild the engine — no Reload. The
-				; snapshot-on-OFF preserves any live section toggles made while it was on.
 				V2Cat := _CategoryEnabledKey(Category)
 				try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
-				; Critical covers ONLY the in-memory mutation window (snapshot/restore ->
-				; gate flip -> master gates), so a keystroke can never observe a torn
-				; Features/TapHold state through a concurrent #HotIf/InputHook evaluation.
-				; It is released BEFORE persistence and the engine rebuild: both do
-				; unbounded file I/O, and holding Critical across that starves the
-				; low-level keyboard hook past LowLevelHooksTimeout, which makes Windows
-				; silently drop physical keystrokes. RebuildHotstringsLive() is
-				; deliberately Critical-free for exactly this reason and fences the
-				; matcher with HSE_RebuildInProgress instead.
+				CandidateFeatures := _HSDeepCloneMap(Features)
+				CandidateCategories := CategoryEnabled.Clone()
+				CandidateTapHold := _HSDeepCloneMap(TapHold)
+				if IsSet(_HSCategorySnapshot)
+						CandidateSnapshot := _HSDeepCloneMap(_HSCategorySnapshot)
+				else
+						CandidateSnapshot := Map()
+				if Bool
+						_HSRestoreCategoryFrom(CandidateFeatures, CandidateSnapshot, V2Cat)
+				else
+						_HSSnapshotCategoryTo(CandidateFeatures, CandidateSnapshot, V2Cat)
+				CandidateCategories[Category] := Bool
+				CandidateGate := (CandidateCategory) => _ConfigCandidateCategoryEnabled(
+						CandidateCategories, CandidateCategory)
+				ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
+				Updates := [{ Section: "category_enabled", Key: V2Cat, Value: Bool }]
+				if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
+						return false
+
+				; Only reference swaps sit under Critical. Candidate construction,
+				; manifest I/O and persistence all completed before this window.
 				_TcafCrit := Critical("On")
 				try {
-						if Bool {
-								_HSRestoreCategory(V2Cat)
-						} else {
-								_HSSnapshotCategory(V2Cat)
-						}
-						CategoryEnabled[Category] := Bool
-						ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
+						Features := CandidateFeatures
+						CategoryEnabled := CandidateCategories
+						TapHold := CandidateTapHold
+						_HSCategorySnapshot := CandidateSnapshot
 				} finally {
 						Critical(_TcafCrit)
-				}
-				; The in-memory flip above is already done. A failed write here would
-				; otherwise skip the rebuild below too, leaving memory, disk and the live
-				; engine in three different states.
-				try {
-						TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKey(Category))
-				} catch as Err {
-						try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
-						try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-						ReloadPreservingSuspend()
-						return
 				}
 				LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
 				RebuildHotstringsLive()
 				LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
-				return
+				return true
 		}
-		CategoryEnabled[Category] := Bool
-		; Reload runs on both paths here, so a failed write self-corrects by
-		; re-reading disk — but it must still be reported, or the toggle silently
-		; reverts on the next start with no explanation.
-		try {
-				TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKey(Category))
-		} catch as Err {
-				try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
-				try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-		}
-		ReloadPreservingSuspend()
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateCategories[Category] := Bool
+		Updates := [{ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool }]
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
+				return false
+		CategoryEnabled := CandidateCategories
+		return ReloadPreservingSuspend()
 }
 
 ; Force every section of one hotstring category on/off (bulk action), scoped to
@@ -305,28 +1034,39 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 				try LoggerWarn("Menu", "ToggleCategoryAllSections: no v2 section for '{1}' — skipped.", V1Cat)
 				return
 		}
-		GateUpdates := []
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		Updates := []
 		if Bool {
 				; Master gate must be on for any hotstring to fire.
-				if !CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"] {
-						CategoryEnabled["Hotstrings"] := true
-						GateUpdates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
+				if !CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"] {
+						CandidateCategories["Hotstrings"] := true
+						Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
 				}
 				; Lift this category's own gate too, when it has one (flat categories do;
 				; DynamicHotstrings / Personal follow the master directly).
-				if (CategoryEnabled.Has(V1Cat) and !CategoryEnabled[V1Cat]) {
-						CategoryEnabled[V1Cat] := true
-						GateUpdates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
+				if (CandidateCategories.Has(V1Cat) and !CandidateCategories[V1Cat]) {
+						CandidateCategories[V1Cat] := true
+						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
 				}
 		}
-		if (GateUpdates.Length > 0)
-				TOML_BatchWrite(ConfigurationFile, GateUpdates)
-		Batch := []
+		Entries := []
 		for _, Entry in ManifestFeaturesForSection(V2Section)
-				Batch.Push(Map("path", Entry["path"], "value", Bool))
-		if (Batch.Length > 0)
-				WriteFeatureBatchV2(Features, Batch)
-		ReloadPreservingSuspend()
+				Entries.Push(Map("path", Entry["path"], "value", Bool))
+		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+		if (Applied != Entries.Length)
+				return ConfigReportPersistenceFailure("the '" . V1Cat . "' section toggle", 0,
+					"one or more feature paths could not be resolved")
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . V1Cat . "' section toggle")
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				CategoryEnabled := CandidateCategories
+				Features := CandidateFeatures
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return ReloadPreservingSuspend()
 }
 
 ; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
@@ -344,21 +1084,35 @@ HS_TogglePersonalAllSections(Enable) {
 				try LoggerWarn("Hotstrings", "Personal sections toggle ignored — no personal hotstrings file at '{1}'.", PersonalSectionsPath)
 				return
 		}
-		if (Bool and (!CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"])) {
-				CategoryEnabled["Hotstrings"] := true
-				TOML_Write(true, ConfigurationFile, "category_enabled", "hotstrings")
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		Updates := []
+		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
+				CandidateCategories["Hotstrings"] := true
+				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
 		}
 		Data := ReadPersonalToml()
-		Batch := []
+		Entries := []
 		for _, SecName in Data["sections_order"] {
 				if (SecName != "-") {
-						EnsurePersonalHotstringFeature(SecName)
-						Batch.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
+						_ConfigSeedPersonalHotstring(CandidateFeatures, SecName)
+						Entries.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
 				}
 		}
-		if (Batch.Length > 0)
-				WriteFeatureBatchV2(Features, Batch)
-		ReloadPreservingSuspend()
+		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+		if (Applied != Entries.Length)
+				return ConfigReportPersistenceFailure("the personal-hotstring section toggle", 0,
+					"one or more personal feature paths could not be resolved")
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the personal-hotstring section toggle")
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				CategoryEnabled := CandidateCategories
+				Features := CandidateFeatures
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return ReloadPreservingSuspend()
 }
 
 _CategoryEnabledKey(Category) {
@@ -375,45 +1129,37 @@ _CategoryEnabledKey(Category) {
 		}
 }
 
-SaveFullConfig() {
-		global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
-		; Guard: the driver must be fully initialised before writing config — prevents
-		; a partial config flush triggered by the -500 ms boot timer from clobbering the
-		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
-		; have been populated by ApplyConfigToml and the deferred tray-menu build).
-		global _DriverReady
-		if !_DriverReady {
-				SetTimer(SaveFullConfig, -100)
-				return
-		}
-		; Guard: refuse to serialize the feature tree when boot could not READ an
-		; existing config.toml. In that case ApplyConfigToml applied nothing and the
-		; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
-		; the user's whole configuration with factory values. TOML_BatchWrite's own
-		; TOML_ReadFailed guard cannot catch this: it re-parses at write time, and a
-		; transient lock (sync client, AV scan, backup) has usually cleared by then,
-		; so the write looks perfectly safe while the payload is already wrong.
-		; Returns false — not a bare return — so a caller (and the regression test)
-		; can tell "refused" from "deferred until ready" and from a completed save.
-		global _ConfigBootReadFailed
-		if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
-				try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
-				return false
-		}
+_ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
+		global Features, ScriptInformation, ScriptShortcutAssignments
+		global GestureAssignments, KeyboardShortcutAssignments
+		global LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+		global _LLM_Menu_Loaded, _LLM_Menu
+		global CategoryEnabled
+		global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
+		global UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
 		Updates := []
-		; Only sync LLM state into Features if LLM_Menu_Init() has already run and
-		; populated _LLM_Menu with the user's persisted values. Calling it before
-		; init would push module-level defaults (e.g. enabled=false) over the user's
-		; saved settings, corrupting the config file.
-		global _LLM_Menu_Loaded
-		if IsSet(_LLM_Menu_SyncToFeatures) && (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded)
-				_LLM_Menu_SyncToFeatures()
-		if IsSet(Features) {
-				_CollectFeatureUpdates(Updates, "", _PruneMasterGatedFeatures(Features))
+		HasFeatureCandidate := IsSet(FeaturesSource)
+		FeatureState := HasFeatureCandidate ? FeaturesSource
+			: (IsSet(Features) ? Features : false)
+		HasMenuCandidate := IsSet(MenuSource)
+		MenuState := HasMenuCandidate ? MenuSource
+			: (IsSet(_LLM_Menu) ? _LLM_Menu : false)
+		MenuReady := HasMenuCandidate
+			|| (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded)
+		if (FeatureState is Map) {
+				; Full-save collection is speculative until TOML_BatchWrite commits. Keep
+				; LLM menu reconciliation detached so a refused writer cannot publish a
+				; state that only existed in the failed serialization candidate.
+				FeatureSnapshot := _HSDeepCloneMap(FeatureState)
+				if IsSet(_LLM_Menu_SyncToFeatures)
+						&& MenuReady && (MenuState is Map)
+						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
+						throw Error("LLM menu state could not be reconciled into the full-save candidate")
+				_CollectFeatureUpdates(Updates, "",
+						_PruneMasterGatedFeatures(FeatureSnapshot))
 				Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
-		global LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
 		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
 		Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
@@ -453,46 +1199,206 @@ SaveFullConfig() {
 		; (onboarding_seen=0, empty overrides, default trigger_shortcut/ollama_port/…)
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
-		if (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded) {
-				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Menu["onboarding_seen"] ? "1" : "0" })
+		if (MenuReady && (MenuState is Map)) {
+				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: MenuState["onboarding_seen"] ? "1" : "0" })
 				_AppOverridesStr := ""
-				for _AppName, _AppProfileId in _LLM_Menu["app_profile_overrides"] {
+				for _AppName, _AppProfileId in MenuState["app_profile_overrides"] {
 						if (_AppOverridesStr != "")
 								_AppOverridesStr .= ";"
 						_AppOverridesStr .= _AppName . "=" . _AppProfileId
 				}
 				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
 				if IsSet(_LLM_Menu_AppendPersistedUpdates)
-						_LLM_Menu_AppendPersistedUpdates(Updates)
+						_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
 		}
-		global CategoryEnabled
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
 						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
 		}
-		global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
 		if IsSet(UPDATER_CHECK_INTERVAL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
-		; atomic write (temp file + rename). A FileDelete here creates a data-loss
-		; window: if a Reload() or thread interrupt fires between the delete and the
-		; write, the user's config is permanently gone with no replacement.
-		PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
-		_TOML_STRICT_CANON_IN_PROGRESS := true
+		return Updates
+}
+
+SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
+		ExistingOwner := 0, CollectFn := 0, &RequestedGeneration := 0) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+			; Collectors traverse live state and writers perform durable TOML I/O.
+			; The path owner supplies serialization without freezing input dispatch.
+			Critical("Off")
+			try return SaveFullConfig(WriterFn, TimerFn, RegisterRequest,
+				ExistingOwner, CollectFn, &RequestedGeneration)
+			finally Critical(InheritedCritical)
+		}
+		global ConfigurationFile
+		global CONFIG_SAVE_FAILED, CONFIG_SAVE_OK, CONFIG_SAVE_DEFERRED
+		global CONFIG_FULL_SAVE_RETRY_DELAY_MS, CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+		; Guard: the driver must be fully initialised before writing config — prevents
+		; a partial config flush triggered by the -500 ms boot timer from clobbering the
+		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
+		; have been populated by ApplyConfigToml and the deferred tray-menu build).
+		global _DriverReady
+		; Guard: refuse to serialize the feature tree when boot could not READ an
+		; existing config.toml. In that case ApplyConfigToml applied nothing and the
+		; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
+		; the user's whole configuration with factory values. TOML_BatchWrite's own
+		; TOML_ReadFailed guard cannot catch this: it re-parses at write time, and a
+		; transient lock (sync client, AV scan, backup) has usually cleared by then,
+		; so the write looks perfectly safe while the payload is already wrong.
+		; Returns false — not a bare return — so a caller (and the regression test)
+		; can tell "refused" from "deferred until ready" and from a completed save.
+		global _ConfigBootReadFailed
+		if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+			try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
+			return CONFIG_SAVE_FAILED
+		}
+		RequestedGeneration := 0
+		if RegisterRequest {
+			RequestedGeneration := _ConfigFullSaveRequest(true, ConfigurationFile)
+			if !RequestedGeneration {
+				try LoggerError("ConfigIO", "Refusing a new full save after terminal or disk-reload authority was sealed.")
+				return CONFIG_SAVE_FAILED
+			}
+		}
+		if !_ConfigFullSaveHasPending()
+			return CONFIG_SAVE_OK
+		BoundPath := _ConfigFullSaveBoundPath()
+		; A deferred generation belongs to the path that accepted it. Re-reading
+		; ConfigurationFile here used to silently rebase old-path work onto a newly
+		; selected config directory. Refuse before collecting live state: that state
+		; may already describe the new path and must never overwrite the old file.
+		if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+			try LoggerError("ConfigIO", "Refusing to rebase a pending full save from '{1}' onto '{2}'. Settle the original path before publishing a config relocation.",
+				BoundPath, ConfigurationFile)
+			return CONFIG_SAVE_FAILED
+		}
+		if !_DriverReady {
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED
+				: CONFIG_SAVE_FAILED
+		}
+		; Claim before reading ANY live global. Waiting here would deadlock: an AHK
+		; callback that interrupted the owner cannot let that owner resume. Defer a
+		; coalesced one-shot instead; it will collect the post-publication state.
+		BorrowedOwner := ExistingOwner is Object
+		if BorrowedOwner {
+			if !_ConfigWriteLeaseOwns(ExistingOwner, BoundPath) {
+				try LoggerError("ConfigIO", "Refusing a full save through a stale configuration owner.")
+				return CONFIG_SAVE_FAILED
+			}
+			OwnerToken := ExistingOwner
+		} else {
+			OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath, "full")
+		}
+		if !(OwnerToken is Object) {
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED
+				: CONFIG_SAVE_FAILED
+		}
+		TargetGeneration := _ConfigFullSaveCapture()
+		Result := CONFIG_SAVE_FAILED
 		try {
+				Phase := "collector"
+				try {
+						Updates := HasMethod(CollectFn, "Call")
+								? CollectFn.Call()
+								: _ConfigCollectFullSaveUpdates()
+						if !(Updates is Array)
+								throw TypeError("The full configuration collector must return an Array")
+						; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
+						; atomic write (temp file + rename). A FileDelete here creates a data-loss
+						; window: if a Reload() or thread interrupt fires between the delete and the
+						; write, the user's config is permanently gone with no replacement.
+						Phase := "writer"
 				; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
 				; the staging file cannot be opened or the atomic replace is refused, and
 				; every caller that dropped this boolean turned that into a silent no-op:
 				; the live toggles mutate memory, re-init the engine and rebuild the menu
 				; with no Reload, so memory, engine and menu all showed a state that never
 				; reached disk — and the next restart silently undid it.
-				Written := TOML_BatchWrite(ConfigurationFile, Updates)
+				if HasMethod(WriterFn, "Call")
+					Written := WriterFn.Call(BoundPath, Updates)
+				else
+					Written := TOML_BatchWrite(BoundPath, Updates)
+				} catch as Err {
+						Written := false
+						try LoggerError("ConfigIO", "The full configuration {1} raised an error: {2}.",
+								Phase, Err.Message)
+				}
+				if ((Written is Integer) && Written == 1)
+					Result := CONFIG_SAVE_OK
+				else
+					Result := CONFIG_SAVE_FAILED
+				if (Result = CONFIG_SAVE_OK)
+						_ConfigFullSaveAcknowledge(TargetGeneration)
 		} finally {
-				_TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
+			if !BorrowedOwner
+				_ConfigWriteLeaseRelease(OwnerToken)
 		}
-		return Written
+		if _ConfigFullSaveHasPending() {
+			RetryDelay := (Result = CONFIG_SAVE_OK)
+				? CONFIG_FULL_SAVE_RETRY_DELAY_MS
+				: CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
+			if !_ConfigArmFullSaveRetry(RetryDelay, TimerFn)
+				Result := CONFIG_SAVE_FAILED
+		}
+		return Result
+}
+
+; Drains an already-recorded obligation. Both the deferred timer and the reload
+; barrier use this entry so neither invents a fresh generation while checking
+; whether work remains.
+_ConfigDrainFullSave(WriterFn := 0, TimerFn := 0, ExistingOwner := 0,
+		CollectFn := 0) {
+	return SaveFullConfig(WriterFn, TimerFn, false, ExistingOwner, CollectFn)
+}
+
+; Resolves every accepted in-memory save before process death. Optional boot
+; canonicalization and unreadable-boot state may be abandoned, but a user-facing
+; obligation must reach the exact owned config path or refuse shutdown.
+_ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
+		CollectFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn,
+			TimerFn, CollectFn)
+		finally Critical(InheritedCritical)
+	}
+	global ConfigurationFile
+	global CONFIG_SAVE_OK
+	State := _ConfigFullSaveCoordinator()
+	PreviousCritical := Critical("On")
+	try {
+		Requested := State.requested_generation
+		Settled := State.settled_generation
+		Required := State.terminal_required_generation
+		BoundPath := State.bound_path
+	} finally Critical(PreviousCritical)
+	if Requested <= Settled
+		return true
+	; Only generations admitted as terminal-optional (the boot canonicalizer)
+	; may be abandoned. _ConfigBootReadFailed is not provenance: a later user
+	; mutation can enqueue a mandatory repair while that flag remains true. The
+	; ordinary drain will refuse unsafe serialization and therefore keep such a
+	; required generation pending, which correctly refuses process death.
+	if Required <= Settled
+		return _ConfigFullSaveAbandonThrough(Requested)
+	if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+		try LoggerError("ConfigIO", "Terminal full-save drain refused because the active configuration path no longer matches the accepted generation path.")
+		return false
+	}
+	OwnerToken := _ConfigWriteLeaseSelectOwner(OwnerBundle, BoundPath)
+	if !(OwnerToken is Object) {
+		try LoggerError("ConfigIO", "Terminal full-save drain refused a bundle that did not own config.toml.")
+		return false
+	}
+	Result := _ConfigDrainFullSave(WriterFn, TimerFn, OwnerToken, CollectFn)
+	return (Result is Integer) && Result == CONFIG_SAVE_OK
+		&& !_ConfigFullSaveHasPending()
 }
 
 ; Resolve the CategoryEnabled master-gate label that owns a Features node key
@@ -577,43 +1483,99 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 		}
 }
 
+; Presents one localized reset refusal without exposing a stale, deletion-only
+; explanation. Typed transition results retain their exact stable status/kind
+; pair so the user can identify the refused transaction in the error log.
+_ConfigResetShowFailure(ReasonKey, Result := 0) {
+	Reason := t(ReasonKey)
+	if Result is Map {
+		Status := Result.Has("status") && (Result["status"] is String)
+			? Result["status"] : "malformed"
+		Kind := Result.Has("kind") && (Result["kind"] is String)
+			? Result["kind"] : "malformed_result"
+		Reason := Format(Reason, Status, Kind)
+	}
+	try MsgBox(Format(t("dialog.reset_defaults.failed"), Reason),
+		t("dialog.reset_defaults.failed_title"), "Iconx")
+}
+
 ReloadWithDefaultConfig(*) {
-		global _ConfigDir, _AhkSubDir
+		global _ConfigDir, _AhkSubDir, ConfigurationFile, _PathsFile
+		PreviousCritical := Critical("Off")
+		try {
 		AhkDir := _ConfigDir . _AhkSubDir
-		; A bare try around the delete turned a locked or read-only config into a
-		; silent no-op — and worse than a no-op: the FSAppend below then APPENDS a
-		; second [_meta] section to the surviving file. The user asked for a reset
-		; and got neither a reset nor an error. Editors, cloud-sync clients and the
-		; read-only attribute all reach this.
-		Undeleted := ""
-		for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
-				Path := AhkDir . FileName
-				try {
-						if FileExist(Path)
-								FileDelete(Path)
-				} catch as Err {
-						Undeleted .= (Undeleted == "" ? "" : ", ") . FileName
-						try LoggerError("Config", "Reset to defaults: could not delete '{1}': {2}", Path, Err.Message)
+		TapHoldPath := AhkDir . "tap_hold.toml"
+		ApiEntriesPath := AhkDir . "api_entries.json"
+		TransitionPaths := [ConfigurationFile, TapHoldPath, ApiEntriesPath]
+		AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
+			TransitionPaths)
+		if !ConfigTransitionResultIs(AcquireResult, "bundle_acquired") {
+			ConfigTransitionLogFailure("ConfigReset", AcquireResult)
+				try LoggerError("Config", "Reset to defaults refused because another configuration transaction owns config.toml.")
+				_ConfigResetShowFailure(
+					"dialog.reset_defaults.reason.acquire", AcquireResult)
+				return false
+		}
+		OwnerBundle := AcquireResult["bundle"]
+		ReleaseBundle := true
+		try {
+				if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
+						try LoggerError("Config", "Reset to defaults refused because LLM trigger native recovery is incomplete.")
+						_ConfigResetShowFailure(
+							"dialog.reset_defaults.reason.trigger_recovery")
+						return false
 				}
-		}
-		if (Undeleted != "") {
-				try MsgBox(Format(t("dialog.reset_defaults.failed"), Undeleted),
-						t("dialog.reset_defaults.failed_title"), "Iconx")
-				return
-		}
+				if !LLM_TriggerJournalPrepareDestructive(ConfigurationFile,
+						OwnerBundle) {
+						try LoggerError("Config", "Reset to defaults refused because LLM trigger journal recovery is incomplete.")
+						_ConfigResetShowFailure(
+							"dialog.reset_defaults.reason.trigger_journal")
+						return false
+				}
 		; Write a minimal config so Onboarding_Run() skips the wizard on reload.
 		; The user chose "reset defaults" — there is a separate "Setup wizard"
 		; menu item for re-running the first-run flow. Without this placeholder
 		; the deleted config.toml triggers Onboarding_Run unconditionally.
-		; FSAppend REPORTS failure rather than throwing, so an ignored return is a
-		; silent one. Without this placeholder the reload runs Onboarding_Run
-		; unconditionally, which is not what "reset defaults" means.
-		if !FSAppend(AhkDir . "config.toml", "[_meta]`nschema_version = 2`n") {
-				try LoggerError("Config", "Reset to defaults: could not write the placeholder config; the setup wizard will run on reload.")
-				try MsgBox(t("dialog.reset_defaults.placeholder_failed"),
-						t("dialog.reset_defaults.failed_title"), "Icon!")
+		; All three intentions share one WAL: the placeholder is target 1, then the
+		; two deletions. A failed/colliding apply rolls every file back before this
+		; function can report success or invoke Reload.
+		TargetSpecs := _ConfigResetTransitionTargets(ConfigurationFile,
+			TapHoldPath, ApiEntriesPath)
+		CommitResult := ConfigTransitionCommitOwned(_PathsFile, TargetSpecs,
+			OwnerBundle)
+		if !ConfigTransitionResultIs(CommitResult, "committed_new") {
+			ConfigTransitionLogFailure("ConfigReset", CommitResult)
+			if CommitResult.Has("barrier_retained")
+					&& (CommitResult["barrier_retained"] is Integer)
+					&& CommitResult["barrier_retained"] == 1
+				ReleaseBundle := false
+			_ConfigResetShowFailure(
+				"dialog.reset_defaults.reason.commit", CommitResult)
+			return false
 		}
-		ReloadPreservingSuspend()
+		; Keep the destructive owner through Reload. Releasing here lets an
+		; interrupting trigger edit repopulate the reset file or leave a fresh WAL
+		; that makes Reload refuse after the user's files were already removed.
+		Reloaded := ReloadPreservingSuspend(0, OwnerBundle)
+		if (Reloaded is Integer) && Reloaded == 1
+			return true
+		RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
+		if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
+				&& !ConfigTransitionResultIs(RollbackResult, "absent") {
+			ConfigTransitionLogFailure("ConfigResetRollback", RollbackResult)
+			if ConfigTransitionRetainBarrier(OwnerBundle)
+				ReleaseBundle := false
+			_ConfigResetShowFailure(
+				"dialog.reset_defaults.reason.rollback", RollbackResult)
+		} else
+			_ConfigResetShowFailure(
+				"dialog.reset_defaults.reason.reload_refused")
+		return false
+		} finally {
+			if ReleaseBundle
+				_ConfigWriteTerminalRelease(OwnerBundle)
+		}
+		} finally Critical(PreviousCritical)
 }
 
 ReadScriptShortcutsConfig() {
@@ -677,12 +1639,11 @@ RunScriptShortcutAction(Slot) {
 }
 
 SetScriptShortcutAction(Slot, ActionName) {
-		global ScriptShortcutAssignments, ConfigurationFile
-		if !GestureEnsureActionParameter(GestureBindingId("script", Slot), ActionName)
-				return
-		ScriptShortcutAssignments[Slot] := ActionName
-		TOML_Write(ActionName, ConfigurationFile, "shortcuts.script_control", Slot)
-		ReloadPreservingSuspend()
+		global ScriptShortcutAssignments
+		if !GestureAssignConfiguredAction(&ScriptShortcutAssignments,
+				"script", "shortcuts.script_control", Slot, ActionName)
+				return false
+		return ReloadPreservingSuspend()
 }
 
 BuildScriptShortcutsMenu() {
@@ -785,12 +1746,11 @@ RunKeyboardShortcutAction(SlotId) {
 }
 
 SetKeyboardShortcutAction(SlotId, ActionName) {
-		global KeyboardShortcutAssignments, ConfigurationFile
-		if !GestureEnsureActionParameter(GestureBindingId("keyboard", SlotId), ActionName)
-				return
-		KeyboardShortcutAssignments[SlotId] := ActionName
-		TOML_Write(ActionName, ConfigurationFile, "shortcuts.keyboard", SlotId)
-		ReloadPreservingSuspend()
+		global KeyboardShortcutAssignments
+		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
+				"keyboard", "shortcuts.keyboard", SlotId, ActionName)
+				return false
+		return ReloadPreservingSuspend()
 }
 
 _MakeKeyboardShortcutHandler(SlotId, ActionName) {

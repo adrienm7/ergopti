@@ -76,7 +76,7 @@ BuildLanguageMenuDeferred() {
 }
 
 
-initMenu() {
+initMenu(PublishAuthorizeFn := 0) {
 	global SubMenus, A_TrayMenu, HotstringCategories
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
 	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
@@ -251,7 +251,8 @@ initMenu() {
 	; live here; layout data comes from menu_manifest.json.
 	_MI_AppendTail()
 	BootProfile_Mark("MENU/initMenu: tail (global_actions…debug)")
-	TrayMenuStage_Publish()
+	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
+	return Published
 	} catch as e {
 		TrayMenuStage_Abort()
 		throw e
@@ -401,7 +402,7 @@ _MI_BuildAboutMenu() {
 	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
 	Commands := Map(
 		"about_changelog",     Updater_ShowChangelog,
-		"about_releases_page", (*) => Run(Updater_ReleasesPageUrl())
+		"about_releases_page", Updater_OpenReleasesPage
 	)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
 }

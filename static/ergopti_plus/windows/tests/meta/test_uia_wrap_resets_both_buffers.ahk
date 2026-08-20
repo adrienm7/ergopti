@@ -18,9 +18,10 @@
 ; The next expansion then counts its backspaces against the pre-wrap text and
 ; eats the wrapped selection instead of the trigger.
 ;
-; The preview keeps agreeing with the engine throughout, because
-; _PreviewEngineWouldFire evaluates candidates against HSE_Buffer — the two end
-; up describing the pre-wrap world together, which is why nothing detects it.
+; The preview keeps agreeing with the engine throughout because its canonical
+; HSE_PreviewNextDecision reads HSE_Buffer. If the wrap forgets to invalidate
+; that one source, both matcher and tooltip faithfully describe the same stale
+; pre-wrap world, which is why a G5 agreement check alone cannot detect it.
 ;
 ; SCOPE: source-level. The branch needs a live UIA selection and a running
 ; InputHook, neither of which exists in the headless runner.
@@ -40,17 +41,27 @@
 ; ====================================================================
 
 _UWB_WrapResetsBothBuffers() {
-	Body := _DriverFuncBody("_OnPrefixChar")
-	Assert(Body != "", "_OnPrefixChar() must be readable")
-	Pos := InStr(Body, "SendInstant(Left")
+	Body := _DriverFuncBody("_PrefixTryWrapSelection")
+	Assert(Body != "", "_PrefixTryWrapSelection() must be readable")
+	Pos := InStr(Body, "Wrapped := SendInstant")
 	Assert(Pos > 0, "the UIA selection-wrap branch must exist")
 	Window := SubStr(Body, Pos, 400)
-	Assert(InStr(Window, "_ResetPrefixBuffer") > 0,
-		"the wrap must reset the preview buffer — this is the half that always worked")
-	Assert(InStr(Window, "HSE_FeedReset") > 0,
-		"the wrap replaces the selection and deletes the typed character, so the ENGINE buffer must be invalidated too. Resetting the preview alone leaves the engine holding text that is no longer left of the caret, and its next expansion backspaces over the wrapped selection")
-	Assert(InStr(Window, "HSE_FeedReset(true, true)") > 0,
-		"and it must declare itself PHYSICAL: the wrap runs with the suppression held, and HSE_FeedReset is a no-op for a non-physical caller while HSE_Suppressed is up — a silent no-op is exactly the failure this guards")
+	Assert(InStr(Window, "if Wrapped") > 0,
+		"the wrap must prove output success before either buffer reset")
+	Assert(InStr(Window, "_PrefixInvalidateInputContext(") > 0,
+		"the wrap must route both resets through the atomic input-context transaction")
+	Assert(InStr(Window, "_ResetPrefixBuffer") == 0 and InStr(Window, "HSE_FeedReset") == 0,
+		"the wrap must not restore the old split reset whose GUI yield let the next physical key enter only one buffer")
+	Reset := _DriverFuncBody("_PrefixInvalidateInputContext")
+	Commit := _DriverFuncBody("_PrefixCommitInputContext")
+	EnterCritical := InStr(Reset, 'Critical("On")')
+	CommitCall := InStr(Reset, "_PrefixCommitInputContext(FocusToken, KnownBoundary)", true, EnterCritical)
+	LeaveCritical := InStr(Reset, "Critical(PreviousCritical)", true, CommitCall)
+	ResetEngine := InStr(Commit, "HSE_FeedReset(KnownBoundary, true)")
+	ResetPreview := InStr(Commit, '_PrefixSetBuffer("")', true, ResetEngine)
+	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
+		and ResetEngine > 0 and ResetPreview > ResetEngine,
+		"engine and preview buffers must be invalidated before the Critical transaction is released")
 }
 Test("meta hotstrings: the UIA selection-wrap resets both buffers (uia-wrap-resets-only-the-preview-buffer)",
 	_UWB_WrapResetsBothBuffers)

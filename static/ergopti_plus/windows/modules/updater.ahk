@@ -16,8 +16,8 @@
 ;    on new releases and updates the menu label immediately.
 ; 3. Channel-aware: the user can switch between the "main" (stable) and "dev"
 ;    (pre-release) channels. The setting is persisted in the shared config TOML.
-; 4. GitHub Releases API: WinHttp synchronous call gated behind user click or
-;    background timer — never on startup.
+; 4. GitHub Releases API: async WinHTTP requests retain immutable manual or
+;    background provenance through their terminal callback.
 ; ==============================================================================
 
 ; INDEX: this file declares nothing itself; it #Include-s the updater

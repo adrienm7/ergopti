@@ -17,7 +17,8 @@ global _LLM_Menu := Map(
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
-	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
+	"trigger_shortcut", "Ctrl+Space", "api_entry_id", "api_primary",
+	"ollama_port", 11434, "inline_autotype", false
 )
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include unit/test_llm_menu_persistence.ahk

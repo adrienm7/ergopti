@@ -13,12 +13,10 @@
 ;    infra/tooltip.ahk instead of the OS-native ToolTip() function. This gives
 ;    diff-chunk coloring (green corrections, orange next-words, gray inactive
 ;    slots) and visual parity with the Hammerspoon renderer.
-; 2. Backwards-compatible public surface: all external callers (prediction_engine,
-;    llm_bridge, tab_accept) use the same LLM_Tooltip_* names as before — only
-;    the implementation changes, not the API.
-; 3. Tab-to-accept + slot navigation: unchanged from the previous implementation;
-;    wired by menu_llm/tab_accept.ahk which calls LLM_Tooltip_GetText() /
-;    LLM_Tooltip_SetActiveIdx().
+; 2. Stable rendering surface: external rendering and navigation callers keep
+;    the LLM_Tooltip_* API while the implementation delegates to the shared Gui.
+; 3. Acceptance ownership: the menu wires the Tab hotkey, while the canonical
+;    source-control/modifier policy and injection gateway live in llm_bridge.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,10 +30,6 @@
 ; ======= 1/ Tooltip Constants =======
 ; ====================================
 ; ====================================
-
-; Re-entrancy guard: prevents double-injection when Tab fires via both the
-; #HotIf hotkey path and the InputHook FeedKeyDown path in the same tick.
-global _LLM_AcceptInProgress := false
 
 ; LLM tooltip chrome — loaded from _shared/modules/tooltip/constants.toml via ui_style.ahk.
 ; Compile-time sentinels overwritten by Tooltip_LlmUiSyncFromShared() at boot.
@@ -85,16 +79,22 @@ LLM_Tooltip_MarkChainTimingOnly(NowTick) {
 	LLM_TooltipMarkChainTimingOnly(NowTick)
 }
 
-LLM_Tooltip_Show(payload, active := 1, is_final := false) {
-	LLM_TooltipShow(payload, active, is_final)
+; Returns the positive generation owned by this exact committed render, else 0.
+LLM_Tooltip_Show(payload, active := 1, is_final := false,
+		PresentationMeta := 0) {
+	return LLM_TooltipShow(payload, active, is_final, PresentationMeta)
+}
+
+LLM_Tooltip_IsRenderGenerationCurrent(RenderGeneration) {
+	return LLM_TooltipRenderGenerationIsCurrent(RenderGeneration)
 }
 
 /**
  * Shows the purple "generation in progress" tooltip (macOS show_loading parity).
  * Replaced automatically when ``LLM_Tooltip_Show`` paints the first prediction.
  */
-LLM_Tooltip_ShowLoading() {
-	LLM_TooltipShowLoading()
+LLM_Tooltip_ShowLoading(PresentationMeta := 0) {
+	LLM_TooltipShowLoading(PresentationMeta)
 }
 
 /**
@@ -104,19 +104,11 @@ LLM_Tooltip_ShowLoading() {
  *     duplicate llm_dismissed event emission).
  */
 LLM_Tooltip_Hide(accepted := false) {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots
-	was_visible := LLM_TooltipIsVisible()
-	slots_snapshot := LLM_TooltipGetSlots()
-	LLM_TooltipHide(accepted)
-	; Emit dismissed event when the tooltip was visible AND this hide is not
-	; part of the accept path — mirrors the previous ToolTip()-based behaviour.
-	if (was_visible and !accepted) {
-		try {
-			app_name := ""
-			try app_name := WinGetProcessName("A")
-			KL_LogLlmDismissed(app_name, slots_snapshot)
-		}
-	}
+	return LLM_TooltipHide(accepted)
+}
+
+LLM_Tooltip_HideExact(ExpectedRecord, accepted := false) {
+	return LLM_TooltipHide(accepted, unset, unset, ExpectedRecord)
 }
 
 /**
@@ -155,6 +147,22 @@ LLM_Tooltip_IsLoading() {
 	return LLM_TooltipIsLoading()
 }
 
+LLM_Tooltip_GetPresentedToken() {
+	return LLM_TooltipGetPresentedToken()
+}
+
+LLM_Tooltip_GetAcceptSnapshot() {
+	return LLM_TooltipGetAcceptSnapshot()
+}
+
+LLM_Tooltip_ClaimAcceptance(ExpectedRecord) {
+	return LLM_TooltipClaimAcceptance(ExpectedRecord)
+}
+
+LLM_Tooltip_FinalizeAcceptance(Lifecycle, Accepted) {
+	return LLM_TooltipFinalizeAcceptance(Lifecycle, Accepted)
+}
+
 /**
  * True while a real prediction is still inside its minimum-display window — the
  * brief span after it renders during which incidental input (an in-flight
@@ -166,48 +174,4 @@ LLM_Tooltip_IsLoading() {
  */
 LLM_Tooltip_InGracePeriod() {
 	return LLM_TooltipInGracePeriod()
-}
-
-/**
- * Accepts the active prediction when the tooltip is showing. Used by the
- * physical Tab hotkey, tap-hold keys remapped to Tab (e.g. AltGr tap), and
- * synthetic Tab events from the prefix watcher.
- * @returns {boolean} True when a prediction was accepted.
- */
-LLM_Tooltip_TryAcceptTab() {
-	global _LLM_AcceptInProgress
-	if _LLM_AcceptInProgress
-		return false
-	if !LLM_Tooltip_IsVisible()
-		return false
-	text := LLM_Tooltip_GetText()
-	if (text == "")
-		return false
-	_LLM_AcceptInProgress := true
-	try {
-		LLM_Bridge_OnAccept(text)
-	} finally {
-		_LLM_AcceptInProgress := false
-	}
-	return true
-}
-
-/**
- * Fires an unmodified Tab keystroke unless an LLM prediction is visible —
- * then accepts it instead of sending Tab to the active app.
- * @param {Array|String} Modifiers - TextPressKey modifier argument (Down/Up unchanged).
- */
-LLM_Tooltip_FireTabOrAccept(Modifiers := []) {
-	if (Modifiers == "Down" or Modifiers == "Up") {
-		TextPressKey("Tab", Modifiers)
-		return
-	}
-	has_mods := false
-	if (Modifiers is Array)
-		has_mods := (Modifiers.Length > 0)
-	else if (Modifiers != "")
-		has_mods := true
-	if !has_mods and LLM_Tooltip_TryAcceptTab()
-		return
-	TextPressKey("Tab", Modifiers)
 }

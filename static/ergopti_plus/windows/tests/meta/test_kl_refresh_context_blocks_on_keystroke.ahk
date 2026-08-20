@@ -1,28 +1,17 @@
 ﻿; tests/meta/test_kl_refresh_context_blocks_on_keystroke.ahk
 
 ; ==============================================================================
-; MODULE: KL-Refresh-Context-Blocks-On-Keystroke Meta Test
+; MODULE: Keylogger Canonical Focus Projection Guard
 ; DESCRIPTION:
-; Static source guard for the kl-refresh-context-blocks-on-keystroke finding.
+; Repairs the false-green test that called a SetTimer context refresh
+; "off-thread". Every AHK timer runs on the same cooperative script thread as
+; keyboard dispatch. A dedicated timer only becomes safe when its callback is
+; memory-only, not merely because the WinGetTitle call moved there.
 ;
-; KL_Hook_RefreshContext() runs WinGetTitle / WinGetProcessName, which send
-; messages (WM_GETTEXT etc.) to the foreground window's thread and can BLOCK
-; when that thread is busy or Not Responding (a common Electron/Office cold-
-; start state). It used to be called lazily from inside the InputHook callbacks
-; (KL_Hook_OnChar / KL_Hook_OnKeyDown) on the keystroke that crossed the 1 s
-; context-cache boundary. On the cooperative keyboard-hook thread, that blocking
-; Win32 call could stall the in-flight keystroke past LowLevelHooksTimeout and
-; drop it - right at an app switch, when the user is starting to type fresh.
-;
-; The fix moves context refresh OFF the keystroke thread: it is armed by a
-; dedicated SetTimer (KLHookConst.CONTEXT_REFRESH_MS) in KL_Hook_Start() and
-; torn down in KL_Hook_Stop(). The hook callbacks then read the cached
-; Keylogger.session_app / session_title with zero Win32 cost.
-;
-; This is a meta-static test (scans source text) because keylogger_hook.ahk is
-; not part of the headless runner's #Include graph. If a regression re-inlines
-; the Win32 probe into a keystroke callback, the "callbacks must not call
-; RefreshContext" assertions fail.
+; KL_Hook_RefreshContext now consumes MetricsFocusCache’s canonical bounded
+; snapshot. It retains the app/window transition ordering and suspend watermark
+; logic, but contains no WinGet, DllCall or second acquisition path. Invalid
+; snapshots are refused before any session or transition state mutates.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,64 +19,84 @@
 
 
 
-; ===================================================
-; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
 
-_KRCB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+; =====================================================
+; =====================================================
+; ======= 1/ Keystroke callbacks remain memory-only ===
+; =====================================================
+; =====================================================
+
+_KRCB_KeystrokeCallbacksDoNotRefreshContext() {
+	for FunctionName in ["KL_Hook_OnChar", "KL_Hook_OnKeyDown"] {
+		Body := _StripFullLineComments(_DriverFuncBody(FunctionName))
+		Assert(Body != "", FunctionName . " must exist in keylogger_hook.ahk")
+		Assert(InStr(Body, "KL_Hook_RefreshContext") = 0,
+			FunctionName . " must not refresh focus in the in-flight keystroke callback")
+		Assert(InStr(Body, "filtered := true") > 0
+			&& InStr(Body, "catch as FilterErr") > 0,
+			FunctionName . " must default a throwing privacy classification to filtered and log the failure")
+	}
 }
 
+Test("keylogger focus: keystroke callbacks never refresh context (focus-refresh-bounded-resident)",
+	_KRCB_KeystrokeCallbacksDoNotRefreshContext)
 
-; ===================================================
-; ===================================================
-; ======= 2/ Off-thread refresh assertions ==========
-; ===================================================
-; ===================================================
 
-; The keystroke callbacks must NOT call KL_Hook_RefreshContext directly - the
-; blocking Win32 probe must never run on the keyboard-hook thread.
-_KRCB_OnCharHasNoInlineRefresh() {
-	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _DriverFuncBody("KL_Hook_OnChar")
-	Assert(Body != "", "KL_Hook_OnChar must exist in keylogger_hook.ahk")
-	Assert(InStr(Body, "KL_Hook_RefreshContext") = 0,
-		"KL_Hook_OnChar must NOT call KL_Hook_RefreshContext on the keystroke thread - WinGetTitle/WinGetProcessName can block on a busy foreground window and drop the in-flight keystroke (kl-refresh-context-blocks-on-keystroke)")
+
+
+
+; ==========================================================
+; ==========================================================
+; ======= 2/ Resident projection performs no OS work =======
+; ==========================================================
+; ==========================================================
+
+_KRCB_ContextProjectionReadsCanonicalMemoryOnly() {
+	Body := _StripFullLineComments(_DriverFuncBody("KL_Hook_RefreshContext"))
+	Assert(Body != "", "KL_Hook_RefreshContext must exist")
+	Assert(InStr(Body, "MF_GetFocusSnapshot()") > 0,
+		"KL_Hook_RefreshContext must read the metrics module's canonical focus snapshot")
+	for Forbidden in ["WinGetTitle(", "WinGetProcessName(", "WinGetClass(",
+		"WinGetID(", "DllCall(", "WICaptureBoundedFocusSnapshot("] {
+		Assert(InStr(Body, Forbidden) = 0,
+			"the resident keylogger projection must be memory-only; found " . Forbidden)
+	}
+	ValidPos := InStr(Body, "Snapshot.valid")
+	SessionPos := InStr(Body, "Keylogger.session_title := NewTitle")
+	Assert(ValidPos > 0 && SessionPos > ValidPos,
+		"an invalid canonical snapshot must be rejected before keylogger session context mutates")
 }
-Test("keylogger_hook: OnChar does not inline the blocking context refresh (kl-refresh-context-blocks-on-keystroke)", _KRCB_OnCharHasNoInlineRefresh)
 
-_KRCB_OnKeyDownHasNoInlineRefresh() {
-	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _DriverFuncBody("KL_Hook_OnKeyDown")
-	Assert(Body != "", "KL_Hook_OnKeyDown must exist in keylogger_hook.ahk")
-	Assert(InStr(Body, "KL_Hook_RefreshContext") = 0,
-		"KL_Hook_OnKeyDown must NOT call KL_Hook_RefreshContext on the keystroke thread (kl-refresh-context-blocks-on-keystroke)")
-}
-Test("keylogger_hook: OnKeyDown does not inline the blocking context refresh (kl-refresh-context-blocks-on-keystroke)", _KRCB_OnKeyDownHasNoInlineRefresh)
+Test("keylogger focus: resident context timer reads canonical memory only (focus-refresh-bounded-resident)",
+	_KRCB_ContextProjectionReadsCanonicalMemoryOnly)
 
-; Context refresh must instead be armed on its own SetTimer in KL_Hook_Start.
-_KRCB_RefreshArmedByTimer() {
-	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _DriverFuncBody("KL_Hook_Start")
-	Assert(Body != "", "KL_Hook_Start must exist in keylogger_hook.ahk")
-	Assert(InStr(Body, "CONTEXT_REFRESH_MS") > 0,
-		"KL_Hook_Start must arm context refresh on a dedicated SetTimer using KLHookConst.CONTEXT_REFRESH_MS (kl-refresh-context-blocks-on-keystroke)")
-	Assert(InStr(Body, "KL_Hook_RefreshContext.Bind()") > 0,
-		"KL_Hook_Start must bind KL_Hook_RefreshContext for SetTimer so the Win32 probe runs off the keystroke thread (kl-refresh-context-blocks-on-keystroke)")
-	Assert(InStr(Body, "SetTimer(KLHook.context_timer") > 0,
-		"KL_Hook_Start must SetTimer the bound context_timer reference (kl-refresh-context-blocks-on-keystroke)")
-}
-Test("keylogger_hook: context refresh is armed by a SetTimer, not the keystroke path (kl-refresh-context-blocks-on-keystroke)", _KRCB_RefreshArmedByTimer)
 
-; The CONTEXT_REFRESH_MS constant must be a finite, bounded period (the whole
-; point is a low-frequency off-thread poll, not a per-keystroke probe).
-_KRCB_RefreshPeriodConstant() {
-	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
+
+
+
+; ===========================================================
+; ===========================================================
+; ======= 3/ Timer owns projection, never acquisition =======
+; ===========================================================
+; ===========================================================
+
+_KRCB_ProjectionTimerLifecycleIsPaired() {
+	StartBody := _StripFullLineComments(_DriverFuncBody("KL_Hook_Start"))
+	StopBody := _StripFullLineComments(_DriverFuncBody("KL_Hook_Stop"))
+	Assert(StartBody != "" && StopBody != "",
+		"keylogger hook start/stop lifecycle functions must exist")
+	Assert(InStr(StartBody, "KL_Hook_RefreshContext.Bind()") > 0
+		&& InStr(StartBody, "SetTimer(KLHook.context_timer") > 0,
+		"KL_Hook_Start must arm the memory-only context projection timer")
+	Assert(InStr(StopBody, "SetTimer(KLHook.context_timer, 0)") > 0,
+		"KL_Hook_Stop must cancel the resident projection timer")
+	Assert(InStr(StartBody, "WICaptureBoundedFocusSnapshot") = 0,
+		"the keylogger lifecycle must not create a second focus acquisition owner")
+
+	Src := _DriverSourceNoComments()
 	Assert(InStr(Src, "static CONTEXT_REFRESH_MS :=") > 0,
-		"KLHookConst must define CONTEXT_REFRESH_MS as a named constant for the off-thread refresh cadence (kl-refresh-context-blocks-on-keystroke)")
+		"the resident memory-only projection cadence must remain a named constant")
 }
-Test("keylogger_hook: CONTEXT_REFRESH_MS is a named constant (kl-refresh-context-blocks-on-keystroke)", _KRCB_RefreshPeriodConstant)
+
+Test("keylogger focus: resident projection timer has paired lifecycle (focus-refresh-bounded-resident)",
+	_KRCB_ProjectionTimerLifecycleIsPaired)

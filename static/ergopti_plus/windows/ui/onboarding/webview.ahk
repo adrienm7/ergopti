@@ -446,12 +446,10 @@ _OnbWeb_Finish(answers) {
 
 	; Do not tear the wizard down until persistence succeeds. Otherwise a failed
 	; path/config write would discard the user's answers and leave no retry UI.
-	if _Onboarding_Commit() {
-		; Close the WebView2 controller before the host window is torn down by
-		; Reload (the WebView2 spec requires Controller.Close first).
-		_OnbWeb_Reset()
-		ReloadPreservingSuspend()
-	}
+	; Close the WebView2 controller only from the accepted reload hand-off. The
+	; config/path owners remain held until that callback, and a refused reload
+	; leaves this retry surface intact.
+	_Onboarding_Commit(_OnbWeb_Reset)
 }
 
 ; Runs the synchronous, elevated touchpad-gesture configuration (same registry

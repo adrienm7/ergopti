@@ -111,7 +111,9 @@ function close_app_modal() {
  * Selects all available apps and re-renders the list.
  */
 function select_all_apps() {
+	app_state.selected_apps.clear();
 	app_state.available_apps.forEach((app) => app_state.selected_apps.add(app));
+	app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
 	render_app_list();
 }
 
@@ -120,6 +122,7 @@ function select_all_apps() {
  */
 function deselect_all_apps() {
 	app_state.selected_apps.clear();
+	app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 	render_app_list();
 }
 
@@ -132,6 +135,13 @@ function toggle_app_selection(checkbox) {
 		app_state.selected_apps.add(checkbox.value);
 	} else {
 		app_state.selected_apps.delete(checkbox.value);
+	}
+	if (app_state.selected_apps.size === 0) {
+		app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
+	} else if (app_state.selected_apps.size === app_state.available_apps.length) {
+		app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+	} else {
+		app_state.app_selection_mode = APP_SELECTION_MODE.SUBSET;
 	}
 }
 

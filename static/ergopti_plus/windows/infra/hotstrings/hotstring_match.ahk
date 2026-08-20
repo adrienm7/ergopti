@@ -103,11 +103,11 @@ _HSE_EndCharBeats(Cand, Best, BestIsEndChar) {
 HSE_FindMatchAtEnd(JustTypedChar) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RegistryByLastChar
 		global HSE_WORD_TERMINATORS, HSE_LastEndChar, HSE_TypoNbspStripped
-		global HSE_RebuildInProgress
+		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
 
-		if HSE_RebuildInProgress {
+		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0) {
 				return ""
 		}
 

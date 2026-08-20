@@ -77,12 +77,40 @@ Test("updater: Updater_SetCheckInterval logs a warning on rejection (updater-set
 
 _USCI_PersistsBeforePublishingTimerState() {
 	Seg := _DriverFuncBody("Updater_SetCheckInterval")
-	PersistAt := InStr(Seg, "if !TOML_Write(Seconds")
-	PublishAt := InStr(Seg, "UPDATER_CHECK_INTERVAL := Seconds")
-	StopAt := InStr(Seg, "Updater_StopBackgroundChecks()")
-	Assert(PersistAt > 0 && PublishAt > PersistAt && StopAt > PersistAt,
-		"Updater_SetCheckInterval must persist before publishing cadence or restarting timers")
-	Assert(InStr(Seg, "LoggerError") > PersistAt,
-		"a failed cadence write must fail loud and leave the current timer untouched")
+	LeaseAt := InStr(Seg, "_Updater_AcquireAsyncActionLease(")
+	CommitAt := InStr(Seg, "ConfigCommitBuilt(", , LeaseAt)
+	ReleaseAt := InStr(Seg,
+		"_Updater_ReleaseAsyncActionLease(", , CommitAt)
+	Assert(LeaseAt > 0 and CommitAt > LeaseAt and ReleaseAt > CommitAt,
+		"Updater_SetCheckInterval must hold updater admission around one globally owned transaction")
+	Assert(InStr(Seg, "GatewayWriter := IsObject(WriteFn)", , LeaseAt) > LeaseAt,
+		"the optional writer seam must preserve the legacy object-vs-default dispatch contract")
+	Adapter := _DriverFuncBody("_Updater_InvokeLegacyConfigWriter")
+	Assert(InStr(Adapter, 'HasMethod(WriteFn, "Call")') > 0
+		and InStr(Adapter,
+			"WriteFn.Call(Update.Value, Path, Update.Section, Update.Key)") > 0,
+		"the owned gateway adapter must retain the legacy four-argument writer signature and refuse malformed objects")
+	Plan := _DriverFuncBody("_Updater_BuildCheckIntervalPlan")
+	Finalize := _DriverFuncBody("_Updater_FinalizeCheckInterval")
+	Publish := _DriverFuncBody("_Updater_PublishCheckInterval")
+	Restore := _DriverFuncBody("_Updater_RestoreCheckInterval")
+	Assert(Plan != "" and Finalize != "" and Publish != ""
+		and Restore != "",
+		"the owned check-interval transaction helpers must remain discoverable")
+	Assert(InStr(Plan, "rollback_updates:") > 0
+		and InStr(Plan, "compensate:") > 0,
+		"a native cadence failure must restore both old durability and old cadence")
+	PublishAt := InStr(Finalize, "UPDATER_CHECK_INTERVAL := Seconds")
+	StopAt := InStr(Finalize, "Updater_StopBackgroundChecks()")
+	StartAt := InStr(Finalize,
+		"Updater_StartBackgroundChecks()", , PublishAt)
+	Assert(StopAt > 0 and PublishAt > StopAt and StartAt > PublishAt,
+		"native cadence retirement, provisional publication and acknowledged re-arm must stay ordered under config ownership")
+	Assert(InStr(Publish, "UPDATER_CHECK_INTERVAL := Seconds") > 0
+		and InStr(Publish, "State.Published := true") > 0,
+		"the gateway's non-yielding publication step must own the authoritative live preference")
+	Assert(InStr(Restore, "State.OldSeconds") > 0
+		and InStr(Restore, "State.CadenceWasRunning") > 0,
+		"a failed writer/finalizer must retain the exact prior live cadence")
 }
 Test("updater: interval persistence commits before state/timer publication", _USCI_PersistsBeforePublishingTimerState)

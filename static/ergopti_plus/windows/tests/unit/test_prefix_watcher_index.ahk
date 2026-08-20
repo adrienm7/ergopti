@@ -1,18 +1,17 @@
 ﻿; static/ergopti_plus/windows/tests/unit/test_prefix_watcher_index.ahk
 
 ; ==============================================================================
-; MODULE: Prefix Watcher Index Tests
+; MODULE: Prefix Watcher Catalogue And Canonical Winner Tests
 ; DESCRIPTION:
-; Regression tests for the preview-tooltip / expansion desync on a live
-; (reload-free) section toggle. The prefix watcher keeps its OWN index, built
-; from each category TOML and filtered by the Features "enabled" flag of every
-; section (_RegisterCategoryTriggers). When a section is toggled live, the HSE
-; registry is updated immediately, but the watcher index must be rebuilt too -
-; otherwise a disabled section keeps previewing an expansion that no longer
-; fires, and a freshly enabled section fires with no tooltip.
+; The file-derived index remains an auxiliary near-miss catalogue, built from
+; each category TOML and filtered by the Features "enabled" flag of every
+; section. It must stay faithful for analytics, but it must never participate in
+; choosing a visible expansion. The live HSE registry now owns selection and the
+; collector transports its complete decision directly.
 ;
-; These tests pin the section-filter invariant the rebuild relies on: a
-; section's triggers appear in the index iff its Features "enabled" flag is set.
+; These tests preserve the catalogue's section-filter and metadata invariants,
+; then prove collision precedence at the real collector boundary rather than
+; pinning the deleted preview-local sort.
 ; ==============================================================================
 
 
@@ -63,7 +62,7 @@ TestPrefixWatcher_EnabledSectionIsIndexed() {
 
 	_PrefixWatcherTest_Reindex()
 	AssertTrue(_PrefixIndex.Has("abc"),
-		"an enabled section's trigger is present in the prefix index")
+		"an enabled section's trigger is present in the auxiliary catalogue")
 }
 Test("prefix watcher: enabled section trigger is indexed",
 	TestPrefixWatcher_EnabledSectionIsIndexed)
@@ -73,13 +72,14 @@ TestPrefixWatcher_DisabledSectionIsNotIndexed() {
 	_PrefixWatcherTest_WriteToml()
 	if !Features.Has("hotstrings")
 		Features["hotstrings"] := Map()
-	; This is the exact tooltip-persistence bug: section disabled, but its
-	; trigger must NOT remain in the index after a live-toggle rebuild.
+	; This was the exact tooltip-persistence bug when the index owned rendering.
+	; It now protects the remaining consumer: a disabled trigger must not survive
+	; as a known-trigger or near-miss analytics row.
 	Features["hotstrings"]["personal"] := Map("testsec", Map("enabled", false))
 
 	_PrefixWatcherTest_Reindex()
 	AssertFalse(_PrefixIndex.Has("abc"),
-		"a disabled section's trigger is absent from the index (no stale tooltip)")
+		"a disabled section's trigger is absent from the analytics catalogue")
 }
 Test("prefix watcher: disabled section trigger is not indexed",
 	TestPrefixWatcher_DisabledSectionIsNotIndexed)
@@ -91,7 +91,7 @@ TestPrefixWatcher_ReenabledSectionIsIndexedAgain() {
 		Features["hotstrings"] := Map()
 
 	; off -> rebuild -> on -> rebuild: the freshly enabled section must reappear
-	; (this is the "fires but no tooltip" half of the bug).
+	; so later manual typing and near misses are attributed again.
 	Features["hotstrings"]["personal"] := Map("testsec", Map("enabled", false))
 	_PrefixWatcherTest_Reindex()
 	AssertFalse(_PrefixIndex.Has("abc"), "precondition: disabled section not indexed")
@@ -99,7 +99,7 @@ TestPrefixWatcher_ReenabledSectionIsIndexedAgain() {
 	Features["hotstrings"]["personal"]["testsec"]["enabled"] := true
 	_PrefixWatcherTest_Reindex()
 	AssertTrue(_PrefixIndex.Has("abc"),
-		"a re-enabled section's trigger reappears in the index (tooltip restored)")
+		"a re-enabled section's trigger reappears in the analytics catalogue")
 }
 Test("prefix watcher: re-enabled section trigger is indexed again",
 	TestPrefixWatcher_ReenabledSectionIsIndexedAgain)
@@ -107,50 +107,107 @@ Test("prefix watcher: re-enabled section trigger is indexed again",
 
 
 
-; ==============================================
-; ==============================================
-; ======= 2/ Priority-ranked preview ===========
-; ==============================================
-; ==============================================
+; ====================================================
+; ====================================================
+; ======= 2/ Engine-ranked canonical preview ==========
+; ====================================================
+; ====================================================
 
-; The live preview must surface the SAME winner the engine fires.
-; _PrefixSortCandidates ranks colliding candidates by the engine tie-break
-; (length > priority > registration order), so the first (non-dimmed) row is the
-; real winner — not just the first-scanned category. Before this, a personal
-; trigger the engine fires showed up DIMMED beneath the common trigger it beats,
-; because the personal category is scanned last.
+; The live preview must surface the SAME winner the engine fires. These cases
+; exercise the collector over the live registry, so deleting the old sort does
+; not delete its guarantee — it makes the guarantee behavioural.
 TestPrefixWatcher_PreviewWinnerByPriority() {
-	; Same trigger, same length — registration order lists the common one first, but
-	; the higher-priority personal one must sort to the front (the engine fires it).
-	Common   := { Trigger: "ct", Output: "common",   Category: "autocorrection", Section: "x", Length: 2, Priority: 10 }
-	Personal := { Trigger: "ct", Output: "personal", Category: "personal",       Section: "x", Length: 2, Priority: 50 }
-	Sorted := _PrefixSortCandidates([Common, Personal])
-	AssertEqual("personal", Sorted[1].Output,
-		"the higher-priority candidate is the preview winner regardless of registration order")
-	AssertEqual("common", Sorted[2].Output, "the lower-priority candidate is the dimmed loser")
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed, ScriptInformation
+	MK := ScriptInformation["MagicKey"]
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_Suppressed := 0
+	HSE_FeedReset(true)
+	try {
+		HSE_Register("*?", "ct" . MK, 0,
+			Map("Replacement", "common", "Priority", 10,
+				"Category", "autocorrection", "Section", "x"))
+		WinnerSpec := HSE_Register("*?", "ct" . MK, 0,
+			Map("Replacement", "personal", "Priority", 50,
+				"Category", "personal", "Section", "x"))
+		HSE_Buffer := "ct"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"one completion key must expose only the canonical collision winner")
+		AssertEqual("personal", Rows[1].Output,
+			"the higher-priority live Spec must be the visible winner regardless of registration order")
+		Assert(ObjPtr(Rows[1].FireDecision.Spec) == ObjPtr(WinnerSpec),
+			"the row must retain the engine winner's exact identity")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
 }
 Test("prefix watcher: higher priority wins the preview (matches the engine fire winner)",
 	TestPrefixWatcher_PreviewWinnerByPriority)
 
 TestPrefixWatcher_PreviewWinnerByLength() {
-	; A longer trigger beats a higher-priority shorter one — the engine fires the longest.
-	Shorter := { Output: "short", Length: 3, Priority: 50 }
-	Longer  := { Output: "long",  Length: 5, Priority: 10 }
-	Sorted := _PrefixSortCandidates([Shorter, Longer])
-	AssertEqual("long", Sorted[1].Output,
-		"a longer trigger outranks a higher-priority shorter one (engine fires the longest match)")
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed, ScriptInformation
+	MK := ScriptInformation["MagicKey"]
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_Suppressed := 0
+	HSE_FeedReset(true)
+	try {
+		HSE_Register("*?", "bc" . MK, 0,
+			Map("Replacement", "short", "Priority", 99,
+				"Category", "test", "Section", "short"))
+		LongSpec := HSE_Register("*?", "abc" . MK, 0,
+			Map("Replacement", "long", "Priority", 10,
+				"Category", "test", "Section", "long"))
+		HSE_Buffer := "abc"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"the collector must expose only the engine's longest suffix winner")
+		AssertEqual("long", Rows[1].Output,
+			"a longer trigger outranks a higher-priority shorter suffix")
+		Assert(ObjPtr(Rows[1].FireDecision.Spec) == ObjPtr(LongSpec),
+			"the visible row must carry the longest live Spec")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
 }
 Test("prefix watcher: longer trigger wins the preview over a higher-priority shorter one",
 	TestPrefixWatcher_PreviewWinnerByLength)
 
 TestPrefixWatcher_PreviewStableOnTie() {
-	; Equal length AND priority → the original registration order is preserved, mirroring
-	; the engine's final Seq tiebreak. A non-stable sort here would flicker the winner.
-	A := { Output: "first",  Length: 2, Priority: 10 }
-	B := { Output: "second", Length: 2, Priority: 10 }
-	Sorted := _PrefixSortCandidates([A, B])
-	AssertEqual("first", Sorted[1].Output, "equal-rank candidates keep their registration order")
-	AssertEqual("second", Sorted[2].Output, "the stable sort preserves Seq as the final tiebreak")
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed, ScriptInformation
+	MK := ScriptInformation["MagicKey"]
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_Suppressed := 0
+	HSE_FeedReset(true)
+	try {
+		FirstSpec := HSE_Register("*?", "eq" . MK, 0,
+			Map("Replacement", "first", "Priority", 10,
+				"Category", "test", "Section", "tie"))
+		HSE_Register("*?", "eq" . MK, 0,
+			Map("Replacement", "second", "Priority", 10,
+				"Category", "test", "Section", "tie"))
+		HSE_Buffer := "eq"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"equal-rank duplicates must still collapse to the one engine winner")
+		AssertEqual("first", Rows[1].Output,
+			"equal length and priority must preserve the engine's registration-order tiebreak")
+		Assert(ObjPtr(Rows[1].FireDecision.Spec) == ObjPtr(FirstSpec),
+			"the first registered Spec must own the visible row on an exact tie")
+	} finally {
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
 }
 Test("prefix watcher: equal-rank candidates keep registration order (stable)",
 	TestPrefixWatcher_PreviewStableOnTie)

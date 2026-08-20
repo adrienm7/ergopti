@@ -103,6 +103,9 @@ local function with_crypto_fixture(options, body)
 		body(require("modules.llm.api_token_crypto"), fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	-- Keep the shared-slot restore explicit so the cross-file hygiene scanner can
+	-- prove this fixture cannot leak an exec-less shell runner into its successor.
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
 	if not ok then error(err) end
 end
 

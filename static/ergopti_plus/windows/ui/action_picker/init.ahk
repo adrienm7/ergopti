@@ -217,10 +217,10 @@ FilePathsEditor(*) {
 				; to be a verbatim copy of that block from before it was hardened: an
 				; unprotected FileOpen and an `if f` with no else, so a read-only or
 				; locked target discarded the user's chosen directory in silence and the
-				; Reload() below dropped them back into the OLD one with no error shown.
+				; the writer's owned Reload dropped them back into the OLD one with no
+				; error shown.
 				if !_PathsFile_Write(N)
 						return
-				ReloadPreservingSuspend()
 		}
 		W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", ConfirmPath)
 		W.Show("Center")

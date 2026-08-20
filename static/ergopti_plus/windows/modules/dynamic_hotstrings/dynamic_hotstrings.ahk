@@ -105,7 +105,8 @@ _DynHS_RegisterAll() {
 	; window. Resolve it once and reuse the options Map across the date registrations;
 	; section 2.1 builds a second Map that adds the privacy marker, because a date is
 	; not a secret and the user's IBAN is.
-	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay())
+	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
+		"Category", "dynamichotstrings")
 	if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
 		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
 	}
@@ -138,7 +139,7 @@ _DynHS_RegisterAll() {
 	; phone number / SSN / IBAN. A row reading trigger="FR7630006" is the secret,
 	; in the field nobody thought to look at.
 	_DynPrivateOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
-		"IsPrivate", True)
+		"IsPrivate", True, "Category", "dynamichotstrings")
 
 	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
 	SsnRaw  := StrReplace(Ssn,  " ", "")

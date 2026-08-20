@@ -1,26 +1,15 @@
 ﻿; infra/personal_info_preview.ahk
 
 ; ==============================================================================
-; MODULE: Personal-Info Preview Provider
+; MODULE: Personal-Info Resolution And Preview Projection
 ; DESCRIPTION:
-; The preview candidate source for every trigger that starts with "@": the
-; personal-information tags (@iban, @tel, …), the letter combos (@n, @np,
-; @nptm, …) and the three dates (@dt, @date, @td).
-;
-; WHY A PROVIDER AND NOT AN INDEX ENTRY:
-; _PrefixIndex is built exclusively from files — the bundled category TOMLs,
-; their in-memory cache and the extension packs. Every @ trigger is created
-; imperatively at boot by CreateHotstring, which feeds the ENGINE registry and
-; nothing else, so no key beginning with "@" has ever existed in that index:
-; _PrefixCollectCandidates returned an empty array for any @ buffer and the
-; bubble was silent for the whole family while the expansions fired normally.
-; Inserting them into the index at registration time would work until the next
-; HotstringPrefixWatcherRebuildIndex — a live section toggle, a personal save,
-; the boot-tail warm-up — which builds a fresh Map and swaps it in, so the bug
-; would come back intermittently and look like a race.
+; The shared catalogue and field resolver for every trigger that starts with
+; "@", plus the masking projection used after the engine has selected and frozen
+; an exact fire decision. Candidate discovery is deliberately absent here:
+; HSE_PreviewNextDecision is the single owner of the answer shown by the tooltip.
 ;
 ; FEATURES & RATIONALE:
-; 1. The ENGINE decides what exists — and it now answers in two ways. A
+; 1. The ENGINE decides what exists — and it answers in two ways. A
 ;    registered Spec still wins where there is one. Where there is not, the
 ;    engine resolves @<letters><magic key> at fire time
 ;    (HSE_TryPersonalInfoCombo), so a tag whose letters all alias a filled-in
@@ -29,12 +18,9 @@
 ;    combos came from a hand-written list of thirty-one registrations; once every
 ;    combination fires, that same check became the bubble refusing to preview
 ;    expansions that work.
-; 2. The ENGINE decides what it is. The rendering branch is chosen from the
-;    Spec's replacement, not from the tag: "@dt" spells two valid letter aliases
-;    AND is the short-date trigger, and only the Spec knows which one the engine
-;    will fire.
-; 3. Masked for display, complete when typed. A row's text goes through the
-;    shared masking policy; the expansion path never reads it.
+; 2. Masked for display, complete when typed. The engine freezes the complete
+;    field/value snapshot on its decision; this module masks that same snapshot
+;    for display, and the expansion path never reads the masked text.
 ; ==============================================================================
 
 
@@ -48,7 +34,7 @@
 
 ; The @-tags that expand to ONE personal_info field, and the field each names.
 ; Read by the registration (modules/hotstrings/hotstrings_text_expansion.ahk
-; turns every entry into a CreateHotstring call) and by the provider below, so
+; turns every entry into a CreateHotstring call) and by the engine resolver, so
 ; the set of tags and the field a tag resolves to cannot drift between what the
 ; driver types and what the bubble promises.
 global PERSONAL_INFO_TAGS := Map(
@@ -68,7 +54,7 @@ global PERSONAL_INFO_TAGS := Map(
 ; from the literal above.
 global PERSONAL_INFO_TAG_ORDER := ["bic", "cb", "cc", "iban", "rib", "ss", "tel", "tél"]
 
-; The longest @-tag the provider looks back for. Bounds the scan on a buffer
+; The longest @-tag the engine resolver looks back for. Bounds the scan on a buffer
 ; that holds a long word, and no registered tag comes close: the hand-listed
 ; combos top out at six letters and the literal tags at four.
 global PI_PREVIEW_MAX_TAG_LEN := 12
@@ -85,14 +71,6 @@ global PI_PREVIEW_FIELD_SEPARATOR := " " . Chr(0x21E5) . " "
 ; CreateHotstring registers every @ trigger with an EMPTY category, and resolving
 ; that would paint them the generic global default instead.
 global PI_PREVIEW_CATEGORY := "personal"
-
-; The category a date row resolves through — the same key the dates already use
-; for their activation delay (_DynamicHotstringDelay), so the tray menu's
-; existing "dynamic hotstrings" entry governs both.
-global PI_PREVIEW_DYNAMIC_CATEGORY := "dynamichotstrings"
-
-
-
 
 ; =====================================
 ; =====================================
@@ -183,154 +161,29 @@ _PIPreviewFieldsForTag(Tag) {
 ; string and never reads this one.
 ; @param Fields Array of personal_info field names.
 ; @return The row text, or "" when a field has no value.
-_PIPreviewMaskedText(Fields) {
+_PIPreviewMaskedText(Fields, Values := unset) {
 	global PersonalInformation, PI_PREVIEW_FIELD_SEPARATOR
-	if (!IsSet(PersonalInformation) or Fields.Length == 0) {
+	if (!(Fields is Array) or Fields.Length == 0) {
 		return ""
 	}
+	UseSnapshot := IsSet(Values)
+	if (UseSnapshot and (!(Values is Array) or Values.Length != Fields.Length))
+		return ""
+	if (!UseSnapshot and !IsSet(PersonalInformation))
+		return ""
 	Text := ""
 	for Index, Field in Fields {
-		if !PersonalInformation.Has(Field) {
+		if (!UseSnapshot and !PersonalInformation.Has(Field)) {
 			try LoggerWarn("PersonalInfoPreview", "No value for personal-info field '{1}' — the row is dropped.", Field)
 			return ""
 		}
+		Value := UseSnapshot ? Values[Index] : PersonalInformation[Field]
+		if !(Value is String) or Value == ""
+			return ""
 		if (Index > 1) {
 			Text .= PI_PREVIEW_FIELD_SEPARATOR
 		}
-		Text .= PersonalInfoMaskForPreview(PersonalInformation[Field], Field)
+		Text .= PersonalInfoMaskForPreview(Value, Field)
 	}
 	return Text
 }
-
-
-
-
-
-; ===============================
-; ===============================
-; ======= 3/ The provider =======
-; ===============================
-; ===============================
-
-; Offer the preview a row for the @-trigger the buffer ends with.
-;
-; Returns an Array so the contract is the same for the no-match case and the
-; match case, and so a future provider can offer several rows without changing
-; the collector.
-; @param Buffer The engine's buffer, exactly what the suffix probe reads.
-; @return Array of preview rows — empty when nothing is offered.
-PersonalInfoPreviewProvider(Buffer) {
-	global ScriptInformation, PI_PREVIEW_CATEGORY, PI_PREVIEW_DYNAMIC_CATEGORY
-	global HSE_PersonalInfoCombosEnabled
-	Rows := []
-	if (Type(Buffer) != "String" or Buffer == "") {
-		return Rows
-	}
-	if (!IsSet(ScriptInformation) or !ScriptInformation.Has("MagicKey")) {
-		return Rows
-	}
-	Tag := _PIPreviewTrailingTag(Buffer)
-	if (Tag == "") {
-		return Rows
-	}
-
-	; The engine's own answer to "does this exist", through the same by-trigger
-	; indexes the matcher probes. A registered Spec still wins: the literal tags
-	; and the dates are registered, and "@dt" spells two valid alias letters AND
-	; is the short-date trigger — only the registration knows which one fires.
-	Trigger := "@" . Tag . ScriptInformation["MagicKey"]
-	Spec := _PreviewSpecForTrigger(Trigger)
-	if !IsObject(Spec) {
-		; Not registered — but no longer "not offered". The engine resolves any
-		; @<letters>★ at fire time (HSE_TryPersonalInfoCombo), so a tag whose
-		; letters all alias a filled-in field WILL expand, and staying silent here
-		; would be the bubble refusing to preview an expansion that works. This
-		; check is deliberately the resolver's own precondition rather than a
-		; re-derivation of it: the fields list below decides both.
-		if (!IsSet(HSE_PersonalInfoCombosEnabled) or !HSE_PersonalInfoCombosEnabled) {
-			return Rows
-		}
-		Fields := _PIPreviewFieldsForTag(Tag)
-		if (Fields.Length == 0) {
-			return Rows
-		}
-		Text := _PIPreviewMaskedText(Fields)
-		if (Text == "") {
-			return Rows
-		}
-		; No Spec means no engine-supplied ranking, so the row carries the values
-		; the resolver's transient Spec will carry: a star trigger of this length,
-		; default priority, and the personal category's own activation window.
-		Rows.Push({ Trigger:    Trigger,
-		            Output:     Text,
-		            Category:   PI_PREVIEW_CATEGORY,
-		            Section:    "",
-		            Length:     StrLen(Trigger),
-		            Priority:   "",
-		            GroupOrder: 0,
-		            Seq:        0,
-		            Delay:      0 })
-		return Rows
-	}
-
-	Replacement := Spec.HasOwnProp("Replacement") ? Spec.Replacement : ""
-	if HasMethod(Replacement) {
-		; A callable replacement is a value the engine computes at fire time —
-		; the three dates. Resolve it the same way, so the bubble shows what the
-		; magic key will actually type rather than a stale registration.
-		Text := ""
-		try {
-			Text := Replacement.Call()
-		} catch as Err {
-			try LoggerError("PersonalInfoPreview", "Resolving the dynamic value for '{1}' failed: {2}. The row is dropped.", Spec.Trigger, Err.Message)
-			return Rows
-		}
-		if (Type(Text) != "String" or Text == "") {
-			return Rows
-		}
-		Category := PI_PREVIEW_DYNAMIC_CATEGORY
-	} else {
-		Fields := _PIPreviewFieldsForTag(Tag)
-		if (Fields.Length == 0) {
-			return Rows
-		}
-		Text := _PIPreviewMaskedText(Fields)
-		if (Text == "") {
-			return Rows
-		}
-		Category := PI_PREVIEW_CATEGORY
-	}
-
-	; Length, Priority, GroupOrder and Seq are the ENGINE's, so _HSE_Beats ranks
-	; this row against the index rows by exactly the rule that will decide the
-	; fire. Delay is the engine's activation window for this trigger, so the
-	; bubble lives exactly as long as the expansion stays armed.
-	Rows.Push({ Trigger:    Spec.Trigger,
-	            Output:     Text,
-	            Category:   Category,
-	            Section:    "",
-	            Length:     Spec.HasOwnProp("Length") ? Spec.Length : StrLen(Spec.Trigger),
-	            Priority:   Spec.HasOwnProp("Priority") ? Spec.Priority : "",
-	            GroupOrder: Spec.HasOwnProp("GroupOrder") ? Spec.GroupOrder : 0,
-	            Seq:        Spec.HasOwnProp("Seq") ? Spec.Seq : 0,
-	            Delay:      Spec.HasOwnProp("TimeActivationSeconds") ? Spec.TimeActivationSeconds : 0 })
-	return Rows
-}
-
-
-
-
-
-; ===============================
-; ===============================
-; ======= 4/ Registration =======
-; ===============================
-; ===============================
-
-; Registered at load rather than from HotstringPrefixWatcherInit: this provider
-; is a static capability of the driver, not a lifecycle-dependent one, and
-; registering it here means the collector is complete from the first keystroke
-; regardless of boot ordering. The provider itself asks the engine what exists,
-; so it offers nothing at all until the @ triggers are registered — a disabled
-; feature needs no gate here.
-HotstringPrefixWatcherRegisterPreviewProvider(PersonalInfoPreviewProvider)

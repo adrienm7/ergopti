@@ -82,6 +82,8 @@ _LLM_Persist_MakeDefaultTray() {
 		"nav_modifiers",              "",
 		"val_modifiers",              "alt",
 		"trigger_shortcut",           "Ctrl+Space",
+		"api_entry_id",               "api_primary",
+		"ollama_port",                11434,
 		"inline_autotype",            false
 	)
 }
@@ -187,8 +189,8 @@ _LLM_Persist_PersistSource() {
 
 Test_LLM_Persist_AllTrayKeysAreSynced() {
 	body := FileRead(_LLM_Persist_PersistSource(), "UTF-8")
-	syncStart := InStr(body, "_LLM_Menu_SyncToFeatures()")
-	appendStart := InStr(body, "_LLM_Menu_AppendPersistedUpdates(Updates)")
+	syncStart := RegExMatch(body, "m)^_LLM_Menu_SyncToFeatures\s*\(")
+	appendStart := RegExMatch(body, "m)^_LLM_Menu_AppendPersistedUpdates\s*\(")
 	if (syncStart = 0 or appendStart = 0)
 		throw Error("persist.ahk missing sync helpers")
 	syncBlock := SubStr(body, syncStart, appendStart - syncStart)
@@ -340,3 +342,37 @@ Test_LLM_Persist_PredIndentZeroIsNumeric() {
 }
 Test("LLM persist: pred_indent 0 writes numeric zero not false",
 	Test_LLM_Persist_PredIndentZeroIsNumeric)
+
+Test_LLM_Persist_ApiEntryIdRoundTrips() {
+	global _LLM_Menu, Features
+	SavedFeatures := Features
+	SavedMenu := _LLM_Menu
+	try {
+		Features := _LLM_Persist_CloneFeatures(Features)
+		_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+		_LLM_Menu["api_entry_id"] := "api_secondary"
+		Updates := _LLM_Persist_CollectUpdates()
+		Found := false
+		for Update in Updates {
+			if Update.Section == "llm" && Update.Key == "api_entry_id" {
+				Found := true
+				AssertEqual("api_secondary", Update.Value)
+				break
+			}
+		}
+		AssertTrue(Found,
+			"the selected remote endpoint must be serialized into config.toml")
+		Path := A_Temp . "\ergopti_llm_api_entry_id.toml"
+		try FileDelete(Path)
+		AssertTrue(TOML_BatchWrite(Path, Updates))
+		Opts := LLM_Menu_BuildSavedOpts(ParseTomlFile(Path))
+		AssertEqual("api_secondary", Opts["api_entry_id"],
+			"the selected remote endpoint must survive a restart")
+	} finally {
+		Features := SavedFeatures
+		_LLM_Menu := SavedMenu
+	}
+}
+Test("LLM persist: active API entry survives config round-trip "
+	. "(llm-api-entry-id-roundtrip)",
+	Test_LLM_Persist_ApiEntryIdRoundTrips)

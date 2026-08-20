@@ -20,6 +20,8 @@
  *    feed system_single back into the init payload.
  * 4. Native fallback preserved — the InputBox wizard must remain (gated behind
  *    the webview TryOpen) so a machine without the WebView2 runtime still works.
+ * 5. Immutable context — init must carry an edit id + epoch that every deferred
+ *    save/cancel echoes, and both the page and host must reject stale epochs.
  *
  * FEATURES & RATIONALE:
  *   Actions are extracted from script.js so the test tracks the UI as it
@@ -142,7 +144,7 @@ check(
 );
 
 // 5. init payload shape consumed by the frontend init(data).
-for (const key of ['title', 'name', 'mode', 'prompt']) {
+for (const key of ['edit_id', 'epoch', 'title', 'name', 'mode', 'prompt']) {
 	check(
 		`Windows host init payload carries "${key}"`,
 		host.includes(`"${key}"`),
@@ -150,7 +152,39 @@ for (const key of ['title', 'name', 'mode', 'prompt']) {
 	);
 }
 
-// 6. Native InputBox fallback preserved, gated behind the webview TryOpen.
+// 6. The page and host must carry the same immutable context through deferral.
+check(
+	'frontend freezes the active prompt context',
+	/Object\.freeze\(\{\s*edit_id:/.test(script),
+	'The page must snapshot edit_id + epoch instead of reading mutable host state at Save time.'
+);
+check(
+	'frontend rejects an init older than the displayed epoch',
+	/nextContext\.epoch\s*<\s*activePromptContext\.epoch/.test(script),
+	'An older fire-and-forget init may otherwise repaint a newer singleton context.'
+);
+check(
+	'save and cancel both echo the displayed edit id',
+	(script.match(/edit_id:\s*activePromptContext\.edit_id/g) || []).length === 2,
+	'Every page action that can mutate or close the host must carry the displayed edit id.'
+);
+check(
+	'save and cancel both echo the displayed epoch',
+	(script.match(/epoch:\s*activePromptContext\.epoch/g) || []).length === 2,
+	'Every page action that can mutate or close the host must carry the displayed epoch.'
+);
+check(
+	'Windows host binds context scalars into deferred save',
+	/_PromptEdWeb_Save\.Bind\(EditId,\s*Epoch,/.test(host),
+	'The timer callback must own edit_id + epoch instead of reading _PromptEdWeb_EditId after yielding.'
+);
+check(
+	'Windows host fences every deferred context action',
+	host.includes('_PromptEdWeb_IsCurrentContext(EditId, Epoch)'),
+	'Save, close and init continuations must reject callbacks from an older display context.'
+);
+
+// 7. Native InputBox fallback preserved, gated behind the webview TryOpen.
 check(
 	'create profile tries the webview first',
 	/_PromptEdWeb_TryOpen\(0\)/.test(menu),

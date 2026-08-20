@@ -135,8 +135,9 @@ helpers.describe("bounded emergency exit", function()
 
 			helpers.assert_true(emergency.request(options))
 			local callback_ok = pcall(deadline())
-			helpers.assert_true(callback_ok,
-				"hs.timer must not swallow a logger exception before the hard exit")
+			if not callback_ok then
+				error("hs.timer must not swallow a logger exception before the hard exit", 0)
+			end
 			helpers.assert_eq(calls.timer_stops, 1)
 			helpers.assert_true(logger_calls >= 1,
 				"the causal fixture must execute the failing diagnostic path")

@@ -78,19 +78,21 @@ _SIMF_WorkerInvocationIsExemptFromTheGate() {
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 	Code := _StripFullLineComments(Src)
 
-	WorkerGatePos := InStr(Code, "KLPF_IsWorkerInvocation()")
-	MutexPos      := InStr(Code, "CreateMutexW")
-	Assert(WorkerGatePos > 0,
-		"the entry must ask whether this invocation is a prefetch worker — without it the worker blocks on the live driver's mutex and exits before reaching its own main")
+	MutexPos := InStr(Code, "CreateMutexW")
 	Assert(MutexPos > 0, "the entry must still acquire the single-owner mutex")
-	Assert(WorkerGatePos < MutexPos,
-		"the worker exemption must be evaluated BEFORE CreateMutexW. Placed after it, the worker still waits the full DRIVER_MUTEX_WAIT_MS on the live driver and still yields, so the projection never publishes")
-
-	; The worker's own main must still run, and still run after the exemption —
-	; exempting it from the mutex is pointless if it never reaches its entry point.
-	MainPos := InStr(Code, "KLPF_WorkerMain()")
-	Assert(MainPos > WorkerGatePos,
-		"the worker's main must still be reachable after the exemption")
+	for Worker in [
+		["KLPF_IsWorkerInvocation()", "KLPF_WorkerMain()", "prefetch"],
+		["UIASW_IsWorkerInvocation()", "UIASW_WorkerMain()", "UIA selection"]
+	] {
+		WorkerGatePos := InStr(Code, Worker[1])
+		Assert(WorkerGatePos > 0,
+			"the entry must identify the detached " . Worker[3] . " worker before acquiring the live driver's mutex")
+		Assert(WorkerGatePos < MutexPos,
+			"the " . Worker[3] . " worker exemption must be evaluated BEFORE CreateMutexW")
+		MainPos := InStr(Code, Worker[2])
+		Assert(MainPos > WorkerGatePos,
+			"the detached " . Worker[3] . " worker main must remain reachable after its exemption")
+	}
 }
-Test("boot: the prefetch worker is exempt from the single-owner mutex before it is created",
+Test("boot: every detached worker is exempt from the single-owner mutex before it is created",
 	_SIMF_WorkerInvocationIsExemptFromTheGate)

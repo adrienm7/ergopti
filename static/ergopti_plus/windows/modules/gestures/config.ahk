@@ -48,11 +48,10 @@ GesturesReadConfig() {
 }
 
 ; Saves a single gesture assignment to the v2 [gestures] section.
-GestureSaveAssignment(slot, action) {
-		global GestureAssignments, ConfigurationFile
-
-		GestureAssignments[slot] := action
-		TOML_Write(action, ConfigurationFile, "gestures", slot)
+GestureSaveAssignment(slot, action, WriterFn := 0, NotifyFn := 0) {
+		global GestureAssignments, GestureActionParameters
+		return _GestureCommitAssignment(&GestureAssignments, &GestureActionParameters,
+				"gestures", slot, action, Map("has_value", false), WriterFn, NotifyFn)
 }
 
 ; Parameters are scoped to an action binding, so one gesture, tap-hold or
@@ -71,11 +70,17 @@ GestureGetActionParameter(BindingId, ActionName) {
 		return GestureActionParameters.Has(Key) ? GestureActionParameters[Key] : ""
 }
 
-GestureSetActionParameter(BindingId, ActionName, Value) {
+GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
 		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
-		GestureActionParameters[Key] := Value
-		TOML_Write(Value, ConfigurationFile, "action_parameters", Key)
+		CandidateParameters := GestureActionParameters.Clone()
+		CandidateParameters[Key] := Value
+		Updates := [{ Section: "action_parameters", Key: Key, Value: Value }]
+		if !ConfigCommitUpdates(ConfigurationFile, Updates,
+				"the parameter for action '" . ActionName . "'", WriterFn, NotifyFn)
+				return false
+		GestureActionParameters := CandidateParameters
+		return true
 }
 
 GestureActionParameterSpec(ActionName) {
@@ -104,12 +109,12 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		return true
 }
 
-; The native dialog is mandatory for every parameterized action assignment.
-; Cancel keeps the existing assignment unchanged.
-GestureEnsureActionParameter(BindingId, ActionName) {
+; Builds a detached action-parameter candidate. Cancel is represented by false;
+; a Map always means the user accepted and no persistence happened yet.
+GesturePromptActionParameter(BindingId, ActionName) {
 		Spec := GestureActionParameterSpec(ActionName)
 		if (Spec = "")
-				return true
+				return Map("has_value", false)
 		Existing := GestureGetActionParameter(BindingId, ActionName)
 		; The %s inside the search-URL prompt is LITERAL — it is the placeholder the
 		; user has to type — so this string is never run through a formatter. The
@@ -124,13 +129,67 @@ GestureEnsureActionParameter(BindingId, ActionName) {
 						return false
 				Value := Trim(Result.Value)
 				ErrorText := ""
-				if GestureValidateActionParameter(ActionName, Value, &ErrorText) {
-						GestureSetActionParameter(BindingId, ActionName, Value)
-						return true
-				}
+				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Value)
 				MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
 		}
+}
+
+; Commits an assignment and its optional parameter as one logical TOML batch,
+; then atomically publishes detached assignment/parameter Maps.
+_GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSection, Slot, ActionName, ParameterCandidate, WriterFn := 0, NotifyFn := 0) {
+		global ConfigurationFile
+		if !(ParameterCandidate is Map)
+				return false
+		CandidateAssignments := AssignmentsTarget.Clone()
+		CandidateParameters := ParametersTarget.Clone()
+		CandidateAssignments[Slot] := ActionName
+		Updates := [{ Section: AssignmentSection, Key: Slot, Value: ActionName }]
+		if ParameterCandidate.Get("has_value", false) {
+				if !ParameterCandidate.Has("key") or !ParameterCandidate.Has("value")
+						throw ValueError("Parameterized action candidate is incomplete.")
+				ParameterKey := ParameterCandidate["key"]
+				ParameterValue := ParameterCandidate["value"]
+				CandidateParameters[ParameterKey] := ParameterValue
+				Updates.Push({ Section: "action_parameters", Key: ParameterKey, Value: ParameterValue })
+		}
+		if !ConfigCommitUpdates(ConfigurationFile, Updates,
+				"the action assignment for '" . Slot . "'", WriterFn, NotifyFn)
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				AssignmentsTarget := CandidateAssignments
+				ParametersTarget := CandidateParameters
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return true
+}
+
+; Prompts when needed, then commits the related parameter + assignment once.
+GestureAssignConfiguredAction(&AssignmentsTarget, Scope, AssignmentSection, Slot, ActionName, WriterFn := 0, NotifyFn := 0) {
+		global GestureActionParameters
+		ParameterCandidate := GesturePromptActionParameter(
+				GestureBindingId(Scope, Slot), ActionName)
+		if !(ParameterCandidate is Map)
+				return false
+		return _GestureCommitAssignment(&AssignmentsTarget, &GestureActionParameters,
+				AssignmentSection, Slot, ActionName, ParameterCandidate, WriterFn, NotifyFn)
+}
+
+; Compatibility entry point used by the tap-hold writer, whose assignment lives
+; in a separate file and therefore cannot join the config.toml batch.
+GestureEnsureActionParameter(BindingId, ActionName, WriterFn := 0, NotifyFn := 0) {
+		ParameterCandidate := GesturePromptActionParameter(BindingId, ActionName)
+		if !(ParameterCandidate is Map)
+				return false
+		if !ParameterCandidate.Get("has_value", false)
+				return true
+		return GestureSetActionParameter(BindingId, ActionName,
+				ParameterCandidate["value"], WriterFn, NotifyFn)
 }
 
 GestureActionDisplayLabel(ActionName, BindingId := "") {
@@ -174,14 +233,38 @@ GestureInvokeAction(ActionName, BindingId := "") {
 		}
 }
 
-GestureSaveAllAssignments(ActionNameBySlot) {
+GestureSaveAllAssignments(ActionNameBySlot, WriterFn := 0, NotifyFn := 0) {
 		global GestureAssignments, ConfigurationFile
+		CandidateAssignments := GestureAssignments.Clone()
 		Updates := []
 		for Slot, ActionName in ActionNameBySlot {
-				GestureAssignments[Slot] := ActionName
+				CandidateAssignments[Slot] := ActionName
 				Updates.Push({ Section: "gestures", Key: Slot, Value: ActionName })
 		}
-		return TOML_BatchWrite(ConfigurationFile, Updates)
+		if !ConfigCommitUpdates(ConfigurationFile, Updates,
+				"the gesture assignment batch", WriterFn, NotifyFn)
+				return false
+		GestureAssignments := CandidateAssignments
+		return true
+}
+
+; Consumes the onboarding marker before arming any elevated/PnP side effect.
+; TimerFn is injectable so a failed commit can be proven to schedule nothing.
+GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
+		global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+		LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
+		Updates := [{ Section: "gestures", Key: "auto_configure_on_next_start", Value: false }]
+		if !ConfigCommitUpdates(Path, Updates,
+				"the onboarding auto-configuration marker", WriterFn, NotifyFn) {
+				LoggerError("gestures", "AutoConfigureOnNextStart flag was not cleared — touchpad configuration was not scheduled.")
+				return false
+		}
+		if HasMethod(TimerFn, "Call")
+				TimerFn.Call(_DeferredGestureAutoConfigure, -GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS)
+		else
+				SetTimer(_DeferredGestureAutoConfigure, -GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS)
+		LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
+		return true
 }
 
 ; Writes a single REG_DWORD value via RegistryLib, counting failures.

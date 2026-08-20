@@ -207,8 +207,6 @@ _PathsEdWeb_Save(ConfigDir) {
 	; directory with no error anywhere — the change simply appeared not to happen.
 	if !_PathsFile_Write(N)
 		return
-	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
-	ReloadPreservingSuspend()
 }
 
 ; Persist ``N`` as the configured directory in paths.toml. THE single writer.
@@ -222,23 +220,72 @@ _PathsEdWeb_Save(ConfigDir) {
 ; @param N {String} Target directory, backslash-separated and trailing-slashed.
 ; @returns {Boolean} True when the file was written; false after reporting.
 _PathsFile_Write(N) {
-	global _PathsFile
-	try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
+	global _PathsFile, ConfigurationFile, _DefaultConfigDir
+	PreviousCritical := Critical("Off")
 	try {
-		f := FileOpen(_PathsFile, "w", "UTF-8")
-		; FileOpen throws in v2 rather than returning falsy, so this is belt and
-		; braces — but it also converts any future falsy return into a loud error
-		; instead of a skipped write.
-		if !IsObject(f)
-			throw Error("FileOpen returned no handle for '" . _PathsFile . "'.")
-		f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
-		f.Close()
-	} catch as Err {
-		try LoggerError("PathsEditor", "Could not write '{1}': {2}.", _PathsFile, Err.Message)
-		try MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
+	N := ConfigTransitionNormalizeConfigDir(N)
+	if !(N is String) {
+		try LoggerError("PathsEditor", "Refused an invalid or relative configuration directory.")
+		try MsgBox(t("paths_editor.save_failed"),
+			t("paths_editor.save_failed_title"), "Iconx")
 		return false
 	}
-	return true
+	AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
+		[_PathsFile])
+	if !ConfigTransitionResultIs(AcquireResult, "bundle_acquired") {
+		ConfigTransitionLogFailure("PathsEditor", AcquireResult)
+		try MsgBox(t("paths_editor.save_failed"),
+			t("paths_editor.save_failed_title"), "Iconx")
+		return false
+	}
+	OwnerBundle := AcquireResult["bundle"]
+	ReleaseBundle := true
+	; The WAL is located beside this stable file and names its owner config.toml.
+	; Settle native and durable authority before changing the next boot's
+	; directory selection, then retain this same owner through Reload. The WAL
+	; snapshots the old locator before publishing its replacement, so a crash can
+	; never leave a truncated paths.toml or ambiguous directory authority.
+	try {
+		if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
+			try LoggerError("PathsEditor", "Could not change the config directory while LLM trigger recovery is incomplete.")
+			try MsgBox(t("paths_editor.save_failed"),
+				t("paths_editor.save_failed_title"), "Iconx")
+			return false
+		}
+		try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
+		NewContent := ConfigTransitionPathsTomlContent(N, _DefaultConfigDir)
+		CommitResult := ConfigTransitionCommitOwned(_PathsFile,
+			[ConfigTransitionPresentTarget(_PathsFile, NewContent)],
+			OwnerBundle)
+		if !ConfigTransitionResultIs(CommitResult, "committed_new") {
+			ConfigTransitionLogFailure("PathsEditor", CommitResult)
+			if CommitResult.Has("barrier_retained")
+					&& (CommitResult["barrier_retained"] is Integer)
+					&& CommitResult["barrier_retained"] == 1
+				ReleaseBundle := false
+			try MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
+			return false
+		}
+		try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
+		Reloaded := ReloadPreservingSuspend(0, OwnerBundle)
+		if (Reloaded is Integer) && Reloaded == 1
+			return true
+		RollbackResult := ConfigTransitionRollbackOwned(_PathsFile,
+			OwnerBundle)
+		if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
+				&& !ConfigTransitionResultIs(RollbackResult, "absent") {
+			ConfigTransitionLogFailure("PathsEditorRollback", RollbackResult)
+			if ConfigTransitionRetainBarrier(OwnerBundle)
+				ReleaseBundle := false
+			try MsgBox(t("paths_editor.save_failed"),
+				t("paths_editor.save_failed_title"), "Iconx")
+		}
+		return false
+	} finally {
+		if ReleaseBundle
+			_ConfigWriteTerminalRelease(OwnerBundle)
+	}
+	} finally Critical(PreviousCritical)
 }
 
 

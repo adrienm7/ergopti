@@ -33,9 +33,15 @@
 
 global _KLMigDir := A_Temp . "\ergopti_migration_test"
 global _KLMigMachineId := "00000000-0000-0000-0000-0000000000AA"
+global _KLMigTimers := []
+global _KLMigSuccesses := []
 
 ; Points the migration at a throwaway ledger and returns its path.
 _KLMig_Reset() {
+    try KL_Mig_Cancel()
+    KLMigration.timer_fn := 0
+    KLMigration.marker_commit_fn := 0
+    KLMigration.success_fn := 0
     if !DirExist(_KLMigDir)
         DirCreate(_KLMigDir)
     Keylogger.by_device_dir := _KLMigDir . "\"
@@ -50,6 +56,22 @@ _KLMig_Reset() {
     KL_Enc_SetMachineIdOverride(_KLMigMachineId)
     KL_Enc_SetEnabled(false)
     return Keylogger.data_sql_path
+}
+
+_KLMig_RecordTimer(callback, period) {
+    global _KLMigTimers
+    _KLMigTimers.Push(Map("callback", callback, "period", period))
+    return true
+}
+
+_KLMig_FailMarkerCommit(*) {
+    return false
+}
+
+_KLMig_RecordSuccess(converted, scanned) {
+    global _KLMigSuccesses
+    _KLMigSuccesses.Push(Map("converted", converted, "scanned", scanned))
+    return true
 }
 
 ; Builds one events_typing statement through the PRODUCTION builder, so the
@@ -435,13 +457,31 @@ _KLMig_HoldsOffTheIngestWhileRewriting() {
     _KLMig_Reset()
     _KLMig_WriteLedger(["held"])
     KL_Enc_SetEnabled(true)
-    KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false)
-    ; An append landing between the pass's last read and its single publishing
-    ; move would be overwritten and lost, so the ingest tick must see this flag.
-    AssertTrue(KL_Mig_IsActive(), "the ingest guard must be raised for the whole pass")
-    _KLMig_Drain()
-    AssertFalse(KL_Mig_IsActive(), "and lowered once the ledger has been published")
-    KL_Enc_SetEnabled(false)
+    try {
+        KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false)
+        ; An append landing between the pass's last read and its single publishing
+        ; move would be overwritten and lost, so the ingest tick must see this flag.
+        AssertTrue(KL_Mig_IsActive(), "the ingest guard must be raised for the whole pass")
+        _KLMig_Drain()
+        AssertFalse(KL_Mig_IsActive(), "and lowered once the ledger has been published")
+
+        ; Force the exact old data-loss window: handles have closed (active=false),
+        ; but the staged ledger has not yet been moved because suspend interrupted
+        ; the commit continuation. Ingest must remain fenced by commitPending.
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+        KLMigration.paused := true
+        _KL_Mig_Finish()
+        AssertFalse(KLMigration.active,
+            "the finish protocol must release scan ownership before publication")
+        AssertTrue(KL_Mig_IsActive(),
+            "commitPending must keep ingest fenced until the staged ledger is published")
+        ingest := _DriverFuncBody("KL_IngestOnce")
+        AssertContains(ingest, "KL_Mig_IsActive",
+            "the real ingest entry point must consume the full scan-or-commit predicate")
+    } finally {
+        KL_Mig_Cancel()
+        KL_Enc_SetEnabled(false)
+    }
 }
 
 Test("KL_Mig: the ingest guard is raised for the duration of the pass", _KLMig_HoldsOffTheIngestWhileRewriting)
@@ -498,3 +538,159 @@ _KLMig_ReentrantSliceIsRefused() {
 }
 
 Test("KL_Mig: a tick landing mid-slice yields instead of re-entering", _KLMig_ReentrantSliceIsRefused)
+
+
+
+
+; ============================================================================
+; ============================================================================
+; ======= 9/ Suspend, durable completion, and new-ledger posture =============
+; ============================================================================
+; ============================================================================
+
+_KLMig_SuspendTickDoesNoIoAndResumeContinuesOnce() {
+    global _KLMigTimers
+    oldTimer := KLMigration.timer_fn
+    _KLMig_Reset()
+    _KLMig_WriteLedger(["alpha", "beta", "gamma"])
+    KL_Enc_SetEnabled(true)
+    KLMigration.timer_fn := _KLMig_RecordTimer
+    _KLMigTimers := []
+    try {
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false),
+            "the lifecycle fixture must own an active resumable pass")
+        AssertTrue(KL_Mig_OnSuspend(),
+            "suspend must claim and disarm an active migration")
+        _KLMigTimers := []
+        readPos := KLMigration.readFh.Pos
+        writePos := KLMigration.writeFh.Pos
+        scanned := KLMigration.scanned
+        converted := KLMigration.converted
+
+        KL_Mig_Tick()
+        AssertEqual(readPos, KLMigration.readFh.Pos,
+            "a suspended tick must perform zero source-ledger reads")
+        AssertEqual(writePos, KLMigration.writeFh.Pos,
+            "a suspended tick must perform zero staging-ledger writes")
+        AssertEqual(scanned, KLMigration.scanned,
+            "a suspended tick must not consume a statement")
+        AssertEqual(converted, KLMigration.converted,
+            "a suspended tick must not run crypto or publish conversion progress")
+
+        AssertTrue(KL_Mig_OnResume(),
+            "resume must schedule the retained cursor exactly once")
+        AssertEqual(1, _KLMigTimers.Length,
+            "one resume transition must arm one continuation, not a timer fan-out")
+        AssertEqual(-KL_MIG_SLICE_INTERVAL_MS, _KLMigTimers[1]["period"],
+            "the resumed continuation must use the named slice interval")
+        AssertFalse(KL_Mig_OnResume(),
+            "a duplicate resume callback must not arm a second continuation")
+        AssertEqual(1, _KLMigTimers.Length,
+            "duplicate resume must leave the one scheduled continuation unchanged")
+
+        _KLMigTimers[1]["callback"].Call()
+        AssertFalse(KL_Mig_IsActive(),
+            "the scheduled continuation must finish the retained pass")
+        after := FileRead(Keylogger.data_sql_path, "UTF-8")
+        AssertEqual("alpha", KL_Enc_Decrypt(_KLMig_FieldOf(after, 1, "text")),
+            "resume must continue from the same migration and publish its result")
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.timer_fn := oldTimer
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig lifecycle: suspended ticks do zero I/O and resume one continuation",
+    _KLMig_SuspendTickDoesNoIoAndResumeContinuesOnce)
+
+_KLMig_MarkerFailureRetainsCheapRetryAndNoSuccess() {
+    global _KLMigTimers, _KLMigSuccesses
+    oldTimer := KLMigration.timer_fn
+    oldCommit := KLMigration.marker_commit_fn
+    oldSuccess := KLMigration.success_fn
+    _KLMig_Reset()
+    _KLMig_WriteLedger(["durable secret"])
+    KL_Enc_SetEnabled(true)
+    KLMigration.timer_fn := _KLMig_RecordTimer
+    KLMigration.marker_commit_fn := _KLMig_FailMarkerCommit
+    KLMigration.success_fn := _KLMig_RecordSuccess
+    _KLMigTimers := []
+    _KLMigSuccesses := []
+    try {
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false),
+            "the marker-failure fixture must start a real ledger conversion")
+        _KLMig_Drain()
+        scanned := KLMigration.scanned
+        AssertFalse(KL_Mig_IsActive(),
+            "the safely published ledger no longer needs to block ingest")
+        AssertEqual("on", KLMigration.pendingMarker,
+            "failed marker commit must retain the ledger's known posture for retry")
+        AssertEqual(0, _KLMigSuccesses.Length,
+            "migration SUCCESS is forbidden until the marker commit is durable")
+        AssertEqual("", KL_Mig_ReadMarker(),
+            "a failed marker seam must not leave a false completion artifact")
+        AssertTrue(_KLMigTimers.Length >= 1,
+            "marker failure must retain an explicit retry callback")
+
+        KLMigration.marker_commit_fn := 0
+        AssertTrue(KL_Mig_RetryMarker(),
+            "a later writable marker commit must finish without rescanning data.sql")
+        AssertEqual("on", KL_Mig_ReadMarker(),
+            "the retry must durably publish the posture")
+        AssertEqual("", KLMigration.pendingMarker,
+            "successful marker retry must retire its pending state")
+        AssertEqual(scanned, KLMigration.scanned,
+            "marker-only recovery must be O(1), never a second ledger proof scan")
+        AssertEqual(1, _KLMigSuccesses.Length,
+            "exactly one SUCCESS may close the original migration START")
+        AssertEqual(scanned, _KLMigSuccesses[1]["scanned"],
+            "the delayed SUCCESS must retain the original completion counters")
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.timer_fn := oldTimer
+        KLMigration.marker_commit_fn := oldCommit
+        KLMigration.success_fn := oldSuccess
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig lifecycle: marker failure withholds SUCCESS and retains O(1) retry",
+    _KLMig_MarkerFailureRetainsCheapRetryAndNoSuccess)
+
+_KLMig_NewLedgerPublishesUniformPostureWithoutScan() {
+    _KLMig_Reset()
+    FileAppend("-- brand-new uniform ledger`n", Keylogger.data_sql_path, "UTF-8")
+    KLMigration.scanned := 777
+    AssertTrue(KL_Mig_RecordNewLedgerPosture(),
+        "new-ledger bootstrap must commit posture metadata after the header")
+    AssertEqual("off", KL_Mig_ReadMarker(),
+        "a new uniform ledger must record the cipher posture already in force")
+    AssertFalse(KL_Mig_SyncToPosture(),
+        "matching creation metadata must take the O(1) no-scan path")
+    AssertEqual(777, KLMigration.scanned,
+        "new-ledger posture sync must not open or consume the ledger")
+    AssertFalse(KL_Mig_IsActive(),
+        "the O(1) path must not create a background migration job")
+    bootstrap := _DriverFuncBody("KL_BootstrapDataSql")
+    AssertContains(bootstrap, "KL_Mig_RecordNewLedgerPosture",
+        "the real data.sql creation path must publish the tested O(1) posture fact")
+}
+
+Test("KL_Mig lifecycle: a new uniform ledger records posture and skips proof scan",
+    _KLMig_NewLedgerPublishesUniformPostureWithoutScan)
+
+_KLMig_DriverLifecycleOwnsSuspendAndResume() {
+    enter := _DriverFuncBody("Ergopti_OnSuspendEnter")
+    resume := _DriverFuncBody("Ergopti_OnSuspendResume")
+    boot := _DriverFuncBody("KL_Init")
+    AssertContains(enter, "KL_Mig_OnSuspend",
+        "the native Suspend reactor must disarm migration I/O explicitly")
+    AssertContains(resume, "KL_Mig_OnResume",
+        "the resume reactor must replay the retained migration owner")
+    AssertContains(boot, "KL_Mig_RequestPostureSync",
+        "boot posture work must be lifecycle-owned before its delayed timer is armed")
+}
+
+Test("KL_Mig lifecycle: driver suspend/resume owns every migration timer",
+    _KLMig_DriverLifecycleOwnsSuspendAndResume)

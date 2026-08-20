@@ -35,11 +35,12 @@
 ; ====================================
 ; ====================================
 
-; Tab accepts the visible suggestion when the tooltip is displayed.
+; A bare physical Tab accepts only when the canonical source-control policy
+; succeeds. On any rejection the wrapper emits the native Tab instead.
 ; The hotkey is context-sensitive: active only when the tooltip is shown.
 #HotIf LLM_Tooltip_GetText() != ""
 Tab:: {
-	LLM_Menu_TryAcceptTabGuarded()
+	LLM_Tooltip_FireTabOrAccept([], true)
 }
 
 ; ── Slot navigation ──
@@ -151,45 +152,4 @@ _LLM_Nav_Jump(idx) {
 	if (idx > slots.Length)
 		return
 	LLM_Tooltip_SetActiveIdx(idx)
-}
-
-
-
-
-
-; ================================================
-; ================================================
-; ======= 3/ Guarded Accept (focus safety) =======
-; ================================================
-; ================================================
-
-/**
- * Accepts the active prediction only when the focused window hasn't changed
- * since the prediction was triggered. Prevents injecting text into a window
- * the user switched to AFTER the tooltip appeared (e.g., a password dialog or
- * an unrelated application that gained focus while the tooltip was still shown).
- * @returns {boolean} True when a prediction was accepted, false when skipped.
- */
-LLM_Menu_TryAcceptTabGuarded() {
-	global _LLM_Engine
-	; If we captured a source window at trigger time, verify it is still the
-	; active window before injecting — a stale prediction must not paste text
-	; into a window the user explicitly switched to after the tooltip appeared
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("source_hwnd") and _LLM_Engine["source_hwnd"]) {
-		source_hwnd := _LLM_Engine["source_hwnd"]
-		try {
-			if !WinExist("ahk_id " . source_hwnd) {
-				try LoggerDebug("LLMTray", "Accept skipped — source window no longer exists.")
-				return false
-			}
-			if (WinActive("ahk_id " . source_hwnd) == 0) {
-				try LoggerDebug("LLMTray", "Accept skipped — source window no longer active.")
-				return false
-			}
-		} catch {
-			; WinExist / WinActive may throw during OS focus transitions — allow
-			; the accept to proceed rather than silently breaking Tab entirely
-		}
-	}
-	return LLM_Tooltip_TryAcceptTab()
 }

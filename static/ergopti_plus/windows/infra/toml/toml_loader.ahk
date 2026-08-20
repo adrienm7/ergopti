@@ -380,6 +380,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				; ResolvedPriority). Without this the fast/cached path and the fallback
 				; could resolve different collision priorities for the same TOML.
 				GeneratedFn(FeatureConfig, ExtraOptions, ResolvedPriority)
+				try LoggerDone("TomlLoader", "Generated section [{1}.{2}] loaded.",
+						CategoryName, SectionName)
 				return
 		}
 

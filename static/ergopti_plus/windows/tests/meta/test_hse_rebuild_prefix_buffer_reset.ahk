@@ -5,15 +5,10 @@
 ; DESCRIPTION:
 ; Static source guard for the hse-rebuild-stale-prefix-buffer finding.
 ;
-; Every production call site that invokes HSE_HardReset() must pair it with
-; _ResetPrefixBuffer() (see LLM_Bridge_OnAccept and the inline auto-type block
-; in modules/llm) so the tooltip preview buffer never diverges from the real
-; HSE matching engine. RebuildHotstringsLive() was the sole call site missing
-; the pairing, desyncing the tooltip preview after any live hotstring-section
-; toggle.
-;
-; The fix adds a _ResetPrefixBuffer() call immediately alongside the existing
-; HSE_HardReset() call in RebuildHotstringsLive() (ui/menu/menu_rebuild.ahk).
+; The live rebuild intentionally yields for ~1.3 seconds. Its final engine and
+; preview resets therefore cannot be two adjacent statements: a queued OnChar
+; may run between them and leave the engine one character ahead. Both must flow
+; through the short Critical input-context transaction.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,11 +23,11 @@
 ; ===================================================
 
 _HRPBR_RebuildResetsPrefixBuffer() {
-	Body := _DriverFuncBody("RebuildHotstringsLive")
-	Assert(Body != "", "RebuildHotstringsLive must exist in ui/menu/menu_rebuild.ahk")
-	Assert(InStr(Body, "HSE_HardReset") > 0,
-		"RebuildHotstringsLive must call HSE_HardReset() after re-registering the hotstrings")
-	Assert(InStr(Body, "_ResetPrefixBuffer") > 0,
-		"RebuildHotstringsLive must call _ResetPrefixBuffer() alongside HSE_HardReset() so the tooltip preview buffer does not desync from the rebuilt matching engine (hse-rebuild-stale-prefix-buffer)")
+	Body := _DriverFuncBody("_RebuildHotstringsLiveOnce")
+	Assert(Body != "", "the serialized live-rebuild pass must exist in ui/menu/menu_rebuild.ahk")
+	Assert(InStr(Body, "_PrefixInvalidateInputContext(0, false)") > 0,
+		"the yielded rebuild must atomically reset engine + preview with unknown left context")
+	Assert(InStr(Body, "HSE_HardReset") == 0 and InStr(Body, "_ResetPrefixBuffer") == 0,
+		"the yielded rebuild must not restore a raw two-statement reset window")
 }
-Test("menu_rebuild: RebuildHotstringsLive pairs HSE_HardReset with _ResetPrefixBuffer (hse-rebuild-stale-prefix-buffer)", _HRPBR_RebuildResetsPrefixBuffer)
+Test("menu_rebuild: yielded rebuild resets both buffers atomically (hse-rebuild-stale-prefix-buffer)", _HRPBR_RebuildResetsPrefixBuffer)

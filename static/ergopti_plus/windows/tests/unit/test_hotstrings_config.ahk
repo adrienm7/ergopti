@@ -36,10 +36,22 @@ HotstringsConfigLoadLlmPredictionColor()
 ; delay/color into the resolution cascade, breaking the "falls back to
 ; defaults" assertions. Tests that DO want to exercise toml metadata seed
 ; their own values via _HCfgTestSeedToml, which overwrites these entries.
+_HCfgTestOverridePath() {
+	return A_Temp . "\ergopti_hotstrings_config_unit_overrides.toml"
+}
+
+_HCfgTestCleanup(*) {
+	try FileDelete(_HCfgTestOverridePath())
+}
+OnExit(_HCfgTestCleanup)
+
 _HCfgTestReset() {
     global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
     _HotstringsOverrides := Map()
-    _HotstringsOverridesPath := ""   ; disable persistence during tests
+	; Mutators publish memory only after a successful write, so unit tests use a
+	; private writable target instead of treating "no path" as a fake success.
+	_HotstringsOverridesPath := _HCfgTestOverridePath()
+	try FileDelete(_HotstringsOverridesPath)
     HotstringGroupConfig := Map()
     ; Build a fresh empty config per category so mutations in one test do not
     ; leak into the next (each Sections map must be a distinct instance).
@@ -370,6 +382,170 @@ TestHotstringsConfig_SetOverrideRejectsUnknownField() {
 Test("HotstringsConfig: setOverride rejects fields other than delay/color/show_tooltip/priority",
     TestHotstringsConfig_SetOverrideRejectsUnknownField)
 
+; A failed disk publication must reject the candidate state in memory too. The
+; config window refreshes from HotstringsResolve after a failed save; publishing
+; the candidate Map before _SaveOverrides made that refresh repeat a value which
+; was never durable. A real deny-sharing lock reproduces the same Windows failure
+; caused by sync, backup, and antivirus processes without mocking the writer.
+TestHotstringsConfig_OverrideMutationRollsBackOnWriteFailure() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_config_override_rollback.toml"
+	OriginalText := "[rolls]`ndelay = 0.400`n"
+	Lock := 0
+	try {
+		try FileDelete(Path)
+		FileAppend(OriginalText, Path, "UTF-8")
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsResolveBumpGen()
+
+		Lock := FileOpen(Path, "r-rwd")
+		Assert(Lock != "" and IsObject(Lock),
+			"the rollback test must hold a real deny-sharing lock or it proves no failure path")
+
+		SetResult := HotstringsSetOverride("rolls", "", "delay", 0.9)
+		SetMemoryAfter := _HotstringsOverrides["rolls"].Delay
+		SetResolvedAfter := HotstringsResolve("rolls", "").Delay
+
+		ClearResult := HotstringsClearOverride("rolls", "", "delay")
+		ClearMemoryAfter := _HotstringsOverrides["rolls"].Delay
+		ClearResolvedAfter := HotstringsResolve("rolls", "").Delay
+
+		Lock.Close()
+		Lock := 0
+		DiskAfter := FileRead(Path, "UTF-8")
+
+		AssertFalse(SetResult,
+			"setOverride must report that the locked override file rejected publication")
+		AssertEqual(0.4, SetMemoryAfter,
+			"a rejected set must leave the live override Map at the last durable value")
+		AssertEqual(0.4, SetResolvedAfter,
+			"resolution after a rejected set must describe durable state, not the candidate")
+		AssertFalse(ClearResult,
+			"clearOverride must report that the locked override file rejected publication")
+		AssertEqual(0.4, ClearMemoryAfter,
+			"a rejected clear must restore the live override Map instead of erasing the field")
+		AssertEqual(0.4, ClearResolvedAfter,
+			"resolution after a rejected clear must still describe the durable override")
+		AssertEqual(OriginalText, DiskAfter,
+			"a failed override transaction must leave the previous file byte-for-byte intact")
+	} finally {
+		if IsObject(Lock)
+			try Lock.Close()
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: set/clear rollback when publication fails (hotstrings-override-rollback-on-write-failure)",
+	TestHotstringsConfig_OverrideMutationRollsBackOnWriteFailure)
+
+; The rollback guarantee also depends on never truncating the durable target
+; before its complete replacement is ready. This source guard is move-resilient:
+; _DriverFuncBody locates the function across the production tree.
+TestHotstringsConfig_SaveOverridesPublishesAtomically() {
+	Body := _DriverFuncBody("_SaveOverrides")
+	Assert(Body != "", "_SaveOverrides must exist for the atomic-publication guard")
+	Assert(InStr(Body, "FSAtomicMoveReplace(") > 0,
+		"_SaveOverrides must publish a same-directory stage through the atomic filesystem adapter")
+	Assert(InStr(Body, 'FileOpen(_HotstringsOverridesPath, "w"') == 0,
+		"_SaveOverrides must never truncate the live override file before publication succeeds")
+}
+Test("HotstringsConfig: override file publication is atomic (hotstrings-override-rollback-on-write-failure)",
+	TestHotstringsConfig_SaveOverridesPublishesAtomically)
+
+global _HCfgLeaseOuterWriterCalls := 0
+global _HCfgLeaseInnerWriterCalls := 0
+global _HCfgLeaseInnerResult := unset
+global _HCfgLeaseReloadResult := unset
+global _HCfgLeaseReloadPreservedIdentity := false
+
+_HCfgLeaseInnerWriter(StagePath, Content) {
+	global _HCfgLeaseInnerWriterCalls
+	_HCfgLeaseInnerWriterCalls += 1
+	return FSWrite(StagePath, Content)
+}
+
+_HCfgLeaseOuterWriter(StagePath, Content) {
+	global _HotstringsOverrides
+	global _HCfgLeaseOuterWriterCalls, _HCfgLeaseInnerResult
+	global _HCfgLeaseReloadResult, _HCfgLeaseReloadPreservedIdentity
+	_HCfgLeaseOuterWriterCalls += 1
+	; Re-enter while the outer transaction is between its snapshot and publish.
+	_HCfgLeaseInnerResult := HotstringsSetOverride("rolls", "", "color", "#222222",
+		_HCfgLeaseInnerWriter)
+	BeforeReload := _HotstringsOverrides
+	_HCfgLeaseReloadResult := HotstringsConfigReload()
+	_HCfgLeaseReloadPreservedIdentity := BeforeReload == _HotstringsOverrides
+	return FSWrite(StagePath, Content)
+}
+
+; AHK can interrupt a transaction inside its writer. Without path ownership,
+; the nested setter publishes successfully from the old live Map, then the outer
+; setter resumes and overwrites both disk and memory with its stale candidate.
+TestHotstringsConfig_ReentrantWriterCannotLoseAcceptedUpdate() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	global _HCfgLeaseOuterWriterCalls, _HCfgLeaseInnerWriterCalls
+	global _HCfgLeaseInnerResult, _HCfgLeaseReloadResult
+	global _HCfgLeaseReloadPreservedIdentity
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_config_reentrant_lease.toml"
+	try {
+		try FileDelete(Path)
+		FileAppend('[rolls]`ndelay = 0.400`ncolor = "#111111"`n', Path, "UTF-8")
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsResolveBumpGen()
+		_HCfgLeaseOuterWriterCalls := 0
+		_HCfgLeaseInnerWriterCalls := 0
+		_HCfgLeaseInnerResult := unset
+		_HCfgLeaseReloadResult := unset
+		_HCfgLeaseReloadPreservedIdentity := false
+
+		OuterResult := HotstringsSetOverride("rolls", "", "delay", 0.9,
+			_HCfgLeaseOuterWriter)
+		DiskAfter := _ParseOverrides(Path)
+
+		AssertTrue(OuterResult, "the owning outer transaction must still publish")
+		AssertFalse(_HCfgLeaseInnerResult,
+			"a re-entrant setter on the owned path must be refused instead of reporting a lost success")
+		AssertEqual(1, _HCfgLeaseOuterWriterCalls,
+			"the owning writer must execute exactly once")
+		AssertEqual(0, _HCfgLeaseInnerWriterCalls,
+			"the refused nested transaction must stop before its writer or any disk publication")
+		AssertFalse(_HCfgLeaseReloadResult,
+			"a re-entrant reload on the owned path must be refused before parsing or swapping live state")
+		AssertTrue(_HCfgLeaseReloadPreservedIdentity,
+			"the refused reload must not replace the live override Map")
+		AssertEqual(0.9, _HotstringsOverrides["rolls"].Delay,
+			"the live Map must publish the outer candidate after its durable commit")
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color,
+			"the refused nested candidate must never enter the live Map")
+		AssertEqual(0.9, DiskAfter["rolls"].Delay,
+			"the durable file must match the accepted outer transaction")
+		AssertEqual("#111111", DiskAfter["rolls"].Color,
+			"the refused nested candidate must never reach disk")
+
+		Probe := _ConfigWriteLeaseTryAcquire(Path, "hotstrings-test-probe")
+		Assert(Probe is Object,
+			"the outer transaction must release path ownership after its live swap")
+		if (Probe is Object)
+			AssertTrue(_ConfigWriteLeaseRelease(Probe),
+				"the test probe must release the shared path lease")
+	} finally {
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: re-entrant writer cannot lose an accepted update (hotstrings-override-lease-reentrant-writer)",
+	TestHotstringsConfig_ReentrantWriterCannotLoseAcceptedUpdate)
+
 ; Regression (fixed 2026-06-04): the dynamic-hotstrings default activation delay
 ; must be defined in this EARLY-loaded config layer, not in modules/hotstrings.ahk.
 ; The tray "Delays" submenu reads DYN_HOTSTRINGS_DEFAULT_DELAY while building the
@@ -575,15 +751,23 @@ Test("HotstringsConfig: priority set/clear round-trips through the override file
 TestHotstringsConfig_ClearAllFieldsClearsPriority() {
 	global _HotstringsOverrides, _HotstringsOverridesPath
 	SavedOv := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_config_clear_all_priority.toml"
+	try FileDelete(Path)
 	_HotstringsOverrides     := Map()
-	_HotstringsOverridesPath := ""
-	HotstringsSetOverride("rolls", "ct", "delay", 0.2)
-	HotstringsSetOverride("rolls", "ct", "priority", 77)
-	HotstringsClearOverride("rolls", "ct", "")
-	AssertEqual("", _HotstringsOverrides["rolls"].Sections["ct"].Priority,
-		"empty-field clearOverride must also clear priority")
-	_HotstringsOverrides := SavedOv
-	HotstringsResolveBumpGen()
+	_HotstringsOverridesPath := Path
+	try {
+		HotstringsSetOverride("rolls", "ct", "delay", 0.2)
+		HotstringsSetOverride("rolls", "ct", "priority", 77)
+		HotstringsClearOverride("rolls", "ct", "")
+		AssertEqual("", _HotstringsOverrides["rolls"].Sections["ct"].Priority,
+			"empty-field clearOverride must also clear priority")
+	} finally {
+		_HotstringsOverrides := SavedOv
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
 }
 Test("HotstringsConfig: clearOverride empty field also clears priority",
 	TestHotstringsConfig_ClearAllFieldsClearsPriority)
@@ -623,15 +807,38 @@ Test("HotstringsResolveExt: exposes priority with the package source default + o
 ; Regression guard for word-delimiters-not-applied-live: HotstringsSetWordDelimiters
 ; was updating the config cache and the disk file but NOT the live engine variable
 ; HSE_WORD_TERMINATORS — so the engine kept firing on the old set until a full Reload.
-; The fix mirrors HotstringsSetConsumedDelimiters: assign HSE_WORD_TERMINATORS in place.
+; The fix publishes HSE_WORD_TERMINATORS in place after durable replacement.
 TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive() {
-	global _HotstringsWordDelimiters, HSE_WORD_TERMINATORS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
 	SavedCache  := _HotstringsWordDelimiters
 	SavedEngine := HSE_WORD_TERMINATORS
-	HotstringsSetWordDelimiters("AB")
-	EngineAfter := HSE_WORD_TERMINATORS
-	_HotstringsWordDelimiters := SavedCache
-	HSE_WORD_TERMINATORS      := SavedEngine
+	SavedConsumedCache := _HotstringsConsumedDelimiters
+	SavedConsumedEngine := HSE_CONSUMED_DELIMITERS
+	Path := A_Temp . "\ergopti_set_word_live_" . A_ScriptHwnd
+		. "_" . A_TickCount . ".toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HotstringsWordDelimiters := ""
+		_HotstringsConsumedDelimiters := ""
+		Committed := HotstringsSetWordDelimiters("AB")
+		EngineAfter := HSE_WORD_TERMINATORS
+		AssertTrue(Committed,
+			"the fixture must complete the durable transaction before asserting its live projection")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsWordDelimiters := SavedCache
+		HSE_WORD_TERMINATORS := SavedEngine
+		_HotstringsConsumedDelimiters := SavedConsumedCache
+		HSE_CONSUMED_DELIMITERS := SavedConsumedEngine
+	}
 	AssertEqual("AB", EngineAfter,
 		"HotstringsSetWordDelimiters must propagate to HSE_WORD_TERMINATORS immediately (no Reload needed)")
 }
@@ -639,13 +846,36 @@ Test("HotstringsConfig: SetWordDelimiters propagates to HSE_WORD_TERMINATORS liv
 	TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive)
 
 TestHotstringsConfig_SetWordDelimitersGetRoundTrip() {
-	global _HotstringsWordDelimiters, HSE_WORD_TERMINATORS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
 	SavedCache  := _HotstringsWordDelimiters
 	SavedEngine := HSE_WORD_TERMINATORS
-	HotstringsSetWordDelimiters("XY")
-	Got := HotstringsGetWordDelimiters()
-	_HotstringsWordDelimiters := SavedCache
-	HSE_WORD_TERMINATORS      := SavedEngine
+	SavedConsumedCache := _HotstringsConsumedDelimiters
+	SavedConsumedEngine := HSE_CONSUMED_DELIMITERS
+	Path := A_Temp . "\ergopti_set_word_roundtrip_" . A_ScriptHwnd
+		. "_" . A_TickCount . ".toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HotstringsWordDelimiters := ""
+		_HotstringsConsumedDelimiters := ""
+		Committed := HotstringsSetWordDelimiters("XY")
+		Got := HotstringsGetWordDelimiters()
+		AssertTrue(Committed,
+			"the fixture must complete the durable transaction before asserting its getter")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsWordDelimiters := SavedCache
+		HSE_WORD_TERMINATORS := SavedEngine
+		_HotstringsConsumedDelimiters := SavedConsumedCache
+		HSE_CONSUMED_DELIMITERS := SavedConsumedEngine
+	}
 	AssertEqual("XY", Got,
 		"HotstringsGetWordDelimiters must return the value just set by HotstringsSetWordDelimiters")
 }
@@ -678,7 +908,7 @@ TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters() {
 	_HotstringsOverrides     := Map()
 	_HotstringsOverridesPath := Path
 
-	; 1. Set custom delimiters — _SaveGlobalKey writes [__global__] to disk
+	; 1. Seed custom delimiter candidates in the live fixture.
 	_HotstringsWordDelimiters   := "AB"
 	_HotstringsConsumedDelimiters := "A"
 
@@ -705,17 +935,16 @@ TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters() {
 }
 Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters)
 
-; F37 (audit 2026-07-20): the SAME [__global__] delimiter keys have two writers with
-; different escaping discipline — _SaveGlobalKey escapes, _SaveOverrides concatenated
-; raw. A delimiter containing a quote or backslash therefore produced malformed TOML,
-; and the next read silently reverted the user's whole delimiter set.
+; F37 (audit 2026-07-20): a delimiter containing a quote or backslash once
+; produced malformed TOML and silently reverted at the next read. Both global
+; keys now share one whole-file serializer, including detached candidates.
 TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
 	Body := _DriverFuncBody("_SaveOverrides")
 	Assert(Body != "", "_SaveOverrides must exist in infra/hotstrings/hotstrings_io.ahk")
-	Assert(InStr(Body, "_EscapeTomlString(_HotstringsWordDelimiters)") > 0,
-		"_SaveOverrides must escape word_delimiters exactly like _SaveGlobalKey does")
-	Assert(InStr(Body, "_EscapeTomlString(_HotstringsConsumedDelimiters)") > 0,
-		"_SaveOverrides must escape consumed_delimiters exactly like _SaveGlobalKey does")
+	Assert(InStr(Body, "_EscapeTomlString(WordSource)") > 0,
+		"_SaveOverrides must escape the detached word-delimiter candidate")
+	Assert(InStr(Body, "_EscapeTomlString(ConsumedSource)") > 0,
+		"_SaveOverrides must escape the detached consumed-delimiter candidate")
 }
-Test("hotstrings_config: _SaveOverrides escapes [__global__] delimiters (no silent revert)",
+Test("hotstrings_config: _SaveOverrides escapes detached [__global__] delimiter candidates",
 	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)

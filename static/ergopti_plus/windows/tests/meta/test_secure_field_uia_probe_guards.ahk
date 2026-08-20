@@ -109,6 +109,14 @@ _SFUG_EveryProbeSiteIsIdleGated() {
 			continue
 		}
 		Checked += 1
+		if (Name = "UIASW_WorkerHandleRequest") {
+			Parent := _DriverFuncBody("_UIA_SelectionPollTick")
+			IdlePos := InStr(Parent, "A_TimeIdlePhysical")
+			DispatchPos := InStr(Parent, "UIASW_Request(")
+			Assert(IdlePos > 0 && DispatchPos > IdlePos,
+				"the resident owner must establish physical idle before posting to the detached UIA worker")
+			continue
+		}
 		IdlePos := InStr(Body, "A_TimeIdlePhysical")
 		UiaPos  := InStr(Body, "UIA.GetFocusedElement")
 		Assert(IdlePos > 0 and IdlePos < UiaPos,
