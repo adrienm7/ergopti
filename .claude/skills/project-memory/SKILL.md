@@ -1,25 +1,24 @@
 ---
 name: project-memory
-description: How to consult and extend docs/PROJECT_MEMORY.md, the in-repo shared engineering memory — entry format, slug convention, TOC bullet, and what belongs there versus in a commit message. Use before non-trivial work in an unfamiliar area, and after learning something non-obvious about this codebase.
+description: How to consult and extend the routed docs/project-memory catalog without loading unrelated context. Use before non-trivial work in an unfamiliar area, and after learning something non-obvious about this codebase.
 ---
 
 # Project memory
 
-`docs/PROJECT_MEMORY.md` is the single source of truth for hard-won knowledge:
-foot-guns, architectural invariants, and the conventions the maintainer insists
-on. It is shared by every developer, agent and reviewer — it replaces any
-agent-private memory store. If you keep a private memory, the pointer there
-should lead here.
+`docs/PROJECT_MEMORY.md` is a short routing index for hard-won knowledge. The
+actual entries live in focused files under `docs/project-memory/`. This catalog
+is shared by every developer, agent and reviewer and replaces agent-private
+memory stores.
 
 ## Consult it first
 
-Before non-trivial work, read the entries covering the area you are about to
-touch. A meaningful share of "new" bugs in this repo are documented recurrences —
-the entry usually names the exact mechanism and the fix that was chosen last time.
+Read the index, then only the topic files covering the area you will touch. Do
+not load every topic by default. A meaningful share of "new" bugs in this repo
+are documented recurrences.
 
 ## What belongs here
 
-Something **non-obvious** and **durable**: a foot-gun that cost real debugging
+Something **non-obvious**, **durable**, and written in **English**: a foot-gun that cost real debugging
 time, an invariant that is not visible from the code, a decision whose rationale
 would otherwise evaporate, an intentional asymmetry that looks like a bug.
 
@@ -29,35 +28,16 @@ content of a fix (that is the commit), git history, or rules already written in
 
 ## Entry format
 
-Body entries sit under `## Working conventions & feedback` (how we work) or
-`## Project architecture & decisions` (how the code is).
+Add the entry to the narrowest existing topic file.
 
 ```markdown
 ### slug-with-dashes
 
-_One-line italic summary — this is what a reader skims_
-
-<sub>slug: `slug_with_underscores`</sub>
-
-The fact, stated concretely. Name files, constants and mechanisms.
-
-**Why:** the reasoning or the incident that produced this knowledge.
-
-**How to apply:** what a future reader should actually do differently.
-
-Related [[other_slug]].
+One concise paragraph naming the mechanism and the action future work must take.
 ```
 
-Then add the matching bullet to the `## Contents` TOC at the top, under the right
-heading:
-
-```markdown
-  - [slug-with-dashes](#slug-with-dashes) — the same one-line hook
-```
-
-Conventions: dashes in the heading and anchor, underscores in the `slug:` line
-and in `[[links]]`. Link liberally — a `[[link]]` to an entry that does not exist
-yet marks something worth writing, it is not an error.
+Use dash-separated slug headings. Keep entries short enough to scan and link
+directly to code/tests when that is more useful than restating them.
 
 ## Writing well
 
@@ -68,11 +48,15 @@ yet marks something worth writing, it is not an error.
   searches for when they hit it again.
 - **Check for an existing entry first** and extend it rather than adding a near
   duplicate. Delete entries that turn out to be wrong.
+- **Delete stale history.** Completed audit transcripts, branch narratives,
+  commit summaries, temporary measurements, and TODO snapshots belong in Git,
+  not project memory.
 - **Verify before trusting.** Entries reflect what was true when written. If one
   names a file, function or flag, confirm it still exists before acting on it —
   and correct it if not.
 
 ## Cadence
 
-Add entries proactively at the end of a task, without being asked. Then commit —
-without pushing, per the `commit-and-push` skill.
+Add or update entries proactively at the end of a task, without being asked.
+Prune obsolete material at the same time. Then commit without pushing, per the
+`commit-and-push` skill.

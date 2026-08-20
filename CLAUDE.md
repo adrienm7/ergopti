@@ -19,10 +19,8 @@ committing) live in `.claude/skills/`. They are loaded on demand — see
 
 ## Project memory
 
-Accumulated engineering knowledge — hard-won gotchas, architectural invariants,
-and the working conventions the maintainer insists on — lives in
-[docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md). It is the single in-repo source
-of truth shared by every developer, LLM agent, and reviewer (it replaces any
-agent-private memory store). Consult it before non-trivial work, and when you
-learn something non-obvious about this codebase, add an entry there so the
-knowledge never evaporates.
+Accumulated engineering knowledge is routed by
+[docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) into focused topic files. Read
+only the topics relevant to the work. The catalog is shared by every developer,
+agent, and reviewer and replaces private memory stores. Keep durable additions
+concise and in English, and prune stale history rather than accumulating it.
