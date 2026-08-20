@@ -23,6 +23,7 @@ local SyntheticInput = require("adapters.synthetic_input")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
+local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -574,23 +575,6 @@ sg("track_prev",            function() sysKey("PREVIOUS") end)
 -- Absolute path: the interactive layer must not inherit its binaries from PATH,
 -- which differs between a login shell and the Hammerspoon process.
 local SCREENCAPTURE_BIN    = "/usr/sbin/screencapture"
-local MKDIR_BIN           = "/bin/mkdir"
-local SCREENSHOT_DIR_REL   = "/Pictures/screenshots"
-local SCREENSHOT_STAMP_FMT = "%Y%m%d%H%M%S"
-
---- Builds the absolute path a saved screenshot goes to.
----
---- `~` and the shell's `$(date …)` used to be expanded by the shell that
---- the blocking launcher spawned. The async one hands argv straight to the binary
---- no shell in between, so both are resolved here - which also means a space or a
---- `$` in HOME can no longer be re-interpreted.
---- @param prefix string Filename prefix identifying the capture mode.
---- @return string Absolute PNG path.
-local function screenshot_path(prefix)
-	local home = os.getenv("HOME") or ""
-	return string.format("%s%s/%s_%s.png",
-		home, SCREENSHOT_DIR_REL, prefix, os.date(SCREENSHOT_STAMP_FMT))
-end
 
 --- Fires screencapture without blocking the runloop.
 --- @param args table Array of argv entries (flags, then an optional target path).
@@ -609,48 +593,24 @@ local function capture(args)
 	return true
 end
 
-local function capture_saved(flags, prefix)
-	local home = os.getenv("HOME") or ""
-	local dir = home .. SCREENSHOT_DIR_REL
-	local target = screenshot_path(prefix)
-	local mkdir_task = ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function(exit_code)
-		if exit_code ~= 0 then
-			Logger.error(LOG, "Gesture screenshot directory creation failed with exit code %s.", tostring(exit_code))
-			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-			return
-		end
-		local args = {}
-		for _, flag in ipairs(flags) do args[#args + 1] = flag end
-		args[#args + 1] = target
-		capture(args)
-	end)
-	if not mkdir_task or mkdir_task.start() ~= true then
-		Logger.error(LOG, "Gesture screenshot directory task refused to start.")
-		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-		return false
-	end
-	return true
-end
-
-
 -- System
 sg("screenshot_window_clipboard",     function()
 	capture({ "-cw" })
 end)
 sg("screenshot_window_save",          function()
-	capture_saved({ "-w" }, "win")
+	return ScreenshotSave.save({ "-w" }, "win")
 end)
 sg("screenshot_region_clipboard",      function()
 	capture({ "-ci" })
 end)
 sg("screenshot_region_save",           function()
-	capture_saved({ "-i" }, "reg")
+	return ScreenshotSave.save({ "-i" }, "reg")
 end)
 sg("screenshot_fullscreen_clipboard",   function()
 	capture({ "-c" })
 end)
 sg("screenshot_fullscreen_save",        function()
-	capture_saved({}, "full")
+	return ScreenshotSave.save({}, "full")
 end)
 
 -- Four actions macOS has always implemented — in the keyboard-SHORTCUT layer —
