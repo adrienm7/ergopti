@@ -66,6 +66,7 @@ package.path = table.concat({
 
 local helpers = require("tests.helpers")
 local ModuleIsolation = require("tests.support.module_isolation")
+local OnlySelector = require("tests.support.only_selector")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation from a red message
@@ -171,6 +172,18 @@ local function discover_tests(dir)
 	return results
 end
 
+--- Reads one discovered test module without executing its top-level code.
+--- @param module_name string Dotted module name below the driver root.
+--- @return string|nil source UTF-8/Lua source, or nil when unreadable.
+local function read_test_module_source(module_name)
+	local relative_path = module_name:gsub("%.", "/") .. ".lua"
+	local handle = io.open(driver_root .. "/" .. relative_path, "rb")
+	if not handle then return nil end
+	local source = handle:read("*a")
+	handle:close()
+	return source
+end
+
 
 
 
@@ -183,17 +196,35 @@ end
 
 helpers.reset_results()
 
-local total_modules = 0
+local discovered_modules = {}
 for _, dir in ipairs(TEST_DIRS) do
 	for _, mod_name in ipairs(discover_tests(dir)) do
-		total_modules = total_modules + 1
-		ModuleIsolation.purge(driver_root, shared_lua)
-		print(string.format("\n>>> Loading %s", mod_name))
-		local ok, err = pcall(require, mod_name)
-		if not ok then
-			print(string.format("  ! LOAD FAILURE in %s: %s", mod_name, tostring(err)))
-			helpers.get_results().failed = helpers.get_results().failed + 1
-		end
+		discovered_modules[#discovered_modules + 1] = mod_name
+	end
+end
+local modules_to_load, narrowed = OnlySelector.select_modules(
+	discovered_modules,
+	only_filter,
+	read_test_module_source
+)
+if only_filter and only_filter ~= "" then
+	print(string.format(
+		"Focused discovery: %d of %d module(s)%s",
+		#modules_to_load,
+		#discovered_modules,
+		narrowed and " selected before require" or " loaded by safe fallback"
+	))
+end
+
+local total_modules = 0
+for _, mod_name in ipairs(modules_to_load) do
+	total_modules = total_modules + 1
+	ModuleIsolation.purge(driver_root, shared_lua)
+	print(string.format("\n>>> Loading %s", mod_name))
+	local ok, err = pcall(require, mod_name)
+	if not ok then
+		print(string.format("  ! LOAD FAILURE in %s: %s", mod_name, tostring(err)))
+		helpers.get_results().failed = helpers.get_results().failed + 1
 	end
 end
 
