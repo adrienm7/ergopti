@@ -242,6 +242,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_live_toggle.ahk
 #Include unit/test_live_rebuild_serialization.ahk
 #Include unit/test_tray_root_coordinator.ahk
+#Include unit/test_terminal_hotstring_pacing.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk

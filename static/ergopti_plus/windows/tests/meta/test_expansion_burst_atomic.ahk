@@ -150,16 +150,22 @@ _EBA_AssertTerminalTuiDeletionIsPaced() {
 	; React/OpenTUI-style prompt controls can batch a zero-delay Backspace run
 	; against one stale render. The replacement then appends to the untouched
 	; trigger (for example xgboostXGBoost). Terminal hosts therefore need one
-	; deliberately paced SendEvent transaction while ordinary controls retain the
-	; zero-latency SendInput path above.
+	; protected transaction made of explicitly paced events while ordinary
+	; controls retain the zero-latency SendInput path above. SetKeyDelay plus a
+	; compact ``{BackSpace N}`` is specifically insufficient: AHK expands those
+	; repetitions without an observable delay between them.
 	Assert(InStr(Src, "_HSE_IsTerminalInputHost") > 0,
 		"the hotstring dispatcher must classify terminal input hosts before choosing its sender")
-	Assert(InStr(Src, "SetKeyDelay(TimingsGet(") > 0,
-		"terminal deletion must use the shared inter-key delay so TUI state can commit each Backspace")
+	Assert(InStr(Src, "_HSE_BeginTerminalTransaction(") > 0,
+		"the terminal branch must defer the behavior-tested edit beyond the visible InputHook callback")
+	Assert(InStr(Src, 'Burst .= "{BackSpace}"') > 0,
+		"terminal deletion must expand each Backspace token; repeat-count syntax bypasses pacing")
+	Assert(InStr(Src, "SetTimer(Runner, -Max(1, Floor(DelayMs)))") > 0,
+		"the paced sender must run on a later timer turn so sleeps can yield real render opportunities")
+	Assert(InStr(Src, '_HSE_SetTerminalSendBlock("Send", BlockFn)') > 0,
+		"one BlockInput Send window must buffer physical typing for the full paced command")
 	Assert(InStr(Src, "SendEvent(Burst)") > 0,
-		"the complete terminal erase/replacement/end-char transaction must stay in one paced send")
-	Assert(InStr(Src, 'BlockInput("Send")') > 0,
-		"physical input must not splice into the slower terminal transaction")
+		"all explicit deletions and replacement text must remain one protected SendEvent command")
 }
-Test("hotstrings: terminal TUI deletion is paced without splitting the transaction (terminal-stale-render)",
+Test("hotstrings: terminal TUI deletion uses explicit paced events in one protected transaction (terminal-stale-render)",
 	_EBA_AssertTerminalTuiDeletionIsPaced)
